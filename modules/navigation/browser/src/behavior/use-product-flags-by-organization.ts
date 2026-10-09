@@ -1,3 +1,5 @@
+import { CLIENT_FLAG_STALE_TIME_MS } from "@langwatch/feature-flag-client";
+
 import type { ProductId } from "../model/products.ts";
 import { navigationApi } from "./navigation-api.ts";
 
@@ -6,7 +8,6 @@ import { navigationApi } from "./navigation-api.ts";
  * restated here because `platform/app`'s `useFeatureFlag` (which used to
  * export it) no longer exists.
  */
-const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 /**
  * Product reachability per organization: the org switch needs the TARGET

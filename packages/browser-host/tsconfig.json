@@ -28,9 +28,6 @@
       "path": "../design-system/tsconfig.build.json"
     },
     {
-      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
-    },
-    {
       "path": "../handled-error/tsconfig.build.json"
     },
     {

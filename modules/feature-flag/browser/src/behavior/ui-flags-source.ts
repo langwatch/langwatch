@@ -5,8 +5,11 @@
 
 import type { UiActiveScope, UiHostServiceInput } from "@langwatch/browser-host/capabilities";
 import type { UiFlags } from "@langwatch/browser-host/feature-flag";
-import { useFeatureFlagOverrides } from "@langwatch/browser-host/feature-flag-overrides";
-import { CLIENT_FLAG_STALE_TIME_MS, featureFlagClient } from "@langwatch/feature-flag-client";
+import {
+  CLIENT_FLAG_STALE_TIME_MS,
+  featureFlagClient,
+  useFeatureFlagOverrides,
+} from "@langwatch/feature-flag-client";
 import type { AuthenticatedFeatureFlagTargetInput } from "@langwatch/feature-flag-contract";
 
 /** The narrowest target the scope names, so a project rule matches on a project page. */

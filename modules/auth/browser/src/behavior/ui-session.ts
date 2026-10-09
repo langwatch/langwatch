@@ -9,7 +9,6 @@ import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import type { UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
 import { UiSession } from "@langwatch/browser-host/capabilities";
-import { readFeatureFlagOverride } from "@langwatch/browser-host/feature-flag-overrides";
 import { uiLeaveTo } from "@langwatch/browser-host/navigation";
 import type {
   UiActiveScopeReading,
@@ -17,6 +16,7 @@ import type {
   UiSessionSnapshot,
 } from "@langwatch/browser-host/session";
 import { setUiStorageReader } from "@langwatch/browser-host/storage";
+import { readFeatureFlagOverride } from "@langwatch/feature-flag-client";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 

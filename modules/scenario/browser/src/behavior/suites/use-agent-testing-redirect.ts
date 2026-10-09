@@ -1,7 +1,7 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 /**
  * Sends a simulations address to Agent Testing when the project reads it.
  * @see specs/features/agent-testing/page-structure.feature
@@ -27,7 +27,7 @@ export function useAgentTestingRedirect({
   const { project, organization, isLoading: orgLoading } = useOrganizationTeamProject();
   const organizationId = organization?.id ?? "";
   const { enabled, isLoading: flagLoading } = useFeatureFlag(
-    "release_ui_agent_testing_v2_enabled",
+    FrontendFlags.release_ui_agent_testing_v2_enabled,
     {
       projectId: project?.id ?? NOT_TARGETED,
       organizationId: organizationId || NOT_TARGETED,

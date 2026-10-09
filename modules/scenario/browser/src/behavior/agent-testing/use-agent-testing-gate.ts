@@ -1,6 +1,6 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
 import { useScenarioHost } from "../../model/scenario-host.ts";
 
@@ -12,7 +12,7 @@ export function useAgentTestingGate(): "deciding" | "absent" | "refused" | "open
   const host = useScenarioHost();
   const { project, organization, isLoading } = useOrganizationTeamProject();
   const organizationId = organization?.id ?? "";
-  const flag = useFeatureFlag(AGENT_TESTING_FLAG, {
+  const flag = useFeatureFlag(FrontendFlags[AGENT_TESTING_FLAG], {
     projectId: project?.id ?? NOT_TARGETED,
     organizationId: organizationId || NOT_TARGETED,
     enabled: !!organizationId,

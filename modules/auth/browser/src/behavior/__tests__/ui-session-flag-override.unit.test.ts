@@ -7,7 +7,7 @@
 import {
   applyFeatureFlagOverridesFromSearch,
   clearAllFeatureFlagOverrides,
-} from "@langwatch/browser-host/feature-flag-overrides";
+} from "@langwatch/feature-flag-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BrowserUiSession } from "../ui-session.ts";

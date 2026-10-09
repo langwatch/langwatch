@@ -1,15 +1,7 @@
-import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
-import {
-  type featureFlagTrpc,
-  type FeatureFlagTargetId,
-  type FrontendFeatureFlag,
-  NOT_TARGETED,
-} from "@langwatch/feature-flag-contract";
 import type { ReleaseFlagToken } from "@langwatch/module";
 
 import { type UiHostServiceSource, useHostService } from "./capabilities.ts";
 import { hostService } from "./declarations.ts";
-import { useFeatureFlagOverrides } from "./feature-flag-overrides.ts";
 
 /** The current scope's release flags: on, off, or undefined while not yet answered. */
 export type UiFlags = Readonly<{ flag: (token: ReleaseFlagToken) => boolean | undefined }>;
@@ -22,78 +14,4 @@ const UNANSWERED_UI_FLAGS: UiFlags = { flag: () => undefined };
 /** The current scope's flags; outside a shell every flag reads not yet answered. */
 export function useUiFlags(): UiFlags {
   return useHostService(UiFlagsService) ?? UNANSWERED_UI_FLAGS;
-}
-
-const api = createModuleApi<ContractApiMap<typeof featureFlagTrpc>>();
-
-// The service caches operator rows for five seconds. Refetching every mounted
-// hook at that cadence adds traffic without making a decision fresher, so the
-// browser keeps its resolved value for five minutes.
-export const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
-
-/**
- * Targeting identity for one flag read. `projectId`/`organizationId` are
- * both required — an omitted scope turns a rollout into a silent no-op.
- * Each id is real, `NOT_TARGETED`, or `undefined` (still loading).
- */
-interface UseFeatureFlagOptions {
-  /** The project this read is about, or `NOT_TARGETED`. */
-  projectId: FeatureFlagTargetId;
-  /** The organization this read is about, or `NOT_TARGETED`. */
-  organizationId: FeatureFlagTargetId;
-  /**
-   * Set to false to disable the query (e.g., while waiting for projectId).
-   * Defaults to true.
-   */
-  enabled?: boolean;
-}
-
-/**
- * JSON carries no `undefined`, so both "no such scope" and "not known yet"
- * travel as `null`. The wire field itself stays required, so the request
- * always states what it targets.
- */
-function toWireTargetId(id: FeatureFlagTargetId): string | null {
-  return id === undefined || id === NOT_TARGETED ? null : id;
-}
-
-interface UseFeatureFlagResult {
-  /** Whether the feature flag is enabled. Returns false while loading. */
-  enabled: boolean;
-  /** Whether the flag check is in progress. */
-  isLoading: boolean;
-}
-
-/**
- * Resolves a browser-visible flag for the signed-in user and an optional
- * authorised tenant target. React Query deliberately caches longer than the
- * server's kill-switch cache to avoid repeated transport calls while mounted.
- */
-export function useFeatureFlag(
-  token: FrontendFeatureFlag | ReleaseFlagToken<FrontendFeatureFlag>,
-  options: UseFeatureFlagOptions,
-): UseFeatureFlagResult {
-  // The string spelling coexists with its token while callers move (ARCHITECTURE.md §15).
-  const flag = typeof token === "string" ? token : token.name;
-  const override = useFeatureFlagOverrides()[flag];
-  const queryEnabled = (options.enabled ?? true) && override === undefined;
-
-  const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
-    {
-      flag,
-      projectId: toWireTargetId(options.projectId),
-      organizationId: toWireTargetId(options.organizationId),
-    },
-    {
-      staleTime: CLIENT_FLAG_STALE_TIME_MS,
-      refetchOnWindowFocus: false,
-      enabled: queryEnabled,
-    },
-  );
-
-  if (override !== undefined) return { enabled: override, isLoading: false };
-  return {
-    enabled: data?.enabled ?? false,
-    isLoading: queryEnabled ? isLoading : false,
-  };
 }

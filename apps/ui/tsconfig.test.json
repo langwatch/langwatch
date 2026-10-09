@@ -98,6 +98,9 @@
       "path": "../../modules/feature-flag/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/feature-flag/client/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/gateway/browser/tsconfig.build.json"
     },
     {

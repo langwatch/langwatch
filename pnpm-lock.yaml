@@ -1939,6 +1939,9 @@ importers:
       '@langwatch/feature-flag-browser':
         specifier: workspace:*
         version: link:../../modules/feature-flag/browser
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../modules/feature-flag/client
       '@langwatch/gateway-browser':
         specifier: workspace:*
         version: link:../../modules/gateway/browser
@@ -4822,6 +4825,12 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -5764,6 +5773,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -7857,6 +7869,12 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -8206,6 +8224,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -10474,6 +10495,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -10950,6 +10974,9 @@ importers:
       '@langwatch/evaluator-client':
         specifier: workspace:*
         version: link:../../evaluator/client
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -11256,6 +11283,9 @@ importers:
       '@langwatch/enterprise-governance-client':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/client
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -13356,6 +13386,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -14769,6 +14802,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/feature-flag-client':
+        specifier: workspace:*
+        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -16363,9 +16399,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
-      '@langwatch/feature-flag-contract':
-        specifier: workspace:*
-        version: link:../../modules/feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error

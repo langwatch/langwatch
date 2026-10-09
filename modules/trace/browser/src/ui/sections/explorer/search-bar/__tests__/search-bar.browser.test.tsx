@@ -12,7 +12,7 @@ import "@testing-library/jest-dom/vitest";
 
 // The Instant Evals gate reads this flag; stub it enabled so nothing here
 // depends on the tRPC provider this suite doesn't mount.
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 

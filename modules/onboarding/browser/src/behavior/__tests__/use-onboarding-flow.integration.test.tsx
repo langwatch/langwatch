@@ -17,13 +17,11 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
 const flagState = vi.hoisted(() => ({ enabled: true, isLoading: false }));
 
 // The intent fork under test; the guided variant stays off, or it would replace the fork.
-vi.mock("../../model/onboarding-host.ts", () => ({
-  useOnboardingHost: () => ({
-    featureFlag: (flag: string) =>
-      flag === "experiment_onboarding_langy_guided"
-        ? { enabled: false, isLoading: false }
-        : { ...flagState },
-  }),
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name }: { name: string }) =>
+    name === "experiment_onboarding_langy_guided"
+      ? { enabled: false, isLoading: false }
+      : { ...flagState },
 }));
 
 vi.mock("../attribution.ts", () => ({

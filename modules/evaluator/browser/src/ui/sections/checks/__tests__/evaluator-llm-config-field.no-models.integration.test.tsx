@@ -25,8 +25,8 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 }));
 
 // Read at render time, after the constant's import has resolved.
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
-  useFeatureFlag: (name: string) => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name }: { name: string }) => ({
     enabled: name === INSTANT_EVALS_FLAG && state.flagReleased,
     isLoading: false,
   }),

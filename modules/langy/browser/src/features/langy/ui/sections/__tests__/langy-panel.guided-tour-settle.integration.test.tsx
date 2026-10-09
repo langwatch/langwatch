@@ -135,7 +135,7 @@ import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.
 import { LangySidecar } from "../langy-panel.tsx";
 
 /** The host port, stubbed for an open panel on a project. Nothing here reads the address bar. */
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

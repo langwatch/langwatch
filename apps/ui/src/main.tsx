@@ -8,7 +8,6 @@ import type {
   UiSessionCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { applyFeatureFlagOverridesFromSearch } from "@langwatch/browser-host/feature-flag-overrides";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
@@ -35,6 +34,8 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "@langwatch/browser/transport";
+import { saasWeb } from "@langwatch/enterprise-saas-browser/declaration";
+import { applyFeatureFlagOverridesFromSearch } from "@langwatch/feature-flag-client";
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
@@ -49,6 +50,7 @@ import {
   type UiRootCapabilities,
 } from "./shell/ui-root-capabilities";
 import { uiRouteTable } from "./shell/ui-route-table";
+import { UiSaasFooter } from "./shell/ui-saas-footer";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
@@ -80,11 +82,6 @@ const useAttributionCapture =
 function UiAttributionCapture({ children }: { children: ReactNode }) {
   useAttributionCapture();
   return <>{children}</>;
-}
-
-/** The SaaS footer has not moved here yet, and self-hosted never had one. */
-function UiNoFooter() {
-  return null;
 }
 
 /**
@@ -203,10 +200,12 @@ class BrowserUiShell extends UiShell {
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: browserUiCapabilitiesHook(rootCapabilities),
           hostServices,
+          footer: UiSaasFooter,
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
             declarations: installedUiDeclarations,
+            supportChat: saasWeb.installation.capabilities.supportChat,
             // The posthog module SINGLETON, the same one `PostHogProvider` is
             // handed: inert until the inner providers initialise it, and
             // initialised well before a screen emits.
@@ -226,7 +225,6 @@ class BrowserUiShell extends UiShell {
           designSystem: composeUiDesignSystem(rootCapabilities),
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
-          footer: UiNoFooter,
           usePublicAppConfig: () => ({ data: telemetry }),
           isDevelopment,
         },

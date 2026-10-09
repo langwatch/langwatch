@@ -30,7 +30,7 @@ import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
  * `useRouter`, which throws outside a `LangyHostProvider` — the component
  * moved from reading Next's router directly to reading it off the host.
  */
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 

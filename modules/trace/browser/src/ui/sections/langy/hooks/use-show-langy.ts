@@ -1,5 +1,6 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { useRequiredSession } from "../../../../behavior/auth-session.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
@@ -48,11 +49,14 @@ export function useLangyVisibility(): LangyVisibility {
 
   // Skip the flag query entirely for callers who are already excluded; the answer is
   // decided without a round-trip.
-  const { enabled: releaseLangy, isLoading: flagLoading } = useFeatureFlag(LANGY_RELEASE_FLAG, {
-    projectId: project?.id,
-    organizationId: organization?.id,
-    enabled: mayReadLangy,
-  });
+  const { enabled: releaseLangy, isLoading: flagLoading } = useFeatureFlag(
+    FrontendFlags[LANGY_RELEASE_FLAG],
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: mayReadLangy,
+    },
+  );
 
   // Deliberately never waits on something that may never arrive: a reader with
   // no project at all is DECIDED (they cannot have Langy), not pending. Only

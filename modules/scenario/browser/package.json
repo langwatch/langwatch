@@ -35,6 +35,7 @@
     "@langwatch/evaluator-client": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/feature-flag-client": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

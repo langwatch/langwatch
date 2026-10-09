@@ -22,7 +22,7 @@ import { LangyEvalRunCard } from "../langy-eval-run-card.tsx";
 
 const navigateMock = vi.fn();
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 

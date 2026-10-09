@@ -1,9 +1,9 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { useMemo, useState } from "react";
 
-import { useOnboardingHost } from "../model/onboarding-host.ts";
 import { readAttribution } from "./attribution.ts";
 import { getOnboardingFlowConfig } from "./onboarding-flow.ts";
 import {
@@ -17,14 +17,6 @@ import {
   type UsageStyle,
 } from "./types.ts";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
-
-/** Keeps pending state to hold the first screen until the governance flag resolves. */
-function useFeatureFlag(
-  flag: string,
-  _targets?: { projectId?: string | null; organizationId?: string | null },
-): { enabled: boolean; isLoading: boolean } {
-  return useOnboardingHost().featureFlag(flag);
-}
 
 function isBasicInfoComplete({
   usageStyle,
@@ -75,7 +67,7 @@ export const useOnboardingFlow = () => {
   // pre-fork flow. User-level evaluation — there is no org yet during
   // onboarding.
   const { enabled: intentForkEnabled, isLoading: intentForkLoading } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
+    FrontendFlags.release_ui_ai_governance_enabled,
     // Onboarding runs before either scope exists, so both targets are stated
     // as absent rather than left out: a rule naming a project or organization
     // can never match this read, and saying so is what the required fields
@@ -89,7 +81,7 @@ export const useOnboardingFlow = () => {
   // waits for it the same way it waits for the fork flag, so the variant
   // is settled before the wizard's shape matters.
   const { enabled: guided, isLoading: guidedLoading } = useFeatureFlag(
-    "experiment_onboarding_langy_guided",
+    FrontendFlags.experiment_onboarding_langy_guided,
     {
       projectId: NOT_TARGETED,
       organizationId: NOT_TARGETED,

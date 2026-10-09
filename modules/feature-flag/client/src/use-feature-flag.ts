@@ -3,7 +3,6 @@
  * the current scope's flags are `useUiFlags()` from browser-host.
  */
 
-import { useFeatureFlagOverrides } from "@langwatch/browser-host/feature-flag-overrides";
 import {
   type FeatureFlagTargetId,
   type FrontendFeatureFlag,
@@ -12,6 +11,7 @@ import {
 import type { ReleaseFlagToken } from "@langwatch/module";
 
 import { CLIENT_FLAG_STALE_TIME_MS, featureFlagClient } from "./feature-flag-client.ts";
+import { useFeatureFlagOverrides } from "./feature-flag-overrides.ts";
 
 /**
  * Targeting identity for one flag read. `projectId`/`organizationId` are
