@@ -26,7 +26,7 @@ import { GithubAppTokenService } from "../../services/github-app-token.service.t
 
 /** The live GitHub App client over github.com, as the live channel bundle builds it. */
 function liveApi(appId: string, key: string): HttpGithubApiAdapter {
-  return HttpGithubApiAdapter.create(appId, key, githubHostOf());
+  return HttpGithubApiAdapter.create({ appId, privateKey: key, host: githubHostOf() });
 }
 
 function requestBody(init: RequestInit | undefined): string {
@@ -644,5 +644,87 @@ describe("configured", () => {
         tokenCache: unansweredRedisRepositories().tokenCache,
       }).configured,
     ).toBe(true);
+  });
+});
+
+describe("userCanAccessInstallation", () => {
+  const authorised = () =>
+    HttpGithubApiAdapter.create({
+      appId: "1",
+      privateKey,
+      host: githubHostOf(),
+      userAuthorization: { clientId: "client", clientSecret: "secret" },
+    });
+
+  function stubGithub(installationIds: number[], { refuseCode = false } = {}) {
+    const calls: { url: string; authorization?: string; body?: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+        const headers = new Headers(init?.headers);
+        const authorization = headers.get("authorization") ?? undefined;
+        const body = init?.body === undefined ? undefined : requestBody(init);
+        calls.push({ url, ...(authorization && { authorization }), ...(body && { body }) });
+        if (url.endsWith("/login/oauth/access_token")) {
+          return Response.json(refuseCode ? { error: "bad" } : { access_token: "ghu_user" });
+        }
+        return Response.json({ installations: installationIds.map((id) => ({ id })) });
+      }),
+    );
+    return calls;
+  }
+
+  describe("when the installing user can reach the installation", () => {
+    it("answers true after listing that user's installations", async () => {
+      const calls = stubGithub([7, 42]);
+
+      await expect(
+        authorised().userCanAccessInstallation({ code: "gh_code", installationId: "42" }),
+      ).resolves.toBe(true);
+      expect(JSON.parse(calls[0]?.body ?? "")).toEqual({
+        client_id: "client",
+        client_secret: "secret",
+        code: "gh_code",
+      });
+      expect(calls[1]).toEqual({
+        url: "https://api.github.com/user/installations?per_page=100&page=1",
+        authorization: "Bearer ghu_user",
+      });
+    });
+  });
+
+  describe("when the installing user cannot reach the installation", () => {
+    it("answers false", async () => {
+      stubGithub([7]);
+
+      await expect(
+        authorised().userCanAccessInstallation({ code: "gh_code", installationId: "42" }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when GitHub refuses the code", () => {
+    it("answers false without listing anything", async () => {
+      const calls = stubGithub([42], { refuseCode: true });
+
+      await expect(
+        authorised().userCanAccessInstallation({ code: "gh_code", installationId: "42" }),
+      ).resolves.toBe(false);
+      expect(calls).toHaveLength(1);
+    });
+  });
+
+  describe("when the App has no client credentials", () => {
+    it("refuses rather than trusting the code", async () => {
+      stubGithub([42]);
+
+      await expect(
+        liveApi("1", privateKey).userCanAccessInstallation({
+          code: "gh_code",
+          installationId: "42",
+        }),
+      ).rejects.toThrow("GitHub App client id and secret are not configured");
+    });
   });
 });

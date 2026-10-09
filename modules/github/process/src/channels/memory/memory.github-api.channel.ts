@@ -22,6 +22,7 @@ type MemoryGithubPullRequest = GithubPullRequestSummary & { owner: string; repo:
 export class MemoryGithubApiAdapter implements GithubAppClient {
   private readonly installations = new Map<string, MemoryGithubInstallation>();
   private readonly pullRequests: MemoryGithubPullRequest[] = [];
+  private readonly installerAccess = new Set<string>();
 
   private constructor(private readonly appConfigured: boolean) {}
 
@@ -32,6 +33,11 @@ export class MemoryGithubApiAdapter implements GithubAppClient {
   /** States one installation a test's `getInstallation`/token mint should find. */
   seedInstallation(installation: MemoryGithubInstallation): void {
     this.installations.set(installation.installationId, installation);
+  }
+
+  /** States that the user who authorised `code` can reach the installation. */
+  seedInstallerAccess(input: { code: string; installationId: string }): void {
+    this.installerAccess.add(`${input.code}:${input.installationId}`);
   }
 
   /** States one pull request `listPullRequestsForHead`/`getPullRequest` should find. */
@@ -52,6 +58,13 @@ export class MemoryGithubApiAdapter implements GithubAppClient {
     if (!installation) throw new GithubInstallationNotFoundError(installationId);
 
     return installation;
+  }
+
+  async userCanAccessInstallation(input: {
+    code: string;
+    installationId: string;
+  }): Promise<boolean> {
+    return this.installerAccess.has(`${input.code}:${input.installationId}`);
   }
 
   async mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken> {

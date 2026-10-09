@@ -52,6 +52,15 @@ const repositoriesSchema = z.object({
   repositories: z.array(z.object({ id: z.number(), full_name: z.string() })).optional(),
 });
 
+const userTokenSchema = z.object({ access_token: z.string().optional() });
+
+const userInstallationsSchema = z.object({
+  installations: z.array(z.object({ id: z.number() })),
+});
+
+/** The App's OAuth client, which turns the installing user's code into a token. */
+type GithubUserAuthorization = { clientId: string; clientSecret: string };
+
 const tokenSchema = z.object({
   token: z.string(),
   expires_at: z.string(),
@@ -98,15 +107,34 @@ function toPullRequestSummary(pull: z.infer<typeof pullRequestSchema>): GithubPu
 }
 
 export class HttpGithubApiAdapter implements GithubAppClient {
-  static create(appId: string, privateKey: string, host: GithubHost): HttpGithubApiAdapter {
-    return new HttpGithubApiAdapter(appId, privateKey, host);
+  static create(parts: {
+    appId: string;
+    privateKey: string;
+    host: GithubHost;
+    userAuthorization?: GithubUserAuthorization;
+  }): HttpGithubApiAdapter {
+    return new HttpGithubApiAdapter({
+      userAuthorization: { clientId: "", clientSecret: "" },
+      ...parts,
+    });
   }
 
-  private constructor(
-    private readonly appId: string,
-    private readonly privateKey: string,
-    private readonly host: GithubHost,
-  ) {}
+  private readonly appId: string;
+  private readonly privateKey: string;
+  private readonly host: GithubHost;
+  private readonly userAuthorization: GithubUserAuthorization;
+
+  private constructor(parts: {
+    appId: string;
+    privateKey: string;
+    host: GithubHost;
+    userAuthorization: GithubUserAuthorization;
+  }) {
+    this.appId = parts.appId;
+    this.privateKey = parts.privateKey;
+    this.host = parts.host;
+    this.userAuthorization = parts.userAuthorization;
+  }
 
   get configured(): boolean {
     return Boolean(this.appId && this.privateKey);
@@ -149,6 +177,53 @@ export class HttpGithubApiAdapter implements GithubAppClient {
       repositorySelection: body.repository_selection ?? "all",
       createdAt: body.created_at ?? null,
     };
+  }
+
+  async userCanAccessInstallation(input: {
+    code: string;
+    installationId: string;
+  }): Promise<boolean> {
+    const { clientId, clientSecret } = this.userAuthorization;
+    if (!clientId || !clientSecret) {
+      throw new Error("GitHub App client id and secret are not configured");
+    }
+
+    const exchange = await this.request(`${this.host.getWebBase()}/login/oauth/access_token`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code: input.code }),
+    });
+    if (!exchange.ok) {
+      throw new Error(`GitHub user code exchange failed: ${exchange.status}`);
+    }
+
+    const userToken = userTokenSchema.parse(await exchange.json()).access_token;
+    if (!userToken) {
+      return false;
+    }
+
+    for (let page = 1; page <= 20; page++) {
+      const response = await this.request(
+        `${this.host.getApiBase()}/user/installations?per_page=100&page=${page}`,
+        { headers: { Authorization: `Bearer ${userToken}` } },
+      );
+      if (!response.ok) {
+        throw (
+          detectRateLimit(response) ??
+          new Error(`GitHub GET /user/installations failed: ${response.status}`)
+        );
+      }
+
+      const { installations } = userInstallationsSchema.parse(await response.json());
+      if (installations.some(({ id }) => String(id) === input.installationId)) {
+        return true;
+      }
+      if (installations.length < 100) {
+        return false;
+      }
+    }
+
+    return false;
   }
 
   async mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken> {

@@ -217,7 +217,18 @@ async function startInstallation({
     return jsonAnswer({ error: "organizationId query param is required" }, 400);
   }
 
-  return redirectTo(await installUrlFor({ app, query, organizationId, userId }));
+  const nonce = randomBytes(16).toString("base64url");
+  const nonceRegistered = await service.registerInstallNonce({
+    nonce,
+    ttlSec: Math.ceil(service.getInstallStateTtlMs() / 1000),
+  });
+
+  // A link that cannot be made single-use is never handed out.
+  if (!nonceRegistered) {
+    return jsonAnswer({ error: "GitHub installation is unavailable. Please try again." }, 503);
+  }
+
+  return redirectTo(await installUrlFor({ app, query, organizationId, userId, nonce }));
 }
 
 /**
@@ -230,19 +241,15 @@ async function installUrlFor({
   query,
   organizationId,
   userId,
+  nonce,
 }: {
   app: GithubInstallApi;
   query: URLSearchParams;
   organizationId: string;
   userId: string;
+  nonce: string;
 }): Promise<string> {
   const service = app.github();
-  const nonce = randomBytes(16).toString("base64url");
-  const nonceRegistered = await service.registerInstallNonce({
-    nonce,
-    ttlSec: Math.ceil(service.getInstallStateTtlMs() / 1000),
-  });
-
   const expected = await resolveExpectedInstallationTarget({
     service,
     organizationId,
@@ -257,7 +264,7 @@ async function installUrlFor({
     returnTo: safeReturnTo(query.get("return")),
     issuedAt: nowInstant().epochMilliseconds,
     nonce,
-    nonceRegistered,
+    nonceRegistered: true,
     ...expected,
   });
 
@@ -348,7 +355,19 @@ async function completeInstallation({
 
   if (setup.rejected) return setup.answer;
 
-  return recordInstallation({ app, state, installationId });
+  // GitHub sends `code` only once the installing user authorised the App.
+  const userAuthorizationCode = query.get("code");
+
+  if (!userAuthorizationCode) {
+    return setupError({
+      app,
+      state,
+      errorMessage: "GitHub did not confirm who installed the app",
+      status: 400,
+    });
+  }
+
+  return recordInstallation({ app, state, installationId, userAuthorizationCode });
 }
 
 /** The write, its audit line, and the two ways it is reported back. */
@@ -356,10 +375,12 @@ async function recordInstallation({
   app,
   state,
   installationId,
+  userAuthorizationCode,
 }: {
   app: GithubInstallApi;
   state: GithubInstallStatePayload;
   installationId: string;
+  userAuthorizationCode: string;
 }): Promise<GithubAnswer> {
   const service = app.github();
   const returnTo = safeReturnTo(state.returnTo);
@@ -370,6 +391,7 @@ async function recordInstallation({
       installationId,
       organizationId: state.organizationId,
       flowStartedAt: state.issuedAt,
+      userAuthorizationCode,
       expectedAccountLogin: state.expectedAccountLogin,
       expectedInstallationId: state.expectedInstallationId,
     }));
@@ -417,18 +439,22 @@ async function rejectUnauthorizedSetup({
     return rejectWith({ app, state, errorMessage: "Session changed mid-flow", status: 401 });
   }
 
-  // Burn the single-use nonce (skipped when Redis was down at `/install`).
-  if (state.nonceRegistered) {
-    const consumed = await app.github().consumeInstallNonce(state.nonce);
+  // Burn the single-use nonce; a link that cannot be proven unused is refused.
+  const consumed = state.nonceRegistered
+    ? await app.github().consumeInstallNonce(state.nonce)
+    : "unavailable";
 
-    if (consumed === "spent") {
-      return rejectWith({
-        app,
-        state,
-        errorMessage: "Installation link already used",
-        status: 401,
-      });
-    }
+  if (consumed === "spent") {
+    return rejectWith({ app, state, errorMessage: "Installation link already used", status: 401 });
+  }
+
+  if (consumed === "unavailable") {
+    return rejectWith({
+      app,
+      state,
+      errorMessage: "Installation link could not be checked. Please try again.",
+      status: 503,
+    });
   }
 
   // Re-check tenant membership (defense in depth against a stale state).

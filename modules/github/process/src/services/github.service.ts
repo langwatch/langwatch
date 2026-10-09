@@ -161,6 +161,7 @@ export class GithubFeatureService implements GithubApi {
     installationId: string;
     organizationId: string;
     flowStartedAt: number;
+    userAuthorizationCode: string;
     expectedAccountLogin?: string | undefined;
     expectedInstallationId?: string | undefined;
   }): Promise<{ accountLogin: string }> {

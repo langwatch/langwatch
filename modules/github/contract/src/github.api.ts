@@ -45,6 +45,8 @@ export interface GithubApi {
     installationId: string;
     organizationId: string;
     flowStartedAt: number;
+    /** The code GitHub hands the Setup URL once the installing user authorised the App. */
+    userAuthorizationCode: string;
     expectedAccountLogin?: string | undefined;
     expectedInstallationId?: string | undefined;
   }): Promise<{ accountLogin: string }>;

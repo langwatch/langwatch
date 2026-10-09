@@ -79,6 +79,10 @@ export class GithubAppTokenService implements GithubAppTokenCache {
     return this.api.getInstallation(installationId);
   }
 
+  userCanAccessInstallation(input: { code: string; installationId: string }): Promise<boolean> {
+    return this.api.userCanAccessInstallation(input);
+  }
+
   async mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken> {
     const permissions = input.permissions ?? GITHUB_WRITE_PERMISSIONS;
     const scopeKey = this.computeRepoScopeKey({

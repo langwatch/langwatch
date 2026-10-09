@@ -44,7 +44,7 @@ function signedState(overrides: Partial<GithubInstallStatePayload> = {}): string
     returnTo: "/settings/integrations#github",
     issuedAt: Date.now(),
     nonce: "nonce_1",
-    nonceRegistered: false,
+    nonceRegistered: true,
     ...overrides,
   });
 }
@@ -69,9 +69,12 @@ function mount(
     canManage?: boolean;
     configured?: boolean;
     session?: { user: { id: string } } | null;
+    nonceRegistered?: boolean;
+    nonce?: "consumed" | "spent" | "unavailable";
   } = {},
 ) {
   const recorded: { installationId: string; organizationId: string }[] = [];
+  const codes: unknown[] = [];
   const webhookEvents: { action: string; installationId: string }[] = [];
   const memberChecks: { userId: string; organizationId: string }[] = [];
   const audits: { action: string }[] = [];
@@ -82,8 +85,8 @@ function mount(
     getAppConfig: () => ({ ...appConfig, configured: options.configured ?? true }),
     getAppInstallUrl: () => INSTALL_URL,
     getInstallStateTtlMs: () => state.getTtlMs(),
-    registerInstallNonce: async () => false,
-    consumeInstallNonce: async () => "consumed",
+    registerInstallNonce: async () => options.nonceRegistered ?? true,
+    consumeInstallNonce: async () => options.nonce ?? "consumed",
     signInstallState: (payload) => state.sign(payload),
     parseInstallState: (token) => state.parse(token),
     popupResponseHtml: (login) => `<p>${login}</p>`,
@@ -94,6 +97,7 @@ function mount(
       return options.member ?? true;
     },
     recordInstallation: async (input) => {
+      codes.push(input.userAuthorizationCode);
       recorded.push({
         installationId: input.installationId,
         organizationId: input.organizationId,
@@ -178,6 +182,7 @@ function mount(
 
   return {
     recorded,
+    codes,
     webhookEvents,
     memberChecks,
     audits,
@@ -334,7 +339,7 @@ describe("given the GitHub installation routes", () => {
 
       const response = await api.setup(
         "/github/setup",
-        `state=${encodeURIComponent(signedState())}&installation_id=555`,
+        `state=${encodeURIComponent(signedState())}&installation_id=555&code=gh_code`,
       );
 
       expect(response.status).toBe(302);
@@ -348,7 +353,7 @@ describe("given the GitHub installation routes", () => {
 
       const response = await api.setup(
         "/github-langy/setup",
-        `state=${encodeURIComponent(signedState())}&installation_id=777`,
+        `state=${encodeURIComponent(signedState())}&installation_id=777&code=gh_code`,
       );
 
       expect(response.status).toBe(302);
@@ -366,6 +371,70 @@ describe("given the GitHub installation routes", () => {
 
       expect(response.status).toBe(400);
       expect(await response.text()).toContain("Invalid state or missing installation");
+      expect(api.recorded).toEqual([]);
+    });
+  });
+
+  describe("when the setup callback carries no GitHub user authorisation", () => {
+    it("records nothing", async () => {
+      const api = mount();
+
+      const response = await api.setup(
+        "/github/setup",
+        `state=${encodeURIComponent(signedState())}&installation_id=555`,
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toContain("githubError");
+      expect(api.recorded).toEqual([]);
+    });
+  });
+
+  describe("when the setup callback carries the user's authorisation code", () => {
+    it("hands the code to the binding so it can prove the installer", async () => {
+      const api = mount();
+
+      await api.setup(
+        "/github/setup",
+        `state=${encodeURIComponent(signedState())}&installation_id=555&code=gh_code`,
+      );
+
+      expect(api.codes).toEqual(["gh_code"]);
+    });
+  });
+
+  describe("when the single-use link could not be registered", () => {
+    it("refuses to start the flow", async () => {
+      const api = mount({ nonceRegistered: false });
+
+      const response = await api.install("organizationId=org_1");
+
+      expect(response.status).toBe(503);
+    });
+
+    it("refuses a state minted without a registered link and records nothing", async () => {
+      const api = mount();
+
+      const response = await api.setup(
+        "/github/setup",
+        `state=${encodeURIComponent(signedState({ nonceRegistered: false }))}&installation_id=555&code=gh_code`,
+      );
+
+      expect(response.headers.get("location")).toContain("githubError");
+      expect(api.recorded).toEqual([]);
+    });
+  });
+
+  describe("when the single-use link cannot be checked", () => {
+    it("refuses and records nothing", async () => {
+      const api = mount({ nonce: "unavailable" });
+
+      const response = await api.setup(
+        "/github/setup",
+        `state=${encodeURIComponent(signedState())}&installation_id=555&code=gh_code`,
+      );
+
+      expect(response.headers.get("location")).toContain("githubError");
       expect(api.recorded).toEqual([]);
     });
   });

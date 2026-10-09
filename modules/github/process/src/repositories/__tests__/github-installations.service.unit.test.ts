@@ -91,6 +91,10 @@ function makeAppTokens(
     getInstallation: (installationId: string) => Promise<GithubInstallationDetails>;
     mintInstallationToken: (input: MintInstallationTokenInput) => Promise<GithubInstallationToken>;
     listInstallationRepositories: (installationId: string) => Promise<GithubRepository[]>;
+    userCanAccessInstallation: (input: {
+      code: string;
+      installationId: string;
+    }) => Promise<boolean>;
   }> = {},
 ): GithubAppTokenService {
   const tokens = GithubAppTokenService.create({
@@ -109,6 +113,9 @@ function makeAppTokens(
         repositorySelection: "all",
         createdAt: new Date().toISOString(),
       })),
+  );
+  vi.spyOn(tokens, "userCanAccessInstallation").mockImplementation(
+    over.userCanAccessInstallation ?? vi.fn(async () => true),
   );
   vi.spyOn(tokens, "mintInstallationToken").mockImplementation(
     over.mintInstallationToken ?? vi.fn(async () => ({ token: "ghs_tok", expiresAt: "" })),
@@ -142,6 +149,7 @@ describe("recordInstallation", () => {
       installationId: "inst-1",
       organizationId: "org-1",
       flowStartedAt: Date.now(),
+      userAuthorizationCode: "gh_code",
     });
     expect(result.accountLogin).toBe("acme");
     expect(repo.insertOrGetExisting).toHaveBeenCalledWith(
@@ -171,6 +179,7 @@ describe("recordInstallation", () => {
           installationId: "inst-1",
           organizationId: "org-2",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
         }),
       ).rejects.toBeInstanceOf(GithubInstallationConflictError);
 
@@ -204,11 +213,13 @@ describe("recordInstallation", () => {
           installationId: "inst-race",
           organizationId: "org-a",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
         }),
         svc.recordInstallation({
           installationId: "inst-race",
           organizationId: "org-b",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
         }),
       ]);
 
@@ -253,6 +264,7 @@ describe("recordInstallation", () => {
           installationId: "inst-victim",
           organizationId: "org-attacker",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
         }),
       ).rejects.toBeInstanceOf(GithubInstallationNotFromFlowError);
 
@@ -279,10 +291,35 @@ describe("recordInstallation", () => {
           installationId: "inst-undated",
           organizationId: "org-attacker",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
         }),
       ).rejects.toBeInstanceOf(GithubInstallationNotFromFlowError);
 
       expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the user GitHub authorised cannot reach the installation", () => {
+    it("refuses the claim and records nothing", async () => {
+      const repo = makeRepo();
+      const userCanAccessInstallation = vi.fn(async () => false);
+      const svc = service(repo, makeAppTokens({ userCanAccessInstallation }));
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-1",
+          organizationId: "org-1",
+          flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
+        }),
+      ).rejects.toBeInstanceOf(GithubInstallationNotFromFlowError);
+
+      expect(userCanAccessInstallation).toHaveBeenCalledWith({
+        code: "gh_code",
+        installationId: "inst-1",
+      });
+      expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
+      expect(repo.upsert).not.toHaveBeenCalled();
     });
   });
 
@@ -310,6 +347,7 @@ describe("recordInstallation", () => {
           installationId: "inst-victim",
           organizationId: "org-attacker",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
           expectedAccountLogin: "acme",
         }),
       ).rejects.toMatchObject({ code: "github_installation_account_mismatch" });
@@ -328,6 +366,7 @@ describe("recordInstallation", () => {
           installationId: "inst-1",
           organizationId: "org-1",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
           expectedAccountLogin: "ACME",
         }),
       ).resolves.toEqual({ accountLogin: "acme" });
@@ -346,6 +385,7 @@ describe("recordInstallation", () => {
           installationId: "inst-1",
           organizationId: "org-1",
           flowStartedAt: Date.now(),
+          userAuthorizationCode: "gh_code",
           expectedAccountLogin: "acme",
           expectedInstallationId: "inst-other",
         }),
@@ -364,6 +404,7 @@ describe("recordInstallation", () => {
         installationId: "inst-1",
         organizationId: "org-1",
         flowStartedAt: Date.now(),
+        userAuthorizationCode: "gh_code",
       });
 
       expect(repo.upsert).toHaveBeenCalledWith(

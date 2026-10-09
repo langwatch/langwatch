@@ -69,6 +69,9 @@ class FakeInstallations implements GithubInstallationLookup {
 class FakeAppTokens implements GithubAppTokenCache {
   readonly configured = true;
   pullRequests: GithubPullRequestSummary[] = [];
+  userCanAccessInstallation(): Promise<boolean> {
+    return Promise.reject(new Error("not used"));
+  }
   getInstallation(): Promise<GithubInstallationDetails> {
     return Promise.reject(new Error("not used"));
   }
