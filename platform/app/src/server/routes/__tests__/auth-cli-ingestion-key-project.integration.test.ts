@@ -19,14 +19,18 @@ import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { splitApiKeyToken } from "~/server/api-key/api-key-token.utils";
+import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { app } from "../auth-cli";
 
 const suffix = nanoid(8);
@@ -89,7 +93,11 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    resetAuthzGrantsCommandsForTests();
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `IKP ${suffix}`, slug: `ikp-${suffix}` },
@@ -130,14 +138,12 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
     });
     // Project permissions resolve through RoleBindings, not the legacy
     // OrganizationUser.role, so the admin needs an explicit org-scoped one.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: ADMIN_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: ADMIN_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
 
     await prisma.team.create({
@@ -181,10 +187,27 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
 
     if (!redisConnection) throw new Error("Redis unavailable in test env");
     const redis = redisConnection;
-    for (const [token, userId] of [
-      [ADMIN_TOKEN, ADMIN_ID],
-      [VIEWER_TOKEN, VIEWER_ID],
-      [LEAVER_TOKEN, LEAVER_ID],
+    // The admin's session carries the login key /exchange mints, because the
+    // personal branch parents its key to that one and answers a session
+    // without it as signed out. The other two never reach that branch.
+    const adminLoginKey = await CliLoginKeyService.create(
+      prisma,
+    ).mintForDeviceSession({
+      userId: ADMIN_ID,
+      organizationId: ORG_ID,
+      deviceLabel: `ikp-admin-${suffix}`,
+      selection: {
+        bindings: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        permissions: ["traces:create"],
+      },
+      sessionStartedAtMs: Date.now(),
+      maxSessionDurationDays: 0,
+      refreshWindowMs: 90 * 24 * 60 * 60 * 1000,
+    });
+    for (const [token, userId, loginKeyId] of [
+      [ADMIN_TOKEN, ADMIN_ID, adminLoginKey.apiKeyId],
+      [VIEWER_TOKEN, VIEWER_ID, null],
+      [LEAVER_TOKEN, LEAVER_ID, null],
     ] as const) {
       await redis.set(
         `lwcli:access:${token}`,
@@ -193,6 +216,7 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
           organization_id: ORG_ID,
           issued_at: Date.now(),
           expires_at: Date.now() + 60 * 60 * 1000,
+          ...(loginKeyId ? { cli_api_key_id: loginKeyId } : {}),
         }),
         "EX",
         60 * 60,
@@ -206,7 +230,11 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
       await redisConnection.del(`lwcli:access:${VIEWER_TOKEN}`);
       await redisConnection.del(`lwcli:access:${LEAVER_TOKEN}`);
     }
+    await resetApp();
+    resetAuthzGrantsCommandsForTests();
     const orgs = [ORG_ID, OTHER_ORG_ID];
+    await prisma.grant.deleteMany({ where: { organizationId: { in: orgs } } });
+    await prisma.role.deleteMany({ where: { organizationId: { in: orgs } } });
     await prisma.aiToolEntry.deleteMany({
       where: { organizationId: { in: orgs } },
     });
@@ -234,7 +262,6 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
       where: { id: { in: [ADMIN_ID, VIEWER_ID, LEAVER_ID] } },
     });
     await prisma.organization.deleteMany({ where: { id: { in: orgs } } });
-    await resetApp();
     await stopTestContainers();
   }, 60_000);
 

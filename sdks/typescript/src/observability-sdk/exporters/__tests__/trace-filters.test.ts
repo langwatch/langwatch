@@ -254,33 +254,146 @@ describe("trace-filters", () => {
   });
 
   describe("isHttpRequestSpan", () => {
-    it("returns true for HTTP verb patterns", () => {
-      expect(isHttpRequestSpan(createMockSpan("GET /api/users", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("POST /data", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("PUT /resource/123", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("DELETE /item", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("PATCH /update", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("OPTIONS /", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("HEAD /check", "http"))).toBe(true);
+    function createSpanWith({
+      name,
+      scopeName,
+      attributes = {},
+    }: {
+      name: string;
+      scopeName: string;
+      attributes?: Record<string, unknown>;
+    }): ReadableSpan {
+      return {
+        ...createMockSpan(name, scopeName),
+        attributes,
+      } as ReadableSpan;
+    }
+
+    describe("given a span from an HTTP instrumentation scope", () => {
+      /** @scenario "An HTTP instrumentation span is still excluded" */
+      it("excludes by fully qualified package scope alone whatever its name says", () => {
+        expect(
+          isHttpRequestSpan(
+            createSpanWith({
+              name: "totally-not-http",
+              scopeName: "@opentelemetry/instrumentation-http",
+            }),
+          ),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan(
+            createSpanWith({
+              name: "fetch",
+              scopeName: "@opentelemetry/instrumentation-undici",
+            }),
+          ),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan(
+            createSpanWith({
+              name: "call",
+              scopeName: "@opentelemetry/instrumentation-fetch",
+            }),
+          ),
+        ).toBe(true);
+      });
+
+      it("keeps an application span whose own scope is merely named fetch", () => {
+        expect(
+          isHttpRequestSpan(
+            createSpanWith({ name: "fetch-user-profile", scopeName: "fetch" }),
+          ),
+        ).toBe(false);
+      });
     });
 
-    it("is case-insensitive for HTTP verbs", () => {
-      expect(isHttpRequestSpan(createMockSpan("get /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("Get /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("GeT /api", "http"))).toBe(true);
+    describe("given a span carrying the HTTP method attribute", () => {
+      /** @scenario "An HTTP instrumentation span is still excluded" */
+      it("excludes by the current and legacy method attributes", () => {
+        expect(
+          isHttpRequestSpan({
+            ...createSpanWith({
+              name: "custom-name",
+              scopeName: "my-scope",
+            }),
+            attributes: { "http.request.method": "POST" },
+          } as ReadableSpan),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan({
+            ...createSpanWith({
+              name: "custom-name",
+              scopeName: "my-scope",
+            }),
+            attributes: { "http.method": "GET" },
+          } as ReadableSpan),
+        ).toBe(true);
+      });
     });
 
-    it("returns false for non-HTTP patterns", () => {
-      expect(isHttpRequestSpan(createMockSpan("chat.completion", "ai"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("database query", "db"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("GETAWAY", "custom"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("", ""))).toBe(false);
-    });
+    describe("given a span from an unknown scope with no method attribute", () => {
+      it("matches every registered uppercase verb shape OpenTelemetry emits", () => {
+        expect(
+          isHttpRequestSpan(createMockSpan("POST", "my-scope")),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan(createMockSpan("POST /v1/traces", "my-scope")),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan(createMockSpan("GET /api/users", "http")),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan(createMockSpan("DELETE /item", "http")),
+        ).toBe(true);
+        expect(isHttpRequestSpan(createMockSpan("HEAD", ""))).toBe(true);
+        expect(
+          isHttpRequestSpan(createMockSpan("TRACE /health", "my-scope")),
+        ).toBe(true);
+        expect(
+          isHttpRequestSpan(
+            createMockSpan("CONNECT proxy.example:443", "my-scope"),
+          ),
+        ).toBe(true);
+      });
 
-    it("requires word boundary after verb", () => {
-      expect(isHttpRequestSpan(createMockSpan("GET /api", "http"))).toBe(true);
-      expect(isHttpRequestSpan(createMockSpan("GETAWAY", "http"))).toBe(false);
-      expect(isHttpRequestSpan(createMockSpan("GETTING", "http"))).toBe(false);
+      /** @scenario "A user span named after a hyphenated verb word reaches the exporter" */
+      it("keeps lowercase and hyphenated verb-word names the application chose", () => {
+        expect(
+          isHttpRequestSpan(createMockSpan("post-publish-smoke", "my-scope")),
+        ).toBe(false);
+        expect(
+          isHttpRequestSpan(createMockSpan("post-process", "my-scope")),
+        ).toBe(false);
+        expect(
+          isHttpRequestSpan(createMockSpan("get-user-profile", "my-scope")),
+        ).toBe(false);
+        expect(
+          isHttpRequestSpan(createMockSpan("delete-account", "my-scope")),
+        ).toBe(false);
+        expect(
+          isHttpRequestSpan(createMockSpan("put-record", "my-scope")),
+        ).toBe(false);
+        expect(
+          isHttpRequestSpan(createMockSpan("patch-config", "my-scope")),
+        ).toBe(false);
+      });
+
+      /** @scenario "The name fallback matches only the uppercase verb shape OpenTelemetry emits" */
+      it("does not drop lookalike names that are not the emitted shape", () => {
+        expect(
+          isHttpRequestSpan(createMockSpan("post /v1/traces", "my-scope")),
+        ).toBe(false);
+        expect(isHttpRequestSpan(createMockSpan("GETAWAY", "custom"))).toBe(
+          false,
+        );
+        expect(
+          isHttpRequestSpan(createMockSpan("postgres-query", "db")),
+        ).toBe(false);
+        expect(isHttpRequestSpan(createMockSpan("GETTING", "http"))).toBe(
+          false,
+        );
+        expect(isHttpRequestSpan(createMockSpan("", ""))).toBe(false);
+      });
     });
   });
 

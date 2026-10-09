@@ -16,7 +16,10 @@ import type {
   ProcessDefinition,
   ProcessEventEnvelope,
 } from "./processManager.types";
-import { ProcessManagerService } from "./processManagerService";
+import {
+  type HandleResult,
+  ProcessManagerService,
+} from "./processManagerService";
 import type { ProcessStore } from "./stores/processStore.types";
 import {
   ProcessWakeWorker,
@@ -27,6 +30,17 @@ const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
 
 const STUCK_DRAIN_LEASE_MULTIPLE = 5;
 const STUCK_DRAIN_FLOOR_MS = 300_000;
+
+/**
+ * Resolves the process instance an event belongs to: the declared `keyBy`, or
+ * the event's aggregate — see `ProcessManagerConfig.keyBy`.
+ */
+function processKeyResolver<E extends Event>(
+  keyBy: ((event: E) => string) | undefined,
+): (params: { event: E; aggregateId: string }) => string {
+  if (!keyBy) return ({ aggregateId }) => aggregateId;
+  return ({ event }) => keyBy(event);
+}
 
 /**
  * Far above any legitimate drain (a full batch of slow deliveries fits in one
@@ -73,6 +87,7 @@ export function buildIntentHandlers(
         tenantId: message.tenantId,
         messageKey: message.messageKey,
         attempt: message.attempt,
+        leaseExpiresAt: message.leaseExpiresAt,
       });
     };
   }
@@ -152,6 +167,13 @@ export function buildProcessDefinition(
   };
 }
 
+/** A commit that inserted no intent left nothing new to lease. */
+function insertedIntents(result: HandleResult): boolean {
+  return (
+    result.outcome === "committed" && result.insertedMessageKeys.length > 0
+  );
+}
+
 /**
  * Owns process managers mounted on event-sourced pipelines. A generated live
  * subscriber hands committed events straight to the transactional inbox; no
@@ -183,9 +205,17 @@ export class ProcessRuntime {
     for (const definition of params.processManagers.values()) {
       const registered = this.registerProcessManager(definition);
       if (definition.config.eventTypes.length === 0) continue;
+      const keyBy = definition.config.keyBy as
+        | ((event: E) => string)
+        | undefined;
+      const processKeyOf = processKeyResolver(keyBy);
       subscribers.push({
         name: `pm:${definition.config.name}`,
         eventTypes: definition.config.eventTypes,
+        // A keyed process gathers several aggregates into one instance, so
+        // its deliveries must serialize into one lane per key — concurrent
+        // ones would fight over the instance revision.
+        options: keyBy ? { groupKeyFn: keyBy } : undefined,
         handle: async (event, context) => {
           const envelope: ProcessEventEnvelope = {
             // The event log can briefly expose two physical rows before its
@@ -197,7 +227,10 @@ export class ProcessRuntime {
             occurredAt: event.occurredAt,
             tenantId: context.tenantId,
             projectId: context.tenantId,
-            processKey: context.aggregateId,
+            processKey: processKeyOf({
+              event,
+              aggregateId: context.aggregateId,
+            }),
             // `toPayload` is the content boundary. Without one the raw event
             // data is persisted into process state and outbox rows verbatim.
             payload: definition.config.toPayload
@@ -213,9 +246,7 @@ export class ProcessRuntime {
               `Process manager "${definition.config.name}" revision conflict on event ${event.id}`,
             );
           }
-          if (result.outcome === "committed") {
-            registered.outboxWorker.notify();
-          }
+          if (insertedIntents(result)) registered.outboxWorker.notify();
         },
       });
     }
@@ -272,11 +303,8 @@ export class ProcessRuntime {
           store: this.store,
           managers: this.wakeManagers,
           logger: this.logger,
-          notifyOutbox: () => {
-            for (const item of this.managers.values()) {
-              item.outboxWorker.notify();
-            }
-          },
+          notifyOutbox: (processName) =>
+            this.managers.get(processName)?.outboxWorker.notify(),
         });
         if (this.consumersEnabled) this.wakeWorker.start();
       }

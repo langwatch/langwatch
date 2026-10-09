@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -662,30 +663,66 @@ export class TraceService {
   }
 
   /**
+   * One trace's evaluations, in the shape the drawer's evaluations panel
+   * reads, through the detail proof (ADR-144 block F).
+   *
+   * @param authorization - The route's proof, narrowed to the trace's member
+   * @param traceId - The trace ID
+   * @param protections - The viewer's protections, resolved through the proof
+   * @returns The trace's evaluations
+   */
+  async getEvaluationsForTrace({
+    authorization,
+    traceId,
+    protections,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+    protections: Protections;
+  }): Promise<Evaluation[]> {
+    return this.tracer.withActiveSpan(
+      "TraceService.getEvaluationsForTrace",
+      { attributes: { "trace.id": traceId } },
+      async () => {
+        const evaluations = await this.evaluationService.getEvaluationsForTrace(
+          { authorization, traceId, protections },
+        );
+        return (
+          mapTraceEvaluationsToLegacyEvaluations({ [traceId]: evaluations })[
+            traceId
+          ] ?? []
+        );
+      },
+    );
+  }
+
+  /**
    * Lazily fetch one evaluation's inputs, keyed by evaluation id so the read
    * prunes ClickHouse granules instead of scanning the whole trace. Used by
    * the v2 drawer when a single evaluation card is expanded.
    *
-   * @param projectId - The project ID
+   * @param authorization - The route's proof, narrowed to a member when named
    * @param evaluationId - The evaluation to fetch inputs for
-   * @returns The parsed inputs, or null when none are available
+   * @param protections - The viewer's protections, resolved through the proof
+   * @returns The parsed inputs, or null when none are available or visible
    */
-  async getEvaluationInputs(
-    projectId: string,
-    evaluationId: string,
-  ): Promise<Record<string, unknown> | null> {
+  async getEvaluationInputs({
+    authorization,
+    evaluationId,
+    protections,
+  }: {
+    authorization: Authorization;
+    evaluationId: string;
+    protections: Protections;
+  }): Promise<Record<string, unknown> | null> {
     return this.tracer.withActiveSpan(
       "TraceService.getEvaluationInputs",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "evaluation.id": evaluationId,
-        },
-      },
+      { attributes: { "evaluation.id": evaluationId } },
       async () => {
         return this.evaluationService.getEvaluationInputs({
-          projectId,
+          authorization,
           evaluationId,
+          protections,
         });
       },
     );
@@ -711,7 +748,7 @@ export class TraceService {
     projectId: string,
     threadIds: string[],
     protections: Protections,
-    opts?: { full?: boolean; withEditOverlay?: boolean },
+    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
@@ -727,7 +764,12 @@ export class TraceService {
             projectId,
             threadIds,
             protections,
-            { resolveBlobs: opts?.full },
+            {
+              resolveBlobs: opts?.full,
+              ...(opts?.maxTraces === undefined
+                ? {}
+                : { maxTraces: opts.maxTraces }),
+            },
           );
         const enriched = await this.enrichCodingAgentTraces(projectId, traces);
         if (!opts?.withEditOverlay) return enriched;

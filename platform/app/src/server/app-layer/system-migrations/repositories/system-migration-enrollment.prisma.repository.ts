@@ -155,10 +155,12 @@ export class PrismaSystemMigrationEnrollmentRepository {
     migrationName,
     enrolledForMigrationName,
     excludeOrganizationIds,
+    includeEnterprise = false,
   }: {
     migrationName: string;
     enrolledForMigrationName?: string;
     excludeOrganizationIds: string[];
+    includeEnterprise?: boolean;
   }): Promise<Array<{ id: string; name: string }>> {
     // The enrollment table has no relation to Organization (a plain string
     // column pair), so the enrolled ids are read first and excluded by id -
@@ -188,9 +190,22 @@ export class PrismaSystemMigrationEnrollmentRepository {
         // PENDING rides along with ACTIVE: a just-signed enterprise whose
         // subscription has not settled is exactly the organization the
         // exclusion exists to keep out of an experimental cohort.
-        subscriptions: {
-          none: { status: { in: ["ACTIVE", "PENDING"] }, plan: "ENTERPRISE" },
-        },
+        //
+        // Spread rather than a ternary INSIDE `subscriptions`, because
+        // `subscriptions: undefined` and no `subscriptions` key are the same
+        // query to Prisma but not the same thing to a reader: omitting the
+        // key says "this filter does not apply", which is what lifting the
+        // exclusion means.
+        ...(includeEnterprise
+          ? {}
+          : {
+              subscriptions: {
+                none: {
+                  status: { in: ["ACTIVE", "PENDING"] },
+                  plan: "ENTERPRISE",
+                },
+              },
+            }),
       },
       select: { id: true, name: true },
     });

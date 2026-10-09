@@ -33,7 +33,7 @@ export const CreateExperimentButton = () => {
     },
   });
 
-  if (!project || !hasPermission("workflows:create")) return null;
+  if (!project || !hasPermission("experiments:update")) return null;
 
   const handleCreate = () => {
     if (isCreating) return;

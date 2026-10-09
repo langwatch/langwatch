@@ -23,7 +23,6 @@ import { RoutingPolicyScopeType } from "~/generated/prisma/client";
 import { suggestTierTargets } from "~/server/modelProviders/suggestTierTargets";
 import { MODEL_TIERS } from "~/utils/modelTierPresets";
 
-import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -79,7 +78,7 @@ export const routingPoliciesRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .use(checkOrganizationPermission("routingPolicies:view"))
+    .permission("routingPolicies:view")
     .query(async ({ ctx, input }) => {
       const service = new RoutingPolicyService(ctx.prisma);
       return await service.list({
@@ -91,7 +90,7 @@ export const routingPoliciesRouter = createTRPCRouter({
   /** Get a single policy by id (includes its scope rows). */
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("routingPolicies:view"))
+    .permission("routingPolicies:view")
     .query(async ({ ctx, input }) => {
       const policy = await ctx.prisma.routingPolicy.findUnique({
         where: { id: input.id },
@@ -116,7 +115,7 @@ export const routingPoliciesRouter = createTRPCRouter({
         boundProviderTypes: z.array(z.string()).default([]),
       }),
     )
-    .use(checkOrganizationPermission("routingPolicies:view"))
+    .permission("routingPolicies:view")
     .query(({ input }) =>
       suggestTierTargets({
         tier: input.tier,
@@ -143,7 +142,7 @@ export const routingPoliciesRouter = createTRPCRouter({
         policyRules: policyRulesSchema,
       }),
     )
-    .use(checkOrganizationPermission("routingPolicies:manage"))
+    .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
       const service = new RoutingPolicyService(ctx.prisma);
       try {
@@ -183,7 +182,7 @@ export const routingPoliciesRouter = createTRPCRouter({
         policyRules: policyRulesSchema,
       }),
     )
-    .use(checkOrganizationPermission("routingPolicies:manage"))
+    .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
       const service = new RoutingPolicyService(ctx.prisma);
       try {
@@ -205,7 +204,7 @@ export const routingPoliciesRouter = createTRPCRouter({
 
   setDefault: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("routingPolicies:manage"))
+    .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
       const service = new RoutingPolicyService(ctx.prisma);
       return await service.setDefault({
@@ -217,7 +216,7 @@ export const routingPoliciesRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("routingPolicies:manage"))
+    .permission("routingPolicies:manage")
     .mutation(async ({ ctx, input }) => {
       const service = new RoutingPolicyService(ctx.prisma);
       await service.delete({

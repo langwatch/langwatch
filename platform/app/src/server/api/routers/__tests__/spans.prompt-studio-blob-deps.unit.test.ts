@@ -7,7 +7,7 @@
  * opened on the bounded preview no matter what the read path did.
  *
  * Mirrors the traces.4991-full-resolution harness: createCaller with a
- * mocked TraceService and mocked rbac/utils.
+ * mocked TraceService, a mocked App permission seam and mocked utils.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
@@ -43,19 +43,30 @@ vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
   buildTraceBlobResolutionDeps: mockBuildDeps,
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
 });
+
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 vi.mock("../../utils", () => ({
   getUserProtectionsForProject: vi.fn().mockResolvedValue({

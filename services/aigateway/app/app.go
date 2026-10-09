@@ -27,6 +27,7 @@ type App struct {
 	traces     AITraceEmitter
 	spend      pipeline.SpendEmitter
 	realtime   RealtimeSessionRegistry
+	hosted     HostedServices
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
 	logger     *zap.Logger
@@ -211,11 +212,23 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 			ID:         listed,
 			Name:       listed,
 			ProviderID: target.ProviderID,
+			Handle:     target.Handle,
 		})
 	}
 
+	// A routing handle is read against the key's own credential chain, which
+	// travels on either side of the bundle depending on the caller.
+	spellingCfg := cfg
+	if len(spellingCfg.Credentials) == 0 {
+		spellingCfg.Credentials = bundle.Credentials
+	}
+
 	for name, alias := range cfg.ModelAliases {
-		add(name, domain.Model{ID: alias.Model, ProviderID: alias.ProviderID})
+		target, routable := aliasTarget(spellingCfg, alias)
+		if !routable {
+			continue
+		}
+		add(name, target)
 	}
 
 	if len(cfg.AllowedModels) > 0 {
@@ -281,8 +294,10 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func
 	}
 	for _, m := range discovered {
 		// A discovered model is its own target: the catalog reports the id
-		// the provider serves it under, which is the id a client sends.
-		add(m.ID, m)
+		// the provider serves it under. What a client sends is that id
+		// qualified by the instance's routing handle when it has one, so
+		// the listed name reaches the instance that reported the model.
+		add(m.ListingSpelling(), m)
 	}
 	return gaps, nil
 }
@@ -299,6 +314,42 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func
 // key at all, so singling out its provider-qualified names would not make the
 // list truer, only empty, and a key still being wired up keeps a model list
 // that shows what it is configured to reach.
+// aliasTarget reads an alias target the way dispatch reads it, and reports
+// whether a request for the alias could be served at all.
+//
+// The config wire leaves a target whole when its first segment is not a
+// provider family, because only the key's own config tells a routing handle
+// from a model id that contains a slash. Dispatch has that config and splits
+// the target; listing has it too, so it splits here rather than judging the
+// raw string. Judging "eu/gpt-5-mini" whole asked models_allowed, the policy
+// rules and reachability about a model no provider serves, so the endpoint
+// listed aliases dispatch refuses and dropped aliases dispatch serves.
+//
+// A handle names ONE row. When that row is one the key cannot dispatch to,
+// the alias reaches nothing, so it is left out entirely rather than borrowed
+// against another row of the same family.
+func aliasTarget(cfg domain.BundleConfig, alias domain.ModelAlias) (domain.Model, bool) {
+	if alias.ProviderID != "" {
+		return domain.Model{ID: alias.Model, ProviderID: alias.ProviderID}, true
+	}
+
+	resolved := cfg.ReadSpelling(alias.Model)
+	if resolved.CredentialID == "" {
+		return domain.Model{ID: resolved.ModelID, ProviderID: resolved.ProviderID}, true
+	}
+
+	for _, cred := range cfg.Credentials {
+		if cred.ID == resolved.CredentialID {
+			return domain.Model{
+				ID:         resolved.ModelID,
+				ProviderID: resolved.ProviderID,
+				Handle:     cred.Handle,
+			}, true
+		}
+	}
+	return domain.Model{}, false
+}
+
 func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
 	creds := bundle.Credentials
 	if len(creds) == 0 {
@@ -318,13 +369,18 @@ func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
 	}
 }
 
-// soleCredentialProviderID returns the credential chain's provider when
-// every credential shares one, and "" when the chain is empty or spans
-// more than one provider (nothing to unambiguously attribute to).
+// soleCredentialProviderID returns the provider a bare model name would be
+// dispatched to when every credential that serves bare names shares one, and
+// "" when there is none or they span more than one provider (nothing to
+// unambiguously attribute to). The LangWatch-managed models slot never serves
+// a bare name, so it never claims one here either.
 func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 	var providerID domain.ProviderID
-	for i, cred := range creds {
-		if i == 0 {
+	for _, cred := range creds {
+		if !cred.ServesBareModels() {
+			continue
+		}
+		if providerID == "" {
 			providerID = cred.ProviderID
 			continue
 		}

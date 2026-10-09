@@ -170,7 +170,29 @@ export const FEATURE_FLAGS = [
     family: "Governance",
   },
 
+  // Deliberately its own key rather than a reuse of the one above, and it
+  // gates strictly less. That one decides whether pulled cost is RECORDED at
+  // all; this one decides whether a version of a charge that a later pull
+  // superseded is WITHDRAWN. Turning the recording off to stop bad
+  // withdrawals would also stop every good record, so the two need separate
+  // switches or the only available remedy is far too blunt.
+  {
+    key: "release_pulled_usage_retraction_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Withdraws the superseded version of a pulled charge when a provider reissues it under a different currency, agent or spender, so a day does not total the same bill twice (ADR-088/ADR-128). Off by default; enable per organization via the operator store or a PostHog rule. With it off the reissue is still detected and logged, but nothing is withdrawn and the day keeps double-counting. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_retraction_enabled.",
+    family: "Governance",
+  },
+
   // ----- PRODUCT -----
+  {
+    key: "release_instant_evals",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. A self-serve organization on the hosted service switches them on itself from the search bar, and that opt-in counts whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals, whatever this says; one that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
+  },
   {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
@@ -186,11 +208,11 @@ export const FEATURE_FLAGS = [
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
   {
-    key: "release_ui_navigation_v2_enabled",
+    key: "release_voice_agents_enabled",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Unlocks the product-scoped navigation shells (spec: specs/navigation/navigation-modes.feature): a per-device mode picker in the avatar menu with legacy, product-switcher and icon-rail values. The flag only unlocks the picker; the device preference decides which shell renders, and flag off or mode legacy keeps the current chrome unchanged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_navigation_v2_enabled.",
+      "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
   },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
@@ -228,7 +250,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media rides inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
+      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media stays inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
   },
   {
     key: "release_ui_ai_governance_enabled",
@@ -247,6 +269,14 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via the operator store (or deployment-wide via RELEASE_UI_AI_GOVERNANCE_ENABLED=0) to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
+  },
+  {
+    key: "release_ui_governance_billed_cost_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Reveals Costs and the Platform preview pages (Insights, Analytics, Signals & Alerts) and their sidebar items. Composed ON TOP of release_ui_ai_governance_enabled: the section flag off still hides everything. Default off. Costs renders billed/gateway amounts and seat counts; the unfinished Billed address stays unavailable. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled. Specs: specs/ai-gateway/governance/governance-home-routing.feature, specs/governance/governance-cost-screen.feature.",
+    family: "Governance",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
@@ -298,11 +328,29 @@ export const FEATURE_FLAGS = [
       "Lets a project API key start and continue Langy turns over the public REST surface (spec: specs/langy/langy-api-key-turns.feature). Strictly narrower than release_langy_enabled and ANDed with it: this flag opens a new way in for an actor who already has Langy, and never grants Langy itself. Off = the REST surface 404s and only the browser can start a turn, which is the rollback position — turning it off cannot break the in-product assistant. Internal flag store only, so the /ops/feature-flags toggle is the one lever.",
   },
   {
+    key: "release_langy_ui_actions",
+    scope: "SYSTEM",
+    defaultValue: true,
+    envOverridable: false,
+    family: "Langy",
+    description:
+      "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
+  },
+  {
     key: "release_langy_promo_enabled",
     scope: "PRODUCT",
     defaultValue: false,
     description:
       "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+  },
+  {
+    key: "release_custom_chart_playground",
+    scope: "SYSTEM",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Custom Chart Playground",
+    description:
+      "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
   },
   {
     key: "release_ui_home_signal_focused_enabled",
@@ -326,12 +374,40 @@ export const FEATURE_FLAGS = [
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
   },
+  // `join_requests` (D12, ADR-117) was here and is retired. The feature is on
+  // for everybody: the lookup already answers the universal nothing to an
+  // unverified address, a consumer domain, an organization that turned joining
+  // off and one the caller is already in, so what the flag actually gated was
+  // an offer that had passed every one of those. It is not a rollback lever
+  // any more; the setting on the Access page is.
   {
-    key: "release_webhook_automations",
+    key: "release_ui_agent_testing_v2_enabled",
+    scope: "PRODUCT",
+    defaultValue: true,
+    description:
+      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the Simulations pages and menu group exactly as they were; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default on, so a self-hosted installation reads Agent Testing with no rule; a rule keeps a project or an organization on the Simulations pages. Every simulations address redirects to Agent Testing while the flag is on.",
+  },
+  {
+    // D05 tier 3 (ADR-117). Named `self_serve_sso` rather than the usual
+    // `release_...` prefix so its auto-derived env override is exactly
+    // `SELF_SERVE_SSO`, which is the per-organization lever the epic names
+    // and the whole of what rolling tier 3 back consists of.
+    key: "self_serve_sso",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
+      "Lets an organization set enterprise single sign-on up itself on the hosted service: register the identity provider, claim a domain, and prove it with a record it publishes once a LangWatch operator has approved the claim (spec: specs/identity/sso-onboarding-tiers.feature). Off = the settings entry is not offered and every self-serve command is refused by name, pointing the reader at talking to us. Self-hosted installations do not consult it. Their license is the authorization there. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=self_serve_sso, or target an organization from /ops/feature-flags.",
+  },
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so there is no picker card,
+  // save route, or test-fire path left to gate.
+  {
+    key: "experiment_onboarding_langy_guided",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      'The guided onboarding: after sign-up Langy takes over the screen, asks what to set up, connects a provider, tours the product and drives the real setup from its panel (spec: specs/features/onboarding/guided-onboarding-variant.feature). Off = the classic wizard, unchanged. For the A/B test add a rule { percentageRollout: 50 } at /ops/feature-flags: the split is a stable hash of the user id, so one user sees the same variant on every read. The resolved variant is recorded on the organization at creation. To QA it in production without touching real users, add a rule { emailDomain: "yourcompany.com" } above the percentage: every fresh account at that domain lands in the guided flow. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=experiment_onboarding_langy_guided or ?ff_experiment_onboarding_langy_guided=on in the browser.',
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 

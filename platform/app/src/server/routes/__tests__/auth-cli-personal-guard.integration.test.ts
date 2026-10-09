@@ -22,6 +22,7 @@
  */
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -29,6 +30,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { z } from "zod";
 
 // vi.mock is hoisted above every top-level const, so the values the session
 // mock needs must come from vi.hoisted (hoisted alongside it). Math.random,
@@ -49,16 +51,22 @@ vi.mock("~/server/auth", () => ({
     user: { id: ids.USER_ID, email: ids.EMAIL, name: ids.NAME },
   }),
 }));
-// The picked shared project's key requires project:update; that RBAC decision
+// The picked shared project's key requires project:manage; that RBAC decision
 // is covered elsewhere. Grant it so the gate logic is what's under test.
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+// The approval route reads probeProjectPermission from the app-layer
+// imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
+// the old path leaves the real check running and the deny test inert.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
 import type { Redis } from "ioredis";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
@@ -88,6 +96,21 @@ const OTHER_PERSONAL_API_KEY = `sk-lw-personal-o-${suffix}-${"d".repeat(34)}`;
 const OTHER_TEAM_API_KEY = `sk-lw-other-${suffix}-${"c".repeat(36)}`;
 
 const GOV_FLAG = "release_ui_ai_governance_enabled";
+const errorResponseSchema = z.object({
+  error: z.string(),
+  error_description: z.string().optional(),
+});
+const apiKeyExchangeResponseSchema = z
+  .object({
+    kind: z.literal("api_key"),
+    api_key: z.string(),
+    project: z.object({
+      id: z.string(),
+      slug: z.string(),
+      name: z.string(),
+    }),
+  })
+  .passthrough();
 
 async function mintDeviceCode(credentialType: string): Promise<string> {
   const res = await app.request("/api/auth/cli/device-code", {
@@ -97,6 +120,20 @@ async function mintDeviceCode(credentialType: string): Promise<string> {
   });
   const dc = (await res.json()) as { user_code: string };
   return dc.user_code;
+}
+
+async function mintDeviceCodePair(
+  credentialType: string,
+): Promise<{ deviceCode: string; userCode: string }> {
+  const res = await app.request("/api/auth/cli/device-code", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ credential_type: credentialType }),
+  });
+  const deviceCode = z
+    .object({ device_code: z.string(), user_code: z.string() })
+    .parse(await res.json());
+  return { deviceCode: deviceCode.device_code, userCode: deviceCode.user_code };
 }
 
 async function approve(body: Record<string, unknown>) {
@@ -276,6 +313,8 @@ describe("CLI login personal-project guards", () => {
   beforeEach(() => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
     delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
+    vi.mocked(probeProjectPermission).mockReset();
+    vi.mocked(probeProjectPermission).mockResolvedValue(true);
   });
 
   // Deletes are org-scoped rather than keyed on the fixture ids because the
@@ -304,6 +343,11 @@ describe("CLI login personal-project guards", () => {
     await prisma.roleBinding.deleteMany({
       where: { organizationId: ORG_ID },
     });
+    // The device-session exchange now mints a user-scoped CLI ApiKey (plus
+    // its private custom role); ApiKey→Organization is a Restrict relation,
+    // so these go before the organization delete.
+    await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.project.deleteMany({
       where: { team: { organizationId: ORG_ID } },
     });
@@ -449,6 +493,68 @@ describe("CLI login personal-project guards", () => {
         expect(status).toBe(200);
         expect((json.project as { id: string }).id).toBe(PERSONAL_PROJECT_ID);
       });
+
+      /** @scenario owning a personal project does not replace project administration */
+      it("refuses the owner when canonical project administration is absent", async () => {
+        vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+        const userCode = await mintDeviceCode("project_api_key");
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: PERSONAL_PROJECT_ID,
+        });
+        const error = errorResponseSchema.parse(json);
+        expect(status).toBe(403);
+        expect(error.error).toBe("forbidden");
+        expect(JSON.stringify(error)).not.toContain(PERSONAL_API_KEY);
+      });
+    });
+
+    describe("when the caller holds a Developer seat (ADR-143)", () => {
+      beforeEach(() =>
+        prisma.organizationUser.update({
+          where: {
+            userId_organizationId: { userId: USER_ID, organizationId: ORG_ID },
+          },
+          data: { role: "DEVELOPER" },
+        }),
+      );
+      afterEach(() =>
+        prisma.organizationUser.update({
+          where: {
+            userId_organizationId: { userId: USER_ID, organizationId: ORG_ID },
+          },
+          data: { role: "ADMIN" },
+        }),
+      );
+
+      /** @scenario CLI login refuses a shared project for a Developer */
+      /** @scenario project-login approval refuses a shared project for a Developer, naming the seat */
+      it("refuses a shared project, naming the seat", async () => {
+        const userCode = await mintDeviceCode("project_api_key");
+
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: SHARED_PROJECT_ID,
+        });
+
+        expect(status).toBe(400);
+        expect(json.error).toBe("developer_seat_personal_only");
+        expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);
+      });
+
+      /** @scenario A Developer works inside their own project */
+      /** @scenario project-login approval honours a Developer's own personal project */
+      it("still honours their own personal project", async () => {
+        const userCode = await mintDeviceCode("project_api_key");
+
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: PERSONAL_PROJECT_ID,
+        });
+
+        expect(status).toBe(200);
+        expect((json.project as { id: string }).id).toBe(PERSONAL_PROJECT_ID);
+      });
     });
 
     describe("when the approval targets a shared team project id", () => {
@@ -485,12 +591,163 @@ describe("CLI login personal-project guards", () => {
       });
     });
 
-    describe("when the caller lacks write access to the picked project", () => {
-      /** @scenario project-login approval denies a project the caller cannot write */
+    describe("when the caller's own seat has been disabled", () => {
+      /** @scenario project-login approval denies a member whose seat has been disabled */
       it("returns forbidden and never the project's API key", async () => {
-        // hasProjectPermission is the source of truth: a caller without
-        // project:update is denied even though the project is in their org.
-        vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+        // The row stays, with its ADMIN role — only the access is gone. A
+        // project key has no owner, so nothing downstream would have caught
+        // this: the membership gate on approve is the whole defence.
+        await prisma.organizationUser.updateMany({
+          where: { userId: USER_ID, organizationId: ORG_ID },
+          data: { disabledAt: new Date() },
+        });
+        try {
+          const userCode = await mintDeviceCode("project_api_key");
+
+          const { status, json } = await approve({
+            user_code: userCode,
+            project_id: SHARED_PROJECT_ID,
+          });
+
+          expect(status).toBe(403);
+          expect(json.error).toBe("forbidden");
+          expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);
+        } finally {
+          await prisma.organizationUser.updateMany({
+            where: { userId: USER_ID, organizationId: ORG_ID },
+            data: { disabledAt: null },
+          });
+        }
+      });
+    });
+
+    describe("when the seat is disabled between approval and exchange", () => {
+      /** @scenario project-login exchange denies a member whose seat was disabled after approval */
+      it("answers the fatal access_denied, never the project's API key, and consumes the code", async () => {
+        // Approval is not the last word: the code is exchanged later, and an
+        // admin can switch the seat off in between. The handout is what must
+        // re-derive membership.
+        const dcRes = await app.request("/api/auth/cli/device-code", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ credential_type: "project_api_key" }),
+        });
+        const dc = (await dcRes.json()) as {
+          device_code: string;
+          user_code: string;
+        };
+        const approved = await approve({
+          user_code: dc.user_code,
+          project_id: SHARED_PROJECT_ID,
+        });
+        expect(approved.status).toBe(200);
+
+        await prisma.organizationUser.updateMany({
+          where: { userId: USER_ID, organizationId: ORG_ID },
+          data: { disabledAt: new Date() },
+        });
+        try {
+          const exchange = () =>
+            app.request("/api/auth/cli/exchange", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ device_code: dc.device_code }),
+            });
+
+          const first = await exchange();
+          // 410 access_denied: the one answer the CLI already treats as
+          // fatal, and the same one a removed member gets from the mint.
+          expect(first.status).toBe(410);
+          expect(await first.text()).not.toContain(SHARED_API_KEY);
+
+          // Consumed: the record is gone from Redis, and a CLI still polling
+          // is told the code expired rather than that it polled too soon or
+          // left waiting on an approval that will never be honoured.
+          expect(
+            await redisConnection!.get(`lwcli:device:${dc.device_code}`),
+          ).toBeNull();
+          const second = await exchange();
+          expect(second.status).toBe(408);
+        } finally {
+          await prisma.organizationUser.updateMany({
+            where: { userId: USER_ID, organizationId: ORG_ID },
+            data: { disabledAt: null },
+          });
+        }
+      });
+    });
+
+    describe("when administration is removed between approval and exchange", () => {
+      /** @scenario project-login exchange rechecks administration after approval */
+      it("denies without returning the key and consumes every polling record", async () => {
+        const dc = await mintDeviceCodePair("project_api_key");
+        const approved = await approve({
+          user_code: dc.userCode,
+          project_id: SHARED_PROJECT_ID,
+        });
+        expect(approved.status).toBe(200);
+        vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+        const exchange = await app.request("/api/auth/cli/exchange", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ device_code: dc.deviceCode }),
+        });
+        expect(exchange.status).toBe(410);
+        const error = errorResponseSchema.parse(await exchange.json());
+        expect(error.error).toBe("access_denied");
+        expect(JSON.stringify(error)).not.toContain(SHARED_API_KEY);
+        expect(await redisConnection!.keys(`*${dc.deviceCode}*`)).toEqual([]);
+        expect(await redisConnection!.keys(`*${dc.userCode}*`)).toEqual([]);
+        const second = await app.request("/api/auth/cli/exchange", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ device_code: dc.deviceCode }),
+        });
+        expect(second.status).toBe(408);
+      });
+    });
+
+    describe("when the base key rotates between approval and exchange", () => {
+      /** @scenario project-login exchange returns a key rotated after approval */
+      it("returns the current key rather than the cached approval secret", async () => {
+        const rotatedKey = `sk-lw-rotated-${suffix}-${"r".repeat(34)}`;
+        const dc = await mintDeviceCodePair("project_api_key");
+        const approved = await approve({
+          user_code: dc.userCode,
+          project_id: SHARED_PROJECT_ID,
+        });
+        expect(approved.status).toBe(200);
+        await prisma.project.update({
+          where: { id: SHARED_PROJECT_ID },
+          data: { apiKey: rotatedKey },
+        });
+        try {
+          const exchange = await app.request("/api/auth/cli/exchange", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ device_code: dc.deviceCode }),
+          });
+          expect(exchange.status).toBe(200);
+          const body = apiKeyExchangeResponseSchema.parse(
+            await exchange.json(),
+          );
+          expect(body.api_key).toBe(rotatedKey);
+          expect(body.api_key).not.toBe(SHARED_API_KEY);
+        } finally {
+          await prisma.project.update({
+            where: { id: SHARED_PROJECT_ID },
+            data: { apiKey: SHARED_API_KEY },
+          });
+        }
+      });
+    });
+
+    describe("when the caller lacks admin access to the picked project", () => {
+      /** @scenario project-login approval denies a project the caller cannot manage */
+      it("returns forbidden and never the project's API key", async () => {
+        // probeProjectPermission is the source of truth: a caller without
+        // project:manage is denied even though the project is in their org.
+        vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
         const userCode = await mintDeviceCode("project_api_key");
 
         const { status, json } = await approve({

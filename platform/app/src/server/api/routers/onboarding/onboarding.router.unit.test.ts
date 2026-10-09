@@ -25,16 +25,22 @@ const {
   mockBatch: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    };
+  },
+);
 
 vi.mock("../organization", () => ({
   organizationRouter: {
@@ -79,6 +85,15 @@ vi.mock("~/server/app-layer/app", () => ({
       batch: mockBatch,
     },
   }),
+}));
+
+const { mockTrackServerEvent } = vi.hoisted(() => ({
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock("~/server/posthog", () => ({
+  trackServerEvent: mockTrackServerEvent,
+  getPostHogInstance: () => null,
 }));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
@@ -188,6 +203,29 @@ describe("onboarding.initializeOrganization", () => {
           featureUsage: "Evaluations",
           yourRole: "Engineer",
         },
+      });
+    });
+  });
+
+  describe("when the onboarding form carries attribution", () => {
+    /** @scenario "Initializing an organization through the procedure tracks organization_created" */
+    it("tracks organization_created in PostHog with the attribution", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        projectName: "Acme Project",
+        signUpData: { utmSource: "newsletter", utmCampaign: "weekly" },
+      });
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "user_1",
+        event: "organization_created",
+        properties: expect.objectContaining({
+          organization_id: "org_1",
+          utm_source: "newsletter",
+          utm_campaign: "weekly",
+        }),
       });
     });
   });

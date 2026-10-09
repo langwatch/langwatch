@@ -2,13 +2,14 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
@@ -32,13 +33,12 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
     sample: number;
   }>;
   try {
-    const response = await fetch(`${endpoint}/api/monitors`, {
+    const response = await langwatchFetch(`${endpoint}/api/monitors`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch monitors" });
+      await failSpinnerFromResponse({ spinner, response, action: "fetch monitors" });
       process.exit(1);
     }
 

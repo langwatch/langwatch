@@ -14,13 +14,10 @@ import type React from "react";
 import { type ReactNode, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { formatDuration } from "~/shared/format/time";
 import { api } from "~/utils/api";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-  STATUS_COLORS,
-} from "../utils/formatters";
+import { formatCost, formatTokens, STATUS_COLORS } from "../utils/formatters";
+import { memberTenantOf, traceDrawerParams } from "../utils/traceDrawerParams";
 
 interface TracePreviewHoverCardProps {
   traceId: string;
@@ -34,6 +31,13 @@ interface TracePreviewHoverCardProps {
    * omitted the popover falls back to the unconstrained by-id fetch.
    */
   occurredAtMs?: number;
+  /**
+   * The project that owns the trace, from the surrounding row. On an
+   * aggregate it is a member (ADR-144 block F), and the peek and the drawer
+   * it opens read that member; on a plain project it is the project itself
+   * and changes nothing.
+   */
+  ownerProjectId?: string;
   /**
    * Defaults to "bottom-start" — sits below the trigger and aligns to
    * its leading edge. Override when the trigger is on the far right of
@@ -58,6 +62,7 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   traceId,
   children,
   occurredAtMs,
+  ownerProjectId,
   placement = "bottom-start",
 }) => {
   const [hasHovered, setHasHovered] = useState(false);
@@ -88,6 +93,7 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
               <PeekPopoverContent
                 traceId={traceId}
                 occurredAtMs={occurredAtMs}
+                ownerProjectId={ownerProjectId}
               />
             )}
           </HoverCard.Content>
@@ -105,6 +111,13 @@ interface TraceIdPeekProps {
    * See {@link TracePreviewHoverCardProps.occurredAtMs}.
    */
   occurredAtMs?: number;
+  /**
+   * The project that owns the trace, from the surrounding row. On an
+   * aggregate it is a member (ADR-144 block F), and the peek and the drawer
+   * it opens read that member; on a plain project it is the project itself
+   * and changes nothing.
+   */
+  ownerProjectId?: string;
 }
 
 /**
@@ -116,10 +129,38 @@ interface TraceIdPeekProps {
  * already have a button or link you can wrap, prefer
  * `<TracePreviewHoverCard>` directly so the eye doesn't crowd the row.
  */
-export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
+export const TraceIdPeek: React.FC<TraceIdPeekProps> = (props) =>
+  // Only a row that names the trace's owner can be on an aggregate's member,
+  // so only it resolves the current project. Every other row renders as it
+  // did before, without the organization/team/project resolution per row.
+  props.ownerProjectId === undefined ? (
+    <TraceIdPeekButton {...props} tenantId={null} />
+  ) : (
+    <MemberTraceIdPeek {...props} ownerProjectId={props.ownerProjectId} />
+  );
+
+/** A row that names the trace's owner: the drawer opens on that member. */
+function MemberTraceIdPeek(
+  props: TraceIdPeekProps & { ownerProjectId: string },
+) {
+  const { project } = useOrganizationTeamProject();
+  return (
+    <TraceIdPeekButton
+      {...props}
+      tenantId={memberTenantOf({
+        ownerProjectId: props.ownerProjectId,
+        projectId: project?.id,
+      })}
+    />
+  );
+}
+
+function TraceIdPeekButton({
   traceId,
   occurredAtMs,
-}) => {
+  ownerProjectId,
+  tenantId,
+}: TraceIdPeekProps & { tenantId: string | null }) {
   const { openDrawer } = useDrawer();
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
@@ -127,14 +168,18 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
     // Forward the timestamp as the drawer's `t` partition hint so the
     // opened drawer's per-trace reads prune partitions instead of
     // walking every weekly partition by id.
-    openDrawer("traceV2Details", {
-      traceId,
-      ...(occurredAtMs !== undefined ? { t: String(occurredAtMs) } : {}),
-    });
+    openDrawer(
+      "traceV2Details",
+      traceDrawerParams({ traceId, occurredAtMs, tenantId }),
+    );
   };
 
   return (
-    <TracePreviewHoverCard traceId={traceId} occurredAtMs={occurredAtMs}>
+    <TracePreviewHoverCard
+      traceId={traceId}
+      occurredAtMs={occurredAtMs}
+      ownerProjectId={ownerProjectId}
+    >
       <Box
         as="button"
         onClick={handleOpenDrawer}
@@ -155,28 +200,42 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
       </Box>
     </TracePreviewHoverCard>
   );
-};
+}
 
-function PeekPopoverContent({
-  traceId,
-  occurredAtMs,
-}: {
+interface PeekPopoverContentProps {
   traceId: string;
   occurredAtMs?: number;
-}) {
-  const { project } = useOrganizationTeamProject();
+  ownerProjectId?: string;
+}
 
-  const { data: trace, isLoading } = api.tracesV2.header.useQuery(
+/**
+ * The peeked trace's header, read from the member that owns it on an
+ * aggregate (ADR-144 block F).
+ */
+function usePeekHeader({
+  traceId,
+  occurredAtMs,
+  ownerProjectId,
+}: PeekPopoverContentProps) {
+  const { project } = useOrganizationTeamProject();
+  const tenantId = memberTenantOf({ ownerProjectId, projectId: project?.id });
+
+  return api.tracesV2.header.useQuery(
     {
       projectId: project?.id ?? "",
       traceId,
       ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+      ...(tenantId !== null ? { tenantId } : {}),
       // The popover only ever shows a 2-line clamp of input/output — never
       // worth the extra spans read full resolution costs.
       full: false,
     },
     { enabled: !!project?.id, staleTime: 300_000 },
   );
+}
+
+function PeekPopoverContent(props: PeekPopoverContentProps) {
+  const { data: trace, isLoading } = usePeekHeader(props);
 
   if (isLoading || !trace) {
     return (
@@ -290,7 +349,7 @@ function PeekPopoverContent({
       {/* Footer */}
       <HStack padding={2} paddingX={3} justify="space-between">
         <Text textStyle="2xs" color="fg.subtle">
-          {traceId.slice(0, 16)}...
+          {props.traceId.slice(0, 16)}...
         </Text>
         <Text textStyle="2xs" color="fg.subtle">
           {trace.serviceName}

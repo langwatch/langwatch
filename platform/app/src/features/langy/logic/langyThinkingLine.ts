@@ -1,3 +1,5 @@
+import { resolveCapabilityProgress } from "../components/capabilities/capabilityRegistry";
+import { LANGY_ANSWER_HERE_OR_TERMINAL } from "./langyLocalWaits";
 import { describeToolCall, effectiveToolName } from "./langyToolLabel";
 
 /**
@@ -20,19 +22,25 @@ import { describeToolCall, effectiveToolName } from "./langyToolLabel";
  *
  * The line may only say things that are TRUE at the moment it says them.
  *
- *   1. A tool is running    → say what it is. We know: it is on the tool stream.
- *   2. Tokens are arriving  → "Writing…". The model really is generating.
+ *   1. A tool is running    → say what it is, in the reader's words. We know:
+ *                              it is on the tool stream, or in the turn's
+ *                              durable record.
+ *   2. Tokens are arriving  → say NOTHING. The streaming answer is on screen
+ *                              and speaks for itself; a line under it reads
+ *                              as still waiting for the visible reply. The
+ *                              row comes back once the text has been quiet
+ *                              for `TEXT_QUIET_MS`, because a pause between
+ *                              paragraphs is the model working.
  *   3. Reasoning is arriving → "Thinking…". The model IS working — live
  *                              reasoning deltas are on the wire — so it must
- *                              never read as "Starting up…".
- *   4. None of those        → we are waiting for a worker that has not started.
+ *                              never read as a startup wait.
+ *   4. The turn has produced something and is between steps → a cycling verb.
+ *   5. None of those        → we are waiting for a worker that has not started.
  *                              Say so, plainly, and let it ESCALATE with time. A
  *                              turn that is stuck must eventually look stuck.
  *
- * Whimsy survives, because whimsy was never the problem — a joke about the
- * model's character ("Bribing the GPUs", "Blaming the NS") claims nothing about
- * the work. It is allowed ONLY while the model is genuinely working, and only
- * from the non-claiming pool. Cycling itself implies progress, so it never runs
+ * The cycling verbs (`langyThinkingVerbs.ts`) are allowed ONLY while the model
+ * is genuinely working. Cycling itself implies progress, so it never runs
  * while we are waiting.
  */
 
@@ -44,6 +52,27 @@ export type LangyThinkingTone =
   | "waiting"
   /** Long enough with nothing that the honest word is "stuck". */
   | "stuck";
+
+/** What the line says while a card is holding the turn (ADR-129). */
+export const LANGY_AWAITING_ANSWER_LINE =
+  "Waiting for your answer on the card above";
+
+/**
+ * What the line says while a permission ask is open in the terminal that
+ * shares the folder. The developer is looking at that terminal, and the ask
+ * is one they approve there.
+ */
+export const LANGY_AWAITING_APPROVAL_TERMINAL_LINE =
+  "Waiting for your approval in the terminal";
+
+/**
+ * How long the text has to be quiet before the activity row shows again.
+ *
+ * While tokens arrive the answer is its own status, and a row flickering in
+ * and out between two deltas reads as broken. A pause longer than this is the
+ * model working on the next paragraph or the next call, and the row says so.
+ */
+export const TEXT_QUIET_MS = 1_000;
 
 export interface LangyThinkingLine {
   /** The line to render. Always true at the moment it is produced. */
@@ -77,14 +106,42 @@ export interface ThinkingMessage {
 /**
  * How long we wait before admitting nothing is happening.
  *
- * A cold spawn legitimately takes a few seconds (fork opencode, lay out the
- * home, install skills, wait for readiness), so silence is normal at first. It
- * stops being normal quickly, and by 75s a spawn that has produced NOTHING has
- * almost certainly failed — the manager's own readiness budget is long gone.
+ * The clock these read is SILENCE, not turn length: it restarts every time the
+ * turn produces something (see `langyTurnActivityKey`). A cold spawn
+ * legitimately takes a few seconds (fork the worker, lay out the home, install
+ * skills, wait for readiness), so silence is normal at first. The first two
+ * steps name the startup's real phases, the control plane prepares the
+ * worker's workspace and then the agent starts, so the wait reads as progress,
+ * not one frozen line. It stops being normal quickly, and by 75s a turn that
+ * has produced NOTHING for that long has almost certainly failed.
  */
+export const THINKING_STARTING_LANGY_MS = 6_000;
 export const THINKING_STILL_STARTING_MS = 12_000;
 export const THINKING_SLOW_MS = 35_000;
 export const THINKING_STUCK_MS = 75_000;
+
+/**
+ * The assistant message of the CURRENT turn: the one after the last user
+ * message, or nothing while the reply has not started arriving. The wire-truth
+ * checks below must read THIS message, never the last assistant overall — on a
+ * follow-up send the last assistant overall is the PREVIOUS completed reply,
+ * whose settled text would read as this turn already generating when it has
+ * produced nothing.
+ */
+export function currentTurnAssistant(
+  messages: ThinkingMessage[],
+): ThinkingMessage | undefined {
+  const lastUserIndex = messages.findLastIndex((m) => m.role === "user");
+  return messages.slice(lastUserIndex + 1).find((m) => m.role === "assistant");
+}
+
+/** Has any earlier turn of this conversation already been answered? */
+export function hasPriorReply(messages: ThinkingMessage[]): boolean {
+  const lastUserIndex = messages.findLastIndex((m) => m.role === "user");
+  return messages
+    .slice(0, Math.max(lastUserIndex, 0))
+    .some((m) => m.role === "assistant");
+}
 
 /** The last tool call that has NOT settled — the one actually running now. */
 export function runningTool(
@@ -101,6 +158,78 @@ export function runningTool(
   return running ?? null;
 }
 
+/**
+ * A tool call off the turn's durable record. This is what a tab that adopted
+ * the turn, or reloaded during it, holds before its stream is back, and it is
+ * where a command running on the developer's machine is recorded.
+ */
+export interface RecordedToolCall {
+  toolCallId: string;
+  toolName: string;
+  command?: string;
+  input?: unknown;
+  status: string;
+}
+
+/** The last recorded call that has not finished. */
+export function runningRecordedTool(
+  toolCalls: readonly RecordedToolCall[] | null | undefined,
+): RecordedToolCall | null {
+  return toolCalls?.findLast((call) => call.status === "initiated") ?? null;
+}
+
+/** The tools that read code, on the developer's machine or in the sandbox. */
+const READING_TOOLS = new Set([
+  "local_read",
+  "local_grep",
+  "local_find",
+  "local_ls",
+  "read",
+  "grep",
+  "glob",
+  "list",
+]);
+
+/** The tools that change code, on the developer's machine or in the sandbox. */
+const EDITING_TOOLS = new Set([
+  "local_write",
+  "local_edit",
+  "write",
+  "edit",
+  "multiedit",
+  "patch",
+]);
+
+/**
+ * What a running tool is doing, in the reader's words.
+ *
+ * The activity cards name the mechanism in full ("Reading a file on your
+ * machine: router.ts"); the row under the transcript names the act the reader
+ * is waiting on, one short line. A LangWatch CLI call is worded by the same
+ * registry as its card, so the two never disagree. Anything else keeps the
+ * card's own label, with its detail, so an unknown command is shown rather
+ * than guessed at.
+ */
+export function customerToolLine({
+  name,
+  input,
+}: {
+  name: string;
+  input: unknown;
+}): string {
+  const lower = name.toLowerCase();
+  if (lower === "local_bash") return "Running the command in your terminal";
+  if (lower === "local_langwatch_env")
+    return "Writing your LangWatch credentials";
+  if (READING_TOOLS.has(lower)) return "Reading the code";
+  if (EDITING_TOOLS.has(lower)) return "Editing the code";
+  if (lower === "skill" || lower === "use_skill") return "Loading a skill";
+  const capability = resolveCapabilityProgress(effectiveToolName(name, input));
+  if (capability) return capability.headline;
+  const { title, detail } = describeToolCall({ name, input });
+  return detail ? `${title}: ${detail}` : title;
+}
+
 /** Has any tool call on this turn already finished, well or badly? */
 export function settledTool(message: ThinkingMessage | undefined): boolean {
   return !!message?.parts?.some(
@@ -111,6 +240,79 @@ export function settledTool(message: ThinkingMessage | undefined): boolean {
   );
 }
 
+/**
+ * Everything that counts as the turn making progress.
+ *
+ * A local command runs on the developer's own machine and a tab that adopted a
+ * running turn has no live stream at all, so the assistant message can stay
+ * empty for minutes while the turn is working perfectly well. Those turns are
+ * visible in the durable record instead, in its tool calls and the cards they
+ * raised, and in the plan the agent keeps.
+ */
+export interface LangyTurnActivity {
+  messages: ThinkingMessage[];
+  /**
+   * The turn's durable tool calls. This is what a reloaded tab has and the
+   * live stream does not, and it is what proves a local command is running.
+   */
+  toolCalls?:
+    | readonly { toolCallId: string; status: string }[]
+    | null
+    | undefined;
+  /** The cards the turn raised, and whether the developer has answered them. */
+  waits?: readonly { waitId: string; status: string }[] | null | undefined;
+  /** The latest snapshot of the plan the agent is following. */
+  planItems?: readonly { content: string; status: string }[] | null | undefined;
+  /** The model's live reasoning so far. It grows with every delta. */
+  reasoning?: string | null | undefined;
+  /** The manager's latest status line for the turn. */
+  status?: string | null | undefined;
+  /** What the page Langy is driving reports it is doing. */
+  pageActivity?: string | null | undefined;
+}
+
+/**
+ * A fingerprint of everything the turn has produced so far.
+ *
+ * The escalation used to measure the time since the line MOUNTED, so a turn
+ * that ran a local command for two minutes, with a settled permission card on
+ * screen and output arriving in the terminal, was told it "may be stuck". The
+ * caller restarts its clock whenever this value changes, which turns the
+ * ladder into a measure of silence: a turn that really is silent still
+ * escalates, and a turn that is working never does.
+ *
+ * Only provable things go in, parts on the wire and rows in the durable
+ * record, so this can no more invent progress than the line itself can.
+ */
+export function langyTurnActivityKey(activity: LangyTurnActivity): string {
+  const parts = currentTurnAssistant(activity.messages)?.parts ?? [];
+  const shape = parts
+    .map((part) => `${part.type ?? ""}/${part.state ?? ""}`)
+    .join(",");
+  const prose = parts.reduce(
+    (total, part) =>
+      total + (part.type === "text" ? (part.text?.length ?? 0) : 0),
+    0,
+  );
+  const calls = (activity.toolCalls ?? [])
+    .map((call) => `${call.toolCallId}/${call.status}`)
+    .join(",");
+  const waits = (activity.waits ?? [])
+    .map((wait) => `${wait.waitId}/${wait.status}`)
+    .join(",");
+  const plan = (activity.planItems ?? []).map((item) => item.status).join(",");
+  return [
+    shape,
+    prose,
+    calls,
+    waits,
+    plan,
+    activity.reasoning?.length ?? 0,
+    activity.status ?? "",
+    activity.pageActivity ?? "",
+  ].join("|");
+}
+
 /** Has the model actually produced any prose yet? */
 export function hasTokens(message: ThinkingMessage | undefined): boolean {
   return !!message?.parts?.some(
@@ -119,7 +321,143 @@ export function hasTokens(message: ThinkingMessage | undefined): boolean {
 }
 
 /**
- * The honest line for the current state of a turn.
+ * The escalation the two waiting paths share: silence is normal for a moment,
+ * then it is not, then it is a fault. Only the wording of the final admission
+ * differs between a cold start and a follow-up, so one ladder serves both.
+ * Returns nothing while the silence is still young enough to say something more
+ * specific than "this is slow".
+ */
+function silenceEscalation({
+  elapsedMs,
+  stuckText,
+}: {
+  elapsedMs: number;
+  stuckText: string;
+}): LangyThinkingLine | undefined {
+  if (elapsedMs >= THINKING_STUCK_MS) {
+    return { text: stuckText, tone: "stuck", allowWhimsy: false };
+  }
+  if (elapsedMs >= THINKING_SLOW_MS) {
+    return {
+      text: "This is taking longer than usual…",
+      tone: "waiting",
+      allowWhimsy: false,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Nothing is on the wire yet. What that MEANS depends on whether this
+ * conversation has answered before: a follow-up is waiting on a worker that is
+ * (almost always) alive, so the model is working; a first turn is waiting on a
+ * worker that does not exist yet, so the startup phases are the true account.
+ */
+function waitingLine({
+  messages,
+  elapsedMs,
+  workerReady,
+}: {
+  messages: ThinkingMessage[];
+  elapsedMs: number;
+  workerReady: boolean;
+}): LangyThinkingLine {
+  // A FOLLOW-UP IS WAITING — or a first message whose worker a panel-open warm
+  // already PROVED alive (`workerReady`). Either way the model is working, not
+  // booting; the manager's own "Thinking…" status lands moments later and
+  // takes over. The startup ladder here would claim a boot that is not
+  // happening, and a connection-flavoured line read as a lost connection. Long
+  // silence still escalates, because a live worker can wedge too.
+  if (hasPriorReply(messages) || workerReady) {
+    return (
+      silenceEscalation({
+        elapsedMs,
+        stuckText: "Langy still has not answered. It may be stuck.",
+      }) ?? { text: "Thinking…", tone: "waiting", allowWhimsy: false }
+    );
+  }
+
+  // NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on a
+  // worker that has not started, and we must not pretend otherwise.
+  const escalated = silenceEscalation({
+    elapsedMs,
+    stuckText: "Langy still has not started. It may be stuck.",
+  });
+  if (escalated) return escalated;
+
+  if (elapsedMs >= THINKING_STILL_STARTING_MS) {
+    return { text: "Still starting up…", tone: "waiting", allowWhimsy: false };
+  }
+  if (elapsedMs >= THINKING_STARTING_LANGY_MS) {
+    return { text: "Starting Langy…", tone: "waiting", allowWhimsy: false };
+  }
+  // The first phase of a cold turn: the control plane resolves credentials and
+  // lays out the worker's home before the agent process exists. The manager's
+  // own "Starting Langy…" status replaces this line the moment the worker is
+  // up (langyChatTransport), so on a warm turn this shows only for a blink.
+  return {
+    text: "Preparing Langy's workspace…",
+    tone: "waiting",
+    allowWhimsy: false,
+  };
+}
+
+/** The line while a card holds the turn for the reader's answer. */
+function awaitingAnswerLine({
+  terminalConnected,
+  awaitingPermission,
+}: {
+  terminalConnected: boolean;
+  awaitingPermission: boolean;
+}): LangyThinkingLine {
+  const text = !terminalConnected
+    ? LANGY_AWAITING_ANSWER_LINE
+    : awaitingPermission
+      ? LANGY_AWAITING_APPROVAL_TERMINAL_LINE
+      : LANGY_ANSWER_HERE_OR_TERMINAL;
+  return { text, tone: "waiting", allowWhimsy: false };
+}
+
+/**
+ * The line for the tool running right now, in the reader's words: it is on
+ * the tool stream with its command in the input, or in the turn's durable
+ * record. Null when nothing is running.
+ */
+function runningToolLine({
+  last,
+  toolCalls,
+}: {
+  last: ReturnType<typeof currentTurnAssistant>;
+  toolCalls: readonly RecordedToolCall[] | null;
+}): LangyThinkingLine | null {
+  const tool = runningTool(last);
+  if (tool?.type) {
+    return {
+      text: customerToolLine({
+        name: tool.type.slice("tool-".length),
+        input: tool.input,
+      }),
+      tone: "working",
+      allowWhimsy: false,
+    };
+  }
+  const recorded = runningRecordedTool(toolCalls);
+  if (recorded) {
+    return {
+      text: customerToolLine({
+        name: recorded.toolName,
+        input: recorded.input ?? { command: recorded.command },
+      }),
+      tone: "working",
+      allowWhimsy: false,
+    };
+  }
+  return null;
+}
+
+/**
+ * The line for the current state of a turn, or null when no line should
+ * render at all (the streaming answer is on screen and speaks for itself).
  *
  * Pure: the caller measures `elapsedMs` (time since the turn was sent) and owns
  * the clock. Everything here is derived from what is provably on the wire.
@@ -128,40 +466,109 @@ export function langyThinkingLine({
   messages,
   elapsedMs,
   hasLiveReasoning = false,
+  workerReady = false,
+  pageActivity = null,
+  awaitingAnswer = false,
+  awaitingPermission = false,
+  terminalConnected = false,
+  proseArriving = false,
+  toolCalls = null,
 }: {
   messages: ThinkingMessage[];
-  /** Time since the turn was sent. */
+  /**
+   * A text token arrived within the last `TEXT_QUIET_MS`. The streaming
+   * answer is its own status then, and the row renders nothing. The caller
+   * measures it: the parts say what has arrived, not when.
+   */
+  proseArriving?: boolean;
+  /**
+   * The turn's tool calls off its durable record. A tab that adopted the turn
+   * reads its running command from here, and a local command on the
+   * developer's machine is recorded here whether or not the stream is open.
+   */
+  toolCalls?: readonly RecordedToolCall[] | null;
+  /**
+   * The card holding the turn is a permission ask. With a terminal connected
+   * the line says the approval is waited for there.
+   */
+  awaitingPermission?: boolean;
+  /**
+   * How long the turn has been SILENT: the time since it last produced
+   * anything (`langyTurnActivityKey`), which on a turn that has produced
+   * nothing at all is the time since it was sent.
+   */
   elapsedMs: number;
+  /**
+   * What the page Langy is driving is doing right now, in the page's own
+   * words, or null when it is doing nothing. The page reports the work it is
+   * actually carrying out — the column it is running and how many rows are
+   * back — so this is the most specific true line available, and it outranks
+   * everything the turn can infer. While the agent waits for a run it is
+   * blocked on a status poll, and naming the poll describes its bookkeeping
+   * where naming the run describes the reader's own work.
+   */
+  pageActivity?: string | null;
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts (they are live-edge only), so without this
-   * signal a reasoning-but-no-prose turn read as "Starting up…" — a false
+   * signal a reasoning-but-no-prose turn read as a startup wait — a false
    * claim: the model is provably working.
    */
   hasLiveReasoning?: boolean;
-}): LangyThinkingLine {
-  const last = [...messages].reverse().find((m) => m.role === "assistant");
+  /**
+   * A card is open and the turn is holding for the developer's answer
+   * (ADR-129). Nothing is running, and nothing is late: the panel used to
+   * escalate through "This is taking longer than usual" to "Langy still
+   * hasn't answered, it may be stuck", every word of it about Langy, while
+   * the turn was waiting on the reader.
+   */
+  awaitingAnswer?: boolean;
+  /**
+   * A folder is shared from a terminal, so the ask that is holding the turn is
+   * open there as well and either place answers it.
+   */
+  terminalConnected?: boolean;
+  /**
+   * A panel-open warm proved this conversation's worker alive before the send
+   * (`warmed: true` from `langy.warmWorker`). A first message then skips the
+   * startup ladder — the workspace it would claim to be preparing already
+   * exists — and reads "Thinking…" like a follow-up. If the proof went stale
+   * (the worker was reaped since), the manager's readiness status corrects
+   * the line moments later, the same recovery a follow-up relies on.
+   */
+  workerReady?: boolean;
+}): LangyThinkingLine | null {
+  const last = currentTurnAssistant(messages);
 
-  // 1. A TOOL IS RUNNING. We know exactly what it is — it is on the tool stream,
-  //    with its command in the input. Say the true thing.
-  const tool = runningTool(last);
-  if (tool?.type) {
-    const rawName = tool.type.slice("tool-".length);
-    const { title, detail } = describeToolCall({
-      name: effectiveToolName(rawName, tool.input),
-      input: tool.input,
-    });
-    return {
-      text: detail ? `${title} — ${detail}` : title,
-      tone: "working",
-      allowWhimsy: false,
-    };
+  // 0. A CARD IS WAITING FOR THE READER. The turn is holding on purpose, so
+  //    nothing about it is slow and nothing about it is stuck. This outranks
+  //    every line below, including the tool that reads as still running: that
+  //    tool IS the card.
+  if (awaitingAnswer) {
+    return awaitingAnswerLine({ terminalConnected, awaitingPermission });
   }
 
-  // 2. TOKENS ARE ARRIVING. The model really is generating, so a whimsical verb
-  //    here claims nothing that isn't happening — it IS thinking.
-  if (hasTokens(last)) {
-    return { text: "Writing…", tone: "working", allowWhimsy: true };
+  // 0b. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
+  //    true and more specific than anything below: the column being run and
+  //    the rows already back, rather than the poll the agent is blocked on.
+  const reported = pageActivity?.trim();
+  if (reported) {
+    return { text: reported, tone: "working", allowWhimsy: false };
+  }
+
+  // 1. A TOOL IS RUNNING. We know exactly what it is: it is on the tool
+  //    stream with its command in the input, or in the turn's durable record.
+  //    Say the true thing, in the reader's words.
+  const running = runningToolLine({ last, toolCalls });
+  if (running) return running;
+
+  // 2. TOKENS ARE ARRIVING. The streaming prose is on screen right above this
+  //    line, so the answer itself is the status — a second line under it
+  //    ("Writing…", or any status orb) reads as the panel still waiting for
+  //    the reply that is visibly arriving. Render nothing until the text has
+  //    been quiet for TEXT_QUIET_MS.
+  if (proseArriving) {
+    return null;
   }
 
   // 3. REASONING IS ARRIVING. No prose yet, but the model is provably working —
@@ -172,35 +579,19 @@ export function langyThinkingLine({
     return { text: "Thinking…", tone: "working", allowWhimsy: false };
   }
 
-  // 4. THE TURN IS BETWEEN STEPS. Nothing is running right now, but tool calls
-  //    have already SETTLED on this turn — so the worker demonstrably started,
-  //    and the startup ladder below would be a plain lie ("Starting up…" under
+  // 4. THE TURN IS BETWEEN STEPS. Nothing is running right now, but the turn
+  //    has already produced something: a settled tool call, a recorded call,
+  //    or a paragraph that has gone quiet. The worker demonstrably started,
+  //    so the startup ladder below would be a plain lie (a startup line under
   //    four completed actions). The model is choosing its next move, which is
-  //    the same state as case 3 and reads the same way.
-  if (settledTool(last)) {
+  //    the same state as case 3 and reads the same way, with the verbs
+  //    cycling.
+  if (settledTool(last) || hasTokens(last) || (toolCalls?.length ?? 0) > 0) {
     return { text: "Thinking…", tone: "working", allowWhimsy: true };
   }
 
-  // 5. NOTHING HAS HAPPENED. No tool, no token, no reasoning. We are waiting on
-  //    a worker that has not started, and we must not pretend otherwise.
-  //    Escalate with time: silence is normal for a moment, then it isn't, then
-  //    it's a fault.
-  if (elapsedMs >= THINKING_STUCK_MS) {
-    return {
-      text: "Langy still hasn't started — it may be stuck.",
-      tone: "stuck",
-      allowWhimsy: false,
-    };
-  }
-  if (elapsedMs >= THINKING_SLOW_MS) {
-    return {
-      text: "This is taking longer than usual…",
-      tone: "waiting",
-      allowWhimsy: false,
-    };
-  }
-  if (elapsedMs >= THINKING_STILL_STARTING_MS) {
-    return { text: "Still starting up…", tone: "waiting", allowWhimsy: false };
-  }
-  return { text: "Starting up…", tone: "waiting", allowWhimsy: false };
+  // 5. NOTHING IS ON THE WIRE. What the silence means, and how it escalates,
+  //    depends on whether this conversation has answered before — or already
+  //    holds a warm-proven worker.
+  return waitingLine({ messages, elapsedMs, workerReady });
 }

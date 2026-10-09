@@ -22,6 +22,7 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
+import { seedSsoConnection } from "~/test-utils/ssoConnection";
 import { FREE_PLAN } from "../../licensing/constants";
 import { app } from "../routes";
 import { ScimTokenService } from "../scim-token.service";
@@ -50,10 +51,19 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
     });
     organizationId = organization.id;
 
+    // A token names the connection it was issued for (D08), so the directory
+    // the identity provider is pushing through has to exist before it can be
+    // minted. Which connection is not what this suite is about — the plan is.
+    const { connectionId } = await seedSsoConnection({
+      prisma,
+      organizationId,
+    });
+
     // Minted while the organization is on Enterprise: the credential itself
     // is legitimate for the whole test.
     const minted = await ScimTokenService.create(prisma).generate({
       organizationId,
+      connectionId,
       description: "lapse test",
     });
     bearerToken = minted.token;
@@ -62,7 +72,9 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
+        ["scimRequestLog", { organizationId }],
         ["scimToken", { organizationId }],
+        ["ssoConnection", { organizationId }],
         ["organizationUser", { organizationId }],
         ["user", { email: { contains: ns } }],
         ["organization", { id: organizationId }],
@@ -134,6 +146,78 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
       // Distinct from the missing-header refusal: an operator debugging a
       // rotated token must not read "required" for a token they did present.
       expect(body.detail).toBe("Bearer token is not valid");
+    });
+  });
+
+  /**
+   * What gets written down about a request, and what deliberately does not
+   * (ADR-126 — see specs/identity/scim-request-log.feature).
+   *
+   * The rule is attribution, and the second half of it is load-bearing: a
+   * token that does not verify cannot be filed under an organization, and a
+   * table unauthenticated traffic can write is a table anybody on the
+   * internet can fill. So the 403 is recorded and the 401 is not, and that
+   * asymmetry is asserted here against the real app and the real table
+   * rather than described in a comment.
+   */
+  describe("given requests the app has answered", () => {
+    /** @scenario "A refusal we can attribute is recorded as a refusal" */
+    it("records a refusal it can attribute, with a reason rather than an error code", async () => {
+      mockGetActivePlan.mockResolvedValue(FREE_PLAN);
+
+      await app.request("/api/scim/v2/Users", {
+        headers: { Authorization: `Bearer ${bearerToken}` },
+      });
+
+      const recorded = await prisma.scimRequestLog.findFirst({
+        where: { organizationId, status: 403 },
+        orderBy: { occurredAt: "desc" },
+      });
+      expect(recorded).not.toBeNull();
+      expect(recorded?.method).toBe("GET");
+      expect(recorded?.resource).toBe("Users");
+      // A slug a provisioning tool can branch on, beside our own sentence.
+      expect(recorded?.reason).toBe("plan_not_entitled");
+    });
+
+    /** @scenario "A request we cannot attribute is answered and not recorded" */
+    it("records nothing for a token nothing issued, because there is no anybody to record it for", async () => {
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+      // Across the whole table, not just this organization: the point is that
+      // the row lands nowhere, not that it lands somewhere else. `findMany` is
+      // how that is asked — it is the one action this model admits at platform
+      // scope, because the retention sweep needs it (see the tenancy config).
+      // An unscoped `count` is refused, and rightly.
+      const idsNow = async (): Promise<string[]> =>
+        (await prisma.scimRequestLog.findMany({ select: { id: true } }))
+          .map((row) => row.id)
+          .sort();
+      const before = await idsNow();
+
+      const res = await app.request("/api/scim/v2/Users", {
+        headers: { Authorization: "Bearer still-not-a-real-token" },
+      });
+
+      expect(res.status).toBe(401);
+      expect(await idsNow()).toEqual(before);
+    });
+
+    /** @scenario "A request the directory makes is recorded with what we answered" */
+    it("records a request it served with the status it answered", async () => {
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+
+      await app.request("/api/scim/v2/Users", {
+        headers: { Authorization: `Bearer ${bearerToken}` },
+      });
+
+      const recorded = await prisma.scimRequestLog.findFirst({
+        where: { organizationId, status: 200 },
+        orderBy: { occurredAt: "desc" },
+      });
+      expect(recorded).not.toBeNull();
+      expect(recorded?.resource).toBe("Users");
+      // Nothing was refused, so there is nothing to call it.
+      expect(recorded?.reason).toBeNull();
     });
   });
 });

@@ -1,6 +1,6 @@
 /**
  * The per-tenant state machine for one in-place migration
- * (specs/rbac/in-place-authz-migration.feature):
+ * (specs/migration/system-migrations-runner.feature):
  *
  *   pending ──► migrated ──► finalized ──► rolled_back
  *     │             ▲                          (operator only)
@@ -19,11 +19,14 @@
  * both returns the tenant to its legacy path (no consumer reads it as
  * finalized) and pins it there until a human moves it again.
  */
-export type TenantMigrationStatus =
-  | "migrated"
-  | "finalized"
-  | "parked"
-  | "rolled_back";
+export const TENANT_MIGRATION_STATUSES = [
+  "migrated",
+  "finalized",
+  "parked",
+  "rolled_back",
+] as const;
+
+export type TenantMigrationStatus = (typeof TENANT_MIGRATION_STATUSES)[number];
 
 /**
  * The two terminal states the runner never re-runs: `finalized` is the
@@ -36,6 +39,16 @@ export function isTerminalTenantStatus(
 ): boolean {
   return status === "finalized" || status === "rolled_back";
 }
+
+/**
+ * The same two statuses as a LIST, for the callers that must ask the question
+ * somewhere a predicate cannot go - a tenant source narrowing its enumeration
+ * with `status = ANY(...)` in SQL. Derived from `isTerminalTenantStatus` over
+ * every declared status rather than written out a second time, so a third
+ * terminal state would reach those queries along with the runner.
+ */
+export const TERMINAL_TENANT_STATUSES: readonly TenantMigrationStatus[] =
+  TENANT_MIGRATION_STATUSES.filter(isTerminalTenantStatus);
 
 export type TenantMigrationRecord = {
   migrationName: string;
@@ -65,9 +78,36 @@ export type MigrationPassSummary = {
   tenantsSeen: number;
   finalized: number;
   held: number;
+  /** Held outcomes from migrations that must settle before startup. */
+  finiteHeld?: number;
   parked: number;
-  /** Finalized or rolled back before this pass, or outside the cohort. */
+  /** Outside the cohort, or an operator's mid-pass pin discarded the
+   *  outcome. Never "already done" - that is `alreadyFinalized` /
+   *  `alreadyRolledBack`. */
   skipped: number;
+  /** Finalized BEFORE this pass ever touched the tenant. Split from
+   *  `skipped` so a targeted run over tenants that are all already done
+   *  reads as done, not as "nothing was in the cohort". */
+  alreadyFinalized: number;
+  /** Rolled back (the operator's pin) BEFORE this pass ever touched the
+   *  tenant. Kept apart from `alreadyFinalized` so an organization whose
+   *  members were rolled back never reads as a successful finalization. */
+  alreadyRolledBack: number;
   /** Claimed by another process's pass, so left to that process. */
   claimed: number;
+  /**
+   * State TRANSITIONS this pass made: a (tenant, migration) whose stored
+   * status is not the one it carried when the pass read it, first record
+   * included. The ONLY field that means the fleet moved.
+   *
+   * None of the others can carry that meaning, which is why this exists.
+   * `held` counts a `migrated` write, and a held tenant is re-proved and
+   * re-written `migrated` on every pass forever - so a caller that read
+   * `held > 0` as progress would drive passes until something else stopped
+   * it. `parked` has the same shape for a tenant that keeps failing the
+   * same way. `tenantsSeen` counts visits, not outcomes. Zero here is the
+   * honest "this pass changed nothing, and running another identical one
+   * will change nothing either".
+   */
+  advanced: number;
 };

@@ -3,6 +3,7 @@ import {
   Button,
   createListCollection,
   HStack,
+  Input,
   Text,
   VStack,
   Wrap,
@@ -12,6 +13,7 @@ import {
   Building2,
   CheckCheck,
   Folder,
+  Search,
   UserLock,
   Users,
 } from "lucide-react";
@@ -94,15 +96,36 @@ interface ScopeOption {
   personalOnly?: boolean;
 }
 
-const SCOPE_DESCRIPTION_SINGLE: Record<ScopeChipPickerScopeType, string> = {
-  PROJECT: "Only this project can use this configuration.",
-  TEAM: "Every project in the team inherits this configuration.",
-  ORGANIZATION:
-    "Every project in the organization inherits this configuration.",
-  DEPARTMENT: "Every member of this department can use this configuration.",
-};
+function describeSingleScope({
+  scopeType,
+  subjectNoun,
+}: {
+  scopeType: ScopeChipPickerScopeType;
+  subjectNoun: string;
+}): string {
+  switch (scopeType) {
+    case "PROJECT":
+      return `Only this project can use this ${subjectNoun}.`;
+    case "TEAM":
+      return `Every project in the team inherits this ${subjectNoun}.`;
+    case "ORGANIZATION":
+      return `Every project in the organization inherits this ${subjectNoun}.`;
+    case "DEPARTMENT":
+      return `Every member of this department can use this ${subjectNoun}.`;
+    default: {
+      const exhaustive: never = scopeType;
+      return exhaustive;
+    }
+  }
+}
 
-function summariseSelection(scopes: ScopeChipPickerEntry[]): string {
+function summariseSelection({
+  scopes,
+  subjectNoun,
+}: {
+  scopes: ScopeChipPickerEntry[];
+  subjectNoun: string;
+}): string {
   if (scopes.length === 0) {
     return "Pick at least one scope.";
   }
@@ -110,10 +133,10 @@ function summariseSelection(scopes: ScopeChipPickerEntry[]): string {
     const only = scopes[0]!;
     if (only.personalOnly) {
       return only.scopeType === "ORGANIZATION"
-        ? "Every personal workspace in the organization inherits this configuration."
-        : "The personal workspaces of this department's members inherit this configuration.";
+        ? `Every personal workspace in the organization inherits this ${subjectNoun}.`
+        : `The personal workspaces of this department's members inherit this ${subjectNoun}.`;
     }
-    return SCOPE_DESCRIPTION_SINGLE[only.scopeType];
+    return describeSingleScope({ scopeType: only.scopeType, subjectNoun });
   }
   const personal = scopes.filter((s) => s.personalOnly);
   const plain = scopes.filter((s) => !s.personalOnly);
@@ -160,6 +183,109 @@ const ScopeIcon = ({ scopeType }: { scopeType: ScopeChipPickerScopeType }) => {
   if (scopeType === "DEPARTMENT") return <Boxes size={16} aria-hidden />;
   return <Folder size={16} aria-hidden />;
 };
+
+/**
+ * Above this many options the dropdown gains a search field: a scope
+ * list that long no longer reads at a glance, so finding beats reading.
+ */
+const SCOPE_SEARCH_THRESHOLD = 8;
+
+/**
+ * The search field pinned to the top of a long scope dropdown.
+ *
+ * Spec: specs/components/scope-chip-picker-search.feature
+ */
+function ScopeSearchField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <Box
+      position="sticky"
+      top={0}
+      zIndex={1}
+      background="bg.panel"
+      paddingX={2.5}
+      paddingY={1.5}
+      borderBottomWidth="1px"
+      borderColor="border"
+    >
+      <HStack gap={2} color="fg.muted">
+        <Search size={14} aria-hidden />
+        <Input
+          placeholder="Search scopes"
+          aria-label="Search scopes"
+          size="sm"
+          height="28px"
+          minWidth={0}
+          flex={1}
+          padding={0}
+          border={0}
+          outline="none"
+          background="transparent"
+          color="fg"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          _placeholder={{ color: "fg.subtle" }}
+          _focusVisible={{ outline: "none" }}
+        />
+      </HStack>
+    </Box>
+  );
+}
+
+/**
+ * Groups the PROJECT options under their parent team so a long project
+ * list stays organised. Projects whose team the caller did not list fall
+ * into a flat "Projects" group, which is also what every project gets
+ * when the caller passes no team data at all.
+ */
+function groupProjectOptions({
+  projectOptions,
+  availableTeams,
+  availableProjects,
+}: {
+  projectOptions: ScopeOption[];
+  availableTeams: Array<{ id: string; name: string }> | undefined;
+  availableProjects: Array<{ id: string; teamId?: string }> | undefined;
+}): {
+  teamGroups: Array<{
+    teamId: string;
+    teamName: string;
+    projects: ScopeOption[];
+  }>;
+  orphanProjects: ScopeOption[];
+} {
+  const teamNameById = new Map(
+    (availableTeams ?? []).map((t) => [t.id, t.name] as const),
+  );
+  const teamIdByProjectId = new Map(
+    (availableProjects ?? []).map((p) => [p.id, p.teamId] as const),
+  );
+  const projectsByTeam = new Map<string, ScopeOption[]>();
+  const orphanProjects: ScopeOption[] = [];
+  for (const option of projectOptions) {
+    const teamId = teamIdByProjectId.get(option.scopeId);
+    if (teamId && teamNameById.has(teamId)) {
+      const bucket = projectsByTeam.get(teamId) ?? [];
+      bucket.push(option);
+      projectsByTeam.set(teamId, bucket);
+    } else {
+      orphanProjects.push(option);
+    }
+  }
+  const teamGroups = Array.from(projectsByTeam.entries())
+    .map(([teamId, projects]) => ({
+      teamId,
+      teamName: teamNameById.get(teamId) ?? "Team",
+      projects,
+    }))
+    .sort((a, b) => a.teamName.localeCompare(b.teamName));
+  return { teamGroups, orphanProjects };
+}
 
 /**
  * Collapses redundant selections after the user picks a new scope.
@@ -319,6 +445,7 @@ export function ScopeChipPicker<
   availableDepartments,
   allowedScopeTypes,
   label = "Scope",
+  subjectNoun = "configuration",
   showSummary = true,
   showQuickPicks = false,
   singleSelect = false,
@@ -357,6 +484,9 @@ export function ScopeChipPicker<
   allowedScopeTypes?: T[];
   /** Override the field label. Defaults to "Scope". */
   label?: string;
+  /** What the summary line calls the thing being scoped ("Only this project
+   *  can use this configuration."). Defaults to "configuration". */
+  subjectNoun?: string;
   /** When false, hides the helper "Shared across …" line below the field. */
   showSummary?: boolean;
   /** Single-scope mode: a row may live at exactly one scope (inline
@@ -511,9 +641,32 @@ export function ScopeChipPicker<
     personalScopes,
   ]);
 
+  // The search filter over a long option list. Matches an option's own
+  // label and, for a project, its parent team's name, so "platform"
+  // finds every project of the Platform team.
+  const [scopeSearch, setScopeSearch] = useState("");
+  const showSearch = options.length > SCOPE_SEARCH_THRESHOLD;
+  const visibleOptions = useMemo(() => {
+    const needle = scopeSearch.trim().toLowerCase();
+    if (!showSearch || !needle) return options;
+    const teamNameById = new Map(
+      (availableTeams ?? []).map((t) => [t.id, t.name] as const),
+    );
+    const teamIdByProjectId = new Map(
+      (availableProjects ?? []).map((p) => [p.id, p.teamId] as const),
+    );
+    return options.filter((option) => {
+      const teamName =
+        option.scopeType === "PROJECT"
+          ? teamNameById.get(teamIdByProjectId.get(option.scopeId) ?? "")
+          : undefined;
+      return `${teamName ?? ""} ${option.label}`.toLowerCase().includes(needle);
+    });
+  }, [options, scopeSearch, showSearch, availableTeams, availableProjects]);
+
   const collection = useMemo(
-    () => createListCollection({ items: options }),
-    [options],
+    () => createListCollection({ items: visibleOptions }),
+    [visibleOptions],
   );
 
   // In single-scope mode the picker represents exactly one scope, so the
@@ -589,6 +742,15 @@ export function ScopeChipPicker<
     ? false
     : !showQuickPicks || multipleMode;
 
+  // The chips-variant dropdown lists projects under their team's name;
+  // computed here so the early single-select return keeps its own copy.
+  const { teamGroups: chipTeamGroups, orphanProjects: chipOrphanProjects } =
+    groupProjectOptions({
+      projectOptions: visibleOptions.filter((o) => o.scopeType === "PROJECT"),
+      availableTeams,
+      availableProjects,
+    });
+
   if (variant === "single-select") {
     const selected = scopes[0] ?? null;
     const selectedOption = selected
@@ -598,34 +760,20 @@ export function ScopeChipPicker<
     // Group PROJECT options under their parent team so the list stays organised
     // even with many projects across teams. Non-project options (org / team /
     // department) keep their own flat groups.
-    const teamNameById = new Map(
-      (availableTeams ?? []).map((t) => [t.id, t.name] as const),
+    const { teamGroups, orphanProjects } = groupProjectOptions({
+      projectOptions: visibleOptions.filter((o) => o.scopeType === "PROJECT"),
+      availableTeams,
+      availableProjects,
+    });
+    const orgOptions = visibleOptions.filter(
+      (o) => o.scopeType === "ORGANIZATION",
     );
-    const teamIdByProjectId = new Map(
-      (availableProjects ?? []).map((p) => [p.id, p.teamId] as const),
+    const deptOptions = visibleOptions.filter(
+      (o) => o.scopeType === "DEPARTMENT",
     );
-    const projectsByTeam = new Map<string, ScopeOption[]>();
-    const orphanProjects: ScopeOption[] = [];
-    for (const option of options.filter((o) => o.scopeType === "PROJECT")) {
-      const teamId = teamIdByProjectId.get(option.scopeId);
-      if (teamId && teamNameById.has(teamId)) {
-        const bucket = projectsByTeam.get(teamId) ?? [];
-        bucket.push(option);
-        projectsByTeam.set(teamId, bucket);
-      } else {
-        orphanProjects.push(option);
-      }
-    }
-    const teamGroups = Array.from(projectsByTeam.entries())
-      .map(([teamId, projects]) => ({
-        teamId,
-        teamName: teamNameById.get(teamId) ?? "Team",
-        projects,
-      }))
-      .sort((a, b) => a.teamName.localeCompare(b.teamName));
-    const orgOptions = options.filter((o) => o.scopeType === "ORGANIZATION");
-    const deptOptions = options.filter((o) => o.scopeType === "DEPARTMENT");
-    const teamScopeOptions = options.filter((o) => o.scopeType === "TEAM");
+    const teamScopeOptions = visibleOptions.filter(
+      (o) => o.scopeType === "TEAM",
+    );
     const fallbackPlaceholder = placeholder ?? "Select an option";
 
     return (
@@ -634,6 +782,9 @@ export function ScopeChipPicker<
         <Select.Root
           collection={collection}
           value={selected ? [entryKey(selected)] : []}
+          onOpenChange={(details) => {
+            if (details.open) setScopeSearch("");
+          }}
           onValueChange={(details) => {
             const pickedValue = details.value[0];
             const option = pickedValue
@@ -667,6 +818,14 @@ export function ScopeChipPicker<
             </Select.ValueText>
           </Select.Trigger>
           <Select.Content>
+            {showSearch && (
+              <ScopeSearchField value={scopeSearch} onChange={setScopeSearch} />
+            )}
+            {visibleOptions.length === 0 && (
+              <Text paddingX={3} paddingY={2} fontSize="sm" color="fg.muted">
+                No scopes match your search.
+              </Text>
+            )}
             {orgOptions.length > 0 && (
               <Select.ItemGroup label="Organization">
                 {orgOptions.map((option) => (
@@ -732,7 +891,7 @@ export function ScopeChipPicker<
         {showSummary && (
           <Box>
             <Text fontSize="xs" color="gray.600">
-              {summariseSelection(scopes)}
+              {summariseSelection({ scopes, subjectNoun })}
             </Text>
           </Box>
         )}
@@ -800,6 +959,9 @@ export function ScopeChipPicker<
           collection={collection}
           value={selectedValues}
           multiple
+          onOpenChange={(details) => {
+            if (details.open) setScopeSearch("");
+          }}
           onValueChange={(details) => {
             const picked = new Set(details.value);
             const next = options
@@ -845,11 +1007,19 @@ export function ScopeChipPicker<
             </Select.ValueText>
           </Select.Trigger>
           <Select.Content>
-            {options.some(
+            {showSearch && (
+              <ScopeSearchField value={scopeSearch} onChange={setScopeSearch} />
+            )}
+            {visibleOptions.length === 0 && (
+              <Text paddingX={3} paddingY={2} fontSize="sm" color="fg.muted">
+                No scopes match your search.
+              </Text>
+            )}
+            {visibleOptions.some(
               (o) => o.scopeType === "ORGANIZATION" && !o.personalOnly,
             ) && (
               <Select.ItemGroup label="Organization">
-                {options
+                {visibleOptions
                   .filter(
                     (o) => o.scopeType === "ORGANIZATION" && !o.personalOnly,
                   )
@@ -863,11 +1033,11 @@ export function ScopeChipPicker<
                   ))}
               </Select.ItemGroup>
             )}
-            {options.some(
+            {visibleOptions.some(
               (o) => o.scopeType === "DEPARTMENT" && !o.personalOnly,
             ) && (
               <Select.ItemGroup label="Departments">
-                {options
+                {visibleOptions
                   .filter(
                     (o) => o.scopeType === "DEPARTMENT" && !o.personalOnly,
                   )
@@ -881,9 +1051,9 @@ export function ScopeChipPicker<
                   ))}
               </Select.ItemGroup>
             )}
-            {options.some((o) => o.scopeType === "TEAM") && (
+            {visibleOptions.some((o) => o.scopeType === "TEAM") && (
               <Select.ItemGroup label="Teams">
-                {options
+                {visibleOptions
                   .filter((o) => o.scopeType === "TEAM")
                   .map((option) => (
                     <Select.Item key={option.value} item={option}>
@@ -895,23 +1065,35 @@ export function ScopeChipPicker<
                   ))}
               </Select.ItemGroup>
             )}
-            {options.some((o) => o.scopeType === "PROJECT") && (
+            {/* Projects list under their team's name so a long list stays
+                readable; projects without team data keep the flat group. */}
+            {chipTeamGroups.map((group) => (
+              <Select.ItemGroup key={group.teamId} label={group.teamName}>
+                {group.projects.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2} paddingLeft={2}>
+                      <ScopeIcon scopeType="PROJECT" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+              </Select.ItemGroup>
+            ))}
+            {chipOrphanProjects.length > 0 && (
               <Select.ItemGroup label="Projects">
-                {options
-                  .filter((o) => o.scopeType === "PROJECT")
-                  .map((option) => (
-                    <Select.Item key={option.value} item={option}>
-                      <HStack gap={2}>
-                        <ScopeIcon scopeType="PROJECT" />
-                        <Text>{option.label}</Text>
-                      </HStack>
-                    </Select.Item>
-                  ))}
+                {chipOrphanProjects.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="PROJECT" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
               </Select.ItemGroup>
             )}
-            {options.some((o) => o.personalOnly) && (
+            {visibleOptions.some((o) => o.personalOnly) && (
               <Select.ItemGroup label="Personal projects">
-                {options
+                {visibleOptions
                   .filter((o) => o.personalOnly)
                   .map((option) => (
                     <Select.Item key={option.value} item={option}>
@@ -929,7 +1111,7 @@ export function ScopeChipPicker<
       {showSummary && (
         <Box>
           <Text fontSize="xs" color="gray.600">
-            {summariseSelection(scopes)}
+            {summariseSelection({ scopes, subjectNoun })}
           </Text>
         </Box>
       )}

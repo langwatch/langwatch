@@ -32,26 +32,36 @@ vi.mock("~/server/evaluations/runEvaluation", () => ({
   runEvaluationForTrace: vi.fn(),
 }));
 
-// Bypass the RBAC middleware — we're testing the handler logic, not auth.
-vi.mock("../../rbac", () => ({
-  checkProjectPermission:
-    () =>
-    ({
-      next,
-      ctx,
-    }: {
-      next: () => unknown;
-      ctx: { permissionChecked?: boolean };
-    }) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-}));
+// Bypass the RBAC resolver — we're testing the handler logic, not auth.
+// Spread the real module rather than hand-listing exports: the Langy graph
+// this import chain reaches runs pure helpers at module-load time, and a
+// hand-listed factory turns any new export into a load-time crash.
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
+import { createTestApp } from "~/server/app-layer/presets";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { evaluationsRouter } from "../evaluations";
+
+wireDefaultTestApp();
 
 function createCaller(_projectId: string) {
   return evaluationsRouter.createCaller({
+    app: createTestApp({ permissions: appPermissionsService() }),
     session: {
       user: { id: "user-test", email: "test@example.com" },
       expires: new Date(Date.now() + 3600_000).toISOString(),

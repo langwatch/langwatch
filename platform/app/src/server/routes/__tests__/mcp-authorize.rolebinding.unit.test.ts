@@ -1,19 +1,13 @@
-/**
- * @vitest-environment node
- *
- * Regression guard for the MCP OAuth authorize endpoint
- * (POST /api/mcp/authorize). A user added to a team after migration
- * 20260407120000_migrate_team_users_to_role_bindings exists only as a
- * TEAM-scoped RoleBinding (no legacy TeamUser row). The endpoint gated
- * project access with `team: { members: { some: { user: { id } } } }` — the
- * TeamUser relation — and returned 403 "Project not found or you don't have
- * access" on Allow. The fix resolves access via RoleBindings
- * (hasProjectPermission), so RoleBinding-only members can authorize.
- */
+/** @vitest-environment node */
+
+// MCP authorization uses the live team grant even without a TeamUser row.
 import { describe, expect, it, vi } from "vitest";
 
 import type * as AppLayerApp from "~/server/app-layer/app";
 import { app } from "../misc";
+
+// The unit pool reuses modules; this route must load with this file's DB/App mocks.
+vi.hoisted(() => vi.resetModules());
 
 const PROJECT_ID = "project_1";
 const TEAM_ID = "team_1";
@@ -49,21 +43,37 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
       // org-level MEMBER role. The MEMBER org role alone grants no project-level
       // permission, so authorization still hinges on the TEAM binding below.
       organizationUser: {
-        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
-      },
-      // checkPermissionFromBindings: user belongs to no groups …
-      groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
-      // … but has a TEAM-scoped ADMIN RoleBinding (project:view is granted).
-      roleBinding: {
-        findMany: vi
+        findFirst: vi
           .fn()
-          .mockResolvedValue([
-            { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-          ]),
+          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
+      },
+      groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      grant: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "grant-team-admin",
+            organizationId: "org_1",
+            principalType: "USER",
+            principalId: "member_rolebinding_only",
+            roleKey: "admin",
+            legacyRole: "ADMIN",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+            source: "grants-service",
+            token: null,
+            permission: null,
+            resourceKind: null,
+            projectId: null,
+            createdByUserId: null,
+            expiresAt: null,
+            maxViews: null,
+            occurredAt: new Date(1),
+            updatedAt: new Date(1),
+          },
+        ]),
       },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
-      // Legacy fallback must find nothing — the whole point is the user has no
-      // TeamUser row.
+      // There is no legacy TeamUser row for this member.
       teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
       project: {
         // Two callers hit project.findUnique: resolveProjectPermission selects
@@ -96,12 +106,20 @@ vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // connection the handler writes the auth code to.
 vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual = await importOriginal<typeof AppLayerApp>();
+  const permissions = await import("~/server/app-layer/permissions/runtime");
+  const { prisma } = await import("~/server/db");
   // misc.ts reads its connection through tryGetApp; getApp is overridden too
-  // so both accessors agree on the fake.
+  // so both accessors agree on the fake. The permission check runs the REAL
+  // walk over this file's prisma fixtures, exactly as it did before the App
+  // owned the service.
+  const app = {
+    redis: mockRedis,
+    permissions: permissions.permissionsServiceFor(prisma),
+  };
   return {
     ...actual,
-    getApp: () => ({ redis: mockRedis }),
-    tryGetApp: () => ({ redis: mockRedis }),
+    getApp: () => app,
+    tryGetApp: () => app,
   };
 });
 vi.mock("~/utils/encryption", () => ({
@@ -158,7 +176,7 @@ async function expectAccessDenied(res: Response) {
 }
 
 describe("POST /mcp/authorize", () => {
-  describe("when the user has project access via a TEAM-scoped RoleBinding but no legacy TeamUser row", () => {
+  describe("when the user has project access via a TEAM-scoped grant but no legacy TeamUser row", () => {
     it("authorizes the connection instead of returning 403", async () => {
       const res = await authorize();
       const json = (await res.json()) as { redirect?: string; error?: string };
@@ -170,10 +188,8 @@ describe("POST /mcp/authorize", () => {
   });
 
   describe("when the user has no binding granting access to the project", () => {
-    it("returns 403 (proves the RoleBinding permission gate actually runs)", async () => {
-      // No bindings at all → checkPermissionFromBindings falls back to TeamUser,
-      // which is also absent → access denied.
-      mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
+    it("returns 403 (proves the authz permission gate actually runs)", async () => {
+      mockPrisma.grant.findMany.mockResolvedValueOnce([]);
 
       await expectAccessDenied(await authorize());
     });

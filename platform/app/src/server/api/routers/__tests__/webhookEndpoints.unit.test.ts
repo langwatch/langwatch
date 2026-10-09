@@ -34,34 +34,26 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (value: string) => value.replace(/^encrypted:/, ""),
 }));
 
-// Every checkOrganizationPermission call records its permission string and
-// denies the ones a test put into `denied`, so each procedure's scope
-// mapping is asserted against the real wiring, not a copy of it.
+// Every declared check records its canonical permission and denies the ones a
+// test put into `denied`, so scope mapping is asserted at the App seam.
 const seenPermissions: string[] = [];
 const denied = new Set<string>();
-
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    checkOrganizationPermission:
-      (permission: string) =>
-      async ({ ctx, next }: any) => {
-        seenPermissions.push(permission);
-        if (denied.has(permission)) {
-          throw Object.assign(new Error("denied"), { code: "UNAUTHORIZED" });
-        }
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+const permissions = vi.hoisted(() => ({
+  getDecision: vi.fn(),
+}));
 
 const getActivePlan = vi.fn();
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
+vi.mock("~/server/app-layer", () => ({
+  getApp: () => ({
+    permissions,
+    planProvider: { getActivePlan },
+  }),
   tryGetApp: () => null,
-  getApp: () => ({ planProvider: { getActivePlan } }),
+}));
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ permissions, planProvider: { getActivePlan } }),
+  tryGetApp: () => null,
 }));
 
 const ENDPOINT_ROW = {
@@ -94,6 +86,11 @@ function buildMockPrisma() {
 
 function buildCaller(prisma: PrismaClient) {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: { user: { id: "user_1" }, expires: "1" },
     req: undefined,
     res: undefined,
@@ -109,6 +106,12 @@ describe("webhookEndpointsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
+    permissions.getDecision.mockImplementation(
+      async ({ permission }: { permission: string }) => {
+        seenPermissions.push(permission);
+        return { permitted: !denied.has(permission), organizationRole: null };
+      },
+    );
     getActivePlan.mockResolvedValue({ webhookEndpointsEnabled: true });
   });
 
@@ -136,7 +139,7 @@ describe("webhookEndpointsRouter", () => {
         url: "https://example.com/hook",
         enabledEvents: ["gateway.request.completed"],
       }),
-    ).rejects.toThrow("denied");
+    ).rejects.toThrow("You do not have permission");
     expect((prisma as any).webhookEndpoint.create).not.toHaveBeenCalled();
   });
 

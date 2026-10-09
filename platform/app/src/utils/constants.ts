@@ -1,9 +1,11 @@
-import { getLatestOpenAIChatFlagship } from "../server/modelProviders/getLatestFlagship";
+import { resolveLatestAlias } from "../server/modelProviders/latestAliases";
 
-// Auto-derived from the LLM model registry (llmModels.json) — always the
-// newest plain `openai/gpt-<major>.<minor>` flagship. Hard fallback only
-// for the unreachable case where the registry has no plain flagship.
-export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
+// The model `openai/latest` resolves to, read from the LLM model registry
+// (llmModels.json) through the same tier grammar, so a surface falling back
+// to this constant shows the model the Default Models settings call "Latest".
+// Hard fallback only for a registry with no OpenAI main-tier model.
+export const DEFAULT_MODEL =
+  resolveLatestAlias("openai/latest") ?? "openai/gpt-5";
 
 export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 
@@ -40,6 +42,8 @@ export const PUBLIC_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
   "GOOGLE_AGENT_PLATFORM_PROJECT",
   "MANAGED",
   "OPENAI_BASE_URL",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_FROM_NUMBER",
   "VERTEXAI_LOCATION",
   "VERTEXAI_PROJECT",
 ]);
@@ -57,6 +61,34 @@ export const SECRET_CREDENTIAL_MARKERS = [
   "PASSWORD",
   "CREDENTIAL",
 ] as const;
+
+/**
+ * Credentials whose exact bytes are the contract, so the whitespace around
+ * them is not noise to strip.
+ *
+ * Trimming is safe for a credential spent as an HTTP header or a query
+ * parameter: both discard the padding anyway, so stripping it early only
+ * spares the client rejecting the value outright. It is not safe for one
+ * spent as cryptographic key material, where every byte is part of the key
+ * and the platform cannot check its copy against the vendor's.
+ *
+ * `ELEVENLABS_WEBHOOK_SECRET` is the HMAC key in `verifyElevenLabsSignature`
+ * (`server/routes/elevenlabs.ts`), so the signing happens here.
+ * `AWS_SECRET_ACCESS_KEY` is signed with elsewhere: it leaves this process at
+ * `gateway/config.materialiser.ts` (as `secret_key`) and at
+ * `api/routers/modelProviders.utils.ts`, and is the root of the SigV4 signing
+ * chain downstream. In both cases one changed byte changes every signature
+ * computed from it.
+ *
+ * `customKeys.trimCredentials` is the single reader, and
+ * `credentialFieldClassification.unit.test.ts` walks the provider registry to
+ * keep this list and the registry in step: a field renamed there and left
+ * behind here would silently start getting trimmed again.
+ */
+export const EXACT_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
+  "AWS_SECRET_ACCESS_KEY",
+  "ELEVENLABS_WEBHOOK_SECRET",
+]);
 
 export const MASKED_KEY_PLACEHOLDER = "HAS_KEY••••••••••••••••••••••••";
 
@@ -115,4 +147,6 @@ export const KSUID_RESOURCES = {
   WEBHOOK_ENDPOINT: "webhookendpoint",
   EXPORT: "export",
   TRACE_EDIT_OVERLAY: "traceedit",
+  INSTANT_EVAL_RUN: "instanteval",
+  INSTANT_EVAL_QUERY: "instantevalquery",
 } as const;

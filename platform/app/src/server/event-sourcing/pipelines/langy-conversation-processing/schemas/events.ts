@@ -23,12 +23,18 @@ import {
   langyConversationMetadataUpdatedEventDataSchema,
   langyConversationStartedEventDataSchema,
   langyConversationTitleGeneratedEventDataSchema,
+  langyLocalControlRequestedEventDataSchema,
+  langyLocalPolicyChangedEventDataSchema,
+  langyLocalWorkspaceConnectedEventDataSchema,
+  langyLocalWorkspaceDisconnectedEventDataSchema,
   langyMessageImportedEventDataSchema,
   langyMessageRecordedEventDataSchema,
   langyPlanUpdatedEventDataSchema,
   langyToolCallFailedEventDataSchema,
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
+  langyUserWaitEndedEventDataSchema,
+  langyUserWaitStartedEventDataSchema,
 } from "@langwatch/langy";
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
@@ -185,6 +191,64 @@ export type LangyConversationTitleGeneratedEvent = z.infer<
   typeof LangyConversationTitleGeneratedEventSchema
 >;
 
+export const LangyLocalControlRequestedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_CONTROL_REQUESTED),
+  data: langyLocalControlRequestedEventDataSchema,
+});
+export type LangyLocalControlRequestedEvent = z.infer<
+  typeof LangyLocalControlRequestedEventSchema
+>;
+
+export const LangyLocalWorkspaceConnectedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED),
+  version: z.literal(
+    LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_CONNECTED,
+  ),
+  data: langyLocalWorkspaceConnectedEventDataSchema,
+});
+export type LangyLocalWorkspaceConnectedEvent = z.infer<
+  typeof LangyLocalWorkspaceConnectedEventSchema
+>;
+
+export const LangyLocalWorkspaceDisconnectedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED),
+  version: z.literal(
+    LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_WORKSPACE_DISCONNECTED,
+  ),
+  data: langyLocalWorkspaceDisconnectedEventDataSchema,
+});
+export type LangyLocalWorkspaceDisconnectedEvent = z.infer<
+  typeof LangyLocalWorkspaceDisconnectedEventSchema
+>;
+
+export const LangyLocalPolicyChangedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.LOCAL_POLICY_CHANGED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.LOCAL_POLICY_CHANGED),
+  data: langyLocalPolicyChangedEventDataSchema,
+});
+export type LangyLocalPolicyChangedEvent = z.infer<
+  typeof LangyLocalPolicyChangedEventSchema
+>;
+
+export const LangyUserWaitStartedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_STARTED),
+  data: langyUserWaitStartedEventDataSchema,
+});
+export type LangyUserWaitStartedEvent = z.infer<
+  typeof LangyUserWaitStartedEventSchema
+>;
+
+export const LangyUserWaitEndedEventSchema = EventSchema.extend({
+  type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED),
+  version: z.literal(LANGY_CONVERSATION_EVENT_VERSIONS.USER_WAIT_ENDED),
+  data: langyUserWaitEndedEventDataSchema,
+});
+export type LangyUserWaitEndedEvent = z.infer<
+  typeof LangyUserWaitEndedEventSchema
+>;
+
 /**
  * Union of all langy-conversation-processing event types.
  */
@@ -204,7 +268,13 @@ export type LangyConversationProcessingEvent =
   | LangyConversationMetadataUpdatedEvent
   | LangyConversationHandoffPendingEvent
   | LangyConversationHandoffConsumedEvent
-  | LangyConversationTitleGeneratedEvent;
+  | LangyConversationTitleGeneratedEvent
+  | LangyLocalControlRequestedEvent
+  | LangyLocalWorkspaceConnectedEvent
+  | LangyLocalWorkspaceDisconnectedEvent
+  | LangyLocalPolicyChangedEvent
+  | LangyUserWaitStartedEvent
+  | LangyUserWaitEndedEvent;
 
 export {
   isLangyAgentRespondedEvent,
@@ -216,9 +286,15 @@ export {
   isLangyConversationMetadataUpdatedEvent,
   isLangyConversationStartedEvent,
   isLangyConversationTitleGeneratedEvent,
+  isLangyLocalControlRequestedEvent,
+  isLangyLocalPolicyChangedEvent,
+  isLangyLocalWorkspaceConnectedEvent,
+  isLangyLocalWorkspaceDisconnectedEvent,
   isLangyMessageRecordedEvent,
   isLangyPlanUpdatedEvent,
   isLangyToolCallFailedEvent,
   isLangyToolCallInitiatedEvent,
   isLangyToolCallSucceededEvent,
+  isLangyUserWaitEndedEvent,
+  isLangyUserWaitStartedEvent,
 } from "./typeGuards";

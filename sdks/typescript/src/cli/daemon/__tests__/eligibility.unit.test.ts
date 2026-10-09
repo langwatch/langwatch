@@ -165,6 +165,27 @@ describe("evaluateEligibility", () => {
     });
   });
 
+  describe("when the command reads the caller's own environment", () => {
+    // The forwarded-env allowlist carries neither the session identity
+    // (CLAUDE_CODE_SESSION_ID) nor TRACEPARENT nor CODEX_HOME, so a
+    // daemon-served declaration resolves the wrong session or none.
+    it.each([
+      [["ingest", "context"]],
+      [["ingest", "guidance", "claude-code"]],
+    ])("refuses %j", (args) => {
+      expect(evaluateEligibility(piped({ args }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
+    });
+
+    it("keeps serving the other ingest commands", () => {
+      expect(evaluateEligibility(piped({ args: ["ingest", "list"] }))).toEqual({
+        eligible: true,
+      });
+    });
+  });
+
   describe("when the command mutates identity or takes over stdio", () => {
     it.each([
       ["login"],
@@ -235,6 +256,28 @@ describe("evaluateEligibility", () => {
           piped({ args: ["ingest", "tail", "src-1", "--follow"] }),
         ),
       ).toEqual({ eligible: false, reason: "long-running-flag" });
+    });
+
+    it("refuses --wait, which polls a run past the client's request deadline", () => {
+      expect(
+        evaluateEligibility(
+          piped({
+            args: ["test-suite", "run", "Smoke", "--target", "connected:a", "--wait"],
+          }),
+        ),
+      ).toEqual({ eligible: false, reason: "long-running-flag" });
+    });
+
+    it("refuses --wait with a number of minutes, in both spellings", () => {
+      for (const tail of [["--wait", "90"], ["--wait=90"]]) {
+        expect(
+          evaluateEligibility(
+            piped({
+              args: ["test-suite", "run", "Smoke", "--target", "connected:a", ...tail],
+            }),
+          ),
+        ).toEqual({ eligible: false, reason: "long-running-flag" });
+      }
     });
   });
 

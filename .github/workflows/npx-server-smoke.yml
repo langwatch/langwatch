@@ -7,7 +7,13 @@
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
 # - nightly schedule (04:00 UTC)
-# - push to non-main branches when key files change (PR validation)
+# - push, on any branch INCLUDING main, when key files change
+#
+# main was excluded from the push trigger for as long as this file has existed,
+# which left the nightly as its only cover. A defect that lands after the
+# nightly sits on main for up to a day while main reads green, and every branch
+# that merges main in that window goes red on work it did not do. The
+# concurrency block below already assumed a per-commit run on main.
 #
 # This workflow is intentionally not in the langwatch-app-complete required
 # checks — postgres/clickhouse/uv downloads are heavy and flaky-prone. Treat
@@ -25,8 +31,6 @@ on:
   schedule:
     - cron: "0 4 * * *"
   push:
-    branches-ignore:
-      - main
     paths:
       - "package.json"
       - "pnpm-workspace.yaml"
@@ -218,10 +222,20 @@ jobs:
           # is Python and IS in package.json's `files[]` (deliberately shipped),
           # so a blanket services/ match false-positives on every run. Grep for
           # go.mod/cmd/pkg/services, then subtract the known-non-Go services/
-          # subdirs — anything left under services/ is an unlisted (and thus
+          # entries — anything left under services/ is an unlisted (and thus
           # unreviewed) directory, which stays worth failing on.
+          #
+          # services/langyworker ships ONE file, its manifest, because the
+          # lockfile names it as a workspace member and an install whose
+          # directory is absent fails much later, inside a migration
+          # (packages/server/test/workspace-invariants.test.ts, "ships a
+          # manifest for every workspace member"). The subtraction names that
+          # exact path rather than the directory, so its TypeScript sources
+          # still fail this guard if they ever start shipping.
           if tar -tzf "$tarball" | grep -E "^package/app/(go\.mod|cmd/|pkg/|services/)" \
-              | grep -v "^package/app/services/langevals/" | grep -q .; then
+              | grep -v "^package/app/services/langevals/" \
+              | grep -vx "package/app/services/langyworker/package.json" \
+              | grep -q .; then
             echo "✗ tarball ships Go source dirs — local-build fallback regression."
             exit 1
           fi

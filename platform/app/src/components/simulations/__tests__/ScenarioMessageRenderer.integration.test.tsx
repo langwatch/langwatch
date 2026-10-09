@@ -561,4 +561,73 @@ describe("<ScenarioMessageRenderer/>", () => {
       expect(mediaWrapper!.querySelector("p")).toBeNull();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // scenario#994 — callee (phone agent under test) turns show their transcript.
+  //
+  // A phone run captures the callee's audio with the transcription the judge
+  // was given as a sibling text part; the renderer must show it as an audio
+  // player with that transcript beside it, exactly the way it shows the
+  // simulator's own voice turns. The agent under test renders as the
+  // assistant role, the simulator as the user role.
+  // -------------------------------------------------------------------------
+  describe("when a phone run's conversation shows callee and simulator voice turns", () => {
+    /** @scenario "Callee turns show their transcript in the run conversation" */
+    it("shows each callee turn's audio player with its transcript beside it, like the simulator's", () => {
+      renderWith([
+        {
+          id: "msg_callee_turn",
+          role: "assistant",
+          content: [
+            { type: "text", text: "Hello, thanks for calling" },
+            {
+              type: "input_audio",
+              input_audio: {
+                url: "/api/files/callee-voice",
+                mimeType: "audio/mpeg",
+              },
+            },
+          ],
+        } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+        {
+          id: "msg_simulator_turn",
+          role: "user",
+          content: [
+            { type: "text", text: "Hi, I have a question about my order" },
+            {
+              type: "input_audio",
+              input_audio: {
+                url: "/api/files/simulator-voice",
+                mimeType: "audio/mpeg",
+              },
+            },
+          ],
+        } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+      ]);
+
+      // Two audio players, one per turn — the callee turn is rendered, not dropped.
+      const players = screen.getAllByTestId("media-part-audio");
+      expect(players).toHaveLength(2);
+
+      // The callee's transcript renders beside its audio, in the same media
+      // wrapper (co-contained), and matches the text the judge was given.
+      const calleeTranscript = screen.getByText("Hello, thanks for calling");
+      const calleePlayer = players[0]!;
+      expect(calleePlayer.closest("[data-align]")).toContainElement(
+        calleeTranscript,
+      );
+
+      // The simulator's turn renders the same way: audio + transcript beside it.
+      const simulatorTranscript = screen.getByText(
+        "Hi, I have a question about my order",
+      );
+      const simulatorPlayer = players[1]!;
+      expect(simulatorPlayer.closest("[data-align]")).toContainElement(
+        simulatorTranscript,
+      );
+
+      // The raw part shape never leaks into a bubble as text.
+      expect(screen.queryByText(/input_audio/)).toBeNull();
+    });
+  });
 });

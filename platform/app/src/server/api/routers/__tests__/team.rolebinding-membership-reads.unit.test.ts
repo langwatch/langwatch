@@ -4,31 +4,46 @@ import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { teamRouter } from "../team";
 
-// Team membership is written ONLY to RoleBinding since migration
-// 20260407120000_migrate_team_users_to_role_bindings — the legacy TeamUser
-// relation is no longer populated for members added through the settings page.
-// These regression guards prove the read paths (getTeamWithMembers,
-// getTeamsWithMembers, getBySlug) resolve membership from TEAM-scoped
-// RoleBindings rather than the stale team.members (TeamUser) relation.
-// Without this, a freshly-added admin vanishes on refresh, disappears from
-// member pickers, and fails the getBySlug access gate.
+// Team membership is read from live TEAM-scoped grants. These regression
+// guards prove the read paths (getTeamWithMembers, getTeamsWithMembers,
+// getBySlug) resolve membership from grant rows rather than a stale
+// compatibility relation. Without this, a freshly-added admin vanishes on
+// refresh, disappears from member pickers, and fails the getBySlug access gate.
 //
 // The org-permission middleware/guard is real authorization the page already
 // passes for an org admin; it's mocked to a pass-through so these tests isolate
 // the member-resolution read path.
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  const mocked = appPermissionsMock();
+  // The listings ask the caller's organisation role to decide whether an
+  // aggregate project is shown (ADR-144); these tests are about membership,
+  // so the caller is simply an admin.
   return {
-    ...actual,
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    ...mocked,
+    getApp: () => ({
+      ...mocked.getApp(),
+      organizations: { getUserOrgRole: async () => "ADMIN" },
+    }),
   };
 });
+
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    };
+  },
+);
 
 const ORG_ID = "org_1";
 const TEAM_ID = "team_1";
@@ -51,7 +66,7 @@ function team() {
 function buildMockPrisma({
   teamBindings,
 }: {
-  teamBindings: unknown[];
+  teamBindings: Array<ReturnType<typeof bindingFor>>;
 }): PrismaClient {
   return {
     team: {
@@ -60,14 +75,40 @@ function buildMockPrisma({
       findFirst: vi.fn().mockResolvedValue(team()),
       findMany: vi.fn().mockResolvedValue([team()]),
     },
-    roleBinding: {
-      findMany: vi.fn().mockResolvedValue(teamBindings),
+    grant: {
+      findMany: vi.fn().mockResolvedValue(
+        teamBindings.map((binding) => ({
+          id: binding.id,
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: binding.userId,
+          roleKey: binding.role.toLowerCase(),
+          legacyRole: binding.role,
+          scopeType: "TEAM",
+          scopeId: TEAM_ID,
+          occurredAt: binding.createdAt,
+          updatedAt: binding.updatedAt,
+        })),
+      ),
+    },
+    user: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue(teamBindings.map((binding) => binding.user)),
+    },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
   } as unknown as PrismaClient;
 }
 
 function buildCaller(prisma: PrismaClient) {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: { user: { id: CALLER_ID }, expires: "1" },
     req: undefined,
     res: undefined,

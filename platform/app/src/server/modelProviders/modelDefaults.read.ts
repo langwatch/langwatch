@@ -2,21 +2,24 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
-
-import type { Session } from "~/server/auth";
+import { batchScopePermissions } from "~/server/app-layer/authz/permission-adapters";
 import {
-  batchScopePermissions,
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
-} from "../api/rbac";
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
+} from "~/server/app-layer/permissions/imperative";
+import type { Session } from "~/server/auth";
 import {
   allFeatures,
   featureByKey,
   MODEL_ROLES,
   type ModelRole,
 } from "./featureRegistry";
-import { resolveModelForFeature } from "./resolveModelForFeature";
+import {
+  type ResolutionScope,
+  type ResolutionSource,
+  resolveModelForFeature,
+} from "./resolveModelForFeature";
 import { buildSeedPlanForProvider } from "./seedOnboardingDefaults";
 
 export type ReadCtx = {
@@ -31,10 +34,16 @@ export type ScopeRef = {
   scopeId: string;
 };
 
+/**
+ * What the cascade resolved for one feature key. `source` and `scope` carry
+ * the resolver's own literals, so a caller that branches on them (the
+ * make-default offer, for one) fails to compile if the resolver ever renames
+ * a slug, instead of quietly going dead.
+ */
 export type DefaultModelEffective = {
   model: string;
-  source: string;
-  scope: string | null;
+  source: ResolutionSource;
+  scope: ResolutionScope;
 };
 
 export type ConfigSnapshotScope = {
@@ -181,7 +190,7 @@ export async function getDefaultModelsSnapshot(
   let writableTeams: { id: string; name: string }[] = [];
   let writableProjects: { id: string; name: string; teamId: string }[] = [];
   if (organizationId) {
-    canWriteOrg = await hasOrganizationPermission(
+    canWriteOrg = await probeOrganizationPermission(
       ctx as { prisma: PrismaClient; session: Session },
       organizationId,
       "organization:manage",
@@ -193,7 +202,10 @@ export async function getDefaultModelsSnapshot(
         orderBy: { name: "asc" },
       }),
       ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
+        where: {
+          team: { organizationId },
+          kind: { not: "internal_governance" },
+        },
         select: { id: true, name: true, teamId: true },
         orderBy: { name: "asc" },
       }),
@@ -222,7 +234,7 @@ export async function getDefaultModelsSnapshot(
       .map(({ id, name, teamId: tid }) => ({ id, name, teamId: tid }));
   } else {
     // Personal-account project (no org/team): only project scope.
-    const writable = await hasProjectPermission(
+    const writable = await probeProjectPermission(
       ctx,
       projectId,
       "project:update",
@@ -255,7 +267,7 @@ export async function getDefaultModelsSnapshot(
   // permission on — that would leak the org-wide policy landscape.
   const canReadOrg =
     !!organizationId &&
-    (await hasOrganizationPermission(
+    (await probeOrganizationPermission(
       ctx as { prisma: PrismaClient; session: Session },
       organizationId,
       "organization:view",
@@ -269,7 +281,13 @@ export async function getDefaultModelsSnapshot(
         select: { id: true },
       }),
       ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
+        // The READABLE set, which decides whose policy rows come back. Filter
+        // it too: leaving the home here would surface a rule scoped to it
+        // even with the writable picker above already clean.
+        where: {
+          team: { organizationId },
+          kind: { not: "internal_governance" },
+        },
         select: { id: true, teamId: true },
       }),
     ]);
@@ -298,7 +316,7 @@ export async function getDefaultModelsSnapshot(
       .filter((p) => projectReadBatch.projects.get(p.id))
       .map((p) => p.id);
   } else if (teamId) {
-    const teamReadable = await hasTeamPermission(ctx, teamId, "team:view");
+    const teamReadable = await probeTeamPermission(ctx, teamId, "team:view");
     if (teamReadable) readableTeamIds = [teamId];
   }
 

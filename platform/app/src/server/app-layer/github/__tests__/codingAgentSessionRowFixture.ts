@@ -39,6 +39,7 @@ export function codingAgentSessionRow(
     gitWorktree: "",
     title: "",
     titleSource: "",
+    auxiliary: false,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -63,6 +64,8 @@ export function codingAgentSessionRow(
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
+    agentReportedCostUsd: 0,
+    usageByContext: [],
 
     modelCallMs: 0,
     toolMs: 0,

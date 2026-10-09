@@ -371,7 +371,7 @@ describe("LangyCredentialService", () => {
   });
 
   // Server-side allowlist read used by /langy/chat to reject tampered
-  // `modelOverride` values before they reach the OpenCode pod. The picker
+  // `modelOverride` values before they reach the langyagent pod. The picker
   // UI also narrows by this list — the server check is defense in depth.
   // The query happens at the DB layer (organizationId + purpose +
   // project-scope are all in the Prisma WHERE), so the tests assert both:
@@ -678,6 +678,18 @@ describe("resolveWorkerGatewayBaseUrl", () => {
         LW_GATEWAY_BASE_URL: "http://127.0.0.1:45000",
       });
       expect(url).toBe("http://host.docker.internal:45000");
+    });
+  });
+
+  describe("given the chart sets the in-cluster gateway address", () => {
+    /** @scenario "The Langy worker dials the in-cluster gateway, not its public URL" */
+    it("prefers LW_GATEWAY_INTERNAL_URL over LW_GATEWAY_PUBLIC_URL", () => {
+      const url = resolveWorkerGatewayBaseUrl({
+        LW_GATEWAY_INTERNAL_URL: "http://acme-gateway:80",
+        LW_GATEWAY_PUBLIC_URL: "https://gateway.acme.example",
+        LW_GATEWAY_BASE_URL: "http://acme-gateway:80",
+      });
+      expect(url).toBe("http://acme-gateway:80");
     });
   });
 

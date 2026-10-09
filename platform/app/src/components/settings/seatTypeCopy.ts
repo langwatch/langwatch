@@ -26,4 +26,40 @@ export const LITE_MEMBER_EXPLANATION =
   "reach the data, including the API and the MCP server. Give someone " +
   "permission to change something and they hold a full seat instead.";
 
+/**
+ * Shown when someone is about to invite a lite member and has named no team.
+ *
+ * A lite seat carries no organization-wide access of its own — the invite
+ * grants only what its teams grant (`applyInviteGrants` skips the
+ * organization-scoped grant for a lite member on purpose). So a lite invite
+ * with no team produces someone who can sign in, see nothing, and still hold
+ * a seat.
+ *
+ * A warning rather than a refusal: assigning the team later is a legitimate
+ * way to work, and the admin is the one who knows. It says what will happen
+ * and how to undo it, and does not explain how grants are put together.
+ */
+export const LITE_MEMBER_NEEDS_TEAM_WARNING =
+  "Add a team, or this person will not see anything. A lite member reaches " +
+  "only the projects their teams give them, so one with no team can sign in " +
+  "and do no more. You can add a team later from the members list.";
+
+/**
+ * What an admin is told when choosing the Developer seat (ADR-143).
+ *
+ * The seat is the answer to one question: a developer who needs a login,
+ * their own project and the ability to send traces and run evaluations
+ * there, and who must never see the shared projects. It is not a cheaper
+ * full seat and not a viewing seat; it is a separate place to work.
+ */
+export const DEVELOPER_SHORT_DESCRIPTION =
+  "Works in a project of their own, sees nothing shared";
+
+export const DEVELOPER_EXPLANATION =
+  "A developer gets a personal project and everything a member can do inside " +
+  "it: send traces from the CLI, run queries and evaluations, manage its keys. " +
+  "They cannot open or be added to any shared project or team, and they are " +
+  "never counted against your member seats. Move them to a Member seat if " +
+  "they need shared projects.";
+
 export const SEAT_TYPES_DOC_PATH = "/ai-governance/roles-and-permissions#seats";

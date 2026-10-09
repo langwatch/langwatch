@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { dataPrivacyConfigSchema } from "~/server/data-privacy/dataPrivacy.types";
 import {
   assertCanWriteDataPrivacyScope,
@@ -12,7 +12,6 @@ import {
   InvalidDataPrivacyConfigError,
   ScopeTargetNotFoundError,
 } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import { authorizeInResolver, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInput = z.object({
@@ -29,7 +28,7 @@ export const dataPrivacyRouter = createTRPCRouter({
    */
   getSnapshot: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input, ctx }) => {
       return getDataPrivacySnapshot(
         { prisma: ctx.prisma, session: ctx.session },
@@ -52,7 +51,12 @@ export const dataPrivacyRouter = createTRPCRouter({
         config: dataPrivacyConfigSchema,
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the write",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const authCtx = { prisma: ctx.prisma, session: ctx.session };
       await assertScopeBelongsToProjectOrganization(
@@ -87,7 +91,12 @@ export const dataPrivacyRouter = createTRPCRouter({
         personalOnly: z.boolean(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the removal",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const authCtx = { prisma: ctx.prisma, session: ctx.session };
       await assertScopeBelongsToProjectOrganization(

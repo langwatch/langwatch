@@ -129,7 +129,7 @@ def _build_response(
 def sync_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
     llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
 ) -> Response[
@@ -172,7 +172,7 @@ def sync_detailed(
 def sync(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
     llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
 ) -> (
@@ -211,7 +211,7 @@ def sync(
 async def asyncio_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
     llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
 ) -> Response[
@@ -252,7 +252,7 @@ async def asyncio_detailed(
 async def asyncio(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
     llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
 ) -> (

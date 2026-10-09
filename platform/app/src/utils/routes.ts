@@ -7,11 +7,6 @@ export const projectRoutes = {
     path: "/[project]/analytics",
     title: "Analytics",
   },
-  analytics_custom_query: {
-    path: "/[project]/analytics/query",
-    title: "Custom query",
-    parent: "analytics",
-  },
   workflows: {
     path: "/[project]/workflows",
     title: "Workflows",
@@ -135,10 +130,6 @@ export const projectRoutes = {
     title: "My Queue",
     parent: "annotations",
   },
-  triggers: {
-    path: "/[project]/triggers",
-    title: "Triggers",
-  },
   automations: {
     path: "/[project]/automations",
     title: "Automations",
@@ -148,14 +139,17 @@ export const projectRoutes = {
     title: "Automations",
     parent: "automations",
   },
+  // The alerts path is a preserved alias: automations and alerts are one list
+  // now (ADR-093 §1), so it resolves to the automations table and its
+  // breadcrumb and document title have to say so.
   automations_alerts: {
     path: "/[project]/automations/alerts",
-    title: "Alerts",
+    title: "Automations",
     parent: "automations",
   },
   automations_schedules: {
     path: "/[project]/automations/schedules",
-    title: "Schedules",
+    title: "Reports",
     parent: "automations",
   },
   automations_activity: {
@@ -170,6 +164,25 @@ export const projectRoutes = {
   simulations: {
     path: "/[project]/simulations",
     title: "Simulations",
+  },
+  agent_testing: {
+    path: "/[project]/agent-testing",
+    title: "Agent Testing",
+  },
+  agent_testing_suite: {
+    path: "/[project]/agent-testing/suites/[suiteSlug]",
+    title: "Test Suite",
+    parent: "agent_testing",
+  },
+  agent_testing_results: {
+    path: "/[project]/agent-testing/results",
+    title: "Results",
+    parent: "agent_testing",
+  },
+  agent_testing_plan: {
+    path: "/[project]/agent-testing/results/[planSlug]",
+    title: "Run Plan",
+    parent: "agent_testing_results",
   },
   agents: {
     path: "/[project]/agents",

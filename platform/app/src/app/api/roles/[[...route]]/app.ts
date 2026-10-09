@@ -17,21 +17,25 @@
  * handlers never emit `management.role.*` rows of their own — that would
  * record the same mutation twice.
  */
+
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
+import {
+  AUTHZ_ACTIONS,
+  type AuthzPermission,
+  permissionGrantTiers,
+} from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
+
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import type { CustomRole, Organization } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import {
-  Actions,
-  isOrgExclusivePermission,
-  type Permission,
-  Resources,
-} from "~/server/api/rbac";
+  CUSTOM_ROLE_RESOURCES,
+  permissionFormatSchema,
+} from "~/server/app-layer/authz/custom-role-permissions";
 import { prisma } from "~/server/db";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { RoleService } from "~/server/role/role.service";
 
 const { service, guard } = createManagementService({
@@ -89,7 +93,9 @@ const roleWire = (
   role: Pick<
     CustomRole,
     "id" | "name" | "description" | "createdAt" | "updatedAt"
-  > & { permissions: string[] },
+  > & {
+    permissions: string[];
+  },
 ): z.infer<typeof roleSchema> => ({
   id: role.id,
   name: role.name,
@@ -132,14 +138,17 @@ const createRoleHandler = async (
   return roleWire(role);
 };
 
+function isOrganizationExclusiveResource(resource: string): boolean {
+  const tiers = permissionGrantTiers(`${resource}:view` as AuthzPermission);
+  return tiers.length > 0 && tiers.every((tier) => tier === "organization");
+}
+
 const permissionCatalogHandler = async () => {
-  const actions = Object.values(Actions) as string[];
+  const actions = [...AUTHZ_ACTIONS];
   return {
-    resources: (Object.values(Resources) as string[]).map((resource) => ({
+    resources: CUSTOM_ROLE_RESOURCES.map((resource) => ({
       resource,
-      organizationExclusive: isOrgExclusivePermission(
-        `${resource}:view` as Permission,
-      ),
+      organizationExclusive: isOrganizationExclusiveResource(resource),
       actions,
       permissions: actions.map((action) => `${resource}:${action}`),
     })),

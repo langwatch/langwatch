@@ -19,12 +19,11 @@ export function makeReader(
   overrides: Partial<AuthzReadRepository> = {},
 ): Mocked<AuthzReadRepository> {
   const base: ReaderStub = {
-    findOrganizationRole: vi.fn().mockResolvedValue(null),
+    findOrganizationMembership: vi.fn().mockResolvedValue(null),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
     findApiKeyOwner: vi.fn().mockResolvedValue(null),
-    findLegacyTeamMemberships: vi.fn().mockResolvedValue([]),
     findCustomRolePermissions: vi.fn().mockResolvedValue([]),
     findShareLinks: vi.fn().mockResolvedValue([]),
     findProjectLineage: vi.fn().mockResolvedValue(null),

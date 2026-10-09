@@ -1,6 +1,8 @@
 import { test as setup, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
+import { closeDb, findUserIdByEmail } from "./front-door/db";
+import { registerConfirmedAccount } from "./front-door/steps";
 
 const AUTH_DIR = path.join(__dirname, "..", ".auth");
 const AUTH_FILE = path.join(AUTH_DIR, "user.json");
@@ -28,52 +30,81 @@ const TEST_USER = {
 };
 
 setup("authenticate", async ({ page, request }) => {
-  // Step 1: Try to register the test user (may already exist)
+  // Step 1: Register the test user when it does not already exist. Credential
+  // enrollment requires the same mailbox proof the sign-up UI consumes.
   try {
-    const registerResponse = await request.post("/api/trpc/user.register?batch=1", {
-      data: {
-        "0": {
-          json: {
-            name: TEST_USER.name,
-            email: TEST_USER.email,
-            password: TEST_USER.password,
-          },
-        },
-      },
-    });
-
-    // 200 = created, other statuses may mean user already exists
-    if (registerResponse.ok()) {
+    const existingUserId = await findUserIdByEmail(TEST_USER.email);
+    if (existingUserId === null) {
+      await registerConfirmedAccount(request, TEST_USER);
       console.log("Test user created successfully");
     } else {
-      const body = await registerResponse.text();
-      if (body.includes("User already exists")) {
-        console.log("Test user already exists, proceeding with sign in");
-      } else {
-        console.log("Registration response:", registerResponse.status(), body);
-      }
+      console.log("Test user already exists, proceeding with log in");
     }
-  } catch (error) {
-    // User might already exist from previous runs
-    console.log("Registration skipped (user may already exist):", error);
+  } finally {
+    await closeDb();
   }
 
-  // Step 2: Sign in through the UI (callbackUrl ensures redirect to app root after sign-in)
+  // Step 2: Log in through the identifier-first UI. callbackUrl ensures the
+  // successful credential ceremony redirects to the app root.
   await page.goto("/auth/signin?callbackUrl=%2F");
 
-  // Wait for the sign in form to be ready
-  await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Log in to LangWatch", exact: true }),
+  ).toBeVisible();
 
-  // Fill in credentials - use label-based locators with fallback
-  await page.getByLabel(/email/i).fill(TEST_USER.email);
-  await page.getByLabel(/password/i).fill(TEST_USER.password);
+  await page.getByLabel("Email", { exact: true }).fill(TEST_USER.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  // Submit the form
-  await page.getByRole("button", { name: /sign in/i }).click();
+  // A registered password account routes to its credential step. Waiting for
+  // that step also proves the router resolved the seeded user before auth.
+  const passwordField = page.getByLabel("Password", { exact: true });
+  await expect(passwordField).toBeVisible();
+  await expect(page.getByTestId("routed-identifier")).toContainText(
+    TEST_USER.email,
+  );
+  await passwordField.fill(TEST_USER.password);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
 
   // Wait for successful authentication - should redirect away from signin
   await expect(page).not.toHaveURL(/\/auth\/signin/);
   console.log("Signed in successfully. Current URL:", page.url());
+
+  // The security offer is product behaviour, but leaving its modal open would
+  // obstruct every unrelated authenticated browser test that reuses this state.
+  const dismissNudgeResponse = await page.request.post(
+    "/api/trpc/user.dismissSecureAccountNudge?batch=1",
+    { data: { "0": { json: {} } } },
+  );
+  const dismissNudgeData = await dismissNudgeResponse.json().catch(() => null);
+
+  if (!dismissNudgeResponse.ok() || dismissNudgeData?.["0"]?.error) {
+    throw new Error(
+      `dismissSecureAccountNudge failed: ${JSON.stringify(dismissNudgeData).slice(0, 500)}`,
+    );
+  }
+
+  // Same reasoning as the nudge above, for the other modal the shell can open
+  // over a reused session. `JoinYourTeamTakeover` offers this account the
+  // organizations already on its verified address's domain — and every account
+  // the front-door suite confirms is `@langwatch.ai`, the same domain as this
+  // one, so by the time the later suites run there is always something to
+  // offer. It is a cover-size modal, so leaving it open does not merely
+  // obstruct clicks: `aria-modal` takes the rest of the page out of the
+  // accessibility tree, and every `getByRole` in every unrelated suite then
+  // fails as "element(s) not found".
+  const dismissJoinOfferResponse = await page.request.post(
+    "/api/trpc/joinRequests.dismissOffer?batch=1",
+    { data: { "0": { json: {} } } },
+  );
+  const dismissJoinOfferData = await dismissJoinOfferResponse
+    .json()
+    .catch(() => null);
+
+  if (!dismissJoinOfferResponse.ok() || dismissJoinOfferData?.["0"]?.error) {
+    throw new Error(
+      `joinRequests.dismissOffer failed: ${JSON.stringify(dismissJoinOfferData).slice(0, 500)}`,
+    );
+  }
 
   // Step 3: Create org + project via API if not already set up.
   // page.request inherits the browser session cookies from the sign-in above,
@@ -143,9 +174,9 @@ setup("authenticate", async ({ page, request }) => {
     });
     // href is stable regardless of sidebar expand state (collapsed links
     // drop their text label), so match the Settings nav link by href.
-    await expect(
-      page.locator('a[href="/settings"]').first(),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('a[href="/settings"]').first()).toBeVisible({
+      timeout: 30000,
+    });
   } catch (err) {
     console.log("Authenticated shell not confirmed. URL:", page.url());
     await page.screenshot({

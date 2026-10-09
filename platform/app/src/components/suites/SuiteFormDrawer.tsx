@@ -66,6 +66,9 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
     name: data.name.trim(),
     description: data.description.trim() || undefined,
     scenarioIds: data.selectedScenarioIds,
+    // This drawer only ever picks a list, so it says so: a plan saved here
+    // covers the scenarios it names and nothing else.
+    scope: data.scope,
     targets: data.selectedTargets,
     repeatCount: data.repeatCount,
     labels: data.labels,
@@ -114,6 +117,13 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   );
 
   const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project && isOpen },
+  );
+
+  // A project that uses test suites reads its scenarios under the suite names in
+  // the picker. A project with no suite reads the flat list it always did.
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project && isOpen },
   );
@@ -371,6 +381,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                     hasError={!!errors.selectedScenarioIds}
                     archivedIds={archivedScenariosWithNames}
                     onRemoveArchived={suiteForm.removeArchivedScenario}
+                    testSuites={testSuites}
                   />
                   {errors.selectedScenarioIds && (
                     <Text fontSize="xs" color="red.fg">

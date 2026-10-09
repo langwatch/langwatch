@@ -7,81 +7,51 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { showErrorToast } from "~/features/errors";
+import type { ExperimentType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useRequiredSession } from "../../hooks/useRequiredSession";
-import {
-  hasPermissionWithHierarchy,
-  teamRoleHasPermission,
-} from "../../server/api/rbac";
+import { useProjectsForCopy } from "../../hooks/useProjectsForCopy";
 import { api } from "../../utils/api";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
+import { replicateReferencesNote } from "./replicateReferencesNote";
 
 export const CopyExperimentDialog = ({
   open,
   onClose,
   experimentId,
   experimentName,
+  experimentType,
 }: {
   open: boolean;
   onClose: () => void;
   experimentId: string;
   experimentName: string;
+  experimentType: ExperimentType;
 }) => {
-  const { organizations, project } = useOrganizationTeamProject();
-  const session = useRequiredSession();
+  const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
   const copyExperiment = api.experiments.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
 
-  const currentUserId = session.data?.user?.id;
-
-  const projects =
-    organizations?.flatMap((org) =>
-      org.teams.flatMap((team) => {
-        // Find the current user's membership in this team
-        const teamMember = team.members.find(
-          (member) => member.userId === currentUserId,
-        );
-        if (!teamMember) return [];
-
-        // Check if user has evaluations:manage permission in this team
-        let hasTeamManagePermission = false;
-        if (teamMember.assignedRole) {
-          const permissions =
-            (teamMember.assignedRole.permissions as string[]) ?? [];
-          if (permissions.length > 0) {
-            hasTeamManagePermission = hasPermissionWithHierarchy(
-              permissions,
-              "evaluations:manage",
-            );
-          } else {
-            hasTeamManagePermission = teamRoleHasPermission(
-              teamMember.role,
-              "evaluations:manage",
-            );
-          }
-        } else {
-          hasTeamManagePermission = teamRoleHasPermission(
-            teamMember.role,
-            "evaluations:manage",
-          );
-        }
-
-        // Include all projects, but mark which ones have permission
-        return team.projects.map((project) => ({
-          label: `${org.name} / ${team.name} / ${project.name}`,
-          value: project.id,
-          hasManagePermission: hasTeamManagePermission,
-        }));
-      }),
-    ) ?? [];
+  const projects = useProjectsForCopy("evaluations:manage").map(
+    ({ label, value, hasCreatePermission }) => ({
+      label,
+      value,
+      hasManagePermission: hasCreatePermission,
+    }),
+  );
 
   const projectCollection = createListCollection({
     items: projects,
+  });
+
+  const note = replicateReferencesNote({
+    experimentType,
+    sourceProjectId: project?.id,
+    targetProjectId: selectedProjectId[0],
   });
 
   const handleCopy = async () => {
@@ -176,6 +146,11 @@ export const CopyExperimentDialog = ({
             >
               Replicate associated dataset
             </Checkbox>
+            {note && (
+              <Text fontSize="sm" color="fg.muted">
+                {note}
+              </Text>
+            )}
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>

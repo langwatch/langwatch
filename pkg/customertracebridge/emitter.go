@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -49,6 +50,13 @@ const (
 	mirrorTierStructural = "structural"
 	mirrorTierSkip       = "skip"
 )
+
+// OriginLangy is the langwatch.origin value the Langy relay stamps on a turn's
+// spans in the customer's project, and the one this emitter stamps on the
+// gen_ai span it retells for a Langy call, so the turn's trace reads as
+// Langy's from whichever span folds first. The gateway keeps its own origin on
+// the resource, and on every span it retells for ordinary customer traffic.
+const OriginLangy = "langy"
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
 // and export them to the customer's OTLP endpoint. The TP's resource carries
@@ -104,6 +112,10 @@ func (d dropFilterExporter) Shutdown(ctx context.Context) error {
 // customer spans in production. Scrubbing at the export boundary holds
 // regardless of how the provider was built.
 //
+// It also removes the reserved ADR-061 mirror markers. This exporter is in the
+// chain whether or not a mirror is armed, so the markers never reach a project
+// even on an install with no mirror (the self-hosted default).
+//
 // tracetest is imported in production code deliberately: ReadOnlySpan is a
 // sealed interface, and SpanStub is the SDK's only public way to reconstruct
 // one with a chosen resource.
@@ -117,6 +129,7 @@ func (r resourceScrubExporter) ExportSpans(ctx context.Context, spans []sdktrace
 	for _, s := range spans {
 		stub := tracetest.SpanStubFromReadOnlySpan(s)
 		stub.Resource = r.policy.ApplyResource(s.Resource())
+		stub.Attributes = withoutMirrorMarkers(stub.Attributes)
 		scrubbed = append(scrubbed, stub.Snapshot())
 	}
 	return r.inner.ExportSpans(ctx, scrubbed)
@@ -288,6 +301,17 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.Usage.OutputAudioTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputAudioTokens, params.Usage.OutputAudioTokens))
 	}
+	// Image tokens ride beside the text totals for the same reason the audio
+	// ones do, and the image count is what a per-image price is applied to.
+	if params.Usage.InputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputImageTokens, params.Usage.InputImageTokens))
+	}
+	if params.Usage.OutputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputImageTokens, params.Usage.OutputImageTokens))
+	}
+	if params.Usage.ImageCount > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageImageCount, params.Usage.ImageCount))
+	}
 	if params.Usage.CacheReadTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
 	}
@@ -368,6 +392,15 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// from every exported copy. Only stamped for a non-skip tier (Langy VKs),
 	// so ordinary customer traffic never grows a mirror copy.
 	if tier := params.MirrorTier; tier == mirrorTierContent || tier == mirrorTierStructural {
+		// A Langy turn's model call is Langy's, not the customer's, and this
+		// span is the first piece of the turn to reach the customer's project:
+		// the worker spans and the langy.turn root only land when the turn
+		// ends, many seconds later. Stamped with the gateway's own origin, the
+		// span folded a "gateway" trace first, which marked a fresh project as
+		// integrated before the langy root could rank the trace as Langy's.
+		// Naming the origin here, on the span, settles the trace's origin from
+		// its first span. The resource keeps the gateway's identity.
+		span.SetAttributes(attribute.String(otelsetup.AttrLangWatchOrigin, OriginLangy))
 		span.SetAttributes(attrMirrorTier.String(tier))
 		if params.MirrorSourceOrgID != "" {
 			span.SetAttributes(attrMirrorSourceOrg.String(params.MirrorSourceOrgID))
@@ -428,11 +461,13 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 // strips the prefix for provider routing, and stamping the stripped name made
 // the gateway the one surface reporting bare wire-names: a Langy turn's
 // Models filter listed the SAME model twice, once bare (this span), once
-// prefixed (the worker's own span). A model whose provider is unknown
-// (implicit resolution never fills it) or that already carries a path
-// segment is reported as requested.
+// prefixed (the worker's own span). Resolution cuts the prefix at the first slash, so a model
+// with slashes of its own ("Qwen/Qwen2.5-32B-Instruct") still gets its
+// provider, as nlpgo does. A model whose provider is unknown (implicit
+// resolution never fills it) or that already starts with its provider is
+// reported as requested.
 func canonicalModelID(provider domain.ProviderID, model string) string {
-	if provider == "" || model == "" || strings.Contains(model, "/") {
+	if provider == "" || model == "" || strings.HasPrefix(model, string(provider)+"/") {
 		return model
 	}
 	return string(provider) + "/" + model
@@ -502,7 +537,8 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 	}
 	switch params.RequestType {
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
-		domain.RequestTypeResponses, domain.RequestTypeSpeech:
+		domain.RequestTypeResponses, domain.RequestTypeSpeech,
+		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
 		return EndUserIDFromBody(params.RequestBody)
 	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
 		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
@@ -510,7 +546,9 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 		// messages body carries attribution under metadata.user_id, passthrough
 		// bodies are provider-shaped and forwarded verbatim, transcription
 		// arrives as multipart form data rather than JSON, and a realtime mint
-		// declares a socket rather than a completion.
+		// declares a socket rather than a completion. The image edit route is
+		// also multipart and still reads the field above, because its
+		// synthesized body states it.
 	}
 	return ""
 }
@@ -552,11 +590,12 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 		}
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
 		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
+		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
 		domain.RequestTypeRealtimeSession:
-		// No inline session id on these request shapes (audio bodies carry no
-		// session field at all, and a realtime mint's session id is the one
-		// the gateway itself hands back); the header lifted above (when
-		// present) is the only source.
+		// No inline session id on these request shapes (audio and image bodies
+		// carry no session field at all, and a realtime mint's session id is
+		// the one the gateway itself hands back); the header lifted above
+		// (when present) is the only source.
 	}
 	return ""
 }
@@ -587,11 +626,30 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 		// are normalised to a chat-style messages array so downstream
 		// rendering matches the other surfaces.
 		return responsesInputAsMessages(body)
+	case domain.RequestTypeMessages:
+		// Anthropic /v1/messages: the system prompt lives in a
+		// top-level `system` field, not inside `messages`, so reading
+		// only `messages` drops it from the trace. Prepend it as a
+		// system message and keep the caller's messages verbatim.
+		return anthropicBodyAsMessages(body)
+	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+		// Images: the prompt is the meaningful input, rendered as a single
+		// user message so the trace viewer shows it like any chat. The source
+		// images of an edit stay out: they are megabytes of binary that no
+		// span should carry.
+		if in := gjson.GetBytes(body, "prompt"); in.Exists() && in.String() != "" {
+			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		}
+		return ""
 	case domain.RequestTypeSpeech:
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
-		if in := gjson.GetBytes(body, "input"); in.Exists() && in.String() != "" {
-			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		// Two field names because two wires reach this shape: the OpenAI one
+		// calls it input, and ElevenLabs' own route calls it text.
+		for _, field := range []string{"input", "text"} {
+			if in := gjson.GetBytes(body, field); in.Exists() && in.String() != "" {
+				return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+			}
 		}
 		return ""
 	default:
@@ -609,18 +667,30 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 // ([{role:"user", content:[{type:"input_text", text:"..."}]}]). Both
 // shapes land here and get flattened to the same renderable form so
 // codex traces show the same input cell as OpenAI chat / Anthropic.
+// The system prompt travels in a top-level `instructions` field, so it
+// is prepended as a system message; reading `input` alone drops it.
 func responsesInputAsMessages(body []byte) string {
+	var msgs []string
+	if instr := gjson.GetBytes(body, "instructions"); instr.Type == gjson.String && instr.String() != "" {
+		msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(instr.String())))
+	}
 	input := gjson.GetBytes(body, "input")
 	if !input.Exists() {
-		return ""
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
 	if input.Type == gjson.String {
-		return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(input.String()))
+		msgs = append(msgs, fmt.Sprintf(`{"role":"user","content":%s}`, jsonString(input.String())))
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
 	if !input.IsArray() {
-		return ""
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
 	}
-	var msgs []string
 	input.ForEach(func(_, m gjson.Result) bool {
 		role := m.Get("role").String()
 		if role == "" {
@@ -656,6 +726,59 @@ func responsesInputAsMessages(body []byte) string {
 		return ""
 	}
 	return "[" + strings.Join(msgs, ",") + "]"
+}
+
+// anthropicBodyAsMessages renders an Anthropic /v1/messages request as
+// a chat-style messages array. When the top-level `system` field is
+// present it becomes a leading {"role":"system"} message; the caller's
+// `messages` array is kept verbatim either way.
+func anthropicBodyAsMessages(body []byte) string {
+	msgs := gjson.GetBytes(body, "messages")
+	sys := anthropicSystemText(body)
+	if sys == "" {
+		if !msgs.Exists() {
+			return ""
+		}
+		return msgs.Raw
+	}
+	sysMsg := fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(sys))
+	if !msgs.Exists() || !msgs.IsArray() {
+		return "[" + sysMsg + "]"
+	}
+	inner := strings.TrimSpace(msgs.Raw)
+	inner = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(inner, "["), "]"))
+	if inner == "" {
+		return "[" + sysMsg + "]"
+	}
+	return "[" + sysMsg + "," + inner + "]"
+}
+
+// anthropicSystemText flattens Anthropic's top-level `system` field to
+// plain text. The wire accepts a bare string or an array of content
+// blocks (used when the caller sets cache_control on the prompt); the
+// blocks' `text` parts join with newlines, mirroring joinGeminiPartsText.
+func anthropicSystemText(body []byte) string {
+	sys := gjson.GetBytes(body, "system")
+	if !sys.Exists() {
+		return ""
+	}
+	if sys.Type == gjson.String {
+		return sys.String()
+	}
+	if !sys.IsArray() {
+		return ""
+	}
+	var out strings.Builder
+	sys.ForEach(func(_, blk gjson.Result) bool {
+		if t := blk.Get("text"); t.Exists() {
+			if out.Len() > 0 {
+				out.WriteByte('\n')
+			}
+			out.WriteString(t.String())
+		}
+		return true
+	})
+	return out.String()
 }
 
 // geminiContentsAsMessages flattens Gemini's `systemInstruction` +
@@ -766,6 +889,14 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 		// non-JSON body) renders as empty rather than as raw bytes.
 		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
 			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
+		}
+		return ""
+	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+		// Images: the response body is base64 image data, megabytes of it,
+		// which must never land on a span. The model's rewritten prompt is
+		// the one renderable part, when the provider states one.
+		if p := gjson.GetBytes(body, "data.0.revised_prompt"); p.Exists() && p.String() != "" {
+			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(p.String()))
 		}
 		return ""
 	default:

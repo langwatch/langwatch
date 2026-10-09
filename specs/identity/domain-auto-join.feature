@@ -1,0 +1,246 @@
+Feature: Domain auto-join - walking straight in, where the organization asked for it
+  As an organization that has decided anybody with a company address belongs
+  I need a verified colleague to land inside without an admin clicking
+  So that onboarding is not a queue, while every automatic join stays visible,
+  reversible and impossible on an address that proves nothing
+
+  # D12 (ADR-117; lifecycle in specs/identity/join-requests.feature, matching
+  # and reveal rules in specs/identity/join-matching-and-privacy.feature).
+  #
+  # Automatic joining is NOT a second mechanism. It is the same request, the
+  # same events, the same panel and the same audit trail - approved by policy
+  # the moment it is made instead of by a person later:
+  #
+  #   request made ──► PENDING ──policy approves at once──► APPROVED
+  #                                                          │
+  #                                    admins told AFTER the fact, immediately
+  #
+  # That equivalence is the point. A surprising join looks exactly like a
+  # surprising approval on the audit page, and turning the setting off does
+  # not leave a class of membership nobody can account for.
+  #
+  # What resolved it is its OWN principal, not the one single sign-on
+  # auto-join already uses. The two look alike and are not: single sign-on
+  # auto-join admits somebody because an identity provider the organization
+  # configured asserted them, and domain auto-join admits them because their
+  # address ends in a domain the organization PROVED it controls and an
+  # administrator opted in. Different evidence, different trust, different thing to argue
+  # with when a customer reads their audit page and asks how this person got
+  # in. Stamping both with one name would make that question unanswerable.
+  #
+  # Three settings, one per organization: joining OFF, joining BY REQUEST
+  # (the default for self-serve organizations), joining AUTOMATIC. Automatic
+  # is never a default and never inferred - an administrator turns it on and
+  # names the domain while doing it.
+  #
+  # LICENSING - a deliberate asymmetry (this file settles it, and
+  # specs/licensing/sso-license-gating.feature carries the matching
+  # vocabulary). Automatic joining is federation: the deployment decides who
+  # is a colleague and admits them with nobody in the loop, which is what that
+  # gate has always counted as single sign-on. Asking to join is not - an
+  # administrator approves every one, no identity provider is involved, and
+  # gating it would recreate "my company is invisible" on exactly the
+  # deployments that have no other way out. So the gate holds automatic
+  # joining and lets requests through.
+  #
+  # On for everybody: the JOIN_REQUESTS flag is retired (see
+  # specs/identity/join-requests.feature).
+
+  Background:
+    Given an organization "acme" with an administrator "ana"
+    And "acme" has proved it controls "acme.com" through the domain verification ceremony
+    And a member of "acme" holds a verified address on "acme.com"
+    And "sam" holds a VERIFIED identifier for "sam@acme.com" and belongs to no organization
+
+  # ── Walking in ─────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: A verified colleague joins an opted-in organization immediately
+    Given "ana" turned on automatic joining for "acme.com"
+    When "sam" completes sign-up and verification
+    Then "sam" is a member of "acme" in the seat the arrival earns: the organization's joiner seat, or Developer for an arrival from the terminal
+    And "sam" was never shown a waiting screen
+
+  @unit
+  Scenario: The automatic path is the same lifecycle, approved by policy
+    Given "ana" turned on automatic joining for "acme.com"
+    When "sam" joins automatically
+    Then a request was made and immediately approved
+    And it records the policy, not a person, as what resolved it
+    And it sits in the same panel and the same history as an admin approval
+
+  @integration
+  Scenario: The admins are told after the fact, straight away
+    Given "ana" turned on automatic joining for "acme.com"
+    When "sam" joins automatically
+    Then every admin of "acme" is told it happened, by email and in the product
+    And the message names who joined and that the domain setting admitted them
+
+  @integration
+  Scenario: Every automatic join is on the customer's audit page
+    Given "ana" turned on automatic joining for "acme.com"
+    When "sam" joins automatically
+    Then "acme"'s audit page shows the membership with the policy as what authorized it
+    And it is no harder to find than a membership an admin approved by hand
+
+  @unit
+  Scenario: Walking in still grants only the default role
+    Given "ana" turned on automatic joining for "acme.com"
+    When "sam" joins automatically
+    Then "sam" holds the organization's joiner seat and nothing more, or a Developer seat when the arrival was from the terminal
+
+  # ── Turning it on is deliberate ────────────────────────────────────────
+
+  @unit
+  Scenario: Asking is the default and automatic is never inferred
+    Given a newly created self-serve organization
+    When its joining setting is read
+    Then colleagues may ask to join
+    And nobody joins automatically until an administrator turns that on
+
+  @unit
+  Scenario: Turning it on names the domain and needs the domain proved
+    Given "acme" has not proved it controls "acme.com"
+    When "ana" turns on automatic joining for "acme.com"
+    Then the attempt is refused with code join_auto_domain_unproven and status 422
+    And it succeeds once "acme.com" is proved through the domain verification ceremony
+    And however many members hold verified addresses on the domain changes neither answer,
+    because receiving mail on a domain is not controlling it
+
+  @unit
+  Scenario: A public email domain cannot be turned on at all
+    When "ana" turns on automatic joining for a consumer mail domain
+    Then the attempt is refused with code join_auto_domain_unproven and status 422
+    And the refusal says company domains only, without listing the deny-list
+
+  @unit
+  Scenario: An organization whose identity provider admits people cannot turn it on
+    Given "acme" has an ACTIVE SSO connection for "acme.com"
+    When "ana" turns on automatic joining
+    Then the attempt is refused with code join_auto_connection_admits and status 409
+    And the refusal points at the connection's own provisioning as the way in
+
+  @unit
+  Scenario: Turning it off stops future joins and touches nobody already in
+    Given "acme" has automatic joining on and members who arrived that way
+    When "ana" turns it back to asking
+    Then the next verified colleague waits for an approval
+    And everybody who already joined stays a member with the role they hold
+
+  # ── Only an administrator, only a person ───────────────────────────────
+
+  @unit
+  Scenario: Changing the setting needs the authority that gates managing the organization
+    Given a member of "acme" who cannot manage the organization
+    When they try to change the joining setting
+    Then the attempt is refused for lack of permission
+
+  @unit
+  Scenario: The setting change is itself audited
+    When "ana" changes "acme"'s joining setting
+    Then the change is on "acme"'s audit page with "ana" as the actor and both values
+
+  # ── The license line ───────────────────────────────────────────────────
+
+  @unit
+  Scenario: An unlicensed deployment cannot turn automatic joining on
+    Given a self-hosted deployment that has never held a genuine license
+    When "ana" turns on automatic joining for "acme.com"
+    Then the attempt is refused with code join_auto_not_licensed and status 403
+    And "acme" stays on asking
+
+  @unit
+  Scenario: An unlicensed deployment still lets colleagues ask
+    Given a self-hosted deployment that has never held a genuine license
+    And "acme" accepts requests to join from "acme.com"
+    When "sam" asks to join "acme"
+    Then the request is PENDING and the admins are told
+    And approving it makes "sam" a member
+    And nothing on that path consulted the license at all
+
+  @unit
+  Scenario: Losing the license stops automatic joining without stranding members
+    Given "acme" has automatic joining on under a genuine license
+    When the deployment restarts without one
+    Then the next verified colleague waits for an approval instead
+    And everybody who already joined stays a member
+
+  # ── Refusing to guess ──────────────────────────────────────────────────
+
+  @unit
+  Scenario: An ambiguous domain refuses to admit and falls back to asking
+    Given two organizations both hold verified members on "acme.com"
+    And both have automatic joining on
+    When "sam" completes verification
+    Then "sam" joins neither automatically
+    And both are offered as somewhere to ask, and "sam" chooses
+
+  @unit
+  Scenario: An unverified address never walks in
+    Given "acme" has automatic joining on for "acme.com"
+    And "sam" has typed the address but not verified it
+    When sign-up continues
+    Then "sam" is not a member of anything
+    And verifying the address is what admits them
+
+  # `JOIN_REQUESTS` is retired (see specs/identity/join-requests.feature).
+  # Automatic joining is still gated, and by the two things that actually
+  # decide it: the administrator's own setting with a domain named on it, and
+  # the licence. Neither of those is a bake flag.
+
+  @unit @regression
+  Scenario: Repeated or concurrent SSO arrivals announce only the new membership
+    Given a live proved SSO connection admits new arrivals automatically
+    When the same person arrives repeatedly or in concurrent callbacks
+    Then one default membership is created with its organization grant
+    And the administrators receive one automatic-join notice for that membership
+    And accepting an invitation does not send an automatic-join notice
+
+  @unit
+  Scenario: A later SSO sign-in completes a failed admission grant
+    Given automatic SSO admission persisted a membership with its pending grant identity
+    And the grant command failed before confirmation
+    When the member signs in again
+    Then the same grant identity and timestamp are retried
+    And admission is completed and announced only once
+
+  @unit
+  Scenario: An SSO admission retry never restores revoked access
+    Given an administrator revoked an SSO member's grant
+    When the member signs in again
+    Then no replacement grant is attached
+
+  @unit
+  Scenario: An accepted SSO grant remains pending until projection confirmation
+    Given the admission grant command was accepted
+    But its authoritative projection has not applied the grant
+    When admission checks for completion
+    Then the admission remains pending and no success notice is sent
+
+  @unit @regression
+  Scenario: A failed automatic SSO notice leaves admission pending for retry
+    Given a new SSO arrival received its membership and organization grant
+    When its durable administrator notification handoff fails
+    Then the admission marker remains pending
+    And a later SSO arrival retries the same notification handoff
+
+  @integration @regression
+  Scenario: Automatic-join notices reach only live administrators in the joined organization
+    Given the joined organization has live administrators and disabled administrators
+    And other people are ordinary members or administrators of another organization
+    When an automatic join is announced
+    Then only the joined organization's live administrators are emailed
+    And the notice names the joined organization, new member and admitting domain
+    And one failed delivery does not stop the other administrators' notices
+
+  @integration @regression
+  Scenario: Concurrent SSO admission completion claims one notification
+    Given two sign-ins are completing the same pending SSO admission
+    When both completion updates wait behind the same membership lock
+    Then only one completion claims the admission
+
+  @integration @regression
+  Scenario: Inactive members cannot complete pending SSO admission
+    Given a pending SSO admission belongs to a disabled member or deactivated user
+    When a sign-in attempts to complete the admission
+    Then the admission remains pending

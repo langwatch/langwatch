@@ -123,10 +123,29 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   # Admin catalog surface — READ-ONLY v1
   # ---------------------------------------------------------------------------
 
+  # UNVERIFIED — this scenario does not describe the product as built, and
+  # nothing measures it (no BOUND_TAG among its tags). Three gaps, all
+  # predating the rename above:
+  #   1. `ingestionTemplate:view` is not a permission that exists. The
+  #      Catalog pane gates on `aiTools:manage` (ToolCatalogPanel.tsx:96),
+  #      returning a PermissionRequiredNotice at :108 for anyone without
+  #      it — so this persona never reaches the Ingestion Templates tab.
+  #      Whether read-only template viewing SHOULD need a manage grant is
+  #      a product decision, not a spec typo; left for the owner.
+  #   2. The footer string below does not exist anywhere in the codebase.
+  #   3. The button set is the mirror of what is claimed. Platform rows —
+  #      the ones this scenario is about — carry 'View' and 'Clone to
+  #      customise' (IngestionTemplatesEditor.tsx:202,218), so "NO Fork
+  #      button" is contradicted outright and the read affordance is
+  #      labelled 'View', not 'View OTTL'. The 'Edit OTTL' and archive
+  #      controls sit on the org-authored branch (:235,237), which this
+  #      scenario does not describe.
+  # The first two Then clauses are also vacuous as written — both expect
+  # an empty set and would pass against an unbuilt feature.
   @bdd @ingestion-templates @admin-readonly
-  Scenario: Admin sees only non-coding-assistant templates as READ-ONLY in tool-catalog
+  Scenario: Admin sees only non-coding-assistant templates as READ-ONLY in the Inventory catalog tab
     Given admin "carol@acme.com" has the `ingestionTemplate:view` permission
-    When carol navigates to "/governance/tool-catalog" and selects the "Ingestion Templates" tab
+    When carol navigates to "/governance/inventory?tab=catalog" and selects the "Ingestion Templates" tab
     # Existing P7-B6 ToolCatalogEditor surface (AiToolEntry catalog) gets a
     # second tab here. No new admin route v1.
     Then she sees the platform-default IngestionTemplate rows listed

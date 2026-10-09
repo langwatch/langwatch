@@ -20,6 +20,7 @@ import {
 import { Markdown } from "~/components/Markdown";
 import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { RedactedInline } from "~/components/ui/RedactedField";
+import { formatDuration } from "~/shared/format/time";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
 import type { RouterOutputs } from "~/utils/api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
@@ -32,11 +33,7 @@ import {
   useAnnotationQueueSessionStore,
 } from "../../../stores/annotationQueueSessionStore";
 import type { TraceListItem } from "../../../types/trace";
-import {
-  formatCost,
-  formatDuration,
-  formatRelativeTimeAgo,
-} from "../../../utils/formatters";
+import { formatCost, formatRelativeTimeAgo } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import {
   Bubble,
@@ -58,7 +55,7 @@ import {
   TurnEditTraceAction,
   TurnSessionCheckbox,
 } from "./TurnAnnotations";
-import { TurnSteps } from "./TurnSteps";
+import { TurnSteps, turnHasGenieSteps } from "./TurnSteps";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
 
@@ -144,7 +141,7 @@ interface ChatTurnRowProps {
   /** Wall-clock seconds between the previous turn's end and this turn's start. */
   gapSecs: number;
   /** Whether the inter-turn gap is long enough to surface as a divider. */
-  showGap: boolean;
+  shouldShowGap: boolean;
   index: number;
   isCurrent: boolean;
   onSelect: (traceId: string) => void;
@@ -177,7 +174,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   userMedia = EMPTY_MEDIA,
   assistantMedia = EMPTY_MEDIA,
   gapSecs,
-  showGap,
+  shouldShowGap,
   index,
   isCurrent,
   onSelect,
@@ -288,7 +285,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
-      {showGap && (
+      {shouldShowGap && (
         <Flex align="center" gap={2}>
           <Box height="1px" flex={1} bg="border.muted" />
           <Text textStyle="2xs" color="fg.subtle">
@@ -345,19 +342,22 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         either side of this show none of it — so the steps sit where they
         happened. Collapsed by default; the spans are only fetched on open.
       */}
-      {isTerminalOrigin({
+      {((isTerminalOrigin({
         serviceName: turn.serviceName,
         origin: turn.origin,
       }) &&
-        // TurnSteps parses Claude Code's span names only — for any other
+        // TurnSteps parses Claude Code's span names — for any other coding
         // agent the strip would announce steps and then find none.
-        (turn.serviceName ?? "").toLowerCase().includes("claude") && (
-          <TurnSteps
-            traceId={turn.traceId}
-            occurredAtMs={turn.timestamp}
-            spanCount={turn.spanCount}
-          />
-        )}
+        (turn.serviceName ?? "").toLowerCase().includes("claude")) ||
+        // Routed Genie turns carry no coding-agent service name; the trace
+        // name is their signal, and only multi-span turns have a SQL step.
+        turnHasGenieSteps(turn)) && (
+        <TurnSteps
+          traceId={turn.traceId}
+          occurredAtMs={turn.timestamp}
+          spanCount={turn.spanCount}
+        />
+      )}
 
       {assistantText ? (
         <TurnMessage

@@ -1,0 +1,5429 @@
+{
+	"tables": [
+		{
+			"name": "automation_audit",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, OccurredAt, EventId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TriggerId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ActionClass",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "ProjectedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "billable_events",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "OrganizationId, TenantId, DeduplicationKeyHash",
+			"columns": [
+				{
+					"name": "OrganizationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "DeduplicationKey",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "DeduplicationKeyHash",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "EventTimestamp",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "coding_agent_session_events",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, SessionId, TimeUnixMs, RecordId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SessionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TimeUnixMs",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "RecordId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "EventKind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Agent",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "SessionKeySource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PromptId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "QuerySource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AgentType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EventSequence",
+					"type": "Int64",
+					"comment": ""
+				},
+				{
+					"name": "RequestId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "InputTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "OutputTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CacheReadTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CacheCreationTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CostUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "DurationMs",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "TtftMs",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Attempt",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "Speed",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "StopReason",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "PreTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "PostTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CompactionTrigger",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "PrecomputeReuse",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "StatusCode",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ErrorType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RateLimitCarrier",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RetryDurationMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ToolName",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Success",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Decision",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "DecisionSource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ToolInputBytes",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ToolResultBytes",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "PromptChars",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "TotalTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "RepositoryHost",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RepositoryOwner",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RepositoryName",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Branch",
+					"type": "String",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "coding_agent_sessions",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, StartedAt, SessionId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SessionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SessionKeySource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "Agent",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AgentVersion",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "TraceIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "FinalRequestId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "UserId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TerminalType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Entrypoint",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ModelCalls",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ToolCalls",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "SubAgents",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Prompts",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "PromptChars",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ResponseChars",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "Steps",
+					"type": "Array(Tuple(String, UInt32, Bool))",
+					"comment": ""
+				},
+				{
+					"name": "ToolCounts",
+					"type": "Map(LowCardinality(String), UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "ToolDurationMs",
+					"type": "Map(LowCardinality(String), UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "FilesTouched",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Skills",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "SubAgentTypes",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "SlashCommands",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "Models",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "McpServers",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "McpTools",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "InputTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "OutputTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CacheReadTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CacheCreationTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CostUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "ModelCallMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ToolMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TtftMsTotal",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TtftSamples",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "BlockedOnUserMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ActiveTimeUserSec",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ActiveTimeCliSec",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ToolResultBytes",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ToolInputBytes",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "Compactions",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "CompactionTokensBefore",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CompactionTokensAfter",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "PeakContextTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CacheRebuildCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "LargestCacheRebuildTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "FailedTools",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ErrorTypes",
+					"type": "Map(LowCardinality(String), UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "ApiErrors",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "RateLimited",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "RetriesExhausted",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "RetryMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "Attempts",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Refusals",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "RefusalCategories",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "InternalErrors",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ToolsDenied",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ToolsAborted",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "PermissionMode",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "PermissionChanges",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "HooksBlocked",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "HooksCancelled",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "HookMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "LinesAdded",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "LinesRemoved",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "Commits",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "PullRequests",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "EditsAccepted",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "EditsRejected",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "LanguagesEdited",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "AtMentions",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "StopReason",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Truncated",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "SubAgentIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "PreviousCallContextTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "StepStartedAt",
+					"type": "Array(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "MetricSeries",
+					"type": "Array(Tuple(String, String, String, String, String, Float64))",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "AppliedEventIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "RateLimitEvents",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "CompactionTriggers",
+					"type": "Map(LowCardinality(String), UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "ParentSessionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "IsFork",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "RepositoryHost",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RepositoryOwner",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RepositoryName",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "GitBranch",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "GitWorktree",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Title",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "GitBranches",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "TitleSource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AgentReportedCostUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "Auxiliary",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "UsageByContext",
+					"type": "Array(Tuple(String, String, String, String, UInt64, UInt64, UInt64, UInt64, Float64))",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "coding_agent_trace_sessions",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, TraceId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SessionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "dspy_steps",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, ExperimentId, RunId, StepIndex",
+			"columns": [
+				{
+					"name": "Id",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ExperimentId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "StepIndex",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "WorkflowVersionId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Score",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "Label",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OptimizerName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OptimizerParameters",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Predictors",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Examples",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "LlmCalls",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "LlmCallsTotal",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "LlmCallsTotalTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "LlmCallsTotalCost",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "InsertedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "evaluation_analytics",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, OccurredAt, EvaluationId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EvaluationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorName",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "IsGuardrail",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "Passed",
+					"type": "Nullable(Bool)",
+					"comment": ""
+				},
+				{
+					"name": "Score",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Label",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "UserId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "ConversationId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "CustomerId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Origin",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "DurationMs",
+					"type": "Int64",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "NonBilledCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Attributes",
+					"type": "Map(String, String)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CompletedAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "AppliedEventIds",
+					"type": "Array(String)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "evaluation_analytics_rollup",
+			"engine": "AggregatingMergeTree",
+			"sortingKey": "TenantId, BucketStart, EvaluatorType, Status",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "BucketStart",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvalCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "PassCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "FailCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "ErrorCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "SkippedCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "ScoreSum",
+					"type": "SimpleAggregateFunction(sum, Float64)",
+					"comment": ""
+				},
+				{
+					"name": "ScoreCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "DurationSum",
+					"type": "SimpleAggregateFunction(sum, Int64)",
+					"comment": ""
+				},
+				{
+					"name": "CostSum",
+					"type": "SimpleAggregateFunction(sum, Float64)",
+					"comment": ""
+				},
+				{
+					"name": "NonBilledCostSum",
+					"type": "SimpleAggregateFunction(sum, Float64)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "SimpleAggregateFunction(max, UInt16)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "evaluation_runs",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, EvaluationId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EvaluationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorName",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "IsGuardrail",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Score",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Passed",
+					"type": "Nullable(UInt8)",
+					"comment": ""
+				},
+				{
+					"name": "Label",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Details",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Inputs",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Error",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "ErrorDetails",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "ArchivedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "ScheduledAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "CompletedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "CostId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "LastProcessedEventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "event_log",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, AggregateType, AggregateId, IdempotencyKey",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "IdempotencyKey",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "AggregateType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AggregateId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EventVersion",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EventTimestamp",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "EventPayload",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProcessingTraceparent",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventOccurredAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "experiment_run_items",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, RunId, ProjectionId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ExperimentId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RowIndex",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "TargetId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResultType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "DatasetEntry",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Predicted",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "TargetCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "TargetDurationMs",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "TargetError",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "TargetDomainError",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluatorName",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluationStatus",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Score",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Label",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Passed",
+					"type": "Nullable(UInt8)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluationDetails",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluationCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluationInputs",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "EvaluationDurationMs",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "CarriedOver",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "experiment_runs",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, RunId, ExperimentId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ExperimentId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "WorkflowVersionId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Total",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Progress",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "CompletedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "FailedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "TotalDurationMs",
+					"type": "Nullable(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "AvgScoreBps",
+					"type": "Nullable(Int32)",
+					"comment": ""
+				},
+				{
+					"name": "PassRateBps",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "Targets",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TotalScoreSum",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "ScoreCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "PassedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "GradedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "FinishedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "StoppedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "LastProcessedEventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "gateway_budget_ledger_events",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, BudgetId, GatewayRequestId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "BudgetId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Scope",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Window",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "VirtualKeyId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProviderCredentialId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "GatewayRequestId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "AmountUSD",
+					"type": "Decimal(18, 6)",
+					"comment": ""
+				},
+				{
+					"name": "TokensInput",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "TokensOutput",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheRead",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheWrite",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProviderSlot",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "DurationMS",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "EventTimestamp",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ProviderKey",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "AmountNanoUSD",
+					"type": "Int64",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "gateway_budget_scope_totals",
+			"engine": "AggregatingMergeTree",
+			"sortingKey": "TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Scope",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Window",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "PeriodStart",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "BudgetId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpendUSD",
+					"type": "AggregateFunction(sum, Decimal(18, 6))",
+					"comment": ""
+				},
+				{
+					"name": "TokensInput",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "TokensOutput",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheRead",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheWrite",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "RequestCount",
+					"type": "AggregateFunction(count, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "SimpleAggregateFunction(max, DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "SpendNanoUSD",
+					"type": "AggregateFunction(sum, Int64)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "gateway_budget_scope_totals_mv",
+			"engine": "MaterializedView",
+			"sortingKey": "",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Scope",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Window",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "PeriodStart",
+					"type": "DateTime64(3, 'UTC')",
+					"comment": ""
+				},
+				{
+					"name": "BudgetId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpendNanoUSD",
+					"type": "AggregateFunction(sum, Int64)",
+					"comment": ""
+				},
+				{
+					"name": "SpendUSD",
+					"type": "AggregateFunction(sum, Decimal(18, 6))",
+					"comment": ""
+				},
+				{
+					"name": "TokensInput",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "TokensOutput",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheRead",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheWrite",
+					"type": "AggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "RequestCount",
+					"type": "AggregateFunction(count)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "gateway_spend",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, GatewayRequestId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "GatewayRequestId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OrganizationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "VirtualKeyId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PrincipalUserId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EndUserId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProviderKey",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RequestType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ErrorClass",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "HttpStatus",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "NeedsReconciliation",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "SettleReason",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "TokensInput",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensOutput",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheRead",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheWrite",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensReasoning",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CostNanoUSD",
+					"type": "Int64",
+					"comment": ""
+				},
+				{
+					"name": "RateVersion",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Labels",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Metadata",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PodId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PodSeq",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "DurationMS",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "EventTimestamp",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "MetadataMap",
+					"type": "Map(String, String)",
+					"comment": ""
+				},
+				{
+					"name": "CharsInput",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "AudioMS",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheWrite1h",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensInputAudio",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensOutputAudio",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensInputImage",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensOutputImage",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ImageCount",
+					"type": "UInt64",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "goose_db_version",
+			"engine": "MergeTree",
+			"sortingKey": "date",
+			"columns": [
+				{
+					"name": "version_id",
+					"type": "Int64",
+					"comment": ""
+				},
+				{
+					"name": "is_applied",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "date",
+					"type": "Date",
+					"comment": ""
+				},
+				{
+					"name": "tstamp",
+					"type": "DateTime",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "governance_cost_rollup_1d",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Day",
+					"type": "Date",
+					"comment": ""
+				},
+				{
+					"name": "CostSource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "IngestionSourceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Provider",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AgentId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CurrencyCode",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RawActorId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OrganizationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ExactOrEstimate",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AmountNanoUsd",
+					"type": "Nullable(Int64)",
+					"comment": ""
+				},
+				{
+					"name": "AmountNanoMinor",
+					"type": "Int64",
+					"comment": ""
+				},
+				{
+					"name": "TokensInput",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensOutput",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheRead",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TokensCacheWrite",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "RequestCount",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "RevisionCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "PreviousAmountNanoUsd",
+					"type": "Nullable(Int64)",
+					"comment": ""
+				},
+				{
+					"name": "PulledItemsJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AppliedEventIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "EventTimestamp",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "RevisedAt",
+					"type": "Nullable(DateTime)",
+					"comment": ""
+				},
+				{
+					"name": "LastObservedAt",
+					"type": "DateTime",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "governance_cost_rollup_restatement_index",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, RestatementKey",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RestatementKey",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Day",
+					"type": "Date",
+					"comment": ""
+				},
+				{
+					"name": "CostSource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "IngestionSourceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Provider",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AgentId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CurrencyCode",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "RawActorId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventTimestamp",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "governance_kpis",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, SourceId, HourBucket, TraceId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SourceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "HourBucket",
+					"type": "DateTime",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SourceType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "SpendUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "PromptTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CompletionTokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "governance_ocsf_events",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, EventId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OcsfSchemaVersion",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SourceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SourceType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ClassUid",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "CategoryUid",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ActivityId",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "TypeUid",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "SeverityId",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "EventTime",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "ActorUserId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ActorEmail",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ActorEnduserId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ActionName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TargetName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "AnomalyAlertId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RawOcsfJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "LastUpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "instant_eval_judgments",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, RunId, TraceId, SpanId, QuestionId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "QuestionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ThreadId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Kind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Passed",
+					"type": "Nullable(UInt8)",
+					"comment": ""
+				},
+				{
+					"name": "Score",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Label",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Probability",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Probabilities",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Error",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "instant_eval_runs",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, RunId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Name",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Sql",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Parameters",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Questions",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Plan",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RowLimit",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Total",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "Progress",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Matched",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "MatchedByQuestion",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Failed",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Skipped",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Tokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CostUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "PriceUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "Error",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "FinishedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "LastEventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProjectionVersion",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "WrittenAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "langy_analytics_events",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, OccurredAt, EventId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "EventType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "EventVersion",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AggregateId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TurnId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "UserId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Role",
+					"type": "LowCardinality(Nullable(String))",
+					"comment": ""
+				},
+				{
+					"name": "ToolName",
+					"type": "LowCardinality(Nullable(String))",
+					"comment": ""
+				},
+				{
+					"name": "Outcome",
+					"type": "LowCardinality(Nullable(String))",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "LowCardinality(Nullable(String))",
+					"comment": ""
+				},
+				{
+					"name": "DurationMs",
+					"type": "Nullable(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "ProjectedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "langy_messages",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, ConversationId, MessageId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ConversationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MessageId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Role",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Parts",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "log_records",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, CorrelationTraceId, TimeUnixMs, RecordId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RecordId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "ResourceSchemaUrl",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributesFlatJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "ResourceDroppedAttributesCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ScopeSchemaUrl",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeVersion",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeDroppedAttributesCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "WireTraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "WireSpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CorrelationTraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CorrelationSpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CorrelationSource",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "TimeUnixNano",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ObservedTimeUnixNano",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TimeUnixMs",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "SeverityNumber",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "SeverityText",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "BodyType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "BodyJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "BodyText",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "AttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "AttributesFlatJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "AttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "DroppedAttributesCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Flags",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "EventName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProviderKind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ProviderEventKind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ProviderEventSequence",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProviderSessionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProviderConversationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProviderPromptId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PiiRedactionLevel",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "CanonicalPayload",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "WrittenAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "DedupVersion",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "log_usage_estimates",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "OrganizationId, TenantId, RecordId",
+			"columns": [
+				{
+					"name": "OrganizationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RecordId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "ProviderKind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedHour",
+					"type": "DateTime",
+					"comment": ""
+				},
+				{
+					"name": "CanonicalSourceBytes",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "WrittenAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "DedupVersion",
+					"type": "UInt64",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "lwql_api_key_tenant_map",
+			"engine": "MergeTree",
+			"sortingKey": "KeyHash",
+			"columns": [
+				{
+					"name": "KeyHash",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "metric_data_points",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, SeriesId, TimeUnixMs, TimeUnixNano, PointId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PointId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "SeriesId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "ResourceSchemaUrl",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeSchemaUrl",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeVersion",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "MetricName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricDescription",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricUnit",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricKind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AggregationTemporality",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "IsMonotonic",
+					"type": "Nullable(Bool)",
+					"comment": ""
+				},
+				{
+					"name": "PointAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PointAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "StartTimeUnixNano",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TimeUnixNano",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TimeUnixMs",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "Flags",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ValueType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ValueInt",
+					"type": "Nullable(Int64)",
+					"comment": ""
+				},
+				{
+					"name": "ValueDouble",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Count",
+					"type": "Nullable(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "Sum",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Min",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Max",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "ExplicitBounds",
+					"type": "Array(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "BucketCounts",
+					"type": "Array(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "ExponentialScale",
+					"type": "Nullable(Int32)",
+					"comment": ""
+				},
+				{
+					"name": "ExponentialZeroThreshold",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "ZeroCount",
+					"type": "Nullable(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "PositiveOffset",
+					"type": "Nullable(Int32)",
+					"comment": ""
+				},
+				{
+					"name": "PositiveBucketCounts",
+					"type": "Array(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "NegativeOffset",
+					"type": "Nullable(Int32)",
+					"comment": ""
+				},
+				{
+					"name": "NegativeBucketCounts",
+					"type": "Array(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "SummaryQuantilesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "CanonicalPayload",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "WrittenAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "DedupVersion",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "metric_series",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, SeriesId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SeriesId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "ResourceSchemaUrl",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeSchemaUrl",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeVersion",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "MetricName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricDescription",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricUnit",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricKind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AggregationTemporality",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "IsMonotonic",
+					"type": "Nullable(Bool)",
+					"comment": ""
+				},
+				{
+					"name": "PointAttributesJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PointAttributeKeys",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "LastSeenAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "metric_time_rollups",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, SeriesId, BucketStart",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SeriesId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "MetricName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricUnit",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricKind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "AggregationTemporality",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "IsMonotonic",
+					"type": "Nullable(Bool)",
+					"comment": ""
+				},
+				{
+					"name": "BucketStart",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "BucketEnd",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "GaugeLast",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Min",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Max",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Sum",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Count",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "ExplicitBounds",
+					"type": "Array(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "BucketCounts",
+					"type": "Array(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "ExponentialScale",
+					"type": "Nullable(Int32)",
+					"comment": ""
+				},
+				{
+					"name": "ExponentialZeroThreshold",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "ZeroCount",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "PositiveOffset",
+					"type": "Int32",
+					"comment": ""
+				},
+				{
+					"name": "PositiveBucketCounts",
+					"type": "Array(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "NegativeOffset",
+					"type": "Int32",
+					"comment": ""
+				},
+				{
+					"name": "NegativeBucketCounts",
+					"type": "Array(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "ResetCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "GapCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "SourcePointCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "metric_usage_estimates",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "OrganizationId, TenantId, PointId",
+			"columns": [
+				{
+					"name": "OrganizationId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "PointId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "SeriesId",
+					"type": "FixedString(64)",
+					"comment": ""
+				},
+				{
+					"name": "MetricName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedHour",
+					"type": "DateTime",
+					"comment": ""
+				},
+				{
+					"name": "CanonicalSourceBytes",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "WrittenAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "DedupVersion",
+					"type": "UInt64",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "session_metric_series",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, SessionId, SeriesId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SessionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SeriesId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricName",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "MetricUnit",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Agent",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Attributes",
+					"type": "Map(LowCardinality(String), String)",
+					"comment": ""
+				},
+				{
+					"name": "Value",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "DataPointCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "AsOf",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "simulation_run_metrics",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, ScenarioRunId, TraceId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScenarioRunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "RoleCosts",
+					"type": "Map(String, Float64)",
+					"comment": ""
+				},
+				{
+					"name": "RoleLatencies",
+					"type": "Map(String, Float64)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "EventId",
+					"type": "String",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "simulation_run_metrics_rollup",
+			"engine": "AggregatingMergeTree",
+			"sortingKey": "TenantId, ScenarioRunId, TraceId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScenarioRunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "AggregateFunction(argMax, Float64, DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "RoleCosts",
+					"type": "AggregateFunction(argMax, Map(String, Float64), DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "RoleLatencies",
+					"type": "AggregateFunction(argMax, Map(String, Float64), DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "AggregateFunction(max, DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "PartitionMonth",
+					"type": "SimpleAggregateFunction(max, UInt32)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "simulation_run_metrics_rollup_mv",
+			"engine": "MaterializedView",
+			"sortingKey": "",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScenarioRunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "AggregateFunction(argMax, Float64, DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "RoleCosts",
+					"type": "AggregateFunction(argMax, Map(String, Float64), DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "RoleLatencies",
+					"type": "AggregateFunction(argMax, Map(String, Float64), DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "AggregateFunction(max, DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "PartitionMonth",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "simulation_runs",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, ScenarioRunId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScenarioRunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScenarioId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "BatchRunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScenarioSetId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Name",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Description",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Metadata",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Messages.Id",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Messages.Role",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Messages.Content",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Messages.TraceId",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Messages.Rest",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "TraceIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Verdict",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Reasoning",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "MetCriteria",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "UnmetCriteria",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Error",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "DurationMs",
+					"type": "Nullable(UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "QueuedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "FinishedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "ArchivedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "LastSnapshotOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "RoleCosts",
+					"type": "Map(String, Array(Float64))",
+					"comment": ""
+				},
+				{
+					"name": "RoleLatencies",
+					"type": "Map(String, Array(Float64))",
+					"comment": ""
+				},
+				{
+					"name": "TraceMetricsJson",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CancellationRequestedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.EvaluatorId",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.Name",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.Status",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.Required",
+					"type": "Array(UInt8)",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.Passed",
+					"type": "Array(Nullable(UInt8))",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.Score",
+					"type": "Array(Nullable(Float64))",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.Label",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.Details",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.CostAmount",
+					"type": "Array(Nullable(Float64))",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.CostCurrency",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Evaluations.InputsJson",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "InconclusiveCriteria",
+					"type": "Array(String)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "stored_log_records",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, TraceId, SpanId, ProjectionId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TimeUnixMs",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "SeverityNumber",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "SeverityText",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Body",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Attributes",
+					"type": "Map(LowCardinality(String), String)",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributes",
+					"type": "Map(LowCardinality(String), String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeVersion",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "stored_metric_records",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, TraceId, SpanId, MetricName, ProjectionId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricName",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "MetricUnit",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "MetricType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Value",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "TimeUnixMs",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "Attributes",
+					"type": "Map(LowCardinality(String), String)",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributes",
+					"type": "Map(LowCardinality(String), String)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "stored_objects",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "project_id, id",
+			"columns": [
+				{
+					"name": "id",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "project_id",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "purpose",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "owner_kind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "owner_id",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "media_type",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "size_bytes",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "sha256",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "storage_uri",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "created_at",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "inserted_at",
+					"type": "DateTime64(3)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "stored_spans",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, TraceId, SpanId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ParentSpanId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "ParentTraceId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "ParentIsRemote",
+					"type": "Nullable(UInt8)",
+					"comment": ""
+				},
+				{
+					"name": "Sampled",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "StartTime",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "EndTime",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "DurationMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "SpanName",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "SpanKind",
+					"type": "UInt8",
+					"comment": ""
+				},
+				{
+					"name": "ServiceName",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ResourceAttributes",
+					"type": "Map(LowCardinality(String), String)",
+					"comment": ""
+				},
+				{
+					"name": "SpanAttributes",
+					"type": "Map(LowCardinality(String), String)",
+					"comment": ""
+				},
+				{
+					"name": "StatusCode",
+					"type": "Nullable(UInt8)",
+					"comment": ""
+				},
+				{
+					"name": "StatusMessage",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "ScopeName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScopeVersion",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Events.Timestamp",
+					"type": "Array(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "Events.Name",
+					"type": "Array(LowCardinality(String))",
+					"comment": ""
+				},
+				{
+					"name": "Events.Attributes",
+					"type": "Array(Map(LowCardinality(String), String))",
+					"comment": ""
+				},
+				{
+					"name": "Links.TraceId",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Links.SpanId",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Links.Attributes",
+					"type": "Array(Map(LowCardinality(String), String))",
+					"comment": ""
+				},
+				{
+					"name": "DroppedAttributesCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "DroppedEventsCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "DroppedLinksCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Cost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "NonBilledCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "suite_runs",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, ScenarioSetId, BatchRunId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SuiteRunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "BatchRunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ScenarioSetId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SuiteId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Total",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "StartedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "CompletedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "FailedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Progress",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "PassRateBps",
+					"type": "Nullable(Int32)",
+					"comment": ""
+				},
+				{
+					"name": "PassedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "GradedCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "FinishedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "trace_analytics",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, OccurredAt, TraceId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "TraceName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TopicId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "SubTopicId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "UserId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "ConversationId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "CustomerId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Origin",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Models",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "Labels",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "NonBilledCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "TotalDurationMs",
+					"type": "Int64",
+					"comment": ""
+				},
+				{
+					"name": "TimeToFirstTokenMs",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "TokensPerSecond",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "PromptTokens",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "CompletionTokens",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "CacheReadTokens",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "CacheWriteTokens",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "ReasoningTokens",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "HasError",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "HasAnnotation",
+					"type": "Nullable(Bool)",
+					"comment": ""
+				},
+				{
+					"name": "Attributes",
+					"type": "Map(String, String)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "SpanCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "AnnotationIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "RootSpanStartTimeMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "TraceNameFromFallback",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "RootMetadataFromFallback",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "TraceNameUserOverridden",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "AppliedEventIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "EarliestSpanStartMs",
+					"type": "UInt64",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "trace_analytics_rollup",
+			"engine": "AggregatingMergeTree",
+			"sortingKey": "TenantId, BucketStart, Model, SpanType",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "BucketStart",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "Model",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "SpanType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "SpanCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "TraceCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "ErrorCount",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "CostSum",
+					"type": "SimpleAggregateFunction(sum, Float64)",
+					"comment": ""
+				},
+				{
+					"name": "NonBilledCostSum",
+					"type": "SimpleAggregateFunction(sum, Float64)",
+					"comment": ""
+				},
+				{
+					"name": "DurationSum",
+					"type": "SimpleAggregateFunction(sum, Int64)",
+					"comment": ""
+				},
+				{
+					"name": "PromptTokensSum",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "CompletionTokensSum",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "CacheReadTokensSum",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "CacheWriteTokensSum",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "ReasoningTokensSum",
+					"type": "SimpleAggregateFunction(sum, UInt64)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "SimpleAggregateFunction(max, UInt16)",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "trace_summaries",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, TraceId",
+			"columns": [
+				{
+					"name": "ProjectionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Version",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Attributes",
+					"type": "Map(String, String)",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "ComputedIOSchemaVersion",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "ComputedInput",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "ComputedOutput",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "TimeToFirstTokenMs",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "TimeToLastTokenMs",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "TotalDurationMs",
+					"type": "Int64",
+					"comment": ""
+				},
+				{
+					"name": "TokensPerSecond",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "SpanCount",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "ContainsErrorStatus",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "ContainsOKStatus",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "ErrorMessage",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Models",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "TotalCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "NonBilledCost",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "TokensEstimated",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "TotalPromptTokenCount",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "TotalCompletionTokenCount",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "OutputFromRootSpan",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "OutputSpanEndTimeMs",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "BlockedByGuardrail",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "SatisfactionScore",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "TopicId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "SubTopicId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "HasAnnotation",
+					"type": "Nullable(Bool)",
+					"comment": ""
+				},
+				{
+					"name": "AnnotationIds",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "LastEventOccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "TraceName",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RootSpanType",
+					"type": "LowCardinality(Nullable(String))",
+					"comment": ""
+				},
+				{
+					"name": "ContainsAi",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "ContainsPrompt",
+					"type": "Bool",
+					"comment": ""
+				},
+				{
+					"name": "SelectedPromptId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "SelectedPromptSpanId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "LastUsedPromptId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "LastUsedPromptVersionNumber",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "LastUsedPromptVersionId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "LastUsedPromptSpanId",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "SourceType",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "SourceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				},
+				{
+					"name": "_size_bytes",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "EarliestSpanStartMs",
+					"type": "UInt64",
+					"comment": ""
+				}
+			]
+		}
+	]
+}

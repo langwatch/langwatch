@@ -49,6 +49,21 @@ Feature: Langy session key lifecycle
       And a session key is minted for the replacement worker
       And the replaced worker's key is revoked
 
+    # The deliberate exception, and it is not really one: a warm IS a spawn.
+    # Opening the panel pre-warms the conversation's worker before the first
+    # message (specs/langy/langy-worker-prewarm.feature), and a spawned worker
+    # needs its key at boot. The rule holds, the key is minted only because a
+    # worker is actually going to be spawned; the spawn just happens before the
+    # message instead of after it. The key dies with the warm worker: used or
+    # not, worker death revokes it and expiry is the backstop, so a warm the
+    # user walks away from leaves no credential behind.
+    Scenario: A panel-open warm mints a key because it spawns a worker
+      Given no worker is running for the conversation
+      When the user opens the Langy panel and the warm finds no live worker
+      Then the control plane mints a session key for that user and project
+      And the warm worker is spawned carrying that key
+      And if the worker is reaped unused its key is revoked with it
+
   Rule: The spawn-after-probe race is resolved, never guessed
 
     # The worker can die between "is one alive?" and "here is the turn". The

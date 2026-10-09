@@ -155,6 +155,42 @@ describe("scenario run CSV serializers", () => {
       expect(row.run_unmet_criteria_count).toBe("3");
     });
 
+    /** @scenario "Criteria rows say when the judge could not decide" */
+    it("flags the criterion the judge could not decide, in both modes", () => {
+      const run = buildRun({
+        results: {
+          verdict: Verdict.FAILURE,
+          reasoning: "",
+          metCriteria: ["stays polite"],
+          unmetCriteria: ["names the refund window", "opens a ticket"],
+          inconclusiveCriteria: ["opens a ticket"],
+          error: undefined,
+        },
+      });
+
+      const criteriaRows = parse(
+        serializeRunsToCriteriaCsv({ runs: [run], includeHeader: true }),
+      );
+      expect(
+        criteriaRows.map((row) => [row.criterion, row.met, row.inconclusive]),
+      ).toEqual([
+        ["stays polite", "true", "false"],
+        ["names the refund window", "false", "false"],
+        ["opens a ticket", "false", "true"],
+      ]);
+
+      const fullRow = parse(
+        serializeRunsToFullCsv({ runs: [run], includeHeader: true }),
+      )[0]!;
+      expect(JSON.parse(fullRow.run_inconclusive_criteria!)).toEqual([
+        "opens a ticket",
+      ]);
+      expect(JSON.parse(fullRow.run_unmet_criteria!)).toEqual([
+        "names the refund window",
+        "opens a ticket",
+      ]);
+    });
+
     /** @scenario Criteria are encoded so that their commas survive */
     it("encodes criteria as JSON so their commas survive a round trip", () => {
       const criterion = "stays polite, even when the customer escalates";
@@ -382,6 +418,32 @@ describe("scenario run CSV serializers", () => {
         seats: 12,
         trial: false,
       });
+    });
+
+    /** @scenario "The CSV export omits secret values" */
+    it("exports neither the names nor any value of a run's secrets", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [
+          buildRun({
+            metadata: {
+              parameters: { account_tier: "platinum" },
+              secretParameterNames: ["api_token"],
+              // Nothing writes this key: the fold projection and the read
+              // mapper both drop it. Present here so the export is pinned on
+              // its own, not on theirs.
+              secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+            },
+          }),
+        ],
+        includeHeader: true,
+      });
+
+      const row = parse(csv)[0]!;
+      expect(JSON.parse(row.run_parameters!)).toEqual({
+        account_tier: "platinum",
+      });
+      expect(csv).not.toContain("ciphertext-of-tok-live-1");
+      expect(csv).not.toContain("api_token");
     });
 
     it("leaves the parameters column empty for a run that resolved none", () => {

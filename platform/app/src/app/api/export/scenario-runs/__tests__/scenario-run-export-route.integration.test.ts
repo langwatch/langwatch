@@ -29,7 +29,7 @@ const session = {
 };
 
 const getServerAuthSession = vi.hoisted(() => vi.fn());
-const hasProjectPermission = vi.hoisted(() => vi.fn());
+const probeProjectPermission = vi.hoisted(() => vi.fn());
 const auditLog = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("~/server/auth", () => ({ getServerAuthSession }));
@@ -37,10 +37,18 @@ vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
 // Only the permission check is replaced: the rest of the module is the
 // permission catalogue the secured-app builder reads at import time, and a bare
 // factory would blank it out.
-vi.mock("~/server/api/rbac", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/api/rbac")>()),
-  hasProjectPermission,
-}));
+// The route reads probeProjectPermission from the app-layer imperative
+// module (it moved off ~/server/api/rbac with ADR-092); mocking the old
+// path leaves the real check running.
+vi.mock(
+  "~/server/app-layer/permissions/imperative",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >()),
+    probeProjectPermission,
+  }),
+);
 
 function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
   return {
@@ -149,7 +157,7 @@ describe("POST /api/export/scenario-runs/download", () => {
     vi.clearAllMocks();
     installApp();
     getServerAuthSession.mockResolvedValue(session);
-    hasProjectPermission.mockResolvedValue(true);
+    probeProjectPermission.mockResolvedValue(true);
   });
 
   describe("when the caller lacks scenarios:view on the project", () => {
@@ -161,7 +169,7 @@ describe("POST /api/export/scenario-runs/download", () => {
      */
     /** @scenario Export requires permission to view scenarios */
     it("refuses with a code the error registry can render", async () => {
-      hasProjectPermission.mockResolvedValue(false);
+      probeProjectPermission.mockResolvedValue(false);
 
       const response = await download();
 
@@ -175,7 +183,7 @@ describe("POST /api/export/scenario-runs/download", () => {
     it("checks the permission against the project being exported", async () => {
       await download({ projectId: "project_42" });
 
-      expect(hasProjectPermission).toHaveBeenCalledWith(
+      expect(probeProjectPermission).toHaveBeenCalledWith(
         expect.anything(),
         "project_42",
         "scenarios:view",

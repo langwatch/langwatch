@@ -79,35 +79,25 @@
  * owns transport concerns only; every domain rule (ownership, idempotency,
  * capacity, model policy) stays in the app layer and arrives here as a
  * HandledError that is re-thrown untouched.
+ *
+ * Steps 1–5 live in `app-layer/langy/langyApiKeyAuthorization.ts`, shared with
+ * the uptime probe `GET /api/health/langy` in `health-checks.ts`, which runs
+ * one real greeting turn as the key's owner behind the same chain — see
+ * `specs/langy/langy-health-canary.feature`.
  */
 
 import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import {
-  enforceApiKeyCeiling,
-  extractCredentials,
-} from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
-import {
-  LangyApiCredentialInvalidError,
-  LangyApiCredentialMissingError,
-  LangyApiIdentityDeniedError,
-  LangyApiRequestInvalidError,
-} from "~/server/app-layer/langy/errors";
+import { LangyApiRequestInvalidError } from "~/server/app-layer/langy/errors";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
-import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
-import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
+import {
+  authorizeLangyApiKey,
+  LANGY_API_KEY_AUTH_REASON,
+} from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { awaitTurnSettlement } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
-import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 import { bodyLimit } from "./_lib/body-limit";
-
-const tokenResolver = TokenResolver.create(prisma);
-
-const AUTH_REASON =
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling, then bridged to an owning user by resolveLangyKeyIdentity";
 
 /**
  * A turn is text plus small structured parts, never an upload. The cap is well
@@ -123,7 +113,7 @@ const MAX_TURN_BODY_BYTES = 1024 * 1024;
  * by hand from the UI.
  */
 const langyTurnAuth = handlerManagedAuth({
-  reason: AUTH_REASON,
+  reason: LANGY_API_KEY_AUTH_REASON,
   permissions: ["langy:create"],
   credential: "apiKey",
 });
@@ -157,89 +147,18 @@ const turnBodySchema = z.object({
   messages: z.array(messageSchema).min(1),
   idempotencyKey: z.string().min(1),
   modelOverride: z.string().min(1).optional(),
+  /**
+   * Adopt the path's conversation id as a NEW conversation when it does not
+   * exist yet, instead of minting a fresh one. This is how a caller that keys
+   * continuity on an externally-chosen id — a scenario run POSTing every turn
+   * to `/conversations/{{ threadId }}/messages` — gets one stable conversation
+   * across turns: turn 1 adopts the id, turns 2+ find it owned and resume with
+   * the durable history. Without it, an unknown id silently yields a fresh
+   * conversation per turn, which degrades every multi-turn run to single-turn
+   * (#7187). Only meaningful on the `/:conversationId/messages` route.
+   */
+  adoptConversationId: z.boolean().optional(),
 });
-
-/**
- * Authenticate, open the flag, enforce the ceiling, and bridge to an actor.
- *
- * Throws on every refusal EXCEPT the dark surface, which returns `{ dark: true }`
- * for the caller to answer — see the flag check below for why that one cannot
- * throw. `enforceApiKeyCeiling` already throws a `HandledError`
- * (`ApiKeyPermissionDeniedError`), so the ceiling denial needs no translation
- * here at all — catching it only to re-serialise it was how the code, the
- * permission in `meta` and the tips got dropped.
- */
-async function authorizeTurn(c: Context) {
-  const credentials = extractCredentials((name) => c.req.header(name));
-  if (!credentials) throw new LangyApiCredentialMissingError();
-
-  const resolved = await tokenResolver.resolve({
-    token: credentials.token,
-    projectId: credentials.projectId,
-  });
-  if (!resolved) throw new LangyApiCredentialInvalidError();
-
-  // Dark surface ⇒ 404, not 403: rollback should look like the route was never
-  // deployed, so a client retries nothing and no one reads a denial as a
-  // permissions bug.
-  //
-  // This sits BEFORE the ceiling on purpose. Behind it, a key without
-  // `langy:create` got a 403 while the flag was off — a refusal no unmounted
-  // route can produce, which told the caller the surface was there.
-  //
-  // It also cannot THROW, unlike every other refusal in this function. Anything
-  // thrown here reaches `createServiceApp`'s `onError` and comes back as the
-  // canonical JSON envelope, carrying `trace_id` and `span_id`; a path that was
-  // never mounted falls to Hono's default handler and comes back as plain-text
-  // `404 Not Found`. Content-Type and body would differ, and that difference is
-  // the leak this 404 exists to prevent. So the caller answers with
-  // `c.notFound()`, which IS that default handler — no router in the chain
-  // overrides it.
-  const surfaceOpen = await featureFlagService.isEnabled(
-    "release_langy_api_key_turns_enabled",
-    {
-      distinctId: resolved.project.id,
-      projectId: resolved.project.id,
-      organizationId: resolved.project.team.organizationId,
-    },
-  );
-  if (!surfaceOpen) return { dark: true as const };
-
-  await enforceApiKeyCeiling({ prisma, resolved, permission: "langy:create" });
-
-  const identity = await resolveLangyKeyIdentity({ resolved });
-  if (!identity.ok) {
-    throw new LangyApiIdentityDeniedError(
-      identity.reason === "unowned"
-        ? "langy_api_key_unowned"
-        : "langy_api_key_no_langy_access",
-      identity.message,
-    );
-  }
-
-  const actor = await resolveLangyActorSession({
-    prisma,
-    userId: identity.userId,
-    now: new Date(),
-  });
-  if (!actor.ok) {
-    throw new LangyApiIdentityDeniedError(
-      "langy_api_actor_missing",
-      actor.message,
-    );
-  }
-
-  return {
-    dark: false as const,
-    session: actor.session,
-    projectId: resolved.project.id,
-    markUsed: () => {
-      if (resolved.type === "apiKey") {
-        tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
-      }
-    },
-  };
-}
 
 /**
  * `Prefer: wait=<seconds>` (RFC 7240) opts a caller into synchronous delivery:
@@ -261,6 +180,29 @@ function requestedWaitSeconds(c: Context): number | null {
 }
 
 /**
+ * Parse and validate a turn request body. Throws `LangyApiRequestInvalidError`
+ * on malformed JSON, schema mismatch, or `adoptConversationId` without an id
+ * in the path — adoption without a path id is a caller mistake, and the silent
+ * reading (ignore the flag, mint fresh) is exactly the ghost-conversation
+ * failure the flag exists to prevent.
+ */
+async function parseTurnBody(c: Context, conversationId: string | null) {
+  const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success)
+    throw new LangyApiRequestInvalidError(parsed.error.issues);
+  if (parsed.data.adoptConversationId && !conversationId) {
+    throw new LangyApiRequestInvalidError([
+      {
+        path: ["adoptConversationId"],
+        message:
+          "adoptConversationId requires the conversation id in the path: POST /conversations/:conversationId/messages",
+      },
+    ]);
+  }
+  return parsed.data;
+}
+
+/**
  * Start or continue a turn.
  *
  * Nothing is caught. A domain `HandledError` already carries the status, code
@@ -275,23 +217,20 @@ async function startTurn({
   c: Context;
   conversationId: string | null;
 }) {
-  const auth = await authorizeTurn(c);
+  const auth = await authorizeLangyApiKey(c);
   // Hono's default 404, byte-for-byte what an unmounted path returns.
   if (auth.dark) return c.notFound();
 
-  const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success)
-    throw new LangyApiRequestInvalidError(parsed.error.issues);
+  const body = await parseTurnBody(c, conversationId);
 
   const result = await getApp().langy.turns.startConversationTurn({
     projectId: auth.projectId,
-    idempotencyKey: parsed.data.idempotencyKey,
+    idempotencyKey: body.idempotencyKey,
     session: auth.session,
     requestedConversationId: conversationId,
-    messages: parsed.data.messages as LangyChatMessageInput[],
-    ...(parsed.data.modelOverride
-      ? { modelOverride: parsed.data.modelOverride }
-      : {}),
+    ...(body.adoptConversationId ? { adoptConversationId: true } : {}),
+    messages: body.messages as LangyChatMessageInput[],
+    ...(body.modelOverride ? { modelOverride: body.modelOverride } : {}),
     isRetry: false,
     turnContext: {},
   });

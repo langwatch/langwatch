@@ -32,7 +32,7 @@ const llmPrefix = "/llm"
 const maxErrorBodyBytes = 64 * 1024
 
 // codexModelPrefix marks a turn whose model is served by the gateway's codex
-// provider. The worker itself never sees the prefix (opencode runs its native
+// provider. The worker itself never sees the prefix (it runs its native
 // openai provider); the proxy restores it request-side so the gateway routes
 // to the codex credential.
 const codexModelPrefix = "openai_codex/"
@@ -96,6 +96,10 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write(body)
 		return
 	}
+	// pi workers export no OTLP of their own: the relay retells each mediated
+	// LLM call as one gen_ai span into the customer's trace (see genai.go).
+	// nil for calls with no turn to parent under.
+	genAI := newGenAICall(r, entry, req)
 	target, err := llmTargetURL(entry.info.GatewayBaseURL, req.PathValue("token"), req.URL)
 	if err != nil {
 		clog.Get(r.baseCtx).Warn("otelrelay llm target resolution failed",
@@ -113,7 +117,14 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// The worker authenticated to US with a placeholder (its env holds no
 			// virtual key). Replace it with the real credential.
 			pr.Out.Header.Set("Authorization", "Bearer "+entry.info.LLMVirtualKey)
-			// Codex turns run opencode's NATIVE openai provider (the Responses
+			// The Anthropic-native dialect (pi's anthropic-messages lane)
+			// authenticates with x-api-key instead of a Bearer header, and the
+			// gateway's /v1/messages accepts the virtual key there. Replace the
+			// placeholder wherever the client put it, so it never travels.
+			if pr.In.Header.Get("x-api-key") != "" {
+				pr.Out.Header.Set("x-api-key", entry.info.LLMVirtualKey)
+			}
+			// Codex turns run the NATIVE openai provider (the Responses
 			// dialect the codex backend speaks), so the worker's request says
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
 			// the gateway routes it to the codex credential. See provision.go.
@@ -148,10 +159,13 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			}
 			pr.SetXForwarded()
 		},
+		// A burst 429 is re-sent by the relay itself, with the provider's
+		// Retry-After, before anything reaches the worker (llmretry.go).
+		Transport: r.llmRetryTransport(entry),
 		// Negative ⇒ flush immediately after each write: SSE pass-through.
 		FlushInterval: -1,
 		// EVERY failed call is captured so the turn's terminal error frame
-		// carries the REAL cause — opencode launders this body into
+		// carries the REAL cause — the agent launders this body into
 		// "AI_APICallError" prose the control plane must never trust. A typed
 		// gateway herr envelope decodes losslessly (herr.FromBody — the
 		// cross-process continuation); a provider-native body the gateway
@@ -159,13 +173,27 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// status, and body kind), never provider prose. The body is restored
 		// untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
-			return r.captureLLMFailure(entry, resp)
+			if err := r.captureLLMFailure(entry, resp); err != nil {
+				return err
+			}
+			// Wraps OUTSIDE the failure capture's own body wrapping, so both
+			// observations ride the same untouched pass-through.
+			if genAI != nil {
+				genAI.observeResponse(resp)
+			}
+			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			clog.Get(r.baseCtx).Warn("otelrelay llm proxy error",
 				zap.String("conversation", entry.info.ConversationID),
 				zap.Error(err),
 			)
+			// No response reaches ModifyResponse on this path, so the gen_ai
+			// span is closed here or the call would never appear in the
+			// customer's trace at all.
+			if genAI != nil {
+				genAI.finishTransportError()
+			}
 			w.WriteHeader(http.StatusBadGateway)
 		},
 	}
@@ -183,7 +211,9 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 			// (OpenAI's insufficient_quota) as an in-stream error event
 			// after the stream opens. Watch the frames as they pass through
 			// untouched; a clean end clears the capture, an error event
-			// captures and latches (see llmStreamSniffer).
+			// captures and latches (see llmStreamSniffer). An answered
+			// stream is not a 429, so it ends a run of them.
+			entry.resetRateLimitStrikes()
 			resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
 			return nil
 		}
@@ -203,7 +233,7 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 		io.Closer
 	}{io.MultiReader(bytes.NewReader(peeked), rest), rest}
 	if err != nil {
-		return nil // capture is best-effort; the proxied response stands.
+		return nil //nolint:nilerr // capture is best-effort; the proxied response stands.
 	}
 	e, typed := decodeLLMErrorBody(peeked, upstreamResponse{
 		handledCode: resp.Header.Get(herr.HandledErrorHeader),
@@ -318,6 +348,13 @@ func (r *Relay) cutRetryLoopOnHardLimit(entry *workerEntry, resp *http.Response,
 // conversation's gateway base URL, preserving the query string. The base URL's
 // own path (e.g. /openai/v1) is kept, so SDK-relative paths land where the
 // direct OPENAI_BASE_URL wiring used to send them.
+//
+// One join rule beyond concatenation: a client speaking a version-rooted
+// dialect (pi's anthropic-messages lane appends /v1/messages to its base URL)
+// sends a path that starts with /v1 while the gateway base URL already ends in
+// /v1, the segment is deduplicated so the forward lands on the gateway's
+// /v1/messages, not /v1/v1/messages. The OpenAI-relative dialects
+// (/chat/completions, /responses) never start with /v1 and are unaffected.
 func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, error) {
 	base, err := url.Parse(gatewayBaseURL)
 	if err != nil {
@@ -328,8 +365,12 @@ func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, erro
 	}
 	prefix := "/w/" + token + llmPrefix
 	rest := strings.TrimPrefix(reqURL.Path, prefix)
+	basePath := strings.TrimRight(base.Path, "/")
+	if strings.HasSuffix(basePath, "/v1") && strings.HasPrefix(rest, "/v1/") {
+		rest = strings.TrimPrefix(rest, "/v1")
+	}
 	out := *base
-	out.Path = strings.TrimRight(base.Path, "/") + rest
+	out.Path = basePath + rest
 	out.RawQuery = reqURL.RawQuery
 	return &out, nil
 }
@@ -508,7 +549,22 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 		// top-level error codes and do not belong in the generated code list.
 		e.Reasons = []error{herr.E{Code: code}}
 	}
+	if refusal, ok := credentialRefusalReason(status); ok && refusal != code {
+		e.Reasons = append(e.Reasons, herr.E{Code: refusal})
+	}
 	return e
+}
+
+// credentialRefusalReason names a 401 or 403 next to the provider's own
+// discriminant. Every provider has its own vocabulary for a refused key
+// (Bedrock alone answers with a dozen exception names), and a client that
+// knows only some of them would read the rest as a failure worth retrying.
+// The status says "refused credential" in every dialect.
+func credentialRefusalReason(status int) (herr.Code, bool) {
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		return "", false
+	}
+	return upstreamReasonCodes[status], true
 }
 
 func providerErrorCode(body []byte) herr.Code {
@@ -549,7 +605,7 @@ func providerCodeCandidate(body []byte, path string) (herr.Code, bool) {
 // body carries no discriminant of its own (see providerErrorCode for that
 // case). Status 0 is never a real HTTP status; decodeProviderErrorBody passes
 // it for the SSE lane, where a terminal in-stream event has no status at all,
-// so every capture still carries exactly one reason.
+// so every capture still carries a reason.
 var upstreamReasonCodes = map[int]herr.Code{
 	0:                              "upstream_stream_error",
 	http.StatusBadRequest:          "upstream_bad_request",

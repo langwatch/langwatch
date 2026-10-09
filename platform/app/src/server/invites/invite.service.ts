@@ -1,6 +1,9 @@
+import { ledgerActorFor } from "@langwatch/actor";
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import {
   type Organization,
   type OrganizationInvite,
@@ -14,10 +17,18 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "~/server/app-layer/identity/admission-audit";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
+import {
+  holdsOrganizationBinding,
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
 import { RoleService } from "../role/role.service";
@@ -34,8 +45,12 @@ import {
   TeamNotInOrganizationError,
 } from "./errors";
 
-/** Duration in milliseconds before an invite expires (48 hours). */
-export const INVITE_EXPIRATION_MS = 2 * 24 * 60 * 60 * 1000;
+/**
+ * Duration in milliseconds before an invite expires (14 days, D11).
+ * Resend is one click, so the window can be generous; the old 48-hour
+ * window plus an ops-only resend was where invitations went to die.
+ */
+export const INVITE_EXPIRATION_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * Ceiling on the batch-invite transaction, derived from the work it holds:
@@ -60,10 +75,13 @@ const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
 const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 
 import { createLogger } from "@langwatch/observability";
-import { env } from "~/env.mjs";
 import { TeamUserRole } from "~/generated/prisma/client";
-import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
+import {
+  DeveloperSeatNoSharedAccessError,
+  LiteMemberViewerOnlyError,
+} from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "../app-layer/projects/project-kinds";
 import type {
   PlanProvider,
   PlanProviderUser,
@@ -74,10 +92,104 @@ import {
 } from "../license-enforcement/license-enforcement.repository";
 import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
+import { sendInviteReRequestEmail } from "../mailer/inviteReRequestEmail";
+import { hasEmailProvider } from "../mailer/providers";
 import { assertNoPersonalTeamScope } from "../role-bindings/personal-team-scope";
 import { buildInviteAcceptUrl } from "./invite-link";
+import { assertInviteSendAllowed } from "./invite-send-throttle";
 
 const logger = createLogger("langwatch:invites");
+
+/**
+ * The state an invitation is IN, as a person sees it. EXPIRED is derived
+ * from `expiration` rather than stored — there is no sweeper to run and no
+ * row to forget to sweep; a PENDING row past its expiry IS expired,
+ * everywhere this function is used (display, acceptance, resend).
+ */
+export type InviteDisplayStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "EXPIRED"
+  | "REVOKED"
+  // Deprecated Postgres enum value (D11 retirement); no row carries it after
+  // the data migration, but the column type still names it.
+  | "WAITING_APPROVAL"
+  | "PAYMENT_PENDING";
+
+export function resolveInviteDisplayStatus(
+  invite: Pick<OrganizationInvite, "status" | "expiration">,
+  now: Date = new Date(),
+): InviteDisplayStatus {
+  if (
+    invite.status === "PENDING" &&
+    invite.expiration !== null &&
+    invite.expiration <= now
+  ) {
+    return "EXPIRED";
+  }
+  return invite.status;
+}
+
+/**
+ * Whether the signed-in person may accept an invitation targeting
+ * `inviteEmail`, and through which identifier (D11).
+ *
+ * `matchable` is the user's proven addresses from the identity read fork —
+ * `null` for a user not yet on identifiers, who keeps the legacy
+ * case-insensitive session-email comparison byte-for-byte. For a user on
+ * identifiers the proven set is the authority: a session email nothing
+ * verified does not accept.
+ */
+export function matchInviteToAcceptor({
+  inviteEmail,
+  sessionEmail,
+  matchable,
+}: {
+  inviteEmail: string;
+  sessionEmail: string;
+  matchable: Array<{ identifierId: string; value: string }> | null;
+}): { matches: boolean; viaIdentifierId: string | null } {
+  if (matchable === null) {
+    return {
+      matches: sessionEmail.toLowerCase() === inviteEmail.trim().toLowerCase(),
+      viaIdentifierId: null,
+    };
+  }
+  const normalizedInviteEmail = normalizeIdentifierValue(inviteEmail);
+  const hit = matchable.find(
+    (candidate) => candidate.value === normalizedInviteEmail,
+  );
+  return {
+    matches: hit !== undefined,
+    viaIdentifierId: hit?.identifierId ?? null,
+  };
+}
+
+/**
+ * The invited address as somebody signed in as the wrong account is allowed
+ * to see it: first character, then the domain — `s•••@acme.com`.
+ *
+ * Enough to recognize an address you already own, and not enough to learn
+ * one you do not. The domain survives whole because that is the half that
+ * makes the hint useful ("oh, my work account"), and the half a person
+ * holding a link for a colleague at that company already knows. The local
+ * part is what identifies the individual, so only its first character
+ * survives — and a single-character local part reveals nothing further by
+ * being shown, since the mask would be the whole of it either way.
+ *
+ * Anything that is not an address is masked whole rather than passed
+ * through: a value this function cannot parse is a value it cannot promise
+ * to have redacted.
+ */
+export function maskInvitedAddress(email: string): string {
+  const trimmed = email.trim();
+  const at = trimmed.lastIndexOf("@");
+  if (at <= 0 || at === trimmed.length - 1) return "•••";
+
+  const local = trimmed.slice(0, at);
+  const domain = trimmed.slice(at + 1);
+  return `${local[0]}•••@${domain}`;
+}
 
 /**
  * Team assignment input for invite creation.
@@ -105,6 +217,9 @@ interface TeamAssignmentInput {
  * they are written, but invitations stored before the rule may still promise
  * more; the seat corrects them here, the same way a seat change corrects
  * stored access rows, rather than refusing the person who clicked the link.
+ *
+ * A Developer seat (ADR-143) grants no team at all: whatever the stored
+ * invitation promised, the person lands with their personal team only.
  */
 export function resolveInviteTeamMemberships({
   role,
@@ -115,6 +230,8 @@ export function resolveInviteTeamMemberships({
   teamIds: string;
   teamAssignments: unknown;
 }): Array<{ teamId: string; role: TeamUserRole; customRoleId?: string }> {
+  if (!holdsSharedAccess(role)) return [];
+
   let memberships: Array<{
     teamId: string;
     role: TeamUserRole;
@@ -159,37 +276,51 @@ export function resolveInviteTeamMemberships({
   );
 }
 
+type InviteSeat = "FullMember" | "LiteMember" | "Developer";
+
+/**
+ * The seat one invite lands on: an EXTERNAL invite that carries a custom
+ * team role with more than view permissions is a Full seat, since that is
+ * what the licence counts it as once accepted.
+ */
+function inviteSeat(
+  invite: {
+    role: OrganizationUserRole;
+    teams?: Array<{ customRoleId?: string }>;
+  },
+  customRoleMap: Map<string, string[]>,
+): InviteSeat {
+  if (
+    invite.role === OrganizationUserRole.ADMIN ||
+    invite.role === OrganizationUserRole.MEMBER
+  ) {
+    return "FullMember";
+  }
+  // Counted so the caller can see it; never compared to a limit (ADR-143).
+  if (invite.role === OrganizationUserRole.DEVELOPER) return "Developer";
+  const hasNonViewRole = invite.teams?.some((t) => {
+    if (!t.customRoleId) return false;
+    const permissions = customRoleMap.get(t.customRoleId);
+    return permissions && !isViewOnlyCustomRole(permissions);
+  });
+  return hasNonViewRole ? "FullMember" : "LiteMember";
+}
+
 export function classifyInvitesByMemberType(
   invites: Array<{
     role: OrganizationUserRole;
     teams?: Array<{ customRoleId?: string }>;
   }>,
   customRoleMap: Map<string, string[]>,
-): { fullMembers: number; liteMembers: number } {
-  let fullMembers = 0;
-  let liteMembers = 0;
-
+): { fullMembers: number; liteMembers: number; developers: number } {
+  const counts = { fullMembers: 0, liteMembers: 0, developers: 0 };
   for (const invite of invites) {
-    if (
-      invite.role === OrganizationUserRole.ADMIN ||
-      invite.role === OrganizationUserRole.MEMBER
-    ) {
-      fullMembers++;
-    } else if (invite.role === OrganizationUserRole.EXTERNAL) {
-      const hasNonViewRole = invite.teams?.some((t) => {
-        if (!t.customRoleId) return false;
-        const permissions = customRoleMap.get(t.customRoleId);
-        return permissions && !isViewOnlyCustomRole(permissions);
-      });
-      if (hasNonViewRole) {
-        fullMembers++;
-      } else {
-        liteMembers++;
-      }
-    }
+    const seat = inviteSeat(invite, customRoleMap);
+    if (seat === "FullMember") counts.fullMembers++;
+    else if (seat === "Developer") counts.developers++;
+    else counts.liteMembers++;
   }
-
-  return { fullMembers, liteMembers };
+  return counts;
 }
 
 /**
@@ -201,6 +332,7 @@ interface CreateAdminInviteInput {
   organizationId: string;
   teamIds: string;
   teamAssignments?: TeamAssignmentInput[];
+  requestedBy?: string | null;
 }
 
 /**
@@ -228,18 +360,6 @@ interface ResolvedInviteTeams {
 }
 
 /**
- * Input for creating a member invite request (WAITING_APPROVAL status).
- */
-interface CreateMemberInviteRequestInput {
-  email: string;
-  role: OrganizationUserRole;
-  organizationId: string;
-  teamIds: string;
-  teamAssignments?: TeamAssignmentInput[];
-  requestedBy: string;
-}
-
-/**
  * Input for creating a PAYMENT_PENDING invite (checkout flow).
  */
 interface CreatePaymentPendingInviteInput {
@@ -252,16 +372,8 @@ interface CreatePaymentPendingInviteInput {
 }
 
 /**
- * Input for approving a WAITING_APPROVAL invite.
- */
-interface ApproveInviteInput {
-  inviteId: string;
-  organizationId: string;
-}
-
-/**
- * Service that encapsulates invite creation, validation, and approval logic.
- * Extracted from the organization router to enable both admin and member invite flows.
+ * Service that encapsulates invite creation, validation, and acceptance
+ * logic used by the invite router and other application adapters.
  *
  * Dependencies are injected to follow DIP and enable testability.
  */
@@ -299,7 +411,7 @@ export class InviteService {
 
   /**
    * Validates that an invite can be created:
-   * - No duplicate invitations across PENDING, WAITING_APPROVAL, and PAYMENT_PENDING statuses
+   * - No duplicate invitations across PENDING and PAYMENT_PENDING statuses
    * - Returns the existing invite if a duplicate is found (null if no duplicate)
    *
    * Case-insensitive on the address, like the membership check next door and
@@ -318,7 +430,7 @@ export class InviteService {
       where: {
         email: { equals: email.trim(), mode: "insensitive" },
         organizationId,
-        status: { in: ["PENDING", "WAITING_APPROVAL", "PAYMENT_PENDING"] },
+        status: { in: ["PENDING", "PAYMENT_PENDING"] },
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
     });
@@ -381,7 +493,7 @@ export class InviteService {
   }
 
   /**
-   * Checks license member limits (counting both PENDING and WAITING_APPROVAL invites).
+   * Checks license member limits (counting live PENDING invites).
    * Throws FORBIDDEN if limits are exceeded.
    */
   async checkLicenseLimits({
@@ -406,19 +518,29 @@ export class InviteService {
     const currentMembersLite =
       await this.licenseRepo.getMembersLiteCount(organizationId);
 
-    const customRoles = await this.prisma.customRole.findMany({
+    const customRoles = await liveRoles(this.prisma).findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
     });
     const customRoleMap = new Map(
-      customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []]),
+      customRoles.map((r) => [
+        r.id,
+        z.array(z.string()).parse(r.permissions ?? []),
+      ]),
     );
 
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
       classifyInvitesByMemberType(newInvites, customRoleMap);
 
+    // A pool is checked only when the batch adds to it. An organization
+    // already over one limit (a plan downgrade) can still invite into the
+    // other pools, and a batch of Developers, which no plan limit applies to
+    // (ADR-143), is never refused for the Full or Lite counts.
     if (!subscriptionLimits.overrideAddingLimitations) {
-      if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
+      if (
+        newFullMembers > 0 &&
+        currentFullMembers + newFullMembers > subscriptionLimits.maxMembers
+      ) {
         throw new LimitExceededError(
           "members",
           currentFullMembers,
@@ -426,8 +548,8 @@ export class InviteService {
         );
       }
       if (
-        currentMembersLite + newLiteMembers >
-        subscriptionLimits.maxMembersLite
+        newLiteMembers > 0 &&
+        currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite
       ) {
         throw new LimitExceededError(
           "membersLite",
@@ -452,6 +574,13 @@ export class InviteService {
     role: OrganizationUserRole;
     teamAssignments?: TeamAssignmentInput[];
   }): void {
+    // A Developer seat (ADR-143) cannot be invited onto any team.
+    if (!holdsSharedAccess(role)) {
+      if ((teamAssignments ?? []).length > 0) {
+        throw new DeveloperSeatNoSharedAccessError();
+      }
+      return;
+    }
     if (role !== OrganizationUserRole.EXTERNAL) return;
     for (const assignment of teamAssignments ?? []) {
       if (assignment.customRoleId || assignment.role !== TeamUserRole.VIEWER) {
@@ -510,6 +639,7 @@ export class InviteService {
             : undefined,
         role: input.role,
         status: "PENDING",
+        requestedBy: input.requestedBy ?? null,
       },
     });
   }
@@ -527,7 +657,7 @@ export class InviteService {
     organization: Organization;
     inviteCode: string;
   }): Promise<{ emailNotSent: boolean }> {
-    if (!env.SENDGRID_API_KEY) {
+    if (!hasEmailProvider()) {
       return { emailNotSent: true };
     }
     try {
@@ -626,7 +756,10 @@ export class InviteService {
       (tx) =>
         this.persistInvites({
           tx,
-          invites: validInvites,
+          invites: validInvites.map((invite) => ({
+            ...invite,
+            requestedBy: user?.id ?? null,
+          })),
           organization,
           isStrict,
         }),
@@ -756,8 +889,8 @@ export class InviteService {
   /**
    * The team side of one requested invite, from whichever form the request
    * used: explicit team role entries, or the legacy comma-separated team id
-   * list. Returns null when the invite names no teams at all, or when
-   * lenient validation drops it entirely.
+   * list. Organization members may have no team assignment; returns null for
+   * teamless external invites or when lenient validation drops the invite.
    */
   private async resolveInviteTeams({
     organizationId,
@@ -768,6 +901,8 @@ export class InviteService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<ResolvedInviteTeams | null> {
+    const seatOnly = this.resolveInviteTeamsForSeat(invite);
+    if (seatOnly) return seatOnly;
     if (invite.teams && invite.teams.length > 0) {
       return this.resolveExplicitInviteTeams({
         organizationId,
@@ -783,7 +918,29 @@ export class InviteService {
         isStrict,
       });
     }
+    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+      return { teamAssignments: [], teamIdsString: "" };
+    }
     return null;
+  }
+
+  /**
+   * A Developer seat (ADR-143) is invited onto no team. An invite for one
+   * that names a team, in either request form, is refused here with the
+   * seat's own code, before the resolver would otherwise read the teams and
+   * before the record's seat assertion sees an already-empty list. One that
+   * names none resolves to an empty team list.
+   */
+  private resolveInviteTeamsForSeat(invite: {
+    role: OrganizationUserRole;
+    teams?: unknown[];
+    teamIds?: string;
+  }): ResolvedInviteTeams | null {
+    if (holdsSharedAccess(invite.role)) return null;
+    if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
+      throw new DeveloperSeatNoSharedAccessError();
+    }
+    return { teamAssignments: [], teamIdsString: "" };
   }
 
   /**
@@ -976,14 +1133,83 @@ export class InviteService {
   }
 
   /**
+   * The invitations waiting for an account, by the addresses it has PROVED
+   * (ADR-143 v6). What comes back includes the invitation code, which is the
+   * secret from the mail, so the caller hands in verified addresses only and
+   * this never falls back to anything softer. Lowercased the way an invite
+   * is stored. Nothing is asked when there is nothing to ask about.
+   *
+   * One `findFirst` per address rather than one `findMany` over them all:
+   * invitations span organizations by definition, and the tenancy guard
+   * admits a read bounded by subject only in the shape the sign-up policy
+   * already uses, a single address answered with at most one row. A
+   * `findMany` naming several addresses is refused outright, which this
+   * lookup learned the hard way: the refusal was invisible for as long as
+   * the address list arrived empty. The oldest pending invitation per
+   * address is the one offered.
+   */
+  async findPendingForAddresses({
+    addresses,
+  }: {
+    addresses: readonly string[];
+  }): Promise<
+    Array<{
+      inviteCode: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+    }>
+  > {
+    const normalized = [
+      ...new Set(addresses.map((address) => address.trim().toLowerCase())),
+    ].filter(Boolean);
+    if (normalized.length === 0) return [];
+
+    const now = new Date();
+    // Invitations are stored as the administrator typed the address, so the
+    // match is case-insensitive like every other address lookup here.
+    const invites = await Promise.all(
+      normalized.map((address) =>
+        this.prisma.organizationInvite.findFirst({
+          where: {
+            email: { equals: address, mode: "insensitive" as const },
+            status: "PENDING",
+            OR: [{ expiration: null }, { expiration: { gt: now } }],
+          },
+          select: {
+            inviteCode: true,
+            role: true,
+            organization: { select: { name: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+      ),
+    );
+
+    return invites
+      .filter((invite) => invite !== null)
+      .map((invite) => ({
+        inviteCode: invite.inviteCode,
+        organizationName: invite.organization.name,
+        role: invite.role,
+      }));
+  }
+
+  /**
    * Pending and approval-waiting invites with the acceptance link each one
    * carries. The link is included because a provisioning tool with no email
    * provider configured has no other way to hand the invite to the person.
+   */
+  /**
+   * Outstanding invitations with their state visible (D11): expired and
+   * revoked rows are part of the answer now — an admin resends an EXPIRED
+   * one instead of wondering where it went. ACCEPTED rows are members, and
+   * PAYMENT_PENDING rides the checkout surface; neither belongs here.
    */
   async listInvites({ organizationId }: { organizationId: string }): Promise<
     Array<
       OrganizationInvite & {
         inviteUrl: string;
+        displayStatus: InviteDisplayStatus;
         requestedByUser: {
           id: string;
           name: string | null;
@@ -995,8 +1221,7 @@ export class InviteService {
     const invites = await this.prisma.organizationInvite.findMany({
       where: {
         organizationId,
-        status: { in: ["PENDING", "WAITING_APPROVAL"] },
-        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+        status: { in: ["PENDING", "REVOKED"] },
       },
       include: {
         requestedByUser: {
@@ -1009,17 +1234,31 @@ export class InviteService {
     return invites.map((invite) => ({
       ...invite,
       inviteUrl: buildInviteAcceptUrl(invite.inviteCode),
+      displayStatus: resolveInviteDisplayStatus(invite),
     }));
   }
 
   /**
-   * Deletes a pending invite. Organization-scoped: an invite id from another
-   * organization reads as not found, never as someone else's invite.
+   * Revocation is a state, not a delete (D11): the row stays, visible as
+   * REVOKED, and the code on it stops opening anything. Organization-scoped:
+   * an invite id from another organization reads as not found, never as
+   * someone else's invite.
    *
-   * No grants to take back, and that is a property of `applyInvite` rather
-   * than an omission here: it marks the invite ACCEPTED in the same
-   * transaction that creates the membership, before it emits a single grant.
-   * A revocable invite is therefore always one that has granted nothing.
+   * Only invitations that were never accepted can be revoked — taking access
+   * back from an accepted one is member removal, a different operation with
+   * a different audit trail. No grants to take back, and that is a property
+   * of `applyInvite` rather than an omission here: it marks the invite
+   * ACCEPTED in the same transaction that creates the membership, before it
+   * emits a single grant. A revocable invite has granted nothing.
+   *
+   * The revoke and the acceptance claim in `applyInvite` are the two
+   * conditional writes that meet on one row, and both are SQL with their
+   * conditions against the table. Through `updateMany` the conditions sit in
+   * a subquery, and a statement that waited on the row lock re-checks only
+   * the outer id predicate against the committed row, so an acceptance that
+   * waited on a revoke would land over it and the admin's revocation would be
+   * lost, or a revoke would mark an accepted invite REVOKED while the
+   * membership stands.
    */
   async revokeInvite({
     organizationId,
@@ -1028,17 +1267,187 @@ export class InviteService {
     organizationId: string;
     inviteId: string;
   }): Promise<{ success: true }> {
-    const invite = await this.prisma.organizationInvite.findFirst({
-      where: { id: inviteId, organizationId },
-      select: { id: true },
-    });
-    if (!invite) {
+    const revoked = await this.prisma.$executeRaw`
+      UPDATE "OrganizationInvite"
+         SET "status" = 'REVOKED',
+             "updatedAt" = now()
+       WHERE "id" = ${inviteId}
+         AND "organizationId" = ${organizationId}
+         AND "status" IN ('PENDING', 'PAYMENT_PENDING')
+    `;
+    if (revoked === 0) {
       throw new InviteNotFoundError("Invitation not found");
     }
-    await this.prisma.organizationInvite.delete({
-      where: { id: invite.id, organizationId },
-    });
     return { success: true };
+  }
+
+  /**
+   * One-click resend (D11): a fresh invite code and a fresh 14-day expiry
+   * on the same row, and a new email out. Rotating the code IS the old
+   * link's revocation — a leaked stale link matches no row afterwards.
+   *
+   * Resend CLAIMS the row exactly as acceptance does: a conditional update
+   * on the (status, inviteCode) pair it read, so two admins racing a resend
+   * mint exactly one live code — the loser reads as not found and reloads.
+   * Only PENDING rows (including ones past their expiry, which is what
+   * resend exists for) can be resent; a revoked or accepted invitation
+   * stays what it is.
+   */
+  async resendInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ invite: OrganizationInvite; emailNotSent: boolean }> {
+    const existing = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId },
+      include: { organization: true },
+    });
+    if (existing?.status !== "PENDING") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    if (!existing.organization) {
+      throw new OrganizationNotFoundError();
+    }
+
+    const freshCode = nanoid();
+    const freshExpiration = new Date(Date.now() + INVITE_EXPIRATION_MS);
+    const claimed = await this.prisma.organizationInvite.updateMany({
+      where: {
+        id: existing.id,
+        organizationId,
+        status: "PENDING",
+        inviteCode: existing.inviteCode,
+      },
+      data: { inviteCode: freshCode, expiration: freshExpiration },
+    });
+    if (claimed.count === 0) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    // Same contract as approval: an email failure never reverts the resend —
+    // the fresh link exists and is shown as the fallback.
+    const { emailNotSent } = await this.trySendInviteEmail({
+      email: existing.email,
+      organization: existing.organization,
+      inviteCode: freshCode,
+    });
+
+    const { organization: _organization, ...inviteRow } = existing;
+    return {
+      invite: {
+        ...inviteRow,
+        inviteCode: freshCode,
+        expiration: freshExpiration,
+      },
+      emailNotSent,
+    };
+  }
+
+  /**
+   * Move an invitation's expiry out, without touching its code.
+   *
+   * The asymmetry with `resendInvite` is the whole reason both exist. A
+   * resend mints a fresh code, which stops the old link working and sends a
+   * new mail — right when the person lost the mail, wrong when they still
+   * have it open and merely ran out of time. An extension changes one field
+   * and sends nothing, so the link already in their inbox starts working
+   * again.
+   *
+   * Measured from NOW rather than from the old expiry, so extending a
+   * fortnight-stale invitation gives the same fortnight as extending one
+   * that lapsed this morning. The caller is told the new expiry as a date;
+   * a duration would leave the reader adding it up.
+   */
+  async extendInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ invite: OrganizationInvite }> {
+    const existing = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId },
+    });
+    if (existing?.status !== "PENDING") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    const freshExpiration = new Date(Date.now() + INVITE_EXPIRATION_MS);
+    const claimed = await this.prisma.organizationInvite.updateMany({
+      where: { id: existing.id, organizationId, status: "PENDING" },
+      data: { expiration: freshExpiration },
+    });
+    if (claimed.count === 0) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    return { invite: { ...existing, expiration: freshExpiration } };
+  }
+
+  /**
+   * The invitee, holding an expired link, asks for a fresh one (D11).
+   *
+   * The asymmetry with `resendInvite` is deliberate: this mints nothing.
+   * Only an admin can rotate a code, so all this does is tell the admins
+   * who can that somebody is waiting. A path that let the holder of a stale
+   * code mint a live one would make expiry decorative.
+   *
+   * The caller may be signed out and is identified by nothing but the code,
+   * so the answer says only that the ask went out. It names no admin: who
+   * runs an organization is not something an expired link should teach.
+   * Non-expired invitations answer like missing ones, which keeps this from
+   * being a way to probe a code's state.
+   */
+  async requestFreshInvite({
+    inviteCode,
+    membersSettingsUrl,
+  }: {
+    inviteCode: string;
+    membersSettingsUrl: string;
+  }): Promise<{ notifiedAdmins: number }> {
+    const existing = await this.prisma.organizationInvite.findUnique({
+      where: { inviteCode },
+      include: { organization: true },
+    });
+    if (existing?.status !== "PENDING" || !existing.organization) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    if (resolveInviteDisplayStatus(existing) !== "EXPIRED") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    // The same counter the admin's resend spends, keyed by the invitation's
+    // stable id rather than its code — the code rotates on every resend, so
+    // keying on it would hand out a fresh allowance with each new link.
+    // Spent here, after the code resolves, so the two routes to one inbox
+    // cannot be alternated to double the mail.
+    await assertInviteSendAllowed({ inviteId: existing.id });
+
+    const admins = await this.prisma.organizationUser.findMany({
+      where: { organizationId: existing.organizationId, role: "ADMIN" },
+      select: { user: { select: { email: true } } },
+    });
+    const adminEmails = admins
+      .map((admin) => admin.user.email)
+      .filter((email): email is string => Boolean(email));
+
+    // One failing address must not silence the rest: an organization whose
+    // first admin has a bouncing address still has the others to ask.
+    const results = await Promise.allSettled(
+      adminEmails.map((adminEmail) =>
+        sendInviteReRequestEmail({
+          adminEmail,
+          organizationName: existing.organization?.name ?? "",
+          invitedEmail: existing.email,
+          membersSettingsUrl,
+        }),
+      ),
+    );
+
+    return {
+      notifiedAdmins: results.filter((r) => r.status === "fulfilled").length,
+    };
   }
 
   /**
@@ -1052,89 +1461,6 @@ export class InviteService {
       );
     }
     return this.prisma;
-  }
-
-  /**
-   * Creates an invite request with WAITING_APPROVAL status (member flow).
-   * No expiration is set, and no email is sent.
-   * Tracks the requestedBy user ID.
-   */
-  async createMemberInviteRequest(
-    input: CreateMemberInviteRequestInput,
-  ): Promise<{ invite: OrganizationInvite }> {
-    this.assertAssignmentsWithinInvitedSeat(input);
-    const existingInvite = await this.checkDuplicateInvite({
-      email: input.email,
-      organizationId: input.organizationId,
-    });
-
-    if (existingInvite) {
-      throw new DuplicateInviteError(input.email);
-    }
-
-    const inviteCode = nanoid();
-
-    const savedInvite = await this.prisma.organizationInvite.create({
-      data: {
-        email: input.email,
-        inviteCode,
-        expiration: null,
-        organizationId: input.organizationId,
-        teamIds: input.teamIds,
-        teamAssignments:
-          input.teamAssignments && input.teamAssignments.length > 0
-            ? (input.teamAssignments as unknown as JsonArray)
-            : undefined,
-        role: input.role,
-        status: "WAITING_APPROVAL",
-        requestedBy: input.requestedBy,
-      },
-    });
-
-    return { invite: savedInvite };
-  }
-
-  /**
-   * Approves a WAITING_APPROVAL invite:
-   * - Transitions status to PENDING
-   * - Sets 48-hour expiration
-   * - Attempts to send invitation email (failure does not revert approval)
-   */
-  async approveInvite(
-    input: ApproveInviteInput,
-  ): Promise<{ invite: OrganizationInvite; emailNotSent: boolean }> {
-    const invite = await this.prisma.organizationInvite.findFirst({
-      where: {
-        id: input.inviteId,
-        organizationId: input.organizationId,
-        status: "WAITING_APPROVAL",
-      },
-      include: { organization: true },
-    });
-
-    if (!invite) {
-      throw new InviteNotFoundError();
-    }
-
-    if (!invite.organization) {
-      throw new OrganizationNotFoundError();
-    }
-
-    const updatedInvite = await this.prisma.organizationInvite.update({
-      where: { id: invite.id, organizationId: input.organizationId },
-      data: {
-        status: "PENDING",
-        expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
-      },
-    });
-
-    const { emailNotSent } = await this.trySendInviteEmail({
-      email: invite.email,
-      organization: invite.organization,
-      inviteCode: invite.inviteCode,
-    });
-
-    return { invite: updatedInvite, emailNotSent };
   }
 
   /**
@@ -1169,7 +1495,8 @@ export class InviteService {
    * Finds the best project slug to redirect to after accepting an invite.
    * Tries the first assigned team first, then falls back to any non-archived
    * project in the org so the client can land directly in the app rather than
-   * hitting the onboarding flow.
+   * hitting the onboarding flow. Never an aggregate, opened on purpose
+   * (ADR-144 block F), nor the governance project, which no one sees.
    */
   async findLandingProjectSlug(
     invite: OrganizationInvite,
@@ -1190,7 +1517,11 @@ export class InviteService {
     const project =
       (invitedTeamIds.length > 0
         ? await this.prisma.project.findFirst({
-            where: { teamId: { in: invitedTeamIds }, archivedAt: null },
+            where: {
+              teamId: { in: invitedTeamIds },
+              archivedAt: null,
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+            },
             select: { slug: true },
           })
         : null) ??
@@ -1201,6 +1532,7 @@ export class InviteService {
             where: {
               team: { organizationId: invite.organizationId, archivedAt: null },
               archivedAt: null,
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
             },
             select: { slug: true },
           })
@@ -1246,7 +1578,7 @@ export class InviteService {
    * `invite`). So the order is membership-and-acceptance first, grants
    * after, and that order is what makes the invite lifecycle
    * consistent: **a PENDING invite never carries grants**. `revokeInvite` can
-   * therefore delete one without hunting for access to take back — there is
+   * therefore retire one without hunting for access to take back — there is
    * none — and the window a crash opens leaves a member who holds a seat and
    * no grants, which is less access than the invite asked for rather than
    * more.
@@ -1263,9 +1595,13 @@ export class InviteService {
   async applyInvite({
     userId,
     invite,
+    viaIdentifierId,
   }: {
     userId: string;
     invite: OrganizationInvite;
+    /** The VERIFIED identifier the acceptance matched on, when the user is
+     *  on identifiers; null/absent for the legacy User.email match. */
+    viaIdentifierId?: string | null;
   }): Promise<void> {
     if (invite.status !== "PENDING") {
       const isCallerRetryingItsOwnAccept =
@@ -1284,9 +1620,29 @@ export class InviteService {
     // Root client only, and it always was: the grants below are ledger
     // commands that cannot ride a caller's transaction, and the acceptance
     // now opens one of its own.
+    //
+    // The acceptance CLAIMS the row (D11): a conditional update on the
+    // expected (status, inviteCode) pair, inside the same transaction as the
+    // membership write. Two racers on one PENDING invite cannot both win —
+    // the loser's update matches nothing, the transaction rolls back, and
+    // no membership row is written for them. SQL with the conditions against
+    // the table, for the reason given on `revokeInvite`.
     const prisma = this.requireRootClient();
-    await prisma.$transaction([
-      prisma.organizationUser.createMany({
+    const claimed = await prisma.$transaction(async (tx) => {
+      const claim = await tx.$executeRaw`
+        UPDATE "OrganizationInvite"
+           SET "status" = 'ACCEPTED',
+               "acceptedByUserId" = ${userId},
+               "acceptedViaIdentifierId" = ${viaIdentifierId ?? null},
+               "updatedAt" = now()
+         WHERE "id" = ${invite.id}
+           AND "organizationId" = ${invite.organizationId}
+           AND "inviteCode" = ${invite.inviteCode}
+           AND "status" = 'PENDING'
+           AND ("expiration" IS NULL OR "expiration" > now())
+      `;
+      if (claim === 0) return false;
+      await tx.organizationUser.createMany({
         data: [
           {
             userId,
@@ -1295,12 +1651,36 @@ export class InviteService {
           },
         ],
         skipDuplicates: true,
-      }),
-      prisma.organizationInvite.update({
-        where: { id: invite.id, organizationId: invite.organizationId },
-        data: { status: "ACCEPTED" },
-      }),
-    ]);
+      });
+      // Inside the claim, not in the grant tail: the tail re-runs on every
+      // retry of an accepted invite, and the admission happens once.
+      if (invite.role === OrganizationUserRole.DEVELOPER) {
+        await this.auditDeveloperAdmission({ tx, userId, invite });
+      }
+      return true;
+    });
+
+    if (!claimed) {
+      // The row moved between the caller's read and the claim. If it moved
+      // because THIS user's own concurrent accept won, the grant tail is a
+      // repair, exactly as in the retry path above; anyone else sees the
+      // stale-code refusal.
+      const current = await prisma.organizationInvite.findUnique({
+        where: { id: invite.id },
+        select: { status: true },
+      });
+      const isCallerRacingItself =
+        current?.status === "ACCEPTED" &&
+        (await this.callerHoldsMembership({
+          userId,
+          organizationId: invite.organizationId,
+        }));
+      if (isCallerRacingItself) {
+        await this.applyInviteGrants({ userId, invite });
+        return;
+      }
+      throw new InviteNotFoundError("Invitation is no longer open");
+    }
 
     await this.applyInviteGrants({ userId, invite });
   }
@@ -1327,6 +1707,35 @@ export class InviteService {
   }
 
   /**
+   * A Developer admission has no grant to reach the audit page through
+   * (ADR-143), so the row itself is audited, as the join paths do. Written
+   * in the claim transaction so a retried acceptance never writes it twice.
+   */
+  private async auditDeveloperAdmission({
+    tx,
+    userId,
+    invite,
+  }: {
+    tx: Prisma.TransactionClient;
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+        userId,
+        actorUserId: invite.requestedBy ?? null,
+        organizationId: invite.organizationId,
+        metadata: {
+          seat: OrganizationUserRole.DEVELOPER,
+          inviteId: invite.id,
+          via: "invite" satisfies DeveloperAdmissionVia,
+        },
+      },
+    });
+  }
+
+  /**
    * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (skipped
    * for EXTERNAL) and each team's grant. Idempotent (revoke-then-attach,
    * duplicates skipped), so both the fresh-accept caller and the retry-repair
@@ -1350,7 +1759,9 @@ export class InviteService {
       fallback: "inviteService",
     });
 
-    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+    // No ORGANIZATION-scoped grant for a Lite Member (access comes from
+    // their teams) nor for a Developer (ADR-143: personal team only).
+    if (holdsOrganizationBinding(invite.role)) {
       await writer.revokeBindingsWhere({
         organizationId: invite.organizationId,
         where: {
@@ -1360,7 +1771,6 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's organization role",
-        skipAppendWhenNoMatches: true,
       });
       await writer.attachBindings({
         organizationId: invite.organizationId,
@@ -1429,7 +1839,6 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's team role",
-        skipAppendWhenNoMatches: true,
       });
     }
     if (teamMembershipData.length > 0) {
@@ -1452,7 +1861,7 @@ export class InviteService {
 
   /**
    * Approves all PAYMENT_PENDING invites for a given subscription:
-   * - Transitions each to PENDING with 48-hour expiration
+   * - Transitions each to PENDING with a fresh INVITE_EXPIRATION_MS window
    * - Sends invite emails
    */
   async approvePaymentPendingInvites({

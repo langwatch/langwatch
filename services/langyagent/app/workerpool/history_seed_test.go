@@ -11,34 +11,33 @@ import (
 )
 
 // seedRecordingAgent is a minimal app.CodingAgent that records every Post's
-// turn and fails on demand, so the seed-once gate can be exercised without an
-// opencode process.
+// turn and fails on demand, so the seed-once gate can be exercised without a
+// worker process.
 type seedRecordingAgent struct {
 	posts   []app.Turn
 	postErr error
 }
 
-func (a *seedRecordingAgent) WaitReady(context.Context, app.Endpoint) error { return nil }
-func (a *seedRecordingAgent) OpenSession(context.Context, app.Endpoint) (string, error) {
-	return "sess", nil
+func (a *seedRecordingAgent) WaitReady(context.Context) error { return nil }
+func (a *seedRecordingAgent) OpenSession(context.Context) (string, bool, error) {
+	return "sess", false, nil
 }
-func (a *seedRecordingAgent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
+func (a *seedRecordingAgent) Post(_ context.Context, _ string, turn app.Turn) error {
 	a.posts = append(a.posts, turn)
 	return a.postErr
 }
-func (a *seedRecordingAgent) Stream(context.Context, app.Endpoint, string, app.ChatSink) error {
+func (a *seedRecordingAgent) Stream(context.Context, string, app.ChatSink) error {
 	return nil
 }
-func (a *seedRecordingAgent) NotifyShutdownImminent(context.Context, app.Endpoint, string, time.Time) error {
+func (a *seedRecordingAgent) NotifyShutdownImminent(context.Context, string, time.Time) error {
 	return nil
 }
 
 func newSeedWorker(agent app.CodingAgent) *Worker {
 	return &Worker{
-		conversationID:    "conv-1",
-		agent:             agent,
-		endpoint:          app.Endpoint{BaseURL: "http://127.0.0.1:0", BearerToken: "b"},
-		openCodeSessionID: "sess",
+		conversationID: "conv-1",
+		agent:          agent,
+		sessionID:      "sess",
 	}
 }
 
@@ -71,6 +70,30 @@ func TestPostMessage_SeedsFirstDeliveredMessageOnly(t *testing.T) {
 	}
 	if second.Prompt != "and my surname?" {
 		t.Fatalf("second prompt re-carried the seed: %q", second.Prompt)
+	}
+}
+
+// A worker that RESUMED the session its home still held (spawn set
+// promptDelivered) already has the conversation in the session's own
+// transcript: folding the seed into its next message would tell the story
+// twice and break the byte-stable prefix provider caching reads.
+//
+// @scenario "A resumed session is never re-seeded"
+func TestPostMessage_ResumedSessionIsNeverSeeded(t *testing.T) {
+	agent := &seedRecordingAgent{}
+	w := newSeedWorker(agent)
+	w.promptDelivered = true
+
+	seed := "THE CONVERSATION SO FAR: earlier things were said"
+	if err := w.PostMessage(context.Background(), "sys", "and my surname?", seed, ""); err != nil {
+		t.Fatalf("PostMessage: %v", err)
+	}
+
+	if len(agent.posts) != 1 {
+		t.Fatalf("posts = %d, want 1", len(agent.posts))
+	}
+	if agent.posts[0].Prompt != "and my surname?" {
+		t.Fatalf("resumed session got the seed folded in: %q", agent.posts[0].Prompt)
 	}
 }
 

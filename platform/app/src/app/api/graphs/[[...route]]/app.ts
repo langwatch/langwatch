@@ -5,6 +5,7 @@ import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import type { CustomGraph, Prisma } from "~/generated/prisma/client";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import { assertCustomGraphWritesAllowed } from "~/server/analytics/customGraphPlaygroundGate";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -171,6 +172,7 @@ secured.access(requires("analytics:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = c.req.valid("json");
+    await assertCustomGraphWritesAllowed({ prisma, projectId: project.id });
     logger.info({ projectId: project.id }, "Creating graph");
 
     if (
@@ -240,6 +242,7 @@ secured.access(requires("analytics:update")).patch(
     const project = c.get("project");
     const { id } = c.req.param();
     const body = c.req.valid("json");
+    await assertCustomGraphWritesAllowed({ prisma, projectId: project.id });
 
     const graph = await prisma.customGraph.findFirst({
       where: { id, projectId: project.id, kind: BUILDER_CHART_KIND },

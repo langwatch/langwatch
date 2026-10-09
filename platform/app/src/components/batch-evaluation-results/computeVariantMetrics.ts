@@ -10,7 +10,7 @@
 import {
   computeMetricStats,
   type MetricStats,
-} from "~/components/shared/MetricStatsTooltip";
+} from "~/components/shared/metricStats";
 import { bootstrapMeanCI } from "./bootstrapMeanCI";
 import type { BatchResultRow } from "./types";
 

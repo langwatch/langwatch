@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
+import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import type { Session } from "~/server/auth";
 
 import {
@@ -19,12 +20,14 @@ const tracer = getLangWatchTracer("langwatch.langy.chat");
 export async function resolveLangyTurnBaseDependencies(args: {
   deps: Pick<
     LangyTurnServiceDeps,
-    "conversations" | "credentials" | "resolveModel"
+    "conversations" | "credentials" | "resolveModel" | "projectKinds"
   >;
   projectId: string;
   userId: string;
   session: Session;
   requestedConversationId: string | null;
+  /** Adopt an unknown requested id as a new conversation — see `ensureConversation`. */
+  adoptConversationId?: boolean;
   modelOverride?: string;
 }) {
   const {
@@ -33,8 +36,16 @@ export async function resolveLangyTurnBaseDependencies(args: {
     userId,
     session,
     requestedConversationId,
+    adoptConversationId,
     modelOverride,
   } = args;
+  // ADR-144 decision 8: an aggregate project takes no writes, and a turn
+  // writes a conversation under the project, runs its model and mints a key
+  // for it. Refused before any of that, so every way into Langy answers with
+  // the read-only refusal rather than whichever step fails on an aggregate
+  // first (no Langy model or key is ever set up for one).
+  await assertProjectAcceptsWrites({ kinds: deps.projectKinds, projectId });
+
   const [
     conversationResult,
     modelResult,
@@ -55,6 +66,7 @@ export async function resolveLangyTurnBaseDependencies(args: {
           projectId,
           userId,
           conversationId: requestedConversationId,
+          ...(adoptConversationId ? { adoptUnknownId: true } : {}),
         }),
         // The resolved default is forwarded to the worker (ADR-065), so with
         // no override the lookup is load-bearing, not just a gate. An

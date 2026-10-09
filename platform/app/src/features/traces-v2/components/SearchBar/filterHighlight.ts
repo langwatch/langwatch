@@ -147,6 +147,11 @@ function isKnownField(fieldName: string): boolean {
   return false;
 }
 
+/** `eval`, `eval.trace`, `eval.conversation`, `eval.llm`: an Instant Eval chip. */
+function isInstantEvalField(fieldName: string): boolean {
+  return fieldName === "eval" || fieldName.startsWith("eval.");
+}
+
 function tagClassName({
   fieldName,
   negated,
@@ -163,6 +168,7 @@ function tagClassName({
   if (SCENARIO_FIELDS.has(fieldName))
     return "filter-token filter-token-scenario";
   if (NUMERIC_FIELDS.has(fieldName)) return "filter-token filter-token-numeric";
+  if (isInstantEvalField(fieldName)) return "filter-token filter-token-eval";
   return "filter-token";
 }
 
@@ -480,17 +486,16 @@ export function setFilterChipLabels(
 }
 
 /**
- * The text the chip overlay paints at rest. Always field-qualified
- * (`evaluator:Policy Check`) so the field prefix stays put — only the value
- * tail swaps to the raw id on hover. Painting the bare label dropped the
- * `evaluator:` prefix at rest and snapped it back on hover, which read as a
- * jarring jump; keeping the field anchored fixes that.
+ * The text the chip paints, in every pointer state. Always field-qualified
+ * (`evaluator:Policy Check`) so the chip reads as a filter and not as a bare
+ * name. The raw id is reachable through the tooltip and by clicking the chip,
+ * never by swapping the visible text — see editorStyles for why.
  *
  * Returns undefined when there's no human label, or it equals the raw value
- * (overlaying `status:error` on `status:error` is pointless and would just
- * flicker on hover) — the CSS overlay only fires when the attr is set, so
- * omission keeps the chip in its raw text-render mode. Shared with the
- * placeholder editor so both renderers paint an identical overlay.
+ * (overlaying `status:error` on `status:error` is pointless) — the CSS
+ * overlay only fires when the attr is set, so omission keeps the chip in its
+ * raw text-render mode. Shared with the placeholder editor so both renderers
+ * paint an identical overlay.
  */
 export function chipOverlayLabel({
   field,
@@ -528,6 +533,13 @@ function computeDecorations(doc: ProseMirrorNode): DecorationSet {
           label: chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value],
         });
         if (overlay) attrs["data-filter-chip-label"] = overlay;
+        // The overlay hides the raw id behind the readable label, and the
+        // chip never resizes to reveal it (see editorStyles), so the id
+        // lives in the tooltip. Same string the placeholder renderer uses,
+        // so the hand-off doesn't change what hovering tells you.
+        attrs.title = overlay
+          ? `${slot.chipToken.field}:${slot.chipToken.value} — click to change value`
+          : "Click to change value";
       }
       decorations.push(Decoration.inline(slot.from, slot.to, attrs));
     }

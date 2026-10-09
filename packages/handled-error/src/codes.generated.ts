@@ -13,18 +13,26 @@
  */
 export const goErrorCodes = {
   /**
-   * ErrAgentError — marks a turn the agent itself reported as failed (an
-   * opencode `error`/`session.error`/`message.error` event — e.g. its LLM call
-   * was rejected). The worker is alive and answered deterministically, so the
-   * control plane must fail the turn immediately with this code instead of the
-   * generic worker-stopped path. When the LLM proxy captured the gateway's
-   * herr for the failed call, it rides as a REASON on this herr — the full
-   * typed cause chain crosses every wire (herr ⇄ the control plane's
-   * DomainError are the same model).
+   * ErrAgentError — marks a turn the agent itself reported as failed (an error
+   * terminal on the worker's event stream — e.g. its LLM call was rejected).
+   * The worker is alive and answered deterministically, so the control plane
+   * must fail the turn immediately with this code instead of the generic
+   * worker-stopped path. When the LLM proxy captured the gateway's herr for
+   * the failed call, it rides as a REASON on this herr — the full typed cause
+   * chain crosses every wire (herr ⇄ the control plane's DomainError are the
+   * same model).
    *
    * @source services/langyagent/domain/errors.go
    */
   agent_error: { service: "langyagent" },
+  /**
+   * ErrSessionNotFound — signals the worker's internal agent session vanished
+   * mid-turn. The orchestrator recycles the worker and surfaces a typed
+   * "session-not-found" event.
+   *
+   * @source services/langyagent/domain/errors.go
+   */
+  agent_session_not_found: { service: "langyagent", httpStatus: 404 },
   /**
    * ErrAuthUpstream
    *
@@ -69,7 +77,7 @@ export const goErrorCodes = {
   circuit_open: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrCodeBlockTimeout — signals the user code subprocess exceeded
-   * NLP_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
+   * NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
    *
    * Also produced as a workflow NodeError type, so this one entry is the copy
    * for both the HTTP failure and the node error event. Its node sites are
@@ -95,9 +103,57 @@ export const goErrorCodes = {
    */
   config_invalid: { service: "config" },
   /**
+   * ErrConnectInstanceRequired — means a license token arrived without the
+   * X-LangWatch-Instance header. A license is bound to one install, so the
+   * token alone identifies nothing.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_instance_required: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrConnectLicenseExpired — means the license term ended. A renewed license
+   * opens hosted services again.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_expired: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectLicenseNotRegistered — means the license behind the token is not
+   * in the registry, or is recorded there without a customer. The install's
+   * operator has to contact LangWatch; retrying changes nothing.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_not_registered: { service: "aigateway", httpStatus: 401 },
+  /**
+   * ErrConnectLicenseRevoked — means the license was revoked or replaced. The
+   * install keeps working offline on the license it holds, but hosted services
+   * are closed to it for good.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_revoked: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectServiceNotEntitled — means the license authenticated but does
+   * not include the hosted service the call needs. Distinct from every refusal
+   * above: the license is live and its other services keep working, so the fix
+   * is a change to the contract rather than to the install.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_service_not_entitled: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectWrongInstance — means the license is bound to another install.
+   * Either the token leaked, or the install was rebuilt and an operator has to
+   * reset the binding.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_wrong_instance: { service: "aigateway", httpStatus: 403 },
+  /**
    * ErrConversationBusy — signals a second concurrent turn for a conversation
-   * whose single-stream opencode session is already answering. The control
-   * plane shows a "still answering — wait" notice. Maps to 409.
+   * whose single-stream agent session is already answering. The control plane
+   * shows a "still answering — wait" notice. Maps to 409.
    *
    * @source services/langyagent/domain/errors.go
    */
@@ -150,8 +206,17 @@ export const goErrorCodes = {
    */
   guardrail_upstream_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
+   * ErrHostedServiceUnavailable — means the gateway could not get an answer
+   * from the control plane for a hosted-service call. Nothing was judged and
+   * nothing was charged, so the caller can retry.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  hosted_service_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
    * ErrIdleTimeout — signals the SSE stream went silent past
-   * NLP_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the connection.
+   * NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the
+   * connection.
    *
    * @source services/nlpgo/domain/errors.go
    */
@@ -243,6 +308,18 @@ export const goErrorCodes = {
    */
   model_not_allowed: { service: "aigateway", httpStatus: 400 },
   /**
+   * ErrModelNotRecognized — means the request named a model that matches
+   * nothing this key can place: no provider declares it, its name matches no
+   * vendor the gateway can guess from, and the key holds more than one
+   * provider that told us what it serves. Sending it down the chain anyway
+   * makes every vendor answer for a model it never had, and the caller reads
+   * the last vendor's error instead of the real problem. Distinct from
+   * model_provider_not_bound, which is a provider the caller DID name.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  model_not_recognized: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrProviderNotBound — means the request names a provider (explicit
    * "provider/model" prefix or alias) that has no credential slot on this VK.
    * Dispatching anyway would hand a mismatched credential to the provider
@@ -280,23 +357,6 @@ export const goErrorCodes = {
    */
   not_found: { service: "nlpgo", httpStatus: 404 },
   /**
-   * ErrOpenCodeAuthNotEnforced — is the fail-closed guard verdict (ADR-033 Fix
-   * A′): opencode answered an unauthenticated control request with something
-   * other than 401, so the per-worker password is not gating the control API.
-   * The worker must not serve traffic in that state.
-   *
-   * @source services/langyagent/domain/errors.go
-   */
-  opencode_auth_not_enforced: { service: "langyagent", httpStatus: 500 },
-  /**
-   * ErrSessionNotFound — signals the worker's opencode internal session
-   * vanished mid-turn. The orchestrator recycles the worker and surfaces a
-   * typed "session-not-found" event.
-   *
-   * @source services/langyagent/domain/errors.go
-   */
-  opencode_session_not_found: { service: "langyagent", httpStatus: 404 },
-  /**
    * CodePayloadTooLarge
    *
    * Also declared by aigateway (ErrPayloadTooLarge).
@@ -311,6 +371,65 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   policy_violation: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrProviderConfigInvalid — means the provider slot is configured in a way
+   * that cannot serve THIS request: no key declares the requested model, a
+   * deployment map is missing, or the provider does not implement the
+   * operation. Terminal, and the remediation is in the customer's model
+   * provider settings rather than in the request.
+   *
+   * The answer carries a "problem" in its meta, one of the ConfigProblem*
+   * values below, naming which of those it was. The copy the customer reads is
+   * chosen from it, because "add your API key" and "add a deployment mapping"
+   * are different instructions.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_config_invalid: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrProviderConnectionFailed — means the request never got to the provider:
+   * DNS failure, connection refused, transport error. Retryable and the
+   * provider's (or the network's) fault, unlike the config and credential
+   * codes above, which repeat identically on every attempt.
+   *
+   * Deliberately not "provider_unreachable": that slug is already an app code,
+   * thrown when a credential CHECK finds nothing answering
+   * (providerValidation.ts), and its customer copy says the key was never
+   * checked. One slug cannot carry both meanings, and the copy for either
+   * would be wrong on the other's path.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_connection_failed: { service: "aigateway", httpStatus: 502 },
+  /**
+   * ErrProviderCredentialInvalid — means the credentials configured for a
+   * model provider cannot produce an authenticated call at all — a Vertex
+   * service account that yields no OAuth token source, AWS credentials the
+   * signer cannot retrieve. The request never reaches the provider, so there
+   * is no upstream verdict to forward and no retry that can help: every
+   * credential in the chain fails the same way. Terminal and the customer's to
+   * fix, so it must not carry provider_timeout's retryable 504.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_credential_invalid: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrProviderCredentialRejected — means the credential reached the provider
+   * and the provider refused it (401/403). Distinct from
+   * provider_credential_invalid, which never got that far: this one proves the
+   * credential is well-formed and says the account behind it is the problem —
+   * expired, revoked, or lacking permission for the operation.
+   *
+   * Reserved: no path emits it today. A provider that refuses a credential
+   * answers with a status, and errFromBifrost forwards every answered error
+   * verbatim before classification runs, so the 401/403 arrives as itself.
+   * Registered anyway (status, fault, remediation, presentation copy) so a
+   * path that does not forward — a pre-dispatch credential refresh, a plugin
+   * rejection — has a code to use without minting a new slug.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_credential_rejected: { service: "aigateway", httpStatus: 401 },
   /**
    * ErrProviderError
    *
@@ -347,6 +466,16 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   realtime_session_limit: { service: "aigateway", httpStatus: 429 },
+  /**
+   * ErrRequestAbandoned — means the caller disconnected or its deadline
+   * expired before the provider answered. It is a verdict about the caller,
+   * not about the credential: it must neither advance the fallback chain nor
+   * move the circuit breaker, or one client hanging up repeatedly would open
+   * the breaker on a healthy provider.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  request_abandoned: { service: "aigateway", httpStatus: 499 },
   /**
    * ErrSSRFBlocked — signals an HTTP block tried to reach a destination
    * disallowed by the SSRF policy (loopback, private, link-local, metadata).
@@ -436,8 +565,8 @@ export const goErrorCodes = {
    */
   virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
   /**
-   * ErrWorkerNotReady — signals a freshly spawned worker's opencode did not
-   * become ready within LANGY_READINESS_TIMEOUT_MS.
+   * ErrWorkerNotReady — signals a freshly spawned worker did not become ready
+   * within LANGY_READINESS_TIMEOUT_MS.
    *
    * @source services/langyagent/domain/errors.go
    */

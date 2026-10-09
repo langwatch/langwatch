@@ -2,6 +2,7 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { PrismaClient, Project } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import { getSchemaShape } from "../../utils/modelProviderHelpers";
@@ -11,13 +12,21 @@ import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderCredentialsUnreadableError,
   ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
+  ModelProviderRoutingHandleInvalidError,
+  ModelProviderRoutingHandleTakenError,
   ModelProviderScopesRequiredError,
+  ModelProviderSkipPermissionsPatternInvalidError,
   ModelProviderTestRateLimitedError,
 } from "./errors";
 import { rowCannotServeEmbeddings } from "./geminiDoor";
+import {
+  firstInvalidSkipPattern,
+  readStoredSkipList,
+} from "./langySkipPermissions";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -27,6 +36,7 @@ import {
   type ModelProviderWithScopes,
   type ScopeInput,
 } from "./modelProvider.repository";
+import { pingModelProvider, UNPINGABLE_CREDENTIALS } from "./providerPing";
 import {
   type ValidationResult,
   validateProviderApiKey,
@@ -37,6 +47,11 @@ import {
   modelProviders,
   providerDeprecation,
 } from "./registry";
+import {
+  isRoutingHandleConflict,
+  normalizeRoutingHandle,
+  routingHandleProblem,
+} from "./routingHandle";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
 /**
@@ -45,6 +60,44 @@ import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
  * Hono routes, workers) without dragging the full tRPC Context in.
  */
 export type AuthzContext = { prisma: PrismaClient; session: Session | null };
+
+/**
+ * Everything one model-provider write needs, after the checks have run and
+ * before the transaction opens. Carried as one value so the update and create
+ * branches read the same payload rather than each re-deriving it.
+ */
+type ModelProviderWrite = {
+  existingProvider: Awaited<
+    ReturnType<ModelProviderService["findExistingProvider"]>
+  >;
+  createScopes: ScopeInput[] | undefined;
+  isHandleProvided: boolean;
+  normalizedHandle: string | null;
+  input: UpdateModelProviderInput;
+  validatedKeys: Record<string, unknown> | null;
+  customKeysProvided: boolean;
+  scopes: ScopeInput[] | undefined;
+};
+
+/** The advanced settings that ride the same row as the basic fields. */
+function advancedFields(input: UpdateModelProviderInput): AdvancedGatewayInput {
+  return {
+    rateLimitRpm: input.rateLimitRpm,
+    rateLimitTpm: input.rateLimitTpm,
+    rateLimitRpd: input.rateLimitRpd,
+    fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+    providerConfig: input.providerConfig,
+    // An empty list is a cleared field, and a cleared field means the
+    // provider's default applies, so it is stored as null rather than as an
+    // empty array that would read as "trust nothing".
+    langySkipPermissionsModels:
+      input.langySkipPermissionsModels === undefined
+        ? undefined
+        : (input.langySkipPermissionsModels?.length ?? 0) > 0
+          ? input.langySkipPermissionsModels
+          : null,
+  };
+}
 
 /**
  * A provider row this service materialized, as opposed to a form-time shape.
@@ -82,6 +135,13 @@ export type UpdateModelProviderInput = {
   customKeys?: Record<string, unknown> | null;
   customModels?: CustomModelsInput | null;
   customEmbeddingsModels?: CustomModelsInput | null;
+  /**
+   * The slug that addresses THIS instance in a gateway model string
+   * ("eu/claude-sonnet-5"). Omit to leave the stored handle alone; send an
+   * empty string or null to clear it, which releases the name for another
+   * provider in the organization.
+   */
+  routingHandle?: string | null;
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
   /**
@@ -110,6 +170,13 @@ export type UpdateModelProviderInput = {
   rateLimitRpd?: number | null;
   fallbackPriorityGlobal?: number | null;
   providerConfig?: Record<string, unknown> | null;
+  /**
+   * Regular expression sources naming the models allowed to run a Langy
+   * conversation with the permission checks skipped (ADR-129). Omit to leave
+   * the stored list alone; send an empty list to clear it, which returns the
+   * provider to its registry default.
+   */
+  langySkipPermissionsModels?: string[] | null;
 };
 
 /**
@@ -144,6 +211,7 @@ type AdvancedGatewayInput = {
   rateLimitRpd?: number | null;
   fallbackPriorityGlobal?: number | null;
   providerConfig?: Record<string, unknown> | null;
+  langySkipPermissionsModels?: string[] | null;
 };
 
 /**
@@ -185,7 +253,7 @@ const TEST_CONNECTION_WINDOW_SECONDS = 60;
 const TEST_CONNECTION_PER_ORGANIZATION = 20;
 const TEST_CONNECTION_GLOBAL = 500;
 
-async function assertTestConnectionWithinBudget(
+export async function assertTestConnectionWithinBudget(
   organizationId: string,
 ): Promise<void> {
   const perOrganization = await rateLimit({
@@ -216,6 +284,158 @@ function retryAfterFrom(resetAt: number): number {
   return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
 }
 
+/**
+ * Strip the whitespace around every header name and value. Whitespace inside
+ * a value is left alone — "Bearer abc" is a legitimate header value, while
+ * " Bearer abc" is one http.client refuses to send at all.
+ */
+function trimHeaders(
+  headers: { key: string; value: string }[],
+): { key: string; value: string }[] {
+  return headers.map(({ key, value }) => ({
+    key: typeof key === "string" ? key.trim() : key,
+    value: typeof value === "string" ? value.trim() : value,
+  }));
+}
+
+/**
+ * Which stored header restores each masked placeholder, by incoming row.
+ *
+ * A stored header is restored at most once. Two names can arrive identical
+ * here — the form permits duplicates outright, and trimming collapses two
+ * that differed only by whitespace — so a plain first-match lookup would hand
+ * the same secret to two placeholders and drop the other secret.
+ *
+ * The three passes run in order of how strongly each proves row identity:
+ * same name in the same row, then the same name somewhere else (the row
+ * moved), then the same row under a new name (the row was renamed). Anything
+ * unresolved after that is left out and the placeholder is dropped.
+ */
+function restoreMaskedHeaders({
+  incoming,
+  existing,
+}: {
+  incoming: { key: string; value: string }[];
+  existing: { key: string; value: string }[];
+}): Map<number, string> {
+  const masked = incoming
+    .map((header, index) => ({ header, index }))
+    .filter(({ header }) => header.value === MASKED_KEY_PLACEHOLDER);
+  const pass: RestorePass = {
+    existing,
+    claimed: new Set<number>(),
+    restored: new Map<number, string>(),
+  };
+
+  restoreSameNameSameRow({ masked, pass });
+  restoreSameNameMovedRow({ masked, pass });
+  restoreRenamedRow({ masked, pass });
+
+  return pass.restored;
+}
+
+/** The running state the three restore passes share. */
+interface RestorePass {
+  existing: { key: string; value: string }[];
+  /** Stored positions already spent, so none is handed out twice. */
+  claimed: Set<number>;
+  /** Incoming row index to the stored value that restores it. */
+  restored: Map<number, string>;
+}
+
+type MaskedRow = { header: { key: string; value: string }; index: number };
+
+function claimStoredHeader({
+  pass,
+  row,
+  position,
+  value,
+}: {
+  pass: RestorePass;
+  row: number;
+  position: number;
+  value: string;
+}): void {
+  pass.claimed.add(position);
+  pass.restored.set(row, value);
+}
+
+/** The strongest proof of row identity, so it is settled first. */
+function restoreSameNameSameRow({
+  masked,
+  pass,
+}: {
+  masked: MaskedRow[];
+  pass: RestorePass;
+}): void {
+  for (const { header, index } of masked) {
+    const atIndex = pass.existing[index];
+    if (atIndex?.key === header.key) {
+      claimStoredHeader({
+        pass,
+        row: index,
+        position: index,
+        value: atIndex.value,
+      });
+    }
+  }
+}
+
+function restoreSameNameMovedRow({
+  masked,
+  pass,
+}: {
+  masked: MaskedRow[];
+  pass: RestorePass;
+}): void {
+  for (const { header, index } of masked) {
+    if (pass.restored.has(index)) continue;
+    const position = pass.existing.findIndex(
+      (h, at) => h.key === header.key && !pass.claimed.has(at),
+    );
+    if (position >= 0) {
+      claimStoredHeader({
+        pass,
+        row: index,
+        position,
+        value: pass.existing[position]!.value,
+      });
+    }
+  }
+}
+
+/**
+ * The row kept its place but was renamed.
+ *
+ * A stored header whose name another placeholder is still waiting to claim is
+ * off limits, so a rename plus a reorder can never copy one header's secret
+ * under another header's name.
+ */
+function restoreRenamedRow({
+  masked,
+  pass,
+}: {
+  masked: MaskedRow[];
+  pass: RestorePass;
+}): void {
+  const stillWanted = new Set(
+    masked
+      .filter(({ index }) => !pass.restored.has(index))
+      .map(({ header }) => header.key),
+  );
+  for (const { index } of masked) {
+    if (pass.restored.has(index) || pass.claimed.has(index)) continue;
+    const positional = pass.existing[index];
+    if (!positional || stillWanted.has(positional.key)) continue;
+    claimStoredHeader({
+      pass,
+      row: index,
+      position: index,
+      value: positional.value,
+    });
+  }
+}
+
 function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   const out: AdvancedGatewayInput = {};
   if (input.rateLimitRpm !== undefined) out.rateLimitRpm = input.rateLimitRpm;
@@ -226,6 +446,9 @@ function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   }
   if (input.providerConfig !== undefined) {
     out.providerConfig = input.providerConfig;
+  }
+  if (input.langySkipPermissionsModels !== undefined) {
+    out.langySkipPermissionsModels = input.langySkipPermissionsModels;
   }
   return out;
 }
@@ -272,17 +495,41 @@ export function providerRowServesModel({
  * Framework-agnostic - no tRPC dependencies.
  */
 export class ModelProviderService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: ModelProviderRepository,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly repository: ModelProviderRepository;
+  private readonly changeEvents: ChangeEventRepository;
+
+  constructor({
+    prisma,
+    repository,
+    changeEvents,
+  }: {
+    prisma: PrismaClient;
+    repository: ModelProviderRepository;
+    /**
+     * The gateway's cache-invalidation feed. Every write that changes a
+     * stored credential has to land here: the gateway holds the decrypted
+     * key inside a per-virtual-key bundle in memory, and a
+     * `MODEL_PROVIDER_UPDATED` event is what evicts the bundles that carry
+     * this provider id so the next request resolves the new key.
+     */
+    changeEvents?: ChangeEventRepository;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+    this.changeEvents = changeEvents ?? new ChangeEventRepository(prisma);
+  }
 
   /**
    * Static factory method for creating a ModelProviderService with proper DI.
    */
   static create(prisma: PrismaClient): ModelProviderService {
     const repository = new ModelProviderRepository(prisma);
-    return new ModelProviderService(prisma, repository);
+    return new ModelProviderService({
+      prisma,
+      repository,
+      changeEvents: new ChangeEventRepository(prisma),
+    });
   }
 
   /**
@@ -552,40 +799,49 @@ export class ModelProviderService {
     input: UpdateModelProviderInput,
     ctx?: AuthzContext,
   ) {
+    // Only what the checks below read. The rest of the payload is carried
+    // whole into `writeModelProvider`, which is what performs the write.
     const {
       id,
       projectId,
       organizationId,
       provider,
-      enabled,
       customKeys,
-      customModels,
-      customEmbeddingsModels,
-      extraHeaders,
-      defaultModel,
-      name,
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
+      routingHandle,
     } = input;
 
     if (!projectId && !organizationId) {
       throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
 
-    const advanced = {
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
-    };
-
     // Validate provider exists
     if (!(provider in modelProviders)) {
       throw new Error("Invalid provider");
+    }
+
+    // The handle is checked before any database work: a name that is not a
+    // handle, or one that already means a provider family, is refused whatever
+    // else the save carries.
+    const isHandleProvided = routingHandle !== undefined;
+    const normalizedHandle = normalizeRoutingHandle(routingHandle);
+    if (isHandleProvided) {
+      const problem = routingHandleProblem(normalizedHandle);
+      if (problem) {
+        throw new ModelProviderRoutingHandleInvalidError({
+          handle: normalizedHandle ?? "",
+          problem,
+        });
+      }
+    }
+
+    // The skip-permissions list is checked before any database work too. A
+    // line that never compiles matches nothing, so storing it would leave the
+    // operator believing a model is trusted when the gate always says no.
+    if (input.langySkipPermissionsModels) {
+      const invalid = firstInvalidSkipPattern(input.langySkipPermissionsModels);
+      if (invalid) {
+        throw new ModelProviderSkipPermissionsPatternInvalidError(invalid);
+      }
     }
 
     // Validate and clean custom keys
@@ -680,72 +936,187 @@ export class ModelProviderService {
       throw new ModelProviderScopesRequiredError();
     }
 
-    return await this.prisma.$transaction(async (tx) => {
-      let result;
-
-      if (existingProvider) {
-        result = await this.updateExisting(
+    return await this.withRoutingHandleConflict({
+      handle: normalizedHandle,
+      write: () =>
+        this.writeModelProvider({
           existingProvider,
-          {
-            provider,
-            enabled,
-            name,
-            scopes,
-            customModels: customModels ?? [],
-            customEmbeddingsModels: customEmbeddingsModels ?? [],
-            extraHeaders: extraHeaders ?? [],
-            advanced,
-          },
+          createScopes,
+          isHandleProvided,
+          normalizedHandle,
+          input,
           validatedKeys,
           customKeysProvided,
-          tx,
-        );
-      } else {
-        result = await this.createNew(
-          {
-            provider,
-            enabled,
-            name: name ?? this.deriveDefaultName(provider),
-            scopes: createScopes!,
-            customModels: customModels ?? undefined,
-            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
-            extraHeaders: extraHeaders ?? [],
-            advanced,
-          },
-          validatedKeys,
-          customKeysProvided,
-          tx,
-        );
-
-        // Onboarding seed: writes one role-level ModelDefault row per
-        // role the provider can fulfill (DEFAULT / FAST / EMBEDDINGS),
-        // at every scope the new credential is bound to. Strictly
-        // additive — `seedOnboardingDefaultsForProvider` skips any
-        // (scope, role) pair that already has a row, so enabling a
-        // second provider later can't silently replace a user's
-        // configured choice. Without this wiring the seed function is
-        // dead code; the bug surfaces as a fresh org showing
-        // "not configured" on every role despite having a provider
-        // enabled. See
-        // specs/model-providers/model-resolver-and-registry.feature.
-        for (const scope of createScopes!) {
-          await seedOnboardingDefaultsForProvider({
-            prisma: tx as unknown as PrismaClient,
-            provider,
-            scopeType: scope.scopeType,
-            scopeId: scope.scopeId,
-          });
-        }
-      }
-
-      // The legacy `defaultModel` parameter is accepted in the input
-      // shape for backwards compatibility but no longer writes anywhere.
-      // Default-model writes go through `setRoleAtScope` against
-      // ModelDefaultConfig (see useProviderFormSubmit).
-      void defaultModel;
-
-      return result;
+          scopes,
+        }),
     });
+  }
+
+  /**
+   * Turns the routing-handle unique-index violation into the refusal a person
+   * reads. The index is what actually makes the name unique, because two saves
+   * racing each other both pass any read-then-write check; this is only the
+   * translation.
+   */
+  private async withRoutingHandleConflict<T>({
+    handle,
+    write,
+  }: {
+    handle: string | null;
+    write: () => Promise<T>;
+  }): Promise<T> {
+    try {
+      return await write();
+    } catch (error) {
+      if (handle !== null && isRoutingHandleConflict(error)) {
+        throw new ModelProviderRoutingHandleTakenError({ handle });
+      }
+      throw error;
+    }
+  }
+
+  private async writeModelProvider(write: ModelProviderWrite) {
+    return await this.prisma.$transaction(async (tx) =>
+      write.existingProvider
+        ? await this.applyUpdate({
+            write,
+            existingProvider: write.existingProvider,
+            tx,
+          })
+        : await this.applyCreate({ write, tx }),
+    );
+  }
+
+  /** Updates a stored row and evicts the gateway config in the same write. */
+  private async applyUpdate({
+    write,
+    existingProvider,
+    tx,
+  }: {
+    write: ModelProviderWrite;
+    existingProvider: NonNullable<ModelProviderWrite["existingProvider"]>;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
+    const { input, isHandleProvided, normalizedHandle, scopes } = write;
+    const result = await this.updateExisting(
+      existingProvider,
+      {
+        provider: input.provider,
+        enabled: input.enabled,
+        name: input.name,
+        scopes,
+        customModels: input.customModels ?? [],
+        customEmbeddingsModels: input.customEmbeddingsModels ?? [],
+        extraHeaders: input.extraHeaders ?? [],
+        ...(isHandleProvided && { routingHandle: normalizedHandle }),
+        advanced: advancedFields(input),
+      },
+      write.validatedKeys,
+      write.customKeysProvided,
+      tx,
+    );
+
+    // Onboarding seed on the enable flip. A row created disabled, or turned off
+    // and back on, never went through `applyCreate`'s seed, so the scope could
+    // sit with an enabled provider and no default for the roles that provider
+    // fills. The seed is per key, so a role the scope already carries is left
+    // exactly as the user set it.
+    if (input.enabled && !existingProvider.enabled) {
+      const seedScopes: ScopeInput[] =
+        scopes ??
+        existingProvider.scopes.map((scope) => ({
+          scopeType: scope.scopeType as ScopeInput["scopeType"],
+          scopeId: scope.scopeId,
+        }));
+      for (const scope of seedScopes) {
+        await seedOnboardingDefaultsForProvider({
+          prisma: tx as unknown as PrismaClient,
+          provider: input.provider,
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+        });
+      }
+    }
+
+    // A running gateway is serving the previous credential, base URL, headers
+    // and routing handle from cache. Rotating a key or renaming a handle is
+    // exactly the moment where that matters, so the eviction rides the same
+    // transaction as the write: either both land or the operator sees the
+    // write fail.
+    await this.changeEvents.append(
+      {
+        organizationId: existingProvider.organizationId,
+        kind: "MODEL_PROVIDER_UPDATED",
+        modelProviderId: existingProvider.id,
+      },
+      tx,
+    );
+
+    return result;
+  }
+
+  /** Creates a new row and seeds the role defaults it can fulfill. */
+  private async applyCreate({
+    write,
+    tx,
+  }: {
+    write: ModelProviderWrite;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
+    const { input, isHandleProvided, normalizedHandle } = write;
+    const createScopes = write.createScopes!;
+    const result = await this.createNew(
+      {
+        provider: input.provider,
+        enabled: input.enabled,
+        name: input.name ?? this.deriveDefaultName(input.provider),
+        scopes: createScopes,
+        customModels: input.customModels ?? undefined,
+        customEmbeddingsModels: input.customEmbeddingsModels ?? undefined,
+        extraHeaders: input.extraHeaders ?? [],
+        ...(isHandleProvided && { routingHandle: normalizedHandle }),
+        advanced: advancedFields(input),
+      },
+      write.validatedKeys,
+      write.customKeysProvided,
+      tx,
+    );
+
+    // Onboarding seed: writes one role-level ModelDefault row per role the
+    // provider can fulfill (DEFAULT / FAST / EMBEDDINGS), at every scope the
+    // new credential is bound to. Strictly additive —
+    // `seedOnboardingDefaultsForProvider` skips any (scope, role) pair that
+    // already has a row, so enabling a second provider later can't silently
+    // replace a user's configured choice. Without this wiring the seed
+    // function is dead code; the bug surfaces as a fresh org showing
+    // "not configured" on every role despite having a provider enabled. See
+    // specs/model-providers/model-resolver-and-registry.feature.
+    for (const scope of createScopes) {
+      await seedOnboardingDefaultsForProvider({
+        prisma: tx as unknown as PrismaClient,
+        provider: input.provider,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      });
+    }
+
+    // A running gateway is serving a bundle that predates this row, so until it
+    // is evicted the new provider is not in any key's chain and its routing
+    // handle is not a handle the resolver knows. An unknown first segment is
+    // read as part of the model name, so "eu/claude-sonnet-5" does not fail
+    // loudly: it becomes a model nobody declares and lands on whichever bound
+    // provider declared no catalog. Creating a provider therefore evicts on the
+    // same terms as updating one.
+    await this.changeEvents.append(
+      {
+        organizationId: result.organizationId,
+        kind: "MODEL_PROVIDER_UPDATED",
+        modelProviderId: result.id,
+      },
+      tx,
+    );
+
+    return result;
   }
 
   /**
@@ -858,10 +1229,56 @@ export class ModelProviderService {
       );
     }
 
+    // A deleted credential has to leave the gateway's cache with the row.
+    // Until it does the bundle keeps dispatching through a provider the
+    // operator has removed, and there is no later write to carry the news.
     if (id) {
-      return await this.repository.delete(id);
+      return await this.prisma.$transaction(async (tx) => {
+        const deleted = await this.repository.delete(id, tx);
+        await this.changeEvents.append(
+          {
+            organizationId: deleted.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: deleted.id,
+          },
+          tx,
+        );
+        return deleted;
+      });
     }
-    return await this.repository.deleteByProvider(provider, projectId!);
+    return await this.prisma.$transaction(async (tx) => {
+      // Resolve the set, delete the part of it still inside the scope, then
+      // ask which rows actually went. Each statement gets its own READ
+      // COMMITTED snapshot, so neither the resolved set nor the count is a
+      // safe answer on its own: the first can name a row that left the scope
+      // before the delete, and the second says how many went without saying
+      // which. The difference is exact, and every row in it gets an event.
+      const doomed = await this.repository.findIdsByProvider({
+        provider,
+        projectId: projectId!,
+        tx,
+      });
+      const ids = doomed.map((row) => row.id);
+      const result = await this.repository.deleteByIdsInProviderScope({
+        ids,
+        provider,
+        projectId: projectId!,
+        tx,
+      });
+      const survivors = await this.repository.findSurvivingIds({ ids, tx });
+      for (const row of doomed) {
+        if (survivors.has(row.id)) continue;
+        await this.changeEvents.append(
+          {
+            organizationId: row.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: row.id,
+          },
+          tx,
+        );
+      }
+      return result;
+    });
   }
 
   /**
@@ -931,7 +1348,62 @@ export class ModelProviderService {
 
     const customKeys = (existing.customKeys ?? {}) as Record<string, string>;
 
-    return await validateProviderApiKey(existing.provider, customKeys);
+    const credential = await validateProviderApiKey(
+      existing.provider,
+      customKeys,
+    );
+    // A refused credential is the end of it: the provider has already said the
+    // key is wrong, and spending a generation to hear it again tells us the
+    // same thing twice.
+    if (credential.outcome === "refused") return credential;
+
+    // So is a row whose credential could not be read. The runtime falls back
+    // to the host environment key when a row carries none, so a generation
+    // here would pass on a credential this row does not hold and report the
+    // row as working. "We could not check this" is the true answer.
+    if (
+      credential.outcome === "unchecked" &&
+      UNPINGABLE_CREDENTIALS.includes(credential.reason)
+    ) {
+      return credential;
+    }
+
+    // Everything else gets the real call. A listing that answered proves the
+    // key reaches the vendor and nothing about whether the account can
+    // generate, and a lane with no listing at all (codex) is otherwise
+    // reported as untestable while working perfectly.
+    const ping = await pingModelProvider({
+      modelProvider: projectId
+        ? await this.materialiseForRuntime(existing, projectId)
+        : null,
+      projectId,
+    });
+    return ping ?? credential;
+  }
+
+  /**
+   * One stored row in the shape the runtime reads it: registry models filled
+   * in, custom models normalised, credential unmasked.
+   *
+   * The connection ping runs on the row the reader asked about rather than on
+   * whatever `getProjectModelProviders` collapses that provider key to, which
+   * with an org row and a project override in play is a coin toss between two
+   * different credentials. Null when the project cannot be read, which leaves
+   * the caller with the credential probe's verdict.
+   */
+  private async materialiseForRuntime(
+    mp: ModelProviderWithScopes,
+    projectId: string,
+  ): Promise<MaybeStoredModelProvider | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) return null;
+    return this.toMaybeStoredProvider(
+      mp,
+      this.buildDefaultProviders(project),
+      true,
+    );
   }
 
   /**
@@ -1114,6 +1586,9 @@ export class ModelProviderService {
       name: mp.name,
       provider: mp.provider,
       enabled: mp.enabled,
+      // Surfaced so the drawer can show the prefix that reaches THIS instance,
+      // and so the settings list can show which instance owns a handle.
+      routingHandle: mp.routingHandle,
       // Whether the credential has been withdrawn. The gateway already
       // refuses to route to a withdrawn provider; surfacing it lets the
       // frontend surfaces that preview routing agree with that decision
@@ -1126,6 +1601,13 @@ export class ModelProviderService {
       customEmbeddingsModels:
         customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
       deploymentMapping: mp.deploymentMapping,
+      // The operator's own skip-permissions list, so the drawer can show it
+      // back. Null on the row means the registry default applies, which the
+      // drawer renders as placeholder text rather than as a value.
+      langySkipPermissionsModels:
+        mp.langySkipPermissionsModels === null
+          ? null
+          : readStoredSkipList(mp.langySkipPermissionsModels),
       disabledByDefault: defaultProvider?.disabledByDefault,
       extraHeaders: mp.extraHeaders as { key: string; value: string }[] | null,
       scopes: mp.scopes.map((s) => ({
@@ -1465,6 +1947,7 @@ export class ModelProviderService {
     existingProvider: {
       id: string;
       customKeys: unknown;
+      customKeysUnreadable?: boolean;
       extraHeaders: unknown;
     },
     data: {
@@ -1475,6 +1958,7 @@ export class ModelProviderService {
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      routingHandle?: string | null;
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1492,6 +1976,7 @@ export class ModelProviderService {
         provider: data.provider,
         validatedKeys,
         existingKeys,
+        existingUnreadable: existingProvider.customKeysUnreadable === true,
       });
       customKeysToSave = mergeStoredCustomKeys({
         incoming: validatedKeys,
@@ -1513,6 +1998,9 @@ export class ModelProviderService {
         ),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.scopes !== undefined && { scopes: data.scopes }),
+        ...(data.routingHandle !== undefined && {
+          routingHandle: data.routingHandle,
+        }),
         ...(customKeysToSave !== undefined && {
           customKeys: customKeysToSave,
         }),
@@ -1531,6 +2019,7 @@ export class ModelProviderService {
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
       scopes: ScopeInput[];
+      routingHandle?: string | null;
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1548,6 +2037,9 @@ export class ModelProviderService {
         // instead of being stored literally.
         extraHeaders: this.mergeExtraHeaders(data.extraHeaders, null),
         scopes: data.scopes,
+        ...(data.routingHandle !== undefined && {
+          routingHandle: data.routingHandle,
+        }),
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
         ...pickAdvancedFields(data.advanced),
@@ -1577,13 +2069,13 @@ export class ModelProviderService {
     provider,
     validatedKeys,
     existingKeys,
+    existingUnreadable,
   }: {
     provider: string;
     validatedKeys: Record<string, unknown> | null;
     existingKeys: Record<string, unknown> | null;
+    existingUnreadable: boolean;
   }): void {
-    if (!existingKeys) return;
-
     const definition =
       modelProviders[provider as keyof typeof modelProviders] ?? undefined;
     const schemaKeys = new Set([
@@ -1591,6 +2083,38 @@ export class ModelProviderService {
       "MANAGED",
     ]);
     if (schemaKeys.size === 1) return; // unknown provider: nothing to judge against
+
+    const incomingCredentials = Object.entries(validatedKeys ?? {}).filter(
+      ([key]) => schemaKeys.has(key),
+    );
+
+    // A row whose stored credentials will not decrypt reads back as keyless,
+    // so without this branch the same save that is refused on a readable row
+    // goes through here and replaces ciphertext that a restored
+    // CREDENTIALS_SECRET would have recovered.
+    //
+    // Naming a field is enough on a readable row, where an empty value is a
+    // deliberate clear of something the customer could see. Here it is not: the
+    // drawer renders the masked placeholder for every secret field of an
+    // enabled row it found no credentials on, and empty for the rest, so the
+    // ordinary save carries a full set of field names and no credential at
+    // all. Only a value that could serve a request counts.
+    if (existingUnreadable) {
+      const replacement = incomingCredentials.some(
+        ([, value]) =>
+          typeof value === "string" &&
+          value !== "" &&
+          value !== MASKED_KEY_PLACEHOLDER,
+      );
+      if (!replacement) {
+        throw new ModelProviderCredentialsUnreadableError({ provider });
+      }
+      return;
+    }
+
+    if (incomingCredentials.length > 0) return;
+
+    if (!existingKeys) return;
 
     // Only a credential that actually holds something is worth protecting. A
     // field already sitting empty has nothing to lose, and counting it would
@@ -1601,39 +2125,45 @@ export class ModelProviderService {
     );
     if (storedCredentials.length === 0) return;
 
-    const incomingCredentials = Object.keys(validatedKeys ?? {}).filter((key) =>
-      schemaKeys.has(key),
-    );
-    if (incomingCredentials.length > 0) return;
-
     throw new ModelProviderCredentialsWouldBeDroppedError({ provider });
   }
 
   /**
    * Header counterpart of `mergeStoredCustomKeys`: the frontend receives header
    * values as the masked placeholder, so an untouched header comes back
-   * masked on save and must be restored from the stored row. Restore by
-   * header key first; when the key was renamed in place, fall back to the
-   * header at the same position — but only when that positional header
-   * isn't also claimed by name elsewhere in the submission, so a
-   * rename+reorder can never copy one header's secret under another
-   * header's name. A placeholder that matches nothing is dropped rather
-   * than stored as a literal value.
+   * masked on save and must be restored from the stored row.
+   * {@link restoreMaskedHeaders} decides which stored row each placeholder
+   * takes its value from. A placeholder that matches nothing is dropped
+   * rather than stored as a literal value.
    */
   private mergeExtraHeaders(
     incoming: { key: string; value: string }[],
     existing: { key: string; value: string }[] | null,
   ): { key: string; value: string }[] {
-    const incomingKeys = new Set(incoming.map((h) => h.key));
-    return incoming.flatMap((header, index) => {
-      if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
-      const byKey = existing?.find((h) => h.key === header.key);
-      if (byKey) return [{ key: header.key, value: byKey.value }];
-      const positional = existing?.[index];
-      if (positional && !incomingKeys.has(positional.key)) {
-        return [{ key: header.key, value: positional.value }];
-      }
-      return [];
-    });
+    // Matching runs on the raw names and the raw row order, because those are
+    // what the settings form round-trips: a row that was stored padded comes
+    // back padded, so the raw name is the row's identity. Trimming before the
+    // match would collapse two names that differ only by whitespace into one
+    // and make that identity ambiguous — deleting the first of the two would
+    // then leave the survivor sitting on the deleted row's secret.
+    const restored = existing
+      ? restoreMaskedHeaders({ incoming, existing })
+      : new Map<number, string>();
+
+    // Trimming is the last thing that happens, on the way to the column. A
+    // header is spent as an HTTP header and nowhere else, and http.client
+    // refuses a name or value whose edges carry whitespace, so a space the
+    // settings form never shows would fail every request to the provider —
+    // with no query-string variant to launder it the way a pasted API key
+    // has. Trimming the output also heals a row that was stored padded
+    // before this guard existed: whatever a placeholder restores is trimmed
+    // on its way back down, so the bad value does not survive the save.
+    return trimHeaders(
+      incoming.flatMap((header, index) => {
+        if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
+        const value = restored.get(index);
+        return value === undefined ? [] : [{ key: header.key, value }];
+      }),
+    );
   }
 }

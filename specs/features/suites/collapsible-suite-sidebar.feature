@@ -10,7 +10,7 @@ Feature: Collapsible suite sidebar
   #   (new suite, all runs), and suite avatar icons only.
   # The collapse toggle is the «/» button in the sidebar header.
 
-  # Parity status: 0 of 6 scenarios bound to existing tests.
+  # Parity status: the 6 collapse/expand scenarios below are unbound.
   # Remaining @unimplemented scenarios (#3458):
   #   6 NO_TEST: shipped behavior, no integration test yet
   # NO_TEST gaps:
@@ -63,3 +63,22 @@ Feature: Collapsible suite sidebar
     Given the sidebar is collapsed
     When I navigate to another page and return
     Then the sidebar is still in collapsed mode
+
+  # The collapsed strip is nothing but initials, so a suite named with a
+  # leading emoji is unreachable when that initial paints as a replacement
+  # box: the icon is the only thing left identifying the suite. Same UTF-16
+  # cause as the project bubble — see
+  # specs/navigation/project-avatar-initial.feature.
+
+  @integration
+  Scenario: A suite named with an emoji keeps its whole initial in the strip
+    Given a suite whose name begins with an emoji that is more than one code
+          unit long
+    When the collapsed strip takes the first character of the name
+    Then it takes the whole emoji, not half of it
+
+  @integration
+  Scenario: An externally reported scenario set is treated the same way
+    Given a scenario set whose id begins with such an emoji
+    When the collapsed strip takes its first character
+    Then the whole emoji is taken, because the id is customer-written too

@@ -7,17 +7,18 @@
  * - src/pages/api/annotations/trace/[trace].ts
  */
 
-import { ValidationError } from "@langwatch/handled-error";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
+import { AnnotationService } from "~/server/annotations/annotation.service";
 import {
   ANNOTATION_ANCHOR_SCOPES,
   type AnnotationAnchorScope,
   annotationAnchorScopeSchema,
   annotationAnchorScopeWhere,
 } from "~/server/annotations/annotationAnchor";
-import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
   apiKeyCeilingDenialResponse,
@@ -80,7 +81,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     return {
@@ -195,23 +196,22 @@ secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
 
   try {
     const annotationId = c.req.param("id");
-    await prisma.annotation.delete({
-      where: { id: annotationId, projectId: project.id },
+    await AnnotationService.create({ prisma }).delete({
+      id: annotationId,
+      projectId: project.id,
     });
     markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
   } catch (e) {
+    // A refusal the caller can act on (unknown id → 404) goes to the app's
+    // error handler as-is. Anything else is ours: log it, and keep the
+    // database's own message out of the response.
+    if (HandledError.isHandled(e)) throw e;
     logger.error(
       { error: e, projectId: project.id },
       "error deleting annotation",
     );
-    return c.json(
-      {
-        status: "error",
-        message: e instanceof Error ? e.message : "ID not found.",
-      },
-      500,
-    );
+    return c.json({ status: "error", message: "Internal server error." }, 500);
   }
 });
 
@@ -315,10 +315,11 @@ secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
 secured
   .access(annotationsCreateAuth)
   .post("/annotations/trace/:id", async (c) => {
-    // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
-    // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
-    // only ever grants annotations:create, never :manage. PATCH/DELETE above
-    // correctly stay on :manage.
+    // `:create` (not `:manage`) — same fix as evaluators' POST route. A create
+    // asks for the create grain; demanding `:manage` here would refuse every
+    // restricted key that can create but not delete, which is exactly how
+    // `scenarios:create` produced a production 403. (`:manage` still implies
+    // `:create` via the hierarchy, so nobody loses access.)
     const auth = await authenticateRequest(c, "annotations:create");
     if ("error" in auth) {
       return c.json(auth.body, auth.status);
@@ -362,15 +363,16 @@ secured
         );
       }
 
-      const addAnnotation = await prisma.annotation.create({
-        data: {
-          id: nanoid(),
-          comment,
-          projectId: project.id,
-          isThumbsUp,
-          traceId: trace,
-          email,
-        },
+      const addAnnotation = await AnnotationService.create({ prisma }).create({
+        id: nanoid(),
+        projectId: project.id,
+        traceId: trace,
+        userId: null,
+        email,
+        comment,
+        isThumbsUp,
+        scoreOptions: null,
+        expectedOutput: null,
       });
 
       markUsed();

@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Code,
   Heading,
   HStack,
   Table,
@@ -13,16 +14,24 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { Fragment } from "react";
 import { HelpCircle, Plus } from "react-feather";
+import { FilterDisplay } from "~/components/automations/FilterDisplay";
+import { HoverableBigText } from "~/components/HoverableBigText";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
+import { matchesEveryTrace } from "~/features/automations/logic/matchesEveryTrace";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { automationContextChip } from "~/features/langy/logic/langyContextChips";
+import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import type { RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { MatchesEveryTraceNotice } from "../MatchesEveryTraceNotice";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
@@ -132,7 +141,6 @@ export function SectionHeader({
   accent,
   title,
   count,
-  summary,
   details,
   addLabel,
   onAdd,
@@ -141,13 +149,12 @@ export function SectionHeader({
   accent: string;
   title: string;
   count: number;
-  summary: string;
   details: string;
   addLabel: string;
   onAdd: () => void;
 }) {
   return (
-    <HStack width="full" align="center" gap={3}>
+    <HStack width="full" align="center" gap={3} flexWrap="wrap">
       <Box
         colorPalette={accent}
         bg="colorPalette.subtle"
@@ -159,22 +166,17 @@ export function SectionHeader({
       >
         {icon}
       </Box>
-      <VStack align="start" gap={0.5} flex={1} minWidth={0}>
-        <HStack gap={2} align="center">
-          <Heading size="md">{title}</Heading>
-          <Badge colorPalette={accent} variant="subtle" borderRadius="full">
-            {count}
-          </Badge>
-          <Tooltip content={details}>
-            <Box color="fg.muted" display="inline-flex" cursor="help">
-              <HelpCircle size={13} />
-            </Box>
-          </Tooltip>
-        </HStack>
-        <Text textStyle="sm" color="fg.muted">
-          {summary}
-        </Text>
-      </VStack>
+      <HStack gap={2} align="center" flex="1 0 auto">
+        <Heading size="md">{title}</Heading>
+        <Badge colorPalette={accent} variant="subtle" borderRadius="full">
+          {count}
+        </Badge>
+        <Tooltip content={details}>
+          <Box color="fg.muted" display="inline-flex" cursor="help">
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      </HStack>
       <Button
         size="sm"
         variant="outline"
@@ -270,6 +272,15 @@ export function TableShell({ children }: { children: React.ReactNode }) {
       <Box
         overflowX="auto"
         css={{
+          // Percentage column widths only bind under a fixed layout, and they
+          // only mean anything above a floor: without one, `width="full"`
+          // shrinks the table to the shell at any cost, and the cost is the
+          // Name column collapsing to its longest single word. Below this the
+          // shell scrolls instead. The floor is what a 1440px laptop leaves
+          // beside the sidebar, so the toggle and the row menu stay on screen
+          // there; a two-word header wraps rather than spilling into its
+          // neighbour, which is why the headers are not kept on one line.
+          "& table": { tableLayout: "fixed", minWidth: "880px" },
           "& thead th": {
             backgroundColor: "var(--chakra-colors-bg-subtle)",
             fontSize: "11px",
@@ -277,7 +288,7 @@ export function TableShell({ children }: { children: React.ReactNode }) {
             textTransform: "uppercase",
             letterSpacing: "0.04em",
             color: "var(--chakra-colors-fg-muted)",
-            whiteSpace: "nowrap",
+            verticalAlign: "bottom",
             paddingTop: "0.6rem",
             paddingBottom: "0.6rem",
             borderBottomColor: "var(--chakra-colors-border)",
@@ -315,7 +326,12 @@ export function EmptyHint({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AlertSubjectCell({
+/**
+ * The "Watches" cell for a graph-watching automation. Names the graph the way
+ * the wizard's rail and review overview do — "Graph · <name>" — so the list and
+ * the composer say one thing about the same row (ADR-093 §1).
+ */
+export function GraphWatchCell({
   graphName,
   graph,
   seriesName,
@@ -331,7 +347,7 @@ export function AlertSubjectCell({
     <VStack align="start" gap={0}>
       {graphName ? (
         <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
-          {graphName}
+          {`Graph · ${graphName}`}
         </Text>
       ) : (
         <Text textStyle="sm" color="fg.muted">
@@ -347,9 +363,30 @@ export function AlertSubjectCell({
   );
 }
 
-/** Alert "Fires when" cell — the threshold rule (the cadence facet). Mirrors
- *  the dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so
- *  both creation paths read the same. */
+/** Email addresses that wrap at their seams (after `@`, before a `.`) rather
+ *  than mid-word, so a narrow Delivery cell never reads "haven.loca / lhost". */
+export function EmailList({ emails }: { emails: string[] }) {
+  return (
+    <>
+      {emails.map((email, i) => (
+        <Fragment key={`${i}-${email}`}>
+          {i > 0 ? ", " : null}
+          <span>
+            {email
+              .split(/(?=\.)|(?<=@)/)
+              .flatMap((part, j) =>
+                j === 0 ? [part] : [<wbr key={`${j}-${part}`} />, part],
+              )}
+          </span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/** The firing rule under a graph-watching row's "Watches" cell. Mirrors the
+ *  dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so both
+ *  creation paths read the same. */
 export function AlertRuleCell({
   actionParams,
 }: {
@@ -374,6 +411,235 @@ export function AlertRuleCell({
       {actionParams.threshold !== undefined ? actionParams.threshold : ""}
       {window ? ` · over ${window}` : ""}
     </Text>
+  );
+}
+
+/** The subject cell of a trace-filter automation's row: which monitors apply
+ *  and the saved search query (or the legacy structured filters). */
+export function TraceFilterCell({
+  checks,
+  filterQuery,
+  filters,
+  applyChecks,
+}: {
+  checks: Monitor[];
+  filterQuery: string | null;
+  filters: unknown;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+}) {
+  const isUnconditioned = matchesEveryTrace({
+    filterQuery,
+    filters,
+    checkCount: checks.length,
+  });
+  return (
+    <VStack gap={2} align="stretch" minWidth={0}>
+      <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+        Trace filter
+      </Text>
+      {isUnconditioned ? <MatchesEveryTraceNotice /> : null}
+      {applyChecks(checks)}
+      {filterQuery ? (
+        // ADR-043: a trace-subject automation shows its search query.
+        <HoverableBigText lineClamp={2} expandedVersion={filterQuery}>
+          <Code
+            size="sm"
+            variant="surface"
+            display="block"
+            minWidth={0}
+            wordBreak="break-word"
+          >
+            {filterQuery}
+          </Code>
+        </HoverableBigText>
+      ) : filters && typeof filters === "string" && filters !== "{}" ? (
+        <FilterDisplay
+          filters={filters}
+          hasBorder={true}
+          shouldClampValues={false}
+        />
+      ) : null}
+    </VStack>
+  );
+}
+
+interface AutomationRowProps {
+  trigger: EnhancedTrigger;
+  graphJsonById: Map<string, unknown>;
+  statsByTriggerId: Map<string, TriggerStats>;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+  actionItems: (
+    action: TriggerAction,
+    actionParams: TriggerActionParams,
+  ) => React.ReactNode;
+  triggerActionName: (action: TriggerAction) => string;
+  sharedRowProps: (
+    trigger: EnhancedTrigger,
+  ) => React.ComponentProps<typeof Table.Row>;
+  activeCell: (trigger: EnhancedTrigger) => React.ReactNode;
+  rowActionsMenu: (trigger: EnhancedTrigger) => React.ReactNode;
+}
+
+/** One row of the automations table: a trace-filter or graph-watching
+ *  automation, plus its delivery, metrics and actions. Extracted out of the
+ *  table body's `.map` (rather than left inline) purely to keep that
+ *  callback under the function-length limit — the row still closes over
+ *  everything the page computed for it, just as named parameters instead of
+ *  free variables. */
+export function AutomationRow({
+  trigger,
+  graphJsonById,
+  statsByTriggerId,
+  applyChecks,
+  actionItems,
+  triggerActionName,
+  sharedRowProps,
+  activeCell,
+  rowActionsMenu,
+}: AutomationRowProps) {
+  const actionParams = trigger.actionParams as TriggerActionParams;
+  const stats = statsByTriggerId.get(trigger.id);
+  const isWatchingGraph = !!trigger.customGraphId;
+  return (
+    // Armed, the row can be handed to Langy; its own click (open the
+    // automation) is untouched. The chip id matches the one the
+    // `/automations/<id>` route derives, so the row and the open
+    // automation are one chip.
+    <LangyContextTarget
+      key={trigger.id}
+      target={automationContextChip({
+        automationId: trigger.id,
+        name: trigger.name,
+      })}
+    >
+      <Table.Row {...sharedRowProps(trigger)}>
+        <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
+        <AutomationWatchCell
+          trigger={trigger}
+          actionParams={actionParams}
+          graphJsonById={graphJsonById}
+          applyChecks={applyChecks}
+        />
+        <AutomationDeliveryCell
+          trigger={trigger}
+          actionParams={actionParams}
+          actionItems={actionItems}
+          triggerActionName={triggerActionName}
+        />
+        <Table.Cell>
+          <LastFiredCell trigger={trigger} stats={stats} />
+        </Table.Cell>
+        <Table.Cell>
+          <Text as="span" color="fg.muted">
+            {stats?.recentFireCount ?? 0}
+          </Text>
+        </Table.Cell>
+        <AutomationFiringCell
+          isWatchingGraph={isWatchingGraph}
+          isFiring={!!stats?.currentlyFiring}
+        />
+        {activeCell(trigger)}
+        <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
+      </Table.Row>
+    </LangyContextTarget>
+  );
+}
+
+/** What a row watches: a graph series and its rule, or a trace filter. */
+function AutomationWatchCell({
+  trigger,
+  actionParams,
+  graphJsonById,
+  applyChecks,
+}: {
+  trigger: EnhancedTrigger;
+  actionParams: TriggerActionParams;
+  graphJsonById: Map<string, unknown>;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+}) {
+  return (
+    <Table.Cell>
+      {trigger.customGraphId ? (
+        <VStack gap={0} align="start" minWidth={0}>
+          <GraphWatchCell
+            graphName={trigger.customGraph?.name ?? null}
+            graph={graphJsonById.get(trigger.customGraphId)}
+            seriesName={actionParams.seriesName}
+          />
+          <AlertRuleCell actionParams={actionParams} />
+        </VStack>
+      ) : (
+        <TraceFilterCell
+          checks={
+            trigger.checks?.filter((check): check is Monitor => !!check) ?? []
+          }
+          filterQuery={trigger.filterQuery}
+          filters={trigger.filters}
+          applyChecks={applyChecks}
+        />
+      )}
+    </Table.Cell>
+  );
+}
+
+/** Where a row delivers: the channel name over its clamped destination. */
+function AutomationDeliveryCell({
+  trigger,
+  actionParams,
+  actionItems,
+  triggerActionName,
+}: {
+  trigger: EnhancedTrigger;
+  actionParams: TriggerActionParams;
+  actionItems: (
+    action: TriggerAction,
+    actionParams: TriggerActionParams,
+  ) => React.ReactNode;
+  triggerActionName: (action: TriggerAction) => string;
+}) {
+  return (
+    <Table.Cell>
+      <VStack align="start" gap={0} minWidth={0}>
+        <Text textStyle="sm" fontWeight="medium">
+          {triggerActionName(trigger.action)}
+        </Text>
+        {/* Clamped, so it needs a reveal: the destination (a long email, a
+            webhook URL) is the whole point of the cell. Not expandable: the
+            dialog wants a string and these are nodes. */}
+        <HoverableBigText
+          textStyle="xs"
+          color="fg.muted"
+          width="full"
+          lineClamp={2}
+          overflowWrap="anywhere"
+          expandable={false}
+        >
+          {actionItems(trigger.action, actionParams)}
+        </HoverableBigText>
+      </VStack>
+    </Table.Cell>
+  );
+}
+
+/** Only a threshold rule has something to be firing or recovered from; a
+ *  trace filter acts per match and has no such state to report. */
+function AutomationFiringCell({
+  isWatchingGraph,
+  isFiring,
+}: {
+  isWatchingGraph: boolean;
+  isFiring: boolean;
+}) {
+  return (
+    <Table.Cell whiteSpace="nowrap">
+      {isWatchingGraph ? (
+        <FiringStatus firing={isFiring} />
+      ) : (
+        <Text textStyle="sm" color="fg.muted">
+          —
+        </Text>
+      )}
+    </Table.Cell>
   );
 }
 

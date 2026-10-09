@@ -7,6 +7,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../src/server/data-retention/retentionPolicy.schema";
+import { licenseConnectServices } from "./connect/install/connectEntitlement";
 import { PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
@@ -143,6 +144,10 @@ export class LicenseHandler {
    * A license we did not sign is not a license. Its numbers could say anything,
    * so an unreadable or tampered key resolves to the baseline, exactly like no
    * license at all.
+   *
+   * The seat count is the one signed into the license and nothing more. A
+   * connected customer that needs more seats has the license reissued with
+   * the new count and picks it up over sync (ADR-141, section 6).
    */
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
     const licenseKey = await this.readStoredLicense(organizationId);
@@ -304,6 +309,9 @@ export class LicenseHandler {
         planName: licenseData.plan.name,
         expiresAt: licenseData.expiresAt,
         organizationName: licenseData.organizationName,
+        connected:
+          licenseConnectServices({ licenseKey, publicKey: this.publicKey })
+            .length > 0,
         ...resourceCounts,
       };
     }

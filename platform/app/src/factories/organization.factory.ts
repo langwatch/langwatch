@@ -1,6 +1,11 @@
+import { DEFAULT_DOMAIN_JOIN_SETTING } from "@langwatch/identity";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
-import { type Organization, PricingModel } from "~/generated/prisma/client";
+import {
+  type Organization,
+  OrganizationUserRole,
+  PricingModel,
+} from "~/generated/prisma/client";
 
 export const organizationFactory = Factory.define<
   Omit<Organization, "stripeCustomerId" | "currency" | "signupData">
@@ -13,6 +18,14 @@ export const organizationFactory = Factory.define<
   updatedAt: new Date(),
   usageSpendingMaxLimit: null,
   maxSessionDurationDays: 0,
+  mfaRequired: false,
+  // Off, like every organization that has not asked for them (GAC-09,
+  // GAC-10). A factory that locked accounts or shortened sessions by default
+  // would make every unrelated test subject to rules its subject never set.
+  lockoutAfterFailedAttempts: 0,
+  lockoutMinutes: 30,
+  sessionIdleTimeoutMinutes: 0,
+  sessionMaxLifetimeMinutes: 0,
   signedDPA: false,
   elasticsearchNodeUrl: null,
   elasticsearchApiKey: null,
@@ -27,9 +40,18 @@ export const organizationFactory = Factory.define<
   promoCode: null,
   ssoDomain: null,
   ssoProvider: null,
+  domainJoin: DEFAULT_DOMAIN_JOIN_SETTING,
+  joinerRole: OrganizationUserRole.MEMBER,
+  joinDomains: [],
   license: null,
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
+  selfHostedCustomer: false,
+  connectServicesDisabled: [],
+  instantEvalsEnabledAt: null,
+  instantEvalsEnabledByUserId: null,
+  connectLastSyncAt: null,
+  connectLastSyncError: null,
   presenceEnabled: false,
   traceSharingEnabled: true,
   supportContact: null,

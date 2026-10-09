@@ -6,17 +6,15 @@ icon: python
 keywords: langwatch, python, documents, pdf, files, attachments, multimodal, tracing
 ---
 
-LangWatch captures a document as soon as it appears in the messages of a traced model call. There is no extra API to call and no separate upload step. Send the file the way your model provider expects, keep the call inside a trace, and the attachment is on the trace.
-
-This page lists the document shapes LangWatch understands, what happens to the bytes, and where the attachment appears in the product.
+Send the file the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the document out of the messages at ingestion, stores it, and leaves a reference in its place.
 
 ## Send the document with the model call
 
-The examples below all use `langwatch.setup()` and a `@langwatch.trace()` entry point. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
+The examples below all call `langwatch.setup()`. The OpenAI and Anthropic ones run inside a `@langwatch.trace()` entry point; the Google ADK one lets the instrumentor make the trace. Read [Integration Guide](/integration/python/guide) first if you have not set that up yet.
 
 ### OpenAI
 
-A document rides a `file` part carrying `file_data`. That is the shape Chat Completions accepts for PDF files.
+Put the document in a `file` part, as `file_data`. That is the shape Chat Completions accepts for PDF files.
 
 ```python
 import base64
@@ -64,7 +62,7 @@ read_invoice("What is the invoice number and the total due?", "invoice.pdf")
 
 ### Anthropic
 
-A document rides a `document` content block with a base64 source.
+Put the document in a `document` content block with a base64 source.
 
 ```python
 import base64
@@ -108,7 +106,7 @@ read_invoice("What is the invoice number and the total due?", "invoice.pdf")
 
 ### Google Gemini and Vertex
 
-A document rides an inline data part with the PDF media type. The rest of the agent setup does not change.
+Put the document in an inline data part with the PDF media type. The rest of the agent setup does not change.
 
 ```python
 import asyncio
@@ -162,10 +160,11 @@ ask("What is the invoice number and the total due?", "invoice.pdf")
 ```
 
 <Note>
-  The instrumentor makes the trace for this call. Do not add a
-  `@langwatch.trace()` wrapper around `Runner.run`: it crosses a
-  sync-to-async boundary that does not carry the trace context, so the
-  wrapper lands in a separate trace.
+  The instrumentor makes the trace for this call, so no `@langwatch.trace()`
+  wrapper is needed. If you add one to attach metadata, switch the run to
+  `Runner.run_async`: the synchronous `Runner.run` starts its own thread, which
+  begins with an empty OpenTelemetry context, and the agent spans open a second
+  trace. See the [Google ADK integration](/integration/python/integrations/google-ai).
 </Note>
 
 
@@ -181,29 +180,25 @@ Send any of these and the attachment is captured.
 | Google Gemini and Vertex | `{"inline_data": {"mime_type": "application/pdf", "data": "..."}}` |
 | AG-UI | `{"type": "document", "source": {"type": "data", "value": "...", "mimeType": "application/pdf"}}` |
 
-A part that names only a provider-hosted file, such as an OpenAI `file_id` with no `file_data`, carries no bytes. It is passed through as it is and no attachment is stored.
+A part that names only a provider-hosted file, such as an OpenAI `file_id` with no `file_data`, holds no bytes. LangWatch passes it through unchanged and stores no attachment.
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at the ingestion edge. The bytes go into content-addressed object storage and the message part is rewritten to a short `/api/files/<projectId>/<id>` reference, so the trace itself stays small and fast to query.
+LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
-Storage is addressed by SHA-256, so identical bytes are stored once. The same contract sent on ten traces costs one stored object.
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
 
 On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
 
 ## Where the document appears
 
-A paperclip sits next to the input preview on the trace list, so a run that carried a file is recognisable without opening it.
+The trace list draws a paperclip next to the input preview, so you can spot a run with a file without opening it.
 
-Open the trace and the Summary tab shows an attachment chip. The chip carries the filename, or the media type when the message sends no filename. Click it to open the file. The Conversation tab shows the same chip in the message it belongs to, and the Trace tab shows the full message payload.
+Open the trace and the Summary tab shows an attachment chip, named after the file, or after its media type when the message sends no filename. Click it to open the file. The Conversation tab shows the same chip in the message it belongs to, and the Trace tab shows the full message payload.
 
 <Frame caption="The trace drawer Summary tab, with an application/pdf attachment chip below the input text and the model answer reading the invoice number and total from the file">
   <img src="/images/integration/multimodal/trace-drawer-pdf.png" alt="LangWatch trace drawer showing a PDF attachment chip below the input question" />
 </Frame>
-
-<Note>
-Attachment capture is enabled per project. If your traces show the message text but no attachment, ask LangWatch to turn it on for your project.
-</Note>
 
 ## Related
 

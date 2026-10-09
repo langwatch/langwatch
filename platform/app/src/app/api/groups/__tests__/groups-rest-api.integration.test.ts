@@ -10,9 +10,12 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -59,7 +62,9 @@ describe("Feature: Groups REST API", () => {
     // entitled. The gate's own coverage lives in
     // groups-enterprise-gate.integration.test.ts.
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: async () => ENTERPRISE_TEST_PLAN,
       }),
@@ -109,15 +114,13 @@ describe("Feature: Groups REST API", () => {
       },
     });
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     const apiKeyService = ApiKeyService.create(prisma);
@@ -140,6 +143,8 @@ describe("Feature: Groups REST API", () => {
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId: testOrganization.id }],
+      ["role", { organizationId: testOrganization.id }],
       ["groupMembership", { group: { organizationId: testOrganization.id } }],
       ["roleBinding", { organizationId: testOrganization.id }],
       ["group", { organizationId: testOrganization.id }],
@@ -154,6 +159,7 @@ describe("Feature: Groups REST API", () => {
       })
       .catch(() => {});
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
   });
 
   describe("GET /api/groups", () => {
@@ -572,29 +578,29 @@ describe("Feature: Groups REST API", () => {
       });
       foreignOrgId = foreignOrg.id;
 
-      const foreignRole = await prisma.customRole.create({
-        data: {
-          name: `foreign-role-${ns}`,
-          organizationId: foreignOrg.id,
-          permissions: ["project:manage"],
-          kind: "custom",
-        },
+      const foreignRole = await seedCustomRole(prisma, {
+        name: `foreign-role-${ns}`,
+        organizationId: foreignOrg.id,
+        permissions: ["project:manage"],
+        kind: "custom",
       });
       foreignRoleId = foreignRole.id;
 
-      const apiKeySystemRole = await prisma.customRole.create({
-        data: {
-          name: `apikey:fake-${ns}`,
-          organizationId: testOrganization.id,
-          permissions: ["organization:manage"],
-          kind: "system_api_key",
-        },
+      const apiKeySystemRole = await seedCustomRole(prisma, {
+        name: `apikey:fake-${ns}`,
+        organizationId: testOrganization.id,
+        permissions: ["organization:manage"],
+        kind: "system_api_key",
       });
       apiKeySystemRoleId = apiKeySystemRole.id;
     });
 
     afterAll(async () => {
       await cleanupTestRows(prisma, [
+        [
+          "role",
+          { organizationId: { in: [foreignOrgId, testOrganization.id] } },
+        ],
         ["customRole", { id: { in: [foreignRoleId, apiKeySystemRoleId] } }],
         ["organization", { id: foreignOrgId }],
       ]);

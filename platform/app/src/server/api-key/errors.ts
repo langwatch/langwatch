@@ -91,8 +91,10 @@ export class ApiKeyPermissionDeniedError extends HandledError {
  * here that advice sends them to a door that does not open, and they wait for
  * a grant nobody can give. Langy hit this with `triggers:create`: it read the
  * generic refusal, offered to retry once the user "granted the permission",
- * and the permission is one `READ_ONLY_FAMILIES` withholds from every session
- * key that will ever exist.
+ * and the permission was one the policy of the day withheld from every
+ * session key that would ever exist. (`triggers:create` is delegable now —
+ * the incident, not the example, is the point; today's withheld grains live
+ * in `langyPermissionPolicy.ts`.)
  *
  * `subject` names the credential in the customer's own words ("Langy"), so the
  * class stays generic while the sentence stays specific. The policy's own
@@ -160,6 +162,34 @@ export class ApiKeyReservedNameError extends HandledError {
   }
 }
 
+/**
+ * Thrown when answering "which projects can this credential see" would have
+ * to walk more projects than the resolution is allowed to. The caller can act
+ * on it: narrow the key's bindings to the projects or teams it works with.
+ *
+ * `platform` fault: the credential is legitimate and the request is
+ * well-formed, so this is our limit showing, not the caller's mistake.
+ */
+export class ProjectVisibilityTooWideError extends HandledError {
+  declare readonly code: "project_visibility_too_wide";
+
+  constructor(
+    message: string,
+    options: {
+      meta?: Record<string, unknown>;
+      reasons?: readonly Error[];
+    } = {},
+  ) {
+    super("project_visibility_too_wide", message, {
+      httpStatus: 507,
+      fault: "platform",
+      ...remediation("project_visibility_too_wide"),
+      ...options,
+    });
+    this.name = "ProjectVisibilityTooWideError";
+  }
+}
+
 export class ApiKeyScopeViolationError extends HandledError {
   declare readonly code: "api_key_scope_violation";
 
@@ -176,5 +206,26 @@ export class ApiKeyScopeViolationError extends HandledError {
       ...options,
     });
     this.name = "ApiKeyScopeViolationError";
+  }
+}
+
+/**
+ * An API key was presented for an aggregate project (ADR-144 decision 7). An
+ * aggregate owns no traces and no credential: it reads its member projects
+ * through grants, so nothing is ever sent to it and no key acts on it. Its
+ * stored base key exists only because the column is required, and is never
+ * shown. HTTP 403 rather than 401, because the key may well be real; it is
+ * the project that accepts none.
+ */
+export class AggregateProjectHasNoCredentialError extends HandledError {
+  declare readonly code: "aggregate_project_has_no_credential";
+
+  constructor(options: { meta?: Record<string, unknown> } = {}) {
+    super(
+      "aggregate_project_has_no_credential",
+      "This project reads traces from other projects and accepts no API key. Send traces to one of its member projects instead.",
+      { httpStatus: 403, meta: options.meta },
+    );
+    this.name = "AggregateProjectHasNoCredentialError";
   }
 }

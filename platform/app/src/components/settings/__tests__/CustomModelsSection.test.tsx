@@ -31,6 +31,7 @@ function buildState(
 ): UseModelProviderFormState {
   return {
     isDirty: false,
+    routingHandle: "",
     useApiGateway: false,
     customKeys: {},
     displayKeys: {},
@@ -55,8 +56,8 @@ function buildActions(
   overrides: Partial<UseModelProviderFormActions> = {},
 ): UseModelProviderFormActions {
   return {
-    setEnabled: vi.fn(),
     setName: vi.fn(),
+    setRoutingHandle: vi.fn(),
     setScopes: vi.fn(),
     setScopeType: vi.fn(),
     setUseApiGateway: vi.fn(),

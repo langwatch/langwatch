@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -10,9 +9,12 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 describe("Feature: API Keys REST API", () => {
   const ns = `api-keys-api-${nanoid(8)}`;
@@ -80,15 +82,12 @@ describe("Feature: API Keys REST API", () => {
       },
     });
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     const project = await prisma.project.create({
@@ -124,6 +123,7 @@ describe("Feature: API Keys REST API", () => {
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId: testOrganization.id }],
       ["roleBinding", { organizationId: testOrganization.id }],
       ["apiKey", { organizationId: testOrganization.id }],
       ["teamUser", { userId }],

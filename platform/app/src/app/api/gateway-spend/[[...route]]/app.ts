@@ -153,6 +153,29 @@ const usageSchema = z.object({
   cache_read_input_tokens: z.number().int(),
   cache_creation_input_tokens: z.number().int(),
   reasoning_tokens: z.number().int(),
+  // Always present, 0 on a request that used no images. The object already
+  // carries the cache and reasoning counts as 0 on calls that never used
+  // them, so an optional field would put two conventions in one payload;
+  // reconciliation consumers sum these fields, and a missing one turns a sum
+  // into NaN where a 0 does not.
+  input_image_tokens: z
+    .number()
+    .int()
+    .describe(
+      "Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.",
+    ),
+  output_image_tokens: z
+    .number()
+    .int()
+    .describe(
+      "Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.",
+    ),
+  image_count: z
+    .number()
+    .int()
+    .describe(
+      "Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.",
+    ),
 });
 
 /** Money is published twice: a display string and the canonical integer. */
@@ -473,6 +496,9 @@ secured.access(requires("gatewaySpend:view")).get(
           cache_read_input_tokens: r.tokensCacheRead,
           cache_creation_input_tokens: r.tokensCacheWrite,
           reasoning_tokens: r.tokensReasoning,
+          input_image_tokens: r.tokensInputImage,
+          output_image_tokens: r.tokensOutputImage,
+          image_count: r.imageCount,
         },
         cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
       })),
@@ -587,6 +613,9 @@ secured.access(requires("gatewaySpend:view")).get(
           cache_read_input_tokens: rollup.tokensCacheRead,
           cache_creation_input_tokens: rollup.tokensCacheWrite,
           reasoning_tokens: rollup.tokensReasoning,
+          input_image_tokens: rollup.tokensInputImage,
+          output_image_tokens: rollup.tokensOutputImage,
+          image_count: rollup.imageCount,
         },
         caps,
       },

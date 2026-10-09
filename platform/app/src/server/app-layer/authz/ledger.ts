@@ -15,20 +15,9 @@
  * when the fold drains (ADR-007's breaker doctrine). Revocations never need
  * the wait: enforcement already deleted the rows.
  *
- * PER-ORGANIZATION, NOT PER-DEPLOY (decision 4). Every verb asks the write
- * gate first: an organization whose genesis import has landed writes
- * through the ledger, everyone else still takes the imperative Prisma
- * write, and an operator's `rolled_back` flip returns an organization to
- * the legacy path with no deploy. The fork lives HERE and nowhere else
- * — every call site keeps calling the same verb and never learns which side
- * answered it. Rows written imperatively while on the legacy side are
- * adopted by the next genesis pass (it takes each legacy row's own id as
- * the fact's id), which is what makes flip → rollback → re-flip safe.
- *
- * The audit trail forks with the writes: a migrated organization gets its
- * rows from the insert-only subscriber (decision 17); an unmigrated one
- * writes the same-shaped `AuditLog` row itself, best-effort, since a failed
- * audit insert must not fail a grant write.
+ * Every grant mutation appends a fact. The subscriber projects expressible
+ * facts into the compatibility tables and the revocation repository applies
+ * the deny effect synchronously where required.
  *
  * Identity: a runtime fact's grant id is the caller-minted binding KSUID,
  * the id the REST surface already returns to customers (decision 23's
@@ -37,66 +26,49 @@
  * import/migration tool's, where identity must survive re-runs with no
  * caller to remember a mint.
  */
+import type { GrantCondition, LedgerActor } from "@langwatch/actor";
 import {
-  type TeamUserRole as AuthzTeamUserRole,
+  PROJECT_READER_ROLE_KEY,
   roleKeyForTeamRole,
+  STORED_PRINCIPAL_KIND,
 } from "@langwatch/authz";
 import {
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
-  type GrantRevocationSelector,
-  type LedgerActor,
-  type LedgerScopeType,
+  type GrantEventSource,
+  GrantValidationError,
+  grantFactToCompatBinding,
+  grantRowToFact,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
-// The migration subpath, not the root: grant identity touches `node:crypto`,
-// and the package root is browser-evaluable by construction (the client
-// bundle reaches it through the shadow fork). See the header of
-// `@langwatch/authz-server/migration`.
-import { bindingIdentityKey } from "@langwatch/authz-server/migration";
+import {
+  bindingIdentityKey,
+  deriveGrantId,
+} from "@langwatch/authz-server/migration";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type {
-  AttachGrantsCommandData,
+  AttachGrantCommandData,
   ChangeGrantRoleCommandData,
-  CompleteCutoverCommandData,
-  DefineRolesCommandData,
+  ChangeRolePermissionsCommandData,
+  DefineRoleCommandData,
   DeleteRoleCommandData,
-  OffboardMemberCommandData,
-  ProveMigrationParityCommandData,
-  RecordMigrationTenantStateCommandData,
-  RevokeGrantsCommandData,
-  RollBackCutoverCommandData,
+  RevokeGrantCommandData,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
-import {
-  AUTHZ_AUDIT_ACTION_PREFIX,
-  AUTHZ_GRANTS_PIPELINE_NAME,
-  type AuthzAuditVerb,
-} from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
+import { AUTHZ_GRANT_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { prisma as appPrisma } from "../../db";
-import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
+import { BACKGROUND_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 import { tryGetApp } from "../app";
 import { bumpAuthzEpoch } from "./epoch";
-import { isOrgOnLedgerWrites } from "./ledger-write-gate";
-import { PrismaAuthzGrantsProjectionRepository } from "./repositories/authz-grants-projection.prisma.repository";
+import { AuthzGrantNotConfirmedError } from "./errors";
+import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
+import { liveGrants, liveRoles } from "./repositories/live-rows";
+import { sharedProjectReadsOf } from "./repositories/shared-reads.grants.repository";
 
 const logger = createLogger("langwatch:authz:ledger");
-
-/**
- * Which writer authored a runtime fact — the event's `source` field.
- *
- * `read-through-mint` is the compatibility path (decision 1: no legacy-key
- * sunset): a credential whose access predates the ledger states it the first
- * time it is used, rather than being asked to be re-issued.
- */
-export type LedgerWriteSource =
-  | "grants-service"
-  | "scim"
-  | "invite"
-  | "read-through-mint";
 
 type Sender<T> = { send: (data: T) => Promise<unknown> };
 
@@ -105,17 +77,18 @@ let grantsLedgerHandle: Promise<{
   commands: AuthzGrantsCommandSenders;
 }> | null = null;
 
+/**
+ * One command per entity (ADR-110): a batch would straddle aggregates, so a
+ * caller with many grants sends many commands. They are independent and
+ * apply concurrently, which is the point.
+ */
 export type AuthzGrantsCommandSenders = {
-  attachGrants: Sender<AttachGrantsCommandData>;
+  attachGrant: Sender<AttachGrantCommandData>;
   changeGrantRole: Sender<ChangeGrantRoleCommandData>;
-  revokeGrants: Sender<RevokeGrantsCommandData>;
-  defineRoles: Sender<DefineRolesCommandData>;
+  revokeGrant: Sender<RevokeGrantCommandData>;
+  defineRole: Sender<DefineRoleCommandData>;
+  changeRolePermissions: Sender<ChangeRolePermissionsCommandData>;
   deleteRole: Sender<DeleteRoleCommandData>;
-  offboardMember: Sender<OffboardMemberCommandData>;
-  proveMigrationParity: Sender<ProveMigrationParityCommandData>;
-  completeCutover: Sender<CompleteCutoverCommandData>;
-  rollBackCutover: Sender<RollBackCutoverCommandData>;
-  recordMigrationTenantState: Sender<RecordMigrationTenantStateCommandData>;
 };
 
 /**
@@ -215,7 +188,7 @@ async function resolveAuthzGrantsCommands(options?: {
     throw new AuthzLedgerUnavailableError();
   }
   return app.eventSourcing.getPipeline(
-    AUTHZ_GRANTS_PIPELINE_NAME as never,
+    AUTHZ_GRANT_PIPELINE_NAME as never,
   ) as unknown as { commands: AuthzGrantsCommandSenders };
 }
 
@@ -224,10 +197,39 @@ export function newLedgerCommandId(): string {
   return generate("authzcmd").toString();
 }
 
-const CONVERGENCE_POLL_MS = 150;
-const CONVERGENCE_TIMEOUT_MS = 8_000;
+/**
+ * The grants ledger waits on the background window: eight seconds, the value
+ * it has always used, now named for the reason it is longer than identity's.
+ *
+ * A grant that is read back before its fold has landed is an authorization
+ * answer derived from state the log may not hold, and that is the one class of
+ * wrong answer this system must not give. Waiting costs a job slot; being
+ * wrong costs a permission decision.
+ *
+ * The poll moves 150ms -> 250ms, which over a window this long is at most
+ * thirty-two reads of the same cursor row instead of fifty-three, and no
+ * accuracy: the fold either lands early or is not landing on this timescale.
+ *
+ * @see ../_shared/read-your-writes-window.ts — why this and identity's
+ *      two-second window are two questions rather than one disagreement.
+ */
+const AUTHZ_CONVERGENCE = BACKGROUND_READ_YOUR_WRITES;
 
-export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
+export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId"> & {
+  /** Internal generation captured by a membership transaction. Callers that
+   *  create the membership before emitting leave this unset; the writer reads
+   *  and locks the live row itself. */
+  membershipStamp?: string;
+  /** Founder-only marker for a membership created in the same transaction. */
+  membershipBootstrap?: boolean;
+};
+
+type BindingRevocationFilter = BindingPrincipalWhere & {
+  scopeType?: RoleBindingWrite["scopeType"];
+  scopeId?: string;
+  customRoleId?: string | { in: string[] };
+  id?: string | { notIn: string[] };
+};
 
 /**
  * The audience a resource fact names. `ShareVisibility`'s three values in
@@ -296,7 +298,7 @@ export class GrantsLedgerWriter {
    * the projection store's fold-side surface.
    */
   private readonly enforcement: Pick<
-    PrismaAuthzGrantsProjectionRepository,
+    PrismaAuthzRevocationRepository,
     "enforceGrantRevocation"
   >;
 
@@ -306,15 +308,9 @@ export class GrantsLedgerWriter {
       commands?: () => Promise<{ commands: AuthzGrantsCommandSenders }>;
       now?: () => number;
       poll?: { intervalMs: number; timeoutMs: number };
-      /**
-       * The per-organization write fork (decision 4). Injectable so a test
-       * can put an organization on either side without a state row; in
-       * production it is the genesis-import gate next door.
-       */
-      onLedgerWrites?: (args: { organizationId: string }) => Promise<boolean>;
     } = {},
   ) {
-    this.enforcement = new PrismaAuthzGrantsProjectionRepository(prisma);
+    this.enforcement = new PrismaAuthzRevocationRepository(prisma);
   }
 
   private now(): number {
@@ -323,55 +319,6 @@ export class GrantsLedgerWriter {
 
   private commands() {
     return (this.deps.commands ?? authzGrantsCommands)();
-  }
-
-  /** Whether THIS organization's grant writes go through the ledger yet. */
-  private onLedger(organizationId: string): Promise<boolean> {
-    return (this.deps.onLedgerWrites ?? isOrgOnLedgerWrites)({
-      organizationId,
-    });
-  }
-
-  /**
-   * The audit row a migrated organization would have got from the subscriber,
-   * written here because an unmigrated one has no event to subscribe to. Same
-   * action vocabulary, same `metadata = the fact minus its actor`, same
-   * actor-to-`userId` rule; only the id differs, because there is no event id
-   * to derive one from, so the column's own default mints it.
-   *
-   * Best-effort on purpose: a write that succeeded must not be reported as
-   * failed because its trail did not land.
-   */
-  private async recordLegacyAudit({
-    organizationId,
-    actor,
-    verb,
-    createdAt,
-    facts,
-  }: {
-    organizationId: string;
-    actor: LedgerActor;
-    verb: AuthzAuditVerb;
-    createdAt: Date;
-    facts: Record<string, unknown>[];
-  }): Promise<void> {
-    if (facts.length === 0) return;
-    try {
-      await this.prisma.auditLog.createMany({
-        data: facts.map((metadata) => ({
-          createdAt,
-          userId: actor.type === "user" ? actor.id : null,
-          organizationId,
-          action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
-          metadata: metadata as Prisma.InputJsonValue,
-        })),
-      });
-    } catch (err) {
-      logger.warn(
-        { err, organizationId, action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}` },
-        "failed to record the audit row for a grant write on the pre-ledger path; the write itself landed",
-      );
-    }
   }
 
   /**
@@ -390,11 +337,20 @@ export class GrantsLedgerWriter {
     commandId,
     occurredAtMs: occurredAtOverrideMs,
     awaitProjection = true,
+    requireProjection = awaitProjection,
   }: {
     organizationId: string;
     bindings: LedgerBindingAttach[];
     actor: LedgerActor;
-    source?: LedgerWriteSource;
+    /**
+     * Which surface authored the fact — the provenance the actor cannot
+     * state. `read-through-mint` is the compatibility path (decision 1: no
+     * legacy-key sunset): a credential whose access predates the ledger
+     * states it the first time it is used, rather than being asked to be
+     * re-issued. Defaults to the grants service, which is what a hand-made
+     * grant is.
+     */
+    source?: GrantEventSource;
     onDuplicate: "reject" | "skip";
     /**
      * A caller-derived command id, for writes that are not a user action and
@@ -421,8 +377,18 @@ export class GrantsLedgerWriter {
      * only spend the request's time.
      */
     awaitProjection?: boolean;
+    /**
+     * Confirmation is required whenever the caller waits. Background writers
+     * may explicitly accept a durable append before projection convergence.
+     * Requiring confirmation also enables the wait.
+     */
+    requireProjection?: boolean;
   }): Promise<AttachOutcome> {
     if (bindings.length === 0) return { attached: [], duplicates: [] };
+
+    bindings.forEach((binding) =>
+      validateMembershipBootstrap({ organizationId, binding }),
+    );
 
     const { fresh, duplicates } = await this.partitionByIdentity({
       organizationId,
@@ -432,43 +398,64 @@ export class GrantsLedgerWriter {
     if (fresh.length === 0) return { attached: [], duplicates };
 
     const occurredAtMs = occurredAtOverrideMs ?? this.now();
-    if (!(await this.onLedger(organizationId))) {
-      return await this.attachBindingsImperatively({
-        organizationId,
-        fresh,
-        duplicates,
-        actor,
-        source,
-        onDuplicate,
-        occurredAtMs,
-      });
-    }
-    await (await this.commands()).commands.attachGrants.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: commandId ?? newLedgerCommandId(),
-      grants: fresh.map((binding) => ({
-        grantId: binding.bindingId,
-        principal: principalForWhere(binding.principal),
-        roleKey: roleKeyFor(binding),
-        scope: { type: binding.scopeType, id: binding.scopeId },
-        source,
-        actor,
-        occurredAtMs,
-      })),
-    });
+    const membershipStamps =
+      source === "migration"
+        ? new Map<string, string>()
+        : await this.captureMembershipStamps({
+            organizationId,
+            bindings: fresh,
+          });
+    // One command per grant, and a command id derived from the batch's own
+    // so a retry of the same attach dedupes per grant at the event store.
+    const batchId = commandId ?? newLedgerCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      fresh.map(async (binding) => {
+        const membershipStamp = membershipStampForBinding(
+          binding,
+          membershipStamps,
+        );
+        await senders.attachGrant.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${binding.bindingId}`,
+          grant: {
+            grantId: binding.bindingId,
+            principal: principalForWhere(binding.principal),
+            roleKey: roleKeyFor(binding),
+            scope: { type: binding.scopeType, id: binding.scopeId },
+            source,
+            actor,
+            occurredAtMs,
+            ...(membershipStamp ? { membershipStamp } : {}),
+            ...(binding.membershipBootstrap
+              ? { membershipBootstrap: binding.membershipBootstrap }
+              : {}),
+          },
+        });
+      }),
+    );
 
     const wanted = fresh.map((binding) => binding.bindingId);
-    if (awaitProjection) {
+    if (awaitProjection || requireProjection) {
       await this.awaitProjection({
         what: `attach of ${wanted.length} binding(s)`,
         organizationId,
         check: async () => {
-          const present = await this.prisma.roleBinding.count({
-            where: { organizationId, id: { in: wanted } },
+          const present = await this.prisma.grant.count({
+            where: {
+              organizationId,
+              revokedAt: null,
+              OR: fresh.map((binding) => ({
+                id: binding.bindingId,
+                ...grantIdentityForBinding(binding),
+                occurredAt: { gte: new Date(occurredAtMs) },
+              })),
+            },
           });
           return present === wanted.length;
         },
+        required: requireProjection,
       });
     }
     await bumpAuthzEpoch({ organizationId });
@@ -476,9 +463,53 @@ export class GrantsLedgerWriter {
   }
 
   /**
+   * Capture the current lifetime of each USER principal while holding its
+   * membership row lock. The lock serializes this snapshot with offboarding;
+   * the event carries the stamp after the transaction releases it, and the
+   * projection checks the same generation before inserting the grant.
+   */
+  private async captureMembershipStamps({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+  }): Promise<Map<string, string>> {
+    const userIds = [
+      ...new Set(
+        bindings.flatMap((binding) =>
+          binding.membershipStamp || !binding.principal.userId
+            ? []
+            : [binding.principal.userId],
+        ),
+      ),
+    ];
+    if (userIds.length === 0) return new Map();
+
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{ userId: string; membershipStamp: string }>
+      >`
+        SELECT "userId", "membershipStamp"
+        FROM "OrganizationUser"
+        WHERE "organizationId" = ${organizationId}
+          AND "userId" IN (${Prisma.join(userIds)})
+          AND "disabledAt" IS NULL
+        FOR UPDATE
+      `;
+      const stamps = new Map(
+        rows.map((row) => [row.userId, row.membershipStamp]),
+      );
+      const missingUserId = userIds.find((userId) => !stamps.has(userId));
+      if (missingUserId) throw new BindingMissingError();
+      return stamps;
+    });
+  }
+
+  /**
    * Split a batch into the bindings that are genuinely new and the ids of the
-   * identical rows already present — the identity pre-check both sides of the
-   * fork run, so an organization's outcome does not change when it migrates.
+   * identical rows already present. The pre-check also gives duplicate
+   * handling a stable result when a request is retried.
    * A repeat inside the same batch counts as a duplicate of itself.
    */
   private async partitionByIdentity({
@@ -533,109 +564,24 @@ export class GrantsLedgerWriter {
     bindings: LedgerBindingAttach[];
   }): Promise<Map<string, string>> {
     if (bindings.length === 0) return new Map();
-    const rows = await this.prisma.roleBinding.findMany({
+    const rows = await liveGrants(this.prisma).findMany({
       where: {
         organizationId,
-        OR: bindings.map((binding) =>
-          bindingIdentityWhere({ organizationId, binding }),
-        ),
-      },
-      select: {
-        id: true,
-        userId: true,
-        groupId: true,
-        apiKeyId: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
+        OR: bindings.map(grantIdentityForBinding),
       },
     });
     const byIdentity = new Map<string, string>();
     for (const row of rows) {
+      const binding = grantFactToCompatBinding({
+        grant: grantRowToFact(row),
+        organizationId,
+      });
       byIdentity.set(
-        bindingIdentityKey({
-          principal: principalWhereForRow(row),
-          role: row.role,
-          customRoleId: row.customRoleId,
-          scopeType: row.scopeType,
-          scopeId: row.scopeId,
-        }),
+        bindingIdentityKey({ ...binding, principal: ledgerPrincipal(binding) }),
         row.id,
       );
     }
     return byIdentity;
-  }
-
-  /**
-   * The pre-ledger attach, for an organization the genesis import has not
-   * reached: the rows are written directly (`insertBindingRows` below owns
-   * the two duplicate semantics). The identity pre-check above ran on this
-   * path too, so both sides answer the same `AttachOutcome`; the partial
-   * unique indexes remain the backstop for the race the pre-check cannot
-   * close.
-   */
-  private async attachBindingsImperatively({
-    organizationId,
-    fresh,
-    duplicates,
-    actor,
-    source,
-    onDuplicate,
-    occurredAtMs,
-  }: {
-    organizationId: string;
-    fresh: LedgerBindingAttach[];
-    duplicates: string[];
-    actor: LedgerActor;
-    source: LedgerWriteSource;
-    onDuplicate: "reject" | "skip";
-    occurredAtMs: number;
-  }): Promise<AttachOutcome> {
-    const rows = fresh.map((binding) =>
-      legacyBindingRow({ organizationId, binding }),
-    );
-
-    await this.insertBindingRows({ rows, onDuplicate });
-
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "attach",
-      createdAt: new Date(occurredAtMs),
-      facts: attachAuditFacts({ fresh, source }),
-    });
-    await bumpAuthzEpoch({ organizationId });
-    return { attached: rows.map((row) => row.id), duplicates };
-  }
-
-  /**
-   * The two INSERT semantics the call sites were built on: `reject` inserts
-   * row by row so the first collision becomes the 409 the REST contract
-   * froze, `skip` takes `createMany`'s own `skipDuplicates`.
-   */
-  private async insertBindingRows({
-    rows,
-    onDuplicate,
-  }: {
-    rows: ReturnType<typeof legacyBindingRow>[];
-    onDuplicate: "reject" | "skip";
-  }): Promise<void> {
-    if (onDuplicate !== "reject") {
-      await this.prisma.roleBinding.createMany({
-        data: rows,
-        skipDuplicates: true,
-      });
-      return;
-    }
-    for (const data of rows) {
-      try {
-        await this.prisma.roleBinding.create({ data });
-      } catch (error) {
-        if (isUniqueViolation(error)) throw new DuplicateBindingError();
-        throw error;
-      }
-    }
   }
 
   /**
@@ -655,11 +601,7 @@ export class GrantsLedgerWriter {
    * means the caller's read-back will come up empty and it is the caller's
    * business what to say about that.
    *
-   * No write-gate ask, on purpose: the only caller is the share
-   * repository's per-organization fork, which fires solely for a CUT-OVER
-   * organization — and cutover requires the genesis import finalized, a
-   * strictly stronger condition than the write gate's migrated-or-finalized.
-   * An organization that is not on ledger writes never reaches this verb.
+   * Resource facts use this same append path as binding facts.
    */
   async attachResourceGrant({
     organizationId,
@@ -683,29 +625,33 @@ export class GrantsLedgerWriter {
     actor: LedgerActor;
     commandId?: string;
   }): Promise<void> {
-    await (await this.commands()).commands.attachGrants.send({
+    const { commands } = await this.commands();
+    await commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
       commandId: commandId ?? newLedgerCommandId(),
-      grants: [
-        {
-          grantId,
-          principal,
-          roleKey: null,
-          scope: { type: "RESOURCE", id: scopeId },
-          resource: { ...resource, projectId },
-          source: "grants-service",
-          actor,
-          occurredAtMs: this.now(),
-        },
-      ],
+      grant: {
+        grantId,
+        principal,
+        roleKey: null,
+        scope: { type: "RESOURCE", id: scopeId },
+        resource: { ...resource, projectId },
+        source: "grants-service",
+        actor,
+        occurredAtMs: this.now(),
+      },
     });
     await this.awaitProjection({
       what: `attach of resource grant ${grantId}`,
       organizationId,
       check: async () => {
-        const row = await this.prisma.shareLink.findFirst({
-          where: { id: grantId, projectId },
+        const row = await liveGrants(this.prisma).findFirst({
+          where: {
+            id: grantId,
+            organizationId,
+            projectId,
+            scopeType: "RESOURCE",
+          },
           select: { id: true },
         });
         return row !== null;
@@ -715,24 +661,254 @@ export class GrantsLedgerWriter {
   }
 
   /**
+   * INSERT one shared project read (ADR-144): the reader project holds a
+   * `project-reader` grant on the member project's PROJECT scope, carrying
+   * the condition the proof will copy. The wire checks the shape; this is
+   * where storage is asked the one question the wire cannot answer, that
+   * both projects sit in this organisation. A project cannot read itself
+   * this way (its own credential is the self-grant).
+   *
+   * Idempotent by identity: a live grant for the same pair is returned as
+   * it stands rather than re-emitted, which is what lets a reconciler run
+   * twice and change nothing.
+   */
+  async attachSharedProjectGrant({
+    organizationId,
+    readerProjectId,
+    memberProjectId,
+    condition,
+    actor,
+    source = "aggregate-reconciler",
+    commandId,
+    awaitProjection = true,
+  }: {
+    organizationId: string;
+    /** The project that reads - an aggregate project. */
+    readerProjectId: string;
+    /** The project whose traces it reads. */
+    memberProjectId: string;
+    condition: GrantCondition;
+    actor: LedgerActor;
+    source?: GrantEventSource;
+    commandId?: string;
+    awaitProjection?: boolean;
+  }): Promise<{ grantId: string; wasAttached: boolean }> {
+    if (readerProjectId === memberProjectId) {
+      throw new GrantValidationError(
+        "A project cannot share a read with itself",
+        {
+          projectId: readerProjectId,
+        },
+      );
+    }
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: [readerProjectId, memberProjectId] } },
+      select: { id: true, team: { select: { organizationId: true } } },
+    });
+    for (const projectId of [readerProjectId, memberProjectId]) {
+      const row = projects.find((project) => project.id === projectId);
+      if (row?.team.organizationId !== organizationId) {
+        throw new GrantValidationError("Project is not in this organization", {
+          projectId,
+        });
+      }
+    }
+    const identity = {
+      ...sharedProjectReadsOf({ organizationId, readerProjectId }),
+      scopeId: memberProjectId,
+    };
+    const existing = await liveGrants(this.prisma).findFirst({
+      where: identity,
+      select: { id: true },
+    });
+    if (existing) return { grantId: existing.id, wasAttached: false };
+
+    const principal = { type: "project" as const, id: readerProjectId };
+    const scope = { type: "PROJECT" as const, id: memberProjectId };
+    const fresh = await this.freshGrantIdentity({
+      organizationId,
+      principal,
+      scope,
+    });
+    // A concurrent attach of the same pair landed between the read above and
+    // this one: its row is the pair's live grant, so it is returned, not
+    // shadowed by a second live row a second later.
+    if (fresh.live) return { grantId: fresh.grantId, wasAttached: false };
+    const { grantId, occurredAtMs } = fresh;
+    const { commands } = await this.commands();
+    await commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: commandId ?? newLedgerCommandId(),
+      grant: {
+        grantId,
+        principal,
+        roleKey: PROJECT_READER_ROLE_KEY,
+        scope,
+        condition,
+        source,
+        actor,
+        occurredAtMs,
+      },
+    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `attach of shared read ${grantId}`,
+        organizationId,
+        check: async () => {
+          const row = await liveGrants(this.prisma).findFirst({
+            where: { id: grantId, organizationId },
+            select: { id: true },
+          });
+          return row !== null;
+        },
+      });
+    }
+    await bumpAuthzEpoch({ organizationId });
+    return { grantId, wasAttached: true };
+  }
+
+  /**
+   * The one read-your-writes wait for a batch of shared reads attached with
+   * `awaitProjection: false`, so a reconciler attaching ten members waits
+   * once rather than ten times. Bumps the epoch after the rows land: each
+   * attach bumped it on append, before its row existed, and a snapshot cached
+   * in between would otherwise miss the read until the next bump. Throws
+   * {@link AuthzGrantNotConfirmedError} when the rows do not land in time;
+   * the appends are durable either way.
+   */
+  async awaitSharedProjectGrants({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.awaitProjection({
+      what: `attach of ${grantIds.length} shared read(s)`,
+      organizationId,
+      check: async () => {
+        const present = await liveGrants(this.prisma).findMany({
+          where: { organizationId, id: { in: [...grantIds] } },
+          select: { id: true },
+        });
+        return present.length === grantIds.length;
+      },
+    });
+    await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
+   * The live shared reads one reader project holds, one per member project.
+   * The condition is not read: what the reconciler compares is which members
+   * hold a row, and a row whose condition no longer parses is still a row it
+   * must be able to revoke.
+   */
+  async findLiveSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+  }): Promise<Array<{ grantId: string; memberProjectId: string }>> {
+    const rows = await liveGrants(this.prisma).findMany({
+      where: sharedProjectReadsOf({ organizationId, readerProjectId }),
+      select: { id: true, scopeId: true },
+      orderBy: { scopeId: "asc" },
+    });
+    return rows.map((row) => ({
+      grantId: row.id,
+      memberProjectId: row.scopeId,
+    }));
+  }
+
+  /**
+   * The grant id an attach of this pair lands on, and the business time it
+   * encodes. The id is a function of the pair and the SECOND it was attached
+   * in, so re-attaching a pair revoked earlier in the same second derives
+   * the revoked row's id, and the attach would land on a row that stays
+   * revoked: the read never returns and the projection wait times out. A
+   * reconciler that revokes on one trigger and re-attaches on the next can do
+   * exactly that, so the fact moves past a REVOKED row to the next second.
+   *
+   * A LIVE row on the id is the same pair attached this second by someone
+   * else, and is the answer itself (`live: true`): stepping past it too is
+   * what wrote two live rows for one pair when two reconciles raced.
+   */
+  private async freshGrantIdentity({
+    organizationId,
+    principal,
+    scope,
+  }: {
+    organizationId: string;
+    principal: { type: "project"; id: string };
+    scope: { type: "PROJECT"; id: string };
+  }): Promise<{ grantId: string; occurredAtMs: number; live: boolean }> {
+    let occurredAtMs = this.now();
+    for (;;) {
+      const grantId = deriveGrantId({
+        organizationId,
+        principal,
+        scope,
+        occurredAtMs,
+      });
+      const taken = await this.prisma.grant.findFirst({
+        where: { id: grantId, organizationId },
+        select: { id: true, revokedAt: true },
+      });
+      if (!taken) return { grantId, occurredAtMs, live: false };
+      if (taken.revokedAt === null)
+        return { grantId, occurredAtMs, live: true };
+      occurredAtMs = (Math.floor(occurredAtMs / 1000) + 1) * 1000;
+    }
+  }
+
+  /**
+   * Revoke the live shared reads one reader project holds - all of them, or
+   * only those on the member projects named. Marks the rows and bumps the
+   * epoch exactly as `revokeBindings` does; returns the grant ids revoked.
+   */
+  async revokeSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+    memberProjectIds,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+    memberProjectIds?: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<string[]> {
+    const rows = await liveGrants(this.prisma).findMany({
+      where: {
+        ...sharedProjectReadsOf({ organizationId, readerProjectId }),
+        ...(memberProjectIds !== undefined
+          ? { scopeId: { in: memberProjectIds } }
+          : {}),
+      },
+      select: { id: true },
+    });
+    const bindingIds = rows.map((row) => row.id);
+    await this.revokeBindings({ organizationId, bindingIds, actor, reason });
+    return bindingIds;
+  }
+
+  /**
    * DELETE resource facts. This is the ledger half of `revokeBindings` under
    * the name the resource tier calls it by — revocation is keyed on grant
    * ids and knows nothing about tiers, so the command, the synchronous
    * enforcement (decision 7) and the epoch bump are literally the same ones.
-   * What the enforcement additionally does for a resource id is delete the
-   * compat `ShareLink` head, which is why a revoked link stops resolving
-   * before this returns, queue running or not.
+   * The synchronous enforcement marks the authoritative `Grant` row; the
+   * compat `ShareLink` head is deleted by the caller
+   * (`share.ledger.repository`, before it returns), not by this enforcement,
+   * so a revoked link stops resolving on both heads without the fold running.
    *
-   * NO `onLedger` gate, like `attachResourceGrant` and for a stronger
-   * reason: the caller (`share.ledger.repository`) has already routed here
-   * on an UNCACHED cutover read, and the write gate is a different, cached
-   * answer — a stale or failed `false` from it would send a cut-over
-   * organization's revocation to the legacy branch, which deletes only
-   * `RoleBinding` rows: no fact appended, the `Grant` head keeps the grant,
-   * and the fold re-projects the "revoked" link. Revocation must never come
-   * undone, so it goes straight to the append; on an organization that
-   * turns out to be on legacy the fact folds as a no-op and the enforcement
-   * delete is the same delete the legacy path wanted.
+   * Revocation always appends to the ledger and applies the deny effect
+   * synchronously, so access cannot return while the compatibility projection
+   * catches up.
    */
   async revokeResourceGrants({
     organizationId,
@@ -760,25 +936,46 @@ export class GrantsLedgerWriter {
     bindingIds,
     actor,
     reason,
-    selector,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
-    selector?: GrantRevocationSelector;
   }): Promise<void> {
-    await (await this.commands()).commands.revokeGrants.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: newLedgerCommandId(),
-      revocations: revocationEntries({ bindingIds, reason, selector }),
-      actor,
-      occurredAtMs: this.now(),
-    });
+    // A revoke names its grant id: a selector cannot address an aggregate,
+    // so resolving "every grant this principal holds" into ids is the
+    // caller's job now, and the deny below is what makes that safe.
+    const revokedAtMs = this.now();
+    const batchId = newLedgerCommandId();
+    const senders = (await this.commands()).commands;
+    // One send at a time, not a Promise.all. In memory mode (no Redis) a
+    // send resolves only once its job has run, and the job in turn sends its
+    // projection jobs to the same queue and waits for them; a batch as wide
+    // as the queue's concurrency (five) fills every slot with command jobs
+    // and none of their projections can start. A seat change to the
+    // Developer seat (ADR-143) revokes that many rows as a matter of course.
+    // On Redis a send returns at enqueue, so the cost there is a few short
+    // round trips instead of one.
+    for (const grantId of bindingIds) {
+      await senders.revokeGrant.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId: `${batchId}:${grantId}`,
+        grantId,
+        ...(reason ? { reason } : {}),
+        actor,
+        occurredAtMs: revokedAtMs,
+      });
+    }
     await this.enforcement.enforceGrantRevocation({
       organizationId,
       grantIds: bindingIds,
+      reason: "revocation",
+      // The same instant and reason the events above carry, so the row the
+      // deny marks is byte-identical to what the queued write would state —
+      // the queue's `revokedAt: null` guard makes this mark the durable one.
+      revokedAt: new Date(revokedAtMs),
+      revokedReason: reason ?? null,
     });
     await bumpAuthzEpoch({ organizationId });
   }
@@ -802,121 +999,38 @@ export class GrantsLedgerWriter {
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
-    const row = await this.prisma.roleBinding.findFirst({
+    const row = await liveGrants(this.prisma).findFirst({
       where: { id: bindingId, organizationId },
     });
     if (!row) throw new BindingMissingError();
+    const binding = grantFactToCompatBinding({
+      grant: grantRowToFact(row),
+      organizationId,
+    });
 
     const to = roleKeyFor({ role, customRoleId });
-    const from = roleKeyFor({
-      role: row.role,
-      customRoleId: row.customRoleId,
-    });
-    if (from === to) return;
-
-    const sibling = await this.prisma.roleBinding.findFirst({
+    if (row.roleKey === to) return;
+    const sibling = await liveGrants(this.prisma).findFirst({
       where: {
-        ...bindingIdentityWhere({
-          organizationId,
-          binding: {
-            principal: principalWhereForRow(row),
-            role,
-            customRoleId,
-            scopeType: row.scopeType,
-            scopeId: row.scopeId,
-          },
-        }),
+        organizationId,
+        principalType: row.principalType,
+        principalId: row.principalId,
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        roleKey: to,
         id: { not: bindingId },
       },
       select: { id: true },
     });
     if (sibling) throw new DuplicateBindingError();
 
-    if (!(await this.onLedger(organizationId))) {
-      return await this.changeBindingRoleImperatively({
-        organizationId,
-        bindingId,
-        role,
-        customRoleId,
-        from,
-        to,
-        actor,
-      });
-    }
-    await this.changeBindingRoleOnLedger({
-      organizationId,
-      row,
-      bindingId,
-      role,
-      customRoleId,
-      from,
-      to,
-      actor,
-    });
-  }
-
-  /**
-   * The ledger-side role change. A compat row can exist with no fact behind
-   * it in the fold's head: it was written imperatively during the write
-   * gate's negative-cache window (an organization the gate briefly, wrongly,
-   * read as legacy — see `ledger-write-gate.ts`) or during the genesis
-   * snapshot -> flip gap, and `finalized` genesis passes never revisit it.
-   * Sending `grant_role_changed` for such an id targets a grantId the
-   * reducer has never seen; it no-ops silently there
-   * (`state.grants[grantId]` undefined), `awaitProjection` times out with
-   * only a warn, and the caller is told success while nothing changed. Adopt
-   * the row instead, exactly as genesis adopts a legacy row: an attach fact
-   * for this id, carrying the NEW role, both creates the head entry and
-   * lands the requested change in one step.
-   */
-  private async changeBindingRoleOnLedger({
-    organizationId,
-    row,
-    bindingId,
-    role,
-    customRoleId,
-    from,
-    to,
-    actor,
-  }: {
-    organizationId: string;
-    row: {
-      id: string;
-      userId: string | null;
-      groupId: string | null;
-      apiKeyId: string | null;
-      scopeType: RoleBindingWrite["scopeType"];
-      scopeId: string;
-    };
-    bindingId: string;
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    from: string;
-    to: string;
-    actor: LedgerActor;
-  }): Promise<void> {
-    const known = await this.prisma.grant.findFirst({
-      where: { id: bindingId, organizationId },
-      select: { id: true },
-    });
-    if (!known) {
-      await this.adoptStrandedRoleChange({
-        organizationId,
-        row,
-        role,
-        customRoleId,
-        actor,
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
-
-    await (await this.commands()).commands.changeGrantRole.send({
+    const { commands } = await this.commands();
+    await commands.changeGrantRole.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
       grantId: bindingId,
-      from,
+      from: roleKeyFor(binding),
       to,
       actor,
       occurredAtMs: this.now(),
@@ -925,303 +1039,88 @@ export class GrantsLedgerWriter {
       what: `role change on binding ${bindingId}`,
       organizationId,
       check: async () => {
-        const updated = await this.prisma.roleBinding.findFirst({
+        const updated = await liveGrants(this.prisma).findFirst({
           where: { id: bindingId, organizationId },
-          select: { role: true, customRoleId: true },
+          select: { roleKey: true },
         });
-        return (
-          updated != null &&
-          roleKeyFor({
-            role: updated.role,
-            customRoleId: updated.customRoleId,
-          }) === to
-        );
+        return updated?.roleKey === to;
       },
     });
     await bumpAuthzEpoch({ organizationId });
   }
 
   /**
-   * Adopt a stranded compat row into the fold as part of changing its role:
-   * an attach fact for the row's own id, carrying the role the caller asked
-   * for, so the reducer's overwrite-by-id semantics for `grant_attached`
-   * both create the head entry and land the change (mirrors
-   * `genesis-import.migration.ts`'s adoption of legacy rows by id).
-   */
-  private async adoptStrandedRoleChange({
-    organizationId,
-    row,
-    role,
-    customRoleId,
-    actor,
-  }: {
-    organizationId: string;
-    row: {
-      id: string;
-      userId: string | null;
-      groupId: string | null;
-      apiKeyId: string | null;
-      scopeType: RoleBindingWrite["scopeType"];
-      scopeId: string;
-    };
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    actor: LedgerActor;
-  }): Promise<void> {
-    const occurredAtMs = this.now();
-    await (await this.commands()).commands.attachGrants.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: newLedgerCommandId(),
-      grants: [
-        {
-          grantId: row.id,
-          principal: principalForWhere(principalWhereForRow(row)),
-          roleKey: roleKeyFor({ role, customRoleId }),
-          scope: { type: row.scopeType, id: row.scopeId },
-          source: "grants-service",
-          actor,
-          occurredAtMs,
-        },
-      ],
-    });
-    await this.awaitProjection({
-      what: `adoption of stranded binding ${row.id} at role ${roleKeyFor({ role, customRoleId })}`,
-      organizationId,
-      check: async () => {
-        const updated = await this.prisma.roleBinding.findFirst({
-          where: { id: row.id, organizationId },
-          select: { role: true, customRoleId: true },
-        });
-        return (
-          updated != null &&
-          roleKeyFor({
-            role: updated.role,
-            customRoleId: updated.customRoleId,
-          }) === roleKeyFor({ role, customRoleId })
-        );
-      },
-    });
-  }
-
-  /**
-   * The pre-ledger role change, unchanged from the imperative writer: the two
-   * knowable database refusals keep their meaning, because neither the
-   * pre-read nor the sibling check above can close either race.
-   */
-  private async changeBindingRoleImperatively({
-    organizationId,
-    bindingId,
-    role,
-    customRoleId,
-    from,
-    to,
-    actor,
-  }: {
-    organizationId: string;
-    bindingId: string;
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    from: string;
-    to: string;
-    actor: LedgerActor;
-  }): Promise<void> {
-    try {
-      // `updateMany`, not `update` by bare id: the pre-read above already
-      // ran under `organizationId`, and the write should stay scoped to the
-      // same tenant rather than trust the id alone. `updateMany` never
-      // throws Prisma's not-found (P2025) the way a singular `update` does,
-      // so the same race — the row gone between the pre-read and here — is
-      // caught by the zero-match count instead.
-      const updated = await this.prisma.roleBinding.updateMany({
-        where: { id: bindingId, organizationId },
-        data: { role, customRoleId },
-      });
-      if (updated.count === 0) throw new BindingMissingError();
-    } catch (error) {
-      if (error instanceof BindingMissingError) throw error;
-      if (isUniqueViolation(error)) throw new DuplicateBindingError();
-      throw error;
-    }
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "role_change",
-      createdAt: new Date(this.now()),
-      facts: [{ grantId: bindingId, from, to }],
-    });
-    await bumpAuthzEpoch({ organizationId });
-  }
-
-  /**
-   * DELETE binding facts — revocation-class (decision 7): the deny effect is
-   * applied synchronously on this path after the append, so it holds before
-   * the call returns even with the queue stopped. Absent ids are no-ops.
+   * DELETE binding facts — revocation-class (decision 7): the deny is applied
+   * synchronously on this path after the append, by marking the authoritative
+   * `Grant` row `revokedAt`. That is the head every migrated organization
+   * decides from, so the deny holds before the call returns even with the
+   * queue stopped. The compat `RoleBinding` is NOT deleted here — the fold
+   * sweeps it when the queue runs — so an organization rolled back to legacy
+   * inside a queue-stopped window can still read the stale binding until the
+   * projection catches up. Absent ids are no-ops.
    */
   async revokeBindings({
     organizationId,
     bindingIds,
     actor,
     reason,
-    selector,
-    skipAppendWhenNoMatches = false,
   }: {
     organizationId: string;
     bindingIds: string[];
     actor: LedgerActor;
     reason?: string;
-    /**
-     * The identity a revoke-by-filter named, carried onto the events so the
-     * FOLD sweeps every grant matching it. `bindingIds` comes from the compat
-     * projection, which lags the ledger by a fold: a grant appended moments
-     * earlier is missing from that list, and an id-only revocation would leave
-     * it standing forever. Synchronous enforcement still runs on the ids alone
-     * — a row the projection cannot see is a row there is nothing to delete —
-     * and the sweep closes the gap when the fold catches up.
-     */
-    selector?: GrantRevocationSelector;
-    /**
-     * Opt-in fold-lag-safety override: when true, an empty `bindingIds`
-     * skips the write entirely, even with a `selector` set. The default
-     * keeps the safety net above — a selector-only `grant_revoked` still
-     * appends when nothing was visible yet, which is what lets the fold's
-     * sweep catch a grant that lands in the gap. Set this only on a call
-     * site whose common case IS "nothing to revoke" (a narrowing revoke
-     * that almost never has a broad grant to find) and that does not depend
-     * on the sweep for that filter shape — otherwise a grant landing in the
-     * gap silently outlives the revoke that was meant to catch it.
-     */
-    skipAppendWhenNoMatches?: boolean;
   }): Promise<void> {
-    if (bindingIds.length === 0 && selector === undefined) return;
-    if (skipAppendWhenNoMatches && bindingIds.length === 0) return;
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger revoke. An imperative delete IS instant enforcement —
-      // decision 7's synchronous deny effect is what this path always was —
-      // so there is no event and nothing to converge on.
-      await this.prisma.roleBinding.deleteMany({
-        where: { organizationId, id: { in: bindingIds } },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: new Date(this.now()),
-        facts: bindingIds.map((grantId) => ({
-          grantId,
-          ...(reason ? { reason } : {}),
-        })),
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
+    if (bindingIds.length === 0) return;
     await this.appendGrantRevocation({
       organizationId,
       bindingIds,
       actor,
       ...(reason ? { reason } : {}),
-      ...(selector ? { selector } : {}),
     });
   }
 
-  /**
-   * Revoke every binding matching a filter; answers how many it revoked.
-   *
-   * On the LEDGER fork the count is ADVISORY: it is the number of rows the
-   * lagging compat projection could see when the filter ran. The event
-   * carries a selector where one can be expressed, so the fold's sweep can
-   * revoke grants the count never included — `0` means "none visible yet",
-   * not "none existed". Callers must not derive existence from it. On the
-   * LEGACY fork (below) there is no fold to sweep anything later, so the
-   * delete is a single `deleteMany(where)` statement and its count is exact.
-   *
-   * SEAM, to be narrowed: `where` is a raw `Prisma.RoleBindingWhereInput`, so
-   * a storage type is part of a port every call site now depends on, and the
-   * filter cannot be carried onto the event except for the shapes
-   * `revocationSelector` can read back (principal, optionally at one scope).
-   * The replacement is a small closed vocabulary — the same union the
-   * selector already speaks — which is a call-site change across four
-   * repositories and belongs in its own commit rather than in a review fix.
-   * Until then, the two guards below stand in for the type: every filter is
-   * organization-scoped, and a filter naming no organization is refused
-   * rather than quietly running fleet-wide.
-   */
+  /** Revoke this principal's matching live grants within one organization. */
   async revokeBindingsWhere({
     organizationId,
     where,
     actor,
     reason,
-    skipAppendWhenNoMatches,
   }: {
     organizationId: string;
-    where: Prisma.RoleBindingWhereInput;
+    where: BindingRevocationFilter;
     actor: LedgerActor;
     reason?: string;
-    /** See `revokeBindings`' parameter of the same name. Only meaningful on
-     *  the ledger fork — the legacy fork below never appends a selector-only
-     *  fact in the first place. */
-    skipAppendWhenNoMatches?: boolean;
   }): Promise<number> {
     if (!organizationId) {
-      throw new Error(
-        "revokeBindingsWhere refused a filter with no organization: a grant revocation is always tenant-scoped",
-      );
+      throw new Error("A grant revocation must name an organization");
     }
-    // `organizationId` LAST, so a caller's filter can never widen the
-    // tenancy the caller named.
-    const legacyWhere = { ...where, organizationId };
-
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger, filtered revoke: ONE `deleteMany(where)` statement,
-      // not a read followed by a delete-by-ids. There is no fold here to
-      // sweep a row that lands in the gap between the two — a row matching
-      // the filter, created between a read and a later delete, has to be
-      // caught by the single statement or it survives the revoke that was
-      // meant to catch it.
-      const { count } = await this.prisma.roleBinding.deleteMany({
-        where: legacyWhere,
-      });
-      await this.recordLegacyAudit({
+    const principal = principalForWhere(where);
+    const { customRoleId } = where;
+    const roleKey =
+      typeof customRoleId === "string"
+        ? `custom:${customRoleId}`
+        : customRoleId && { in: customRoleId.in.map((id) => `custom:${id}`) };
+    const grants = await liveGrants(this.prisma).findMany({
+      where: {
         organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: new Date(this.now()),
-        facts:
-          count > 0
-            ? [{ where: legacyWhere, count, ...(reason ? { reason } : {}) }]
-            : [],
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return count;
-    }
-
-    const rows = await this.prisma.roleBinding.findMany({
-      where: legacyWhere,
+        principalType: STORED_PRINCIPAL_KIND[principal.type],
+        principalId: principal.id,
+        ...(where.scopeType !== void 0 && { scopeType: where.scopeType }),
+        ...(where.scopeId !== void 0 && { scopeId: where.scopeId }),
+        ...(where.id !== void 0 && { id: where.id }),
+        ...(roleKey !== void 0 && { roleKey }),
+      },
       select: { id: true },
     });
-    const selector = revocationSelector(where);
-    await this.revokeBindings({
-      organizationId,
-      bindingIds: rows.map((row) => row.id),
-      actor,
-      ...(reason ? { reason } : {}),
-      ...(selector ? { selector } : {}),
-      ...(skipAppendWhenNoMatches !== undefined
-        ? { skipAppendWhenNoMatches }
-        : {}),
-    });
-    return rows.length;
+    const bindingIds = grants.map((grant) => grant.id);
+    await this.revokeBindings({ organizationId, bindingIds, actor, reason });
+    return bindingIds.length;
   }
 
   /**
-   * Record one member's offboarding: the fact carries every revoked grant id
-   * the caller could see, and enforcement deletes those heads synchronously.
-   * The id list is the AUDIT record, not the instruction — the fold sweeps
-   * every grant the principal holds, so a grant appended between the caller's
-   * query and this append (invisible to the lagging projection) cannot
-   * survive the departure. Membership tables (OrganizationUser, TeamUser,
-   * group memberships, invites) are not grant facts — their deletes stay with
-   * the caller.
+   * Revoke the grant IDs observed for a departing member and deny them
+   * synchronously. Membership deletion stays with the caller. This snapshot
+   * does not cover a concurrent attach that has not reached the projection.
    */
   async offboardMember({
     organizationId,
@@ -1234,35 +1133,32 @@ export class GrantsLedgerWriter {
     revokedGrantIds: string[];
     actor: LedgerActor;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger offboard: the member's grant rows go, and the
-      // membership tables stay with the caller exactly as they do on the
-      // ledger side.
-      await this.prisma.roleBinding.deleteMany({
-        where: { organizationId, id: { in: revokedGrantIds } },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "offboard",
-        createdAt: new Date(this.now()),
-        facts: [{ userId, revokedGrantIds }],
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
-    await (await this.commands()).commands.offboardMember.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: newLedgerCommandId(),
-      userId,
-      revokedGrantIds,
-      actor,
-      occurredAtMs: this.now(),
-    });
+    // Offboarding is N revocations sharing one reason, not an event of its
+    // own: a person is not an aggregate here, and an event that named one
+    // would have to straddle every grant they hold.
+    const offboardedAtMs = this.now();
+    const batchId = newLedgerCommandId();
+    const senders = (await this.commands()).commands;
+    await Promise.all(
+      revokedGrantIds.map((grantId) =>
+        senders.revokeGrant.send({
+          tenantId: organizationId,
+          organizationId,
+          commandId: `${batchId}:${grantId}`,
+          grantId,
+          reason: `offboarded:${userId}`,
+          actor,
+          occurredAtMs: offboardedAtMs,
+        }),
+      ),
+    );
     await this.enforcement.enforceGrantRevocation({
       organizationId,
       grantIds: revokedGrantIds,
+      reason: "offboard",
+      // Same instant and reason as the events above — see appendGrantRevocation.
+      revokedAt: new Date(offboardedAtMs),
+      revokedReason: `offboarded:${userId}`,
     });
     await bumpAuthzEpoch({ organizationId });
   }
@@ -1279,6 +1175,7 @@ export class GrantsLedgerWriter {
     permissions,
     kind,
     actor,
+    requireProjection = true,
   }: {
     organizationId: string;
     roleId: string;
@@ -1287,46 +1184,33 @@ export class GrantsLedgerWriter {
     permissions: string[];
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
+    /**
+     * Require the role to be readable before reporting success. Background
+     * callers may explicitly allow an accepted write to converge later.
+     */
+    requireProjection?: boolean;
   }): Promise<void> {
     const occurredAtMs = this.now();
-    if (!(await this.onLedger(organizationId))) {
-      return await this.defineRoleImperatively({
-        organizationId,
-        roleId,
-        name,
-        description,
-        permissions,
-        kind,
-        actor,
-        occurredAtMs,
-      });
-    }
-    await (await this.commands()).commands.defineRoles.send({
+    const { commands } = await this.commands();
+    await commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
-      roles: [
-        {
-          roleId,
-          name,
-          ...(description ? { description } : {}),
-          permissions,
-          kind,
-          occurredAtMs,
-        },
-      ],
+      role: {
+        roleId,
+        name,
+        ...(description ? { description } : {}),
+        permissions,
+        kind,
+        occurredAtMs,
+      },
       actor,
     });
     await this.awaitProjection({
       what: `definition of role ${roleId}`,
       organizationId,
-      // The COMPAT head, like every other read-your-writes check here: that
-      // is the table `deleteRole` polls, the table the resolver reads, and
-      // the table every consumer of a freshly defined role reads. `Role` is
-      // the future head, written by the same `store()` — polling it would
-      // return before the row the caller is about to look for exists.
       check: async () => {
-        const row = await this.prisma.customRole.findFirst({
+        const row = await liveRoles(this.prisma).findFirst({
           where: { id: roleId, organizationId },
           select: { name: true, permissions: true },
         });
@@ -1336,77 +1220,7 @@ export class GrantsLedgerWriter {
           samePermissions({ stored: row.permissions, wanted: permissions })
         );
       },
-    });
-    await bumpAuthzEpoch({ organizationId });
-  }
-
-  /**
-   * The pre-ledger role write. `role_defined` collapsed the editor's create
-   * and update into one verb; the upsert is that same collapse against the
-   * table, keyed on the id the caller minted — organization scoped on the
-   * update so a role can never be edited across tenants. The
-   * name-uniqueness pre-check lives at the service layer (`assertNameFree`)
-   * and runs on both sides — but it is advisory, read ahead of the append
-   * rather than inside it, so two concurrent renames can still both pass it
-   * and race for the same `(organizationId, name)` unique index here. The
-   * loser gets the deterministic conflict rather than a raw Prisma error
-   * degrading to an unknown 500.
-   */
-  private async defineRoleImperatively({
-    organizationId,
-    roleId,
-    name,
-    description,
-    permissions,
-    kind,
-    actor,
-    occurredAtMs,
-  }: {
-    organizationId: string;
-    roleId: string;
-    name: string;
-    description?: string;
-    permissions: string[];
-    kind: "custom" | "system_api_key";
-    actor: LedgerActor;
-    occurredAtMs: number;
-  }): Promise<void> {
-    try {
-      await this.prisma.customRole.upsert({
-        where: { id: roleId, organizationId },
-        create: {
-          id: roleId,
-          organizationId,
-          name,
-          description: description ?? null,
-          permissions,
-          kind,
-        },
-        update: {
-          name,
-          description: description ?? null,
-          permissions,
-          kind,
-        },
-      });
-    } catch (error) {
-      if (isUniqueViolation(error)) throw new RoleDuplicateNameError();
-      throw error;
-    }
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "role_defined",
-      createdAt: new Date(occurredAtMs),
-      facts: [
-        {
-          roleId,
-          name,
-          ...(description ? { description } : {}),
-          permissions,
-          kind,
-        },
-      ],
+      required: requireProjection,
     });
     await bumpAuthzEpoch({ organizationId });
   }
@@ -1421,29 +1235,24 @@ export class GrantsLedgerWriter {
     organizationId,
     roleId,
     actor,
+    awaitProjection = true,
   }: {
     organizationId: string;
     roleId: string;
     actor: LedgerActor;
+    /**
+     * Whether to hold for the projection to drop the role row. On by
+     * default: a caller that deletes a role usually needs the name free
+     * again straight away. A caller that only retires a role nothing reads
+     * any more turns it off and saves a full fold pickup cycle on the
+     * request; the append is durable either way and the fold converges.
+     * Nothing here depends on the ordering of other commands, which the
+     * queue does not give: command jobs are grouped per command name.
+     */
+    awaitProjection?: boolean;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger role delete. `deleteMany` rather than `delete` keeps
-      // the imperative writer's shape: a role already gone is not an error,
-      // and the organization scoping is in the filter, not a later check.
-      await this.prisma.customRole.deleteMany({
-        where: { id: roleId, organizationId },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "role_deleted",
-        createdAt: new Date(this.now()),
-        facts: [{ roleId }],
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
-    await (await this.commands()).commands.deleteRole.send({
+    const { commands } = await this.commands();
+    await commands.deleteRole.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
@@ -1451,36 +1260,45 @@ export class GrantsLedgerWriter {
       actor,
       occurredAtMs: this.now(),
     });
-    await this.awaitProjection({
-      what: `deletion of role ${roleId}`,
-      organizationId,
-      check: async () => {
-        const present = await this.prisma.customRole.count({
-          where: { id: roleId, organizationId },
-        });
-        return present === 0;
-      },
-    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `deletion of role ${roleId}`,
+        organizationId,
+        check: async () => {
+          const present = await liveRoles(this.prisma).findFirst({
+            where: { id: roleId, organizationId },
+            select: { id: true },
+          });
+          return present === null;
+        },
+      });
+    }
     await bumpAuthzEpoch({ organizationId });
   }
 
   /**
    * Bounded read-your-writes: poll until the projection reflects the write.
-   * Timing out is NOT a failure — the append landed and the fold will drain
-   * (Redis-down doctrine); the caller's write is durable either way.
+   * Answers whether the rows landed inside the window.
+   *
+   * Timing out is not in itself a failure — the append landed and the fold
+   * will drain (Redis-down doctrine), so the caller's write is durable either
+   * way. It IS a failure for a caller whose next step only makes sense once
+   * the rows are readable, which is what `requireProjection` states.
    */
   private async awaitProjection({
     what,
     organizationId,
     check,
+    required = true,
   }: {
     what: string;
     organizationId: string;
     check: () => Promise<boolean>;
-  }): Promise<void> {
+    required?: boolean;
+  }): Promise<boolean> {
     const poll = this.deps.poll ?? {
-      intervalMs: CONVERGENCE_POLL_MS,
-      timeoutMs: CONVERGENCE_TIMEOUT_MS,
+      intervalMs: AUTHZ_CONVERGENCE.pollMs,
+      timeoutMs: AUTHZ_CONVERGENCE.timeoutMs,
     };
     // Deadline uses wall-clock time, not `this.now()`: `deps.now` is
     // injectable business time (frozen in tests for deterministic
@@ -1488,13 +1306,14 @@ export class GrantsLedgerWriter {
     // ever time out.
     const deadline = Date.now() + poll.timeoutMs;
     for (;;) {
-      if (await check()) return;
+      if (await check()) return true;
       if (Date.now() >= deadline) {
         logger.warn(
           { organizationId, what },
           "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
         );
-        return;
+        if (required) throw new AuthzGrantNotConfirmedError();
+        return false;
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
     }
@@ -1504,144 +1323,6 @@ export class GrantsLedgerWriter {
 /** The writer over the app's Prisma singleton, composed per call. */
 export function grantsLedgerWriter(): GrantsLedgerWriter {
   return new GrantsLedgerWriter(appPrisma);
-}
-
-/**
- * The revocation entries one revoke command carries.
- *
- * The selector rides the FIRST entry only: the fold's sweep is absolute, so
- * repeating it on every entry would remove exactly the same grants while
- * writing the identity into every audit row. When the lagging projection
- * listed no id at all, the selector IS the whole instruction and is the only
- * entry — which is why a filtered revoke that matched nothing still appends.
- */
-function revocationEntries({
-  bindingIds,
-  reason,
-  selector,
-}: {
-  bindingIds: string[];
-  reason?: string;
-  selector?: GrantRevocationSelector;
-}): {
-  grantId?: string;
-  selector?: GrantRevocationSelector;
-  reason?: string;
-}[] {
-  const withReason = reason ? { reason } : {};
-  if (bindingIds.length === 0) {
-    return selector ? [{ selector, ...withReason }] : [];
-  }
-  return bindingIds.map((grantId, index) => ({
-    grantId,
-    ...(index === 0 && selector ? { selector } : {}),
-    ...withReason,
-  }));
-}
-
-/** The three principal columns, as the selector's principal type. */
-const SELECTOR_PRINCIPAL_TYPE = {
-  userId: "user",
-  groupId: "group",
-  apiKeyId: "api_key",
-} as const;
-
-/** The filter keys a selector can express. Anything else — a customRoleId
- *  filter, a nested relation, a NOT — leaves the revocation on ids alone. */
-const SELECTABLE_FILTER_KEYS: readonly string[] = [
-  ...Object.keys(SELECTOR_PRINCIPAL_TYPE),
-  "scopeType",
-  "scopeId",
-  "organizationId",
-];
-
-/**
- * The identity a `revokeBindingsWhere` filter names, when it names one the
- * event can carry: exactly one principal column, optionally narrowed to one
- * scope, every value a plain string.
- *
- * Returning undefined is the safe answer, not a failure: the revocation then
- * behaves exactly as it did before — the ids the projection could see — and
- * the only thing lost is the fold's healing for that filter shape.
- */
-function revocationSelector(
-  where: Prisma.RoleBindingWhereInput,
-): GrantRevocationSelector | undefined {
-  const keys = Object.keys(where).filter(
-    (key) => where[key as keyof typeof where] !== undefined,
-  );
-  if (keys.some((key) => !SELECTABLE_FILTER_KEYS.includes(key))) {
-    return undefined;
-  }
-  const principals = keys.filter((key) => key in SELECTOR_PRINCIPAL_TYPE);
-  if (principals.length !== 1) return undefined;
-  const column = principals[0] as keyof typeof SELECTOR_PRINCIPAL_TYPE;
-  const id = where[column];
-  if (typeof id !== "string") return undefined;
-
-  const principal = { type: SELECTOR_PRINCIPAL_TYPE[column], id } as const;
-
-  const { scopeType, scopeId } = where;
-  if (scopeType === undefined && scopeId === undefined) return { principal };
-  // A half-named scope (one column without the other) is not a scope, and
-  // guessing which grants it meant is exactly the wrong kind of healing.
-  if (typeof scopeId !== "string") return undefined;
-  const scope = ledgerScopeType(scopeType);
-  if (scope === undefined) return undefined;
-  return { principal, scope: { type: scope, id: scopeId } };
-}
-
-/** The scope enum as the ledger spells it, or undefined for anything the
- *  selector cannot name (a Prisma filter object rather than a value). */
-function ledgerScopeType(value: unknown): LedgerScopeType | undefined {
-  return LEDGER_SCOPE_TYPES.find((candidate) => candidate === value);
-}
-
-const LEDGER_SCOPE_TYPES: readonly LedgerScopeType[] = [
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-  "RESOURCE",
-  "PLATFORM",
-];
-
-/** One binding fact as the legacy table's three optional principal columns. */
-function legacyBindingRow({
-  organizationId,
-  binding,
-}: {
-  organizationId: string;
-  binding: LedgerBindingAttach;
-}) {
-  return {
-    id: binding.bindingId,
-    organizationId,
-    userId: binding.principal.userId ?? null,
-    groupId: binding.principal.groupId ?? null,
-    apiKeyId: binding.principal.apiKeyId ?? null,
-    role: binding.role,
-    customRoleId: binding.customRoleId,
-    scopeType: binding.scopeType,
-    scopeId: binding.scopeId,
-  };
-}
-
-/** The `grant_attached` payloads the subscriber would have seen, minus actor. */
-function attachAuditFacts({
-  fresh,
-  source,
-}: {
-  fresh: LedgerBindingAttach[];
-  source: LedgerWriteSource;
-}): Record<string, unknown>[] {
-  if (!auditableSource(source)) return [];
-  return fresh.map((binding) => ({
-    grantId: binding.bindingId,
-    principal: principalForWhere(binding.principal),
-    roleKey: roleKeyFor(binding),
-    scope: { type: binding.scopeType, id: binding.scopeId },
-    source,
-  }));
 }
 
 /**
@@ -1679,17 +1360,6 @@ export function isRecordNotFound(error: unknown): boolean {
   );
 }
 
-/**
- * The subscriber's relevance guard, on the pre-ledger side (decision 17).
- * `genesis-import` and `backfill-b` never reach this writer at all, and the
- * read-through mint is gated off for an unmigrated organization, so in
- * practice nothing is filtered here — the rule is stated anyway so the two
- * audit paths cannot drift into disagreeing about what earns a row.
- */
-function auditableSource(source: LedgerWriteSource): boolean {
-  return source !== "read-through-mint";
-}
-
 function roleKeyFor({
   role,
   customRoleId,
@@ -1698,12 +1368,57 @@ function roleKeyFor({
   customRoleId: string | null;
 }): string {
   return customRoleId === null
-    ? roleKeyForTeamRole(role as AuthzTeamUserRole)
+    ? roleKeyForTeamRole(role)
     : `custom:${customRoleId}`;
 }
 
-function principalForWhere(principal: BindingPrincipalWhere): {
-  type: "user" | "group" | "api_key";
+function grantIdentityForBinding(binding: LedgerBindingAttach) {
+  const principal = principalForWhere(binding.principal);
+  return {
+    principalType: STORED_PRINCIPAL_KIND[principal.type],
+    principalId: principal.id,
+    roleKey: roleKeyFor(binding),
+    scopeType: binding.scopeType,
+    scopeId: binding.scopeId,
+  };
+}
+
+function membershipStampForBinding(
+  binding: LedgerBindingAttach,
+  stamps: Map<string, string>,
+): string | undefined {
+  if (binding.membershipStamp) return binding.membershipStamp;
+  const userId = binding.principal.userId;
+  return userId ? stamps.get(userId) : undefined;
+}
+
+function validateMembershipBootstrap({
+  organizationId,
+  binding,
+}: {
+  organizationId: string;
+  binding: LedgerBindingAttach;
+}): void {
+  if (!binding.membershipBootstrap) return;
+  const scopeIsAllowed =
+    binding.scopeType === "TEAM" ||
+    (binding.scopeType === "ORGANIZATION" &&
+      binding.scopeId === organizationId);
+  if (
+    !binding.principal.userId ||
+    !binding.membershipStamp ||
+    binding.role !== "ADMIN" ||
+    binding.customRoleId !== null ||
+    !scopeIsAllowed
+  ) {
+    throw new Error(
+      "membershipBootstrap is only valid for stamped USER ADMIN organization/team bindings",
+    );
+  }
+}
+
+export function principalForWhere(principal: BindingPrincipalWhere): {
+  type: "user" | "group" | "apiKey";
   id: string;
 } {
   if (principal.userId !== undefined) {
@@ -1712,41 +1427,5 @@ function principalForWhere(principal: BindingPrincipalWhere): {
   if (principal.groupId !== undefined) {
     return { type: "group", id: principal.groupId };
   }
-  return { type: "api_key", id: principal.apiKeyId };
-}
-
-function principalWhereForRow(row: {
-  userId: string | null;
-  groupId: string | null;
-  apiKeyId: string | null;
-}): BindingPrincipalWhere {
-  if (row.userId !== null) return { userId: row.userId };
-  if (row.groupId !== null) return { groupId: row.groupId };
-  if (row.apiKeyId !== null) return { apiKeyId: row.apiKeyId };
-  throw new Error("role binding row carries no principal");
-}
-
-/**
- * Identity as the DATABASE defines it — the partial unique indexes key a
- * built-in binding on its role and a custom one on its custom role id (see
- * `bindingKey` in the backfill migration; same two-key rule).
- */
-function bindingIdentityWhere({
-  organizationId,
-  binding,
-}: {
-  organizationId: string;
-  binding: Omit<LedgerBindingAttach, "bindingId">;
-}): Prisma.RoleBindingWhereInput {
-  return {
-    organizationId,
-    scopeType: binding.scopeType,
-    scopeId: binding.scopeId,
-    userId: binding.principal.userId ?? null,
-    groupId: binding.principal.groupId ?? null,
-    apiKeyId: binding.principal.apiKeyId ?? null,
-    ...(binding.customRoleId === null
-      ? { role: binding.role, customRoleId: null }
-      : { customRoleId: binding.customRoleId }),
-  };
+  return { type: "apiKey", id: principal.apiKeyId };
 }

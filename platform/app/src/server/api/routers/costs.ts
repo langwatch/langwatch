@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Project } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOrganizationPermission } from "../rbac";
+import { getApp } from "~/server/app-layer/app";
+import { projectKindsHiddenFrom } from "~/server/app-layer/projects/project-kinds";
 
 export const costsRouter = createTRPCRouter({
   getAggregatedCostsForOrganization: protectedProcedure
@@ -12,7 +13,7 @@ export const costsRouter = createTRPCRouter({
         endDate: z.number(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ input, ctx }) => {
       const { startDate, endDate } = input;
       const prisma = ctx.prisma;
@@ -23,8 +24,19 @@ export const costsRouter = createTRPCRouter({
           ? new Date().getTime()
           : endDate;
 
+      const callerOrganizationRole =
+        await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
       const userProjects = await prisma.project.findMany({
         where: {
+          // Pulled provider cost is STORED under the org's governance project
+          // but OWNED by a team or the org (ADR-128), so dropping the home
+          // here hides a row members must never see without hiding the money
+          // — that reaches this view under its own scope. An aggregate is
+          // listed to organisation admins only (ADR-144 decision 5).
+          kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
           OR: [
             {
               team: {

@@ -36,6 +36,7 @@ import {
 } from "./errors";
 import type { Logger } from "@/logger";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 type EvaluationsFacadeConfig = {
   endpoint: string;
@@ -148,7 +149,7 @@ export class EvaluationsFacade {
 
       this.#logger.debug(`Calling evaluation API: ${url}`);
 
-      const response = await fetch(url, {
+      const response = await langwatchFetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

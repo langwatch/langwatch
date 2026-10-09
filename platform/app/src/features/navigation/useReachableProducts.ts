@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
-import { PRODUCTS, type ProductId } from "./products";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import { PRODUCTS, type ProductId, seatReachesProduct } from "./products";
 
 /**
  * Which products the current user can open right now: every access gate
@@ -23,7 +24,9 @@ export function useReachableProducts({
   isLoading: boolean;
 } {
   const {
+    project,
     organization,
+    organizationRole,
     hasPermission,
     isLoading: isOrganizationLoading,
   } = useOrganizationTeamProject({
@@ -33,10 +36,12 @@ export function useReachableProducts({
 
   const isQueryEnabled = enabled && !!organization?.id;
   const gatewayFlag = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id,
     enabled: isQueryEnabled,
   });
   const governanceFlag = useFeatureFlag("release_ui_ai_governance_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id,
     enabled: isQueryEnabled,
   });
@@ -47,17 +52,19 @@ export function useReachableProducts({
   };
 
   const reachableIds = enabled
-    ? PRODUCTS.filter((product) =>
-        product.gates.every((gate) => {
-          if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
-          if (
-            gate.permission !== undefined &&
-            !hasPermission(gate.permission)
-          ) {
-            return false;
-          }
-          return true;
-        }),
+    ? PRODUCTS.filter(
+        (product) =>
+          seatReachesProduct({ product, organizationRole }) &&
+          product.gates.every((gate) => {
+            if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
+            if (
+              gate.permission !== undefined &&
+              !hasPermission(gate.permission)
+            ) {
+              return false;
+            }
+            return true;
+          }),
       ).map((product) => product.id)
     : [];
 

@@ -1,10 +1,12 @@
 import { Button, Portal } from "@chakra-ui/react";
 import { Monitor, PanelsTopLeft } from "lucide-react";
+import { displayNameFor } from "~/features/auth/logic/displayName";
 import {
   DEFAULT_NAVIGATION_MODE,
   type NavigationMode,
   useNavigationModeStore,
 } from "~/features/navigation/navigationModeStore";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
@@ -27,22 +29,20 @@ const GRAPHICS_OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
 };
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
-  legacy: "Old navigation",
   "product-switcher": "Product switcher",
   "icon-rail": "Icon rail",
 };
 
-/** The order the modes are offered in, oldest first. */
 const NAVIGATION_MODES = Object.keys(
   NAVIGATION_MODE_LABELS,
 ) as NavigationMode[];
 
 /**
  * The avatar button and its dropdown in the top-right of the app header.
- * Shared by the legacy chrome and the navigation-v2 shells so the account
- * entries, the graphics override and the navigation-mode picker stay
- * identical in every mode. Self-contained: it resolves its own session,
- * flags and stores so a shell only decides where the avatar sits.
+ * Shared by both navigation shells so the account entries, the graphics
+ * override and the navigation-mode picker stay identical in every mode.
+ * Self-contained: it resolves its own session, flags and stores so a
+ * shell only decides where the avatar sits.
  *
  * Spec: specs/navigation/navigation-modes.feature
  */
@@ -55,11 +55,13 @@ export function AppHeaderUserMenu({
 }) {
   const { data: session } = useRequiredSession({ required: !publicPage });
   const user = session?.user;
-  const { organization, isLoading: isOrganizationLoading } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  // An account with no name of its own is ordinary — a passkey sign-up asks
+  // for none — and interpolating the gap put "null (sam@acme.com)" in the menu.
+  const displayName = displayNameFor({ name: user?.name, email: user?.email });
+  const { organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { isLiteMember } = useLiteMemberGuard();
 
   // The "My Workspace" entry in the user-avatar dropdown is part of the
@@ -70,27 +72,21 @@ export function AppHeaderUserMenu({
   // show the menu entry while the page it links to 404s.
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
-  );
-
-  // The navigation-mode picker only appears once the v2 flag is on; the
-  // preference itself lives on the device (see navigationModeStore). The
-  // gate matches useNavigationMode, which resolves the flag at user level
-  // for a user with no organization: that persona reaches the new shells
-  // on /me, so it must also reach the control that selects them.
-  const { enabled: navigationV2Enabled } = useFeatureFlag(
-    "release_ui_navigation_v2_enabled",
     {
+      projectId: NOT_TARGETED,
       organizationId: organization?.id,
-      enabled: !isOrganizationLoading,
+      enabled: !!organization?.id,
     },
   );
+
+  // The navigation-mode preference lives on the device (see
+  // navigationModeStore).
   const storedNavigationMode = useNavigationModeStore((s) => s.storedMode);
   const setStoredNavigationMode = useNavigationModeStore(
     (s) => s.setStoredMode,
   );
-  // The picker only shows with the flag on, where a device that never
-  // picked runs the default mode. It reports that, not the old chrome.
+  // A device that never picked runs the default mode; the picker reports
+  // that, not an empty choice.
   const currentNavigationMode = storedNavigationMode ?? DEFAULT_NAVIGATION_MODE;
 
   const graphicsQualityOverride = useGraphicsQualityOverrideStore(
@@ -113,8 +109,8 @@ export function AppHeaderUserMenu({
           aria-label={
             publicPage
               ? "Sign in"
-              : user?.name
-                ? `Open user menu for ${user.name}`
+              : displayName
+                ? `Open user menu for ${displayName}`
                 : "Open user menu"
           }
           {...(publicPage
@@ -137,7 +133,7 @@ export function AppHeaderUserMenu({
             : {})}
         >
           <UserAvatar
-            name={user?.name ?? undefined}
+            name={displayName || undefined}
             image={user?.image ?? undefined}
             size="xs"
             backgroundColor="orange.400"
@@ -151,9 +147,7 @@ export function AppHeaderUserMenu({
         <Portal>
           <Menu.Content>
             <ImpersonationSwitchBackMenuItem />
-            <Menu.ItemGroup
-              title={`${session.user.name} (${session.user.email})`}
-            >
+            <Menu.ItemGroup title={`${displayName} (${session.user.email})`}>
               {governancePreviewEnabled && (
                 <Menu.Item value="my-workspace" asChild>
                   <Link href="/me">My Workspace</Link>
@@ -167,32 +161,28 @@ export function AppHeaderUserMenu({
               <Menu.Item value="settings" asChild>
                 <Link href="/settings">Settings</Link>
               </Menu.Item>
-              {navigationV2Enabled && (
-                <Menu.Root
-                  positioning={{ placement: "right-start", gutter: 2 }}
-                >
-                  <Menu.TriggerItem value="navigation-mode">
-                    <PanelsTopLeft size={14} />
-                    Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
-                  </Menu.TriggerItem>
-                  <Menu.Content>
-                    <Menu.RadioItemGroup
-                      value={currentNavigationMode}
-                      onValueChange={(e) => {
-                        const mode = e.value as NavigationMode;
-                        setStoredNavigationMode(mode);
-                        trackEvent("navigation_mode_change", { mode });
-                      }}
-                    >
-                      {NAVIGATION_MODES.map((mode) => (
-                        <Menu.RadioItem key={mode} value={mode}>
-                          {NAVIGATION_MODE_LABELS[mode]}
-                        </Menu.RadioItem>
-                      ))}
-                    </Menu.RadioItemGroup>
-                  </Menu.Content>
-                </Menu.Root>
-              )}
+              <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                <Menu.TriggerItem value="navigation-mode">
+                  <PanelsTopLeft size={14} />
+                  Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
+                </Menu.TriggerItem>
+                <Menu.Content>
+                  <Menu.RadioItemGroup
+                    value={currentNavigationMode}
+                    onValueChange={(e) => {
+                      const mode = e.value as NavigationMode;
+                      setStoredNavigationMode(mode);
+                      trackEvent("navigation_mode_change", { mode });
+                    }}
+                  >
+                    {NAVIGATION_MODES.map((mode) => (
+                      <Menu.RadioItem key={mode} value={mode}>
+                        {NAVIGATION_MODE_LABELS[mode]}
+                      </Menu.RadioItem>
+                    ))}
+                  </Menu.RadioItemGroup>
+                </Menu.Content>
+              </Menu.Root>
               <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
                 <Menu.TriggerItem value="reduced-graphics">
                   <Monitor size={14} />
@@ -209,13 +199,13 @@ export function AppHeaderUserMenu({
                     }
                   >
                     <Menu.RadioItem value="auto">
-                      Auto — adapts to this device on its own
+                      Auto, adapts to this device on its own
                     </Menu.RadioItem>
                     <Menu.RadioItem value="on">
-                      On — always keep things responsive
+                      On, always keep things responsive
                     </Menu.RadioItem>
                     <Menu.RadioItem value="off">
-                      Off — always show full decorative effects
+                      Off, always show full decorative effects
                     </Menu.RadioItem>
                   </Menu.RadioItemGroup>
                 </Menu.Content>

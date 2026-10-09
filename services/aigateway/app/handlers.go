@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 	"io"
-	"strconv"
 
+	"github.com/bytedance/sonic"
 	"github.com/tidwall/gjson"
 
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
@@ -73,13 +73,118 @@ func (a *App) HandleSpeech(ctx context.Context, bundle *domain.Bundle, body io.R
 // body-reading pipeline stages see well-formed bytes instead of multipart
 // framing.
 func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, upload *domain.TranscriptionUpload, model string) (*CompletionResult, error) {
-	body := []byte(`{"model":` + strconv.Quote(model) + `}`)
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{
 		Type:          domain.RequestTypeTranscription,
 		Model:         model,
-		Body:          body,
+		Body:          modelOnlyBody("model", model),
 		Transcription: upload,
 	})
+}
+
+// HandleImageGeneration dispatches POST /v1/images/generations (OpenAI-wire
+// image generation). Same pipeline as every sync call; the response body is
+// the OpenAI images JSON, whose data[] entries carry the base64 images.
+//
+//nolint:revive // argument-limit: the same four values HandleSpeech beside it takes.
+func (a *App) HandleImageGeneration(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeImageGeneration, Model: model, BodyReader: body})
+}
+
+// HandleImageEdit dispatches POST /v1/images/edits (OpenAI-wire multipart
+// image edit). The router already parsed the form; the upload rides on
+// req.ImageEdit and Body carries a synthesized JSON summary so the
+// body-reading pipeline stages see well-formed bytes instead of multipart
+// framing. The prompt is in that summary because guardrails judge it, and the
+// end user because spend attribution reads it.
+//
+//nolint:revive // argument-limit: the same four values HandleTranscription beside it takes.
+func (a *App) HandleImageEdit(ctx context.Context, bundle *domain.Bundle, upload *domain.ImageEditUpload, model string) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:      domain.RequestTypeImageEdit,
+		Model:     model,
+		Body:      imageEditBody(model, upload.Params["prompt"], upload.Params["user"]),
+		ImageEdit: upload,
+	})
+}
+
+// HandleElevenLabsSpeech dispatches POST /v1/text-to-speech/{voice_id},
+// ElevenLabs' own synthesis path. Same request type, pipeline and metering as
+// the OpenAI-wire TTS route: only the wire differs, and the vendor reads that
+// wire directly. The response body is binary audio.
+func (a *App) HandleElevenLabsSpeech(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
+	route := in.Route
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:       domain.RequestTypeSpeech,
+		Model:      in.Model,
+		Body:       in.Body,
+		ElevenLabs: &route,
+		Surface:    domain.ElevenLabsSpeechSurface(),
+	})
+}
+
+// HandleElevenLabsTranscription dispatches POST /v1/speech-to-text,
+// ElevenLabs' own transcription path. The router parsed the multipart form,
+// so the upload rides on req.Transcription and Body carries the synthesized
+// JSON summary the body-reading pipeline stages need, exactly as the
+// OpenAI-wire transcription route does.
+func (a *App) HandleElevenLabsTranscription(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
+	route := in.Route
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:          domain.RequestTypeTranscription,
+		Model:         in.Model,
+		Body:          modelOnlyBody(domain.ElevenLabsModelField, in.Model),
+		Transcription: in.Upload,
+		ElevenLabs:    &route,
+		Surface:       domain.ElevenLabsTranscriptionSurface(),
+	})
+}
+
+// modelOnlyBody is the synthesized JSON a multipart route hands the pipeline,
+// so the body-reading stages see a well-formed object instead of multipart
+// framing.
+//
+// Marshaled rather than concatenated, the same rule the realtime mint states:
+// the model is a caller-supplied form part, and strconv.Quote emits Go escapes
+// such as \x01 for a control byte, which is not JSON. Every stage downstream
+// parses this body, including the sjson rewrite that puts the resolved model
+// back into it, so one control byte would break resolution rather than the
+// request that carried it. A marshal failure cannot happen for a map of two
+// strings; an empty object is still valid JSON and the resolver refuses the
+// missing model with its own message.
+func modelOnlyBody(field, model string) []byte {
+	body, err := sonic.Marshal(map[string]string{field: model})
+	if err != nil {
+		return []byte(`{}`)
+	}
+	return body
+}
+
+// imageEditBody is the synthesized JSON the multipart image edit route hands
+// the pipeline. It carries the model, the prompt every guardrail judges, and
+// the end user spend attribution reads. The image bytes stay off it: they are
+// megabytes of binary that no pipeline stage reads from the body.
+//
+// Marshaled rather than concatenated, for the reason modelOnlyBody states.
+func imageEditBody(model, prompt, user string) []byte {
+	fields := map[string]string{"model": model, "prompt": prompt}
+	if user != "" {
+		fields["user"] = user
+	}
+	body, err := sonic.Marshal(fields)
+	if err != nil {
+		return []byte(`{}`)
+	}
+	return body
+}
+
+// ElevenLabsAudioDispatch is one ElevenLabs-native audio call: the model it
+// bills under, the vendor-shaped body or upload, and the URL-level parameters
+// the vendor's own path carries.
+type ElevenLabsAudioDispatch struct {
+	Model  string
+	Body   []byte
+	Upload *domain.TranscriptionUpload
+	Route  domain.ElevenLabsAudioRequest
 }
 
 // HandlePassthrough dispatches a provider-native request whose wire shape

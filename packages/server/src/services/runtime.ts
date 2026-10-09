@@ -22,6 +22,7 @@ import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
 import { runMigrations } from "./migrate.ts";
 import { startNlpgo } from "./nlpgo.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
+import { ensureTiktokenEncodings } from "./offline-defaults.ts";
 import { startPostgres } from "./postgres.ts";
 import { startRedis } from "./redis.ts";
 import type { SupervisedHandle } from "./spawn.ts";
@@ -60,7 +61,9 @@ const runtimeImpl: RuntimeApi = {
 		const features = resolveEffectiveFeatures(ctx.envFile);
 		await Promise.all([
 			syncVenvs(ctx, bus),
-			ensureLangwatchDeps(ctx, bus),
+			ensureLangwatchDeps(ctx, bus).then((langwatchDir) =>
+				ensureTiktokenEncodings({ paths: ctx.paths, bus, langwatchDir }),
+			),
 			// The assistant's CLI: only an install running it needs the download.
 			...(features.isLangyEnabled ? [ensureLangyCli(ctx, bus)] : []),
 		]);
@@ -150,7 +153,7 @@ const runtimeImpl: RuntimeApi = {
 			// URL with no agent behind it turns every send into a hang, and the
 			// forced rollout flag would render the panel. The .env keeps its lines
 			// (they are the user's knobs); only the running processes lose them.
-			delete childEnv.OPENCODE_AGENT_URL;
+			delete childEnv.LANGY_AGENT_URL;
 			const forced = (childEnv.FEATURE_FLAG_FORCE_ENABLE ?? "")
 				.split(",")
 				.map((f) => f.trim())

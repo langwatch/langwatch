@@ -1,8 +1,9 @@
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
 import {
-  attachGrantsCommandDataSchema,
-  defineRolesCommandDataSchema,
-  revokeGrantsCommandDataSchema,
+  attachGrantCommandDataSchema,
+  defineRoleCommandDataSchema,
+  revokeGrantCommandDataSchema,
 } from "../schemas/commands";
 
 /**
@@ -40,17 +41,17 @@ const SHARE_TERMS = {
 } as const;
 
 function parse(overrides: Record<string, unknown> = {}, entryOverrides = {}) {
-  return attachGrantsCommandDataSchema.safeParse({
+  return attachGrantCommandDataSchema.safeParse({
     tenantId: ORG,
     organizationId: ORG,
     commandId: "cmd_1",
-    grants: [entry(entryOverrides)],
+    grant: entry(entryOverrides),
     ...overrides,
   });
 }
 
 describe("the grants ledger's wire boundary", () => {
-  describe("given a well-formed batch", () => {
+  describe("given a well-formed grant", () => {
     it("accepts it", () => {
       expect(parse().success).toBe(true);
     });
@@ -91,6 +92,58 @@ describe("the grants ledger's wire boundary", () => {
             roleKey: null,
             scope: { type: "RESOURCE", id: "trace_t1" },
             resource: SHARE_TERMS,
+          },
+        ).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("when a founder membership bootstrap marker is malformed", () => {
+    it("requires a stamped USER ADMIN organization or team grant", () => {
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            membershipStamp: "membership_1",
+            roleKey: "admin",
+          },
+        ).success,
+      ).toBe(true);
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            roleKey: "admin",
+            principal: { type: "group", id: "group_1" },
+          },
+        ).success,
+      ).toBe(false);
+      expect(
+        parse({}, { membershipBootstrap: true, roleKey: "admin" }).success,
+      ).toBe(false);
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            membershipStamp: "membership_1",
+            roleKey: "viewer",
+          },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("requires an organization bootstrap to target its tenant", () => {
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            membershipStamp: "membership_1",
+            roleKey: "admin",
+            scope: { type: "ORGANIZATION", id: "org_other" },
           },
         ).success,
       ).toBe(false);
@@ -224,10 +277,97 @@ describe("the grants ledger's wire boundary", () => {
             principal: { type: "project", id: "proj_chatbot" },
             roleKey: "admin",
             scope: { type: "PROJECT", id: "proj_chatbot" },
-            source: "cutover-import",
+            source: "migration",
           },
         ).success,
       ).toBe(true);
+    });
+  });
+
+  /**
+   * ADR-144: the one foreign placement a `project` principal may take, and
+   * every neighbour of it that must stay refused. Same-organisation
+   * placement is the writer's question (it needs storage); the wire checks
+   * shape only.
+   */
+  describe("when a project reads another project (ADR-144)", () => {
+    const SHARED_READ = {
+      principal: { type: "project", id: "proj_aggregate" },
+      roleKey: "project-reader",
+      scope: { type: "PROJECT", id: "proj_member" },
+      condition: { type: "trace", from: "2026-10-01T00:00:00.000Z" },
+      source: "aggregate-reconciler",
+    } as const;
+
+    it("accepts a project-reader on a foreign project carrying a condition with no where", () => {
+      expect(parse({}, SHARED_READ).success).toBe(true);
+      expect(
+        parse({}, { ...SHARED_READ, condition: { type: "trace", where: "" } })
+          .success,
+      ).toBe(true);
+    });
+
+    it("refuses every other role key on the foreign placement", () => {
+      for (const roleKey of ["admin", "member", "viewer", "custom:role_1"]) {
+        expect(parse({}, { ...SHARED_READ, roleKey }).success).toBe(false);
+      }
+    });
+
+    it("refuses a project-reader placed on a team or an organization", () => {
+      for (const scope of [
+        { type: "TEAM", id: "team_client_a" },
+        { type: "ORGANIZATION", id: ORG },
+      ]) {
+        expect(parse({}, { ...SHARED_READ, scope }).success).toBe(false);
+      }
+    });
+
+    it("refuses a project-reader placement without a condition", () => {
+      const { condition: _condition, ...withoutCondition } = SHARED_READ;
+      expect(parse({}, withoutCondition).success).toBe(false);
+    });
+
+    /** @scenario "A where clause is refused until the filter compiler exists" */
+    it("refuses a condition with a non-empty where until the filter compiler exists", () => {
+      expect(
+        parse(
+          {},
+          {
+            ...SHARED_READ,
+            condition: { type: "trace", where: 'attributes["env"] == "prod"' },
+          },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("refuses a condition whose type or dates are outside the vocabulary", () => {
+      expect(
+        parse({}, { ...SHARED_READ, condition: { type: "metric" } }).success,
+      ).toBe(false);
+      expect(
+        parse(
+          {},
+          { ...SHARED_READ, condition: { type: "trace", from: "yesterday" } },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("refuses the shared read's marks on any other grant", () => {
+      // A user cannot hold project-reader, and an own grant cannot carry a window.
+      expect(parse({}, { roleKey: "project-reader" }).success).toBe(false);
+      expect(parse({}, { condition: { type: "trace" } }).success).toBe(false);
+      // The self-grant is a credential, not a read; it carries no condition.
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "project", id: "proj_chatbot" },
+            roleKey: "project-reader",
+            scope: { type: "PROJECT", id: "proj_chatbot" },
+            condition: { type: "trace" },
+          },
+        ).success,
+      ).toBe(false);
     });
   });
 
@@ -242,35 +382,52 @@ describe("the grants ledger's wire boundary", () => {
 
     it("refuses a role whose permission list holds an empty entry", () => {
       expect(
-        defineRolesCommandDataSchema.safeParse({
+        defineRoleCommandDataSchema.safeParse({
           tenantId: ORG,
           organizationId: ORG,
           commandId: "cmd_1",
           actor: { type: "user", id: "user_admin" },
-          roles: [
-            {
-              roleId: "role_1",
-              name: "Auditor",
-              permissions: ["traces:read", ""],
-              kind: "custom",
-              occurredAtMs: 1_755_000_000_000,
-            },
-          ],
+          role: {
+            roleId: "role_1",
+            name: "Auditor",
+            permissions: ["traces:read", ""],
+            kind: "custom",
+            occurredAtMs: 1_755_000_000_000,
+          },
         }).success,
       ).toBe(false);
+    });
+  });
+
+  describe("when the grant names where it came from", () => {
+    /** The wire derives its enum from `GRANT_EVENT_SOURCES` rather than
+     *  restating it, so adding a source to the vocabulary is the whole
+     *  change. Driving the vocabulary itself is what pins that: a restated
+     *  union would pass for the sources it copied and fail for the new one.
+     *  @scenario "The wire accepts every source the vocabulary names" */
+    it("accepts every source the vocabulary names", () => {
+      for (const source of GRANT_EVENT_SOURCES) {
+        expect(parse({}, { source }).success).toBe(true);
+      }
+    });
+
+    it("refuses a source the vocabulary does not name", () => {
+      expect(parse({}, { source: "a-surface-nobody-declared" }).success).toBe(
+        false,
+      );
     });
   });
 });
 
 describe("the revocation wire boundary", () => {
   function revoke(entry: Record<string, unknown>) {
-    return revokeGrantsCommandDataSchema.safeParse({
+    return revokeGrantCommandDataSchema.safeParse({
       tenantId: ORG,
       organizationId: ORG,
       commandId: "cmd_1",
-      revocations: [entry],
       actor: { type: "user", id: "user_admin" },
       occurredAtMs: 1_755_000_000_000,
+      ...entry,
     });
   }
 
@@ -280,35 +437,20 @@ describe("the revocation wire boundary", () => {
     });
   });
 
-  describe("given a revocation naming an identity instead", () => {
-    it("accepts a principal with no scope, meaning every scope", () => {
-      expect(
-        revoke({ selector: { principal: { type: "api_key", id: "key_1" } } })
-          .success,
-      ).toBe(true);
-    });
-
-    it("accepts a principal narrowed to one scope", () => {
-      expect(
-        revoke({
-          selector: {
-            principal: { type: "user", id: "user_alice" },
-            scope: { type: "TEAM", id: "team_client_a" },
-          },
-        }).success,
-      ).toBe(true);
-    });
-
-    it("refuses a subject-less selector, which would revoke by nothing", () => {
-      expect(
-        revoke({ selector: { principal: { type: "user", id: null } } }).success,
-      ).toBe(false);
-    });
-  });
-
-  describe("given a revocation naming neither", () => {
+  describe("given a revocation naming no grant", () => {
+    /**
+     * A revoke used to be able to name an IDENTITY instead of an id, and the
+     * fold swept every grant matching it. The aggregate is the grant now, so
+     * an event cannot address a set of them: resolving "every grant this
+     * principal holds" into ids is the caller's job, and the synchronous deny
+     * is what makes that safe.
+     */
     it("refuses it rather than appending a fact that removes nothing", () => {
       expect(revoke({ reason: "seat removed" }).success).toBe(false);
+    });
+
+    it("refuses an empty grant id", () => {
+      expect(revoke({ grantId: "" }).success).toBe(false);
     });
   });
 });

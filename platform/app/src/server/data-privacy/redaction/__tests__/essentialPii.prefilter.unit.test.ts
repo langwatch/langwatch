@@ -11,6 +11,14 @@
  * touch.
  */
 
+import {
+  findPhoneNumbersInText,
+  getCountries,
+  getExampleNumber,
+} from "libphonenumber-js";
+import examples from "libphonenumber-js/examples.mobile.json" with {
+  type: "json",
+};
 import { describe, expect, it } from "vitest";
 
 import { redactEssentialPiiInText } from "../essentialPii";
@@ -77,6 +85,64 @@ describe("given a recognizer that is skipped unless the text holds its literal",
       const payload = `{"token":"${"a1b2c3d4e5".repeat(200)}"}`;
 
       expect(redact(payload)).toBe(payload);
+    });
+  });
+});
+
+/**
+ * The phone detector is skipped on text whose longest digit window is too short
+ * to hold a number. It is the one detector where the saving is measured in
+ * hundreds of milliseconds instead of single ones: 200 KB of JSON with numeric
+ * fields cost 240 ms and found nothing.
+ *
+ * The floor must stay below the shortest number the detector will return, and
+ * the detector itself is the only honest reference for that. These cases run
+ * every country's own example number through the public redaction path and
+ * require that anything the library finds is still marked. Raise the floor too
+ * far and the small territories fail here first.
+ */
+describe("given the phone detector's digit gate", () => {
+  const shapesOf = ({
+    formatted,
+    plain,
+  }: {
+    formatted: string;
+    plain: string;
+  }) => [plain, formatted, `call ${formatted} now`, `{"phone":"${plain}"}`];
+
+  describe("when the text holds a number of any country", () => {
+    /** @scenario "A phone number is redacted whatever country it belongs to" */
+    it("still redacts every example number the detector recognises", () => {
+      const missed: string[] = [];
+      let recognised = 0;
+      for (const country of getCountries()) {
+        const example = getExampleNumber(country, examples);
+        if (!example) continue;
+        for (const shape of shapesOf({
+          formatted: example.formatInternational(),
+          plain: example.number,
+        })) {
+          const found = findPhoneNumbersInText(shape, { defaultCountry: "US" });
+          if (found.length === 0) continue;
+          recognised++;
+          if (!redact(shape).includes("[PHONE_NUMBER]")) missed.push(shape);
+        }
+      }
+      expect(recognised).toBeGreaterThan(500);
+      expect(missed).toEqual([]);
+    });
+  });
+
+  describe("when the text holds digits but no number", () => {
+    /** @scenario "Numeric text that is no phone number is left alone" */
+    it("leaves alone the numeric text that carries no number", () => {
+      for (const input of [
+        "the release notes for the 3.9.0 tag say so",
+        '{"input_tokens":15234,"cost_usd":0.0412}',
+        "retry 3 times after 45 seconds",
+      ]) {
+        expect(redact(input)).toBe(input);
+      }
     });
   });
 });

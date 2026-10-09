@@ -1,19 +1,16 @@
+import { ledgerActorFor } from "@langwatch/actor";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
+import { checkPrincipalPermission } from "~/server/app-layer/authz/credential-permissions";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
   permissionFormatSchema,
-} from "~/server/rbac/custom-role-permissions";
-import {
-  checkRoleBindingPermission,
-  resolveApiKeyPermission,
-  resolveLegacyCeiling,
-} from "~/server/rbac/role-binding-resolver";
+} from "~/server/app-layer/authz/custom-role-permissions";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { RoleRepository } from "~/server/role/repositories/role.repository";
 import { CUSTOM_ROLE_KIND } from "~/server/role/role-kind";
 import { assertPersonalTeamScopesOwnedBy } from "~/server/role-bindings/personal-team-scope";
@@ -23,6 +20,10 @@ import {
   type ApiKeyWithBindings,
 } from "./api-key.repository";
 import {
+  type ApiKeyLastUsedRecorder,
+  processApiKeyLastUsed,
+} from "./api-key-last-used";
+import {
   generateApiKeyToken,
   hashSecret,
   INGEST_KEY_PREFIX,
@@ -30,6 +31,7 @@ import {
   verifySecret,
 } from "./api-key-token.utils";
 import {
+  AggregateProjectHasNoCredentialError,
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
@@ -38,6 +40,7 @@ import {
 } from "./errors";
 import { mintLegacyKeyGrant } from "./legacy-grant-mint";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+import type { ApiKeyRevocationCause } from "./revocation-cause";
 
 const logger = createLogger("langwatch:api-key:service");
 
@@ -86,9 +89,19 @@ type RoleBindingBase = {
   scopeId: string;
 };
 
-type RoleBindingInput =
+export type RoleBindingInput =
   | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
-  | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
+  | CustomRoleBindingInput;
+
+/**
+ * A binding carrying an explicit permission list rather than a built-in role.
+ * Only these are mintable under `permissionMode: "restricted"`, so the
+ * selection dry run takes exactly this shape.
+ */
+export type CustomRoleBindingInput = RoleBindingBase & {
+  role: "CUSTOM";
+  customRoleId?: string;
+};
 
 type CreatorScope =
   | { type: "org"; id: string }
@@ -109,12 +122,14 @@ export class ApiKeyService {
   private readonly mintLegacyGrant: (args: {
     apiKey: ApiKeyWithBindings;
   }) => void;
+  private readonly lastUsed: ApiKeyLastUsedRecorder;
 
   constructor({
     prisma,
     repo,
     roleRepo,
     mintLegacyGrant = mintLegacyKeyGrant,
+    lastUsed = processApiKeyLastUsed,
   }: {
     prisma: PrismaClient;
     repo: ApiKeyRepository;
@@ -125,11 +140,14 @@ export class ApiKeyService {
      * stack behind it.
      */
     mintLegacyGrant?: (args: { apiKey: ApiKeyWithBindings }) => void;
+    /** Defaults to the process-wide recorder; a test injects its own clock. */
+    lastUsed?: ApiKeyLastUsedRecorder;
   }) {
     this.prisma = prisma;
     this.repo = repo;
     this.roleRepo = roleRepo;
     this.mintLegacyGrant = mintLegacyGrant;
+    this.lastUsed = lastUsed;
   }
 
   static create(prisma: PrismaClient): ApiKeyService {
@@ -171,6 +189,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    parentApiKeyId,
     isSystemManaged = false,
   }: {
     name: string;
@@ -185,6 +204,12 @@ export class ApiKeyService {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * The CLI login key of the device session minting this ingestion key,
+     * so revoking that session revokes this key with it. Null for every key
+     * minted outside a CLI session.
+     */
+    parentApiKeyId?: string | null;
     /**
      * Only the product's own minting paths (e.g. the Langy session key) may
      * claim a HIDDEN_SYSTEM_KEY_NAMES name. Customer entry points leave this
@@ -308,6 +333,11 @@ export class ApiKeyService {
     // is that a failed create leaves less-or-equal access, never a live token
     // with no grants (which is also the shape the read-through mint refuses
     // to widen, see ./legacy-grant-mint.ts).
+    //
+    // "Facts" means readable, not merely appended. The grant writes below
+    // require the projection, so a durable append that the fold has not
+    // landed yet throws AuthzGrantNotConfirmedError and the key is never
+    // activated: the row stays revoked and the token cannot authenticate.
     const apiKey = await this.repo.create({
       name,
       description,
@@ -321,6 +351,7 @@ export class ApiKeyService {
       ingestSourceType,
       ingestionTemplateId,
       createdByDeviceLabel,
+      parentApiKeyId,
       startsDisabled: true,
     });
 
@@ -333,6 +364,7 @@ export class ApiKeyService {
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
         actor,
+        requireProjection: true,
       });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
@@ -499,6 +531,7 @@ export class ApiKeyService {
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
         actor,
+        requireProjection: true,
       });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
@@ -507,13 +540,12 @@ export class ApiKeyService {
       );
     }
 
-    await this.repo.update({
-      id,
-      name,
-      description,
-      permissionMode,
-    });
-
+    // The grants move first, the metadata after. `replaceRoleBindings` can
+    // refuse with AuthzGrantNotConfirmedError, and a metadata write that had
+    // already landed would leave the key describing permissions it does not
+    // hold — a key marked "restricted" while the old grants are still the
+    // live ones. Writing it last means a refused grant change leaves the key
+    // exactly as it was.
     if (effectiveBindings) {
       await this.repo.replaceRoleBindings({
         apiKeyId: id,
@@ -544,6 +576,13 @@ export class ApiKeyService {
       }
     }
 
+    await this.repo.update({
+      id,
+      name,
+      description,
+      permissionMode,
+    });
+
     const updated = await this.repo.findById({ id });
     if (!updated) throw new ApiKeyNotFoundError(id);
     return updated;
@@ -568,6 +607,58 @@ export class ApiKeyService {
         meta: { userId, organizationId },
       });
     }
+  }
+
+  /**
+   * The mint-time validation of {@link create}, exposed as a dry run for
+   * callers that decide a selection long before they mint (the CLI device-flow
+   * approval stamps a selection that `create` only consumes at exchange time).
+   * Same checks, same errors, nothing persisted: the permission format, the
+   * empty-input refusals, org membership, every binding within the user's own
+   * ceiling for every permission, and personal-team scopes owned by the user.
+   * An input this method accepts is an input `create` mints.
+   *
+   * The bindings are CUSTOM by type, not by runtime guard: `create` refuses a
+   * restricted key whose bindings carry a built-in role, and the ceiling walk
+   * routes a built-in role to a one-permission probe that never reads the
+   * supplied list. Accepting one here would be both permissive and weaker
+   * than the mint, so the compiler rules it out instead.
+   */
+  async assertSelectionWithinCeiling({
+    userId,
+    organizationId,
+    bindings,
+    permissions,
+  }: {
+    userId: string;
+    organizationId: string;
+    bindings: CustomRoleBindingInput[];
+    permissions: string[];
+  }): Promise<void> {
+    if (permissions.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "CUSTOM bindings require at least one permission",
+      );
+    }
+    if (bindings.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "A personal API key needs at least one role binding",
+      );
+    }
+    ApiKeyService.assertPermissionFormat(permissions);
+    await this.ensureCallerIsOrgMember({ userId, organizationId });
+    await this.assertBindingsWithinCeiling({
+      prisma: this.prisma,
+      ceilingUserId: userId,
+      organizationId,
+      bindings,
+      rawPermissions: [...permissions].sort(),
+    });
+    await assertPersonalTeamScopesOwnedBy({
+      client: this.prisma,
+      scopes: bindings,
+      ownerUserId: userId,
+    });
   }
 
   /**
@@ -681,6 +772,12 @@ export class ApiKeyService {
         { meta: { projectId: binding.scopeId, organizationId } },
       );
     }
+    // ADR-144 decision 7: an aggregate owns no credential, so no key may be
+    // bound to it, whichever surface mints the key. Refused with the same
+    // code the ingest door and the CLI key mint answer.
+    if (isAggregateProjectKind(project.kind)) {
+      throw new AggregateProjectHasNoCredentialError();
+    }
     return { type: "project", id: binding.scopeId, teamId: project.team.id };
   }
 
@@ -725,38 +822,13 @@ export class ApiKeyService {
       }
       throw err;
     }
-    // Same legacy fallback as the raw-permission and builtin-role branches.
-    // This one used to call `checkRoleBindingPermission` bare, so a user whose
-    // access comes from legacy membership was refused here even though the
-    // branch beside it would have allowed the identical permission.
-    const legacy = await resolveLegacyCeiling({
+    await this.assertRawPermissionsWithinCeiling({
       prisma,
-      userId: ceilingUserId,
+      ceilingUserId,
       organizationId,
       scope,
+      permissions: perms,
     });
-
-    for (const perm of perms) {
-      const userHas =
-        (await checkRoleBindingPermission({
-          prisma,
-          principal: { type: "user", id: ceilingUserId },
-          organizationId,
-          scope,
-          permission: perm as Permission,
-          // One ADR-092 shadow comparison per permission would fan a single
-          // mint out into dozens of detached collects. The mint path's engine
-          // coverage comes from enforceApiKeyCeiling instead, which shadows
-          // the same question on every request the key goes on to make.
-          skipShadow: true,
-        })) || legacy.grants(perm as Permission);
-      if (!userHas) {
-        throw new ApiKeyScopeViolationError(
-          `Cannot grant permission "${perm}" — exceeds your own access`,
-          { meta: { permission: perm, scope } },
-        );
-      }
-    }
   }
 
   private async assertRawPermissionsWithinCeiling({
@@ -772,31 +844,14 @@ export class ApiKeyService {
     scope: CreatorScope;
     permissions: string[];
   }): Promise<void> {
-    // Resolved once for the whole request, not per permission. The mint path
-    // that calls this (Langy's per-turn session key) passes ~23 permissions
-    // inside a 5-second interactive transaction, and langyApiKey.ts records
-    // what per-permission queries did to it once already: the fan-out starved
-    // the connection pool and aborted the transaction. Two queries, flat.
-    const legacy = await resolveLegacyCeiling({
-      prisma,
-      userId: ceilingUserId,
-      organizationId,
-      scope,
-    });
-
     for (const perm of permissions) {
-      const userHas =
-        (await checkRoleBindingPermission({
-          prisma,
-          principal: { type: "user", id: ceilingUserId },
-          organizationId,
-          scope,
-          permission: perm as Permission,
-          // Same reason as the custom-role loop above: the mint path's engine
-          // coverage comes from the per-request enforceApiKeyCeiling path,
-          // not from one shadow per candidate permission.
-          skipShadow: true,
-        })) || legacy.grants(perm as Permission);
+      const userHas = await checkPrincipalPermission({
+        prisma,
+        principal: { type: "user", id: ceilingUserId },
+        organizationId,
+        scope,
+        permission: perm as Permission,
+      });
 
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
@@ -832,25 +887,13 @@ export class ApiKeyService {
             : "project:update"
           : "project:view";
 
-    const userHasPermission =
-      (await checkRoleBindingPermission({
-        prisma,
-        principal: { type: "user", id: ceilingUserId },
-        organizationId,
-        scope,
-        permission: representativePermission,
-      })) ||
-      // The builtin-role UI is the ordinary way a person creates a key, so
-      // leaving this branch bare meant the common path still refused a
-      // legacy-membership user while the Langy path had been fixed.
-      (
-        await resolveLegacyCeiling({
-          prisma,
-          userId: ceilingUserId,
-          organizationId,
-          scope,
-        })
-      ).grants(representativePermission);
+    const userHasPermission = await checkPrincipalPermission({
+      prisma,
+      principal: { type: "user", id: ceilingUserId },
+      organizationId,
+      scope,
+      permission: representativePermission,
+    });
 
     if (!userHasPermission) {
       throw new ApiKeyScopeViolationError(
@@ -895,6 +938,17 @@ export class ApiKeyService {
     // Expired tokens are rejected
     if (apiKey.expiresAt && apiKey.expiresAt < new Date()) return null;
 
+    // A key minted under a CLI session cannot outlive that session. The
+    // cascade retires it when the login key is revoked, but the cascade is
+    // one caller's work and a credential must not depend on it having run:
+    // a transient failure mid-cascade, or a revoke through a path that has
+    // no cascade behind it, would otherwise leave this key authenticating
+    // under a session that ended. The parent is the authority, so this is
+    // the one place that has to agree with it.
+    if (apiKey.parentApiKeyId && !(await this.isParentLive(apiKey))) {
+      return null;
+    }
+
     // Verify the secret portion — supports both current HMAC and legacy SHA-256
     const result = verifySecret(parts.secret, apiKey.hashedSecret);
     if (result === "no_match") return null;
@@ -923,14 +977,33 @@ export class ApiKeyService {
   }
 
   /**
-   * Fire-and-forget lastUsedAt update. Call after full authorization succeeds.
+   * Whether the CLI login key a key was minted under is still live.
+   *
+   * A parent that is gone reads as dead: the row is the only record of the
+   * session, so its absence is not something to authenticate past. Expiry
+   * counts as well as revocation, which is what retires the children of a
+   * session that ran out in the window before the hourly sweep reaches it.
+   */
+  private async isParentLive(apiKey: {
+    id: string;
+    parentApiKeyId: string | null;
+  }): Promise<boolean> {
+    if (!apiKey.parentApiKeyId) return true;
+    const parent = await this.repo.findLivenessById({
+      id: apiKey.parentApiKeyId,
+    });
+    if (!parent || parent.revokedAt) return false;
+    return !(parent.expiresAt && parent.expiresAt < new Date());
+  }
+
+  /**
+   * Fire-and-forget lastUsedAt update, at most once a minute per key per
+   * process. Call after full authorization succeeds.
    */
   markUsed({ id }: { id: string }): void {
-    this.repo.updateLastUsedAt({ id }).catch((err: unknown) => {
-      logger.warn(
-        { err, apiKeyId: id },
-        "failed to update API key lastUsedAt (fire-and-forget)",
-      );
+    this.lastUsed.markUsed({
+      id,
+      write: () => this.repo.updateLastUsedAt({ id }),
     });
   }
 
@@ -967,8 +1040,18 @@ export class ApiKeyService {
     callerUserId,
     callerIsAdmin,
     organizationId,
+    awaitProjection = true,
+    cause = "user",
+    cascadeToChildren = true,
   }: {
     id: string;
+    /**
+     * Why the key dies, recorded on the row. Defaults to a person's decision,
+     * which is what every user-facing path is; the platform's own revocations
+     * (a hard-cut rotation, the personal ingest-key cap) name themselves so
+     * the CLI can tell a key it may re-mint from one it must leave dead.
+     */
+    cause?: ApiKeyRevocationCause;
     /**
      * Null when the caller is a service credential. Ownership then never
      * matches, so a null caller revokes a key only through `callerIsAdmin`.
@@ -976,6 +1059,21 @@ export class ApiKeyService {
     callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
+    /**
+     * Whether the deletion of the key's private role holds for its
+     * projection. The key row itself is revoked imperatively either way, so
+     * the key is dead on the next read regardless, and the retired role is
+     * named after the key id, so no later mint waits for that name to come
+     * free. A caller that only needs the credential dead (the hard-cut
+     * ingestion-key rotation) turns this off and saves a fold pickup cycle.
+     */
+    awaitProjection?: boolean;
+    /**
+     * Whether to retire the keys minted under this one. On by default, so
+     * every entry point cascades; the cascade itself turns it off, since a
+     * child has no children and nothing should recurse further.
+     */
+    cascadeToChildren?: boolean;
   }): Promise<ApiKey> {
     const apiKey = await this.repo.findById({ id });
     if (!apiKey) throw new ApiKeyNotFoundError(id);
@@ -998,7 +1096,7 @@ export class ApiKeyService {
       ),
     ];
 
-    const result = await this.repo.revoke({ id });
+    const result = await this.repo.revoke({ id, cause });
 
     if (customRoleIds.length > 0) {
       await this.roleRepo.deleteExclusiveToApiKey({
@@ -1009,10 +1107,91 @@ export class ApiKeyService {
           userId: callerUserId,
           fallback: "apiKeyService",
         }),
+        awaitProjection,
+      });
+    }
+
+    if (cascadeToChildren) {
+      await this.revokeChildrenOf({
+        parentApiKeyId: id,
+        organizationId,
+        callerUserId,
+        cause,
       });
     }
 
     return result;
+  }
+
+  /**
+   * Retire the keys minted under one key.
+   *
+   * This lives on the primitive rather than in the CLI session service
+   * because the parent link is a property of the row, and the revoke reaches
+   * it from the API-keys page, the REST route and the tRPC mutation as well
+   * as from a logout. A cascade implemented in one caller is one the other
+   * three skip.
+   *
+   * Best effort, and never fails the revoke that triggered it: the parent is
+   * already dead by the time this runs, and reporting a failure would say the
+   * revoke did not happen when it did. A child left behind is refused at
+   * authentication anyway, because `verify` reads the parent.
+   *
+   * `callerIsAdmin` is true here for the same reason the cause is remapped:
+   * this is the platform retiring what a dead session owned, not the caller
+   * reaching for someone else's key. Whoever was allowed to revoke the parent
+   * is allowed to have its children go with it.
+   */
+  private async revokeChildrenOf({
+    parentApiKeyId,
+    organizationId,
+    callerUserId,
+    cause,
+  }: {
+    parentApiKeyId: string;
+    organizationId: string;
+    callerUserId: string | null;
+    cause: ApiKeyRevocationCause;
+  }): Promise<void> {
+    let children: Array<{ id: string }>;
+    try {
+      children = await this.repo.findLiveChildren({
+        parentApiKeyId,
+        organizationId,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, parentApiKeyId, organizationId },
+        "could not read the keys minted under a revoked key",
+      );
+      return;
+    }
+
+    // A person's revoke of the parent is not a decision about each child, so
+    // the children record that their session went, not that someone chose
+    // them. Every other cause describes the session itself and passes down.
+    const childCause: ApiKeyRevocationCause =
+      cause === "user" ? "session" : cause;
+
+    for (const child of children) {
+      try {
+        await this.revoke({
+          id: child.id,
+          callerUserId,
+          callerIsAdmin: true,
+          organizationId,
+          awaitProjection: false,
+          cause: childCause,
+          cascadeToChildren: false,
+        });
+      } catch (err) {
+        if (err instanceof ApiKeyAlreadyRevokedError) continue;
+        logger.warn(
+          { err, apiKeyId: child.id, parentApiKeyId },
+          "could not retire a key minted under a revoked key",
+        );
+      }
+    }
   }
 
   /**
@@ -1052,33 +1231,6 @@ export class ApiKeyService {
       organizationId,
     });
     return !!binding;
-  }
-
-  /**
-   * Whether the presented credential resolves the given permission at
-   * organization scope: the same primitive the route-level
-   * `requireOrgPermission` middleware applies, exposed for handlers that need
-   * a second, stricter permission on one branch of a route.
-   */
-  async hasOrgScopedPermission({
-    apiKeyId,
-    userId,
-    organizationId,
-    permission,
-  }: {
-    apiKeyId: string;
-    userId: string | null;
-    organizationId: string;
-    permission: Permission;
-  }): Promise<boolean> {
-    return resolveApiKeyPermission({
-      prisma: this.prisma,
-      apiKeyId,
-      userId,
-      organizationId,
-      scope: { type: "org", id: organizationId },
-      permission,
-    });
   }
 
   /**
@@ -1221,7 +1373,9 @@ export class ApiKeyService {
 
   async enrichBindingsWithNames({
     bindings,
+    organizationId,
   }: {
+    organizationId: string;
     bindings: Array<{
       id: string;
       role: string;
@@ -1245,7 +1399,10 @@ export class ApiKeyService {
       this.repo.findOrgsByIds([...orgIds]),
       this.repo.findTeamsByIds([...teamIds]),
       this.repo.findProjectsByIds([...projectIds]),
-      this.repo.findCustomRolesByIds([...customRoleIds]),
+      this.repo.findCustomRolesByIds({
+        ids: [...customRoleIds],
+        organizationId,
+      }),
     ]);
 
     const orgName = new Map(orgs.map((o) => [o.id, o.name]));
@@ -1265,24 +1422,12 @@ export class ApiKeyService {
   }
 
   async enrichApiKeyList({ apiKeys }: { apiKeys: ApiKeyWithBindings[] }) {
-    const customRoleIds = new Set<string>();
     const userIds = new Set<string>();
-    for (const k of apiKeys) {
-      for (const rb of k.roleBindings) {
-        if (rb.customRoleId) customRoleIds.add(rb.customRoleId);
-      }
-      if (k.userId) userIds.add(k.userId);
-      if (k.createdByUserId) userIds.add(k.createdByUserId);
+    for (const key of apiKeys) {
+      if (key.userId) userIds.add(key.userId);
+      if (key.createdByUserId) userIds.add(key.createdByUserId);
     }
-
-    const [customRoles, users] = await Promise.all([
-      this.repo.findCustomRolesByIds([...customRoleIds]),
-      this.repo.findUsersByIds([...userIds]),
-    ]);
-
-    return {
-      customRoles,
-      users,
-    };
+    const users = await this.repo.findUsersByIds([...userIds]);
+    return { users };
   }
 }

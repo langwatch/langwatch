@@ -68,3 +68,37 @@ Feature: Langy loads its skills from the canonical skill directory
     When a Langy conversation starts
     Then that skill is available to the assistant
     And it is offered the same way as the canonical skills
+
+  # ---------------------------------------------------------------------------
+  # A skill body is read by the customer, not only by the agent
+  # ---------------------------------------------------------------------------
+
+  # The agent reads a skill as tool output, and the reader sees that output in
+  # the tool card. So anything in a skill that describes the machine we run on
+  # reaches them. One answer about where scenario results live carried a
+  # worker-side host, which says how the product is wired and nothing about the
+  # question that was asked.
+  #
+  # Naming a variable the customer sets in their own .env is the opposite of a
+  # leak: it is how the agent learns a project is self-hosted and how it
+  # authenticates at all. The rule is about what the agent says, not what it
+  # reads, and it is the operating contract that carries it.
+
+  @unit
+  Scenario: A skill never hands the customer a path from the machine it runs on
+    Given the set of skills Langy ships with
+    When each one is rendered
+    Then none of them names a home directory or a machine-local path
+
+  @unit
+  Scenario: A skill never hands the customer an address only the worker can reach
+    Given the set of skills Langy ships with
+    When each one is rendered
+    Then none of them names a loopback, container or internal host
+
+  @unit
+  Scenario: The setup guidance still names the variables the agent has to find
+    Given the skill whose subject is environment setup
+    When it is rendered
+    Then it names the API key variable the agent reads from the project
+    And it names the endpoint variable that says the project is self-hosted

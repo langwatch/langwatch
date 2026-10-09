@@ -1,21 +1,30 @@
-# LangWatch and LangEvals Documentation
+# LangEvals documentation (unmaintained)
 
-This is the documentation repository for the [LangWatch](https://github.com/langwatch/langwatch) and [LangEvals](https://github.com/langwatch/langevals) projects.
+**This directory is not published anywhere, and nothing in CI builds it.**
 
-### Development
+It is a second Mintlify site that predates the move of the docs into this
+repository. It has had no substantive edit since February 2026, it still uses
+the retired `mint.json` configuration format rather than `docs.json`, and
+`docs-ci.yml` does not look at it — that workflow's path filter covers `docs/**`
+and `skills/**` only, so nothing here is link-checked or validated.
 
-Install the [Mintlify CLI](https://www.npmjs.com/package/mintlify) to preview the documentation changes locally. To install, use the following command:
+Two things superseded it:
 
-```
-npm i -g mintlify
-```
+- **`docs/`** at the repository root is the live site, published at
+  <https://langwatch.ai/docs>. Evaluator reference pages live under
+  `docs/api-reference/evaluators/` and `docs/evaluations/evaluators/`.
+- The live site **redirects `/langevals/:path*`** to
+  <https://github.com/langwatch/langevals>, so no reader is routed here.
 
-Run the following command:
+## If you are looking for evaluator docs
 
-```
-mintlify dev
-```
+Edit them under `docs/` instead. Changes there are validated by `docs-ci` and
+deployed by `docs-release` on merge to `main`.
 
-### Publishing Changes
+## Restoring or retiring this directory
 
-Install our Github App to auto propagate changes from your repo to your deployment. Changes will be deployed to production automatically after pushing to the default branch. Find the link to install on your dashboard.
+Nothing depends on it, so it can be deleted without affecting the build. That is
+a publishing decision rather than a mechanical one, so it has been left in place
+and labelled instead. If it is ever revived, it needs a `mint.json` →
+`docs.json` migration and its own entry in the `docs-ci.yml` path filter, or it
+will rot again in exactly the same way.

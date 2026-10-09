@@ -23,15 +23,17 @@ interface AppliedQuery {
 }
 
 /**
- * Stateful wrapper that mirrors the real store contract: `applyQueryText` is
- * the only path back into the editor's `queryText` prop. Lets us exercise
- * the X-widget deletion (which calls `applyQueryText` with the result of
+ * Stateful wrapper that mirrors the real store contract: `applyQueryText`
+ * (an edit of an existing chip) and `submitQueryText` (Enter) are the two
+ * paths back into the editor's `queryText` prop. Lets us exercise the
+ * X-widget deletion (which calls `applyQueryText` with the result of
  * `removeNodeAtLocation`) and observe the resulting render.
  */
 const StatefulEditor: React.FC<{
   initialText?: string;
   onApplied?: (text: string) => void;
-}> = ({ initialText = "", onApplied }) => {
+  onSubmitted?: (text: string) => void;
+}> = ({ initialText = "", onApplied, onSubmitted }) => {
   const [text, setText] = useState(initialText);
   return (
     <ActiveSearchEditor
@@ -39,6 +41,10 @@ const StatefulEditor: React.FC<{
       applyQueryText={(next) => {
         setText(next);
         onApplied?.(next);
+      }}
+      submitQueryText={(next) => {
+        setText(next);
+        onSubmitted?.(next);
       }}
       autoFocus
       onHasContentChange={() => undefined}
@@ -48,12 +54,16 @@ const StatefulEditor: React.FC<{
 
 function renderEditor() {
   const applied: AppliedQuery[] = [];
+  const submitted: AppliedQuery[] = [];
   const utils = render(
     <ChakraProvider value={defaultSystem}>
-      <StatefulEditor onApplied={(text) => applied.push({ text })} />
+      <StatefulEditor
+        onApplied={(text) => applied.push({ text })}
+        onSubmitted={(text) => submitted.push({ text })}
+      />
     </ChakraProvider>,
   );
-  return { ...utils, applied };
+  return { ...utils, applied, submitted };
 }
 
 function getEditor(): HTMLElement {
@@ -220,18 +230,18 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("clears the editor entirely when removing the only tag", async () => {
-      const { applied } = renderEditor();
+      const { applied, submitted } = renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error");
-      // Click on body to trigger blur → applyQueryText fires → wrapper
-      // state catches up. Mirrors a real user clicking elsewhere before
-      // returning to remove the chip.
-      await userEvent.click(document.body);
+      // The first Enter accepts the highlighted value, the second submits
+      // the query so the wrapper state catches up. Mirrors a real user
+      // searching before returning to remove the chip.
+      await userEvent.keyboard("status:error[Enter][Enter]");
       await waitFor(() => {
-        expect(applied.at(-1)?.text.trim()).toBe("status:error");
+        expect(submitted.at(-1)?.text.trim()).toBe("status:error");
       });
+      await userEvent.click(document.body);
 
       // Click back into the editor to mount actions on the same view.
       await userEvent.click(editor);
@@ -421,25 +431,24 @@ describe("SearchBar in real Chromium", () => {
       expect(andKeywords[0]?.textContent).toBe("AND");
     });
 
-    it("with a dangling AND (no right operand), keeps `status:error` decorated and surfaces the parse failure to applyQueryText", async () => {
-      const { applied } = renderEditor();
+    it("with a dangling AND (no right operand), keeps `status:error` decorated and surfaces the parse failure to submitQueryText", async () => {
+      const { submitted } = renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
-      // Type the exact sequence, then commit via blur instead of Enter
-      // (Enter inside a value dropdown accepts; we want the unparseable
-      // intermediate to reach the wrapper).
-      await userEvent.keyboard("status:error[Enter] AND");
-      await userEvent.click(document.body);
+      // Type the exact sequence, then Enter with the dropdown closed (free
+      // text never opens it) so the unparseable intermediate reaches the
+      // wrapper as a submit.
+      await userEvent.keyboard("status:error[Enter] AND[Enter]");
 
       // The wrapper received the user's raw text — `status:error AND` is
       // unparseable, so the real store would surface a parse error here.
       // We verify the unparseable string actually got there.
       await waitFor(() => {
-        expect(applied.length).toBeGreaterThan(0);
+        expect(submitted.length).toBeGreaterThan(0);
       });
-      const lastApplied = applied.at(-1)?.text ?? "";
-      expect(lastApplied).toMatch(/status:error\s+AND/);
+      const lastSubmitted = submitted.at(-1)?.text ?? "";
+      expect(lastSubmitted).toMatch(/status:error\s+AND/);
 
       // Visually, status:error stays decorated as a tag. The dangling AND
       // is unstyled (regex fallback only matches the tag). No merged
@@ -959,20 +968,26 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("stress: parent/child synchronisation", () => {
-    it("after typing, `applyQueryText` fires per keystroke (live commit) — applied list grows steadily", async () => {
-      const { applied } = renderEditor();
+    /** @scenario "Typing does not trigger live search" */
+    it("typing and blurring reach neither apply nor submit; Enter submits once", async () => {
+      const { applied, submitted } = renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
       await userEvent.keyboard("status:error");
+      await userEvent.click(document.body);
 
-      // We expect AT LEAST one applied call per typed char (12 chars).
-      // Test isn't strict on the exact count — typing some chars may merge
-      // into batched updates — but it MUST be > 1 to prove live commit.
-      expect(applied.length).toBeGreaterThan(1);
-      // The final applied text contains the typed content.
-      const last = applied.at(-1)?.text ?? "";
+      expect(applied).toHaveLength(0);
+      expect(submitted).toHaveLength(0);
+
+      await userEvent.click(editor);
+      await userEvent.keyboard("[Enter][Enter]");
+      await waitFor(() => {
+        expect(submitted).toHaveLength(1);
+      });
+      const last = submitted.at(-1)?.text ?? "";
       expect(last.replace(/\u00A0/g, " ").trim()).toBe("status:error");
+      expect(applied).toHaveLength(0);
     });
   });
 
@@ -1217,6 +1232,7 @@ describe("SearchBar in real Chromium", () => {
           <ActiveSearchEditor
             queryText={text}
             applyQueryText={setText}
+            submitQueryText={setText}
             autoFocus
             onHasContentChange={() => undefined}
           />
@@ -1263,6 +1279,7 @@ describe("SearchBar in real Chromium", () => {
           <ActiveSearchEditor
             queryText={text}
             applyQueryText={setText}
+            submitQueryText={setText}
             autoFocus
             onHasContentChange={() => undefined}
           />

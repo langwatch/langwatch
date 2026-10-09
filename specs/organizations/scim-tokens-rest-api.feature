@@ -36,3 +36,54 @@ Feature: SCIM tokens REST API
     Then the response status is 200
     And a SCIM request authenticated with it is refused
     And revoking it again is refused with code scim_token_not_found and status 404
+
+  # ── Connection scoping (D08) ────────────────────────────────────────────
+
+  # A token is the whole write authority a directory holds, so "which
+  # organization" was never a fine enough answer once an organization can
+  # have more than one connection: a contractor directory and the staff
+  # directory should not be able to edit each other's people. Creating a
+  # token therefore names the connection it is for, and that naming is what
+  # makes a cross-connection write impossible rather than merely discouraged.
+  # What such a token may then do is
+  # specs/identity/scim-connection-sync.feature's; what this API says about
+  # it is here. The two anchors above are untouched by any of it: the secret
+  # is still shown exactly once, and listing still hands out no secrets.
+
+  # Needs the REST boundary: a 201 from the authenticated route, and the
+  # listing endpoint reading the stored connection back.
+  @integration @unimplemented
+  Scenario: Creating a SCIM token names the connection it is for
+    Given the organization has an SSO connection
+    When I create a SCIM token described as "Okta production" for that connection
+    Then the response status is 201
+    And the response carries the token value and names the connection
+    And listing tokens afterwards shows the connection and still no value
+
+  # Needs the REST boundary: a 422 from the authenticated route, and the
+  # token count unchanged in Postgres.
+  @integration @unimplemented
+  Scenario: Creating a SCIM token without a connection is refused
+    When I create a SCIM token without naming a connection
+    Then the request is refused with code scim_connection_required and status 422
+    And no token is created
+
+  # Needs the REST boundary: a 404 whose body is inspected for anything
+  # naming the other organization.
+  @integration @unimplemented
+  Scenario: Creating a SCIM token for another organization's connection is refused
+    Given a connection belonging to a different organization
+    When I create a SCIM token for it
+    Then the request is refused with code scim_connection_not_found and status 404
+    And nothing about the other organization appears in the response
+
+  # Needs the REST boundary: a SCIM request with the revoked token refused,
+  # the sibling connection's token still working, and the listing endpoint
+  # no longer offering it.
+  @integration @unimplemented
+  Scenario: Tearing down a connection revokes the tokens issued for it
+    Given the organization has SCIM tokens for two different connections
+    When one of those connections is torn down
+    Then a SCIM request authenticated with that connection's token is refused
+    And the other connection's token still works
+    And listing tokens no longer offers the revoked one

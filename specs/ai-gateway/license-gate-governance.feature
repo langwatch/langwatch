@@ -91,7 +91,7 @@ Feature: AI Gateway — Enterprise license gate on governance backend
   @bdd @license-gate @ingestion-sources @cap
   Scenario: Composer-level source-type restriction still applies on non-enterprise
     Given "acme" has 0 active IngestionSources
-    When alice opens the Ingestion Sources composer
+    When alice opens the ingestion source composer
     Then only `otel_generic` is selectable in the source-type dropdown
     And the composer footer notes that other source types require Enterprise
 

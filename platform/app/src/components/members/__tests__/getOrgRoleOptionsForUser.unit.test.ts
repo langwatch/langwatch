@@ -10,13 +10,14 @@ import { getOrgRoleOptionsForUser } from "../getOrgRoleOptionsForUser";
 
 describe("getOrgRoleOptionsForUser()", () => {
   describe("when user is a non-admin", () => {
-    it("returns only Member and Lite Member options", () => {
+    it("returns Member, Lite Member and Developer options", () => {
       const options = getOrgRoleOptionsForUser({ isAdmin: false });
 
       const labels = options.map((o) => o.label);
       expect(labels).toContain("Member");
       expect(labels).toContain("Lite Member");
-      expect(labels).toHaveLength(2);
+      expect(labels).toContain("Developer");
+      expect(labels).toHaveLength(3);
     });
 
     it("does not include Admin as a role option", () => {
@@ -28,14 +29,15 @@ describe("getOrgRoleOptionsForUser()", () => {
   });
 
   describe("when user is an admin", () => {
-    it("returns Admin, Member, and Lite Member options", () => {
+    it("returns Admin, Member, Lite Member and Developer options", () => {
       const options = getOrgRoleOptionsForUser({ isAdmin: true });
 
       const labels = options.map((o) => o.label);
       expect(labels).toContain("Admin");
       expect(labels).toContain("Member");
       expect(labels).toContain("Lite Member");
-      expect(labels).toHaveLength(3);
+      expect(labels).toContain("Developer");
+      expect(labels).toHaveLength(4);
     });
   });
 });

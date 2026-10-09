@@ -34,6 +34,47 @@ describe("namesCreatedResource", () => {
     });
   });
 
+  /** @scenario A create that only scaffolded a local file is not a platform create */
+  describe("given a payload that scaffolds a local file", () => {
+    it("rejects the prompt create scaffold shape", () => {
+      expect(
+        namesCreatedResource({
+          name: "cart-intent-classifier",
+          path: "prompts/cart-intent-classifier.prompt.yaml",
+          dependency: "file:prompts/cart-intent-classifier.prompt.yaml",
+        }),
+      ).toBe(false);
+    });
+
+    it("still accepts a server id beside a file path", () => {
+      expect(
+        namesCreatedResource({
+          id: "prompt_1",
+          name: "cart-intent-classifier",
+          dependency: "file:prompts/cart-intent-classifier.prompt.yaml",
+        }),
+      ).toBe(true);
+    });
+
+    it("still accepts a resource-specific id beside a file path", () => {
+      expect(
+        namesCreatedResource({
+          prompt_id: "prompt_1",
+          dependency: "file:prompts/cart-intent-classifier.prompt.yaml",
+        }),
+      ).toBe(true);
+    });
+
+    it("leaves a dependency that is not a local file alone", () => {
+      expect(
+        namesCreatedResource({
+          name: "cart-intent-classifier",
+          dependency: "cart-intent-classifier@3",
+        }),
+      ).toBe(true);
+    });
+  });
+
   describe("given a payload that names the created resource", () => {
     it("accepts an id", () => {
       expect(namesCreatedResource({ id: "scenario_1" })).toBe(true);
@@ -118,6 +159,38 @@ describe("reading a create result as a created-resource card", () => {
         card: "resourceCreated",
         payload: { id: "scenario_1" },
       });
+    });
+  });
+
+  describe("when the result only scaffolded a local file", () => {
+    const scaffold = {
+      name: "cart-intent-classifier",
+      path: "prompts/cart-intent-classifier.prompt.yaml",
+      dependency: "file:prompts/cart-intent-classifier.prompt.yaml",
+    };
+
+    it("refuses the card schema", () => {
+      expect(
+        SCHEMA_BY_CARD_KIND.resourceCreated.safeParse(scaffold).success,
+      ).toBe(false);
+    });
+
+    it("records the outcome as unconfirmed", () => {
+      expect(
+        toCliToolResult({ resource: "prompt", verb: "create", payload: scaffold }),
+      ).toEqual({
+        kind: "card",
+        card: "resourceCreated",
+        payload: scaffold,
+        outcome: "unconfirmed",
+      });
+    });
+
+    it("confirms the create once a server id arrives beside the file path", () => {
+      const pushed = { ...scaffold, id: "prompt_1" };
+      expect(
+        toCliToolResult({ resource: "prompt", verb: "create", payload: pushed }),
+      ).toEqual({ kind: "card", card: "resourceCreated", payload: pushed });
     });
   });
 

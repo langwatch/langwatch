@@ -7,7 +7,7 @@ import {
 
 /**
  * A settled trace search exactly as the live transport hands it to the panel:
- * opencode ran the CLI through `bash`, and the envelope retyped the call to
+ * The worker ran the CLI through `bash`, and the envelope retyped the call to
  * `langwatch.trace.search` while keeping the shell payload as its input.
  */
 const traceSearch = (over: Partial<SettledCall> = {}): SettledCall => ({
@@ -219,6 +219,26 @@ describe("deriveFollowUpChips", () => {
         expect(chips.map((chip) => chip.label)).not.toContain(
           "Open in Online Evaluations",
         );
+      });
+    });
+  });
+
+  describe("given a prompt listing", () => {
+    const promptList: SettledCall = {
+      name: "langwatch.prompt.list",
+      state: "output-available",
+      input: { command: "langwatch prompt list" },
+      output: JSON.stringify([
+        { id: "prompt_1", handle: "demo-prompt", version: 3 },
+      ]),
+    };
+
+    describe("when its consumers cannot carry the prompt across", () => {
+      /** @scenario A prompts result earns no bare surface chips */
+      it("offers no chip at all — no destination can receive a prompt", () => {
+        expect(
+          deriveFollowUpChips({ call: promptList, projectSlug: "demo" }),
+        ).toEqual([]);
       });
     });
   });

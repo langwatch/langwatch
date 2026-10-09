@@ -159,6 +159,8 @@ export type SideMenuLinkProps = SideMenuItemProps & {
    * that goes somewhere the label never promised.
    */
   unavailableReason?: string;
+  /** The `data-tour` target the guided tour spotlights on this entry. */
+  tourId?: string;
 };
 
 export const SideMenuLink = ({
@@ -177,13 +179,14 @@ export const SideMenuLink = ({
   legacyLabel,
   isExternal,
   unavailableReason,
+  tourId,
 }: SideMenuLinkProps) => {
   const linkRef = useRef<HTMLAnchorElement>(null);
   // A page opened by its address can have its entry below the visible
   // part of a scrolled menu. "nearest" leaves the menu alone whenever
   // the entry is already visible, so click navigation never shifts it.
-  // Where the entry lands when a menu FIRST renders is the column's own
-  // call, not the entry's: useRevealActiveEntryOnLoad.
+  // Where a menu scrolls to is the column's own call, not the entry's:
+  // useMenuScrollPosition.
   useEffect(() => {
     if (isActive) {
       linkRef.current?.scrollIntoView?.({ block: "nearest" });
@@ -228,6 +231,7 @@ export const SideMenuLink = ({
       width="full"
       href={href}
       aria-label={label}
+      data-tour={tourId}
       // The active item is otherwise only a background colour, which a
       // screen reader cannot report and a test cannot read.
       aria-current={isActive ? "page" : undefined}

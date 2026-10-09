@@ -1,6 +1,10 @@
 import {
   explainHandledError,
   type HandledErrorShape,
+  PROVIDER_CONFIG_PROBLEMS,
+  PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_INVALID_REQUEST_REASONS,
+  PROVIDER_MODEL_MISSING_REASONS,
   readHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors";
@@ -143,6 +147,10 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_egress_misconfigured",
   "langy_insufficient_scope",
   "langy_turn_in_progress",
+  // The project is an aggregate, which takes no writes, and a turn writes a
+  // conversation under it. Refused before anything is written, with the
+  // shared read-only refusal rather than a Langy code of its own.
+  "aggregate_project_is_read_only",
   // Sending faster than the per-user limit allows. Explicit copy matters more
   // here than almost anywhere: the generic default titles every unknown kind
   // "Langy couldn't finish that" and hands it a "Try again" button, which tells
@@ -155,6 +163,10 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   // promoteCodexAgentError. Spec: specs/model-providers/codex-account-provider.feature
   "langy_codex_session_expired",
   "langy_codex_plan_limit",
+  // The model selected for Langy has no credential this project can reach.
+  // Promoted off the agent-errored reason chain — see
+  // promoteModelUnavailableError.
+  "langy_model_unavailable",
 ] as const;
 
 /**
@@ -207,6 +219,183 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "insufficient_quota",
   "billing_hard_limit_reached",
 ]);
+
+/**
+ * The proxy's upstream-status reasons (llmproxy.go `upstreamReasonCodes`).
+ * They say the call to the MODEL PROVIDER failed and which way, which is a
+ * different fact from "Langy's reply failed" and carries a different next
+ * step: wait out a rate limit, fix a credential, pick another model.
+ *
+ * The last three are not status fallbacks but the providers' own rate limit
+ * discriminants, which the proxy files as the one reason under
+ * `llm_upstream_error` when the failure body carries them (llmproxy.go
+ * `decodeProviderErrorBody`): `rate_limit_exceeded` from OpenAI and Azure
+ * OpenAI, `rate_limit_error` from Anthropic, `RESOURCE_EXHAUSTED` from
+ * Google. A real 429 arrives this way far more often than as the bare
+ * `upstream_rate_limited`.
+ *
+ * The proxy's own `llm_upstream_error` promotes on its own: it already says
+ * the provider answered with a failure, whatever discriminant sits beneath
+ * it. The discriminants only select which sentence the card says, and one no
+ * list names gets the generic provider line. Promotion is still by exact
+ * code, never by reading a message.
+ *
+ * `llm_upstream_error` already writes one sentence per group, so promoting to
+ * it reuses that copy rather than restating it here.
+ */
+const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
+  // The proxy's own code for "the provider answered with a failure". Its
+  // reason beneath is the provider's discriminant, which may be one no list
+  // here names (Bedrock's "access_denied"), so the code itself is what says
+  // the provider refused.
+  "llm_upstream_error",
+  // The gateway's own codes for a provider failure it named in its envelope
+  // rather than forwarding the provider's body: an unusable answer, no
+  // answer in time, or no connection at all.
+  "provider_error",
+  "provider_timeout",
+  "provider_connection_failed",
+  "upstream_stream_error",
+  "upstream_bad_request",
+  "upstream_unauthorized",
+  "upstream_forbidden",
+  "upstream_not_found",
+  "upstream_timeout",
+  "upstream_conflict",
+  "upstream_unprocessable_entity",
+  "upstream_rate_limited",
+  "upstream_unavailable",
+  "upstream_http_error",
+  "rate_limit_exceeded",
+  "rate_limit_error",
+  "RESOURCE_EXHAUSTED",
+]);
+
+/**
+ * A turn that died because the model provider refused the call reads as the
+ * provider failure it was, not as a nameless "Langy hit an error".
+ *
+ * Same rule as `promoteCodexAgentError`: promote by EXACT reason-code match,
+ * never by sniffing the provider's message. Runs after it, so the codex codes
+ * keep their more specific cards.
+ */
+export function promoteUpstreamProviderError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  return hasReasonKind(domain.reasons, UPSTREAM_PROVIDER_REASONS)
+    ? { ...domain, code: "llm_upstream_error" }
+    : domain;
+}
+
+/**
+ * The gateway's reasons for "this key cannot serve that model at all".
+ *
+ * `model_provider_not_bound` means the model named a provider the project has
+ * no credential for; `model_not_recognized` means no bound provider declares
+ * the model; `model_provider_disabled` means the credential exists but is
+ * turned off. One remediation covers all three: choose a model the project can
+ * reach, or connect the provider that serves this one.
+ *
+ * Their registry entries are written for whoever configures a virtual key, and
+ * say to bind the provider to the key or drop the prefix from the model name.
+ * That is the right advice at the gateway and the wrong advice in the panel,
+ * where the model came from a menu and there is no key or prefix to edit. So
+ * these promote to a Langy code with Langy's own copy, rather than reusing the
+ * gateway's.
+ */
+const MODEL_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
+  "model_provider_not_bound",
+  "model_not_recognized",
+  "model_provider_disabled",
+]);
+
+/**
+ * A turn that died because the chosen model is not reachable says so, and
+ * offers the model settings.
+ *
+ * Distinct from `promoteUpstreamProviderError`: there the provider was reached
+ * and refused the call, so waiting or retrying can work. Here there is nothing
+ * to reach, and the same request fails the same way forever, so the card
+ * offers the setting instead of a retry.
+ */
+export function promoteModelUnavailableError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  return hasReasonKind(domain.reasons, MODEL_UNAVAILABLE_REASONS)
+    ? { ...domain, code: "langy_model_unavailable" }
+    : domain;
+}
+
+/**
+ * The gateway's code for a provider slot that cannot serve the request as it
+ * is set up: no API key saved, no endpoint, no deployment for the model.
+ */
+const PROVIDER_CONFIG_REASON = "provider_config_invalid";
+
+/** A model id as a menu offers it: short, and made of identifier characters. */
+const MODEL_ID_PATTERN = /^[\w./:@-]{1,120}$/;
+
+/**
+ * A turn that died because the provider behind the chosen model is not set up
+ * says which setting is missing, and offers the provider settings.
+ *
+ * The gateway stops these before any request leaves, so the provider never
+ * refused anything and there is nothing to retry: a provider saved without its
+ * API key fails the same way on every turn until the key is added. Left on
+ * `langy_agent_errored` the card said only that the reply failed and offered
+ * another try.
+ *
+ * The code is re-keyed to the gateway's own, so the panel says the sentence
+ * every other surface says for it. Two fields are carried off the reason and
+ * nothing else: `problem`, only when it is one of the enumerated values, and
+ * `model`, only when it reads as a model id. The reason's `message` is never
+ * read.
+ */
+export function promoteProviderConfigError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  const reason = findReason(domain.reasons, PROVIDER_CONFIG_REASON);
+  if (!reason) return domain;
+
+  const meta: Record<string, unknown> = {};
+  const problem = reason.meta?.problem;
+  if (typeof problem === "string" && PROVIDER_CONFIG_PROBLEMS.has(problem)) {
+    meta.problem = problem;
+  }
+  const model = reason.meta?.model;
+  if (typeof model === "string" && MODEL_ID_PATTERN.test(model)) {
+    meta.model = model;
+  }
+  return { ...domain, code: PROVIDER_CONFIG_REASON, meta };
+}
+
+/** The first reason in the chain, at any depth, of this kind. */
+function findReason(
+  reasons: LangySerializedReason[] | undefined,
+  kind: string,
+): LangySerializedReason | undefined {
+  for (const reason of reasons ?? []) {
+    if (reason.kind === kind) return reason;
+    const nested = findReason(reason.reasons, kind);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+/** Does any reason in the chain, at any depth, carry one of these kinds? */
+function hasReasonKind(
+  reasons: LangySerializedReason[] | undefined,
+  kinds: ReadonlySet<string>,
+): boolean {
+  for (const reason of reasons ?? []) {
+    if (kinds.has(reason.kind)) return true;
+    if (hasReasonKind(reason.reasons, kinds)) return true;
+  }
+  return false;
+}
 
 /*
  * `firstReasonMessage` used to live here: it walked the reason chain for the
@@ -364,6 +553,28 @@ const REGISTRY_CODE_ALIASES: Record<string, string> = {
  * are dropped: the registry never reads them, and Langy's parsed form is its
  * own.
  */
+/**
+ * A Langy reason carries only `kind`; the registry matches on `code` OR
+ * `kind`, so the one name fills both. Nothing is read out of a reason except
+ * membership of an enumerated set, so no upstream prose can ride along.
+ *
+ * Returns the mutable element array rather than the readonly one the shape
+ * declares: a nested `reasons` field is `SerializedReason[]`, so the recursive
+ * step has to produce that to build the chain. A caller reading the whole
+ * result as readonly still works, since mutable widens to readonly.
+ */
+type RegistryReason = HandledErrorShape["reasons"][number];
+
+function toRegistryReasons(
+  reasons: LangySerializedReason[] | undefined,
+): RegistryReason[] {
+  return (reasons ?? []).map((reason) => ({
+    code: reason.kind,
+    kind: reason.kind,
+    reasons: toRegistryReasons(reason.reasons),
+  }));
+}
+
 function registryCopy(domain: LangyDomainError) {
   return explainHandledError({
     code: REGISTRY_CODE_ALIASES[domain.code] ?? domain.code,
@@ -373,7 +584,11 @@ function registryCopy(domain: LangyDomainError) {
     tips: domain.tips ?? [],
     docsUrl: domain.docsUrl,
     traceId: domain.traceId,
-    reasons: [],
+    // The chain is passed on so an entry that varies its sentence on a reason
+    // discriminant can do it (`llm_upstream_error` says which way the provider
+    // failed). This is the sanctioned way for copy to vary on an upstream:
+    // matching an enumerated code, never reading its message.
+    reasons: toRegistryReasons(domain.reasons),
   });
 }
 
@@ -431,10 +646,46 @@ export function isStaleLangyHistoryRead({
   );
 }
 
+/**
+ * Is a not-found history read still the projection lagging an accepted create?
+ *
+ * The create command is accepted before its row lands, so for a moment the
+ * history read of a conversation this tab just minted answers not-found and
+ * means "not yet". That window has to END. A conversation whose row is never
+ * written answers not-found for ever, and the turn it was created for keeps
+ * running: a whole turn once streamed into a panel that said nothing at all
+ * about the conversation it could not read back.
+ *
+ * The grace is generous, because a cold worker makes the first turn slow, and
+ * it is cut short anyway the moment any read or signal confirms the
+ * conversation.
+ */
+export const LANGY_CONVERSATION_PENDING_GRACE_MS = 20_000;
+
+/** @see LANGY_CONVERSATION_PENDING_GRACE_MS */
+export function isLangyConversationPending({
+  code,
+  unconfirmed,
+  graceIsOver,
+}: {
+  code: string | undefined;
+  unconfirmed: boolean;
+  graceIsOver: boolean;
+}): boolean {
+  return code === "langy_conversation_not_found" && unconfirmed && !graceIsOver;
+}
+
 export function explainLangyError(
   received: LangyDomainError,
 ): LangyErrorPresentation {
-  const domain = promoteCodexAgentError(received);
+  // Order matters: the narrower promotions run first, so a codex session that
+  // also carries an upstream status keeps its own card. "Not reachable at all"
+  // is checked before "reached and refused" for the same reason.
+  const domain = promoteUpstreamProviderError(
+    promoteProviderConfigError(
+      promoteModelUnavailableError(promoteCodexAgentError(received)),
+    ),
+  );
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
     meta: Object.keys(domain.meta).length > 0 ? domain.meta : undefined,
@@ -478,6 +729,26 @@ export function explainLangyError(
       // still landing on `langy_agent_errored` is a rejection we cannot name,
       // so the registry's line plus the trace id is the honest answer.
       return { ...copy, render: "card", action: retry, ...debug };
+    }
+
+    case "llm_upstream_error": {
+      // The provider was reached and refused. A refused key, a model it
+      // does not serve or a request it reads as invalid fails the same way
+      // every time, so the card offers the model settings; anything else (a
+      // rate limit, an outage) can pass, so it offers another try.
+      const deterministic =
+        hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_INVALID_REQUEST_REASONS);
+      return {
+        ...copy,
+        render: "card",
+        action: deterministic
+          ? { label: "Configure model", kind: "configure-model" }
+          : retry,
+        traceId: domain.traceId,
+        ...debug,
+      };
     }
 
     case "langy_worker_spawn_failed":
@@ -530,6 +801,30 @@ export function explainLangyError(
         ...debug,
       };
 
+    case "langy_model_unavailable":
+      // A model IS chosen, and the project cannot serve it. Deterministic, so
+      // the card offers the model settings rather than a retry that would fail
+      // the same way. Sits beside `langy_model_not_configured`, which is the
+      // other half: there nothing is chosen at all.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Configure model", kind: "configure-model" },
+        ...debug,
+      };
+
+    case "provider_config_invalid":
+      // The provider behind the chosen model is missing a setting, and the
+      // gateway stopped the call before it left. Deterministic, so no retry:
+      // the card opens the provider settings, where the fix is.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Open model providers", kind: "configure-model" },
+        traceId: domain.traceId,
+        ...debug,
+      };
+
     case "langy_egress_misconfigured":
       // Fail-closed network policy: Langy refuses to run rather than leak. Not a
       // user error and not a retry — an admin has to fix the policy.
@@ -558,6 +853,12 @@ export function explainLangyError(
       // resets, so the useful moves are waiting or switching models; retry is
       // still offered for after the reset.
       return { ...copy, render: "card", action: retry, ...debug };
+
+    case "aggregate_project_is_read_only":
+      // An aggregate reads other projects and takes no writes, so a turn on it
+      // is refused every time. No retry, which would be refused the same way:
+      // the shared copy says to open the project the data belongs to.
+      return { ...copy, render: "card", ...debug };
 
     case "langy_turn_in_progress":
       // One turn at a time per conversation. A retry would just 409 again, so

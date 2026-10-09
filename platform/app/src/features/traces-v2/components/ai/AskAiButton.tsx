@@ -1,21 +1,14 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { MeshGradient } from "@paper-design/shaders-react";
-import { Sparkles, Zap } from "lucide-react";
-import React, { useCallback, useState } from "react";
+import { Sparkles } from "lucide-react";
+import React from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { useColorModeValue } from "~/components/ui/color-mode";
-import {
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-  PopoverRoot,
-  PopoverTrigger,
-} from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import NextLink from "~/utils/compat/next-link";
 import { aiBrandPalette, aiBrandPaletteHot } from "./aiBrandPalette";
+import { ProviderPrimerPopover } from "./ProviderPrimerPopover";
 
 // Slow, breathing halo that cycles through the palette so the Ask AI
 // affordance reads as alive without becoming a flashing distraction. Each
@@ -68,6 +61,12 @@ interface AskAiButtonProps {
    * knows it'll be available on their real data.
    */
   disabledReason?: string;
+  /**
+   * Drops the halo while another affordance on the same row is animating,
+   * so the search bar never pulses in two places at once. The button stays
+   * fully usable; only the animation stands down.
+   */
+  quiet?: boolean;
 }
 
 /**
@@ -85,6 +84,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   label = "Ask AI",
   needsProviderPrimer = false,
   disabledReason,
+  quiet = false,
 }) => {
   const reduceMotion = useReducedMotion();
   const isGated = needsProviderPrimer || !!disabledReason;
@@ -117,7 +117,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       // primer mode still pulses so the affordance pulls the eye to
       // "set me up to use AI."
       animation={
-        reduceMotion || disabledReason
+        reduceMotion || disabledReason || quiet
           ? undefined
           : `${glowPulse} 6s ease-in-out infinite`
       }
@@ -163,7 +163,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   }
 
   if (needsProviderPrimer) {
-    return <ProviderPrimerPopover trigger={button} />;
+    return <ProviderPrimerPopover>{button}</ProviderPrimerPopover>;
   }
 
   return (
@@ -179,80 +179,6 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
     >
       {button}
     </Tooltip>
-  );
-};
-
-interface ProviderPrimerPopoverProps {
-  trigger: React.ReactElement;
-}
-
-/**
- * Shown in place of the regular AI tooltip when no model provider is
- * enabled. The point isn't just to disable the affordance — it's to
- * teach the user *why* they need a provider and link them straight to
- * the settings page so they can finish setup in one click.
- */
-const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({
-  trigger,
-}) => {
-  const [open, setOpen] = useState(false);
-  const handleOpenChange = useCallback(
-    (e: { open: boolean }) => setOpen(e.open),
-    [],
-  );
-
-  return (
-    <PopoverRoot
-      open={open}
-      onOpenChange={handleOpenChange}
-      positioning={{ placement: "bottom-start" }}
-    >
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent maxWidth="320px">
-        <PopoverArrow />
-        <PopoverBody>
-          <VStack align="stretch" gap={3}>
-            <HStack gap={2}>
-              <Box
-                width="28px"
-                height="28px"
-                borderRadius="full"
-                bg="orange.subtle"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                color="orange.fg"
-              >
-                <Zap size={14} />
-              </Box>
-              <Text textStyle="sm" fontWeight="semibold">
-                Connect a model provider
-              </Text>
-            </HStack>
-            <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-              Ask AI uses your own model provider keys to translate plain
-              English into trace queries — &ldquo;errors yesterday from
-              service-x&rdquo;, &ldquo;slow checkout traces with eval scores
-              under 0.5&rdquo;. Add a provider to unlock it.
-            </Text>
-            <NextLink
-              href="/settings/model-providers"
-              style={{ display: "block" }}
-            >
-              <Button
-                size="xs"
-                width="full"
-                bg="orange.solid"
-                color="white"
-                _hover={{ bg: "orange.fg" }}
-              >
-                Add a provider
-              </Button>
-            </NextLink>
-          </VStack>
-        </PopoverBody>
-      </PopoverContent>
-    </PopoverRoot>
   );
 };
 

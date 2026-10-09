@@ -11,13 +11,13 @@ from ...models.put_api_prompts_tags_by_tag_response_400 import PutApiPromptsTags
 from ...models.put_api_prompts_tags_by_tag_response_401 import PutApiPromptsTagsByTagResponse401
 from ...models.put_api_prompts_tags_by_tag_response_422 import PutApiPromptsTagsByTagResponse422
 from ...models.put_api_prompts_tags_by_tag_response_500 import PutApiPromptsTagsByTagResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     tag: str,
     *,
-    body: PutApiPromptsTagsByTagBody | Unset = UNSET,
+    body: PutApiPromptsTagsByTagBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,8 +28,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -101,8 +100,8 @@ def _build_response(
 def sync_detailed(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsTagsByTagBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PutApiPromptsTagsByTagBody,
 ) -> Response[
     PutApiPromptsTagsByTagResponse200
     | PutApiPromptsTagsByTagResponse400
@@ -114,7 +113,7 @@ def sync_detailed(
 
     Args:
         tag (str):
-        body (PutApiPromptsTagsByTagBody | Unset):
+        body (PutApiPromptsTagsByTagBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -139,8 +138,8 @@ def sync_detailed(
 def sync(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsTagsByTagBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PutApiPromptsTagsByTagBody,
 ) -> (
     PutApiPromptsTagsByTagResponse200
     | PutApiPromptsTagsByTagResponse400
@@ -153,7 +152,7 @@ def sync(
 
     Args:
         tag (str):
-        body (PutApiPromptsTagsByTagBody | Unset):
+        body (PutApiPromptsTagsByTagBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,8 +172,8 @@ def sync(
 async def asyncio_detailed(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsTagsByTagBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PutApiPromptsTagsByTagBody,
 ) -> Response[
     PutApiPromptsTagsByTagResponse200
     | PutApiPromptsTagsByTagResponse400
@@ -186,7 +185,7 @@ async def asyncio_detailed(
 
     Args:
         tag (str):
-        body (PutApiPromptsTagsByTagBody | Unset):
+        body (PutApiPromptsTagsByTagBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -209,8 +208,8 @@ async def asyncio_detailed(
 async def asyncio(
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsTagsByTagBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PutApiPromptsTagsByTagBody,
 ) -> (
     PutApiPromptsTagsByTagResponse200
     | PutApiPromptsTagsByTagResponse400
@@ -223,7 +222,7 @@ async def asyncio(
 
     Args:
         tag (str):
-        body (PutApiPromptsTagsByTagBody | Unset):
+        body (PutApiPromptsTagsByTagBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -15,6 +15,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
 // License limits need the app layer, which is not initialized under
 // vitest — same workaround as the other router integration tests.
@@ -28,6 +29,7 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 });
 
 import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { blankTemplate } from "../../../../optimization_studio/templates/blank";
 import type {
   LLMConfig,
@@ -37,6 +39,8 @@ import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("workflow.create node LLM materialization", () => {
   const testNamespace = `wf-node-llm-${nanoid(8)}`;
@@ -122,6 +126,14 @@ describe("workflow.create node LLM materialization", () => {
       data: { userId, teamId, role: TeamUserRole.ADMIN },
     });
 
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+    });
+
     caller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: userId }, expires: "1" },
@@ -144,6 +156,8 @@ describe("workflow.create node LLM materialization", () => {
       ["workflow", { projectId }],
       ["modelDefaultConfig", { organizationId }],
       ["teamUser", { teamId }],
+      ["grant", { organizationId }],
+      ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["project", { id: projectId }],
       ["team", { id: teamId }],

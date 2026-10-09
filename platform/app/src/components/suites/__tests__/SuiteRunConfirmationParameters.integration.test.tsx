@@ -10,6 +10,7 @@
  * neither half proves the behaviour on its own.
  *
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -249,6 +250,106 @@ describe("suite run confirmation parameters", () => {
 
         expect(mocks.mutate).toHaveBeenCalledWith(
           expect.objectContaining({ parameters: { region: "eu-central" } }),
+        );
+      });
+    });
+  });
+
+  describe("given a run plan whose scenarios declare a secret parameter", () => {
+    // The secret is declared by the second scenario alone, so the union has to
+    // carry the flag across the run for the field to hide anything.
+    const scenariosDeclaringASecret = [
+      {
+        id: "scenario_1",
+        parameters: [{ name: "region", defaultValue: "eu-central" }],
+      },
+      {
+        id: "scenario_2",
+        parameters: [
+          {
+            name: "api_token",
+            description: "The tenant API token",
+            secret: true,
+          },
+        ],
+      },
+    ];
+
+    describe("when the run confirmation opens", () => {
+      /** @scenario "The run dialog requires a value for every secret parameter" */
+      it("hides what is typed for the secret and asks for it empty", async () => {
+        mocks.scenarios = scenariosDeclaringASecret;
+
+        await openConfirmation();
+
+        const secret = screen.getByTestId("suite-run-parameter-api_token");
+        expect(secret).toHaveAttribute("type", "password");
+        expect(secret).toHaveValue("");
+        expect(
+          screen.getByTestId("suite-run-parameter-region"),
+        ).toHaveAttribute("type", "text");
+      });
+
+      /** @scenario "The run dialog requires a value for every secret parameter" */
+      it("holds the run until the secret has a value", async () => {
+        mocks.scenarios = scenariosDeclaringASecret;
+
+        const user = await openConfirmation();
+
+        const runButton = screen.getByText("Run 2 Jobs").closest("button");
+        expect(runButton).toBeDisabled();
+        expect(
+          screen.getByTestId("suite-run-parameter-error-api_token"),
+        ).toBeInTheDocument();
+
+        await user.type(
+          screen.getByTestId("suite-run-parameter-api_token"),
+          "tok-live-1",
+        );
+
+        expect(runButton).not.toBeDisabled();
+        expect(
+          screen.queryByTestId("suite-run-parameter-error-api_token"),
+        ).toBeNull();
+      });
+    });
+
+    describe("when the secret is typed and the run is confirmed", () => {
+      /** @scenario "The run dialog requires a value for every secret parameter" */
+      it("sends the typed value under that name", async () => {
+        mocks.scenarios = scenariosDeclaringASecret;
+
+        const user = await openConfirmation();
+        await user.type(
+          screen.getByTestId("suite-run-parameter-api_token"),
+          "tok-live-1",
+        );
+        await user.click(screen.getByText("Run 2 Jobs"));
+
+        expect(mocks.mutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            parameters: { region: "eu-central", api_token: "tok-live-1" },
+          }),
+        );
+      });
+
+      it("keeps a token of digits a string", async () => {
+        mocks.scenarios = [
+          {
+            id: "scenario_1",
+            parameters: [{ name: "api_token", secret: true }],
+          },
+        ];
+
+        const user = await openConfirmation();
+        await user.type(
+          screen.getByTestId("suite-run-parameter-api_token"),
+          "12345",
+        );
+        await user.click(screen.getByText("Run 1 Job"));
+
+        expect(mocks.mutate).toHaveBeenCalledWith(
+          expect.objectContaining({ parameters: { api_token: "12345" } }),
         );
       });
     });

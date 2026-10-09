@@ -23,10 +23,16 @@ export async function givenIAmOnTheMembersPage(page: Page) {
   // session's active org), not project-prefixed — every app nav link uses this
   // exact href (see platform/app/src/routes.tsx). The org context comes from the
   // authenticated session, not the URL.
+  //
+  // The address is kept rather than updated to `/settings/directory` on
+  // purpose: members became the first cut of Directory, and `members.tsx` is
+  // now a `<Navigate>` that forwards the old address on. Arriving the way a
+  // stale link does is what proves that forward still works, so this step
+  // covers the redirect as well as the page it lands on.
   await page.goto(`/settings/members`);
-  await expect(
-    page.getByRole("heading", { name: "Organization Members" })
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 // =============================================================================
@@ -34,13 +40,18 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Click the "Add members" button and wait for the dialog to appear.
+ * Open the invite drawer from People and wait for it to appear.
+ *
+ * The trigger is called "Invite people" now, beside the inline invite box that
+ * launches the same drawer (`PeopleSection` -> `PeopleHeader`). Only the
+ * BUTTON was renamed: the drawer it opens still leads with "Add members",
+ * which is what the wait below still keys on.
  */
 export async function whenIClickAddMembers(page: Page) {
-  await page.getByRole("button", { name: /Add members/i }).click();
+  await page.getByRole("button", { name: /Invite people/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
-    page.getByRole("heading", { name: "Add members" }).last()
+    page.getByRole("heading", { name: "Add members" }).last(),
   ).toBeVisible({ timeout: 5000 });
 }
 
@@ -51,7 +62,10 @@ export async function whenIFillEmailWith(page: Page, email: string) {
   // The Add-members dialog uses a single comma/space-separated email input whose
   // placeholder is an example list ("alice@example.com, bob@example.com") — see
   // platform/app/src/components/AddMembersForm.tsx. Match it by a stable substring.
-  await page.getByPlaceholder(/alice@example\.com/i).last().fill(email);
+  await page
+    .getByPlaceholder(/alice@example\.com/i)
+    .last()
+    .fill(email);
 }
 
 /**
@@ -93,61 +107,20 @@ export async function whenICloseInviteLinkDialog(page: Page) {
 }
 
 // =============================================================================
-// Invitation Action Steps
-// =============================================================================
-
-/**
- * Approve the invitation for a given email in the Invites table.
- */
-export async function whenIApproveInvitationFor(page: Page, email: string) {
-  const row = page
-    .getByRole("row")
-    .filter({ hasText: email });
-  await row.getByRole("button", { name: /approve/i }).click();
-}
-
-/**
- * Reject the invitation for a given email in the Invites table.
- */
-export async function whenIRejectInvitationFor(page: Page, email: string) {
-  const row = page
-    .getByRole("row")
-    .filter({ hasText: email });
-  await row.getByRole("button", { name: /reject/i }).click();
-}
-
-// =============================================================================
 // Assertion Steps
 // =============================================================================
 
 /**
- * Assert that an email appears in the "Invites" list with an invited badge.
+ * Assert that the invitation appears in Directory with its pending status.
  */
 export async function thenISeeSentInviteFor(page: Page, email: string) {
-  const invitesHeading = page.getByRole("heading", { name: "Invites" });
-  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
+  const row = page
+    .getByTestId("people-list")
+    .getByTestId("invite-row")
+    .filter({ has: page.getByText(email, { exact: true }) });
 
-  const invitesSection = invitesHeading.locator("..");
-  const row = invitesSection.getByRole("row").filter({ hasText: email });
-
-  await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Invited")).toBeVisible({ timeout: 5000 });
-}
-
-/**
- * Assert that an email appears in the "Invites" list with a pending badge.
- */
-export async function thenISeePendingApprovalFor(page: Page, email: string) {
-  const invitesHeading = page.getByRole("heading", { name: "Invites" });
-  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
-
-  const invitesSection = invitesHeading.locator("..");
-  const row = invitesSection.getByRole("row").filter({ hasText: email });
-
-  await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Pending Approval")).toBeVisible({
-    timeout: 5000,
-  });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await expect(row.getByTestId("invite-status")).toHaveText("Invited");
 }
 
 /**
@@ -164,15 +137,6 @@ export async function thenISeeSuccessToast(page: Page, titleText: string) {
   await expect(page.getByText(titleText, { exact: false })).toBeVisible({
     timeout: 5000,
   });
-}
-
-/**
- * Assert that the Invites section is NOT visible.
- */
-export async function thenPendingApprovalSectionIsHidden(page: Page) {
-  await expect(
-    page.getByRole("heading", { name: "Invites" })
-  ).not.toBeVisible({ timeout: 5000 });
 }
 
 // =============================================================================
@@ -216,52 +180,6 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
 }
 
 /**
- * Create a WAITING_APPROVAL invitation via tRPC API.
- */
-export async function seedWaitingApprovalInvite({
-  page,
-  email,
-  organizationId,
-  teamId,
-}: {
-  page: Page;
-  email: string;
-  organizationId: string;
-  teamId: string;
-}) {
-  const response = await page.request.post(
-    "/api/trpc/organization.createInviteRequest",
-    {
-      data: {
-        json: {
-          organizationId,
-          invites: [
-            {
-              email: email.toLowerCase(),
-              role: "MEMBER",
-              // Omit customRoleId entirely: the createInviteRequest schema types
-              // it as z.string().optional() (organization.ts), so a literal null
-              // fails validation with "Expected string, received null".
-              teams: [
-                {
-                  teamId,
-                  role: "MEMBER",
-                },
-              ],
-            },
-          ],
-        },
-      },
-    }
-  );
-
-  if (!response.ok()) {
-    const body = await response.text();
-    throw new Error(`Failed to seed invite for ${email}: ${response.status()} ${body}`);
-  }
-}
-
-/**
  * Generate a unique email to avoid duplicate conflicts between test runs.
  */
 export function generateUniqueEmail(prefix: string): string {
@@ -278,7 +196,7 @@ export function generateUniqueEmail(prefix: string): string {
  * Activate a test ENTERPRISE license (maxMembers=100) for the current org.
  *
  * A no-license self-hosted deployment resolves to FREE_PLAN (maxMembers=1), so
- * the owner alone is at the cap and createInviteRequest 403s. The app trusts
+ * the owner alone is at the cap and createInvites 403s. The app trusts
  * this test-signed license because e2e-ci sets LANGWATCH_LICENSE_PUBLIC_KEY to
  * the matching TEST_PUBLIC_KEY; getActivePlan re-reads the org's license from
  * Postgres on every call, so activation takes effect with no app restart.

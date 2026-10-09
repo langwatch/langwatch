@@ -12,8 +12,8 @@ import {
   bindingScopeCanGrantPermission,
   permissionSatisfiedBy,
 } from "./registry";
-import { builtinRoleGrants, roleKeyForTeamRole } from "./roles";
-import { audienceMatches, type ScopeChainLink } from "./scope";
+import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles";
+import { audienceMatches } from "./scope";
 import type {
   AuthzScopeRef,
   CollectedBinding,
@@ -21,13 +21,12 @@ import type {
   ResourceGrant,
 } from "./types";
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a flat, ordered sequence of legacy grant rules (fence → org-scoped semantics → custom role → EXTERNAL cap → built-in bag) whose ORDER is the stage-A parity contract; the score counts the guards, and splitting them would scatter the one place the rules read top to bottom.
 export function bindingGrants({
   binding,
   grants,
   permission,
 }: {
-  binding: Pick<CollectedBinding, "role" | "customRoleId" | "scopeType">;
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId">;
   grants: CollectedGrants;
   permission: string;
 }): boolean {
@@ -42,83 +41,60 @@ export function bindingGrants({
     return false;
   }
 
-  // Org-scoped non-CUSTOM bindings have their own semantics: ADMIN grants
-  // everything, anything else grants the org-member bag only.
-  // LEGACY-QUIRK(C): role meaning depends on binding scope until roleKey.
-  if (binding.scopeType === "ORGANIZATION" && binding.role !== "CUSTOM") {
-    // LEGACY-QUIRK(C): EXTERNAL users are never promoted through org-scoped
-    // bindings — OrganizationUser.role is authoritative for the restriction.
+  // ADR-143: a Developer seat holds its personal team and nothing shared.
+  // The write paths keep it that way for direct rows; this is the cap for
+  // the two routes a row rule never sees. An ORGANIZATION-scoped binding
+  // reaches every project, and a group-delivered binding reaches whatever
+  // the group was mapped to, so neither grants a Developer anything. A
+  // direct TEAM or PROJECT row (their own personal team) grants normally.
+  if (grants.organizationRole === "DEVELOPER") {
+    if (binding.scopeType === "ORGANIZATION") return false;
+    if (binding.viaGroupId) return false;
+  }
+
+  const { roleKey } = binding;
+  // A custom key is authoritative, including grants imported beside a legacy
+  // built-in role. Missing or empty role facts never restore that old role.
+  if (roleKey.startsWith("custom:")) {
+    const customRoleId = roleKey.slice("custom:".length);
+    if (customRoleId.length === 0) return false;
+    const customPermissions = grants.customRolePermissions.get(customRoleId);
+    if (!customPermissions || customPermissions.length === 0) return false;
+    return permissionSatisfiedBy({
+      granted: new Set(customPermissions),
+      requested: permission,
+    });
+  }
+
+  // ADR-144: a shared project-to-project read. The ledger places it on a
+  // PROJECT scope and nowhere else, and nothing widens or narrows it - not
+  // an organisation role, not the EXTERNAL cap - because the principal is a
+  // project, which has neither.
+  if (roleKey === PROJECT_READER_ROLE_KEY) {
+    return (
+      binding.scopeType === "PROJECT" &&
+      builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission })
+    );
+  }
+
+  if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {
+    return false;
+  }
+
+  // Organization grants retain their existing scope-specific meaning:
+  // admin covers everything; member and viewer carry the organization floor.
+  if (binding.scopeType === "ORGANIZATION") {
     if (grants.organizationRole === "EXTERNAL") return false;
-    if (binding.role === "ADMIN") return true;
+    if (roleKey === "admin") return true;
     return builtinRoleGrants({ role: "org-member", permission });
   }
 
-  // Non-empty custom role is authoritative; empty/missing falls through.
-  if (binding.customRoleId) {
-    const customPermissions = grants.customRolePermissions.get(
-      binding.customRoleId,
-    );
-    if (customPermissions && customPermissions.length > 0) {
-      return permissionSatisfiedBy({
-        granted: new Set(customPermissions),
-        requested: permission,
-      });
-    }
-  }
-
-  // LEGACY-QUIRK(C): EXTERNAL caps team/project bindings at the lite-member
-  // bag unless a non-empty custom role overrode it above.
+  // EXTERNAL membership caps built-in team/project grants, not custom roles.
   if (grants.organizationRole === "EXTERNAL") {
     return builtinRoleGrants({ role: "lite-member", permission });
   }
 
-  return builtinRoleGrants({
-    role: roleKeyForTeamRole(binding.role),
-    permission,
-  });
-}
-
-/**
- * LEGACY-QUIRK(B) — the TeamUser fallback step of the walk. Project/team
- * checks consult the chain's team only when the principal has ZERO bindings
- * on the chain (rbac.ts:765); organization checks union every non-personal
- * membership on ANY denial, even when org-scoped bindings exist
- * (rbac.ts:1094-1110). Both respect the ADR-021 fence via TEAM-scoped
- * evaluation.
- */
-export function legacyTeamFallbackGrants({
-  grants,
-  scope,
-  chain,
-  chainBindingCount,
-  permission,
-}: {
-  grants: CollectedGrants;
-  scope: AuthzScopeRef;
-  chain: readonly ScopeChainLink[];
-  chainBindingCount: number;
-  permission: string;
-}): boolean {
-  if (scope.type !== "organization" && chainBindingCount > 0) return false;
-  const candidateTeams =
-    scope.type === "organization"
-      ? grants.legacyTeamMemberships.filter((row) => !row.isPersonal)
-      : grants.legacyTeamMemberships.filter((row) =>
-          chain.some(
-            (link) => link.scopeType === "TEAM" && link.scopeId === row.teamId,
-          ),
-        );
-  return candidateTeams.some((row) =>
-    bindingGrants({
-      binding: {
-        role: row.role,
-        customRoleId: row.customRoleId,
-        scopeType: "TEAM",
-      },
-      grants,
-      permission,
-    }),
-  );
+  return builtinRoleGrants({ role: roleKey, permission });
 }
 
 /**

@@ -88,6 +88,9 @@ func TestIsReasoningModel(t *testing.T) {
 	yes := []string{
 		"openai/o1-mini", "openai/o3", "openai/o4-preview",
 		"openai/gpt-5-mini", "gpt-5", "o1",
+		// Every generation after gpt-5 keeps the fixed temperature: the
+		// catalog's latest-mini resolves to these, and OpenAI refuses 0.2.
+		"openai/gpt-5.6-terra", "openai/gpt-6-luna", "gpt-7", "openai/gpt-10-mini",
 	}
 	// Pin Python parity: matching is anchored on the model BASENAME
 	// (anything after the last `/`, or the full string if no `/`),
@@ -97,7 +100,7 @@ func TestIsReasoningModel(t *testing.T) {
 	// non-reasoning models.
 	no := []string{
 		"openai/gpt-4o", "anthropic/claude-3-5-sonnet", "gemini/gemini-2.0-flash",
-		"openai/gpt-3.5-turbo",
+		"openai/gpt-3.5-turbo", "openai/gpt-4.1-mini",
 		// CodeRabbit-flagged false-positives that the basename-anchor fixes:
 		"openai/co3-thing",     // `co3` would substring-match o3 in the full id
 		"vertex_ai/pro1-model", // `pro1` would substring-match o1 in the full id

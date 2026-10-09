@@ -52,7 +52,7 @@ export function PublishedPromptsList() {
     return (
       <Sidebar.List>
         {[1, 2, 3, 4].map((i) => (
-          <Sidebar.Item key={i} paddingY={1} paddingLeft={2}>
+          <Sidebar.Item key={i} paddingY={1.5} paddingX={2.5}>
             <Skeleton width="full" height="20px" borderRadius="sm" />
           </Sidebar.Item>
         ))}
@@ -115,8 +115,8 @@ export function PublishedPromptsList() {
                     },
                   });
                 }}
-                paddingY={1}
-                paddingLeft={2}
+                paddingY={1.5}
+                paddingX={2.5}
               >
                 <PublishedPromptContent
                   promptId={prompt.id}

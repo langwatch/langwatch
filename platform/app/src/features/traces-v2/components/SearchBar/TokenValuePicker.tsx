@@ -15,7 +15,7 @@ import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useUIStore } from "../../stores/uiStore";
 import { dedupeByValue } from "../../utils/dedupeByValue";
 
@@ -54,7 +54,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   anchor,
   onClose,
 }) => {
-  const setFacetValueAt = useFilterStore((s) => s.setFacetValueAt);
+  const setFacetValueAt = useExplorerStore((s) => s.setFacetValueAt);
   const setSyntaxHelpOpen = useUIStore((s) => s.setSyntaxHelpOpen);
   const { data: facets = [] } = useTraceFacets();
   const [filter, setFilter] = useState("");

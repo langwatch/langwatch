@@ -1,16 +1,13 @@
 /**
- * Shared fixtures for the grant writer's per-organization fork tests
- * (ADR-092 decision 4). The fork's two sides live in their own files —
- * `ledger-write-fork.legacy.unit.test.ts` for an organization the genesis
- * import has not reached, `ledger-write-fork.ledger.unit.test.ts` for one
- * past it — and both drive the writer through this harness.
+ * Shared fixtures for the grants ledger writer tests. The writer has one
+ * engine-backed path; migration parity is tested by the migration suite.
  *
  * Each test file mocks `../epoch` itself: vi.mock is per-file, so it cannot
  * live here.
  *
- * @see specs/rbac/in-place-authz-migration.feature
+ * @see specs/migration/authz-grants-rollout.feature
  */
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { vi } from "vitest";
 import {
   Prisma,
@@ -24,16 +21,12 @@ export const ORG_ID = "org_fork";
 export const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
 
 const COMMAND_VERBS = [
-  "attachGrants",
+  "attachGrant",
   "changeGrantRole",
-  "revokeGrants",
-  "defineRoles",
+  "revokeGrant",
+  "defineRole",
+  "changeRolePermissions",
   "deleteRole",
-  "offboardMember",
-  "proveMigrationParity",
-  "completeCutover",
-  "rollBackCutover",
-  "recordMigrationTenantState",
 ] as const;
 
 export function uniqueViolation(): Error {
@@ -51,18 +44,24 @@ export function recordNotFound(): Error {
 }
 
 export function harness({
-  onLedger,
   poll,
 }: {
-  onLedger: boolean;
   /** Defaults to a poll that never retries — one failed `check()` times out
    *  immediately. Override to exercise the read-your-writes retry loop. */
   poll?: { intervalMs: number; timeoutMs: number };
 }) {
   const sent: Array<{ verb: string; data: unknown }> = [];
+  const queryRaw = vi.fn().mockResolvedValue([
+    { userId: "user_sam", membershipStamp: "stamp_user_sam" },
+    { userId: "user_alice", membershipStamp: "stamp_user_alice" },
+    { userId: "user_admin", membershipStamp: "stamp_user_admin" },
+  ]);
   const db = {
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue(null),
+      // The tenancy pre-read `GrantsService` does before a revoke, when a
+      // test drives the writer through the service rather than directly.
+      findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn().mockResolvedValue(undefined),
@@ -79,20 +78,32 @@ export function harness({
     },
     role: { findFirst: vi.fn().mockResolvedValue(null) },
     grant: {
+      // Revocation MARKS: the synchronous deny is an updateMany, not a
+      // delete. `deleteMany` stays stubbed so a test that expects nothing
+      // deleted can assert on it rather than on an absent property.
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      // Known to the fold's head by default, so a test that does not care
-      // about the stranded-row adoption path (`changeBindingRole`) keeps
-      // taking the ordinary `changeGrantRole` branch.
-      findFirst: vi.fn().mockResolvedValue({ id: "known" }),
-      // Enforcement reads the revoked rows' projectIds before deleting them
-      // (the resource tier's compat ShareLink head is scoped by project);
-      // none here, so no share delete follows.
+      findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    // ADR-144: the shared-read writer asks which organization each project
+    // sits in. Empty by default; a test seeds the lineage it is about.
+    project: { findMany: vi.fn().mockResolvedValue([]) },
+    organizationUser: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { userId: "user_sam", membershipStamp: "stamp_1" },
+        ]),
     },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    $queryRaw: queryRaw,
+    $transaction: vi.fn(async (run: (tx: unknown) => unknown) =>
+      run({ $queryRaw: queryRaw }),
+    ),
   };
   const writer = new GrantsLedgerWriter(db as unknown as PrismaClient, {
-    onLedgerWrites: async () => onLedger,
     now: () => 1_700_000_000_000,
     poll: poll ?? { intervalMs: 0, timeoutMs: 0 },
     commands: async () => ({

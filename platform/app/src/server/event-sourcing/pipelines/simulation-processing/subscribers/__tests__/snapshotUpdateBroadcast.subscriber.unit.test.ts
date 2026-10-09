@@ -58,9 +58,45 @@ describe("snapshotUpdateBroadcast subscriber", () => {
       SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
       SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
       SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
       SIMULATION_RUN_EVENT_TYPES.DELETED,
       SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
     ]);
+  });
+
+  describe("when an evaluated event lands", () => {
+    /** @scenario "The UI is told when a run is evaluated" */
+    it("broadcasts the run with its status so the page reads it again", async () => {
+      const broadcast = makeBroadcast();
+      const subscriber = createSnapshotUpdateBroadcastSubscriber({ broadcast });
+
+      await subscriber.handler(
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+          data: {
+            scenarioRunId: "run-1",
+            evaluations: [],
+            verdict: "failure",
+            status: "FAILURE",
+            batchRunId: "batch-1",
+            scenarioSetId: "set-1",
+          },
+        }),
+        CONTEXT,
+      );
+
+      expect(broadcast.broadcastToTenant).toHaveBeenCalledWith(
+        "project-1",
+        JSON.stringify({
+          event: "simulation_updated",
+          scenarioRunId: "run-1",
+          batchRunId: "batch-1",
+          scenarioSetId: "set-1",
+          status: "FAILURE",
+        }),
+        "simulation_updated",
+      );
+    });
   });
 
   it("excludes text_message_start — the API route owns streaming broadcasts", () => {

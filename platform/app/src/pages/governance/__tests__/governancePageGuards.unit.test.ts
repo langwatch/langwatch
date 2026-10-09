@@ -11,14 +11,28 @@
  *
  * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
+
+import {
+  builtinRoleGrants,
+  permissionSatisfiedBy,
+  roleKeyForTeamRole,
+} from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import {
-  hasPermissionWithHierarchy,
-  organizationRoleHasPermission,
-  teamRoleHasPermission,
-} from "~/server/api/rbac";
+
+const hasPermissionWithHierarchy = (permissions: string[], requested: string) =>
+  permissionSatisfiedBy({ granted: new Set(permissions), requested });
+const teamRoleHasPermission = (role: TeamUserRole, permission: string) =>
+  builtinRoleGrants({ role: roleKeyForTeamRole(role), permission });
+const organizationRoleHasPermission = (
+  role: OrganizationUserRole,
+  permission: string,
+) =>
+  builtinRoleGrants({
+    role: role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+    permission,
+  });
 
 describe("governance page guard permission", () => {
   describe("when every built-in role is checked", () => {

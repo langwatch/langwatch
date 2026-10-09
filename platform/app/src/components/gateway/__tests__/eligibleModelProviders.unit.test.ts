@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { CODEX_DEFAULT_MODEL } from "~/server/modelProviders/codexRestrictions";
+import { recommendedChatModel } from "~/server/modelProviders/latestAliases";
 
 import {
   buildScopeHierarchy,
@@ -45,9 +47,16 @@ describe("resolveProviderDefaultModel", () => {
   });
 
   describe("when the provider is a first-class registry provider", () => {
-    it("prefixes the registry default with the provider key", () => {
+    it("names the catalog's recommended model for the provider", () => {
       const result = resolveProviderDefaultModel("openai", "OpenAI", []);
+      expect(result).toBe(recommendedChatModel("openai"));
       expect(result.startsWith("openai/")).toBe(true);
+    });
+
+    it("names the Codex default model for a Codex row", () => {
+      expect(resolveProviderDefaultModel("openai_codex", "Codex", [])).toBe(
+        CODEX_DEFAULT_MODEL,
+      );
     });
   });
 

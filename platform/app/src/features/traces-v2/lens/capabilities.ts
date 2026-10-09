@@ -1,4 +1,4 @@
-import type { GroupingMode, SortConfig } from "../stores/viewStore";
+import type { GroupingMode, SortConfig } from "../stores/viewSlice";
 import { isEvalColumnId } from "./evalColumnId";
 
 /**

@@ -187,13 +187,13 @@ export class WorkflowEvaluationService {
       }
     }
 
-    const dataResult = await loadExecutionData(
+    const dataResult = await loadExecutionData({
       projectId,
-      datasetRef,
-      [target],
-      [],
-      { data, datasetId: resolvedDatasetId, parameters },
-    );
+      dataset: datasetRef,
+      targets: [target],
+      evaluators: [],
+      inputs: { data, datasetId: resolvedDatasetId, parameters },
+    });
     if ("error" in dataResult) {
       throw new EvaluationInputError(dataResult.error, dataResult.status);
     }
@@ -243,9 +243,9 @@ export class WorkflowEvaluationService {
       ui: createInitialUIState(),
     };
 
-    const experiment = await ExperimentService.create(
-      this.prisma,
-    ).findOrCreateForWorkflow({
+    const experiment = await ExperimentService.create({
+      prisma: this.prisma,
+    }).findOrCreateForWorkflow({
       projectId,
       workflowId: workflow.id,
       name: workflow.name,

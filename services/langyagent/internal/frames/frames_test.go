@@ -9,7 +9,7 @@ import (
 )
 
 // The frame JSON shapes must match the TS langyRelayFrame zod union exactly (the
-// relay parses the payload against it). These pin the marshalled shape per
+// relay parses the payload against it). These pin the marshaled shape per
 // constructor, and prove a produced frame signs + verifies through frameauth.
 
 // mk unwraps a constructor's (Frame, error) — usable as `mk(Delta("hi"))`
@@ -43,7 +43,7 @@ func TestFrameShapes(t *testing.T) {
 		{"heartbeat", mk(Heartbeat()), map[string]any{"type": "heartbeat"}},
 		{"progress-empty", mk(Progress("", nil)), map[string]any{"type": "progress"}},
 		{"progress-full", mk(Progress("step 1", &prog)), map[string]any{"type": "progress", "message": "step 1", "progress": 0.5}},
-		{"progress-measured", mk(MeasuredProgress("Analysing traces — 25/100", 25, 100, 25, 1250)), map[string]any{"type": "progress", "message": "Analysing traces — 25/100", "progress": 0.25, "current": float64(25), "total": float64(100), "batchItems": float64(25), "batchDurationMs": float64(1250)}},
+		{"progress-measured", mk(MeasuredProgress("Analyzing traces — 25/100", 25, 100, 25, 1250)), map[string]any{"type": "progress", "message": "Analyzing traces — 25/100", "progress": 0.25, "current": float64(25), "total": float64(100), "batchItems": float64(25), "batchDurationMs": float64(1250)}},
 		{"card", mk(Card("trace_download", "trace-9", nil)), map[string]any{"type": "card", "kind": "trace_download", "detail": "trace-9"}},
 		{"tool-start", mk(ToolStart("tc-1", "bash", "Run bash", "ls", nil)), map[string]any{"type": "tool", "id": "tc-1", "name": "bash", "phase": "start", "title": "Run bash", "command": "ls"}},
 		{"error", mk(Error("Langy is unavailable", "at-capacity")), map[string]any{"type": "error", "error": "Langy is unavailable", "code": "at-capacity"}},
@@ -69,6 +69,19 @@ func TestToolEnd_CarriesFlagInputAndOutput(t *testing.T) {
 	ok := asMap(t, mk(ToolEnd("tc-2", "bash", nil, false, "done", 0)))
 	if v, present := ok["isError"]; !present || v != false {
 		t.Fatalf("successful tool end must carry isError=false, got %v", ok)
+	}
+}
+
+// The marker of a call that ran in the developer's folder rides the end frame
+// and only that frame: a sandbox end carries no local field at all.
+func TestToolEndLocal_MarksTheFrame(t *testing.T) {
+	local := asMap(t, mk(ToolEndLocal("tc-3", "bash", json.RawMessage(`{"command":"git push"}`), false, "pushed", 0)))
+	if local["local"] != true {
+		t.Fatalf("a local tool end must carry local=true, got %v", local)
+	}
+	sandbox := asMap(t, mk(ToolEnd("tc-4", "bash", json.RawMessage(`{"command":"git push"}`), false, "pushed", 0)))
+	if _, present := sandbox["local"]; present {
+		t.Fatalf("a sandbox tool end must carry no local field, got %v", sandbox)
 	}
 }
 

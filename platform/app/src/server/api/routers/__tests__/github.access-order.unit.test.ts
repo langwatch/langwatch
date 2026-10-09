@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -40,6 +39,19 @@ const { appConfig } = vi.hoisted(() => ({
     configured: true,
   },
 }));
+// The declared permission seam resolves its canonical service from the App.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    permissions: {
+      getDecision: async ({ permission }: { permission: string }) => {
+        permissionsAsked.push(permission);
+        return { permitted: hasOrgPermission(), organizationRole: null };
+      },
+    },
+  }),
+  tryGetApp: () => null,
+}));
+
 vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
   getGithubAppConfig: () => appConfig,
 }));
@@ -52,28 +64,6 @@ const { githubHost } = vi.hoisted(() => ({
 vi.mock("~/server/app-layer/github/githubHost", () => ({
   getGithubWebBase: () => githubHost.webBase,
 }));
-
-vi.mock("~/server/api/rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
-  return {
-    ...actual,
-    checkOrganizationPermission:
-      (permission: string) =>
-      async ({ ctx, next }: any) => {
-        permissionsAsked.push(permission);
-        if (!hasOrgPermission()) {
-          // The top-level TRPCError binding is safe here: this closure runs
-          // at request time, long after the hoisted factory phase.
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You do not have permission",
-          });
-        }
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
 
 vi.mock("~/server/app-layer", () => ({
   getApp: () => ({
@@ -101,6 +91,11 @@ const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 function caller() {
   return githubRouter.createCaller(
     createInnerTRPCContext({
+      // Not a suite about the second-factor gate. Without this the gate runs
+      // inside the permission middleware, reads the scope's owner from a Prisma
+      // double that has only this router's models, and fails there instead of
+      // here — and only where the deployment switches it on.
+      mfaGate: { offered: () => false },
       session: { user, expires: "1" } as any,
       permissionChecked: false,
     }),
@@ -222,7 +217,7 @@ describe("githubRouter access gates", () => {
 
       await expect(
         caller().listRepos({ organizationId: "org-1" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(permissionsAsked).toEqual(["organization:manage"]);
       expect(listRepositoriesForOrganization).not.toHaveBeenCalled();
     });
@@ -236,7 +231,7 @@ describe("githubRouter access gates", () => {
           organizationId: "org-1",
           installationId: "555",
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(permissionsAsked).toEqual(["organization:manage"]);
       expect(getByInstallationId).not.toHaveBeenCalled();
     });

@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import { ManagerExplorerService } from "../../manager-explorer.service";
 import { ProcessAuditRepository } from "../../process-audit.repository";
 import { ProcessOpsPrismaRepository } from "../../repositories/process-ops.prisma.repository";
@@ -319,6 +320,47 @@ describe("process ops against a real Postgres", () => {
       });
       expect(auditRows).toHaveLength(1);
       expect(auditRows[0]?.metadata).toMatchObject({ messageKey: "dead-1" });
+    });
+  });
+
+  describe("when two operators redrive and discard one dead message at the same moment", () => {
+    /** @scenario "A redrive and a discard on one dead message: only the first lands" */
+    it("applies the redrive and refuses the discard, which waited on the row", async () => {
+      const id = await seedMessage({
+        processKey: "stuck-both",
+        messageKey: "dead-both",
+        status: "dead",
+        nextAttemptAt: new Date(NOW - 1_000),
+      });
+      const ref = {
+        processName: ns,
+        projectId: PROJECT,
+        processKey: "stuck-both",
+      };
+
+      const acts = await raceOnOneRow({
+        prisma,
+        table: "ProcessManagerOutbox",
+        first: (tx) =>
+          new ProcessOpsPrismaRepository(tx).redriveDeadMessage({
+            ref,
+            messageId: id,
+            now: NOW,
+          }),
+        second: (tx) =>
+          new ProcessOpsPrismaRepository(tx).discardDeadMessage({
+            ref,
+            messageId: id,
+            now: NOW,
+          }),
+      });
+
+      expect(acts.first).toEqual({ messageKey: "dead-both" });
+      expect(acts.second).toBeNull();
+      const row = await prisma.processManagerOutbox.findFirstOrThrow({
+        where: { id, projectId: PROJECT },
+      });
+      expect(row.status).toBe("pending");
     });
   });
 

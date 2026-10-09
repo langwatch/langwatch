@@ -1,8 +1,9 @@
 import { useCallback } from "react";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
+import { useLangyTraceViewContext } from "~/features/langy/hooks/useLangyTraceViewContext";
 import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { handOffSearchToLangy } from "./searchLangyHandoff";
 
 /**
@@ -26,6 +27,9 @@ export function useAskLangyFromSearch(): {
   const askLangy = useLangyStore((s) => s.askLangy);
   const openPanel = useLangyStore((s) => s.openPanel);
   const attachContext = useLangyStore((s) => s.attachContext);
+  // The view the passive page context would send: time range, lens, sort,
+  // grouping, applied search. The explicit route sends at least as much.
+  const viewContext = useLangyTraceViewContext();
 
   const askLangyFromSearch = useCallback(
     (typedText?: string) => {
@@ -33,7 +37,8 @@ export function useAskLangyFromSearch(): {
         typedText,
         // Read at call time rather than subscribing — the handoff needs the
         // query once per click, not a re-render per keystroke.
-        appliedQueryText: useFilterStore.getState().queryText,
+        appliedQueryText: useExplorerStore.getState().queryText,
+        viewContext,
         askLangy,
         openPanel,
         attachContext,
@@ -46,7 +51,7 @@ export function useAskLangyFromSearch(): {
         },
       });
     },
-    [askLangy, openPanel, attachContext],
+    [askLangy, openPanel, attachContext, viewContext],
   );
 
   return { langyRoutesAsk: showLangy && canAskLangy, askLangyFromSearch };

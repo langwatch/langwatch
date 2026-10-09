@@ -59,7 +59,7 @@
  * the schema endpoint's published example SQL uses it.
  *
  * @see ./validate.ts — the walk that applies this
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 /**
@@ -452,21 +452,62 @@ const CONVERSION_FUNCTIONS: readonly string[] = [
   ),
 ];
 
-/** Every name a LangWatchQL query may call, lowercased. */
+/**
+ * Every allowed function name, in its canonical (case-sensitive) spelling.
+ *
+ * The single shared source for both {@link ALLOWED_FUNCTION_NAMES} (the
+ * lowercased lookup set) and {@link LWQL_ALLOWED_FUNCTION_NAMES} (the
+ * published list), so the two can never drift apart — one enumerates names,
+ * the other only reshapes that same enumeration.
+ */
+const FUNCTION_NAME_SOURCES: readonly string[] = [
+  ...OPERATORS,
+  ...AGGREGATE_FUNCTIONS,
+  ...WINDOW_FUNCTIONS,
+  ...DATE_TIME_FUNCTIONS,
+  ...ARITHMETIC_FUNCTIONS,
+  ...STRING_FUNCTIONS,
+  ...CONDITIONAL_FUNCTIONS,
+  ...COLLECTION_FUNCTIONS,
+  ...JSON_FUNCTIONS,
+  ...CONVERSION_FUNCTIONS,
+];
+
 const ALLOWED_FUNCTION_NAMES: ReadonlySet<string> = new Set(
-  [
-    ...OPERATORS,
-    ...AGGREGATE_FUNCTIONS,
-    ...WINDOW_FUNCTIONS,
-    ...DATE_TIME_FUNCTIONS,
-    ...ARITHMETIC_FUNCTIONS,
-    ...STRING_FUNCTIONS,
-    ...CONDITIONAL_FUNCTIONS,
-    ...COLLECTION_FUNCTIONS,
-    ...JSON_FUNCTIONS,
-    ...CONVERSION_FUNCTIONS,
-  ].map((name) => name.toLowerCase()),
+  FUNCTION_NAME_SOURCES.map((name) => name.toLowerCase()),
 );
+
+/**
+ * The allowlist as a sorted, deduplicated, public list — in the spelling a
+ * caller should write it as (ClickHouse function names are case-sensitive for
+ * most functions, even though {@link isAllowedLangWatchQLFunction} matches
+ * case-insensitively).
+ *
+ * Derived from the same {@link FUNCTION_NAME_SOURCES} enumeration
+ * {@link ALLOWED_FUNCTION_NAMES} reads, so the list a `FUNCTION_NOT_ALLOWED`
+ * refusal and the schema endpoint publish can never drift from the set
+ * actually enforced. Deduplicated case-insensitively (the first spelling seen
+ * wins) and sorted case-insensitively. Combinator forms (`countIf`) are
+ * admitted by {@link aggregateBaseOf} and are
+ * deliberately not enumerated here — this is the base allowlist a caller
+ * writes against.
+ */
+export const LWQL_ALLOWED_FUNCTION_NAMES: readonly string[] = (() => {
+  const seenLowercased = new Set<string>();
+  const canonicalNames: string[] = [];
+  for (const name of FUNCTION_NAME_SOURCES) {
+    const lowercased = name.toLowerCase();
+    if (seenLowercased.has(lowercased)) continue;
+    seenLowercased.add(lowercased);
+    canonicalNames.push(name);
+  }
+  // The dedup above is case-insensitive, so no two survivors share a
+  // lowercased spelling and the lowercased comparison is already total — a
+  // case-sensitive tiebreak could never run.
+  return canonicalNames.sort((a, b) =>
+    a.toLowerCase().localeCompare(b.toLowerCase()),
+  );
+})();
 
 /** The aggregates a combinator suffix may be appended to, lowercased. */
 const AGGREGATE_BASE_NAMES: ReadonlySet<string> = new Set(

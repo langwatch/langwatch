@@ -30,6 +30,7 @@ vi.mock("~/server/featureFlag", () => ({
 // mainMethod: "presidio" reaches.
 vi.mock("~/server/tracer/collector/piiCheck", () => ({
   batchPresidioClearPII: vi.fn(),
+  NAME_AND_PLACE_ENTITIES: new Set(["PERSON", "LOCATION"]),
   googleDLPClearPII: vi.fn(),
   PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],
 }));
@@ -568,6 +569,23 @@ describe("OtlpSpanPiiRedactionService api key id attribute", () => {
     const span = spanWith({ "langwatch.api_key.id.extra": "plain text value" });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
     expect(attr(span, "langwatch.api_key.id.extra")).toBe("[SECRET]");
+  });
+});
+
+/**
+ * The run id is how the pipeline attaches a trace to its simulation run. A
+ * shape rule read it as a vendor key and wrote `[SECRET]` over it, so every
+ * trace of every run in a project addressed the same wrong run, and the cost
+ * of all of them landed on a run that never existed.
+ */
+describe("OtlpSpanPiiRedactionService scenario run id attribute", () => {
+  /** @scenario "A simulation trace keeps the run id that links it to its run" */
+  it("keeps the run id on the span it stores", async () => {
+    const { service } = makeService(mkPolicy({}));
+    const runId = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";
+    const span = spanWith({ "scenario.run_id": runId });
+    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    expect(attr(span, "scenario.run_id")).toBe(runId);
   });
 });
 

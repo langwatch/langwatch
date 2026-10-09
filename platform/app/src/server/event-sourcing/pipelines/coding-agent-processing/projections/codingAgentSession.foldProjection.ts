@@ -7,6 +7,10 @@ import type {
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections/foldProjection.types";
 import {
+  codingAgentCostComputedUsd,
+  codingAgentCostReportedUsd,
+} from "../metrics";
+import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
   type MetricFactsContributedEvent,
@@ -23,10 +27,13 @@ import {
 } from "../services/coding-agent-session.derivation";
 import {
   type CodingAgentSessionData,
+  contextUsageKey,
   type MetricSeriesFact,
+  type SessionContextUsage,
   type SessionTitleSource,
   sessionTitleSourceSchema,
 } from "../services/coding-agent-session.types";
+import { stampedContextOf } from "../services/session-context-memo";
 
 /**
  * The coding-agent session fold (ADR-056).
@@ -58,6 +65,16 @@ const codingAgentSessionEvents = [
 ] as const;
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes.
+ *
+ *  2026-08-23: the session's `CostUsd` became the computed figure — the
+ *  call's own tokens priced against the model registry, the same formula and
+ *  the same cache-write lifetime the trace pipeline applies to the identical
+ *  span — and what the agent reports about its own bill moved to the new
+ *  `AgentReportedCostUsd` (migration 00085). Rows stamped earlier carry the
+ *  agent-reported number AS CostUsd and decode the new column as zero, so the
+ *  bump refolds each session once: the replayed span contributions rebuild
+ *  the computed cost, and the replayed api_request contributions land on the
+ *  reported column where they belong.
  *
  *  2026-08-10: `GitBranches` (migration 00077) joined the projected row shape,
  *  the bounded first-seen set of every branch a session reported. A row stamped
@@ -106,7 +123,25 @@ const codingAgentSessionEvents = [
  *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
  *  `LastEventOccurredAt`) and 00054 (`AppliedEventIds`) joined the projected row
  *  shape. That shape change is exactly what this stamp records (ADR-021/022). */
-export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-10";
+export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-23";
+
+/** The cost-drift counters' label set, off one contribution's facts. */
+function costDriftLabels({
+  agent,
+  facts,
+}: {
+  agent?: string;
+  facts: Record<string, unknown>;
+}): { agent: string; model: string } {
+  const model =
+    facts.model ??
+    facts["gen_ai.request.model"] ??
+    facts["gen_ai.response.model"];
+  return {
+    agent: agent ?? "unknown",
+    model: typeof model === "string" && model.length > 0 ? model : "unknown",
+  };
+}
 
 /**
  * The stamp rows carried while migrations 00053 and 00054 shipped.
@@ -319,7 +354,20 @@ export class CodingAgentSessionFoldProjection
       // The contribution's own label, not the folded (first-writer-wins)
       // state's — same reasoning as the log handler below.
       agent: data.agent,
+      // The stamp the contribute command put on the event, so the call's
+      // tokens are charged to the context declared before it.
+      context: stampedContextOf(data),
     });
+
+    // The computed half of the cost-drift canary: what this span's tokens
+    // priced at. Its reported counterpart rides the log handler below.
+    const computedDelta = next.costUsd - state.costUsd;
+    if (computedDelta > 0) {
+      codingAgentCostComputedUsd.inc(
+        costDriftLabels({ agent: data.agent, facts: data.facts }),
+        computedDelta,
+      );
+    }
 
     const withIdentity = this.withContributionIdentity(
       { ...state, ...next },
@@ -340,7 +388,21 @@ export class CodingAgentSessionFoldProjection
       // state's — the logs-only gate must reflect what THIS record is.
       agent: data.agent,
       occurredAtMs: data.timeUnixMs,
+      context: stampedContextOf(data),
     });
+
+    // The reported half of the cost-drift canary: what the agent says this
+    // call billed. Computed-vs-reported per model is the alarm for a stale
+    // price, ours or theirs.
+    const reportedDelta =
+      next.agentReportedCostUsd - state.agentReportedCostUsd;
+    if (reportedDelta > 0) {
+      codingAgentCostReportedUsd.inc(
+        costDriftLabels({ agent: data.agent, facts: data.facts }),
+        reportedDelta,
+      );
+    }
+
     return this.withContributionIdentity(
       { ...state, ...next },
       { ...data, occurredAt: data.timeUnixMs },
@@ -406,6 +468,11 @@ export interface CodingAgentSessionRow {
   entrypoint: string;
   parentSessionId: string;
   isFork: boolean;
+  /**
+   * A thread the agent ran for itself (00096): codex's thread title
+   * generator, its recap. Kept and priced, never listed as a session.
+   */
+  auxiliary: boolean;
   /** Git identity from the companion event, and the generated title (00075). */
   repositoryHost: string;
   repositoryOwner: string;
@@ -446,6 +513,14 @@ export interface CodingAgentSessionRow {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
+  agentReportedCostUsd: number;
+  /**
+   * What the session spent under each declared working context (00097),
+   * first seen first. The counters above are the amount; this says where it
+   * went. Empty on a row folded before the column, whose whole usage then
+   * reads as spent before any declaration.
+   */
+  usageByContext: SessionContextUsage[];
 
   modelCallMs: number;
   toolMs: number;
@@ -548,6 +623,7 @@ export function projectCodingAgentSessionToRow({
     entrypoint: state.entrypoint ?? "",
     parentSessionId: state.parentSessionId ?? "",
     isFork: state.isFork,
+    auxiliary: state.auxiliary,
     ...gitContextColumns(state),
 
     modelCalls: state.modelCalls,
@@ -573,6 +649,8 @@ export function projectCodingAgentSessionToRow({
     cacheReadTokens: state.cacheReadTokens,
     cacheCreationTokens: state.cacheCreationTokens,
     costUsd: state.costUsd,
+    agentReportedCostUsd: state.agentReportedCostUsd,
+    usageByContext: Object.values(state.usageByContext),
 
     modelCallMs: state.modelCallMs,
     toolMs: state.toolMs,
@@ -733,6 +811,7 @@ export function codingAgentSessionStateFromRow(
     userId: nullIfEmpty(row.userId),
     parentSessionId: nullIfEmpty(row.parentSessionId),
     isFork: row.isFork,
+    auxiliary: row.auxiliary,
     repositoryHost: nullIfEmpty(row.repositoryHost),
     repositoryOwner: nullIfEmpty(row.repositoryOwner),
     repositoryName: nullIfEmpty(row.repositoryName),
@@ -771,6 +850,10 @@ export function codingAgentSessionStateFromRow(
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
     costUsd: row.costUsd,
+    agentReportedCostUsd: row.agentReportedCostUsd,
+    usageByContext: Object.fromEntries(
+      row.usageByContext.map((usage) => [contextUsageKey(usage), usage]),
+    ),
 
     modelCallMs: row.modelCallMs,
     toolMs: row.toolMs,

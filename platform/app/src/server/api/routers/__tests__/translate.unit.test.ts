@@ -13,6 +13,14 @@ import { translateRouter } from "../translate";
 // actionable toast (missing model / provider disabled / AI call failed).
 
 const mockGetVercelAIModel = vi.fn();
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("../../../modelProviders/utils", () => ({
   getVercelAIModel: (...args: unknown[]) => mockGetVercelAIModel(...args),
 }));
@@ -33,39 +41,34 @@ type MiddlewareParams = {
 };
 
 // Mock the permission check to always allow
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      resolveTeamPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+      skipPermissionCheck: ({ ctx, next }: MiddlewareParams) => {
         ctx.permissionChecked = true;
         return next();
       },
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
+      skipPermissionCheckProjectCreation: ({ ctx, next }: MiddlewareParams) => {
         ctx.permissionChecked = true;
         return next();
       },
-    checkTeamPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-    skipPermissionCheck: ({ ctx, next }: MiddlewareParams) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-    skipPermissionCheckProjectCreation: ({ ctx, next }: MiddlewareParams) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+    };
+  },
+);
 
 describe("translateRouter.translate()", () => {
   let caller: ReturnType<typeof translateRouter.createCaller>;

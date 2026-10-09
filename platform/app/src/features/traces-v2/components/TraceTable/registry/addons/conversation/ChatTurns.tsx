@@ -10,9 +10,9 @@ import {
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { formatDuration } from "~/shared/format/time";
 import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatDuration } from "../../../../../utils/formatters";
 import { SystemPromptBanner } from "../../../../TraceDrawer/conversationView/SystemPromptBanner";
 import { TraceIdPeek } from "../../../../TraceIdPeek";
 import { findMessageContent, parseSystemPrompt } from "../../../chatContent";
@@ -219,7 +219,11 @@ const TurnDivider: React.FC<{
           {formatDuration(trace.durationMs)}
         </Text>
         <Box marginLeft={1}>
-          <TraceIdPeek traceId={trace.traceId} occurredAtMs={trace.timestamp} />
+          <TraceIdPeek
+            traceId={trace.traceId}
+            occurredAtMs={trace.timestamp}
+            ownerProjectId={trace.projectId}
+          />
         </Box>
       </HStack>
       <Box

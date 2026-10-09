@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/identity-tests.tsbuildinfo"
+  },
+  // The suite, plus the sources it exercises. `vitest` resolves from the
+  // package's own devDependency, so the test types are checked here and
+  // nowhere else.
+  "include": ["src/**/*.ts", "src/__tests__/**/*.ts"],
+  "exclude": []
+}

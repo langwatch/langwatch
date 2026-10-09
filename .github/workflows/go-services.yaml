@@ -40,6 +40,7 @@ on:
       - "charts/gateway/**"
       # from `langyagent`
       - "services/langyagent/**"
+      - "services/langyworker/**"
       - "sdks/go/**"
       - "infra/docker/Dockerfile.langyagent"
       - "sdks/typescript/**"
@@ -114,6 +115,7 @@ jobs:
               # (a new copy-types.sh input was never COPYed into the image).
               # Validate the image build whenever any build input moves.
               - 'services/langyagent/**'
+              - 'services/langyworker/**'
               - 'pkg/**'
               - 'cmd/**'
               - 'sdks/go/**'
@@ -255,6 +257,12 @@ jobs:
       # resolve against; inline YAML steps bind nothing.
       - name: Assert shutdown values render as the pod needs them
         run: ./charts/gateway/tests/shutdown-values.sh
+
+      # A plain install creates no gateway Ingress and no ingress-nginx
+      # annotations, an enabled one carries the class the operator picked,
+      # and the PDB never blocks a node drain at any replica count.
+      - name: Assert the gateway Ingress is opt-in and the PDB allows drains
+        run: ./charts/gateway/tests/ingress-and-pdb.sh
 
       # The chart's graceful window has to stay above the gateway's 45s
       # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),

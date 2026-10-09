@@ -10,12 +10,12 @@ from ...models.post_api_scenario_events_browser_tab_response_400 import PostApiS
 from ...models.post_api_scenario_events_browser_tab_response_401 import PostApiScenarioEventsBrowserTabResponse401
 from ...models.post_api_scenario_events_browser_tab_response_422 import PostApiScenarioEventsBrowserTabResponse422
 from ...models.post_api_scenario_events_browser_tab_response_500 import PostApiScenarioEventsBrowserTabResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiScenarioEventsBrowserTabBody | Unset = UNSET,
+    body: PostApiScenarioEventsBrowserTabBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,8 +24,7 @@ def _get_kwargs(
         "url": "/api/scenario-events/browser-tab",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -96,8 +95,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenarioEventsBrowserTabBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenarioEventsBrowserTabBody,
 ) -> Response[
     PostApiScenarioEventsBrowserTabResponse200
     | PostApiScenarioEventsBrowserTabResponse400
@@ -109,7 +108,7 @@ def sync_detailed(
     tab took it.
 
     Args:
-        body (PostApiScenarioEventsBrowserTabBody | Unset):
+        body (PostApiScenarioEventsBrowserTabBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -132,8 +131,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenarioEventsBrowserTabBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenarioEventsBrowserTabBody,
 ) -> (
     PostApiScenarioEventsBrowserTabResponse200
     | PostApiScenarioEventsBrowserTabResponse400
@@ -146,7 +145,7 @@ def sync(
     tab took it.
 
     Args:
-        body (PostApiScenarioEventsBrowserTabBody | Unset):
+        body (PostApiScenarioEventsBrowserTabBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -164,8 +163,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenarioEventsBrowserTabBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenarioEventsBrowserTabBody,
 ) -> Response[
     PostApiScenarioEventsBrowserTabResponse200
     | PostApiScenarioEventsBrowserTabResponse400
@@ -177,7 +176,7 @@ async def asyncio_detailed(
     tab took it.
 
     Args:
-        body (PostApiScenarioEventsBrowserTabBody | Unset):
+        body (PostApiScenarioEventsBrowserTabBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -198,8 +197,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiScenarioEventsBrowserTabBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiScenarioEventsBrowserTabBody,
 ) -> (
     PostApiScenarioEventsBrowserTabResponse200
     | PostApiScenarioEventsBrowserTabResponse400
@@ -212,7 +211,7 @@ async def asyncio(
     tab took it.
 
     Args:
-        body (PostApiScenarioEventsBrowserTabBody | Unset):
+        body (PostApiScenarioEventsBrowserTabBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

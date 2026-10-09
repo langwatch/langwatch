@@ -19,6 +19,12 @@ vi.mock("~/utils/crispBubblePolicy", () => ({
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => true,
 }));
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  // The palette resolves release flags over tRPC, which this render has no
+  // provider for. The flag state is not what these tests are about.
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));

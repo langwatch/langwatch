@@ -2,27 +2,27 @@ import {
   Badge,
   Box,
   Button,
-  Code,
   HStack,
   SimpleGrid,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Calendar,
   Edit2,
   Eye,
   Filter,
   MoreVertical,
+  Plus,
   Trash,
-  TrendingUp,
   Zap,
 } from "react-feather";
-import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { HoverableBigText } from "~/components/HoverableBigText";
+import { AggregateReadOnlyGate } from "~/components/projects/AggregateReadOnlyNotice";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
 import { Link } from "~/components/ui/link";
@@ -34,33 +34,60 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { UseCaseStrip } from "~/features/automations/components/page/AutomationsEducation";
 import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";
 import {
-  AlertRuleCell,
-  AlertSubjectCell,
+  AutomationRow,
   describeSchedule,
+  EmailList,
   EmptyHint,
-  FiringStatus,
-  LastFiredCell,
   MetricHeader,
   ReportRunCells,
   ReportSubjectCell,
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
-import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
+import {
+  type ConditionSource,
+  presetLabels,
+} from "~/features/automations/logic/draftReducer";
+import {
+  RUNAWAY_PAUSE_EXPLANATION,
+  RUNAWAY_PAUSE_REASON,
+} from "~/features/automations/logic/pauseReasons";
+import {
+  slackDestinationLabel,
+  slackDestinationPresentation,
+} from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
+import { showErrorToast } from "~/features/errors";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";
 import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
-type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
+/** What a saved row watches (`draft.source`), derived the same way the
+ *  composer derives it — so the row-actions menu, the delete dialog, and the
+ *  toast all name the row the way the customer does. Both automation subjects
+ *  share one noun; only a report has its own (ADR-093 §1). */
+function triggerSource(trigger: EnhancedTrigger): ConditionSource {
+  if (trigger.customGraphId) return "customGraph";
+  if (trigger.triggerKind === "REPORT") return "report";
+  return "trace";
+}
+
+/** The customer's noun for a saved row — the menu item, the delete dialog and
+ *  both toasts must all name it identically. */
+function triggerNoun(trigger: EnhancedTrigger): string {
+  return presetLabels({ source: triggerSource(trigger), isEdit: false }).noun;
+}
+
+type AutomationSection = "overview" | "automations" | "reports";
 
 const sectionDetails: Record<
   AutomationSection,
@@ -73,34 +100,54 @@ const sectionDetails: Record<
   },
   automations: {
     title: "Automations",
-    description: "Act on every incoming trace that matches your filters.",
-  },
-  alerts: {
-    title: "Alerts",
     description:
-      "Get told when a metric crosses a threshold and when it recovers.",
+      "Watch a trace filter or a graph, and act when something matches.",
   },
-  schedules: {
-    title: "Schedules",
+  reports: {
+    title: "Reports",
     description:
-      "Send a dashboard, graph, or trace table on a recurring cadence.",
+      "Send a dashboard, graph, or trace table on a recurring schedule.",
   },
 };
 
 const sectionFromPath = (pathname: string): AutomationSection => {
   if (pathname.includes("/automations/automations")) return "automations";
-  if (pathname.includes("/automations/alerts")) return "alerts";
-  if (pathname.includes("/automations/schedules")) return "schedules";
+  // Alerts and automations are one list now (ADR-093 §1). The old path keeps
+  // resolving to it, so a link issued before the merge still lands on the row
+  // it was pointing at rather than on a dead route.
+  if (pathname.includes("/automations/alerts")) return "automations";
+  // A report is what the third concept is called; "/schedules" is the path it
+  // shipped under and keeps answering on, so no existing link breaks. There is
+  // deliberately no "/reports" path yet — renaming the route is its own change,
+  // and a branch here for a path no route file serves would only ever 404.
+  if (pathname.includes("/automations/schedules")) return "reports";
   return "overview";
 };
 
 function AutomationsPage() {
   const { project } = useOrganizationTeamProject();
+  const projectIsAggregate = isAggregateProjectKind(project?.kind);
   const { openDrawer } = useDrawer();
   const router = useRouter();
   const section = sectionFromPath(router.pathname);
   const details = sectionDetails[section];
   const basePath = project ? `/${project.slug}/automations` : "/auth/signin";
+  const trpcUtils = api.useUtils();
+
+  // Row pending a delete confirmation (#6716: deletion was immediate and
+  // irreversible). Holding the row itself, not just its id, lets the dialog
+  // and the toast name the row the way the customer does (automation /
+  // report).
+  const [pendingDelete, setPendingDelete] = useState<EnhancedTrigger | null>(
+    null,
+  );
+
+  // One query for the whole table, not one per row: every Slack row names
+  // its connection from the same list (ADR-093 §5a).
+  const slackConnections = api.slackIntegration.list.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, refetchOnWindowFocus: false },
+  );
 
   const triggers = api.automation.getTriggers.useQuery(
     {
@@ -112,7 +159,7 @@ function AutomationsPage() {
   );
 
   // Fire-history rollup for the metric columns (last fired, 30-day count,
-  // open alert incidents). Triggers that never fired have no entry.
+  // open incidents). Triggers that never fired have no entry.
   const triggerStats = api.automation.getTriggerStats.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
@@ -148,22 +195,20 @@ function AutomationsPage() {
     { enabled: !!project?.id },
   );
 
-  // Alerts react to a custom graph's metric; automations react to traces.
-  // Distinct shapes, so they get distinct tables.
-  const alerts = useMemo(
-    () => (triggers.data ?? []).filter((t) => !!t.customGraphId),
-    [triggers.data],
-  );
+  // One table for everything that watches something (ADR-093 §1): a trace
+  // filter and a graph metric are two subjects of one kind, not two kinds.
+  // Reports keep their own tab — the clock is not something to watch.
   const reports = useMemo(
     () => (triggers.data ?? []).filter((t) => t.triggerKind === "REPORT"),
     [triggers.data],
   );
-  const traceAutomations = useMemo(
-    () =>
-      (triggers.data ?? []).filter(
-        (t) => !t.customGraphId && t.triggerKind !== "REPORT",
-      ),
+  const automations = useMemo(
+    () => (triggers.data ?? []).filter((t) => t.triggerKind !== "REPORT"),
     [triggers.data],
+  );
+  const graphAutomationCount = useMemo(
+    () => automations.filter((t) => !!t.customGraphId).length,
+    [automations],
   );
   // Only needed to resolve dataset names on ADD_TO_DATASET rows. Gated on
   // the project being loaded (an empty projectId trips the permission
@@ -194,7 +239,7 @@ function AutomationsPage() {
   const graphsQuery = api.graphs.getAll.useQuery(
     { projectId: project?.id ?? "" },
     {
-      enabled: !!project?.id && (alerts.length > 0 || reportsUseGraph),
+      enabled: !!project?.id && (graphAutomationCount > 0 || reportsUseGraph),
       retry: false,
     },
   );
@@ -219,18 +264,28 @@ function AutomationsPage() {
   const toggleTrigger = api.automation.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.automation.deleteById.useMutation();
 
-  const handleToggleTrigger = (triggerId: string, active: boolean) => {
+  const handleToggleTrigger = ({
+    trigger,
+    active,
+  }: {
+    trigger: EnhancedTrigger;
+    active: boolean;
+  }) => {
+    const noun = triggerNoun(trigger);
     toggleTrigger.mutate(
-      { triggerId, active, projectId: project?.id ?? "" },
+      { triggerId: trigger.id, active, projectId: project?.id ?? "" },
       {
         onSuccess: () => {
           void triggers.refetch();
+          // The view/edit drawers read this row by id — without invalidating
+          // it too, reopening either after a toggle can still show the
+          // pre-toggle active state until something else happens to refetch it.
+          void trpcUtils.automation.getTriggerById.invalidate();
         },
-        onError: () => {
-          toaster.create({
-            title: "Update automation",
-            type: "error",
-            description: "Failed to update automation",
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: `Couldn't update ${noun}`,
           });
         },
       },
@@ -252,24 +307,31 @@ function AutomationsPage() {
     return "";
   };
 
-  const deleteTrigger = (triggerId: string) => {
+  const deleteTrigger = (trigger: EnhancedTrigger) => {
+    const noun = triggerNoun(trigger);
     deleteTriggerMutation.mutate(
-      { triggerId, projectId: project?.id ?? "" },
+      { triggerId: trigger.id, projectId: project?.id ?? "" },
       {
         onSuccess: () => {
           toaster.create({
-            title: "Delete automation",
+            title: `Delete ${noun}`,
             type: "success",
-            description: "Automation deleted",
+            description: `${noun.charAt(0).toUpperCase()}${noun.slice(1)} deleted`,
           });
           void triggers.refetch();
+          // The view/edit drawers read this row by id — without invalidating
+          // it too, a still-open drawer for the deleted row would keep
+          // showing it as though nothing happened.
+          void trpcUtils.automation.getTriggerById.invalidate();
+          setPendingDelete(null);
         },
-        onError: () => {
-          toaster.create({
-            title: "Delete automation",
-            type: "error",
-            description: "Failed to delete automation",
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: `Couldn't delete ${noun}`,
           });
+          // Leave the dialog open so the author can retry or cancel — closing
+          // it here would silently discard the confirmation they just gave.
         },
       },
     );
@@ -287,18 +349,17 @@ function AutomationsPage() {
     switch (action) {
       case "SEND_SLACK_MESSAGE":
         return (
-          <Tooltip
-            content={(actionParams as { slackWebhook: string }).slackWebhook}
-          >
-            <Text lineClamp={1} display="block">
-              Webhook
-            </Text>
-          </Tooltip>
+          <SlackNotifyCell
+            actionParams={actionParams}
+            connections={slackConnections.data?.connections}
+          />
         );
       case "SEND_EMAIL":
-        return (actionParams as { members: string[] }).members?.join(", ");
+        return <EmailList emails={actionParams.members ?? []} />;
       case "ADD_TO_DATASET":
         return getDatasetName(actionParams) ?? "";
+      case "SEND_WEBHOOK":
+        return actionParams.url ?? "";
     }
   };
 
@@ -348,7 +409,10 @@ function AutomationsPage() {
 
   const FilterValue = ({ children }: { children: React.ReactNode }) => {
     return (
-      <Box padding={1} borderRightRadius="md">
+      // minWidth 0 opts out of the flex child's min-width: auto, so a long
+      // unbreakable value (a monitor id) clamps inside the chip instead of
+      // widening it past its border.
+      <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
         <HoverableBigText lineClamp={1} expandable={false}>
           {children}
         </HoverableBigText>
@@ -371,59 +435,70 @@ function AutomationsPage() {
     );
   };
 
-  const rowActionsMenu = (trigger: EnhancedTrigger) => (
-    <Menu.Root>
-      <Menu.Trigger asChild>
-        <Button
-          variant={"ghost"}
-          aria-label={`Actions for ${trigger.name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <MoreVertical />
-        </Button>
-      </Menu.Trigger>
-      <Menu.Content>
-        <Menu.Item
-          value="view"
-          onClick={(event) => {
-            event.stopPropagation();
-            openDrawer("viewAutomation", { automationId: trigger.id });
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2}>
-            <Eye size={14} />
-            View
-          </Box>
-        </Menu.Item>
-        <Menu.Item
-          value="edit"
-          onClick={(event) => {
-            event.stopPropagation();
-            openDrawer("automation", { automationId: trigger.id });
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2}>
-            <Edit2 size={14} />
-            Edit
-          </Box>
-        </Menu.Item>
-        <Menu.Item
-          value="delete"
-          onClick={(event) => {
-            event.stopPropagation();
-            deleteTrigger(trigger.id);
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2} color="red.fg">
-            <Trash size={14} />
-            Delete
-          </Box>
-        </Menu.Item>
-      </Menu.Content>
-    </Menu.Root>
-  );
+  const rowActionsMenu = (trigger: EnhancedTrigger) => {
+    const noun = triggerNoun(trigger);
+    return (
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button
+            variant={"ghost"}
+            aria-label={`Actions for ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <MoreVertical aria-hidden="true" />
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          {/* `aria-label` is set explicitly (not left to the text content) so
+              View/Edit/Delete keep an accessible name distinguishing the row
+              they belong to — Playwright resolving them by their visible text
+              alone was masking that the accessibility tree had nothing to
+              announce. #6716. */}
+          <Menu.Item
+            value="view"
+            aria-label={`View ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openDrawer("viewAutomation", { automationId: trigger.id });
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={2}>
+              <Eye size={14} aria-hidden="true" />
+              View
+            </Box>
+          </Menu.Item>
+          <Menu.Item
+            value="edit"
+            aria-label={`Edit ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openDrawer("automation", { automationId: trigger.id });
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={2}>
+              <Edit2 size={14} aria-hidden="true" />
+              Edit
+            </Box>
+          </Menu.Item>
+          <Menu.Item
+            value="delete"
+            aria-label={`Delete ${noun} ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setPendingDelete(trigger);
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={2} color="red.fg">
+              <Trash size={14} aria-hidden="true" />
+              Delete {noun}
+            </Box>
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Root>
+    );
+  };
 
   // No `key` here: the row is wrapped by <LangyContextTarget>, and the key
   // belongs on the outermost element of the iteration, not on the row inside it.
@@ -449,7 +524,7 @@ function AutomationsPage() {
             checked={trigger.active}
             inputProps={{ "aria-label": `Toggle ${trigger.name}` }}
             onCheckedChange={({ checked }) => {
-              handleToggleTrigger(trigger.id, checked);
+              handleToggleTrigger({ trigger, active: checked });
             }}
           />
           {/* An automation that is running but silently dropping matches is
@@ -459,7 +534,7 @@ function AutomationsPage() {
               plain span, and a span with no tab stop can be hovered but never
               focused, so the explanation would be mouse-only. */}
           {pausedForVolume ? (
-            <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+            <Tooltip content={RUNAWAY_PAUSE_EXPLANATION}>
               <Badge colorPalette="red" size="sm" tabIndex={0}>
                 Paused
               </Badge>
@@ -516,15 +591,13 @@ function AutomationsPage() {
         {
           label: "Automations",
           href: `${basePath}/automations`,
+          // The retired alerts path renders this same table, so it highlights
+          // this tab rather than leaving the reader on a page no tab claims.
+          includePath: `${basePath}/alerts`,
           icon: <Zap size={14} />,
         },
         {
-          label: "Alerts",
-          href: `${basePath}/alerts`,
-          icon: <TrendingUp size={14} />,
-        },
-        {
-          label: "Schedules",
+          label: "Reports",
           href: `${basePath}/schedules`,
           icon: <Calendar size={14} />,
         },
@@ -539,468 +612,422 @@ function AutomationsPage() {
             {details.description}
           </Text>
 
-          {isLoading ? (
-            <Text textStyle="sm" color="fg.muted">
-              Loading...
-            </Text>
-          ) : (
-            <>
-              {section === "alerts" && (
-                <VStack align="stretch" gap={4}>
-                  <SectionHeader
-                    icon={<TrendingUp size={18} />}
-                    accent="orange"
-                    title="Alerts"
-                    count={alerts.length}
-                    summary="Get told when a metric crosses a threshold, and again when it recovers."
-                    details="An alert watches one series on an analytics graph. When the value crosses your threshold it notifies your channel; when it returns to normal it sends a recovery notice."
-                    addLabel="New alert"
-                    onAdd={() =>
-                      openDrawer("automation", {
-                        initialSource: "customGraph",
-                      })
-                    }
-                  />
-                  {alerts.length === 0 ? (
-                    <UseCaseStrip
-                      kind="alert"
-                      onOpen={(prefill) => openDrawer("automation", prefill)}
-                    />
-                  ) : (
-                    <TableShell>
-                      <Table.Root variant="line" width="full">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              Fires when
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader>Notifies</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Last fired"
-                                help="When this alert last crossed its threshold and notified you."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Status"
-                                help="Firing while the metric is past its threshold, back to OK when it recovers."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {alerts.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
-                            const stats = statsByTriggerId.get(trigger.id);
-                            return (
-                              // Armed, the row can be handed to Langy; its own click (open the
-                              // automation) is untouched. The chip id matches the one the
-                              // `/automations/<id>` route derives, so the row and the open
-                              // automation are one chip.
-                              <LangyContextTarget
-                                key={trigger.id}
-                                target={automationContextChip({
-                                  automationId: trigger.id,
-                                  name: trigger.name,
-                                })}
-                              >
-                                <Table.Row {...sharedRowProps(trigger)}>
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
-                                  <Table.Cell maxWidth="260px">
-                                    <AlertSubjectCell
-                                      graphName={
-                                        trigger.customGraph?.name ?? null
-                                      }
-                                      graph={graphJsonById.get(
-                                        trigger.customGraphId ?? "",
-                                      )}
-                                      seriesName={actionParams.seriesName}
-                                    />
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <AlertRuleCell
-                                      actionParams={actionParams}
-                                    />
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {actionItems(trigger.action, actionParams)}
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <LastFiredCell
-                                      trigger={trigger}
-                                      stats={stats}
-                                    />
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <FiringStatus
-                                      firing={!!stats?.currentlyFiring}
-                                    />
-                                  </Table.Cell>
-                                  {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
-                                </Table.Row>
-                              </LangyContextTarget>
-                            );
-                          })}
-                        </Table.Body>
-                      </Table.Root>
-                    </TableShell>
-                  )}
-                </VStack>
-              )}
+          {/* An aggregate (ADR-144) runs nothing of its own, and the server
+              refuses an automation created under it. */}
+          <AggregateReadOnlyGate isAggregate={projectIsAggregate}>
+            {isLoading ? (
+              <Text textStyle="sm" color="fg.muted">
+                Loading...
+              </Text>
+            ) : (
+              <>
+                {section === "overview" && (
+                  <VStack align="stretch" gap={8} width="full">
+                    {/* G5: the Overview had tiles, activity, and a use-case
+                      strip, but no way to actually start creating something —
+                      every other tab opens the composer from its own section
+                      header. Two things can be created, because there are two
+                      kinds left (ADR-093 §1): what an automation watches is
+                      chosen inside its own first step, not here. */}
+                    <HStack justify="flex-end">
+                      <Menu.Root>
+                        <Menu.Trigger asChild>
+                          <Button size="sm" colorPalette="orange">
+                            <Plus size={14} aria-hidden="true" /> Create
+                          </Button>
+                        </Menu.Trigger>
+                        <Menu.Content>
+                          <Menu.Item
+                            value="automation"
+                            onClick={() => openDrawer("automation", {})}
+                          >
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Zap size={14} aria-hidden="true" />
+                              New automation
+                            </Box>
+                          </Menu.Item>
+                          <Menu.Item
+                            value="report"
+                            onClick={() =>
+                              openDrawer("automation", {
+                                initialSource: "report",
+                              })
+                            }
+                          >
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Calendar size={14} aria-hidden="true" />
+                              New report
+                            </Box>
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
+                    </HStack>
 
-              {section === "overview" && (
-                <VStack align="stretch" gap={8} width="full">
-                  <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-                    <StatTile
-                      label="Firing now"
-                      value={overview.firingNow}
-                      sub={
-                        overview.firingNow > 0
-                          ? "alerts over their threshold"
-                          : "all clear"
-                      }
-                      alert={overview.firingNow > 0}
-                    />
-                    <StatTile
-                      label="Fired (30 days)"
-                      value={overview.fired30d.toLocaleString()}
-                      sub="across every automation"
-                    />
-                    <StatTile
-                      label="Next scheduled"
-                      value={
-                        overview.next
-                          ? (formatTimeAgo(overview.next.at) ?? "—")
-                          : "—"
-                      }
-                      sub={overview.nextName ?? "no schedules queued"}
-                    />
-                  </SimpleGrid>
+                    <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                      <StatTile
+                        label="Firing now"
+                        value={overview.firingNow}
+                        sub={
+                          overview.firingNow > 0
+                            ? "automations over their threshold"
+                            : "all clear"
+                        }
+                        alert={overview.firingNow > 0}
+                      />
+                      <StatTile
+                        label="Fired (30 days)"
+                        value={overview.fired30d.toLocaleString()}
+                        sub="across every automation"
+                      />
+                      <StatTile
+                        label="Next scheduled"
+                        value={
+                          overview.next
+                            ? (formatTimeAgo(overview.next.at) ?? "—")
+                            : "—"
+                        }
+                        sub={overview.nextName ?? "no reports queued"}
+                      />
+                    </SimpleGrid>
 
-                  <VStack align="stretch" gap={3} width="full">
-                    <OverviewSectionHeading
-                      title="Recent activity"
-                      summary="See what alerts, schedules, and automations have done recently."
-                    />
-                    <AutomationsHistory
-                      fires={activity.data ?? []}
-                      triggers={triggers.data ?? []}
-                      isLoading={activity.isLoading}
-                      onOpenAutomation={(triggerId) =>
-                        openDrawer("viewAutomation", {
-                          automationId: triggerId,
-                        })
-                      }
-                    />
-                  </VStack>
-
-                  <VStack align="stretch" gap={4} width="full">
-                    <OverviewSectionHeading
-                      title="Popular uses"
-                      summary="Start from a common workflow and tailor it to your project."
-                    />
-                    <VStack align="stretch" gap={2}>
-                      <Text
-                        textStyle="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
-                        Alerts
-                      </Text>
-                      <UseCaseStrip
-                        kind="alert"
-                        showLabel={false}
-                        onOpen={(prefill) => openDrawer("automation", prefill)}
+                    <VStack align="stretch" gap={3} width="full">
+                      <OverviewSectionHeading
+                        title="Recent activity"
+                        summary="See what your automations and reports have done recently."
+                      />
+                      <AutomationsHistory
+                        fires={activity.data ?? []}
+                        triggers={triggers.data ?? []}
+                        isLoading={activity.isLoading}
+                        onOpenAutomation={(triggerId) =>
+                          openDrawer("viewAutomation", {
+                            automationId: triggerId,
+                          })
+                        }
                       />
                     </VStack>
-                    <VStack align="stretch" gap={2}>
-                      <Text
-                        textStyle="xs"
-                        fontWeight="semibold"
-                        color="fg.muted"
-                      >
-                        Automations
-                      </Text>
-                      <UseCaseStrip
-                        kind="automation"
-                        showLabel={false}
-                        onOpen={(prefill) => openDrawer("automation", prefill)}
+
+                    <VStack align="stretch" gap={4} width="full">
+                      <OverviewSectionHeading
+                        title="Popular uses"
+                        summary="Start from a common workflow and tailor it to your project."
                       />
+                      {/* Grouped by what each one watches, which is the only
+                        distinction left between them (ADR-093 §1). */}
+                      <VStack align="stretch" gap={2}>
+                        <Text
+                          textStyle="xs"
+                          fontWeight="semibold"
+                          color="fg.muted"
+                        >
+                          Watching a graph
+                        </Text>
+                        <UseCaseStrip
+                          kind="alert"
+                          showLabel={false}
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                      </VStack>
+                      <VStack align="stretch" gap={2}>
+                        <Text
+                          textStyle="xs"
+                          fontWeight="semibold"
+                          color="fg.muted"
+                        >
+                          Watching a trace filter
+                        </Text>
+                        <UseCaseStrip
+                          kind="automation"
+                          showLabel={false}
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                      </VStack>
                     </VStack>
                   </VStack>
-                </VStack>
-              )}
-
-              {section === "schedules" && (
-                <VStack align="stretch" gap={4}>
-                  <SectionHeader
-                    icon={<Calendar size={18} />}
-                    accent="purple"
-                    title="Schedules"
-                    count={reports.length}
-                    summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
-                    details="A schedule bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
-                    addLabel="New schedule"
-                    onAdd={() =>
-                      openDrawer("automation", { initialSource: "report" })
-                    }
-                  />
-                  {reports.length === 0 ? (
-                    <EmptyHint>
-                      No schedules yet. Create one for a recurring Slack or
-                      email digest.
-                    </EmptyHint>
-                  ) : (
-                    <TableShell>
-                      <Table.Root variant="line" width="full">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Sends</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              Schedule
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Next run"
-                                help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Last run"
-                                help="The last time this was sent."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {reports.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
-                            const schedule = (
-                              actionParams as {
-                                schedule?: {
-                                  cron?: string;
-                                  timezone?: string;
-                                };
-                              }
-                            ).schedule;
-                            return (
-                              // Armed, the row can be handed to Langy; its own click (open the
-                              // automation) is untouched. The chip id matches the one the
-                              // `/automations/<id>` route derives, so the row and the open
-                              // automation are one chip.
-                              <LangyContextTarget
-                                key={trigger.id}
-                                target={automationContextChip({
-                                  automationId: trigger.id,
-                                  name: trigger.name,
-                                })}
-                              >
-                                <Table.Row
-                                  data-trigger-id={trigger.id}
-                                  cursor="pointer"
-                                  _hover={{ bg: "bg.muted" }}
-                                  onClick={() =>
-                                    openDrawer("automation", {
-                                      automationId: trigger.id,
-                                    })
-                                  }
+                )}
+                {section === "reports" && (
+                  <VStack align="stretch" gap={4}>
+                    <SectionHeader
+                      icon={<Calendar size={18} />}
+                      accent="purple"
+                      title="Reports"
+                      count={reports.length}
+                      details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
+                      addLabel="New report"
+                      onAdd={() =>
+                        openDrawer("automation", { initialSource: "report" })
+                      }
+                    />
+                    {reports.length === 0 ? (
+                      <EmptyHint>
+                        No reports yet. Create one for a recurring Slack or
+                        email digest.
+                      </EmptyHint>
+                    ) : (
+                      <TableShell>
+                        <Table.Root variant="line" width="full">
+                          <Table.Header>
+                            <Table.Row>
+                              <Table.ColumnHeader width="20%">
+                                Name
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="17%">
+                                Sends
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="16%">
+                                Schedule
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="12%">
+                                <MetricHeader
+                                  label="Next run"
+                                  help="When this next goes out, straight from the scheduler. A paused report has no next run."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="12%">
+                                <MetricHeader
+                                  label="Last run"
+                                  help="The last time this was sent."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="9%">
+                                Delivery
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%">
+                                Active
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%" />
+                            </Table.Row>
+                          </Table.Header>
+                          <Table.Body>
+                            {reports.map((trigger) => {
+                              const actionParams =
+                                trigger.actionParams as TriggerActionParams;
+                              const schedule = (
+                                actionParams as {
+                                  schedule?: {
+                                    cron?: string;
+                                    timezone?: string;
+                                  };
+                                }
+                              ).schedule;
+                              return (
+                                // Armed, the row can be handed to Langy; its own click (open the
+                                // automation) is untouched. The chip id matches the one the
+                                // `/automations/<id>` route derives, so the row and the open
+                                // automation are one chip.
+                                <LangyContextTarget
+                                  key={trigger.id}
+                                  target={automationContextChip({
+                                    automationId: trigger.id,
+                                    name: trigger.name,
+                                  })}
                                 >
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    <ReportSubjectCell
-                                      actionParams={actionParams}
-                                      graphNameById={graphNameById}
-                                    />
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <Text textStyle="sm">
-                                      {schedule?.cron
-                                        ? describeSchedule(
-                                            schedule.cron,
-                                            schedule.timezone ?? "UTC",
-                                          )
-                                        : "Not set"}
-                                    </Text>
-                                  </Table.Cell>
-                                  <ReportRunCells
-                                    schedule={scheduleByTriggerId.get(
-                                      trigger.id,
-                                    )}
-                                    loading={reportSchedules.isLoading}
-                                  />
-                                  <Table.Cell>
-                                    {trigger.action === "SEND_SLACK_MESSAGE"
-                                      ? "Slack"
-                                      : "Email"}
-                                  </Table.Cell>
-                                  {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
-                                </Table.Row>
-                              </LangyContextTarget>
-                            );
-                          })}
-                        </Table.Body>
-                      </Table.Root>
-                    </TableShell>
-                  )}
-                </VStack>
-              )}
-
-              {section === "automations" && (
-                <VStack align="stretch" gap={4}>
-                  <SectionHeader
-                    icon={<Zap size={18} />}
-                    accent="blue"
-                    title="Automations"
-                    count={traceAutomations.length}
-                    summary="Act on every incoming trace that matches your filters."
-                    details="An automation runs on each trace matching your filters: post to Slack or email, add rows to a dataset, or queue traces for annotation."
-                    addLabel="New automation"
-                    onAdd={() => openDrawer("automation", {})}
-                  />
-                  {traceAutomations.length === 0 ? (
-                    <UseCaseStrip
-                      kind="automation"
-                      onOpen={(prefill) => openDrawer("automation", prefill)}
-                    />
-                  ) : (
-                    <TableShell>
-                      <Table.Root variant="line" width="full">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Acts on</Table.ColumnHeader>
-                            <Table.ColumnHeader>Then</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Last fired"
-                                help="When this automation last matched a trace and ran its action. Automations on a digest schedule also show when the next bundled send is due."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Fires (30d)"
-                                help="Times this automation fired in the last 30 days."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {traceAutomations.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
-                            const stats = statsByTriggerId.get(trigger.id);
-                            return (
-                              // Armed, the row can be handed to Langy; its own click (open the
-                              // automation) is untouched. The chip id matches the one the
-                              // `/automations/<id>` route derives, so the row and the open
-                              // automation are one chip.
-                              <LangyContextTarget
-                                key={trigger.id}
-                                target={automationContextChip({
-                                  automationId: trigger.id,
-                                  name: trigger.name,
-                                })}
-                              >
-                                <Table.Row {...sharedRowProps(trigger)}>
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
-                                  <Table.Cell maxWidth="360px">
-                                    <VStack gap={2} align="stretch">
-                                      {applyChecks(
-                                        trigger.checks?.filter(
-                                          (check): check is Monitor => !!check,
-                                        ) ?? [],
-                                      )}
-
-                                      {trigger.filterQuery ? (
-                                        // ADR-043: a trace-subject automation shows
-                                        // its search query.
-                                        <Code
-                                          size="sm"
-                                          variant="surface"
-                                          whiteSpace="pre-wrap"
-                                          wordBreak="break-word"
-                                        >
-                                          {trigger.filterQuery}
-                                        </Code>
-                                      ) : trigger.filters &&
-                                        typeof trigger.filters === "string" &&
-                                        trigger.filters !== "{}" ? (
-                                        <FilterDisplay
-                                          filters={trigger.filters}
-                                          hasBorder={true}
-                                        />
-                                      ) : null}
-                                    </VStack>
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    <VStack align="start" gap={0}>
-                                      <Text textStyle="sm" fontWeight="medium">
-                                        {triggerActionName(trigger.action)}
+                                  <Table.Row
+                                    data-trigger-id={trigger.id}
+                                    cursor="pointer"
+                                    _hover={{ bg: "bg.muted" }}
+                                    onClick={() =>
+                                      openDrawer("automation", {
+                                        automationId: trigger.id,
+                                      })
+                                    }
+                                  >
+                                    <Table.Cell fontWeight="medium">
+                                      {trigger.name}
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                      <ReportSubjectCell
+                                        actionParams={actionParams}
+                                        graphNameById={graphNameById}
+                                      />
+                                    </Table.Cell>
+                                    {/* No nowrap here: a cadence plus an IANA
+                                      zone ("Weekly · Monday 09:00
+                                      Europe/Amsterdam") is far wider than this
+                                      column, and under a fixed layout a
+                                      nowrap cell prints straight over its
+                                      neighbour instead of widening. */}
+                                    <Table.Cell>
+                                      <Text textStyle="sm">
+                                        {schedule?.cron
+                                          ? describeSchedule(
+                                              schedule.cron,
+                                              schedule.timezone ?? "UTC",
+                                            )
+                                          : "Not set"}
                                       </Text>
-                                      <Box textStyle="xs" color="fg.muted">
-                                        {actionItems(
-                                          trigger.action,
-                                          actionParams,
-                                        )}
-                                      </Box>
-                                    </VStack>
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <LastFiredCell
-                                      trigger={trigger}
-                                      stats={stats}
+                                    </Table.Cell>
+                                    <ReportRunCells
+                                      schedule={scheduleByTriggerId.get(
+                                        trigger.id,
+                                      )}
+                                      loading={reportSchedules.isLoading}
                                     />
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    <Text as="span" color="fg.muted">
-                                      {stats?.recentFireCount ?? 0}
-                                    </Text>
-                                  </Table.Cell>
-                                  {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
-                                </Table.Row>
-                              </LangyContextTarget>
-                            );
-                          })}
-                        </Table.Body>
-                      </Table.Root>
-                    </TableShell>
-                  )}
-                </VStack>
-              )}
-            </>
-          )}
+                                    <Table.Cell>
+                                      {trigger.action === "SEND_SLACK_MESSAGE"
+                                        ? "Slack"
+                                        : "Email"}
+                                    </Table.Cell>
+                                    {activeCell(trigger)}
+                                    <Table.Cell>
+                                      {rowActionsMenu(trigger)}
+                                    </Table.Cell>
+                                  </Table.Row>
+                                </LangyContextTarget>
+                              );
+                            })}
+                          </Table.Body>
+                        </Table.Root>
+                      </TableShell>
+                    )}
+                  </VStack>
+                )}
+                {section === "automations" && (
+                  <VStack align="stretch" gap={4}>
+                    <SectionHeader
+                      icon={<Zap size={18} />}
+                      accent="blue"
+                      title="Automations"
+                      count={automations.length}
+                      details="An automation watches either the traces matching your conditions or one series on an analytics graph. When it fires it posts to Slack or email, adds rows to a dataset, or queues traces for annotation."
+                      addLabel="New automation"
+                      onAdd={() => openDrawer("automation", {})}
+                    />
+                    {automations.length === 0 ? (
+                      <VStack align="stretch" gap={4}>
+                        <UseCaseStrip
+                          kind="automation"
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                        <UseCaseStrip
+                          kind="alert"
+                          showLabel={false}
+                          onOpen={(prefill) =>
+                            openDrawer("automation", prefill)
+                          }
+                        />
+                      </VStack>
+                    ) : (
+                      <TableShell>
+                        <Table.Root variant="line" width="full">
+                          <Table.Header>
+                            <Table.Row>
+                              <Table.ColumnHeader width="19%">
+                                Name
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="20%">
+                                Watches
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="14%">
+                                Delivery
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="12%">
+                                <MetricHeader
+                                  label="Last fired"
+                                  help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="11%">
+                                <MetricHeader
+                                  label="Fires (30 days)"
+                                  help="Times this automation fired in the last 30 days."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="10%">
+                                <MetricHeader
+                                  label="Status"
+                                  help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
+                                />
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%">
+                                Active
+                              </Table.ColumnHeader>
+                              <Table.ColumnHeader width="7%" />
+                            </Table.Row>
+                          </Table.Header>
+                          <Table.Body>
+                            {automations.map((trigger) => (
+                              <AutomationRow
+                                key={trigger.id}
+                                trigger={trigger}
+                                graphJsonById={graphJsonById}
+                                statsByTriggerId={statsByTriggerId}
+                                applyChecks={applyChecks}
+                                actionItems={actionItems}
+                                triggerActionName={triggerActionName}
+                                sharedRowProps={sharedRowProps}
+                                activeCell={activeCell}
+                                rowActionsMenu={rowActionsMenu}
+                              />
+                            ))}
+                          </Table.Body>
+                        </Table.Root>
+                      </TableShell>
+                    )}
+                  </VStack>
+                )}
+              </>
+            )}
+          </AggregateReadOnlyGate>
         </VStack>
       </Box>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={
+          pendingDelete ? `Delete ${triggerNoun(pendingDelete)}` : "Delete"
+        }
+        message={
+          pendingDelete
+            ? `This permanently deletes "${pendingDelete.name}". This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteTriggerMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) deleteTrigger(pendingDelete);
+        }}
+      />
     </SectionNavigationLayout>
+  );
+}
+
+/**
+ * The "Notifies" cell for a Slack automation row: the connection it posts
+ * through, and the channel for a bot. Shares `slackDestinationPresentation`
+ * with the view drawer so the two cannot drift apart (#6244).
+ */
+function SlackNotifyCell({
+  actionParams,
+  connections,
+}: {
+  actionParams: TriggerActionParams;
+  connections: ReadonlyArray<{ id: string; name: string }> | undefined;
+}) {
+  const destination = slackDestinationPresentation({
+    actionParams,
+    connections,
+  });
+  const label = slackDestinationLabel(destination);
+  return destination.kind === "webhook" && destination.tooltipUrl ? (
+    <Tooltip content={destination.tooltipUrl}>
+      <Text lineClamp={1} display="block">
+        {label}
+      </Text>
+    </Tooltip>
+  ) : (
+    <Text lineClamp={1} display="block">
+      {label}
+    </Text>
   );
 }
 

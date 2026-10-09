@@ -4,6 +4,9 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import type { PlaceableKindWhere } from "~/server/analytics/placeableKindFilter";
+
 /**
  * Input types for dashboard operations
  */
@@ -29,8 +32,16 @@ export class DashboardRepository {
 
   /**
    * Finds all dashboards for a project, ordered by order field.
+   *
+   * The card count is scoped by the caller-supplied `kind` clause so the list
+   * advertises exactly the cards the dashboard's grid will render — the
+   * service derives the clause from the same gate the graph-card procedures
+   * apply, which is what keeps the two endpoints of one resource agreeing.
    */
-  async findAll(input: { projectId: string }): Promise<
+  async findAll(input: {
+    projectId: string;
+    graphKindWhere: PlaceableKindWhere;
+  }): Promise<
     Array<
       Dashboard & {
         _count: { graphs: number };
@@ -42,14 +53,29 @@ export class DashboardRepository {
       orderBy: { order: "asc" },
       include: {
         _count: {
-          select: { graphs: true },
+          select: { graphs: { where: input.graphKindWhere } },
         },
       },
     });
   }
 
   /**
-   * Finds a dashboard by id within a project, including its graphs.
+   * Finds a dashboard by id within a project, including its builder graphs.
+   *
+   * The `kind` predicate is load-bearing rather than tidy. This read feeds the
+   * v1 REST `GET /dashboards/{id}` response, which serialises each graph row
+   * wholesale — and a saved LangWatchQL workbench chart's `graph` column holds
+   * `{ sql, parameters, vegaLiteSpec }`, so including one here publishes a
+   * member's stored SQL to any project API key that can read a dashboard.
+   * Scoping the include is what keeps the discriminator's promise (neither kind
+   * sees the other's rows) true on the way out as well as on the way in.
+   *
+   * Workbench charts placed on a dashboard are rendered by the application's
+   * own widget surface, which reads them through the saved-chart service and
+   * its own gates, never through this row.
+   *
+   * @see ~/server/analytics/chartKinds — the discriminator
+   * @see specs/analytics/dashboard-rest-api.feature
    */
   async findById(input: { id: string; projectId: string }) {
     return await this.prisma.dashboard.findFirst({
@@ -59,6 +85,7 @@ export class DashboardRepository {
       },
       include: {
         graphs: {
+          where: { kind: BUILDER_CHART_KIND },
           orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
         },
       },

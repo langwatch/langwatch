@@ -1,0 +1,110 @@
+/**
+ * The one place a run plan's scope becomes a list of scenarios.
+ *
+ * A dynamic scope is a rule, so the list it means changes as scenarios are
+ * written, filed, labelled and archived. It is resolved when the run starts,
+ * and the plan's `scenarioIds` cache is refreshed from the same read, inside
+ * the same transaction, so what the plan reads back is what the run covered.
+ *
+ * The suite's row lock comes first, before the read that decides what to
+ * write, for the reason it does in test-suite-membership.ts: two runs of the same
+ * plan would otherwise each write a list from a read the other has already
+ * moved past.
+ *
+ * @see specs/suites/run-plan-dynamic-scopes.feature
+ */
+
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { isDynamicScope, type SuiteScope } from "./scope";
+
+/** The Prisma surface the resolve needs; a transaction client fits. */
+export type ScopeMembershipClient = Pick<
+  Prisma.TransactionClient,
+  "scenario" | "simulationSuite" | "$executeRaw"
+>;
+
+/**
+ * Resolves a dynamic scope to the project's matching active scenario ids and
+ * writes the result onto the plan, under the plan's row lock.
+ *
+ * Static scopes never reach here: a plan of mode "scenarios" already holds its
+ * list, and a test suite's membership is `Scenario.testSuiteId`.
+ */
+export async function resolveAndCacheScope({
+  projectId,
+  suiteId,
+  scope,
+  tx,
+}: {
+  projectId: string;
+  suiteId: string;
+  scope: SuiteScope;
+  tx: ScopeMembershipClient;
+}): Promise<string[]> {
+  await tx.$executeRaw`SELECT id FROM "SimulationSuite" WHERE id = ${suiteId} AND "projectId" = ${projectId} FOR UPDATE`;
+
+  const scenarioIds = await readScopeScenarioIds({ projectId, scope, tx });
+
+  await tx.simulationSuite.update({
+    where: { id: suiteId, projectId },
+    data: { scenarioIds },
+  });
+
+  return scenarioIds;
+}
+
+/**
+ * The project's active scenarios a dynamic scope matches, oldest first.
+ *
+ * The read alone, with no plan row involved. A run started under a name
+ * resolves what it covers through this before its plan exists, and the plan is
+ * then written with the list that came back.
+ */
+export async function readScopeScenarioIds({
+  projectId,
+  scope,
+  tx,
+}: {
+  projectId: string;
+  scope: SuiteScope;
+  tx: Pick<ScopeMembershipClient, "scenario">;
+}): Promise<string[]> {
+  const rows = await tx.scenario.findMany({
+    where: {
+      projectId,
+      archivedAt: null,
+      ...(scope.mode === "test_suites" && {
+        testSuiteId: { in: scope.testSuiteIds },
+      }),
+      ...(scope.mode === "labels" && { labels: { hasSome: scope.labels } }),
+    },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map((row) => row.id);
+}
+
+/**
+ * The scenarios a run of this plan covers.
+ *
+ * A dynamic scope is resolved and cached in one transaction; a static one is
+ * the list the plan already holds, returned untouched.
+ */
+export async function readScopeMembership({
+  projectId,
+  suiteId,
+  scope,
+  storedScenarioIds,
+  prisma,
+}: {
+  projectId: string;
+  suiteId: string;
+  scope: SuiteScope;
+  storedScenarioIds: string[];
+  prisma: PrismaClient;
+}): Promise<string[]> {
+  if (!isDynamicScope(scope)) return storedScenarioIds;
+  return prisma.$transaction((tx) =>
+    resolveAndCacheScope({ projectId, suiteId, scope, tx }),
+  );
+}

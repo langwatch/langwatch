@@ -224,7 +224,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
       terminal) or to use `--api-key <key>` instead
 
   @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint refuses a project the caller cannot write to
+  Scenario: the project-key endpoint refuses a project the caller cannot manage
     Given a device-session bearer token
     When POST /api/auth/cli/project-key names a project the user cannot write to
     Then the server responds 403 and no key is returned
@@ -275,6 +275,31 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And the auth-mode prompt still fires (device vs api-key vs both)
     And the resolved endpoint for both flows is `https://lw.acme.internal`
     And the persisted config (and/or .env) records the endpoint after success
+
+  # `~/.langwatch/config.json` is one file for the whole machine. A login
+  # against a local dev instance repoints it for every other shell, so the next
+  # `langwatch ingest context` and every wrapped tool follow a port that is only
+  # up while that dev server runs. The CLI says so once and continues; a shell
+  # that already exports LANGWATCH_CLI_CONFIG has its own config file and hears
+  # nothing.
+
+  @unit @cli @login @endpoint @local-instance
+  Scenario: Logging in against a local instance says the machine's global config now points there
+    When the user logs in with `--endpoint http://localhost:5580`
+    Then the CLI warns that the machine's global config now points at a local instance
+    And the warning names LANGWATCH_CLI_CONFIG, CLAUDE_CONFIG_DIR and CODEX_HOME as the way to isolate a QA shell
+    And the login continues
+
+  @unit @cli @login @endpoint @local-instance
+  Scenario: A login shell that already relocated the CLI config hears nothing
+    Given LANGWATCH_CLI_CONFIG points at a scratch config file
+    When the user logs in with `--endpoint http://localhost:5580`
+    Then the CLI says nothing about the machine's global config
+
+  @unit @cli @login @endpoint @local-instance
+  Scenario: A self-hosted endpoint on another host is not a local instance
+    When the user logs in with `--endpoint https://lw.acme.internal`
+    Then the CLI says nothing about the machine's global config
 
   @bdd @cli @login @device-skip
   Scenario: `langwatch login --device` skips both prompts (existing behavior preserved)
@@ -392,3 +417,28 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     When the user runs `langwatch logout`
     Then `~/.langwatch/config.json` is removed (or access_token cleared)
     And `$CWD/.env`'s `LANGWATCH_API_KEY` is NOT touched
+
+  # A login overwrites the session on this machine in place. Logging in as a
+  # second account left every command answering from the first account's
+  # organization with nothing on screen saying the account had changed, and a
+  # CLI sat on a throwaway test organization for a morning because of it.
+  @unit
+  Scenario: Logging in as another organization says whose login it replaced
+    Given the machine holds a device session for one organization
+    When the user completes a login for a different organization
+    Then the output names the account and organization being signed out
+    And names the account and organization every command now runs as
+
+  @unit
+  Scenario: an organization with no name is named by its id
+    Given a stored session whose organization was recorded with neither a name
+      nor a slug
+    When the user completes a login for a different organization
+    Then the notice names that organization by its id
+    And neither side of the sentence reads as an empty identity
+
+  @unit
+  Scenario: Logging in again as the same organization says nothing extra
+    Given the machine holds a device session for one organization
+    When the user completes a login for that same organization
+    Then no replacement notice is printed

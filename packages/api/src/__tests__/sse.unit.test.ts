@@ -74,7 +74,7 @@ describe("SSE endpoints", () => {
         .version("2025-03-15", (v) => {
           v.sse(
             "/stream",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               events: {
                 progress: z.object({ percent: z.number() }),
                 done: z.object({ total: z.number() }),
@@ -110,7 +110,7 @@ describe("SSE endpoints", () => {
         .version("2025-03-15", (v) => {
           v.sse(
             "/stream",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               events: {
                 result: z.object({ score: z.number() }),
               },
@@ -158,7 +158,7 @@ describe("SSE endpoints", () => {
         .version("2025-03-15", (v) => {
           v.sse(
             "/stream",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               events: { ready: z.object({ channel: z.string() }) },
               query: z.object({ channel: z.string() }),
             },
@@ -195,7 +195,7 @@ describe("SSE endpoints", () => {
         .version("2025-03-15", (v) => {
           v.sse(
             "/stream",
-            { events: { result: z.object({ score: z.number() }) } },
+            { noPermission: { reason: "framework test endpoint" }, events: { result: z.object({ score: z.number() }) } },
             async () => {
               throw new Error("stream failed");
             },
@@ -226,7 +226,7 @@ describe("SSE endpoints", () => {
         .version("2025-03-15", (v) => {
           v.sse(
             "/stream",
-            { events: { ready: z.object({ ok: z.boolean() }) } },
+            { noPermission: { reason: "framework test endpoint" }, events: { ready: z.object({ ok: z.boolean() }) } },
             async (c) => {
               requestContext = c;
               await new Promise(() => {});

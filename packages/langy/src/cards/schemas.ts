@@ -186,6 +186,12 @@ export const choicesCardFields = {
         id: z.string().min(1),
         label: z.string().min(1),
         description: z.string().optional(),
+        /**
+         * A quiet option is the way out, not the way forward: it renders as
+         * an underlined link under the bordered rows and answers like any
+         * other option ("I'd rather describe it", "Chat about this").
+         */
+        quiet: z.boolean().optional(),
         ref: z
           .object({
             type: z.string().min(1),
@@ -197,6 +203,12 @@ export const choicesCardFields = {
     .min(1),
   multiSelect: z.boolean().optional(),
   allowOther: z.boolean().optional(),
+  /**
+   * The question is drawn as ordinary reply prose above the options, not as
+   * a title: the ask is the whole of what Langy says, so its words live here
+   * and the card carries them in the reply's own typography.
+   */
+  bare: z.boolean().optional(),
 } as const;
 
 /**
@@ -340,15 +352,26 @@ const isNamedValue = (value: unknown): boolean =>
  * Evidence, not vibes: an id/name, or a non-empty collection of rows. A bare
  * `{ ok: true }` names nothing and does not pass — the card would have nothing
  * to title itself with or link to, which is precisely the state this guards.
+ *
+ * A LOCAL scaffold is the other lie a name can tell. `prompt create` writes a
+ * file on disk and exits 0 with `{ name, path, dependency: "file:..." }` — a
+ * true result about a file, and nothing about the platform. Its name must not
+ * carry the platform claim; only a server-minted id can. So a payload that
+ * declares a `file:` dependency passes on an id, never on a name alone.
  */
 export const namesCreatedResource = (payload: unknown): boolean => {
   if (Array.isArray(payload)) return payload.length > 0;
   if (!payload || typeof payload !== "object") return false;
 
   const record = payload as Record<string, unknown>;
+  const isLocalFileScaffold =
+    typeof record.dependency === "string" &&
+    record.dependency.startsWith("file:");
+
   for (const [key, value] of Object.entries(record)) {
-    if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
     if (/(^|_)id$|Id$/.test(key) && isNamedValue(value)) return true;
+    if (isLocalFileScaffold) continue;
+    if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
     if (RESOURCE_COLLECTION_KEYS.includes(key) && Array.isArray(value) && value.length > 0) {
       return true;
     }

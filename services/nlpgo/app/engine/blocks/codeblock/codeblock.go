@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,10 +37,13 @@ var fakeDspyPySource []byte
 type Options struct {
 	// Python is the interpreter binary. Default: "python3".
 	Python string
-	// RunnerPath, if set, points at an existing runner.py on disk
-	// (used in dev so we don't have to write the embedded copy each
-	// time). When unset, the executor materializes the embedded
-	// runner.py to a temp file on first use.
+	// RunnerPath, if set, points at an existing runner.py on disk, and
+	// its directory is where fake_dspy.py is looked for too (used in dev
+	// to run an edited runner without rebuilding the binary). The files
+	// are read once, when the executor is built; from then on the
+	// executor works from those bytes and never reads the path again, so
+	// a dev override is as immutable to user code as the embedded copy.
+	// When unset, the embedded runner.py and fake_dspy.py are used.
 	RunnerPath string
 	// DefaultTimeout caps execution when the request doesn't specify one.
 	DefaultTimeout time.Duration
@@ -49,6 +53,11 @@ type Options struct {
 	// projected service-account token path, LANGWATCH_* internals, and
 	// DB/Redis/ClickHouse secrets stay out of reach of user code.
 	//
+	// The allowlist names what is COPIED from the engine's environment, so a
+	// value the engine does not hold cannot arrive through it. That is why
+	// the sandbox credential is appended after this list rather than added to
+	// it: it belongs to one run, not to the process.
+	//
 	// Semantics:
 	//   - nil            → defaultEnvAllowlist (secure default)
 	//   - non-nil empty  → pass nothing (maximally locked down)
@@ -57,7 +66,16 @@ type Options struct {
 	// A project's own secrets reach user code via Request.Secrets (piped
 	// over stdin into the `secrets` namespace), never via the environment,
 	// so withholding the environment does not break the secrets contract.
+	//
+	// The one credential that does travel in the environment is the run's
+	// sandbox key; see Request.SandboxAPIKey.
 	EnvAllowlist []string
+	// SandboxEndpoint is the LangWatch instance the sandbox calls, and comes
+	// from the engine's own LANGWATCH_ENDPOINT. It is injected together with
+	// Request.SandboxAPIKey and never on its own: a key with no endpoint, or
+	// an endpoint with no key, gives agent code half a credential and one
+	// failure it cannot read.
+	SandboxEndpoint string
 }
 
 // defaultEnvAllowlist is the environment passed into the code-block
@@ -86,19 +104,32 @@ var defaultEnvAllowlist = []string{
 }
 
 // Executor runs code blocks via a Python subprocess.
+//
+// The runner sources are held as bytes in the engine's own memory, not as a
+// path on disk the subprocess shares. Execute writes them out fresh for each
+// execution, into a directory belonging to that execution alone, and removes
+// the directory afterwards. That is what makes the runner one execution runs
+// independent of anything an earlier execution did: user code and the runner
+// run as the same user, so a file the subprocess can read is a file it can
+// also rewrite, and the only copy it cannot reach is the one it never sees.
 type Executor struct {
-	opts       Options
-	runnerPath string
+	opts           Options
+	runnerSource   []byte
+	fakeDspySource []byte
 }
 
-// New builds an Executor. If RunnerPath is empty the embedded runner.py
-// is materialized once into a temp dir.
+// New builds an Executor, resolving the runner sources it will write for
+// every execution: the embedded copies, or the files named by
+// Options.RunnerPath when a dev run overrides them.
 func New(opts Options) (*Executor, error) {
 	if opts.Python == "" {
 		opts.Python = "python3"
 	}
 	if opts.DefaultTimeout == 0 {
-		opts.DefaultTimeout = 60 * time.Second
+		// Counterpart: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS in
+		// platform/app/src/server/nlpgo/timeouts.ts, which the platform's client
+		// falls back to when the operator names no ceiling. Change both together.
+		opts.DefaultTimeout = 600 * time.Second
 	}
 	// Secure default: a nil allowlist means "the caller didn't opt out of
 	// the safe default", NOT "inherit everything". A non-nil empty slice is
@@ -106,26 +137,85 @@ func New(opts Options) (*Executor, error) {
 	if opts.EnvAllowlist == nil {
 		opts.EnvAllowlist = defaultEnvAllowlist
 	}
-	runnerPath := opts.RunnerPath
-	if runnerPath == "" {
-		dir, err := os.MkdirTemp("", "nlpgo-codeblock-*")
+	runnerSource := runnerPySource
+	fakeDspySource := fakeDspyPySource
+	if opts.RunnerPath != "" {
+		loaded, err := os.ReadFile(opts.RunnerPath)
 		if err != nil {
-			return nil, fmt.Errorf("codeblock: tmp dir: %w", err)
+			return nil, fmt.Errorf("codeblock: read runner %q: %w", opts.RunnerPath, err)
 		}
-		runnerPath = filepath.Join(dir, "runner.py")
-		if err := os.WriteFile(runnerPath, runnerPySource, 0o600); err != nil {
-			return nil, fmt.Errorf("codeblock: write runner: %w", err)
-		}
-		// runner.py imports fake_dspy from its own directory — write
-		// it alongside so the import resolves whether the executor is
-		// running from the embedded copy (prod / tests) or a dev
-		// RunnerPath override.
-		fakeDspyPath := filepath.Join(dir, "fake_dspy.py")
-		if err := os.WriteFile(fakeDspyPath, fakeDspyPySource, 0o600); err != nil {
-			return nil, fmt.Errorf("codeblock: write fake_dspy: %w", err)
+		runnerSource = loaded
+		// runner.py imports fake_dspy from its own directory, so an
+		// override of one is an override of the pair. A dev checkout that
+		// carries only the runner keeps the embedded stand-in.
+		sibling := filepath.Join(filepath.Dir(opts.RunnerPath), "fake_dspy.py")
+		if loaded, err := os.ReadFile(sibling); err == nil {
+			fakeDspySource = loaded
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("codeblock: read fake_dspy %q: %w", sibling, err)
 		}
 	}
-	return &Executor{opts: opts, runnerPath: runnerPath}, nil
+	return &Executor{
+		opts:           opts,
+		runnerSource:   runnerSource,
+		fakeDspySource: fakeDspySource,
+	}, nil
+}
+
+// runnerFileMode is read-only even for the owner. User code runs as the same
+// user and can chmod it back, so this stops a careless write rather than a
+// deliberate one; the per-execution directory is what makes the rewrite
+// pointless either way.
+const runnerFileMode = 0o400
+
+// newRunDir creates the directory for one execution and materializes the
+// runner pair into it. The caller removes the directory when the execution
+// ends, which also disposes of whatever the user's code wrote inside it.
+func (e *Executor) newRunDir() (string, error) {
+	dir, err := os.MkdirTemp("", "nlpgo-codeblock-run-*")
+	if err != nil {
+		return "", fmt.Errorf("codeblock: run dir: %w", err)
+	}
+	for name, source := range map[string][]byte{
+		"runner.py":    e.runnerSource,
+		"fake_dspy.py": e.fakeDspySource,
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), source, runnerFileMode); err != nil {
+			_ = os.RemoveAll(dir)
+			return "", fmt.Errorf("codeblock: write %s: %w", name, err)
+		}
+	}
+	return dir, nil
+}
+
+// removeRunDir disposes of one execution's directory.
+//
+// A plain RemoveAll is not enough: unlinking a file needs write permission on
+// the directory holding it, so user code that chmods its own run directory (or
+// any directory it created inside) read-only makes the removal fail and leaves
+// the tree on disk. The next execution still gets a fresh directory, so the
+// isolation property holds either way, but a long-lived engine process would
+// accumulate them until the volume filled. Restoring owner write permission on
+// the way down costs one walk and removes the only failure mode user code can
+// arrange for itself.
+func removeRunDir(dir string) {
+	if err := os.RemoveAll(dir); err == nil {
+		return
+	}
+	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			// Keep walking: one unreadable entry must not abandon the rest.
+			return nil //nolint:nilerr // best-effort cleanup, see the doc comment
+		}
+		if entry.IsDir() {
+			// G302 does not distinguish a directory from a file: 0700 is already
+			// owner-only, and the execute bit is what makes a directory
+			// traversable at all.
+			_ = os.Chmod(path, 0o700) //nolint:gosec // directory mode, not a file mode
+		}
+		return nil
+	})
+	_ = os.RemoveAll(dir)
 }
 
 // Request is what the engine hands to the executor per node invocation.
@@ -143,7 +233,22 @@ type Request struct {
 	// code as a `params` namespace so `params.NAME` works, the same shape
 	// as secrets. Values are typed: a number configured as a number
 	// arrives in Python as an int/float, not as a string.
-	Params  map[string]any
+	Params map[string]any
+	// SandboxAPIKey is the run's own LangWatch credential. It is minted per
+	// run, reaches the project's agent cache and nothing else, and expires by
+	// itself, so agent code can keep state between rows without the project
+	// key ever entering the sandbox. Empty means the run injects nothing.
+	//
+	// This is the one deliberate exception to "credentials never travel in
+	// the environment": the LangWatch SDK reads LANGWATCH_API_KEY and
+	// LANGWATCH_ENDPOINT from there, so putting it anywhere else would mean
+	// every agent wiring it up by hand. The engine scrubs the value out of
+	// captured stdout and stderr, so printing the environment stores nothing.
+	SandboxAPIKey string
+	// Timeout asks for LESS time than the operator allows; it can never buy
+	// more. Options.DefaultTimeout carries the deployment's ceiling on how
+	// long untrusted customer code may hold a worker, so Execute clamps this
+	// value to it. Zero or negative means "no request of my own".
 	Timeout time.Duration
 }
 
@@ -183,6 +288,13 @@ const (
 
 func (e *Error) String() string { return fmt.Sprintf("%s: %s", e.Type, e.Message) }
 
+// DefaultTimeout reports the wall-clock timeout the executor applies to a
+// request that does not carry its own Request.Timeout. Exported so the
+// wiring that builds the executor from operator config can be asserted on.
+func (e *Executor) DefaultTimeout() time.Duration {
+	return e.opts.DefaultTimeout
+}
+
 // childEnv builds the environment handed to the user-code subprocess from
 // the configured allowlist. It always returns a non-nil slice — even when
 // no allowlisted variable is present — so the caller can assign it to
@@ -202,22 +314,51 @@ func (e *Executor) childEnv() []string {
 	return env
 }
 
+// withSandboxCredential appends the run's LangWatch credential to env, or
+// returns env unchanged.
+//
+// Both halves or neither: a key with no endpoint sends the call to the wrong
+// instance, and an endpoint with no key gets a 401 the agent cannot act on.
+// LANGWATCH_SKIP_OTEL_SETUP rides along because the run already reports this
+// row, so a second exporter inside it would only spend the runner's time
+// budget.
+func withSandboxCredential(env []string, apiKey, endpoint string) []string {
+	if apiKey == "" || endpoint == "" {
+		return env
+	}
+	return append(env,
+		"LANGWATCH_API_KEY="+apiKey,
+		"LANGWATCH_ENDPOINT="+endpoint,
+		"LANGWATCH_SKIP_OTEL_SETUP=true",
+	)
+}
+
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
-	timeout := req.Timeout
-	if timeout == 0 {
-		timeout = e.opts.DefaultTimeout
+	// The operator's ceiling wins. A per-request value only ever shortens the
+	// budget: a workflow author must not be able to escape
+	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into
+	// their own node. A non-positive request means no request at all — and in
+	// particular keeps a negative duration away from context.WithTimeout,
+	// which would expire the run before the subprocess starts.
+	timeout := e.opts.DefaultTimeout
+	if req.Timeout > 0 && req.Timeout < timeout {
+		timeout = req.Timeout
 	}
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	resultFile, err := os.CreateTemp("", "nlpgo-codeblock-result-*.json")
+	// One directory per execution, holding the runner pair and the result
+	// file, removed on the way out. Nothing the user's code writes here
+	// survives to be read, imported or executed by a later run.
+	runDir, err := e.newRunDir()
 	if err != nil {
-		return nil, fmt.Errorf("codeblock: tmp result: %w", err)
+		return nil, err
 	}
-	resultPath := resultFile.Name()
-	_ = resultFile.Close()
-	defer os.Remove(resultPath)
+	defer removeRunDir(runDir)
+
+	runnerPath := filepath.Join(runDir, "runner.py")
+	resultPath := filepath.Join(runDir, "result.json")
 
 	payload, err := json.Marshal(map[string]any{
 		"code":    req.Code,
@@ -230,11 +371,25 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
 	}
 
-	cmd := exec.CommandContext(runCtx, e.opts.Python, e.runnerPath, resultPath) //nolint:gosec // runnerPath is operator-controlled
+	cmd := exec.CommandContext(runCtx, e.opts.Python, runnerPath, resultPath) //nolint:gosec // runnerPath is this execution's own copy of the engine's embedded runner
 	// Withhold the pod environment from user code. cmd.Env is always set to
 	// a non-nil slice so exec never falls back to inheriting os.Environ();
 	// see childEnv. Project secrets travel via the request payload, not here.
-	cmd.Env = e.childEnv()
+	// The run's own sandbox credential is the one exception, and it is added
+	// only when the run carries both halves of it.
+	//
+	// TMPDIR is pointed at this execution's directory last, after the
+	// allowlist copy, so the deployment's own TMPDIR cannot send the
+	// subprocess's scratch files to a location shared with other executions.
+	cmd.Env = append(withSandboxCredential(
+		e.childEnv(),
+		req.SandboxAPIKey,
+		e.opts.SandboxEndpoint,
+	), "TMPDIR="+runDir)
+	// Relative paths in user code resolve inside the disposable directory
+	// rather than the engine's working directory. Python already puts the
+	// script's own directory on sys.path, so imports are unaffected.
+	cmd.Dir = runDir
 	cmd.Stdin = bytes.NewReader(payload)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var stderrBuf bytes.Buffer

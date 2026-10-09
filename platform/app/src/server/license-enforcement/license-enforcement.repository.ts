@@ -3,10 +3,16 @@ import {
   OrganizationUserRole,
   type Prisma,
   type PrismaClient,
-  RoleBindingScopeType,
 } from "~/generated/prisma/client";
+import { parseCustomRolePermissions } from "~/server/app-layer/authz/custom-role-permissions";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import { getCurrentMonthStart } from "../utils/dateUtils";
-import { isFullMember, isLiteMember } from "./member-classification";
+import {
+  isDeveloper,
+  isFullMember,
+  isLiteMember,
+} from "./member-classification";
 
 /**
  * Type for team assignment in organization invites.
@@ -43,6 +49,9 @@ interface MemberClassificationContext {
 export interface ILicenseEnforcementRepository {
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
+  getMembersDeveloperCount(organizationId: string): Promise<number>;
+  getActiveScenarioCount(organizationId: string): Promise<number>;
+  getEvaluatorCount(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
 }
@@ -54,16 +63,20 @@ export interface ILicenseEnforcementRepository {
 export class LicenseEnforcementRepository
   implements ILicenseEnforcementRepository
 {
+  private readonly accessListing: GrantsAccessListingRepository;
+
   constructor(
     private readonly prisma: PrismaClient | Prisma.TransactionClient,
-  ) {}
+  ) {
+    this.accessListing = new GrantsAccessListingRepository(prisma);
+  }
 
   /**
    * Counts full members in organization:
    * - Users with ADMIN or MEMBER org role
    * - Users with EXTERNAL role BUT have a custom role with ANY non-view permission
-   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with ADMIN or MEMBER role
-   * - PENDING and WAITING_APPROVAL invites with custom role that has non-view permissions
+   * - PENDING invites (not expired, or no expiration) with ADMIN or MEMBER role
+   * - PENDING invites with custom role that has non-view permissions
    */
   async getMemberCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
@@ -73,11 +86,44 @@ export class LicenseEnforcementRepository
   /**
    * Counts Lite Member users in organization:
    * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
-   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
+   * - PENDING invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
     return this.countMembersByType(context, isLiteMember);
+  }
+
+  /**
+   * Counts Developer seats (ADR-143): users and live PENDING invites with the
+   * DEVELOPER role. Shown on the plan page, never compared to a limit.
+   */
+  async getMembersDeveloperCount(organizationId: string): Promise<number> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return this.countMembersByType(context, isDeveloper);
+  }
+
+  /**
+   * Counts active (non-archived) scenarios across the organization's projects.
+   * Archived scenarios do not count against the plan's scenario cap.
+   */
+  async getActiveScenarioCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+    return this.prisma.scenario.count({
+      where: { projectId: { in: projectIds }, archivedAt: null },
+    });
+  }
+
+  /**
+   * Counts active (non-archived) custom evaluators across the organization's
+   * projects. Archived evaluators do not count against the plan's cap.
+   */
+  async getEvaluatorCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+    return this.prisma.evaluator.count({
+      where: { projectId: { in: projectIds }, archivedAt: null },
+    });
   }
 
   /**
@@ -87,11 +133,23 @@ export class LicenseEnforcementRepository
   private async getMemberClassificationContext(
     organizationId: string,
   ): Promise<MemberClassificationContext> {
-    // Disabled memberships are out of the seat pool by definition: they hold
-    // no access, so billing for them would be charging for a locked door.
+    // A SEAT IS SOMEBODY WHO CAN SIGN IN, which is two conditions and not
+    // one. Disabled memberships are out of the pool by definition: they hold
+    // no access, so billing for them would be charging for a locked door. A
+    // DEACTIVATED person is behind the same locked door and was still being
+    // billed - and that is the state a directory puts a leaver in, because
+    // `active: false` is what Okta and Entra send when somebody leaves, not
+    // `DELETE`. So an organization went on paying for everybody its identity
+    // provider had already offboarded, which is the one thing this feature
+    // promises never to do. `refuseIfItClosesTheOrganization` in the SCIM
+    // service counts "able to sign in" the same way, for the same reason.
     // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null },
+      where: {
+        organizationId,
+        disabledAt: null,
+        user: { deactivatedAt: null },
+      },
       select: { userId: true, role: true },
     });
 
@@ -105,7 +163,7 @@ export class LicenseEnforcementRepository
     const pendingInvites = await this.prisma.organizationInvite.findMany({
       where: {
         organizationId,
-        status: { in: [INVITE_STATUS.PENDING, INVITE_STATUS.WAITING_APPROVAL] },
+        status: INVITE_STATUS.PENDING,
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
       select: { role: true, teamAssignments: true },
@@ -128,11 +186,19 @@ export class LicenseEnforcementRepository
   private async getCustomRoleMap(
     organizationId: string,
   ): Promise<Map<string, string[]>> {
-    const customRoles = await this.prisma.customRole.findMany({
+    const customRoles = await liveRoles(this.prisma).findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
     });
-    return new Map(customRoles.map((r) => [r.id, r.permissions as string[]]));
+    return new Map(
+      customRoles.map((role) => [
+        role.id,
+        parseCustomRolePermissions({
+          customRoleId: role.id,
+          permissions: role.permissions,
+        }),
+      ]),
+    );
   }
 
   /**
@@ -161,14 +227,15 @@ export class LicenseEnforcementRepository
     }
 
     const teamIds = teams.map((t) => t.id);
-    const bindings = await this.prisma.roleBinding.findMany({
+    const bindings = await this.accessListing.findBindingRows({
+      organizationId,
       where: {
-        organizationId,
-        scopeType: RoleBindingScopeType.TEAM,
+        principalType: "USER",
+        principalId: { in: externalUserIds },
+        scopeType: "TEAM",
         scopeId: { in: teamIds },
-        userId: { in: externalUserIds },
+        roleKey: { startsWith: "custom:" },
       },
-      select: { userId: true, customRoleId: true },
     });
 
     const userPermissionsMap = new Map<string, string[]>();

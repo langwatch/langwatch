@@ -1,5 +1,7 @@
 import stripeCatalogData from "./stripeCatalog.json";
 import {
+  OPTIONAL_STRIPE_METER_NAMES,
+  OPTIONAL_STRIPE_PRICE_NAMES,
   STRIPE_METER_NAMES,
   STRIPE_PRICE_NAMES,
   type StripeEnvironment,
@@ -27,8 +29,12 @@ export const resolveStripePriceMap = (
   const resolvedPrices = {} as StripePriceMap;
 
   for (const key of STRIPE_PRICE_NAMES) {
-    const priceId = data.mapping[key][environment];
+    const priceId = data.mapping[key]?.[environment];
     if (!priceId) {
+      // An optional name is left unresolved rather than thrown on: it is
+      // provisioned per mode by hand, and the surface that reads it checks
+      // whether it resolved. Everything else is a plan nobody could buy.
+      if (OPTIONAL_STRIPE_PRICE_NAMES.includes(key)) continue;
       throw new Error(`Missing mapped price for ${key} in ${environment} mode`);
     }
 
@@ -53,6 +59,7 @@ export const resolveStripeMeterMap = (
   for (const key of STRIPE_METER_NAMES) {
     const meterId = data.meters?.[key]?.[environment];
     if (!meterId) {
+      if (OPTIONAL_STRIPE_METER_NAMES.includes(key)) continue;
       throw new Error(`Missing mapped meter for ${key} in ${environment} mode`);
     }
     resolved[key] = meterId;

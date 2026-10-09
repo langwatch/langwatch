@@ -155,7 +155,15 @@ function evaluateNotContainsRule({
 
 /**
  * "matches_regex" rule: regex test against string values.
- * For arrays, stringifies the array for matching.
+ *
+ * For arrays, tests each element and passes if any one matches, the same
+ * any-element semantics `is`, `contains` and `not_contains` already use. The
+ * serialized array is still tested as well, so a pattern written against the
+ * old JSON-encoded form keeps matching — this rule only ever gains matches,
+ * never loses them.
+ *
+ * Testing only the serialization is why an anchored pattern could not match an
+ * array field: `^gpt-4` was tested against `["gpt-4"]`, which starts with `[`.
  */
 function evaluateRegexRule({
   fieldValue,
@@ -171,12 +179,15 @@ function evaluateRegexRule({
       throw new Error("Invalid regex");
     }
 
-    const valueToTest = Array.isArray(fieldValue)
-      ? JSON.stringify(fieldValue)
-      : fieldValue;
+    const valuesToTest = Array.isArray(fieldValue)
+      ? [...fieldValue, JSON.stringify(fieldValue)]
+      : [fieldValue];
 
-    const regex = new RegExp(conditionValue, "gi");
-    return regex.test(valueToTest);
+    // A `g`-flagged regex carries lastIndex across .test() calls, so build a
+    // fresh one per candidate rather than reusing a single instance.
+    return valuesToTest.some((value) =>
+      new RegExp(conditionValue, "gi").test(value),
+    );
   } catch (error) {
     logger.error(
       { error, precondition: conditionValue },
@@ -326,6 +337,10 @@ export function buildPreconditionTraceDataFromTrace({
       ),
     customMetadata:
       Object.keys(customMetadata).length > 0 ? customMetadata : null,
+    // Not available in legacy collector path — this shape carries parsed
+    // metadata only, so a `metadata.value` precondition on a bare OTEL
+    // resource attribute cannot resolve here.
+    attributes: null,
     annotationIds: [], // Not available in legacy collector path
     events:
       events?.map((e) => ({
@@ -369,6 +384,11 @@ export function buildPreconditionTraceDataFromCommand({
           (model): model is string => typeof model === "string" && model !== "",
         ),
     customMetadata: data.customMetadata ?? null,
+    // Not available at command time — ExecuteEvaluationCommandData carries
+    // customMetadata and no raw attributes (see the command schema), so a
+    // `metadata.value` precondition on a bare OTEL resource attribute
+    // cannot resolve here the way it does for automation triggers.
+    attributes: null,
     annotationIds: [], // Not available at command time
     events: events ?? null,
   };

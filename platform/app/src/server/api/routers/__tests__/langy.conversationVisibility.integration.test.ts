@@ -43,18 +43,21 @@ vi.mock("../langyAccessMiddleware", () => ({
   refuseDemoProject: ({ next }: { next: () => unknown }) => next(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 import { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
 import { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
@@ -62,6 +65,7 @@ import { PrismaLangyConversationRepository } from "~/server/app-layer/langy/repo
 import { createLangyConversationUpdateBroadcastSubscriber } from "~/server/app-layer/langy/subscribers/langy-conversation-update-broadcast.subscriber";
 import { prisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { createInnerTRPCContext } from "../../trpc";
 import { langyRouter } from "../langy";
 
@@ -244,7 +248,13 @@ describe("Langy conversation updates reach exactly the members who may read", ()
       undefined,
       eventsReader,
     );
-    appHolder.current = { broadcast, langy: { conversations } };
+    appHolder.current = {
+      broadcast,
+      langy: { conversations },
+      // `.permission()` procedures decide through getApp().permissions
+      // (ADR-092); this file's rbac mock still stubs the resolvers underneath.
+      permissions: appPermissionsService(),
+    };
 
     const subscriber = createLangyConversationUpdateBroadcastSubscriber({
       broadcast,

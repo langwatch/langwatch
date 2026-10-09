@@ -9,7 +9,6 @@
  * member_seat_limit_reached), and the invite link a provisioning run needs
  * when it has no email provider.
  */
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -35,6 +34,8 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -42,7 +43,6 @@ import {
   seedManagementOrg,
   seedOrgMember,
 } from "~/test-utils/managementApiOrg";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import type * as EnvModule from "../../../../env.mjs";
 
 // Invite creation attempts email delivery; the suite is about the API, so the
@@ -73,6 +73,7 @@ describe("Feature: Organization members and invites REST API", () => {
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
   let teamAId: string;
   let teamBId: string;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${seeded.adminToken}`,
@@ -90,22 +91,21 @@ describe("Feature: Organization members and invites REST API", () => {
     teamId: string;
     role: TeamUserRole;
   }) => {
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: seeded.organization.id,
-        userId,
-        role,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: seeded.organization.id,
+      userId,
+      role,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
     });
   };
 
   beforeAll(async () => {
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     mockGetActivePlan = vi.fn().mockResolvedValue(ENTERPRISE_TEST_PLAN);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -142,6 +142,7 @@ describe("Feature: Organization members and invites REST API", () => {
       await cleanupTestRows(prisma, [
         ["auditLog", { organizationId: seeded?.organization.id }],
         ["organizationInvite", { organizationId: seeded?.organization.id }],
+        ["grant", { organizationId: seeded?.organization.id }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["apiKey", { organizationId: seeded?.organization.id }],
         ["customRole", { organizationId: seeded?.organization.id }],
@@ -150,6 +151,7 @@ describe("Feature: Organization members and invites REST API", () => {
         ["organizationUser", { organizationId: seeded?.organization.id }],
         ...(lastAdminOrg
           ? ([
+              ["grant", { organizationId: lastAdminOrg.organization.id }],
               ["roleBinding", { organizationId: lastAdminOrg.organization.id }],
               ["apiKey", { organizationId: lastAdminOrg.organization.id }],
               [
@@ -529,15 +531,12 @@ describe("Feature: Organization members and invites REST API", () => {
         teamId: teamAId,
         role: TeamUserRole.MEMBER,
       });
-      await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: seeded.organization.id,
-          userId: member.userId,
-          role: TeamUserRole.VIEWER,
-          scopeType: RoleBindingScopeType.PROJECT,
-          scopeId: project.id,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: seeded.organization.id,
+        userId: member.userId,
+        role: TeamUserRole.VIEWER,
+        scopeType: RoleBindingScopeType.PROJECT,
+        scopeId: project.id,
       });
 
       const response = await app.request(
@@ -628,13 +627,11 @@ describe("Feature: Organization members and invites REST API", () => {
 
     /** @scenario Creating invites assigns teams including a custom role */
     it("creates a batch with a custom-role team assignment and reports email delivery", async () => {
-      const customRole = await prisma.customRole.create({
-        data: {
-          organizationId: seeded.organization.id,
-          name: `Invite Role ${ns}`,
-          permissions: ["project:view", "traces:view"],
-          kind: "custom",
-        },
+      const customRole = await seedCustomRole(prisma, {
+        organizationId: seeded.organization.id,
+        name: `Invite Role ${ns}`,
+        permissions: ["project:view", "traces:view"],
+        kind: "custom",
       });
 
       const emails = [
@@ -699,6 +696,49 @@ describe("Feature: Organization members and invites REST API", () => {
           },
         }),
       ).toBeNull();
+    });
+
+    /** @scenario The management API accepts the Developer seat */
+    it("creates a Developer invite and lists it with no teams", async () => {
+      const email = `invitee-developer-${ns}@example.com`;
+      const create = await app.request("/api/organization/invites", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          invites: [{ email, role: "DEVELOPER" }],
+        }),
+      });
+      expect(create.status).toBe(201);
+
+      const response = await app.request("/api/organization/invites", {
+        headers: authHeaders(),
+      });
+      const invite = (await response.json()).invites.find(
+        (entry: { email: string }) => entry.email === email,
+      );
+      expect(invite).toMatchObject({ role: "DEVELOPER", teams: [] });
+    });
+
+    /** @scenario A Developer cannot be given a role on a shared team */
+    it("refuses a Developer invite that names a team, naming the seat", async () => {
+      const response = await app.request("/api/organization/invites", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          invites: [
+            {
+              email: `invitee-developer-team-${ns}@example.com`,
+              role: "DEVELOPER",
+              teams: [{ teamId: teamAId, role: "VIEWER" }],
+            },
+          ],
+        }),
+      });
+
+      expect(response.status).toBe(409);
+      expect((await response.json()).code).toBe(
+        "developer_seat_no_shared_access",
+      );
     });
 
     /** @scenario A duplicate pending invite is refused */
@@ -781,8 +821,8 @@ describe("Feature: Organization members and invites REST API", () => {
       ).toBe(0);
     });
 
-    /** @scenario Revoking a pending invite deletes it */
-    it("revokes an invite, removes it from the list, and 404s a second revoke", async () => {
+    /** @scenario Revoking a pending invite marks it REVOKED */
+    it("revokes an invite, keeps it listed as REVOKED, and 404s a second revoke", async () => {
       const email = `invitee-revoke-${ns}@example.com`;
       const create = await app.request("/api/organization/invites", {
         method: "POST",
@@ -806,6 +846,9 @@ describe("Feature: Organization members and invites REST API", () => {
       );
       expect(revoke.status).toBe(200);
 
+      // D11: the row stays and stays listed, now reading REVOKED — an admin
+      // can see what they revoked. Disappearing from the list was the old
+      // hard-delete behaviour.
       const list = await app.request("/api/organization/invites", {
         headers: authHeaders(),
       });
@@ -813,7 +856,7 @@ describe("Feature: Organization members and invites REST API", () => {
         (await list.json()).invites.find(
           (entry: { id: string }) => entry.id === inviteId,
         ),
-      ).toBeUndefined();
+      ).toMatchObject({ id: inviteId, status: "REVOKED" });
 
       const again = await app.request(`/api/organization/invites/${inviteId}`, {
         method: "DELETE",

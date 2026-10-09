@@ -51,6 +51,7 @@ import {
 	removeSessionContextHooks,
 } from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 
 /**
  * Tools whose Path B telemetry persists as a scoped shell function (no
@@ -162,17 +163,45 @@ export function rcHasLangwatchBlock({
 	requiredKeys?: string[];
 	markers?: { begin: string; end: string };
 }): boolean {
+	const block = readLangwatchBlock({ shell, markers });
+	if (block === undefined) return false;
+	if (!requiredKeys || requiredKeys.length === 0) return true;
+	return requiredKeys.every((k) => block.includes(k));
+}
+
+/** The text between a well-formed pair of markers in the shell's rc file. */
+function readLangwatchBlock({
+	shell,
+	markers,
+}: {
+	shell: DetectedShell;
+	markers: { begin: string; end: string };
+}): string | undefined {
 	try {
 		const content = fs.readFileSync(rcPath(shell), "utf8");
 		const begin = content.indexOf(markers.begin);
 		const end = content.indexOf(markers.end);
-		if (begin === -1 || end === -1 || end < begin) return false;
-		if (!requiredKeys || requiredKeys.length === 0) return true;
-		const block = content.slice(begin, end);
-		return requiredKeys.every((k) => block.includes(k));
+		if (begin === -1 || end === -1 || end < begin) return undefined;
+		return content.slice(begin, end);
 	} catch {
-		return false;
+		return undefined;
 	}
+}
+
+/**
+ * Every http(s) address written in the shell's langwatch block, whole, so a
+ * caller can parse the host instead of searching the block for a piece of
+ * one: `://localhost` is also how `https://localhost.acme.test` starts.
+ */
+export function rcLangwatchBlockUrls({
+	shell,
+	markers = { begin: BLOCK_BEGIN, end: BLOCK_END },
+}: {
+	shell: DetectedShell;
+	markers?: { begin: string; end: string };
+}): string[] {
+	const block = readLangwatchBlock({ shell, markers }) ?? "";
+	return block.match(/https?:\/\/[^\s'"\\;,]+/g) ?? [];
 }
 
 function quote(s: string): string {
@@ -436,6 +465,7 @@ export async function maybeOfferIngestionShellRcPersist({
 	// the same grant.
 	if (tool === "codex") {
 		assertCodexTurnHarvest();
+		assertCodexAgentGuidance();
 		return;
 	}
 

@@ -47,7 +47,7 @@ def sync_detailed(
     id: str,
     user_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[Any]:
     """Remove a member from a group
 
@@ -79,7 +79,7 @@ async def asyncio_detailed(
     id: str,
     user_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[Any]:
     """Remove a member from a group
 

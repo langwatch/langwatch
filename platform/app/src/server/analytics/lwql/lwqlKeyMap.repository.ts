@@ -1,5 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type { LwqlKeyMapRow } from "./productionProvisioning";
+import type { LwqlKeyMapRow } from "./provisioning";
 
 /**
  * The one place runtime code writes the LangWatchQL key-map table.
@@ -62,7 +62,7 @@ export class LwqlKeyMapClickHouseRepository implements LwqlKeyMapRepository {
  * For presets with no datastore. Refuses rather than silently succeeding: a
  * key map that accepted writes and kept none is the failure mode the deploy
  * backfill exists to prevent, and the caller already treats a throw as
- * "the scheduled backfill will pick it up".
+ * "the next deploy's backfill writes it".
  */
 export class NullLwqlKeyMapRepository implements LwqlKeyMapRepository {
   insertRow(): Promise<void> {

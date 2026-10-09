@@ -64,6 +64,11 @@ vi.mock("~/utils/api", async () => {
   const setup = await import("./subscription-test-setup");
   return {
     api: {
+      limits: {
+        getUsage: {
+          useQuery: () => setup.mockGetUsage(),
+        },
+      },
       plan: {
         getActivePlan: {
           useQuery: () => setup.mockGetActivePlan(),
@@ -73,6 +78,8 @@ vi.mock("~/utils/api", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+      },
+      invite: {
         getOrganizationPendingInvites: {
           useQuery: () => ({
             ...setup.mockGetPendingInvites(),
@@ -440,12 +447,14 @@ describe("<SubscriptionPage/>", () => {
               email: "inv1@example.com",
               role: "MEMBER",
               status: "PENDING",
+              displayStatus: "PENDING",
             },
             {
               id: "inv-2",
               email: "inv2@example.com",
               role: "ADMIN",
               status: "PENDING",
+              displayStatus: "PENDING",
             },
           ],
           isLoading: false,

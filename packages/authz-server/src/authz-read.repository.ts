@@ -2,19 +2,36 @@
  * ADR-092 — the read port. This package holds the authorization POLICIES
  * (what a snapshot means); the app holds the QUERIES, as a Prisma
  * repository implementing this interface
- * (platform/app/src/server/app-layer/authz/repositories/authz-read.prisma.repository.ts).
+ * (platform/app/src/server/app-layer/authz/repositories/authz-read.grants.repository.ts).
  * Methods return stored facts - no policy - and follow the repository
  * naming convention (findX, never getX).
  */
 import type {
   AuthzPrincipalRef,
   CollectedBinding,
-  LegacyTeamMembership,
   ShareableResourceKind,
 } from "@langwatch/authz";
 
-/** OrganizationUser.role, or null when no membership row exists. */
-export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
+/**
+ * OrganizationUser.role, or null when no membership row exists. DEVELOPER is
+ * the seat ADR-143 adds: a personal team and nothing shared.
+ */
+export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
+
+/**
+ * The membership row as stored: its role, and whether an admin has disabled
+ * it to stay within the licensed seat count.
+ *
+ * Both halves are FACTS, not policy - a disabled row keeps its role, and it
+ * is the collector that decides a disabled membership is not a membership
+ * (so `isOrgMember` goes false and the engine's gate denies). The role is
+ * still reported because the denial wants to say WHICH gate closed, and
+ * because re-enabling has to restore exactly what was there.
+ */
+export type OrganizationMembership = {
+  role: OrganizationRole;
+  disabled: boolean;
+};
 
 /** A CustomRole row's permission payload, unparsed - the collector applies
  *  the documented lenient parse (malformed JSON degrades to no grants). */
@@ -58,11 +75,19 @@ export interface ScopeLineageRepository {
 }
 
 export interface AuthzReadRepository extends ScopeLineageRepository {
-  findOrganizationRole(args: {
+  /**
+   * The membership row, disabled or not, or null when there is none.
+   *
+   * Named for what it returns: the previous `findOrganizationRole` reported
+   * only the role, which gave the collector no way to tell a seat-disabled
+   * membership from an absent one - so a disabled member passed the engine's
+   * membership gate and kept every permission.
+   */
+  findOrganizationMembership(args: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null>;
-  /** Direct user bindings - viaGroupId null. */
+  }): Promise<OrganizationMembership | null>;
+  /** Direct user bindings - viaGroupId null. Fenced on an ACTIVE membership. */
   findUserBindings(args: {
     userId: string;
     organizationId: string;
@@ -82,10 +107,6 @@ export interface AuthzReadRepository extends ScopeLineageRepository {
    * carries no ceiling. `null` means the key itself is unknown.
    */
   findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null>;
-  findLegacyTeamMemberships(args: {
-    userId: string;
-    organizationId: string;
-  }): Promise<LegacyTeamMembership[]>;
   /**
    * The permission payloads for custom roles the principal's bindings
    * reference. The organization and principal are passed so the query can

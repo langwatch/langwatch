@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
+import { projectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { DashboardService } from "../../dashboards/dashboard.service";
 import { dashboardErrorHandler } from "../../dashboards/middleware";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -18,7 +19,7 @@ export const dashboardsRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -30,7 +31,7 @@ export const dashboardsRouter = createTRPCRouter({
    */
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), dashboardId: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -47,7 +48,7 @@ export const dashboardsRouter = createTRPCRouter({
         name: z.string(),
       }),
     )
-    .use(checkProjectPermission("analytics:create"))
+    .permission("analytics:create")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -65,7 +66,7 @@ export const dashboardsRouter = createTRPCRouter({
         name: z.string(),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -86,7 +87,7 @@ export const dashboardsRouter = createTRPCRouter({
         dashboardId: z.string(),
       }),
     )
-    .use(checkProjectPermission("analytics:delete"))
+    .permission("analytics:delete")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -103,7 +104,7 @@ export const dashboardsRouter = createTRPCRouter({
         dashboardIds: z.array(z.string()),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -112,14 +113,22 @@ export const dashboardsRouter = createTRPCRouter({
 
   /**
    * Gets or creates the first dashboard for a project.
-   * Used to ensure every project has at least one dashboard.
+   * Used to ensure every project has at least one dashboard. A query, so the
+   * mutation write guard never sees it: on an aggregate it creates nothing
+   * and returns `null` when there is no dashboard yet.
    */
   getOrCreateFirst: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
-      return await service.getOrCreateFirst(input.projectId);
+      return await service.getOrCreateFirst({
+        projectId: input.projectId,
+        acceptsWrites: await projectAcceptsWrites({
+          kinds: getApp().projectKinds,
+          projectId: input.projectId,
+        }),
+      });
     }),
 });

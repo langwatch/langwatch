@@ -258,3 +258,32 @@ pool-lifetime context):
   `specs/langy/langy-worker-isolation.feature`,
   `specs/langy/langy-api-key-provisioning.feature`,
   `specs/langy/langy-deploy-hardening.feature`
+
+## Amendment: OpenCode is removed, pi is the only harness
+
+Langy ran on two coding-agent harnesses for one release: OpenCode, the original
+one this ADR describes, and pi (the `langy-worker` wrapper in
+`services/langyworker/`, driven over a stdio protocol). A per-project feature
+flag chose between them, the choice rode the credential envelope, and the
+worker credential signature carried it so a flip replaced the worker.
+
+pi now serves every turn, so the OpenCode harness is deleted:
+`services/langyagent/adapters/opencode`, the flag
+(`release_langy_pi_harness`), the `harness` field on the credential envelope,
+the probe and the worker signature, the OpenCode binary in the langyagent
+image, and the OpenCode wording in the charts and the docs.
+
+What changes for an operator:
+
+- `OPENCODE_AGENT_URL` is now `LANGY_AGENT_URL`. The chart sets it; an install
+  that sets it by hand has to rename it.
+- The error code `opencode_session_not_found` is now
+  `agent_session_not_found`, and `opencode_auth_not_enforced` is gone (it was
+  the OpenCode control-port auth guard).
+
+The isolation model this ADR records is unchanged apart from one rung getting
+simpler: a pi worker binds no listener, so there is no control port for a
+sibling worker to reach, and the per-worker OpenCode password and its auth
+proxy are gone with the port they protected. Per-worker UID, the
+chown-before-secrets home, the process-group kill, the orphan reaper and the
+NetworkPolicy all stand.

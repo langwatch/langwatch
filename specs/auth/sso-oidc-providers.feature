@@ -1,9 +1,17 @@
 Feature: Sign in with Amazon Cognito, OneLogin or any other OIDC provider
 
-  Self-hosted deployments federate to one identity provider, named by
-  NEXTAUTH_PROVIDER. Cognito and OneLogin join the providers already supported,
-  so an operator whose company already runs one of them does not have to stand
-  up a second identity provider just to sign in to LangWatch.
+  A self-hosted deployment names the identity provider it federates to, and
+  that provider is what its default sign-in method set offers (ADR-117 §4).
+  Cognito and OneLogin join the providers already supported, so an operator
+  whose company already runs one of them does not have to stand up a second
+  identity provider just to sign in to LangWatch.
+
+  Ported at D13 (ADR-117): naming a provider mounts it and puts it in the
+  default method set. Where a given address is SENT is the router's decision,
+  which can route one organization's domain to a connection while everyone
+  else sees the default set - so "the deployment federates to one provider" is
+  a fact about what is mounted, no longer a limit on what a person can be
+  offered.
 
   Both speak OpenID Connect, so both are configured the way Okta already is:
   the operator supplies a client id, a client secret and the issuer URL, and
@@ -208,6 +216,16 @@ Feature: Sign in with Amazon Cognito, OneLogin or any other OIDC provider
   Scenario: Unconfigured providers contribute no environment variables
     Given the chart is rendered with no identity provider configured
     Then the application container receives no provider credentials at all
+
+  # Charts up to 3.17 rendered the provider as NEXTAUTH_PROVIDER ahead of
+  # app.extraEnvs, so an operator who selected it there won. The chart now
+  # renders AUTH_PROVIDER, which the application ranks above the old name.
+  @integration
+  Scenario: A provider selected in extraEnvs survives the upgrade
+    Given the chart is rendered with app.extraEnvs setting NEXTAUTH_PROVIDER to "okta"
+    And the provider values key is left at its default
+    Then the application container receives the provider as "okta"
+    And the chart renders no AUTH_PROVIDER that would put the install into email mode
 
   # ==========================================================================
   # Proven against a real identity provider

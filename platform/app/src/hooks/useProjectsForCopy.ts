@@ -1,10 +1,8 @@
+import { permissionSatisfiedBy } from "@langwatch/authz";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import {
-  hasPermissionWithHierarchy,
-  teamRoleHasPermission,
-} from "~/server/api/rbac";
+import { api } from "~/utils/api";
 
 export type CopyTargetProject = {
   label: string;
@@ -19,6 +17,7 @@ export type CopyTargetProject = {
  * - workflows:create: workflows
  */
 export type CopyTargetPermission =
+  | "datasets:create"
   | "evaluations:manage"
   | "prompts:create"
   | "workflows:create";
@@ -34,35 +33,40 @@ export function useProjectsForCopy(
   const session = useRequiredSession();
   const currentUserId = session.data?.user?.id;
 
-  return useMemo(() => {
+  const projects = useMemo(() => {
     if (!organizations) return [];
 
     return organizations.flatMap((org) =>
       org.teams.flatMap((team) => {
-        const teamMember = team.members.find(
-          (member) => member.userId === currentUserId,
-        );
-        if (!teamMember) return [];
-
-        let hasPermission = false;
-        if (teamMember.assignedRole) {
-          const permissions =
-            (teamMember.assignedRole.permissions as string[]) ?? [];
-          if (permissions.length > 0) {
-            hasPermission = hasPermissionWithHierarchy(permissions, permission);
-          } else {
-            hasPermission = teamRoleHasPermission(teamMember.role, permission);
-          }
-        } else {
-          hasPermission = teamRoleHasPermission(teamMember.role, permission);
-        }
+        if (!team.members.some((member) => member.userId === currentUserId))
+          return [];
 
         return team.projects.map((proj) => ({
           label: `${org.name} / ${team.name} / ${proj.name}`,
           value: proj.id,
-          hasCreatePermission: hasPermission,
         }));
       }),
     );
-  }, [organizations, currentUserId, permission]);
+  }, [organizations, currentUserId]);
+
+  const permissionQueries = api.useQueries((t) =>
+    projects.map((project) =>
+      t.authz.effectivePermissions(
+        { projectId: project.value },
+        { staleTime: 30_000, refetchOnWindowFocus: true },
+      ),
+    ),
+  );
+
+  return useMemo(
+    () =>
+      projects.map((project, index) => ({
+        ...project,
+        hasCreatePermission: permissionSatisfiedBy({
+          granted: new Set(permissionQueries[index]?.data?.permissions),
+          requested: permission,
+        }),
+      })),
+    [permission, permissionQueries, projects],
+  );
 }

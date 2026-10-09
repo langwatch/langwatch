@@ -208,9 +208,11 @@ delegates the run to `haven slot run`, which gates on the same flock semaphore
 haven (`CHECK_QUEUE_IMPL=js` forces it). With a slot free it prints nothing
 and is otherwise transparent (same stdio, same exit code). Queued, it says so on
 stderr, which is what tells you a slow run was waiting rather than hung.
-`CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
-unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
-4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
+`CHECK_SLOTS=N` overrides the limit, and `CHECK_SLOTS=0` turns the queue off
+from a person's shell only: agent shells carry `CLAUDECODE`, and a gate-off
+there is ignored with a note (never set `CHECK_SLOTS` yourself — the queue
+exists to serialize agents). Unset, the limit comes from the machine (one per
+6 GiB of RAM, capped at one per 4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
 --explain` shows the limit and who currently holds a slot. Don't cap the tools'
 own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
@@ -222,8 +224,10 @@ CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 a slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
 no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
 and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
-for the session. A run that already holds a slot exports `CHECK_SLOTS=0` to
-everything it spawns, so it can't queue behind itself. The installer stands
+for the session. A run that already holds a slot exports `CHECK_SLOTS=0` with
+its pid in `CHECK_QUEUE_HELD` to everything it spawns, so it can't queue behind
+itself; the marker only convinces a descendant of that run, and only when the
+pid names one of the queue's own wrappers. The installer stands
 down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
 `false`, so an image build or a server install keeps pnpm's own bin entries.
 
@@ -267,6 +271,7 @@ specs/               # BDD feature specs
 | Building settings UI without reading the UX guidelines | Read `dev/docs/best_practices/` first (`scope-selector-and-badges.md`, `drawers.md`, `row-actions-overflow-menu.md`, `scoped-resources.md`). Scope selection ALWAYS uses `ScopeChipPicker` (multi-scope, `personalScopes` for personal-project variants), never a hand-rolled Select |
 | Exposing internal technical details in user-facing copy ("in-process", "uses the analysis service") | Read `dev/docs/best_practices/copywriting.md`. Copy says what the feature does for the customer, never how it is built; descriptions stay short, full lists go in a `(?)` tooltip pinned to the code by a test |
 | Abbreviating words in user-facing copy ("156.8K tok", "oai", "req", "ctx") | Spell them out: "tokens", "OpenAI", "requests", "context". A shortened word saves a few pixels and costs the reader a guess, and the guess is often wrong. Applies to labels, tooltips, chart axes, empty states and error copy. Identifiers, units with a standard symbol (ms, KB, USD) and vendor names written the vendor's own way are not abbreviations |
+| Repeating the frontmatter `title` as the first body heading of a `docs/` page | The frontmatter renders as part of the page: `title` becomes the H1 and `description` the visible lede under it, so a body heading or opening sentence with the same text shows twice. Never restate either. Give the first section its own name for what it covers, for example "Getting Started" or "What are Run Parameters" |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |
@@ -297,6 +302,7 @@ specs/               # BDD feature specs
 | Using `gh api graphql -f`/`-F` variable parameters for GraphQL queries | Inline the values directly in the query string (replace `OWNER`, `REPO`, `NUMBER` literals). The `-f`/`-F` flags cause escaping issues with multiline queries and special characters |
 | Using gpt-4o or gpt-4.1-mini in tests, scenarios, or fixtures | Always use `gpt-5-mini` — it's the cheapest and most capable model. Default to `openai("gpt-5-mini")` for scenario judges, user simulators, and test fixtures |
 | Only verifying tests parse (CI=1) without running them end-to-end | Always run scenario tests end-to-end locally (`npx vitest run file.test.ts` without CI flag) to verify they actually pass with Claude Code |
+| Running `langwatch login`, `langwatch instrument <tool>` or `langwatch <tool>` against a local instance with the machine's real config | Never. Those commands write the machine's global files (`~/.langwatch/config.json`, `~/.claude/settings.json`, `~/.codex/config.toml`), so a local endpoint repoints every other session on the machine: agent telemetry goes to a dev port that is only up while `pnpm dev` runs, and `langwatch ingest context` fails with connection refused and spools, leaving real PRs with no coding agent usage. Dogfood under an isolated home by exporting `LANGWATCH_CLI_CONFIG=<worktree>/.claude/tmp/dogfood/langwatch-config.json`, `CLAUDE_CONFIG_DIR=<worktree>/.claude/tmp/dogfood/claude` and `CODEX_HOME=<worktree>/.claude/tmp/dogfood/codex` for the whole QA shell (the tmux session), before the first `langwatch` command. The CLI state directory `~/.langwatch/state` has no override, so its spool files still land in the real home. See `dev/docs/best_practices/dogfooding-isolation.md` |
 | Dogfooding agent-usage tracking features with `claude -p` or other headless modes | Never. Spin up a sub-tmux session (`tmux new-session -d`, `send-keys`, `capture-pane`) and drive the agent interactively, the way a user runs it: headless mode skips or reorders the session lifecycle (hooks, prompts, settings reads) that these features exist to observe. Verify the captured data landed in the product afterward, not just that the process exited |
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
 | Mounting a drawer component from inside another drawer (`useState`/`useDisclosure`) | Drawers are URL-routed singletons with a navigation stack. A sub-flow navigates: `openDrawer("target", { onSuccess, onClose: goBack })`, and `goBack` returns to the caller. Pass `onClose`, never let the target call `closeDrawer` (it clears the whole stack), and keep the caller's draft in a store that survives its unmount. See `dev/docs/best_practices/drawers.md` |

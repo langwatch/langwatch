@@ -87,6 +87,10 @@ func (w *configWire) keyExpiry() (time.Time, bool, error) {
 type excludedProviderWire struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
+	// Handle is the row's routing handle, carried so a request naming the
+	// handle of a dropped provider is told which setting dropped it instead of
+	// being told the handle means nothing.
+	Handle string `json:"handle,omitempty"`
 }
 
 type providerSlotWire struct {
@@ -103,6 +107,15 @@ type providerSlotWire struct {
 	// etc.). Emitted by the control-plane materialiser as a top-level
 	// sibling of credentials — see config.materialiser.ts:buildProviderSlot.
 	DeploymentMap map[string]string `json:"deployment_map,omitempty"`
+	// Handle is the operator-chosen routing handle of this ModelProvider row
+	// (ModelProvider.routingHandle), unique inside the organization. Absent
+	// when the operator set none.
+	Handle string `json:"handle,omitempty"`
+	// Models is what this provider declares it serves: the customer's declared
+	// custom models and embeddings models, and for the hosted families the
+	// model catalog the platform ships. Used for ROUTING a bare model name to
+	// the provider that owns it; authorization stays with models_allowed.
+	Models []string `json:"models,omitempty"`
 }
 
 // fallbackWire is the fallback block of the config payload. Only max_attempts
@@ -251,6 +264,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	}
 
 	cfg.Budget.Scopes = toBudgetScopes(w.Budgets)
+	cfg.Budget.ValidUntil = budgetsValidUntil(w.Budgets)
 	cfg.PolicyRules = buildPolicyRules(w.PolicyRules)
 	cfg.CacheRules = buildCacheRules(w.CacheRules)
 
@@ -329,12 +343,14 @@ func failsClosed(g guardrailWire) bool {
 // provider a model name it has never heard of. A bare target carries no
 // provider and resolves against the credential chain like any other
 // unqualified model.
+// The prefix has to name a provider family the gateway knows. A target whose
+// first segment is a routing handle, or a model id that simply contains a
+// slash, is left whole for the resolver, which holds the key's config and can
+// tell the two apart. Splitting those here produced an alias pointing at a
+// provider nobody holds, so no request for it could ever be served.
 func buildModelAlias(target string) domain.ModelAlias {
-	provider, model, found := strings.Cut(target, "/")
-	if !found || provider == "" || model == "" {
-		return domain.ModelAlias{Model: target}
-	}
-	return domain.ModelAlias{ProviderID: domain.NormalizeProviderID(provider), Model: model}
+	providerID, model, _ := domain.SplitModelSpelling(target)
+	return domain.ModelAlias{ProviderID: providerID, Model: model}
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
@@ -433,6 +449,32 @@ func toBudgetScopes(ws []budgetWire) []domain.BudgetScope {
 	return scopes
 }
 
+// budgetsValidUntil is the earliest boundary any enforceable budget on this
+// bundle is heading for: the instant its spend figures stop describing the
+// current period. See domain.BudgetConfig.ValidUntil for what the cache does
+// with it.
+//
+// Scopes without a limit are skipped because the checker skips them too, so
+// their boundary would shorten the config's life for a budget that can never
+// block. A non-positive resets_at is skipped as no answer rather than read as
+// 1970: TOTAL and MANUAL windows ship a far-future sentinel, and a control
+// plane older than the field ships nothing at all, neither of which is a
+// period that has ended.
+func budgetsValidUntil(ws []budgetWire) time.Time {
+	var earliest time.Time
+	for i := range ws {
+		b := &ws[i]
+		if b.LimitMicroUSD <= 0 || b.ResetsAt <= 0 {
+			continue
+		}
+		at := time.Unix(b.ResetsAt, 0)
+		if earliest.IsZero() || at.Before(earliest) {
+			earliest = at
+		}
+	}
+	return earliest
+}
+
 // toExcludedProviders maps the {id, type} exclusion wire entries onto domain
 // rows, normalizing the provider type the same way credentials are so the
 // gateway matches a resolved request's provider kind consistently.
@@ -445,6 +487,7 @@ func toExcludedProviders(ws []excludedProviderWire) []domain.ExcludedModelProvid
 		out = append(out, domain.ExcludedModelProvider{
 			ID:         w.ID,
 			ProviderID: domain.NormalizeProviderID(w.Type),
+			Handle:     strings.ToLower(w.Handle),
 		})
 	}
 	return out
@@ -454,6 +497,8 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	cred := domain.Credential{
 		ID:         p.ID,
 		ProviderID: domain.NormalizeProviderID(p.Type),
+		Handle:     strings.ToLower(p.Handle),
+		Models:     p.Models,
 	}
 
 	getString := func(key string) string {
@@ -503,6 +548,12 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"account_id":      getString("account_id"),
 			"provider_row_id": getString("provider_row_id"),
 		}
+	case domain.ProviderLangWatch:
+		// The license token is the bearer and the instance id rides a header,
+		// because the registry binds a license to one install and refuses the
+		// token presented from anywhere else (ADR-139 section 4).
+		cred.APIKey = getString("api_key")
+		cred.Extra = map[string]string{"instance_id": getString("instance_id")}
 	case domain.ProviderGemini:
 		// Gemini's second door: a credential carrying project_id + region
 		// is an Agent Platform key, and mapProvider routes it to

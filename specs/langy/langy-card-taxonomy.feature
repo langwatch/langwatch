@@ -44,6 +44,9 @@ Feature: Langy's cards read at the right attention weight
     Then the card leans in with the warm accent
     And it offers a clear action to respond with
 
+  # The secret snippet card shows a value once: it leans in while the value
+  # is on screen, and settles to a quiet masked receipt once it is gone.
+  # See specs/langy/langy-secret-snippet.feature.
   Scenario: A headline result takes full attention
     Given Langy is showing me something worth my full attention
     When it shows a spotlight card
@@ -61,3 +64,17 @@ Feature: Langy's cards read at the right attention weight
     Then the error reads as a calm change-weight card in Langy's own skin
     And the trouble is carried by a calm rust tone, not a loud alert box
     And the retry is offered as a clear action
+
+  @integration
+  Scenario: A step the turn recovered from folds to one line
+    Given a step that failed and a reply Langy wrote after it
+    When I read the finished turn
+    Then that failure is one quiet line, not a card
+    And the line says Langy answered below, never that it carried on, since the reply may be the turn stopping there
+    And opening the line shows the card it always showed
+
+  @integration
+  Scenario: A step the turn never recovered from keeps its card
+    Given a step that failed and no reply after it
+    When I read the turn
+    Then that failure keeps its card

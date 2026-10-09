@@ -152,7 +152,7 @@ describe("validateVegaLiteSpec", () => {
 
   describe("given several registered named datasets and their columns", () => {
     describe("when a spec reads more than one of them", () => {
-      /** @scenario "The renderer contract accepts multiple registered named datasets" */
+      /** @scenario "The renderer contract accepts multiple registered named views" */
       it("resolves each branch against the dataset that feeds it", () => {
         const layeredOverTwoDatasets = {
           $schema: VEGA_LITE_SCHEMA_URL,

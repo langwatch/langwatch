@@ -100,7 +100,7 @@ Feature: Trace media blob extraction at the ingestion edge
 
   @integration
   Scenario: Media carried on span events is externalized like span attributes
-    Given a span whose gen_ai prompt rides in a span event attribute containing an inline image
+    Given an instrumentation that records the prompt on a span event, with an inline image in it
     When the span is ingested
     Then the event attribute is rewritten to reference the stored object
 

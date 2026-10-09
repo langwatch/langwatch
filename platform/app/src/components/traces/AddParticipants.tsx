@@ -150,7 +150,22 @@ export const AddParticipants = ({
               }}
             </Select.ValueText>
           </Select.Trigger>
-          <Select.Content maxHeight="300px" portalled={false}>
+          {/*
+            #6716: this listbox sat unclickable when the automation drawer's
+            annotation-queue config renders it inside the secondary
+            (Configuration) drawer stacked on top of the main composer —
+            `portalled={false}` puts the floating listbox in the DOM as a
+            normal descendant instead of routing it through the shared
+            z-index-safe portal every other Select in the app uses
+            (`components/ui/select.tsx`'s `useOverlayZIndex`, added for
+            exactly this "selects can render behind another overlay" class of
+            bug, see #2519). The listbox rendered fine within a single
+            drawer, so its clicks reached the combobox trigger but never the
+            options underneath the stacked drawer body. Portalling (the
+            default) fixes it in the single- and stacked-drawer contexts this
+            listbox renders in.
+          */}
+          <Select.Content maxHeight="300px">
             <Box
               maxH="250px"
               overflowY="auto"

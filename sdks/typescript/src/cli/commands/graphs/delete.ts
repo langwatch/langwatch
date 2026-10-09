@@ -1,12 +1,13 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -22,14 +23,13 @@ export const deleteGraphCommand = async (
   const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `delete graph "${id}"` });
+      await failSpinnerFromResponse({ spinner, response, action: `delete graph "${id}"` });
       process.exit(1);
     }
 

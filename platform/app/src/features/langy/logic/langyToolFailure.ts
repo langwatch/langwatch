@@ -32,6 +32,7 @@ import {
   parseCliJson,
   readCliErrorDocument,
 } from "@langwatch/langy";
+import { explainHandledError } from "~/features/errors/logic/presentation";
 import { LIMIT_TYPE_LABELS } from "~/server/license-enforcement/constants";
 
 /** The plan allowance a failure ran into, in the customer's own words. */
@@ -320,6 +321,72 @@ function describeFailure(domain: CliHandledError): {
 }
 
 /**
+ * Tools whose NAME says they run in the folder the developer shared from their
+ * own machine (ADR-129), with their own git identity and their own `gh` login.
+ * The same carve-out the manager's GitHub gate makes.
+ *
+ * The name is only half the answer: the shell that delegates a command to that
+ * folder is registered as plain `bash`, so a delegated run is named like a
+ * sandbox one. The settled call carries a `local` marker for exactly that case.
+ */
+const LOCAL_TOOL_PREFIX = "local_";
+
+/**
+ * `gh` in the sandbox saying it has no login.
+ *
+ * gh answers an unauthenticated call with "To get started with GitHub CLI,
+ * please run: gh auth login", and that sentence reached the customer verbatim:
+ * the sandbox's own shell telling them to log into a machine they cannot open.
+ * What it actually means on that path is that the LangWatch GitHub App is not
+ * installed for this organization, which is a setup step with a real next
+ * action.
+ *
+ * The manager's gate raises `langy_github_not_connected` for the same
+ * condition, but it reads SETTLED tool frames — so the failed command's card is
+ * already on screen by the time the turn stops. This is that card.
+ *
+ * On the LOCAL path gh's own instruction is exactly right: that is the
+ * developer's gh, in their folder, on their machine. A call is on that path
+ * when its name says so (`local_*`) or when the settled call carries the
+ * `local` marker. The delegating shell is named `bash`, so that marker is the
+ * only thing that can tell a delegated run apart. Either way it is left alone.
+ */
+function githubAppNotInstalled({
+  toolName,
+  raw,
+  local,
+}: {
+  toolName: string | undefined;
+  raw: string | undefined;
+  local: boolean | undefined;
+}): LangyToolErrorPresentation | null {
+  if (!raw) return null;
+  if (local === true) return null;
+  if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
+  if (!/\bgh auth login\b/i.test(raw)) return null;
+
+  const copy = explainHandledError({
+    code: "langy_github_not_connected",
+    meta: {},
+    httpStatus: 409,
+    fault: "customer",
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: [],
+  });
+
+  return {
+    title: copy.title,
+    message: copy.description,
+    tips: ["Install it from Settings, under Integrations."],
+    code: "langy_github_not_connected",
+    terminal: true,
+    raw,
+  };
+}
+
+/**
  * Turn a failed tool frame into safe, structured card copy.
  *
  * @see the three levels in this module's header.
@@ -327,12 +394,28 @@ function describeFailure(domain: CliHandledError): {
 export function presentLangyToolError({
   title,
   errorText,
+  toolName,
+  local,
 }: {
   title: string;
   errorText: unknown;
+  /**
+   * The tool that failed. Only used to tell the sandbox's `gh` apart from the
+   * developer's own — see {@link githubAppNotInstalled}.
+   */
+  toolName?: string;
+  /**
+   * The call ran in the developer's shared folder rather than the sandbox, as
+   * the settled call reported it. Says what the name cannot for the shell that
+   * delegates there, which is registered as `bash`.
+   */
+  local?: boolean;
 }): LangyToolErrorPresentation {
   const raw = rawFailureText(errorText);
   const domain = readStructuredError(errorText);
+
+  const notInstalled = githubAppNotInstalled({ toolName, raw, local });
+  if (notInstalled) return notInstalled;
 
   // Level 3. No document, so no code — but there is usually TEXT, and the text
   // is the only thing left that knows anything. Showing it beats "This step
@@ -341,10 +424,19 @@ export function presentLangyToolError({
   // pins the copy to a regex, breaks the moment the sentence is reworded, and
   // hides the real defect (whoever dropped the document) instead of fixing it.
   if (!domain) {
+    // ...unless the text is a traceback. A traceback is the engine talking to
+    // itself: a file path, a line number and an exception class from inside a
+    // process, none of it written for a reader
+    // (dev/docs/best_practices/error-handling.md). Its most quotable line reads
+    // exactly like a detail sentence, so `firstLine` lifted
+    // "json.decoder.JSONDecodeError: ..." into a card body. The body stays the
+    // plain sentence and the whole text keeps its place behind the disclosure.
+    const detail = raw && !isEngineTraceback(raw) ? firstLine(raw) : undefined;
     return {
       title: `${title} failed`,
       message: "This step couldn't be completed.",
-      ...(raw ? { detail: firstLine(raw), raw } : {}),
+      ...(detail ? { detail } : {}),
+      ...(raw ? { raw } : {}),
     };
   }
 
@@ -392,6 +484,24 @@ export function presentLangyToolError({
     ...(logsUrl ? { logsUrl } : {}),
     ...(raw ? { raw } : {}),
   };
+}
+
+/**
+ * The marks of a stack trace, in the two languages the tools we run are written
+ * in. Any one of them is enough: a truncated traceback keeps its frames without
+ * its header, and a process that printed only the exception line still printed
+ * an exception line.
+ */
+const TRACEBACK_SIGNALS = [
+  /^\s*Traceback \(most recent call last\)/m,
+  /^\s*File "[^"]+", line \d+/m,
+  /^\s*at [\w$.<>[\] ]+ \(?[^\s]+:\d+:\d+\)?$/m,
+  /^[A-Za-z_][\w.]*(?:Error|Exception|Warning)\s*:/m,
+];
+
+/** Whether raw failure text is a stack trace rather than a sentence. */
+function isEngineTraceback(raw: string): boolean {
+  return TRACEBACK_SIGNALS.some((signal) => signal.test(raw));
 }
 
 /** The most informative single line of an unstructured failure. */

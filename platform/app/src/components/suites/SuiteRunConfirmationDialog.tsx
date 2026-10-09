@@ -3,13 +3,15 @@
  *
  * Displays the suite name, scenario/target counts, and estimated job count
  * so the user can review what will be executed before confirming.
+ *
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
-import { Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Crosshair, FileText, Repeat } from "lucide-react";
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { Dialog } from "../ui/dialog";
+import { RunParameterFields } from "./RunParameterFields";
 
 export function SuiteRunConfirmationDialog({
   open,
@@ -39,6 +41,14 @@ export function SuiteRunConfirmationDialog({
   onParameterChange?: (name: string, value: string) => void;
 }) {
   const estimatedJobs = scenarioCount * targetCount * repeatCount;
+
+  // A secret has no default and the run refuses to start without it, so the
+  // dialog holds the run here rather than sending it to be rejected.
+  const missingSecrets = parameters.some(
+    (parameter) =>
+      parameter.secret === true &&
+      (parameterValues[parameter.name] ?? "") === "",
+  );
 
   return (
     <Dialog.Root
@@ -129,7 +139,7 @@ export function SuiteRunConfirmationDialog({
               e.stopPropagation();
               onConfirm();
             }}
-            disabled={isLoading}
+            disabled={isLoading || missingSecrets}
           >
             {isLoading ? (
               <Spinner size="sm" />
@@ -140,68 +150,5 @@ export function SuiteRunConfirmationDialog({
         </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
-  );
-}
-
-/**
- * One input per parameter the run can carry, prefilled with the value the run
- * would use if nothing here is touched.
- */
-function RunParameterFields({
-  parameters,
-  values,
-  onChange,
-  disabled,
-}: {
-  parameters: ScenarioParameterDefinition[];
-  values: Record<string, string>;
-  onChange?: (name: string, value: string) => void;
-  disabled: boolean;
-}) {
-  return (
-    <VStack
-      align="stretch"
-      gap={2}
-      data-testid="suite-run-parameters"
-      borderTopWidth="1px"
-      borderColor="border"
-      paddingTop={4}
-    >
-      <Text
-        fontSize="11px"
-        fontWeight="bold"
-        textTransform="uppercase"
-        color="fg.muted"
-        letterSpacing="0.5px"
-      >
-        Parameters
-      </Text>
-      {parameters.map((parameter) => (
-        <HStack key={parameter.name} gap={2}>
-          <HStack gap={0} width="180px" flexShrink={0} minWidth={0}>
-            <Text fontSize="sm" fontFamily="mono" truncate>
-              {parameter.name}
-            </Text>
-            {parameter.description && (
-              <FieldInfoTooltip
-                description={parameter.description}
-                testId={`suite-run-param-info-${parameter.name}`}
-              />
-            )}
-          </HStack>
-          <Input
-            size="sm"
-            flex={1}
-            fontFamily="mono"
-            fontSize="13px"
-            aria-label={parameter.name}
-            value={values[parameter.name] ?? ""}
-            onChange={(e) => onChange?.(parameter.name, e.target.value)}
-            disabled={disabled}
-            data-testid={`suite-run-parameter-${parameter.name}`}
-          />
-        </HStack>
-      ))}
-    </VStack>
   );
 }

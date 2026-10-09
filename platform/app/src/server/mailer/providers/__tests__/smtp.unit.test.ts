@@ -19,7 +19,11 @@ vi.mock("nodemailer", () => ({
   default: { createTransport: createTransportMock },
 }));
 
-import { buildSmtpTransportOptions, smtpProvider } from "../smtp";
+import {
+  buildSmtpTransportOptions,
+  smtpProvider,
+  smtpSendsCredentials,
+} from "../smtp";
 import { EmailProviderConfigurationError } from "../types";
 
 const setEnv = (values: Record<string, unknown>) => {
@@ -28,6 +32,28 @@ const setEnv = (values: Record<string, unknown>) => {
 };
 
 const sentMessage = () => sendMailMock.mock.calls[0]?.[0];
+
+describe("smtpSendsCredentials", () => {
+  beforeEach(() => setEnv({}));
+
+  it("is true for a connection URL that names a user", () => {
+    setEnv({ SMTP_URL: "smtps://user:pass@relay.corp:465" });
+    expect(smtpSendsCredentials()).toBe(true);
+  });
+
+  it("is false for a connection URL with no user, even beside SMTP_USER", () => {
+    setEnv({ SMTP_URL: "smtp://relay.corp:25", SMTP_USER: "ignored" });
+    expect(smtpSendsCredentials()).toBe(false);
+  });
+
+  it("follows SMTP_USER for discrete host settings", () => {
+    setEnv({ SMTP_HOST: "relay.corp", SMTP_USER: "mailer" });
+    expect(smtpSendsCredentials()).toBe(true);
+
+    setEnv({ SMTP_HOST: "relay.corp" });
+    expect(smtpSendsCredentials()).toBe(false);
+  });
+});
 
 describe("buildSmtpTransportOptions", () => {
   beforeEach(() => {
@@ -155,6 +181,31 @@ describe("smtpProvider.send", () => {
       });
 
       expect(closeMock).toHaveBeenCalled();
+    });
+  });
+
+  describe("given an outbox delivery identity", () => {
+    /** @scenario "SMTP retries preserve the notification message identity" */
+    it("preserves the MIME identity on retry without exposing the delivery key", async () => {
+      const content = {
+        to: "a@example.com",
+        subject: "Joined",
+        html: "<p>Joined</p>",
+      };
+      for (const idempotencyKey of ["org:join:a", "org:join:a", "org:join:b"]) {
+        await smtpProvider.send({
+          content: { ...content, idempotencyKey },
+          defaultFrom: "noreply@langwatch.ai",
+        });
+      }
+      const messages = sendMailMock.mock.calls.map(([message]) => message);
+      expect(messages).toHaveLength(3);
+      expect(messages[0].messageId).toMatch(
+        /^<[a-f0-9]{64}@notifications\.langwatch\.ai>$/,
+      );
+      expect(messages[1].messageId).toBe(messages[0].messageId);
+      expect(messages[2].messageId).not.toBe(messages[0].messageId);
+      expect(messages[0]).not.toHaveProperty("idempotencyKey");
     });
   });
 

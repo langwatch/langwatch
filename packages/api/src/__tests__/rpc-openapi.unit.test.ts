@@ -22,7 +22,7 @@ function buildRpcService() {
     .version("2026-08-07", (v) => {
       v.rpc(
         "/things.create",
-        {
+        { noPermission: { reason: "framework test endpoint" },
           input: z.object({ name: z.string() }),
           output: z.object({ name: z.string() }),
           status: 201,

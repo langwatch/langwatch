@@ -1,20 +1,24 @@
 import {
-  AlertTriangle,
+  Bot,
   Brain,
+  Coins,
   Eye,
   Gauge,
+  Inbox,
   KeyRound,
   LineChart,
   type LucideIcon,
   PackageOpen,
-  PlugZap,
   ReceiptText,
   Route,
   Shield,
-  Wallet,
+  Target,
+  Users,
   Webhook,
   Zap,
 } from "lucide-react";
+
+import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 /**
  * The Gateway and Governance section navigations as data. The legacy
@@ -27,8 +31,20 @@ export interface SectionNavItemData {
   href: string;
   includePath?: string;
   icon: LucideIcon;
-  /** Opens in a new tab with an external-link marker. */
-  isExternal?: boolean;
+  /**
+   * Listed only while this frontend flag is enabled. Every renderer of
+   * these lists must filter through useVisibleSectionNavItems so the two
+   * presentations agree on what exists.
+   */
+  featureFlag?: FrontendFeatureFlag;
+  /** The `data-tour` target the guided tour spotlights on this entry. */
+  tourId?: string;
+  /**
+   * Listed under a labelled group in the navigation-v2 sidebar, after
+   * every ungrouped entry. The legacy section rail has no grouping
+   * affordance and lists grouped entries flat, in the same order.
+   */
+  group?: string;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -37,13 +53,13 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/gateway/virtual-keys",
     includePath: "/gateway/virtual-keys",
     icon: KeyRound,
+    tourId: "nav-virtual-keys",
   },
   {
     label: "Model Providers",
     href: "/settings/model-providers",
     includePath: "/settings/model-providers",
     icon: Brain,
-    isExternal: true,
   },
   {
     label: "Budgets",
@@ -96,27 +112,59 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: Eye,
   },
   {
-    label: "Ingestion Sources",
-    href: "/governance/ingestion-sources",
-    includePath: "/governance/ingestion-sources",
-    icon: PlugZap,
+    label: "Costs",
+    href: "/governance/costs",
+    includePath: "/governance/costs",
+    icon: Coins,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
   },
   {
-    label: "Anomaly Rules",
-    href: "/governance/anomaly-rules",
-    includePath: "/governance/anomaly-rules",
-    icon: AlertTriangle,
-  },
-  {
-    label: "Tool Catalog",
-    href: "/governance/tool-catalog",
-    includePath: "/governance/tool-catalog",
+    label: "Inventory",
+    href: "/governance/inventory",
+    includePath: "/governance/inventory",
     icon: PackageOpen,
   },
   {
-    label: "Departments",
-    href: "/governance/departments",
-    includePath: "/governance/departments",
-    icon: Wallet,
+    // Anomaly Rules left the rail for a tab inside Inventory, and Billed
+    // left it for this entry. The /governance/billed page stays reachable
+    // by address behind its flag; it is only no longer listed.
+    label: "Agents",
+    href: "/governance/agents",
+    includePath: "/governance/agents",
+    icon: Bot,
+  },
+  {
+    label: "People",
+    href: "/governance/people",
+    includePath: "/governance/people",
+    icon: Users,
+  },
+  // The Platform group: placeholder screens for the brief, explore and
+  // rule registry that the cost work leads into. They ride the billed-cost
+  // flag so the audience previewing Costs previews these too.
+  // Spec: specs/governance/governance-platform-placeholders.feature
+  {
+    label: "Insights",
+    href: "/governance/insights",
+    includePath: "/governance/insights",
+    icon: Inbox,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
+  },
+  {
+    label: "Analytics",
+    href: "/governance/analytics",
+    includePath: "/governance/analytics",
+    icon: LineChart,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
+  },
+  {
+    label: "Signals & Alerts",
+    href: "/governance/signals",
+    includePath: "/governance/signals",
+    icon: Target,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
   },
 ];

@@ -4,7 +4,7 @@
  * Similar to experiments-v3/utils/computeAggregates.ts but works with
  * the transformed BatchEvaluationData format.
  */
-import type { MetricStats } from "~/components/shared/MetricStatsTooltip";
+import type { MetricStats } from "~/components/shared/metricStats";
 import type {
   BatchEvaluationData,
   BatchResultRow,

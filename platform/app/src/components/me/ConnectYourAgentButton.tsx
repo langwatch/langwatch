@@ -8,8 +8,8 @@ import { docsUrl } from "~/utils/docsUrl";
  *
  * The mirror image of `SetupWithAgentButton`: that one lives on empty states
  * and sets a feature up; this one appears only once usage EXISTS and hands an
- * agent the reader's own usage to explore. Same menu anatomy (Langy first,
- * copy-a-prompt, docs), different job.
+ * agent the reader's own usage to explore. Same menu anatomy (copy-a-prompt,
+ * Langy, docs), different job.
  *
  * The gate is `Project.firstMessage` on the personal project, the same
  * first-traces signal the authorize page's post-login watch polls
@@ -17,9 +17,9 @@ import { docsUrl } from "~/utils/docsUrl";
  * nothing to explore, so the button stays out of the header entirely.
  */
 
-/** Docs path for the guide the menu links; page lives in docs/ai-governance. */
+/** Docs path for the guide the menu links; page lives in docs/coding-agents. */
 export const EXPLORE_USAGE_DOCS_PATH =
-  "/ai-governance/explore-your-usage-with-your-own-agent";
+  "/coding-agents/explore-your-usage-with-your-own-agent";
 
 /** What Langy is asked when the reader picks "Explore via Langy". */
 export const EXPLORE_USAGE_LANGY_PROMPT =

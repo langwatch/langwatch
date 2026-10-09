@@ -62,6 +62,14 @@ Feature: Scenario run CSV export
     Then each row also includes scenario_run_id, scenario_id, scenario_name, batch_run_id, started_at, and status_category
 
   @unit
+  Scenario: Criteria rows say when the judge could not decide
+    Given a run whose judge met 1 criterion, failed 1 and could not decide 1
+    When the criteria CSV is generated
+    Then the undecided criterion's row has met "false" and inconclusive "true"
+    And the other rows have inconclusive "false"
+    And the full CSV lists the undecided criterion under run_inconclusive_criteria
+
+  @unit
   Scenario: A run that was judged against no criteria produces no criteria rows
     Given a run has no met criteria and no unmet criteria
     When I export in Criteria mode

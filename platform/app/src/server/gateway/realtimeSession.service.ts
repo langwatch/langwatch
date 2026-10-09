@@ -13,9 +13,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayRealtimeSession,
-  GatewayRealtimeSessionStatus,
+import {
+  type GatewayRealtimeSession,
+  type GatewayRealtimeSessionStatus,
   Prisma,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
@@ -152,26 +152,34 @@ export async function correlateRealtimeSession(params: {
   return updated.count > 0;
 }
 
-/** Closes a session that never opened, so the cap stops counting it. */
+/**
+ * Closes a session that never opened, so the cap stops counting it.
+ *
+ * The three writes that move a session out of OPEN (this one, the close on a
+ * report, the expiry sweep) are SQL with the status condition against the
+ * table. Through `updateMany` the condition sits in a subquery, and a
+ * statement that waited on the row lock re-checks only the outer id predicate
+ * against the committed row, so a release or a sweep parked behind a close
+ * would regress a CLOSED row to EXPIRED, and a second close parked behind the
+ * first would settle the same call into the trace twice.
+ */
 export async function releaseRealtimeSession(params: {
   sessionId: string;
   projectId: string;
   status: GatewayRealtimeSessionStatus;
   reason: string;
 }): Promise<boolean> {
-  const updated = await prisma.gatewayRealtimeSession.updateMany({
-    where: {
-      id: params.sessionId,
-      projectId: params.projectId,
-      status: "OPEN",
-    },
-    data: {
-      status: params.status,
-      closedAt: new Date(),
-      closeReason: params.reason.slice(0, 256),
-    },
-  });
-  return updated.count > 0;
+  const updated = await prisma.$executeRaw`
+    UPDATE "GatewayRealtimeSession"
+       SET "status" = ${params.status}::"GatewayRealtimeSessionStatus",
+           "closedAt" = now(),
+           "closeReason" = ${params.reason.slice(0, 256)},
+           "updatedAt" = now()
+     WHERE "id" = ${params.sessionId}
+       AND "projectId" = ${params.projectId}
+       AND "status" = 'OPEN'
+  `;
+  return updated > 0;
 }
 
 /**
@@ -303,22 +311,25 @@ export async function closeAndConfirmRealtimeSession(params: {
     metadata: "",
   });
 
-  const closed = await prisma.gatewayRealtimeSession.updateMany({
-    where: {
-      id: params.session.id,
-      projectId: params.session.projectId,
-      status: { in: ["OPEN", "EXPIRED"] },
-    },
-    data: {
-      status: "CLOSED",
-      closedAt: occurredAt,
-      closeReason: params.reason.slice(0, 256),
-      ...(params.vendorCostRaw === undefined
-        ? {}
-        : { vendorCostRaw: params.vendorCostRaw as Prisma.InputJsonValue }),
-    },
-  });
-  if (closed.count === 0) {
+  // SQL with the status condition on the table, for the reason given on
+  // `releaseRealtimeSession`. The vendor's cost payload is kept as it was when
+  // the report carries none.
+  const vendorCostRaw =
+    params.vendorCostRaw === undefined
+      ? null
+      : JSON.stringify(params.vendorCostRaw);
+  const closed = await prisma.$executeRaw`
+    UPDATE "GatewayRealtimeSession"
+       SET "status" = 'CLOSED',
+           "closedAt" = ${occurredAt},
+           "closeReason" = ${params.reason.slice(0, 256)},
+           "vendorCostRaw" = COALESCE(${vendorCostRaw}::jsonb, "vendorCostRaw"),
+           "updatedAt" = now()
+     WHERE "id" = ${params.session.id}
+       AND "projectId" = ${params.session.projectId}
+       AND "status" IN ('OPEN', 'EXPIRED')
+  `;
+  if (closed === 0) {
     logger.info(
       { sessionId: params.session.id },
       "a realtime report arrived for a session that was already closed",
@@ -407,25 +418,27 @@ export async function reportRealtimeSessionUsage(params: {
 export async function expireStaleRealtimeSessions(params: {
   virtualKeyId?: string;
   now?: Date;
-  tx?: Pick<typeof prisma, "gatewayRealtimeSession">;
+  tx?: Pick<Prisma.TransactionClient, "$executeRaw">;
 }): Promise<number> {
   const now = params.now ?? new Date();
   const db = params.tx ?? prisma;
-  const { count } = await db.gatewayRealtimeSession.updateMany({
-    where: {
-      ...(params.virtualKeyId ? { virtualKeyId: params.virtualKeyId } : {}),
-      status: "OPEN",
-      mintedAt: {
-        lt: new Date(now.getTime() - REALTIME_OPEN_SESSION_WINDOW_MS),
-      },
-    },
-    data: {
-      status: "EXPIRED",
-      closedAt: now,
-      closeReason: "no vendor report arrived within the longest possible call",
-    },
-  });
-  return count;
+  const keyFilter = params.virtualKeyId
+    ? Prisma.sql`AND "virtualKeyId" = ${params.virtualKeyId}`
+    : Prisma.empty;
+  // SQL with the status condition on the table, for the reason given on
+  // `releaseRealtimeSession`.
+  return await db.$executeRaw`
+    -- @tenancy: a fleet sweep over open sessions; the mint path narrows it
+    -- to one key under the cap's advisory lock, the poller runs it whole.
+    UPDATE "GatewayRealtimeSession"
+       SET "status" = 'EXPIRED',
+           "closedAt" = ${now},
+           "closeReason" = 'no vendor report arrived within the longest possible call',
+           "updatedAt" = now()
+     WHERE "status" = 'OPEN'
+       AND "mintedAt" < ${new Date(now.getTime() - REALTIME_OPEN_SESSION_WINDOW_MS)}
+       ${keyFilter}
+  `;
 }
 
 /**

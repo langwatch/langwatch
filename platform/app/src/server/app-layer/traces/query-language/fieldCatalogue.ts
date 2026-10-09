@@ -14,7 +14,9 @@
  * reason for extracting it and has not been built, so this is one definition
  * with one consumer, not yet a shared one.
  */
+import type { Authorization } from "@langwatch/actor";
 import { getApp } from "~/server/app-layer/app";
+import { isInstantEvalField } from "./instantEvalChips";
 import { FIELD_VALUES, SEARCH_FIELDS } from "./metadata";
 
 /** Values fetched per categorical field before merging with the static list. */
@@ -23,7 +25,8 @@ const DYNAMIC_VALUES_LIMIT = 20;
 const SAMPLES_SHOWN = 8;
 
 export interface FieldCatalogueInput {
-  projectId: string;
+  /** The proof the sample-value facet reads apply. */
+  authorization: Authorization;
   timeRange: { from: number; to: number };
 }
 
@@ -34,6 +37,10 @@ export async function buildFieldsBlock(
   const dynamicValues = await fetchDynamicCategoricalValues(input);
   const lines: string[] = [];
   for (const [name, meta] of Object.entries(SEARCH_FIELDS)) {
+    // An `eval` chip stands for a run the Explorer starts under its cost
+    // rule; the model is never to write one, the search router decides when
+    // a sentence is a judgement.
+    if (isInstantEvalField(name)) continue;
     const sample = pickSampleValues(name, meta.facetField, dynamicValues);
     const sampleStr = sample.length > 0 ? ` — e.g. ${sample.join(", ")}` : "";
     lines.push(`- ${name} (${meta.valueType}): ${meta.label}${sampleStr}`);
@@ -70,7 +77,7 @@ async function fetchDynamicCategoricalValues(
   const results = await Promise.allSettled(
     facetFields.map((facetKey) =>
       app.traces.list.getFacetValues({
-        tenantId: input.projectId,
+        authorization: input.authorization,
         timeRange: input.timeRange,
         facetKey,
         limit: DYNAMIC_VALUES_LIMIT,

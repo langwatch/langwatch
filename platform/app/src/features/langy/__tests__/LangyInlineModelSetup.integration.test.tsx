@@ -21,7 +21,7 @@
  * screen itself is tested where it lives.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,6 +35,12 @@ const projectRef = {
     slug: string;
   } | null,
 };
+
+// The guided tour host reads the guided onboarding state over tRPC; this
+// suite covers the panel, not the tour.
+vi.mock("~/features/guided-onboarding/tour/GuidedOnboardingHost", () => ({
+  GuidedOnboardingHost: () => null,
+}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
@@ -74,10 +80,12 @@ vi.mock("~/components/Markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
+const sendMessage = vi.hoisted(() => vi.fn());
 vi.mock("@ai-sdk/react", () => ({
   useChat: () => ({
     messages: [],
-    sendMessage: vi.fn(),
+    sendMessage,
+    clearError: vi.fn(),
     stop: vi.fn(),
     status: "ready",
     setMessages: vi.fn(),
@@ -158,6 +166,11 @@ const refetchResolvedDefault = vi.fn(() => {
 
 vi.mock("~/utils/api", () => ({
   api: {
+    onboarding: {
+      attachConversation: {
+        useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+      },
+    },
     useUtils: () => ({
       langy: {
         list: { invalidate: () => Promise.resolve() },
@@ -205,6 +218,20 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
+      // ADR-129: the panel reads the shared folder and answers a
+      // question card's wait; neither is what these tests drive.
+      getLocalWorkspace: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      localRecord: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      answerQuestion: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
@@ -231,6 +258,12 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
+      setRoleAssignmentForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       getResolvedDefault: {
         useQuery: () => ({
           data: resolvedDefaultRef.current.data,
@@ -313,6 +346,7 @@ beforeEach(() => {
     isError: false,
   };
   refetchResolvedDefault.mockClear();
+  sendMessage.mockClear();
   lastOnComplete.current = null;
   currentDrawerRef.current = undefined;
   window.localStorage.clear();
@@ -404,6 +438,50 @@ describe("Feature: Langy prompts for a model when the project has none configure
             "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a project with no model and a question handed to Langy from a page", () => {
+    describe("when the panel opens with that question queued", () => {
+      /** @scenario "A question handed to Langy waits for a model instead of failing" */
+      it("holds the question behind the setup prompt and sends it once a model resolves", async () => {
+        resolvedDefaultRef.current = {
+          data: { model: null },
+          isLoading: false,
+        };
+        const rendered = renderPanel();
+        act(() => {
+          useLangyStore.getState().askLangy("Set up my first evaluator");
+        });
+
+        expect(
+          await screen.findByText("Langy needs a model to get started"),
+        ).toBeInTheDocument();
+        expect(sendMessage).not.toHaveBeenCalled();
+        expect(useLangyStore.getState().pendingPrompt).toBe(
+          "Set up my first evaluator",
+        );
+        expect(
+          screen.getByText("Set up my first evaluator"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("Langy sends this once a model is set up."),
+        ).toBeInTheDocument();
+
+        resolvedDefaultRef.current = {
+          data: { model: "gpt-5-mini" },
+          isLoading: false,
+        };
+        rendered.rerender(<LangySidecar />);
+
+        await waitFor(() => {
+          expect(sendMessage).toHaveBeenCalledTimes(1);
+        });
+        expect(JSON.stringify(sendMessage.mock.calls[0]?.[0])).toContain(
+          "Set up my first evaluator",
+        );
+        expect(useLangyStore.getState().pendingPrompt).toBeNull();
       });
     });
   });

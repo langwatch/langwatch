@@ -13,10 +13,90 @@ import { describe, expect, it } from "vitest";
 
 import {
   displayOptionalValue,
+  displayTypedValue,
   displayValue,
   serializeOptionalScalarValue,
+  serializeOptionalTypedScalarValue,
   serializeScalarValue,
+  serializeTypedScalarValue,
 } from "../jsonValueText";
+
+describe("serializeTypedScalarValue()", () => {
+  describe("given a string parameter", () => {
+    /** @scenario "A typed value reaches the run as the declared type" */
+    it("keeps text that looks like another type as text", () => {
+      expect(serializeTypedScalarValue({ raw: "007", type: "string" })).toBe(
+        "007",
+      );
+      expect(serializeTypedScalarValue({ raw: "true", type: "string" })).toBe(
+        "true",
+      );
+      expect(serializeTypedScalarValue({ raw: '"007"', type: "string" })).toBe(
+        "007",
+      );
+    });
+  });
+
+  describe("given a number parameter", () => {
+    it("reads a number, and keeps text it cannot read", () => {
+      expect(serializeTypedScalarValue({ raw: "5", type: "number" })).toBe(5);
+      expect(serializeTypedScalarValue({ raw: "007", type: "number" })).toBe(7);
+      expect(serializeTypedScalarValue({ raw: "many", type: "number" })).toBe(
+        "many",
+      );
+      expect(serializeTypedScalarValue({ raw: " ", type: "number" })).toBe(" ");
+    });
+  });
+
+  describe("given a boolean parameter", () => {
+    it("reads true and false, and keeps anything else as text", () => {
+      expect(serializeTypedScalarValue({ raw: "true", type: "boolean" })).toBe(
+        true,
+      );
+      expect(serializeTypedScalarValue({ raw: "false", type: "boolean" })).toBe(
+        false,
+      );
+      expect(serializeTypedScalarValue({ raw: "yes", type: "boolean" })).toBe(
+        "yes",
+      );
+    });
+  });
+
+  describe("given no declared type", () => {
+    it("falls back to the JSON rule", () => {
+      expect(serializeTypedScalarValue({ raw: "7" })).toBe(7);
+      expect(serializeTypedScalarValue({ raw: "true" })).toBe(true);
+      expect(serializeTypedScalarValue({ raw: "text" })).toBe("text");
+    });
+  });
+
+  describe("given an empty optional input", () => {
+    it("reads as absent whatever the type", () => {
+      expect(
+        serializeOptionalTypedScalarValue({ raw: "", type: "number" }),
+      ).toBeUndefined();
+      expect(
+        serializeOptionalTypedScalarValue({ raw: "5", type: "number" }),
+      ).toBe(5);
+    });
+  });
+});
+
+describe("displayTypedValue()", () => {
+  describe("given a string parameter", () => {
+    it("shows the value bare, since the type keeps it text", () => {
+      expect(displayTypedValue({ value: "007", type: "string" })).toBe("007");
+    });
+  });
+
+  describe("given any other parameter", () => {
+    it("reads as displayOptionalValue", () => {
+      expect(displayTypedValue({ value: "true" })).toBe('"true"');
+      expect(displayTypedValue({ value: 7, type: "number" })).toBe("7");
+      expect(displayTypedValue({ value: undefined, type: "number" })).toBe("");
+    });
+  });
+});
 
 describe("displayValue()", () => {
   describe("given a value JSON.stringify has no text for", () => {

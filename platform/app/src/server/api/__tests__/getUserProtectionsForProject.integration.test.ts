@@ -16,13 +16,16 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
 import type { Session } from "~/server/auth";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestProject } from "../../../utils/testUtils";
 import { getDataPrivacyPolicyService } from "../../data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "../../db";
 import { getUserProtectionsForProject } from "../utils";
+
+wireDefaultTestApp();
 
 const NAMESPACE = "dataprivacy-visibility";
 
@@ -69,24 +72,24 @@ describe("getUserProtectionsForProject audience-aware visibility", () => {
     });
     // Team RoleBindings make membership resolve from the binding query directly,
     // so the read path never needs the (uninitialized) app layer in tests.
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          organizationId,
-          userId: adminUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: project.teamId,
-        },
-        {
-          organizationId,
-          userId: memberUserId,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: project.teamId,
-        },
-      ],
-    });
+    for (const binding of [
+      {
+        organizationId,
+        userId: adminUserId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: project.teamId,
+      },
+      {
+        organizationId,
+        userId: memberUserId,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: project.teamId,
+      },
+    ]) {
+      await seedRoleBinding(prisma, binding);
+    }
   });
 
   beforeEach(async () => {

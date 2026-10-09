@@ -7,50 +7,66 @@
  * teams surfaces, and the control only appears once departments exist.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Imported at the top: vitest hoists the vi.mock / vi.hoisted calls below above
 // these statements, so the modules under test still resolve the mocks.
-import DepartmentsPage from "~/pages/governance/departments";
+import PeoplePage from "~/pages/governance/people";
 import { DepartmentPicker } from "../DepartmentPicker";
 import { useDepartmentColumn } from "../useDepartmentColumn";
 
-const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(
-  () => ({
-    ffEnabled: { current: true },
-    departmentList: {
-      current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
+const {
+  ffEnabled,
+  canViewGovernance,
+  departmentQueriesEnabled,
+  departmentList,
+  assignments,
+  mutations,
+} = vi.hoisted(() => ({
+  ffEnabled: { current: true },
+  canViewGovernance: { current: true },
+  /** Whether each department query asked the server, in call order. */
+  departmentQueriesEnabled: { current: [] as boolean[] },
+  departmentList: {
+    current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
+      id: string;
+      name: string;
+    }>,
+  },
+  assignments: {
+    current: {
+      users: [] as Array<{
         id: string;
         name: string;
+        departmentId: string | null;
+      }>,
+      teams: [] as Array<{
+        id: string;
+        name: string;
+        departmentId: string | null;
+      }>,
+      projects: [] as Array<{
+        id: string;
+        name: string;
+        departmentId: string | null;
       }>,
     },
-    assignments: {
-      current: {
-        users: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-        teams: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-        projects: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-      },
-    },
-    mutations: {
-      assignUser: vi.fn(async () => ({})),
-      assignTeam: vi.fn(async () => ({})),
-      assignProject: vi.fn(async () => ({})),
-    },
-  }),
-);
+  },
+  mutations: {
+    assignUser: vi.fn(async () => ({})),
+    assignTeam: vi.fn(async () => ({})),
+    assignProject: vi.fn(async () => ({})),
+  },
+}));
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: ffEnabled.current, isLoading: false }),
@@ -63,23 +79,78 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     // The page hides its write controls without `governance:manage`, and this
     // test is about what an admin sees.
     hasAnyPermission: () => true,
+    hasPermission: (permission: string) =>
+      permission !== "governance:view" || canViewGovernance.current,
+    hasOrgPermission: () => true,
   }),
 }));
 
-vi.mock("~/utils/api", () => ({
-  api: {
+// The people page renders inside GovernanceLayout, which pulls in the whole
+// dashboard shell — plan lookups, usage banner, nav. None of that is what these
+// tests are about, so stand it down to its children. Same stub the governance
+// page tests use — see peopleDepartments.integration.test.tsx.
+vi.mock("~/components/governance/GovernanceLayout", () => ({
+  default: ({ children }: { children: ReactNode }) => children,
+}));
+
+vi.mock("~/utils/api", () => {
+  // Any router these tests do not steer answers empty rather than throwing.
+  // Without this the file needed a fresh stub every time the page gained a
+  // panel, and it broke three times in a row that way: usage, permissions,
+  // spend-by-user. Same recursive shape the governance page tests use — see
+  // peopleDepartments.integration.test.tsx.
+  const anyRouter = (): unknown =>
+    new Proxy(
+      {},
+      {
+        get(_target, property) {
+          if (typeof property !== "string") return undefined;
+          if (property === "useQuery") {
+            return () => ({
+              data: undefined,
+              isLoading: false,
+              isFetching: false,
+              isError: false,
+              error: null,
+              refetch: vi.fn(),
+            });
+          }
+          if (property === "useMutation") {
+            return () => ({
+              mutate: vi.fn(),
+              mutateAsync: vi.fn(),
+              isPending: false,
+            });
+          }
+          if (property === "invalidate") return vi.fn();
+          return anyRouter();
+        },
+      },
+    );
+
+  const steered: Record<string, unknown> = {
     useUtils: () => ({
       departments: {
         list: { invalidate: vi.fn() },
         assignments: { invalidate: vi.fn() },
       },
+      governancePeople: {
+        list: { invalidate: vi.fn() },
+        suggestions: { invalidate: vi.fn() },
+      },
     }),
     departments: {
       list: {
-        useQuery: () => ({ data: departmentList.current, isLoading: false }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          departmentQueriesEnabled.current.push(options?.enabled !== false);
+          return { data: departmentList.current, isLoading: false };
+        },
       },
       assignments: {
-        useQuery: () => ({ data: assignments.current, isLoading: false }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          departmentQueriesEnabled.current.push(options?.enabled !== false);
+          return { data: assignments.current, isLoading: false };
+        },
       },
       create: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
       rename: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
@@ -103,8 +174,29 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-  },
-}));
+    // The page now carries the discovered-people panel; an empty answer keeps
+    // these tests about what they were about — departments and their links.
+    governancePeople: {
+      list: { useQuery: () => ({ data: [], isLoading: false }) },
+      suggestions: { useQuery: () => ({ data: [], isLoading: false }) },
+      runMatch: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      confirmSuggestion: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+  };
+
+  return {
+    api: new Proxy(steered, {
+      get: (target, property) =>
+        typeof property === "string" && property in target
+          ? target[property]
+          : anyRouter(),
+    }),
+  };
+});
 
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn(), dismiss: vi.fn() },
@@ -138,8 +230,20 @@ vi.mock("~/components/ui/link", () => ({
   ),
 }));
 
-function renderWithChakra(node: ReactNode) {
-  return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
+// The people page reads its tab and filter state from the query string via
+// useSearchParams, so rendering it needs a router in context. Same wrapper the
+// governance page tests use — see peopleDepartments.integration.test.tsx.
+function renderWithChakra(node: ReactNode, entry = "/") {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <MemoryRouter initialEntries={[entry]}>{node}</MemoryRouter>
+    </ChakraProvider>,
+  );
+}
+
+function DepartmentColumnProbe() {
+  const dept = useDepartmentColumn("org-1");
+  return <div data-testid="show">{String(dept.show)}</div>;
 }
 
 describe("department assignment UI", () => {
@@ -147,16 +251,30 @@ describe("department assignment UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ffEnabled.current = true;
+    canViewGovernance.current = true;
     departmentList.current = [{ id: "dept_mkt", name: "Marketing" }];
     assignments.current = { users: [], teams: [], projects: [] };
   });
 
   describe("given the departments page", () => {
     /** @scenario The departments page manages departments and links out to assign them */
-    it("manages departments and links to the members and teams pages instead of listing every person", () => {
-      renderWithChakra(<DepartmentsPage />);
+    it("manages departments and links to the members and teams pages instead of listing every person", async () => {
+      // Departments are the page's second tab, and the selected tab is part of
+      // the address — see the usePeopleTab block in pages/governance/people.tsx.
+      renderWithChakra(<PeoplePage />, "/governance/people?tab=departments");
 
-      expect(screen.getByText("Create a department")).toBeDefined();
+      expect(screen.getByText("Add department")).toBeDefined();
+
+      // The three assignment links now sit behind a disclosure rather than
+      // filling the tab. They still have to be reachable and still have to
+      // point at the settings pages that do the assigning.
+      await userEvent.click(
+        screen.getByRole("button", { name: /How departments are assigned/i }),
+      );
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: /^People/i })).toBeDefined();
+      });
+
       expect(
         screen.getByRole("link", { name: /People/i }).getAttribute("href"),
       ).toBe("/settings/members");
@@ -238,6 +356,31 @@ describe("department assignment UI", () => {
         teamId: "team_platform",
         departmentId: "dept_eng",
       });
+    });
+  });
+
+  describe("given a member without the governance:view grant", () => {
+    /** @scenario The department lists are not requested without the grant to read them */
+    it("asks for neither the departments nor their assignments, and shows no column", () => {
+      canViewGovernance.current = false;
+      departmentQueriesEnabled.current = [];
+
+      renderWithChakra(<DepartmentColumnProbe />);
+
+      expect(departmentQueriesEnabled.current).toEqual([false, false]);
+      expect(screen.getByTestId("show").textContent).toBe("false");
+    });
+  });
+
+  describe("given a member who holds the governance:view grant", () => {
+    it("asks for both the departments and their assignments", () => {
+      canViewGovernance.current = true;
+      departmentQueriesEnabled.current = [];
+
+      renderWithChakra(<DepartmentColumnProbe />);
+
+      expect(departmentQueriesEnabled.current).toEqual([true, true]);
+      expect(screen.getByTestId("show").textContent).toBe("true");
     });
   });
 

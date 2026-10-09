@@ -8,6 +8,7 @@
  * RoutingPolicy.modelProviderIds ordering. See `scopeResolver.ts` for
  * the cascade walker.
  */
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
   GatewayCacheRule,
@@ -16,7 +17,7 @@ import type {
   VirtualKey,
 } from "~/generated/prisma/client";
 
-import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
+import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import {
   type LangyMirrorTier,
   resolveLangyMirrorTier,
@@ -29,15 +30,28 @@ import {
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
+import { computeConfigETag } from "./configETag";
+import { connectLangWatchProviderSlot } from "./connectManagedModels";
 import { withTierFallthrough } from "./modelTierFallthrough";
+import { declaredModelsForProvider } from "./providerModelCatalog";
 import {
   eligibleModelProvidersForVk,
   scopeReachableModelProvidersForVk,
   traceProjectFor,
 } from "./scopeResolver";
+import { settleBefore } from "./settleBefore";
 import { organizationSpendTenantIds } from "./spendTenants";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+
+const logger = createLogger("langwatch:gateway:config-materialiser");
+
+/**
+ * How long the config endpoint waits for the ClickHouse spend read before it
+ * ships the stored spend instead. Well under the gateway's 10s config fetch
+ * timeout, so a slow replica costs budget freshness, not the key's config.
+ */
+export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
 export type GuardrailWire = {
   id: string;
@@ -75,6 +89,20 @@ export type ProviderSlot = {
   base_url?: string;
   region?: string;
   deployment_map?: Record<string, string>;
+  /**
+   * The operator-chosen routing handle of this ModelProvider row. A caller
+   * writes it where a provider family goes ("eu/claude-sonnet-5") to reach
+   * THIS instance rather than whichever instance of the family the key's chain
+   * order reaches first. Absent when the operator set none.
+   */
+  handle?: string;
+  /**
+   * What this provider declares it serves, for ROUTING a bare model name to
+   * the provider that owns it. Absent when the row declares nothing, which the
+   * gateway reads as "this provider said nothing" rather than "this provider
+   * serves nothing". Authorization stays with `models_allowed`.
+   */
+  models?: string[];
   config: Record<string, unknown>;
 };
 
@@ -87,6 +115,12 @@ export type ProviderSlot = {
 export type ProviderExclusionWire = {
   id: string;
   type: string;
+  /**
+   * The dropped row's routing handle, carried so a request naming it is told
+   * which of the key's settings dropped the provider instead of being told the
+   * operator's own handle means nothing.
+   */
+  handle?: string;
 };
 
 export type GatewayConfigPayload = {
@@ -307,6 +341,19 @@ export class GatewayConfigMaterialiser {
     };
   }
 
+  /**
+   * The version token for the bundle this materialiser would build for `vk`.
+   *
+   * It lives beside `materialise` because it describes that output: the token
+   * has to move whenever the bundle would come back different, and the two
+   * drifting apart is what lets a 304 confirm a bundle that is no longer
+   * current. See `configETag.ts` for what it covers and what it leaves to the
+   * change feed.
+   */
+  async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
+    return await computeConfigETag({ prisma: this.prisma, virtualKey: vk });
+  }
+
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await eligibleModelProvidersForVk(
       this.prisma,
@@ -322,6 +369,7 @@ export class GatewayConfigMaterialiser {
       eligibleProviders,
       config.providersAllowed,
     );
+    const slots = await this.providerSlots(vk, providers);
     const policySides = resolvePolicySideOfBundle(vk, config);
     const guardrailSides = await this.resolveGuardrailSideOfBundle(
       vk,
@@ -347,9 +395,9 @@ export class GatewayConfigMaterialiser {
         vk.purpose === "LANGY" && traceProject?.id
           ? resolveLangyMirrorTier({ projectId: traceProject.id })
           : "skip",
-      providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
+      providers: slots,
       fallback: {
-        chain: providers.map((mp) => mp.id),
+        chain: slots.map((slot) => slot.id),
         // routing_mode NONE means the request never leaves the provider
         // that serves the model, so the attempt budget is one. Pinning it
         // here makes no-fallback real for gateways that predate the
@@ -379,6 +427,29 @@ export class GatewayConfigMaterialiser {
       vk_tags: config.metadata?.tags ?? [],
       expires_at: expiresAtWire(vk.expiresAt),
     };
+  }
+
+  /**
+   * The dispatch chain as the gateway reads it: the organization's own
+   * providers, then, on a connected install that switched managed models on,
+   * the LangWatch gateway itself.
+   *
+   * The LangWatch slot goes last on purpose. A credential the customer
+   * configured keeps serving the models it serves, and LangWatch is reached
+   * only where the caller wrote `langwatch/...`. Its license token is read
+   * here, at materialisation, and never stored on a provider row.
+   */
+  private async providerSlots(
+    vk: VirtualKeyWithScopes,
+    providers: ModelProvider[],
+  ): Promise<ProviderSlot[]> {
+    const slots = providers.map((mp, index) => buildProviderSlot(mp, index));
+    const connectSlot = await connectLangWatchProviderSlot({
+      prisma: this.prisma,
+      organizationId: vk.organizationId,
+      slot: `fallback_${slots.length}`,
+    });
+    return connectSlot ? [...slots, connectSlot] : slots;
   }
 
   private async applicableCacheRules(
@@ -440,7 +511,8 @@ export class GatewayConfigMaterialiser {
 
   /**
    * CH spend rollup. Best-effort: falls back to PG `spentUsd` when CH
-   * isn't wired (test fixtures, deploys without CH). Tenant set = every
+   * isn't wired (test fixtures, deploys without CH) or does not answer
+   * inside CONFIG_SPEND_READ_TIMEOUT_MS. Tenant set = every
    * project under the VK's organization so ORG/TEAM/PRINCIPAL-scoped
    * budgets see ledger rows under whichever project emitted the trace.
    */
@@ -462,9 +534,10 @@ export class GatewayConfigMaterialiser {
       // bucket's own: a GROUP budget read from the raw row would prefix-sum
       // every member's bucket, and the gateway would then cap each member
       // at what the whole group spent together.
-      const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+      const deadline = AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS);
+      const read = this.chRepo.getSpendForBudgetsAcrossTenantsUntil({
         tenantIds,
-        budgets
+        budgets: budgets
           // Templates have no single bucket to read; their per-user spend
           // is fetched request-side through the bucket-spend endpoint.
           .filter((r) => r.budget.scopeType !== "ATTRIBUTED_USER")
@@ -476,13 +549,19 @@ export class GatewayConfigMaterialiser {
             match: "exact" as const,
             periodFloorMs: budgetPeriodFloorMs(r.budget),
           })),
-      );
+        signal: deadline,
+      });
+      const spends = await settleBefore({ work: read, signal: deadline });
       const out = new Map<string, string>();
       for (const s of spends) {
         out.set(s.budgetId, s.spentUsd);
       }
       return out;
-    } catch {
+    } catch (error) {
+      logger.warn(
+        { virtualKeyId: vk.id, error },
+        "gateway config spend read failed; shipping the stored spend instead",
+      );
       return new Map();
     }
   }
@@ -640,7 +719,7 @@ function geminiCredentials(
 
 export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
-  const customKeys = decryptCustomKeys(mp.customKeys);
+  const customKeys = readCustomKeys(mp.customKeys).keys;
   const pick = (k: string): string =>
     typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
 
@@ -723,7 +802,7 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
-  const customKeys = decryptCustomKeys(mp.customKeys);
+  const customKeys = readCustomKeys(mp.customKeys).keys;
   // Providers whose base-URL override the gateway consumes (see mapProvider
   // in bifrost.go): "custom" and "openai" route it to Bifrost's VLLM
   // (OpenAI-compat) adapter; "anthropic" derives a per-endpoint custom
@@ -763,7 +842,26 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
+    ...routingWire({ mp }),
     config: buildProviderConfig(mp),
+  };
+}
+
+/**
+ * The routing half of a provider slot: the handle that addresses this exact
+ * instance, and the models it declares it serves. Both are absent rather than
+ * empty when there is nothing to say, which is what the gateway reads as "this
+ * provider said nothing" instead of "this provider serves nothing".
+ */
+function routingWire({
+  mp,
+}: {
+  mp: ModelProvider;
+}): Pick<ProviderSlot, "handle" | "models"> {
+  const models = declaredModelsForProvider(mp);
+  return {
+    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
+    ...(models ? { models } : {}),
   };
 }
 
@@ -829,7 +927,11 @@ function routingModeToWire(
 }
 
 function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
-  return { id: mp.id, type: mp.provider };
+  return {
+    id: mp.id,
+    type: mp.provider,
+    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
+  };
 }
 
 /**

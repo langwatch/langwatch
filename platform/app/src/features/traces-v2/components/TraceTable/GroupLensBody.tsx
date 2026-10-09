@@ -7,8 +7,8 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { useFilterStore } from "../../stores/filterStore";
-import { groupByForGrouping, type LensConfig } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import { groupByForGrouping, type LensConfig } from "../../stores/viewSlice";
 import type { TraceListItem } from "../../types/trace";
 import { buildGroupColumns } from "./columns";
 import {
@@ -41,12 +41,13 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     () => (groupBy ? buildGroups(traces, groupBy) : []),
     [traces, groupBy],
   );
-  const pageSize = useFilterStore((s) => s.pageSize);
+  const pageSize = useExplorerStore((s) => s.pageSize);
   const groups = useMemo(
     () => (isLoading ? buildGroupPlaceholderRows(pageSize) : realGroups),
     [isLoading, pageSize, realGroups],
   );
-  const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set());
+  const openKeys = useExplorerStore((s) => s.expandedRows);
+  const toggleExpandedRow = useExplorerStore((s) => s.toggleExpandedRow);
   const [sorting, setSorting] = useState<SortingState>([
     { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
   ]);
@@ -80,13 +81,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
   if (!groupBy) return <NoTracesToGroupMessage />;
   if (!isLoading && groups.length === 0) return <NoTracesToGroupMessage />;
 
-  const toggleExpanded = (key: string) =>
-    setOpenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const toggleExpanded = (key: string) => toggleExpandedRow({ key });
 
   return (
     <TraceTableShell table={table} minWidth={GROUP_MIN_WIDTH} stickyFirstColumn>

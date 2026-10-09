@@ -22,16 +22,16 @@ import (
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, playground httpapi.PlaygroundProxy) error {
 	deps.Logger.Info("nlpgo_starting", zap.String("addr", cfg.Server.Addr))
 
+	logInternalAuthPosture(deps.Logger, cfg.InternalSecret)
+
 	info := contexts.MustGetServiceInfo(ctx)
-	handler := httpapi.NewRouter(httpapi.RouterDeps{
-		App:                 application,
-		Logger:              deps.Logger,
-		Health:              deps.Health,
-		Version:             info.Version,
-		MaxRequestBodyBytes: cfg.Server.MaxRequestBodyBytes,
-		PlaygroundProxy:     playground,
-		OTel:                deps.OTel,
-	})
+	handler := httpapi.NewRouter(newRouterDeps(routerDepsInput{
+		App:        application,
+		Deps:       deps,
+		Cfg:        cfg,
+		Version:    info.Version,
+		Playground: playground,
+	}))
 
 	srv := &http.Server{
 		Handler:           handler,
@@ -50,6 +50,90 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 	)
 	g.Add(buildServices(deps, srv)...)
 	return g.Run(ctx)
+}
+
+// logInternalAuthPosture says out loud which of the two postures this process
+// is in. The engine runs user-authored code for whichever project the request
+// body names and authenticates no project itself, so an operator reading the
+// log of an unguarded install should find that stated rather than have to
+// infer it from the absence of a line.
+//
+// Separate from Serve so the posture is assertable without binding a listener.
+func logInternalAuthPosture(logger *zap.Logger, secret string) {
+	if secret == "" {
+		logger.Warn("nlpgo_internal_auth_disabled",
+			zap.String("variable", "LANGWATCH_NLP_INTERNAL_SECRET"),
+			zap.String("effect", "/go routes accept any caller that can reach this address"),
+		)
+		return
+	}
+	logger.Info("nlpgo_internal_auth_enabled",
+		zap.String("header", httpapi.InternalSecretHeader),
+	)
+}
+
+// routerDepsInput carries everything newRouterDeps needs to map the
+// service config onto the HTTP adapter. A struct rather than a positional
+// list so a new knob is named at the call site instead of joining a row of
+// interchangeable arguments.
+type routerDepsInput struct {
+	App        *app.App
+	Deps       *Deps
+	Cfg        Config
+	Version    string
+	Playground httpapi.PlaygroundProxy
+}
+
+// newRouterDeps maps the service config onto the HTTP adapter's
+// dependencies. Extracted from Serve so a test can assert which
+// operator knob reaches which transport option without binding a
+// listener or standing up the engine.
+func newRouterDeps(in routerDepsInput) httpapi.RouterDeps {
+	return httpapi.RouterDeps{
+		App:                 in.App,
+		Logger:              in.Deps.Logger,
+		Health:              in.Deps.Health,
+		Version:             in.Version,
+		MaxRequestBodyBytes: in.Cfg.Server.MaxRequestBodyBytes,
+		InternalSecret:      in.Cfg.InternalSecret,
+		PlaygroundProxy:     in.Playground,
+		OTel:                in.Deps.OTel,
+		StreamHeartbeat:     resolveStreamHeartbeat(in.Cfg.Engine.StreamHeartbeatSeconds),
+		StreamIdleTimeout:   resolveStreamIdleTimeout(in.Cfg.Engine.StreamIdleTimeoutSeconds),
+	}
+}
+
+// resolveStreamHeartbeat converts the operator's
+// NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS into the is_alive_response
+// cadence the SSE handler applies.
+//
+// Zero or negative returns zero, which defers to the handler's own
+// DefaultStreamHeartbeat — one default, in one place. Passing a
+// non-positive duration on instead would reach engine.ExecuteStream,
+// which starts no heartbeat goroutine at all below zero, so a typo in a
+// config file would silently stop every is_alive_response frame and let
+// intermediate proxies tear down healthy long-running streams.
+func resolveStreamHeartbeat(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+// resolveStreamIdleTimeout converts the operator's
+// NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS into the silence budget the SSE
+// handler enforces.
+//
+// Zero or negative returns zero, which defers to the handler's own
+// DefaultStreamIdleTimeout — one default, in one place. Passing a
+// non-positive duration on instead would arm a timer that fires before the
+// first engine event, so a typo in a config file would tear down every
+// stream at once rather than only the stalled ones.
+func resolveStreamIdleTimeout(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // buildServices returns the lifecycle services Serve registers.

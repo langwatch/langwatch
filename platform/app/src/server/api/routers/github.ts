@@ -26,12 +26,8 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  checkOrganizationPermission,
-  checkProjectPermission,
-  type PermissionMiddleware,
-} from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
+import type { PermissionMiddleware } from "~/server/app-layer/authz/permission-adapters";
 import { GithubNotConnectedError } from "~/server/app-layer/github/errors";
 import { MAX_STATUS_REFS } from "~/server/app-layer/github/github-pull-request-status.service";
 import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
@@ -101,7 +97,7 @@ function installUrl(organizationId: string): string | null {
 export const githubRouter = createTRPCRouter({
   getConnectionStatus: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .use(enforceOrganizationMembership)
     .query(async ({ input }) => {
       const service = getApp().github.installations;
@@ -135,7 +131,7 @@ export const githubRouter = createTRPCRouter({
 
   listRepos: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .use(enforceOrganizationMembership)
     .query(async ({ input }) => {
       return getApp().github.installations.listRepositoriesForOrganization(
@@ -168,7 +164,7 @@ export const githubRouter = createTRPCRouter({
           .max(MAX_STATUS_REFS),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const organizationId = await resolveOrganizationId(input.projectId);
       if (!organizationId) return { statuses: [] };
@@ -182,7 +178,7 @@ export const githubRouter = createTRPCRouter({
 
   disconnect: protectedProcedure
     .input(z.object({ organizationId: z.string(), installationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .use(enforceOrganizationMembership)
     .mutation(async ({ ctx, input }) => {
       const installation =

@@ -21,8 +21,6 @@
  *    answer waiting to disagree with the first.
  *  - Result rules (`MISSING_TIME_BUCKETS`, `INCOMPLETE_COMPARISON_PERIOD`) read
  *    the typed columns and rows that came back.
- *  - `RESULT_TRUNCATED` reads the executor's own report that a response ceiling
- *    cut the answer short.
  *
  * ## Under-report rather than over-report
  *
@@ -34,14 +32,14 @@
  * gets ignored, and then it is not a warning at all.
  *
  * @see ./validation/validate.ts — the walk whose record the shape rules read
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import {
   type LangWatchQLViewDefinition,
   lwqlGrainColumns,
 } from "./catalog/types";
-import type { LangWatchQLColumn, LangWatchQLResultLimits } from "./executor";
+import type { LangWatchQLColumn } from "./executor";
 import type {
   AcceptedLangWatchQL,
   LangWatchQLQueryBlock,
@@ -51,15 +49,16 @@ import type {
  * Every note this API can attach to a result.
  *
  * A code is here because a caller would *do something different* on seeing it,
- * which is the same bar the violation codes are held to. The set is the four
- * rules issue #6480 scopes — fanout, truncation, comparison period, missing
- * buckets — plus the unfiltered-time-range rule, which is here because the
- * partition-pruning measurement recorded in `./views.ts` puts an eight-fold
- * read cost on exactly that shape.
+ * which is the same bar the violation codes are held to. The set is the
+ * query-shape and result rules issue #6480 scopes — fanout, comparison period,
+ * missing buckets — plus the unfiltered-time-range rule, which is here because
+ * the partition-pruning measurement recorded in
+ * `./provisioning/catalogStatements.ts` puts an eight-fold read cost on exactly
+ * that shape.
  */
 export const LWQL_DIAGNOSTIC_CODES = [
-  /** A response ceiling cut the answer short. */
-  "RESULT_TRUNCATED",
+  /** The result carries rows from more than one project the key can read. */
+  "MULTI_PROJECT_RESULT",
   /** A join repeats one dataset's rows once per row of another. */
   "POSSIBLE_FANOUT",
   /** A dataset was read with no predicate on the column that prunes it. */
@@ -68,6 +67,45 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "MISSING_TIME_BUCKETS",
   /** A time-bucketed answer compares periods of unequal or unfinished coverage. */
   "INCOMPLETE_COMPARISON_PERIOD",
+  /**
+   * An app function's value was cut at the per-value ceiling.
+   *
+   * Its own code rather than `RESULT_TRUNCATED`, because the remedy is
+   * different: nothing about the query is too big, one conversation or trace
+   * is, and the fix is a tighter token budget on that call rather than a
+   * narrower query.
+   */
+  "APP_FUNCTION_VALUE_TRUNCATED",
+  /**
+   * An app function's key named no trace or thread, so the column is null for
+   * those rows.
+   *
+   * Worth saying out loud because null is otherwise ambiguous: a caller cannot
+   * tell "this conversation is empty" from "this conversation id is not one we
+   * hold" — which is what a mistyped id, or a row older than the retention
+   * window, looks like.
+   */
+  "APP_FUNCTION_UNRESOLVED_KEYS",
+  /**
+   * Trailing rows were dropped because the hydrated values reached the
+   * response's byte ceiling.
+   *
+   * A cut rather than a refusal, unlike the plain result ceiling: the rows that
+   * survive are a prefix of the caller's own `ORDER BY`, so the answer is one
+   * they can page past. Its own code because the remedy is a smaller token
+   * budget per call, not a narrower query.
+   */
+  "APP_FUNCTION_RESULT_TRUNCATED",
+  /**
+   * Some texts went unjudged, so their judged columns are null.
+   *
+   * Distinct from an unresolved key: the key found its text and the text was
+   * sent — the judge did not answer for it, because it was rate limited, too
+   * large even after being cut, or because this deployment has no judge
+   * configured at all. The reasons ride in `meta`, because the action differs:
+   * run the statement again, extract less text, or ask an administrator.
+   */
+  "INSTANT_EVAL_SKIPPED",
 ] as const;
 
 export type LangWatchQLDiagnosticCode = (typeof LWQL_DIAGNOSTIC_CODES)[number];
@@ -111,11 +149,6 @@ export interface LangWatchQLDiagnosticsInput {
   readonly views: readonly LangWatchQLViewDefinition[];
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
-  /** Whether a response ceiling cut the result short. */
-  readonly truncated: boolean;
-  readonly limits: LangWatchQLResultLimits;
-  /** Rows actually handed back, after the ceilings. */
-  readonly rowsReturned: number;
   /**
    * The instant "has this bucket finished yet" is asked against.
    *
@@ -124,19 +157,48 @@ export interface LangWatchQLDiagnosticsInput {
    * same diagnostics.
    */
   readonly now: Date;
+  /**
+   * What the app-function hydration stage did, when the statement called one.
+   *
+   * Absent for every statement that called none, which is how a query that
+   * existed before this feature earns exactly the diagnostics it earned before.
+   */
+  readonly appFunctions?: LangWatchQLAppFunctionDiagnosticsInput;
+}
+
+/** The hydration stage's own report, as the rules below read it. */
+export interface LangWatchQLAppFunctionDiagnosticsInput {
+  /** Whether the hydrated-bytes ceiling cut trailing rows off the result. */
+  readonly isTruncatedByBytes: boolean;
+  /** The ceiling that cut it, so the caller can size the next request against it. */
+  readonly maxHydratedBytes: number;
+  /** Rows handed back after the cut. */
+  readonly rowsReturned: number;
+  readonly valueTruncations: readonly {
+    readonly column: string;
+    readonly function: string;
+    readonly values: number;
+  }[];
+  readonly unresolvedKeys: readonly {
+    readonly column: string;
+    readonly function: string;
+    readonly keys: number;
+  }[];
+  /** How many texts went unjudged, by why. Absent when nothing was judged. */
+  readonly skippedJudgements?: Readonly<Record<string, number>>;
 }
 
 /**
  * Every diagnostic a finished query earns, in a stable order.
  *
- * Pure. Truncation first because it changes what the other rules are looking
- * at: a cut-off result can be missing the buckets they would have read.
+ * Pure.
  */
 export function lwqlDiagnostics(
   input: LangWatchQLDiagnosticsInput,
 ): readonly LangWatchQLDiagnostic[] {
   return [
-    ...truncationDiagnostics(input),
+    ...multiProjectDiagnostics(input),
+    ...appFunctionDiagnostics(input),
     ...fanoutDiagnostics(input),
     ...unboundedTimeRangeDiagnostics(input),
     ...timeBucketDiagnostics(input),
@@ -144,27 +206,115 @@ export function lwqlDiagnostics(
 }
 
 // ---------------------------------------------------------------------------
-// Truncation
+// Multi-project result
 // ---------------------------------------------------------------------------
 
-function truncationDiagnostics({
-  truncated,
-  limits,
-  rowsReturned,
+/** The project-identifier column, matched however the caller cased it. */
+const PROJECT_ID_COLUMN = "tenantid";
+
+/**
+ * Notes when a result draws rows from more than one project.
+ *
+ * A key that can read several projects gets the union of their rows unless the
+ * query narrows to one, and a caller who did not mean to aggregate across
+ * projects would misread the total. The count is computed from the rows already
+ * returned — no second query — and only when the caller selected the project
+ * column: without it the projects are not in the result to count, and guessing
+ * would mean inventing the fact the diagnostic reports.
+ *
+ * Fires only for a count above one: a single-project result is the ordinary
+ * case and says nothing worth reading twice.
+ */
+function multiProjectDiagnostics({
+  columns,
+  rows,
 }: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
-  if (!truncated) return [];
+  const column = columns.find(
+    (candidate) => candidate.name.trim().toLowerCase() === PROJECT_ID_COLUMN,
+  );
+  if (!column) return [];
+
+  const projects = new Set(rows.map((row) => row[column.name]));
+  if (projects.size <= 1) return [];
+
   return [
     {
-      code: "RESULT_TRUNCATED",
+      code: "MULTI_PROJECT_RESULT",
       message:
-        "The result was cut off at this API's response ceiling. Aggregate further, or narrow the query, to see the whole answer.",
+        `This result draws rows from ${projects.size} projects this key can read. ` +
+        `If you meant one, filter on ${column.name} — for example ` +
+        `WHERE ${column.name} = '<project id>'.`,
       meta: {
-        maxRows: limits.maxRows,
-        maxResultBytes: limits.maxResultBytes,
-        rowsReturned,
+        /** How many distinct projects contributed rows to this result. */
+        projectCount: projects.size,
       },
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// App functions
+// ---------------------------------------------------------------------------
+
+/**
+ * What the hydration stage has to say about the values it put in the result.
+ *
+ * One diagnostic per condition rather than per column: a statement projecting
+ * three functions whose keys all went unresolved is one fact about the query,
+ * and three entries saying it would push the rest of the list out of a
+ * consumer's view for no extra information. The columns ride in `meta`.
+ */
+function appFunctionDiagnostics({
+  appFunctions,
+}: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
+  if (!appFunctions) return [];
+  const diagnostics: LangWatchQLDiagnostic[] = [];
+
+  if (appFunctions.valueTruncations.length > 0) {
+    diagnostics.push({
+      code: "APP_FUNCTION_VALUE_TRUNCATED",
+      message:
+        "Some values were cut because a single conversation or trace was larger than one value may be. Ask for a smaller token budget to choose what is kept.",
+      meta: { columns: appFunctions.valueTruncations },
+    });
+  }
+
+  if (appFunctions.isTruncatedByBytes) {
+    diagnostics.push({
+      code: "APP_FUNCTION_RESULT_TRUNCATED",
+      message:
+        "Trailing rows were dropped because the extracted values reached this API's response ceiling. Ask for a smaller token budget per call, or narrow the query, to see the whole answer.",
+      meta: {
+        maxHydratedBytes: appFunctions.maxHydratedBytes,
+        rowsReturned: appFunctions.rowsReturned,
+      },
+    });
+  }
+
+  if (appFunctions.unresolvedKeys.length > 0) {
+    diagnostics.push({
+      code: "APP_FUNCTION_UNRESOLVED_KEYS",
+      message:
+        "Some rows are null because their conversation, trace or span key matched nothing. Check the ids, and that the rows are inside the retention window.",
+      meta: { columns: appFunctions.unresolvedKeys },
+    });
+  }
+
+  const skipped = appFunctions.skippedJudgements ?? {};
+  const skippedTexts = Object.values(skipped).reduce(
+    (total, count) => total + count,
+    0,
+  );
+  if (skippedTexts > 0) {
+    diagnostics.push({
+      code: "INSTANT_EVAL_SKIPPED",
+      message:
+        "Some rows are null because their text could not be judged. Run the query again, ask for less text per row, or check that judging is switched on for this project.",
+      meta: { texts: skippedTexts, reasons: skipped },
+    });
+  }
+
+  return diagnostics;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,12 +334,12 @@ const IMPLICITLY_MATCHED_KEY_COLUMNS: ReadonlySet<string> = new Set([
   "tenantid",
 ]);
 
-/** One of a block's table references, resolved to the dataset it names. */
+/** One of a block's table references, resolved to the view it names. */
 interface ResolvedTableReference {
   /** How a join condition would qualify it: its alias, or its bare name. */
   readonly qualifier: string;
   /** The name a caller writes, qualified with the LangWatchQL database. */
-  readonly datasetName: string;
+  readonly viewName: string;
   readonly view: LangWatchQLViewDefinition;
 }
 
@@ -244,7 +394,7 @@ function fanoutForPair({
     const unmatched = unmatchedGrainColumns(multiplier.view, matched);
     if (unmatched.length === 0) continue;
 
-    const key = `${multiplied.datasetName}<-${multiplier.datasetName}`;
+    const key = `${multiplied.viewName}<-${multiplier.viewName}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -299,20 +449,20 @@ function fanoutDiagnostic({
   return {
     code: "POSSIBLE_FANOUT",
     message:
-      `The join repeats each row of ${multiplied.datasetName} once per matching row of ` +
-      `${multiplier.datasetName}, because it does not match ${multiplier.datasetName} on ` +
+      `The join repeats each row of ${multiplied.viewName} once per matching row of ` +
+      `${multiplier.viewName}, because it does not match ${multiplier.viewName} on ` +
       `${unmatched.join(", ")}. ` +
       (isRowCollapsing
-        ? `Any aggregate over a ${multiplied.datasetName} measure therefore counts that measure ` +
-          `once per matching row. Aggregate ${multiplied.datasetName} to its own grain first, ` +
+        ? `Any aggregate over a ${multiplied.viewName} measure therefore counts that measure ` +
+          `once per matching row. Aggregate ${multiplied.viewName} to its own grain first, ` +
           `then join.`
-        : `Its rows are therefore repeated in the result. Aggregate ${multiplier.datasetName} to ` +
-          `${multiplied.datasetName}'s grain first, then join.`),
+        : `Its rows are therefore repeated in the result. Aggregate ${multiplier.viewName} to ` +
+          `${multiplied.viewName}'s grain first, then join.`),
     meta: {
-      /** The dataset whose rows are repeated. */
-      dataset: multiplied.datasetName,
-      /** The dataset each of those rows is repeated for. */
-      multipliedBy: multiplier.datasetName,
+      /** The view whose rows are repeated. */
+      view: multiplied.viewName,
+      /** The view each of those rows is repeated for. */
+      multipliedByView: multiplier.viewName,
       /**
        * The repeated dataset's measures: the columns where the repetition
        * changes the number rather than only the row count.
@@ -516,7 +666,7 @@ function resolveTableReferences({
     if (!view) continue;
     resolved.push({
       qualifier: reference.alias ?? view.name.toLowerCase(),
-      datasetName: `${database}.${view.name}`,
+      viewName: `${database}.${view.name}`,
       view,
     });
   }
@@ -542,26 +692,48 @@ function unboundedTimeRangeDiagnostics({
       database,
       views,
     })) {
-      const { timeColumn } = reference.view;
-      if (filtered.has(timeColumn.toLowerCase())) continue;
-      if (seen.has(reference.datasetName)) continue;
-      seen.add(reference.datasetName);
-
-      diagnostics.push({
-        code: "UNBOUNDED_TIME_RANGE",
-        message:
-          `${reference.datasetName} was read with no condition on ${timeColumn}, so the read ` +
-          `covers the whole history this project has rather than a window of it. Add a range ` +
-          `on ${timeColumn} to bound the scan.`,
-        meta: {
-          dataset: reference.datasetName,
-          /** Filter on this column to bound the read. */
-          timeColumn,
-        },
+      const diagnostic = buildUnboundedTimeRangeDiagnostic({
+        reference,
+        filtered,
+        seen,
       });
+      if (diagnostic) {
+        diagnostics.push(diagnostic);
+      }
     }
   }
   return diagnostics;
+}
+
+function buildUnboundedTimeRangeDiagnostic({
+  reference,
+  filtered,
+  seen,
+}: {
+  reference: ReturnType<typeof resolveTableReferences>[number];
+  filtered: Set<string>;
+  seen: Set<string>;
+}): LangWatchQLDiagnostic | undefined {
+  const { timeColumn } = reference.view;
+  // A view with no time column has nothing to bound a scan on, so there is
+  // no unbounded-range advice to give.
+  if (!timeColumn) return undefined;
+  if (filtered.has(timeColumn.toLowerCase())) return undefined;
+  if (seen.has(reference.viewName)) return undefined;
+  seen.add(reference.viewName);
+
+  return {
+    code: "UNBOUNDED_TIME_RANGE",
+    message:
+      `${reference.viewName} was read with no condition on ${timeColumn}, so the read ` +
+      `covers the whole history this project has rather than a window of it. Add a range ` +
+      `on ${timeColumn} to bound the scan.`,
+    meta: {
+      view: reference.viewName,
+      /** Filter on this column to bound the read. */
+      timeColumn,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

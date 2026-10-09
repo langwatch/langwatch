@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Instance, Ksuid } from "@langwatch/ksuid";
-import type { LedgerPrincipal, LedgerScope } from "./grants-ledger.reducer";
+import type { LedgerPrincipal, LedgerScope } from "./facts";
 
 /**
  * Pinned, never read from the ambient environment. A KSUID's environment is a

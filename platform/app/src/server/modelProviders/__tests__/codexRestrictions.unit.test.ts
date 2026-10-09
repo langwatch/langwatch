@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   CODEX_ALLOWED_FEATURE_KEYS,
   CODEX_DEFAULT_MODEL,
+  CONNECTION_TEST_FEATURE_KEY,
   isCodexAllowedFeature,
   isCodexModel,
   isModelAllowedAsRoleDefault,
@@ -25,9 +26,13 @@ describe("codexRestrictions", () => {
 
   it("registers every allowed feature key, with langy.chat on its own role", () => {
     for (const key of CODEX_ALLOWED_FEATURE_KEYS) {
+      // The connection test is the one exception: it names no surface anyone
+      // configures a model for, so it has no registry entry to find.
+      if (key === CONNECTION_TEST_FEATURE_KEY) continue;
       expect(featureByKey(key), `feature "${key}" must exist`).toBeTruthy();
     }
     expect(featureByKey(LANGY_CHAT_FEATURE_KEY)?.role).toBe("LANGY");
+    expect(featureByKey(CONNECTION_TEST_FEATURE_KEY)).toBeFalsy();
   });
 
   it("allows codex on Langy and the fast assists, nowhere else", () => {
@@ -138,6 +143,7 @@ describe("codexRestrictions", () => {
     expect([...CODEX_ALLOWED_FEATURE_KEYS].sort()).toEqual(
       [
         "langy.chat",
+        "model_provider.connection_test",
         "langy.conversation_title",
         "studio.autocomplete",
         "traces.ai_search",

@@ -1,0 +1,19 @@
+---
+title: Run your first Instant Eval
+description: Start a run over the last week of conversations, wait for it, and read the matches.
+---
+
+## Start a run
+
+Run the command below from a shell where `langwatch login` has already stored a project key.
+
+```bash
+langwatch instant-eval run "the customer sounds annoyed" \
+  --target threads --last 7d --limit 100 --wait
+```
+
+This will price the run, judge the last seven days of conversations up to a hundred of them, and print one progress line every three seconds until the run finishes. When it exits, run `langwatch instant-eval results <id> --matched` to read the conversations that matched.
+
+## Check what the judge read
+
+Run `langwatch instant-eval sample <id> -n 5` to print five rows with the exact text the judge received next to its verdict. If the text is cut before the part you care about, raise the token budget in the statement, or narrow the window with `--filter` so fewer rows share it.

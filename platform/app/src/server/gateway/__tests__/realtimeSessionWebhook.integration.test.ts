@@ -29,6 +29,10 @@ import {
 /** Stubbed so a confirmation can be asserted without the whole spend spine. */
 const sentConfirmations = vi.hoisted(() => [] as Record<string, unknown>[]);
 vi.mock("~/server/app-layer/app", () => ({
+  // appContextMiddleware injects the App when one is built; absent is a
+  // supported state for public routes, so the stub stays absent and the
+  // handler falls back to getApp() below.
+  tryGetApp: () => undefined,
   getApp: () => ({
     eventSourcing: {
       getPipeline: () => ({

@@ -23,6 +23,7 @@
 	"license": "MIT",
 	"dependencies": {
 		"@hono/standard-validator": "^0.2.0",
+		"@langwatch/authz": "workspace:*",
 		"@langwatch/handled-error": "workspace:*",
 		"@langwatch/observability": "workspace:*",
 		"@opentelemetry/api": "^1.9.1",

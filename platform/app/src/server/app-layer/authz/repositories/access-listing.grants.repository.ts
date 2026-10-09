@@ -1,38 +1,17 @@
 /**
- * ADR-092 delivery-plan PR 3 follow-up — the Access surface's reader for a
- * CUT-OVER organization: the same port as
- * `access-listing.prisma.repository.ts`, answered from the ledger's own
- * projection (`Grant` / `Role`) instead of the compat
- * `RoleBinding` / `CustomRole` heads.
- *
- * The translation into the legacy vocabulary is the one the fold itself
- * performs onto the compat rows (`grantFactToCompatBinding`,
- * packages/authz-server): admin→ADMIN, member→MEMBER, viewer→VIEWER,
- * custom:<id>→(`legacyRole` ?? CUSTOM, id). A row the translation cannot
- * express - `lite-member`, a RESOURCE or PLATFORM row, a collective
- * principal - is SKIPPED, never defaulted: those are the dormant head-only
- * facts (delivery-plan decision 13) the legacy pages never carried, and a
- * listing that surfaced them would be a parity break in what people see.
- *
- * Decoration (user names, group names, key names) reads the tables those
- * things actually live in - `User`, `Group`, `ApiKey` are not grants and are
- * never projected - while role names and permissions come from the `Role`
- * head, so a cut-over organization's listing never reads
- * `RoleBinding`/`CustomRole` at all. Role decoration is bounded to the
- * organization: a poisoned grant pointing at another organization's role
- * renders as no role, exactly as the decision reader refuses to honour one.
- *
- * `createdAt` on a listed row is the grant's `occurredAt` - the fact's
- * business time, which an imported grant backdates to the legacy row's
- * `createdAt` - so "since when" reads the same across the heads.
- *
- * Deliberately independent of the legacy implementation, like the decision
- * readers: each has to be readable on its own for a listing parity check to
- * mean anything.
+ * Access surface reader backed by the grants projection (`Grant` / `Role`).
+ * It translates only facts expressible by the existing Access API and keeps
+ * principal and role decoration tenant-scoped.
  */
+import {
+  grantFactToCompatBinding,
+  grantRowToFact,
+  isBindingGrant,
+} from "@langwatch/authz-server";
 import type {
   CustomRole,
   Prisma,
+  RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
@@ -50,6 +29,7 @@ import {
   ACCESS_LISTING_GROUP_SELECT,
   ACCESS_LISTING_USER_SELECT,
 } from "./access-listing.repository";
+import { liveGrants, liveRoles } from "./live-rows";
 
 /** The three scope tiers a listed binding can carry - RESOURCE rows are the
  *  share tier and PLATFORM rows are dormant facts; neither is a binding the
@@ -77,8 +57,17 @@ const GRANT_ROW_SELECT = {
   principalId: true,
   roleKey: true,
   legacyRole: true,
+  source: true,
   scopeType: true,
   scopeId: true,
+  token: true,
+  permission: true,
+  resourceKind: true,
+  projectId: true,
+  createdByUserId: true,
+  expiresAt: true,
+  maxViews: true,
+  condition: true,
   occurredAt: true,
   updatedAt: true,
 } as const satisfies Prisma.GrantSelect;
@@ -86,48 +75,6 @@ const GRANT_ROW_SELECT = {
 type GrantListRow = Prisma.GrantGetPayload<{
   select: typeof GRANT_ROW_SELECT;
 }>;
-
-/** roleKey → the compat (role, customRoleId) pair, the translation the fold
- *  writes onto the compat head. Null for a key the legacy vocabulary cannot
- *  carry - the caller skips the row. */
-function compatRole(row: {
-  roleKey: string | null;
-  legacyRole: string | null;
-}): { role: TeamUserRole; customRoleId: string | null } | null {
-  if (row.roleKey === "admin") return { role: "ADMIN", customRoleId: null };
-  if (row.roleKey === "member") return { role: "MEMBER", customRoleId: null };
-  if (row.roleKey === "viewer") return { role: "VIEWER", customRoleId: null };
-  if (row.roleKey?.startsWith("custom:")) {
-    return {
-      // `roleKey` alone cannot say which built-in role an imported custom
-      // binding ALSO carried, and the compat head reproduces it - so must the
-      // listing, or a cut-over Access page would show CUSTOM where the page
-      // showed ADMIN the day before. The column is a plain string on the
-      // projection row; a value the enum cannot carry reads as CUSTOM rather
-      // than inventing a role.
-      role: teamUserRoleFrom(row.legacyRole) ?? "CUSTOM",
-      customRoleId: row.roleKey.slice("custom:".length),
-    };
-  }
-  return null;
-}
-
-function teamUserRoleFrom(value: string | null): TeamUserRole | null {
-  return value === "ADMIN" ||
-    value === "MEMBER" ||
-    value === "VIEWER" ||
-    value === "CUSTOM"
-    ? value
-    : null;
-}
-
-function isBindingScope(scopeType: string): scopeType is RoleBindingScopeType {
-  return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
-}
-
-function isBindingPrincipal(principalType: string): boolean {
-  return (BINDING_PRINCIPAL_TYPES as readonly string[]).includes(principalType);
-}
 
 type ListableGrant = {
   row: GrantListRow;
@@ -139,15 +86,17 @@ type ListableGrant = {
 function listableGrants(rows: readonly GrantListRow[]): ListableGrant[] {
   const listable: ListableGrant[] = [];
   for (const row of rows) {
-    if (!isBindingScope(row.scopeType)) continue;
-    if (!isBindingPrincipal(row.principalType)) continue;
-    const translated = compatRole(row);
-    if (!translated) continue;
+    const grant = grantRowToFact(row);
+    if (!isBindingGrant(grant)) continue;
+    const binding = grantFactToCompatBinding({
+      grant,
+      organizationId: row.organizationId,
+    });
     listable.push({
       row,
-      role: translated.role,
-      customRoleId: translated.customRoleId,
-      scopeType: row.scopeType,
+      role: binding.role,
+      customRoleId: binding.customRoleId,
+      scopeType: binding.scopeType,
     });
   }
   return listable;
@@ -155,6 +104,27 @@ function listableGrants(rows: readonly GrantListRow[]): ListableGrant[] {
 
 export class GrantsAccessListingRepository implements AccessListingRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
+
+  async findBindingRows({
+    organizationId,
+    where,
+  }: {
+    organizationId: string;
+    where: Prisma.GrantWhereInput;
+  }): Promise<RoleBinding[]> {
+    const rows = await this.findGrantRows({ organizationId, where });
+    return rows.flatMap((row) => {
+      const grant = grantRowToFact(row);
+      if (!isBindingGrant(grant)) return [];
+      return [
+        {
+          ...grantFactToCompatBinding({ grant, organizationId }),
+          createdAt: row.occurredAt,
+          updatedAt: row.updatedAt,
+        },
+      ];
+    });
+  }
 
   async findUserBindings({
     organizationId,
@@ -241,11 +211,70 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     organizationId: string;
     groupId: string;
   }): Promise<AccessListingBindingRow[]> {
+    const bindingsByGroupId = await this.findGroupsBindings({
+      organizationId,
+      groupIds: [groupId],
+    });
+    return bindingsByGroupId.get(groupId) ?? [];
+  }
+
+  async findGroupsBindings({
+    organizationId,
+    groupIds,
+  }: {
+    organizationId: string;
+    groupIds: readonly string[];
+  }): Promise<Map<string, AccessListingBindingRow[]>> {
+    const bindingsByGroupId = new Map<string, AccessListingBindingRow[]>(
+      groupIds.map((groupId) => [groupId, []]),
+    );
+    if (groupIds.length === 0) return bindingsByGroupId;
+
     const rows = await this.findGrantRows({
       organizationId,
-      where: { principalType: "GROUP", principalId: groupId },
+      where: {
+        principalType: "GROUP",
+        principalId: { in: [...groupIds] },
+      },
     });
-    return this.decorate({ organizationId, grants: listableGrants(rows) });
+    const bindings = await this.decorate({
+      organizationId,
+      grants: listableGrants(rows),
+    });
+    for (const binding of bindings) {
+      if (binding.groupId)
+        bindingsByGroupId.get(binding.groupId)?.push(binding);
+    }
+    return bindingsByGroupId;
+  }
+
+  async findApiKeyBindings({
+    organizationId,
+    apiKeyIds,
+  }: {
+    organizationId: string;
+    apiKeyIds: readonly string[];
+  }): Promise<Map<string, AccessListingBindingRow[]>> {
+    const byKey = new Map<string, AccessListingBindingRow[]>(
+      apiKeyIds.map((apiKeyId) => [apiKeyId, []]),
+    );
+    if (apiKeyIds.length === 0) return byKey;
+
+    const rows = await this.findGrantRows({
+      organizationId,
+      where: {
+        principalType: "API_KEY",
+        principalId: { in: [...apiKeyIds] },
+      },
+    });
+    const listed = await this.decorate({
+      organizationId,
+      grants: listableGrants(rows),
+    });
+    for (const row of listed) {
+      if (row.apiKeyId) byKey.get(row.apiKeyId)?.push(row);
+    }
+    return byKey;
   }
 
   async findTeamMemberBindings({
@@ -329,12 +358,14 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   }): Promise<RoleBindingForSynthesis[]> {
     if (orgIds.length === 0) return [];
 
-    const { groupIdsByOrg, allGroupIds } = await this.groupMembershipsFor({
-      userId,
-      orgIds,
-    });
+    const [{ groupIdsByOrg, allGroupIds }, developerOrgIds] = await Promise.all(
+      [
+        this.groupMembershipsFor({ userId, orgIds }),
+        this.developerSeatOrgIds({ userId, orgIds }),
+      ],
+    );
 
-    const rows = await this.prisma.grant.findMany({
+    const rows = await liveGrants(this.prisma).findMany({
       where: {
         organizationId: { in: [...orgIds] },
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
@@ -354,12 +385,23 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
       select: GRANT_ROW_SELECT,
       orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
     });
-    const grants = listableGrants(rows).filter(
-      ({ row }) =>
-        row.principalType !== "GROUP" ||
-        (row.principalId != null &&
-          groupIdsByOrg.get(row.organizationId)?.has(row.principalId) === true),
-    );
+    const grants = listableGrants(rows)
+      .filter(
+        ({ row }) =>
+          row.principalType !== "GROUP" ||
+          (row.principalId != null &&
+            groupIdsByOrg.get(row.organizationId)?.has(row.principalId) ===
+              true),
+      )
+      // ADR-143: the engine grants a Developer nothing through an
+      // ORGANIZATION-scoped binding or a group (packages/authz matchers), so
+      // the workspace listing must not synthesize a shared team, or an admin
+      // organization role, out of one either.
+      .filter(
+        ({ row, scopeType }) =>
+          !developerOrgIds.has(row.organizationId) ||
+          (row.principalType !== "GROUP" && scopeType !== "ORGANIZATION"),
+      );
 
     const rolesByOrg = await this.rolesByOrganizationFor(grants);
 
@@ -386,6 +428,25 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
           : null,
       };
     });
+  }
+
+  /** The organizations among `orgIds` where this user holds a Developer seat. */
+  private async developerSeatOrgIds({
+    userId,
+    orgIds,
+  }: {
+    userId: string;
+    orgIds: readonly string[];
+  }): Promise<Set<string>> {
+    const memberships = await this.prisma.organizationUser.findMany({
+      where: {
+        userId,
+        organizationId: { in: [...orgIds] },
+        role: "DEVELOPER",
+      },
+      select: { organizationId: true },
+    });
+    return new Set(memberships.map((m) => m.organizationId));
   }
 
   /** The user's group memberships, resolved per organization so a grant
@@ -447,7 +508,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   }: {
     organizationId: string;
   }): Promise<CustomRole[]> {
-    const roles = await this.prisma.role.findMany({
+    const roles = await liveRoles(this.prisma).findMany({
       where: { organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     });
@@ -466,9 +527,10 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     organizationId: string;
     where: Prisma.GrantWhereInput;
   }): Promise<GrantListRow[]> {
-    return this.prisma.grant.findMany({
+    return liveGrants(this.prisma).findMany({
       where: {
         organizationId,
+        principalId: { not: null },
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
         principalType: { in: [...BINDING_PRINCIPAL_TYPES] },
         AND: [LISTABLE_ROLE_KEY_WHERE, where],
@@ -489,7 +551,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     roleIds: readonly string[];
   }): Promise<CustomRole[]> {
     if (roleIds.length === 0) return [];
-    const roles = await this.prisma.role.findMany({
+    const roles = await liveRoles(this.prisma).findMany({
       where: { id: { in: [...roleIds] }, organizationId },
     });
     return roles.map((role) => toCustomRoleShape(role));
@@ -666,6 +728,7 @@ function toListedRow({
     scopeType: grant.scopeType,
     scopeId: row.scopeId,
     createdAt: row.occurredAt,
+    updatedAt: row.updatedAt,
     user,
     group,
     apiKey,
@@ -682,7 +745,7 @@ function toListedRow({
 /** A `Role` head row in the `CustomRole` column shape. The two heads share
  *  every column; `createdAt` carries the fact's business time
  *  (`occurredAt`), consistent with what the binding rows report. */
-function toCustomRoleShape(role: {
+export function toCustomRoleShape(role: {
   id: string;
   organizationId: string;
   name: string;

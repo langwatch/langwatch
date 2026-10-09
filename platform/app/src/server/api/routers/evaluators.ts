@@ -2,11 +2,12 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
+import { enforceCreationLimit } from "../../license-enforcement";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
@@ -46,7 +47,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.getAllWithFields({
@@ -60,7 +61,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.getByIdWithFields({
@@ -74,7 +75,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   getBySlug: protectedProcedure
     .input(z.object({ slug: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.getBySlug({
@@ -98,8 +99,15 @@ export const evaluatorsRouter = createTRPCRouter({
         workflowId: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
+      await enforceCreationLimit({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        limitType: "evaluators",
+        user: ctx.session.user,
+      });
+
       if (input.type === "code") {
         const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
         if (!parsed.success) {
@@ -158,7 +166,7 @@ export const evaluatorsRouter = createTRPCRouter({
         workflowId: z.string().nullable().optional(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       if (input.type === "code" && input.config !== undefined) {
         const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
@@ -199,7 +207,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   getRelatedEntities: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const evaluator = await ctx.prisma.evaluator.findFirst({
         where: {
@@ -241,7 +249,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   cascadeArchive: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.$transaction(async (tx) => {
         // 1. Get the evaluator to find linked workflow
@@ -297,7 +305,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.softDelete({
@@ -313,7 +321,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   getWorkflowFields: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       // Fetch the evaluator first, then scope its workflow to the same project.
       const evaluator = await ctx.prisma.evaluator.findFirst({
@@ -380,7 +388,7 @@ export const evaluatorsRouter = createTRPCRouter({
         evaluatorId: z.string(),
       }),
     )
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const source = await ctx.prisma.evaluator.findFirst({
         where: {
@@ -421,7 +429,7 @@ export const evaluatorsRouter = createTRPCRouter({
       const authorizedCopies = await Promise.all(
         copies.map(async (c) => ({
           copy: c,
-          hasPermission: await hasProjectPermission(
+          hasPermission: await probeProjectPermission(
             ctx,
             c.projectId,
             "evaluations:view",
@@ -452,9 +460,9 @@ export const evaluatorsRouter = createTRPCRouter({
         newEvaluatorId: z.string().default(() => `evaluator_${nanoid()}`),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "evaluations:manage",
@@ -487,7 +495,7 @@ export const evaluatorsRouter = createTRPCRouter({
         copyIds: z.array(z.string()).optional(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const source = await ctx.prisma.evaluator.findFirst({
         where: {
@@ -530,7 +538,7 @@ export const evaluatorsRouter = createTRPCRouter({
 
       let pushedTo = 0;
       for (const copy of copiesToPush) {
-        const hasPermission = await hasProjectPermission(
+        const hasPermission = await probeProjectPermission(
           ctx,
           copy.projectId,
           "evaluations:manage",
@@ -563,7 +571,7 @@ export const evaluatorsRouter = createTRPCRouter({
         evaluatorId: z.string(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const copy = await ctx.prisma.evaluator.findFirst({
         where: {
@@ -593,7 +601,7 @@ export const evaluatorsRouter = createTRPCRouter({
         });
       }
 
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         source.projectId,
         "evaluations:manage",
@@ -626,7 +634,7 @@ export const evaluatorsRouter = createTRPCRouter({
    */
   getHistory: protectedProcedure
     .input(z.object({ evaluatorId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:view"))
+    .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       const service = EvaluatorService.create(ctx.prisma);
       return service.getHistory(input.evaluatorId, input.projectId);

@@ -4,7 +4,7 @@
  *   node vercel-ai.ts image
  *   node vercel-ai.ts pdf
  *
- * An image and a PDF both ride an AI SDK `file` part inside one user
+ * An image and a PDF both go in an AI SDK `file` part inside one user
  * message. `experimental_telemetry` turns on tracing for this call, and
  * `setupObservability()` points the OpenTelemetry exporter at LangWatch.
  * Model traffic goes through the OpenAI-shaped chat completions path so the

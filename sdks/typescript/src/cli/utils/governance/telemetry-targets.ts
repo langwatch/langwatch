@@ -41,6 +41,11 @@ import {
 	removeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
+	defaultCodexAgentsMdPath,
+	hasCodexAgentGuidance,
+	removeCodexAgentGuidance,
+} from "./codex-agents-md";
+import {
 	appEnvHasAnyVar,
 	appEnvValues,
 	appSettingsTargetFor,
@@ -248,6 +253,16 @@ export function scanTelemetryTargets({
 		label: `codex langwatch profile file (${tildify(codexProfile)})`,
 		present: codexProfileFileIsLangwatchOwned(codexProfile),
 		remove: () => removeCodexGatewayProfileFile(codexProfile),
+	});
+
+	// codex, the declare-your-context guidance block in its global AGENTS.md.
+	// Its own target because the file is the user's: removal deletes exactly
+	// the marker-managed block and keeps their content byte for byte.
+	const codexAgentsMd = defaultCodexAgentsMdPath();
+	targets.push({
+		label: `codex agent guidance (${tildify(codexAgentsMd)})`,
+		present: hasCodexAgentGuidance(codexAgentsMd),
+		remove: () => removeCodexAgentGuidance(codexAgentsMd),
 	});
 
 	// codex, the session context hook entries in its own hooks file. Same

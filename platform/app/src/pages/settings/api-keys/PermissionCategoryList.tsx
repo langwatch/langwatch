@@ -2,12 +2,12 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronsUpDown, Lock } from "lucide-react";
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
-import { hasPermissionWithHierarchy } from "../../../server/api/rbac";
 import {
   type AccessLevel,
   PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "../../../server/api-key/permission-categories";
+import { categoryAccessAvailability } from "./utils";
 
 export type PermissionSelection = "none" | AccessLevel;
 
@@ -39,21 +39,16 @@ function PermissionRow({
   userPermissions: string[];
   onChange: (next: PermissionSelection) => void;
 }) {
-  const canRead = category.readPermissions.every((p) =>
-    hasPermissionWithHierarchy(userPermissions, p),
-  );
-  const canWrite =
-    category.writePermissions.length > 0 &&
-    category.writePermissions.every((p) =>
-      hasPermissionWithHierarchy(userPermissions, p),
-    );
-  const isDisabled = !canRead;
+  const { canRead, canWrite } = categoryAccessAvailability({
+    category,
+    userPermissions,
+  });
+  const isDisabled = !canRead && !canWrite;
   const isActive = value !== "none";
 
   const options: Array<{ value: PermissionSelection; label: string }> = [];
   if (canRead) options.push({ value: "read", label: "Read" });
-  if (canWrite && category.accessLevels.includes("write"))
-    options.push({ value: "write", label: "Write" });
+  if (canWrite) options.push({ value: "write", label: "Write" });
   options.push({ value: "none", label: "None" });
 
   const trigger = (

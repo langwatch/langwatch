@@ -15,7 +15,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
-import { tryGetApp } from "../app-layer/app";
+import { getApp, tryGetApp } from "../app-layer/app";
 import { resolveAppPackageRoot } from "../appPackageRoot";
 import {
   createContextFromJobData,
@@ -35,15 +35,19 @@ import { buildChildEnvironment } from "./execution/child-environment";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
 import {
   createDataPrefetcherDependencies,
+  type ModelParamsFailureReason,
+  type PrefetchResult,
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
 import type {
   ExecutionJobData,
   ScenarioExecutionPool,
 } from "./execution/execution-pool";
-import type {
-  ChildProcessJobData,
-  ScenarioExecutionResult,
+import {
+  type ChildProcessJobData,
+  type ScenarioAgentInstance,
+  ScenarioAgentInstanceSchema,
+  type ScenarioExecutionResult,
 } from "./execution/types";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
@@ -51,6 +55,11 @@ import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
+import {
+  handleVoiceNonceRegisterMessage,
+  isVoiceNonceRegisterMessage,
+} from "./voice/voice-nonce-handoff";
+import { getVoiceNonceRegistry } from "./voice/voice-nonce-registry";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -69,10 +78,35 @@ export interface FailureEmitter {
   ensureFailureEventsEmitted(params: FailureEventParams): Promise<void>;
 }
 
-/** Dependencies for the scenario processor's failure handling */
+/** The connected agent instance that answered a run. */
+export interface ServedAgentInstance {
+  hostname: string;
+  label: string | null;
+}
+
+/** Writes the instance that served a run onto the run's record. */
+export interface AgentInstanceRecorder {
+  recordAgentInstance(params: {
+    projectId: string;
+    scenarioRunId: string;
+    agentInstance: ServedAgentInstance;
+  }): Promise<void>;
+}
+
+/** Marks a run as ended at the maximum call duration on the run's record. */
+export interface CutAtLimitRecorder {
+  recordCutAtLimit(params: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<void>;
+}
+
+/** Dependencies for the scenario processor's job outcome handling */
 export interface ProcessorDependencies {
   scenarioLookup: ScenarioLookup;
   failureEmitter: FailureEmitter;
+  agentInstanceRecorder: AgentInstanceRecorder;
+  cutAtLimitRecorder: CutAtLimitRecorder;
 }
 
 // ============================================================================
@@ -94,7 +128,74 @@ export function createProcessorDependencies(): ProcessorDependencies {
       ensureFailureEventsEmitted: (params) =>
         failureHandler.ensureFailureEventsEmitted(params),
     },
+    agentInstanceRecorder: {
+      recordAgentInstance: ({ projectId, scenarioRunId, agentInstance }) =>
+        getApp().simulations.recordAgentInstance({
+          tenantId: projectId,
+          scenarioRunId,
+          agentInstance,
+          occurredAt: Date.now(),
+        }),
+    },
+    cutAtLimitRecorder: {
+      recordCutAtLimit: ({ projectId, scenarioRunId }) =>
+        getApp().simulations.recordCutAtLimit({
+          tenantId: projectId,
+          scenarioRunId,
+          occurredAt: Date.now(),
+        }),
+    },
   };
+}
+
+/**
+ * Handle a job that ran to the end: record the post-exit facts the child
+ * learned during the run — which connected agent instance answered it, and
+ * whether the call was cut at the maximum duration.
+ *
+ * The run's own finished event comes from the child through the SDK; these
+ * facts are what the parent learns from the child's result line, so they are
+ * recorded here, after the child exits. Each is independent: a run can carry
+ * either, both, or neither. A failure to record one is logged and not raised —
+ * the run is complete, and each is a detail of it.
+ */
+export async function handleSucceededJobResult({
+  jobData,
+  result,
+  deps,
+}: {
+  jobData: ExecutionJobData;
+  result: ScenarioExecutionResult;
+  deps: ProcessorDependencies;
+}): Promise<void> {
+  if (result.agentInstance) {
+    try {
+      await deps.agentInstanceRecorder.recordAgentInstance({
+        projectId: jobData.projectId,
+        scenarioRunId: jobData.scenarioRunId,
+        agentInstance: result.agentInstance,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, scenarioRunId: jobData.scenarioRunId },
+        "Could not record the agent instance that served the run",
+      );
+    }
+  }
+
+  if (result.isCutAtLimit) {
+    try {
+      await deps.cutAtLimitRecorder.recordCutAtLimit({
+        projectId: jobData.projectId,
+        scenarioRunId: jobData.scenarioRunId,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, scenarioRunId: jobData.scenarioRunId },
+        "Could not record that the run was cut at the call limit",
+      );
+    }
+  }
 }
 
 // ============================================================================
@@ -121,7 +222,9 @@ export async function handleFailedJobResult(
     batchRunId: jobData.batchRunId,
     scenarioRunId: jobData.scenarioRunId,
     error,
-    name: scenario?.name,
+    // A run with no scenario row (an agent test) keeps the name it was
+    // queued with.
+    name: scenario?.name ?? jobData.scenarioName,
     description: scenario?.situation,
     target: jobData.target,
   });
@@ -227,6 +330,8 @@ export interface ChildProcessResult {
   success: boolean;
   error?: string;
   reasoning?: string;
+  /** The connected agent instance that answered the run, when one did. */
+  agentInstance?: ScenarioAgentInstance;
 }
 
 /** Parse a single stdout line as the runner's result, or null if it isn't one. */
@@ -248,7 +353,21 @@ function parseResultLine(line: string): ChildProcessResult | null {
     ...(typeof record.reasoning === "string"
       ? { reasoning: record.reasoning }
       : {}),
+    ...(agentInstanceOf(record.agentInstance) ?? {}),
   };
+}
+
+/**
+ * The instance the line names, when the line names a whole one.
+ *
+ * Parsed against the shared schema rather than probed field by field, so the
+ * value the recorder receives is one the run's own result schema accepts.
+ */
+function agentInstanceOf(
+  value: unknown,
+): { agentInstance: ScenarioAgentInstance } | null {
+  const parsed = ScenarioAgentInstanceSchema.safeParse(value);
+  return parsed.success ? { agentInstance: parsed.data } : null;
 }
 
 /**
@@ -271,6 +390,60 @@ export function parseChildProcessResult(
     if (result) return result;
   }
   return null;
+}
+
+/** The identity and resolved values the prefetch reads off one pool job. */
+function prefetchContext(jobData: ExecutionJobData) {
+  return {
+    projectId: jobData.projectId,
+    scenarioId: jobData.scenarioId,
+    setId: jobData.setId,
+    batchRunId: jobData.batchRunId,
+    scenarioRunId: jobData.scenarioRunId,
+    parameters: jobData.parameters,
+    secretParameters: jobData.secretParameters,
+  };
+}
+
+/**
+ * The prefetch failures the customer's own configuration caused: a disabled or
+ * missing provider, a malformed model name, absent credentials, no model set
+ * for scenarios at all. Their run fails with the remediation message, and the
+ * record logs at warn because there is nothing here for us to fix.
+ *
+ * An allowlist and not `!== "preparation_error"`, so a reason added later is
+ * treated as ours until someone decides otherwise. The sibling clustering
+ * classifier makes the same argument: we do not tell someone their
+ * configuration is broken on the strength of not recognising an error.
+ */
+const CUSTOMER_ACTIONABLE_PREFETCH_REASONS = new Set<ModelParamsFailureReason>([
+  "invalid_model_format",
+  "provider_not_found",
+  "provider_not_enabled",
+  "missing_params",
+  "model_not_configured",
+]);
+
+export function logPrefetchFailure({
+  jobLogger,
+  prefetchResult,
+}: {
+  jobLogger: ReturnType<typeof createScenarioLogger>;
+  prefetchResult: Extract<PrefetchResult, { success: false }>;
+}): void {
+  const isCustomerActionable =
+    prefetchResult.reason !== undefined &&
+    CUSTOMER_ACTIONABLE_PREFETCH_REASONS.has(prefetchResult.reason);
+  jobLogger[isCustomerActionable ? "warn" : "error"](
+    {
+      error: prefetchResult.error,
+      reason: prefetchResult.reason,
+      phase: "prefetch",
+    },
+    isCustomerActionable
+      ? "Scenario prefetch blocked by project configuration; failing the run with its remediation message"
+      : "Failed to prefetch scenario data",
+  );
 }
 
 /**
@@ -297,14 +470,7 @@ export async function executeScenarioRun(
 
     const prefetchDeps = createDataPrefetcherDependencies();
     const prefetchResult = await prefetchScenarioData({
-      context: {
-        projectId: jobData.projectId,
-        scenarioId: jobData.scenarioId,
-        setId: jobData.setId,
-        batchRunId: jobData.batchRunId,
-        scenarioRunId: jobData.scenarioRunId,
-        parameters: jobData.parameters,
-      },
+      context: prefetchContext(jobData),
       target: jobData.target,
       deps: prefetchDeps,
     });
@@ -321,10 +487,7 @@ export async function executeScenarioRun(
     }
 
     if (!prefetchResult.success) {
-      jobLogger.error(
-        { error: prefetchResult.error, phase: "prefetch" },
-        "Failed to prefetch scenario data",
-      );
+      logPrefetchFailure({ jobLogger, prefetchResult });
       await handleFailedJobResult(jobData, prefetchResult.error, deps);
       return;
     }
@@ -357,6 +520,7 @@ export async function executeScenarioRun(
         { success: true, totalDurationMs, childDurationMs },
         "Scenario job completed",
       );
+      await handleSucceededJobResult({ jobData, result, deps });
     } else if (result.cancelled) {
       jobLogger.info("Scenario job cancelled by user");
       await handleCancelledJobResult(jobData, result.error, deps);
@@ -374,6 +538,61 @@ export async function executeScenarioRun(
       await handleFailedJobResult(jobData, result.error, deps);
     }
   });
+}
+
+/**
+ * Wire the parent's side of the voice nonce handoff onto a spawned child:
+ * answer the child's nonce-registration IPC message by writing it into this
+ * process's registry and acking. This process is exactly the one the
+ * voice-ws-listener reads (both boot together on every worker, see
+ * worker-boot-plan.ts), so the registration and the eventual `consume()`
+ * lookup share memory by construction. Only ever called for a voice child —
+ * every other target's child has no IPC channel to listen on.
+ */
+function registerVoiceNonceHandoffListener(child: ChildProcess): void {
+  child.on("message", (message: unknown) => {
+    if (!isVoiceNonceRegisterMessage(message)) return;
+    const ack = handleVoiceNonceRegisterMessage({
+      message,
+      child,
+      registry: getVoiceNonceRegistry(),
+    });
+    child.send?.(ack);
+  });
+}
+
+/**
+ * Spawn the scenario's child process, wiring the voice nonce handoff channel
+ * (see {@link registerVoiceNonceHandoffListener}) when the target is voice.
+ * A voice target's child mints its own Twilio stream nonce and must tell the
+ * parent about it before dialling — that round trip needs a Node IPC
+ * channel, absent from every other target's plain pipe stdio. Isolated here
+ * so the voice-only stdio/IPC branching does not live in the caller.
+ */
+function spawnScenarioChild({
+  command,
+  args,
+  childEnv,
+  packageRoot,
+  isVoiceChild,
+}: {
+  command: string;
+  args: string[];
+  childEnv: NodeJS.ProcessEnv;
+  packageRoot: string;
+  isVoiceChild: boolean;
+}): ChildProcess {
+  const child: ChildProcess = spawn(command, args, {
+    env: childEnv,
+    stdio: isVoiceChild
+      ? ["pipe", "pipe", "pipe", "ipc"]
+      : ["pipe", "pipe", "pipe"],
+    cwd: packageRoot,
+  });
+  if (isVoiceChild) {
+    registerVoiceNonceHandoffListener(child);
+  }
+  return child;
 }
 
 /**
@@ -408,6 +627,13 @@ async function spawnScenarioChildProcess(
       jobData,
       labels: childProcessData.scenario.labels,
       telemetry,
+      // Voice-only: the caller's OpenAI / ElevenLabs keys reach the SDK's TTS
+      // and transcription clients through the child env. Narrowed here so no
+      // other target ever receives them.
+      callerEnv:
+        childProcessData.adapterData?.type === "voice"
+          ? childProcessData.adapterData.callerEnv
+          : undefined,
     });
 
     const packageRoot = resolveAppPackageRoot();
@@ -416,11 +642,14 @@ async function spawnScenarioChildProcess(
       packageRoot,
       nodeEnv: process.env.NODE_ENV,
     });
+    const isVoiceChild = childProcessData.adapterData?.type === "voice";
     log("info", "Spawning scenario child process", { command, args });
-    const child: ChildProcess = spawn(command, args, {
-      env: childEnv,
-      stdio: ["pipe", "pipe", "pipe"],
-      cwd: packageRoot,
+    const child = spawnScenarioChild({
+      command,
+      args,
+      childEnv,
+      packageRoot,
+      isVoiceChild,
     });
     log("info", "Child process spawned", {
       pid: child.pid,
@@ -506,8 +735,12 @@ async function spawnScenarioChildProcess(
         return;
       }
 
-      log("info", "Scenario completed successfully", { exitCode: code });
-      resolve({ success: true });
+      const served = parseChildProcessResult(stdout)?.agentInstance;
+      log("info", "Scenario completed successfully", {
+        exitCode: code,
+        ...(served ? { agentInstance: served } : {}),
+      });
+      resolve({ success: true, ...(served ? { agentInstance: served } : {}) });
     });
 
     child.on("error", (error) => {

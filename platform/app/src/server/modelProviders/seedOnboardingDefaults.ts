@@ -90,15 +90,21 @@ export function buildSeedPlanForProvider(provider: string): ProviderSeedPlan {
 /**
  * Onboarding seed: when a provider is enabled at a scope, ensure that
  * scope has a ModelDefaultConfig with sensible role-level values for
- * roles the provider can fulfill. Strictly additive:
+ * roles the provider can fulfill. Strictly additive, per KEY:
  *
  *   - If no config is attached to (scopeType, scopeId), one is created
  *     with the seed plan's roles. Default scope: ORGANIZATION so the
  *     entire organization inherits, not just the first project.
- *   - If a config is already attached at the same scope, it is left
- *     untouched. We do NOT merge in missing keys, because the user
- *     may have intentionally cleared a key to inherit from a higher
- *     scope; re-seeding would silently re-set it.
+ *   - If a config is already attached at the same scope, the roles that
+ *     scope does not carry yet are merged into it. A role that already
+ *     has a value is never rewritten.
+ *
+ * Per key rather than per scope, because a scope-level early return let
+ * the order the providers were added in decide which roles ever
+ * existed: Anthropic seeds DEFAULT and FAST and no EMBEDDINGS, so a
+ * later OpenAI add found a config here and did nothing, and every
+ * embeddings feature stayed unconfigured on an organization that had
+ * two enabled providers.
  *
  * Skips a role entirely when the provider has no model for it (e.g.
  * Anthropic + EMBEDDINGS).
@@ -123,23 +129,55 @@ export async function seedOnboardingDefaultsForProvider(params: {
   }
   if (Object.keys(config).length === 0) return;
 
-  // Idempotent at the scope level: if any config is already attached
-  // here, leave everything alone. Replacing or merging would step on
-  // the user's intentional choices (including their intentional
-  // "inherit from parent" via key absence).
-  const existing = await prisma.modelDefaultConfigScope.findFirst({
-    where: { scopeType, scopeId },
-    select: { id: true },
-  });
-  if (existing) return;
-
   // Persist through the repository so the org anchor resolution + single-org
   // invariant (ADR-021) live in one place. It mints the KSUIDs, resolves the
   // org for the seeded scope, and hard-fails an unresolvable scope (the column
   // is NOT NULL).
-  await new ModelDefaultsRepository(prisma).create({
-    config,
-    authorId: authorId ?? null,
-    scopes: [{ scopeType, scopeId }],
+  const repository = new ModelDefaultsRepository(prisma);
+
+  // The merge below reads then writes, so it needs the same organization lock
+  // every other default-models write takes first (see `lockForWrite` in
+  // modelDefaults.service.ts). Without it a settings save landing between the
+  // read and the update would be overwritten by the seed.
+  await repository.lockOrganization(
+    await repository.organizationIdForScopes([{ scopeType, scopeId }]),
+  );
+
+  const configsHere = await repository.findConfigsAtScope(scopeType, scopeId);
+
+  if (configsHere.length === 0) {
+    await repository.create({
+      config,
+      authorId: authorId ?? null,
+      scopes: [{ scopeType, scopeId }],
+    });
+    return;
+  }
+
+  // A role counts as set when ANY config at this scope carries it, so the
+  // merge cannot duplicate a value the scope already resolves.
+  const rolesAlreadyHere = new Set(
+    configsHere.flatMap((c) =>
+      Object.entries((c.config ?? {}) as Record<string, unknown>)
+        .filter(([, value]) => typeof value === "string" && value.length > 0)
+        .map(([key]) => key),
+    ),
+  );
+  const missing = Object.fromEntries(
+    Object.entries(config).filter(([key]) => !rolesAlreadyHere.has(key)),
+  );
+  if (Object.keys(missing).length === 0) return;
+
+  // Newest config first (findConfigsAtScope sorts by createdAt DESC), which is
+  // the row the settings page's own upsert path writes to.
+  const target = configsHere[0]!;
+  await repository.updateConfigPayload({
+    id: target.id,
+    data: {
+      config: {
+        ...((target.config ?? {}) as Record<string, string>),
+        ...missing,
+      },
+    },
   });
 }

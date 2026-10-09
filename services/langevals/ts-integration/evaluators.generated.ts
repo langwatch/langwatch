@@ -242,27 +242,25 @@ export const evaluatorsSchema = z.object({
           "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
         )
         .default(2048),
-      rubrics: z
-        .array(z.object({ description: z.string() }))
-        .default([
-          { description: "The response is incorrect, irrelevant." },
-          {
-            description:
-              "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
-          },
-        ]),
+      rubrics: z.array(z.object({ description: z.string() })).default([
+        { description: "The response is incorrect, irrelevant." },
+        {
+          description:
+            "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
+        },
+        {
+          description:
+            "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
+        },
+        {
+          description:
+            "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
+        },
+        {
+          description:
+            "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
+        },
+      ]),
     }),
   }),
   "ragas/sql_query_equivalence": z.object({
@@ -893,7 +891,13 @@ export type EvaluatorDefinition<T extends EvaluatorTypes> = {
   name: string;
   description: string;
   category:
-    "quality" | "rag" | "safety" | "policy" | "other" | "custom" | "similarity";
+    | "quality"
+    | "rag"
+    | "safety"
+    | "policy"
+    | "other"
+    | "custom"
+    | "similarity";
   docsUrl?: string;
   isGuardrail: boolean;
   requiredFields: string[];
@@ -1699,8 +1703,8 @@ A simple evaluator that checks if the output matches the expected_output exactly
     category: "quality",
     docsUrl: "",
     isGuardrail: false,
-    requiredFields: [],
-    optionalFields: ["output", "expected_output"],
+    requiredFields: ["output", "expected_output"],
+    optionalFields: [],
     settings: {
       case_sensitive: {
         description:
@@ -1734,8 +1738,8 @@ Uses an LLM to check if the generated output answers a question correctly the sa
     category: "quality",
     docsUrl: "",
     isGuardrail: false,
-    requiredFields: [],
-    optionalFields: ["input", "output", "expected_output"],
+    requiredFields: ["output", "expected_output"],
+    optionalFields: ["input"],
     settings: {
       model: {
         description: "The model to use for evaluation",

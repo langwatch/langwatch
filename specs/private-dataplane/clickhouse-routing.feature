@@ -97,8 +97,8 @@ Feature: Private ClickHouse Routing
     And no project needs to exist for that id
 
   @integration
-  Scenario: A tenant that names neither a project nor an organization is refused
-    Given an id that matches no project and no organization
+  Scenario: A tenant that names no project, organization or user is refused
+    Given an id that matches no project, no organization and no user
     When a client is resolved for that tenant
     Then resolution fails with an error naming the tenant
     And the shared client is not returned
@@ -153,3 +153,31 @@ Feature: Private ClickHouse Routing
     When a row is inserted via the routed client for this project
     Then the row exists in container B
     And the row does NOT exist in container A
+
+  # ── The third tenant kind ──────────────────────────────────────────────
+  #
+  # A tenant was a project, then a project or an organization, and now a
+  # user as well: `user_identity` keeps one aggregate per PERSON, so its
+  # tenantId is a user id and every append asked the resolver a question it
+  # could not answer. A user is NOT resolved into an organization on the way
+  # - somebody can be in several, and picking one would put their identity
+  # history on an instance chosen by accident.
+  #
+  # User data always lands on the shared instance. What a user-tenanted event
+  # records is how somebody signs in, which is true of them before, across and
+  # after every organization they belong to - so membership does not enter
+  # into the routing at all.
+
+  @integration
+  Scenario: A user is a tenant in its own right
+    Given a user
+    When the routed client is resolved for that user as the tenant
+    Then it answers the shared ClickHouse
+    And the user is not resolved into any organization to get there
+
+  @integration
+  Scenario: A user in a private-dataplane organization still routes to shared
+    Given a user who is a member of an organization with a private ClickHouse
+    When the routed client is resolved for that user as the tenant
+    Then it answers the shared ClickHouse
+    And their organization's private instance is not consulted

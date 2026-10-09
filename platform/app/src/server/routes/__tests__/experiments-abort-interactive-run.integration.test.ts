@@ -3,23 +3,32 @@
  *
  * @see specs/experiments-v3/execution-backend.feature
  *
- * Regression guard: an interactive workbench run streams over SSE and never
- * creates a polling run-state record (runStateManager.createRun is only called
- * by the CI/CD polling path). The orchestrator instead registers the run owner
- * via abortManager.setRunning. Before the fix, POST /api/experiments/abort only
- * consulted runStateManager.getRunState, so every workbench run 404'd and the
- * Stop button reported "Abort Failed". Abort must authorize against the
- * running-owner that the orchestrator records.
+ * Regression guard: abort must authorize against the running-owner the
+ * orchestrator records (abortManager.setRunning), not only against the polling
+ * run-state record. Before the fix, POST /api/experiments/abort consulted
+ * runStateManager.getRunState alone, so a workbench run 404'd and the Stop
+ * button reported "Abort Failed". The run-state record can also be missing
+ * entirely — Redis is optional, and it expires after 24h — so the owner lookup
+ * must still answer from the abort manager.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+
+wireDefaultTestApp();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user_1" } }),
 }));
 
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+// The route reads probeProjectPermission from the app-layer imperative
+// module (it moved off ~/server/api/rbac with ADR-092); mocking the old
+// path leaves the real check running.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
 // Interactive runs have no polling run-state record.

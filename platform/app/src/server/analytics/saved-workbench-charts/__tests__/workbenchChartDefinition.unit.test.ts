@@ -4,12 +4,12 @@
  * The schema is the only way a row is ever read, so these are the claims that
  * decide whether a `Json` column can be trusted.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";
 
-import { MAX_LWQL_LENGTH } from "../../lwql/sqlText";
+import { MAX_LWQL_LENGTH } from "../../lwql/limits";
 import {
   WORKBENCH_CHART_DEFINITION_VERSION,
   workbenchChartDefinitionSchema,

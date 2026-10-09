@@ -318,6 +318,70 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	}
 }
 
+// @scenario "A borrowed held-marker does not turn the queue off"
+// @scenario "An agent's own shell is not a queue wrapper"
+func TestHeldByQueueAncestor(t *testing.T) {
+	// The chain walk on its own: the test binary's parent really is above us.
+	// The full check refuses it all the same, because that parent runs "go
+	// test", not the queue. An agent's CHECK_QUEUE_HELD=$$ has exactly this
+	// shape, and this is what stops it.
+	if !isLiveAncestor(os.Getppid()) {
+		t.Fatal("the test binary's own parent must count as a live ancestor")
+	}
+	if heldByQueueAncestor(strconv.Itoa(os.Getppid())) {
+		t.Fatal("an ancestor that is not a queue wrapper must not verify")
+	}
+
+	for _, raw := range []string{"", "1", "0", "-4", "bananas"} {
+		if heldByQueueAncestor(raw) {
+			t.Fatalf("%q must not verify as a held marker", raw)
+		}
+	}
+
+	// A live process that is not above us: an agent copying a wrapper's pid
+	// into its own environment is exactly this shape.
+	bystander := exec.Command("sleep", "30")
+	if err := bystander.Start(); err != nil {
+		t.Fatalf("starting the bystander: %v", err)
+	}
+	defer func() {
+		_ = bystander.Process.Kill()
+		_ = bystander.Wait()
+	}()
+	if heldByQueueAncestor(strconv.Itoa(bystander.Process.Pid)) {
+		t.Fatal("a live process that is not an ancestor must not verify")
+	}
+}
+
+// @scenario "An agent's own shell is not a queue wrapper"
+func TestIsQueueCommand(t *testing.T) {
+	accepted := []string{
+		"node /repo/dev/scripts/check-queue.mjs pnpm typecheck",
+		"haven slot run --label typecheck -- pnpm typecheck",
+		"/Users/someone/go/bin/haven typecheck",
+		"/var/folders/T/go-build/b001/haven.test -test.run TestX",
+	}
+	for _, command := range accepted {
+		if !isQueueCommand(command) {
+			t.Fatalf("%q must read as a queue wrapper", command)
+		}
+	}
+
+	refused := []string{
+		"",
+		"   ",
+		"-zsh",
+		"/bin/bash -l",
+		"node /repo/platform/app/scripts/__tests__/check-queue.unit.test.ts",
+		"/opt/homebrew/bin/havenclone slot run",
+	}
+	for _, command := range refused {
+		if isQueueCommand(command) {
+			t.Fatalf("%q must not read as a queue wrapper", command)
+		}
+	}
+}
+
 // @scenario "A signal delivered to the whole process group still counts as forwarded"
 func TestSignalRelayRecordsAQueuedSignal(t *testing.T) {
 	child := exec.Command("sleep", "10")

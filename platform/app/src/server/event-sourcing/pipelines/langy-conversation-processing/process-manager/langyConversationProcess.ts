@@ -43,7 +43,8 @@ export function buildLangyProcessEventView(
         ? event.data.outcome
         : null,
     titleTouched:
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED &&
+      (event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED ||
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED) &&
       typeof event.data.title === "string",
   };
 }
@@ -162,6 +163,17 @@ export const handleMetadataUpdated: LangyHandler = (state, payload) => {
   return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.USER } };
 };
 
+/**
+ * A title chosen when the conversation is created (a fork, the guided
+ * onboarding kickoff) is as sticky as a rename: the fold keeps it over any
+ * generated title, so the generation is never requested in the first place.
+ */
+export const handleConversationStarted: LangyHandler = (state, payload) => {
+  const view = langyProcessEventViewSchema.parse(payload);
+  if (!view.titleTouched) return { state };
+  return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.USER } };
+};
+
 export const handleTitleGenerated: LangyHandler = (state) => {
   if (state.titleSource === LANGY_TITLE_SOURCE.USER) return { state };
   return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.AUTO } };
@@ -266,7 +278,10 @@ export function langyConversationProcess(
         LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
         handleHandoffConsumed,
       )
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED, handleNoDecision)
+      .on(
+        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
+        handleConversationStarted,
+      )
       .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED, handleNoDecision)
       .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED, handleNoDecision)
       .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED, handleNoDecision)

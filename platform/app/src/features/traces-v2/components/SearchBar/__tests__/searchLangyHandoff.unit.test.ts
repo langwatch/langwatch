@@ -59,6 +59,37 @@ describe("handOffSearchToLangy", () => {
     });
   });
 
+  describe("given the whole view is known", () => {
+    /** @scenario "Ask Langy sends the whole view with the question" */
+    it("attaches the view before the filter, so the explicit route sends at least the page context", () => {
+      handOffSearchToLangy({
+        typedText: "which of these are timeouts?",
+        appliedQueryText: "status:error",
+        viewContext: {
+          id: "view:traces:all-traces:30d:status:error",
+          kind: "filter",
+          label: "Traces · All traces · Last 30 days · searched",
+          ref: "data source: traces; time range: Last 30 days; search and attribute filters: status:error",
+        },
+        askLangy,
+        openPanel,
+        attachContext,
+        seedDraft,
+      });
+
+      expect(attachContext).toHaveBeenNthCalledWith(1, {
+        type: "filter",
+        id: "data source: traces; time range: Last 30 days; search and attribute filters: status:error",
+        label: "Traces · All traces · Last 30 days · searched",
+      });
+      expect(attachContext).toHaveBeenNthCalledWith(2, {
+        type: "filter",
+        id: "status:error",
+        label: "filtered: status:error",
+      });
+    });
+  });
+
   describe("given the seed", () => {
     it("is never planted over a question the user actually typed", () => {
       handOffSearchToLangy({
@@ -132,6 +163,7 @@ describe("handOffSearchToLangy", () => {
   });
 
   describe("given the typed text is exactly the applied filter", () => {
+    /** @scenario "A question that is just the applied filter is not attached twice" */
     it("asks the question without attaching a duplicate of it", () => {
       handOffSearchToLangy({
         typedText: "status:error",

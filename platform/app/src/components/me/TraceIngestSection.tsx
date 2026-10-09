@@ -17,6 +17,7 @@ import {
 } from "~/components/me/IngestionTemplateInstallDrawer";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
+import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
@@ -73,6 +74,27 @@ function errorFor<TError, TVariables extends { sourceType: string }>(
   return mutation.variables?.sourceType === sourceType ? mutation.error : null;
 }
 
+/** One live key, as `ingestionKey.list` hands it over. */
+type IngestionKeySummary = {
+  sourceType: string;
+  ingestionTemplateId: string | null;
+  deviceLabel: string | null;
+};
+
+const sourceKey = (sourceType: string, templateId: string | null): string =>
+  `${sourceType}\u0000${templateId ?? ""}`;
+
+function groupKeysBySource<T extends IngestionKeySummary>(
+  keys: T[],
+): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const key of keys) {
+    const id = sourceKey(key.sourceType, key.ingestionTemplateId ?? null);
+    grouped.set(id, [...(grouped.get(id) ?? []), key]);
+  }
+  return grouped;
+}
+
 export function TraceIngestSection() {
   const ctx = usePersonalContext();
   const orgId = ctx.organizationId ?? "";
@@ -87,9 +109,9 @@ export function TraceIngestSection() {
   );
 
   const utils = api.useUtils();
-  // Neither mutation toasts: both are driven from inside the install drawer,
-  // which is open whenever they can fail and renders this same error inline
-  // via `<HandledErrorAlert>`. A toast would report it a second time.
+  // Neither mutation toasts its failure: both are driven from inside the
+  // install drawer, which is open whenever they can fail and renders the
+  // error inline via `<HandledErrorAlert>`. A toast would report it twice.
   const installMutation = api.ingestionKey.install.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
@@ -115,8 +137,14 @@ export function TraceIngestSection() {
   const templates = templatesQuery.data ?? [];
   const keys = keysQuery.data ?? [];
 
-  /** Connected ingestion keys, keyed by the source they were minted for. */
-  const keyBySourceType = new Map(keys.map((k) => [k.sourceType, k]));
+  /**
+   * Live keys per source, keyed the way a rotation groups them: one source
+   * can be installed on several machines at once, and rotating it kills all
+   * of them, so the tile counts them rather than answering yes or no.
+   */
+  const keysBySource = groupKeysBySource(keys);
+  const keysFor = (sourceType: string, templateId: string | null) =>
+    keysBySource.get(sourceKey(sourceType, templateId)) ?? [];
 
   // No templates, no section: the platform ships no defaults, so most
   // orgs have nothing to install here. Rendering nothing (not even
@@ -168,6 +196,13 @@ export function TraceIngestSection() {
         ...s,
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
+      // The count is the part a person cannot see: the drawer shows the new
+      // token, not how many machines just went quiet.
+      toaster.create({
+        title: "Token rotated",
+        description: `Revoked ${result.revokedCount} previous ${result.revokedCount === 1 ? "key" : "keys"}. Paste the new token wherever you wired the old one.`,
+        type: "success",
+      });
     } catch {
       // surfaced inline by the drawer, off `rotateMutation.error`
     }
@@ -179,7 +214,7 @@ export function TraceIngestSection() {
     slug: string,
   ) => {
     setOpenSlug(slug);
-    const isAlreadyConnected = keyBySourceType.has(sourceType);
+    const isAlreadyConnected = keysFor(sourceType, templateId).length > 0;
     if (
       !isAlreadyConnected &&
       !installResults[slug] &&
@@ -221,7 +256,7 @@ export function TraceIngestSection() {
             label={t.displayName}
             subtitle={t.description ?? t.sourceType}
             icon={FALLBACK_ICON}
-            installed={keyBySourceType.has(t.sourceType)}
+            installedCount={keysFor(t.sourceType, t.id).length}
             onClick={() => handleTileClick(t.sourceType, t.id, t.slug)}
           />
         ))}
@@ -251,7 +286,9 @@ export function TraceIngestSection() {
             errorFor(installMutation, openTemplate.sourceType) ??
             errorFor(rotateMutation, openTemplate.sourceType)
           }
-          hasExistingKey={keyBySourceType.has(openTemplate.sourceType)}
+          installedOn={keysFor(openTemplate.sourceType, openTemplate.id).map(
+            (key) => key.deviceLabel,
+          )}
           onInstall={() =>
             void handleInstall(
               openTemplate.sourceType,
@@ -278,16 +315,18 @@ function InstallTile({
   label,
   subtitle,
   icon,
-  installed,
+  installedCount,
   onClick,
 }: {
   slug: string;
   label: string;
   subtitle: string;
   icon: ReactNode;
-  installed: boolean;
+  /** How many machines hold a live key for this source. */
+  installedCount: number;
   onClick: () => void;
 }) {
+  const installed = installedCount > 0;
   return (
     <Box
       as="button"
@@ -326,7 +365,10 @@ function InstallTile({
             <Spacer />
             {installed ? (
               <Badge size="xs" variant="surface" colorPalette="green">
-                <Check size={10} /> Installed
+                <Check size={10} />{" "}
+                {installedCount > 1
+                  ? `Installed on ${installedCount} machines`
+                  : "Installed"}
               </Badge>
             ) : (
               <Badge size="xs" variant="surface" colorPalette="gray">

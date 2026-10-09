@@ -17,7 +17,7 @@ import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { ProjectSelector } from "../../components/DashboardLayout";
+import { ProjectSelector } from "../../components/ProjectSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";

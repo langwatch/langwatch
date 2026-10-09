@@ -2,6 +2,8 @@ import type {
   CreateScenarioBody,
   DeleteScenarioResponse,
   ScenarioResponse,
+  ScenarioVersionDetail,
+  ScenarioVersionListResponse,
   UpdateScenarioBody,
 } from "./types";
 import {
@@ -14,6 +16,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export class ScenariosApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -26,6 +29,7 @@ export class ScenariosApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new ScenariosApiError(message, operation, error);
   }
 
@@ -59,6 +63,45 @@ export class ScenariosApiService {
     });
     if (error)
       this.handleApiError(`update scenario with ID "${id}"`, error);
+    return data;
+  }
+
+  /** The saved versions of a scenario, newest first. */
+  async listVersions(
+    id: string,
+    options?: { limit?: number; cursor?: number },
+  ): Promise<ScenarioVersionListResponse> {
+    const query = {
+      ...(options?.limit !== undefined && { limit: options.limit }),
+      ...(options?.cursor !== undefined && { cursor: options.cursor }),
+    };
+    const { data, error } = await this.apiClient.GET(
+      "/api/scenarios/{id}/versions",
+      {
+        params: { path: { id }, query },
+      },
+    );
+    if (error)
+      this.handleApiError(`list versions of scenario "${id}"`, error);
+    return data;
+  }
+
+  /** One saved version of a scenario, with the content it saved. */
+  async getVersion(
+    id: string,
+    version: number,
+  ): Promise<ScenarioVersionDetail> {
+    const { data, error } = await this.apiClient.GET(
+      "/api/scenarios/{id}/versions/{version}",
+      {
+        params: { path: { id, version } },
+      },
+    );
+    if (error)
+      this.handleApiError(
+        `get version ${version} of scenario "${id}"`,
+        error,
+      );
     return data;
   }
 

@@ -4,16 +4,57 @@ import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.
 
 function makeRepository() {
   const findMany = vi.fn().mockResolvedValue([]);
+  const findFirstReceipt = vi.fn().mockResolvedValue(null);
   const prisma = {
     langyConversationProjection: { findMany },
+    langyTurnRequest: { findFirst: findFirstReceipt },
   } as unknown as PrismaClient;
   return {
     findMany,
+    findFirstReceipt,
     repository: new PrismaLangyConversationRepository(prisma),
   };
 }
 
+describe("PrismaLangyConversationRepository.hasAdmittedTurn", () => {
+  it("reads the turn receipt for the project, conversation and user", async () => {
+    const { findFirstReceipt, repository } = makeRepository();
+    findFirstReceipt.mockResolvedValueOnce({ id: "receipt-1" });
+
+    const admitted = await repository.hasAdmittedTurn({
+      projectId: "project-a",
+      conversationId: "conv-a",
+      userId: "user-a",
+    });
+
+    expect(admitted).toBe(true);
+    expect(findFirstReceipt).toHaveBeenCalledWith({
+      where: {
+        projectId: "project-a",
+        conversationId: "conv-a",
+        userId: "user-a",
+      },
+      select: { id: true },
+    });
+  });
+
+  it("is false when no receipt exists", async () => {
+    const { repository } = makeRepository();
+
+    expect(
+      await repository.hasAdmittedTurn({
+        projectId: "project-a",
+        conversationId: "conv-a",
+        userId: "user-a",
+      }),
+    ).toBe(false);
+  });
+});
+
 describe("PrismaLangyConversationRepository.findAllForUser", () => {
+  /** @scenario "Listing conversations reads the operational projection, newest activity first" */
+  /** @scenario "Deleting a conversation archives it rather than hard-deleting" */
+  /** @scenario "Every conversation read is scoped to the project" */
   it("keeps project/user visibility predicates on server-side title search", async () => {
     const { findMany, repository } = makeRepository();
 

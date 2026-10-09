@@ -222,6 +222,128 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
   });
 });
 
+describe("QueueManager migration preflight targets", () => {
+  const aggregateType = createTestAggregateType();
+  const tenantId = createTestTenantId();
+
+  it("registers the complete default-routed pipeline before staging a command", async () => {
+    const queue = createMockSharedQueue();
+    queue.registerPreflightGroups = vi.fn().mockResolvedValue(void 0);
+    const registry = new Map<string, JobRegistryEntry>();
+    const manager = new QueueManager({
+      aggregateType,
+      pipelineName: "test-pipeline",
+      globalQueue: queue,
+      globalJobRegistry: registry,
+    });
+    manager.initializeHandlerQueues(
+      {
+        writer: {
+          name: "writer",
+          handler: { handle: vi.fn() },
+          options: {},
+        },
+      },
+      vi.fn(),
+    );
+    manager.initializeProjectionQueues(
+      { state: { name: "state" } },
+      vi.fn(),
+      undefined,
+      { queueType: "projection", jobPath: "fold" },
+    );
+    manager.initializeProjectionSubscriberQueues(
+      {
+        effect: {
+          name: "effect",
+          parentProjection: "state",
+          parentType: "fold",
+          handler: { handle: vi.fn() },
+        },
+      },
+      vi.fn(),
+    );
+    manager.initializeCommandQueues(
+      [
+        {
+          name: "start",
+          handlerClass: createMockCommandHandlerClass("start"),
+        },
+      ],
+      vi.fn(),
+      "test-pipeline",
+    );
+
+    const command = manager.getCommandQueue("start")!;
+    await command.send({
+      tenantId: String(tenantId),
+      aggregateId: "aggregate-1",
+      occurredAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+    });
+
+    expect(queue.registerPreflightGroups).toHaveBeenCalledOnce();
+    const registered = vi
+      .mocked(queue.registerPreflightGroups!)
+      .mock.calls[0]![0]();
+    expect(new Set(registered)).toEqual(
+      new Set([
+        `${tenantId}/map/writer/${aggregateType}:aggregate-1`,
+        `${tenantId}/fold/state/${aggregateType}:aggregate-1`,
+        `${tenantId}/fold/state/reactor/effect/${aggregateType}:aggregate-1`,
+        `${tenantId}/command/start/${aggregateType}:aggregate-1`,
+      ]),
+    );
+    expect(
+      vi.mocked(queue.registerPreflightGroups!).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(queue.send).mock.invocationCallOrder[0]!);
+  });
+
+  it("fails closed before staging when a pipeline has custom group routing", async () => {
+    const queue = createMockSharedQueue();
+    queue.registerPreflightGroups = vi.fn(async (resolveGroups) => {
+      const groups = resolveGroups();
+      if (groups.some((groupId: string | undefined) => !groupId)) {
+        throw new Error("custom routing cannot be pre-registered");
+      }
+    });
+    const manager = new QueueManager({
+      aggregateType,
+      pipelineName: "test-pipeline",
+      globalQueue: queue,
+      globalJobRegistry: new Map(),
+    });
+    manager.initializeHandlerQueues(
+      {
+        custom: {
+          name: "custom",
+          handler: { handle: vi.fn() },
+          options: { groupKeyFn: () => "custom" },
+        },
+      },
+      vi.fn(),
+    );
+    manager.initializeCommandQueues(
+      [
+        {
+          name: "start",
+          handlerClass: createMockCommandHandlerClass("start"),
+        },
+      ],
+      vi.fn(),
+      "test-pipeline",
+    );
+
+    await expect(
+      manager.getCommandQueue("start")!.send({
+        tenantId: String(tenantId),
+        aggregateId: "aggregate-1",
+        occurredAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      }),
+    ).rejects.toThrow("custom routing cannot be pre-registered");
+    expect(queue.send).not.toHaveBeenCalled();
+  });
+});
+
 const UNCOALESCED_PRODUCER_MESSAGE =
   "grouped command producer registered without append coalescing";
 

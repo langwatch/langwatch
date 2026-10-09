@@ -34,9 +34,11 @@ const MODULE_TALLY = "__langwatchShardTestModuleTally";
 
 interface ModuleTally {
   selected: number;
+  shardSelected: number | null;
   started: number;
   reported: number;
   inFlight: Set<string>;
+  finished: boolean;
 }
 
 type StateCarrier = typeof globalThis & {
@@ -56,11 +58,28 @@ function moduleTally(): ModuleTally {
   const carrier = globalThis as StateCarrier;
   carrier[MODULE_TALLY] ??= {
     selected: 0,
+    shardSelected: null,
     started: 0,
     reported: 0,
     inFlight: new Set<string>(),
+    finished: false,
   };
   return carrier[MODULE_TALLY];
+}
+
+/**
+ * How many files this shard was given, which only the sequencer knows.
+ *
+ * The reporter is handed the whole suite's file list, before the sequencer
+ * splits it, so its own `selected` is the same number on all four shards.
+ * Comparing a shard's progress against that says "still had files to start"
+ * on every sharded run, whatever the shard was doing.
+ *
+ * Recorded rather than read back later because the sequencer runs once, in the
+ * same process, and nothing else is in a position to say.
+ */
+export function recordShardSelection(count: number): void {
+  moduleTally().shardSelected = count;
 }
 
 /**
@@ -88,16 +107,20 @@ export function resetShardState(): void {
  */
 export function shardModuleTally(): {
   selected: number;
+  shardSelected: number | null;
   started: number;
   reported: number;
   unreportedFiles: string[];
+  finished: boolean;
 } {
   const tally = moduleTally();
   return {
     selected: tally.selected,
+    shardSelected: tally.shardSelected,
     started: tally.started,
     reported: tally.reported,
     unreportedFiles: [...tally.inFlight].sort(),
+    finished: tally.finished,
   };
 }
 
@@ -128,7 +151,10 @@ export default class ShardFailureReporter {
     tally.selected = specifications.length;
     tally.started = 0;
     tally.reported = 0;
+    tally.finished = false;
     tally.inFlight.clear();
+    // `shardSelected` is deliberately left alone: the sequencer sets it, and
+    // the two run in an order vitest does not promise.
   }
 
   /**
@@ -167,7 +193,108 @@ export default class ShardFailureReporter {
     unhandledErrors: readonly unknown[],
     reason: string,
   ): void {
-    if (unhandledErrors.length > 0 || reason === "failed") markFailure();
+    if (unhandledErrors.length > 0 || reason !== "passed") markFailure();
     moduleTally().inFlight.clear();
+    moduleTally().finished = true;
   }
+}
+
+/**
+ * How many files the shard was given, said so that a sharded run and a whole
+ * one both read plainly.
+ *
+ * A sharded run has two counts and they are far apart: the reporter is handed
+ * the whole suite before the sequencer splits it, so `selected` is the same
+ * number on every shard while the shard itself holds a quarter of it.
+ */
+function describeFileCount({
+  selected,
+  shardSelected,
+}: {
+  selected: number;
+  shardSelected: number | null | undefined;
+}): string {
+  if (shardSelected == null) return `${selected} selected`;
+  return `${shardSelected} in this shard (of ${selected} selected)`;
+}
+
+function hardFloorExitCode({
+  failed,
+  finished,
+  incomplete,
+}: {
+  failed: boolean;
+  finished: boolean;
+  incomplete: boolean;
+}): 0 | 1 {
+  if (failed) return 1;
+  if (finished) return 0;
+  return incomplete ? 1 : 0;
+}
+
+/**
+ * What the floor prints and the code it exits with, given what the shard knew
+ * when it fired. Split out from the timer so the exit contract can be asserted
+ * without wedging a real run.
+ */
+export function hardFloorReport({
+  hardFloorMs,
+  sawFailure,
+  modules,
+  label = "unit globalSetup",
+}: {
+  label?: string;
+  hardFloorMs: number;
+  sawFailure: boolean;
+  modules: {
+    selected: number;
+    shardSelected?: number | null;
+    started: number;
+    reported: number;
+    unreportedFiles: readonly string[];
+    finished?: boolean;
+  };
+}): { exitCode: 0 | 1; lines: string[] } {
+  const { selected, shardSelected, started, reported, unreportedFiles } =
+    modules;
+  // What this shard was given, which on a sharded run is a quarter or so of
+  // `selected`. Without it the counts below compare a shard against the suite.
+  const mine = shardSelected ?? selected;
+  const exitCode = hardFloorExitCode({
+    failed: sawFailure,
+    finished: modules.finished === true,
+    incomplete: mine === 0 || reported < mine || unreportedFiles.length > 0,
+  });
+  const minutes = Number((hardFloorMs / 60_000).toFixed(2));
+
+  const causes: string[] = [];
+  if (sawFailure) causes.push("failures were reported before the wedge");
+  if (unreportedFiles.length > 0) {
+    causes.push(
+      `${unreportedFiles.length} test ${unreportedFiles.length === 1 ? "file" : "files"} started and never reported a result`,
+    );
+  }
+  const suffix = causes.length > 0 ? ` (${causes.join(", and ")})` : "";
+
+  const counted = describeFileCount({ selected, shardSelected });
+  const lines = [
+    `[${label}] hard floor reached at ${minutes} min - forcing process.exit(${exitCode}) to release the CI step from a vitest finalize wedge${suffix}`,
+    `[${label}] test files: ${counted}, ${started} started, ${reported} reported a result`,
+  ];
+
+  if (started < mine) {
+    lines.push(
+      `[${label}] the shard still had files to start, so the floor cut a run that was working rather than one that was wedged. Read that as a shard too slow for the floor, not as a hang.`,
+    );
+  }
+
+  if (unreportedFiles.length > 0) {
+    lines.push(
+      `[${label}] these test files never completed, so the tests in them did not run and this shard is red rather than green:`,
+      ...unreportedFiles.map((file) => `[${label}]   ${file}`),
+      `[${label}] Run each incomplete file separately with the matching test config to locate the failure.`,
+    );
+  }
+
+  return { exitCode, lines };
 }

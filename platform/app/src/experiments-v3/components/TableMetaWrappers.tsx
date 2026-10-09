@@ -91,6 +91,7 @@ export const TargetHeaderFromMeta = ({
   return (
     <TargetHeader
       target={target}
+      onOptimize={meta?.handleOptimizeTarget}
       onEdit={meta?.openTargetEditor}
       onDuplicate={meta?.handleDuplicateTarget}
       onSwitch={meta?.handleSwitchTarget}

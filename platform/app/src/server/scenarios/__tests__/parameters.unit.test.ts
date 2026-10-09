@@ -3,6 +3,7 @@
  * a run's values resolve against those declarations.
  *
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -13,9 +14,12 @@ import {
   MAX_RUN_PARAMETER_KEYS,
   MAX_SCENARIO_PARAMETER_DEFINITIONS,
   mergeRunParameters,
+  parseRunParametersJson,
   parseScenarioParameterDefinitions,
+  partitionParameterDefinitions,
   runParameterValuesSchema,
   scenarioParameterDefinitionsSchema,
+  withoutParameterNames,
 } from "../parameters";
 
 const definition = (
@@ -297,6 +301,100 @@ describe("scenario run parameters", () => {
           }),
         ).toEqual([]);
       });
+    });
+  });
+
+  describe("given a parameter declared secret", () => {
+    describe("when it also carries a default value", () => {
+      /** @scenario "A parameter declared secret cannot carry a default value" */
+      it("rejects the declaration", () => {
+        const result = scenarioParameterDefinitionsSchema.safeParse([
+          { name: "api_token", secret: true, defaultValue: "abc" },
+        ]);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("when it also lists options", () => {
+      /** @scenario "A parameter declared secret cannot list options" */
+      it("rejects the declaration", () => {
+        const result = scenarioParameterDefinitionsSchema.safeParse([
+          { name: "api_token", secret: true, options: ["credential"] },
+        ]);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("when it carries no default value and no options", () => {
+      it("accepts the declaration", () => {
+        const result = scenarioParameterDefinitionsSchema.safeParse([
+          { name: "api_token", secret: true, description: "The API token" },
+        ]);
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe("when the declarations are split for a run", () => {
+      it("keeps the secret ones out of the plain half", () => {
+        const { plain, secret } = partitionParameterDefinitions([
+          definition("region", "eu-central"),
+          { name: "api_token", secret: true },
+          { name: "plain_flag", secret: false },
+        ]);
+
+        expect(plain.map((one) => one.name)).toEqual(["region", "plain_flag"]);
+        expect(secret.map((one) => one.name)).toEqual(["api_token"]);
+      });
+
+      it("resolves nothing for a secret name in the plain merge", () => {
+        const { plain } = partitionParameterDefinitions([
+          definition("region", "eu-central"),
+          { name: "api_token", secret: true },
+        ]);
+
+        const resolved = mergeRunParameters({
+          definitions: plain,
+          values: withoutParameterNames({
+            values: { region: "us-east", api_token: "tok-live-1" },
+            names: new Set(["api_token"]),
+          }),
+        });
+
+        expect(resolved).toEqual({ region: "us-east" });
+      });
+    });
+  });
+});
+
+describe("parseRunParametersJson", () => {
+  describe("given the raw parameters a run stored", () => {
+    it("reads back strings, numbers and booleans", () => {
+      expect(
+        parseRunParametersJson(
+          JSON.stringify({ region: "eu-central", seats: 12, trial: false }),
+        ),
+      ).toEqual({ region: "eu-central", seats: 12, trial: false });
+    });
+
+    it("reads a run that stored none as no parameters", () => {
+      expect(parseRunParametersJson("")).toEqual({});
+    });
+
+    it("drops a value the current shape cannot carry", () => {
+      expect(
+        parseRunParametersJson(
+          JSON.stringify({ region: "eu", extra: { a: 1 } }),
+        ),
+      ).toEqual({ region: "eu" });
+    });
+
+    it("reads anything that is not an object as no parameters", () => {
+      expect(parseRunParametersJson("not json")).toEqual({});
+      expect(parseRunParametersJson("[1, 2]")).toEqual({});
+      expect(parseRunParametersJson("null")).toEqual({});
     });
   });
 });

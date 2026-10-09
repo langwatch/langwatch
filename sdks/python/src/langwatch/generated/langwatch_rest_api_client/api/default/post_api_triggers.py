@@ -4,18 +4,26 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.post_api_triggers_body import PostApiTriggersBody
+from ...models.post_api_triggers_body_type_0 import PostApiTriggersBodyType0
+from ...models.post_api_triggers_body_type_1 import PostApiTriggersBodyType1
+from ...models.post_api_triggers_body_type_2 import PostApiTriggersBodyType2
+from ...models.post_api_triggers_body_type_3 import PostApiTriggersBodyType3
+from ...models.post_api_triggers_body_type_4 import PostApiTriggersBodyType4
 from ...models.post_api_triggers_response_201 import PostApiTriggersResponse201
 from ...models.post_api_triggers_response_400 import PostApiTriggersResponse400
 from ...models.post_api_triggers_response_401 import PostApiTriggersResponse401
 from ...models.post_api_triggers_response_422 import PostApiTriggersResponse422
 from ...models.post_api_triggers_response_500 import PostApiTriggersResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiTriggersBody | Unset = UNSET,
+    body: PostApiTriggersBodyType0
+    | PostApiTriggersBodyType1
+    | PostApiTriggersBodyType2
+    | PostApiTriggersBodyType3
+    | PostApiTriggersBodyType4,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +32,15 @@ def _get_kwargs(
         "url": "/api/triggers",
     }
 
-    if not isinstance(body, Unset):
+    if isinstance(body, PostApiTriggersBodyType0):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiTriggersBodyType1):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiTriggersBodyType2):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiTriggersBodyType3):
+        _kwargs["json"] = body.to_dict()
+    else:
         _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
@@ -96,8 +112,12 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTriggersBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiTriggersBodyType0
+    | PostApiTriggersBodyType1
+    | PostApiTriggersBodyType2
+    | PostApiTriggersBodyType3
+    | PostApiTriggersBodyType4,
 ) -> Response[
     PostApiTriggersResponse201
     | PostApiTriggersResponse400
@@ -105,10 +125,12 @@ def sync_detailed(
     | PostApiTriggersResponse422
     | PostApiTriggersResponse500
 ]:
-    """Create a new trigger (automation)
+    """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
+    scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
     Args:
-        body (PostApiTriggersBody | Unset):
+        body (PostApiTriggersBodyType0 | PostApiTriggersBodyType1 | PostApiTriggersBodyType2 |
+            PostApiTriggersBodyType3 | PostApiTriggersBodyType4):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,8 +153,12 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTriggersBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiTriggersBodyType0
+    | PostApiTriggersBodyType1
+    | PostApiTriggersBodyType2
+    | PostApiTriggersBodyType3
+    | PostApiTriggersBodyType4,
 ) -> (
     PostApiTriggersResponse201
     | PostApiTriggersResponse400
@@ -141,10 +167,12 @@ def sync(
     | PostApiTriggersResponse500
     | None
 ):
-    """Create a new trigger (automation)
+    """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
+    scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
     Args:
-        body (PostApiTriggersBody | Unset):
+        body (PostApiTriggersBodyType0 | PostApiTriggersBodyType1 | PostApiTriggersBodyType2 |
+            PostApiTriggersBodyType3 | PostApiTriggersBodyType4):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,8 +190,12 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTriggersBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiTriggersBodyType0
+    | PostApiTriggersBodyType1
+    | PostApiTriggersBodyType2
+    | PostApiTriggersBodyType3
+    | PostApiTriggersBodyType4,
 ) -> Response[
     PostApiTriggersResponse201
     | PostApiTriggersResponse400
@@ -171,10 +203,12 @@ async def asyncio_detailed(
     | PostApiTriggersResponse422
     | PostApiTriggersResponse500
 ]:
-    """Create a new trigger (automation)
+    """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
+    scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
     Args:
-        body (PostApiTriggersBody | Unset):
+        body (PostApiTriggersBodyType0 | PostApiTriggersBodyType1 | PostApiTriggersBodyType2 |
+            PostApiTriggersBodyType3 | PostApiTriggersBodyType4):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -195,8 +229,12 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTriggersBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiTriggersBodyType0
+    | PostApiTriggersBodyType1
+    | PostApiTriggersBodyType2
+    | PostApiTriggersBodyType3
+    | PostApiTriggersBodyType4,
 ) -> (
     PostApiTriggersResponse201
     | PostApiTriggersResponse400
@@ -205,10 +243,12 @@ async def asyncio(
     | PostApiTriggersResponse500
     | None
 ):
-    """Create a new trigger (automation)
+    """Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a
+    scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
     Args:
-        body (PostApiTriggersBody | Unset):
+        body (PostApiTriggersBodyType0 | PostApiTriggersBodyType1 | PostApiTriggersBodyType2 |
+            PostApiTriggersBodyType3 | PostApiTriggersBodyType4):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

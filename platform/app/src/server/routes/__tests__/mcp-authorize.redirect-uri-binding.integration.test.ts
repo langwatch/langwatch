@@ -15,6 +15,7 @@
  * that registration, and rejects unless redirect_uri is an exact string
  * match against one of the registered URIs.
  */
+import { grantFactToRow } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as AppLayerApp from "~/server/app-layer/app";
@@ -34,16 +35,12 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
     },
     mockPrisma: {
       organizationUser: {
-        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
-      roleBinding: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([
-            { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-          ]),
-      },
+      grant: { findMany: vi.fn().mockResolvedValue([]) },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
       teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
       project: {
@@ -71,10 +68,21 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual = await importOriginal<typeof AppLayerApp>();
   // misc.ts reads its connection through tryGetApp; getApp is overridden too
   // so both accessors agree on the fake.
+  // The authorize route decides through the App's permissions (ADR-092);
+  // composing over this file's mocked ~/server/db keeps the Grant
+  // stubs in charge of every outcome.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const fakeApp = () => ({
+    redis: mockRedis,
+    permissions: permissionsServiceFor(dbForPermissions),
+  });
   return {
     ...actual,
-    getApp: () => ({ redis: mockRedis }),
-    tryGetApp: () => ({ redis: mockRedis }),
+    getApp: fakeApp,
+    tryGetApp: fakeApp,
   };
 });
 vi.mock("~/utils/encryption", () => ({
@@ -112,14 +120,33 @@ async function authorize(overrides: Record<string, unknown> = {}) {
 function resetMocks() {
   mockRedis.set.mockReset().mockResolvedValue("OK");
   mockRedis.get.mockReset();
-  mockPrisma.roleBinding.findMany
-    .mockReset()
-    .mockResolvedValue([
-      { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
-    ]);
+  mockPrisma.grant.findMany.mockReset().mockResolvedValue([
+    grantFactToRow({
+      organizationId: ORG_ID,
+      grant: {
+        grantId: "grant_admin",
+        principal: { type: "user", id: SESSION.user.id },
+        roleKey: "admin",
+        scope: { type: "TEAM", id: TEAM_ID },
+        source: "grants-service",
+        occurredAtMs: 1,
+      },
+    }),
+  ]);
   mockPrisma.organizationUser.findFirst
     .mockReset()
-    .mockResolvedValue({ role: "MEMBER" });
+    .mockResolvedValue({ role: "MEMBER", disabledAt: null });
+  mockPrisma.project.findUnique
+    .mockReset()
+    .mockImplementation(({ select }: { select?: { team?: unknown } }) =>
+      select?.team
+        ? Promise.resolve({ team: { id: TEAM_ID, organizationId: ORG_ID } })
+        : Promise.resolve({
+            id: PROJECT_ID,
+            apiKey: "lw_test_key",
+            archivedAt: null as Date | null,
+          }),
+    );
 }
 
 describe("POST /api/mcp/authorize — redirect_uri binding", () => {
@@ -268,7 +295,7 @@ describe("POST /api/mcp/authorize — where failures are reported", () => {
     /** @scenario A project the user cannot reach is reported to the client as access denied */
     it("sends the browser back to the registered redirect URI as access denied", async () => {
       mockRedis.get.mockResolvedValueOnce(registeredClient());
-      mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
+      mockPrisma.grant.findMany.mockResolvedValueOnce([]);
       mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
 
       const res = await authorize();
@@ -293,6 +320,53 @@ describe("POST /api/mcp/authorize — where failures are reported", () => {
       expect(res.status).toBe(400);
       expect(json.redirect).toBeUndefined();
       expect(json.error).toBe("Unknown or unregistered client_id");
+    });
+  });
+});
+
+/**
+ * ADR-144 decision 7: an aggregate accepts no credential, and an MCP
+ * authorization code carries the project's base key. So even an
+ * organisation admin, who may open the aggregate, is refused a code for it.
+ */
+describe("POST /api/mcp/authorize, given a project that holds no credential", () => {
+  beforeEach(resetMocks);
+
+  describe("when an organisation admin authorizes an aggregate project", () => {
+    it("is refused with the aggregate's code and never mints an authorization code", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: "ADMIN",
+        disabledAt: null,
+      });
+      mockPrisma.project.findUnique.mockImplementation(
+        ({ select }: { select?: { team?: unknown; kind?: unknown } }) =>
+          select?.team
+            ? Promise.resolve({
+                team: { id: TEAM_ID, organizationId: ORG_ID },
+              })
+            : Promise.resolve({
+                id: PROJECT_ID,
+                apiKey: "lw_test_key",
+                archivedAt: null as Date | null,
+                kind: "aggregate",
+              }),
+      );
+
+      const res = await authorize();
+      const json = (await res.json()) as {
+        error?: string;
+        code?: string;
+        redirect?: string;
+      };
+
+      expect(res.status).toBe(403);
+      expect(json.error).toBe("access_denied");
+      expect(json.code).toBe("aggregate_project_has_no_credential");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.searchParams.get("error")).toBe("access_denied");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mockRedis.set).not.toHaveBeenCalled();
     });
   });
 });

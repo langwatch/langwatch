@@ -241,6 +241,72 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
 });
 
 /**
+ * Dialect 4, the canonical envelope every `SecuredApp` publishing it answers
+ * with (`app/api/shared/schemas.ts`). It nests the failure under `error` and
+ * spells the trace ids in snake_case, and the reader knew neither: an agent got
+ * `network_error` for a refusal the platform had named, and a customer's card
+ * printed the whole envelope verbatim because it could not find a sentence in
+ * it.
+ */
+describe("parseHandledError, given dialect 4 (the canonical envelope)", () => {
+  const body = {
+    error: {
+      type: "bad_request",
+      code: "langy_ui_payload_invalid",
+      message: 'The payload for "workbench.setTargetPrompt" is not valid.',
+      meta: { kind: "workbench.setTargetPrompt" },
+      trace_id: TRACE_ID,
+      span_id: "00f067aa0ba902b7",
+    },
+  };
+
+  it("reads the nested code, sentence, meta and trace id", () => {
+    const parsed = parseHandledError({ status: 400, body });
+
+    expect(parsed).toMatchObject({
+      code: "langy_ui_payload_invalid",
+      message: 'The payload for "workbench.setTargetPrompt" is not valid.',
+      meta: { kind: "workbench.setTargetPrompt" },
+      traceId: TRACE_ID,
+      isHandled: true,
+    });
+  });
+
+  it("prefers the nested code over the status class in `type`", () => {
+    expect(parseHandledError({ status: 400, body }).code).not.toBe(
+      "bad_request",
+    );
+  });
+
+  it("still reads an envelope that carries only the status class", () => {
+    const parsed = parseHandledError({
+      status: 404,
+      body: { error: { type: "not_found", message: "No such experiment" } },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "not_found",
+      message: "No such experiment",
+      isHandled: true,
+    });
+  });
+
+  it("leaves dialect 1's string `error` alone", () => {
+    // Dialect 1 puts the CODE in `error` as a string. Reading dialect 4 first
+    // is only safe because it requires an object there.
+    const parsed = parseHandledError({
+      status: 404,
+      body: { error: "dataset_not_found", message: "Dataset not found" },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "dataset_not_found",
+      message: "Dataset not found",
+    });
+  });
+});
+
+/**
  * The remediation channel (ADR-045). The platform spells it `tips`/`docsUrl`;
  * the CLI had only ever read `suggestions`/`docUrl`, names the platform never
  * emits, so every one of the centrally-authored tips in
@@ -249,6 +315,64 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
  * `specs/features/domain-error-contract.feature` names the CLI as a consumer
  * that must be able to self-diagnose from these.
  */
+describe("parseHandledError, given dialect 4 (the canonical nested envelope)", () => {
+  it("reads code, sentence, trace and meta from under the `error` object", () => {
+    const parsed = parseHandledError({
+      status: 404,
+      body: {
+        error: {
+          type: "not_found",
+          code: "saved_workbench_chart_not_found",
+          message: "Saved chart not found.",
+          meta: { chart_id: "chart-1" },
+          trace_id: TRACE_ID,
+        },
+      },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "saved_workbench_chart_not_found",
+      message: "Saved chart not found.",
+      httpStatus: 404,
+      meta: { chart_id: "chart-1" },
+      traceId: TRACE_ID,
+      isHandled: true,
+    });
+  });
+
+  it("lifts the reason chain out of `meta.reasons`", () => {
+    const parsed = parseHandledError({
+      status: 400,
+      body: {
+        error: {
+          type: "bad_request",
+          code: "validation_error",
+          message: "The request didn't match the expected shape.",
+          meta: {
+            fields: ["granularitySeconds"],
+            reasons: [{ code: "schema_failure" }],
+          },
+        },
+      },
+    });
+
+    expect(parsed.meta).toEqual({ fields: ["granularitySeconds"] });
+    expect(parsed.reasons).toEqual([{ kind: "schema_failure" }]);
+  });
+
+  it("does not read a nested transport failure as the platform speaking", () => {
+    const parsed = parseHandledError({
+      status: 0,
+      body: {
+        error: { code: "ECONNREFUSED", errno: -61, syscall: "connect" },
+      },
+    });
+
+    expect(parsed.isHandled).toBe(false);
+    expect(parsed.code).toBe("network_error");
+  });
+});
+
 describe("parseHandledError, given the platform's remediation channel", () => {
   it("reads `tips` and `docsUrl`, the names the platform actually emits", () => {
     const parsed = parseHandledError({
@@ -515,6 +639,126 @@ describe("handledErrorFromThrown", () => {
     const parsed = handledErrorFromThrown(new Error("fetch failed"));
 
     expect(parsed).toMatchObject({ isHandled: false, message: "fetch failed" });
+  });
+});
+
+/**
+ * A crash in the CLI's own code arrives the same way a dead socket does: no
+ * HTTP status, so the status-derived code was `network_error` and the reader
+ * was told to check their connection. `langwatch chart schema` did exactly
+ * that, reading `.views.length` off a payload that had no `views`.
+ */
+describe("handledErrorFromThrown, given a fault in our own code", () => {
+  /** @scenario "a TypeError with no status is an internal error, not a network one" */
+  it("calls a bare TypeError an internal error rather than a network one", () => {
+    const parsed = handledErrorFromThrown(
+      new TypeError("Cannot read properties of undefined (reading 'length')"),
+    );
+
+    expect(parsed.code).toBe("internal_error");
+    expect(parsed.code).not.toBe("network_error");
+    expect(parsed.message).toContain("Cannot read properties of undefined");
+  });
+
+  it("still marks it as a failure the platform never named", () => {
+    const parsed = handledErrorFromThrown(new TypeError("boom"));
+
+    expect(parsed).toMatchObject({ isHandled: false, httpStatus: 0 });
+  });
+
+  it("covers the other constructors that only a program fault raises", () => {
+    for (const thrown of [
+      new RangeError("out of range"),
+      new ReferenceError("x is not defined"),
+    ]) {
+      expect(handledErrorFromThrown(thrown).code, thrown.name).toBe(
+        "internal_error",
+      );
+    }
+  });
+
+  /** @scenario "a body that would not parse stays a network failure" */
+  it("leaves a SyntaxError a network failure, since it is a body that would not parse", () => {
+    const parsed = handledErrorFromThrown(
+      new SyntaxError("Unexpected token '<', \"<html>\" is not valid JSON"),
+    );
+
+    expect(parsed.code).toBe("network_error");
+  });
+
+  /** @scenario "fetch failed with nothing behind it is a fault in our code" */
+  it("does not take the sentence 'fetch failed' as evidence of a transport", () => {
+    const parsed = handledErrorFromThrown(new TypeError("fetch failed"));
+
+    expect(parsed.code).toBe("internal_error");
+    expect(parsed.code).not.toBe("network_error");
+  });
+
+  /** @scenario "a Node error code is not a transport code" */
+  it("keeps a Node ERR_ code a program fault, since only the transport's own codes count", () => {
+    const badUrl = Object.assign(new TypeError("Invalid URL"), {
+      code: "ERR_INVALID_URL",
+      input: "app.langwatch.ai/api",
+    });
+
+    expect(handledErrorFromThrown(badUrl).code).toBe("internal_error");
+  });
+
+  /** @scenario "a transport failure the SDK wrapped is still a transport failure" */
+  it("finds the transport under originalError, which the body reader unwraps", () => {
+    const wrapped = Object.assign(new Error("request failed"), {
+      originalError: Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error("certificate has expired"), {
+          code: "CERT_HAS_EXPIRED",
+        }),
+      }),
+    });
+
+    const parsed = handledErrorFromThrown(wrapped);
+
+    expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
+    expect(parsed.code).not.toBe("CERT_HAS_EXPIRED");
+  });
+
+  it("reads undici's own codes as the transport speaking", () => {
+    const socket = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("other side closed"), {
+        code: "UND_ERR_SOCKET",
+      }),
+    });
+
+    expect(handledErrorFromThrown(socket).code).toBe("network_error");
+  });
+
+  /** @scenario "a request that never landed is still a network failure" */
+  it("leaves a plain Error with no status a network failure", () => {
+    expect(handledErrorFromThrown(new Error("something went wrong")).code).toBe(
+      "network_error",
+    );
+  });
+
+  it("leaves the TypeError fetch throws for a dead socket a network failure", () => {
+    const transport = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5560"), {
+        errno: -61,
+        code: "ECONNREFUSED",
+        syscall: "connect",
+      }),
+    });
+
+    expect(handledErrorFromThrown(transport).code).toBe("network_error");
+  });
+
+  /** @scenario "a TLS failure is a network failure, not a code the platform chose" */
+  it("leaves a TLS failure a network failure, which carries no errno", () => {
+    const tls = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("certificate has expired"), {
+        code: "CERT_HAS_EXPIRED",
+      }),
+    });
+
+    expect(handledErrorFromThrown(tls).code).toBe("network_error");
+    expect(handledErrorFromThrown(tls).code).not.toBe("CERT_HAS_EXPIRED");
   });
 });
 

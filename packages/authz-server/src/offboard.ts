@@ -9,11 +9,11 @@
  * GrantsService keeps the epoch bump; this module owns the flow, the proof,
  * and the manifest.
  */
+import type { LedgerActor } from "@langwatch/actor";
 import { HandledError } from "@langwatch/handled-error";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
   AuthzGrantsRepository,
-  LedgerActor,
   OffboardCounts,
 } from "./authz-grants.repository";
 import type { AuthzReadRepository } from "./authz-read.repository";
@@ -106,16 +106,11 @@ async function proveNothingResolves({
     principal: { type: "user", id: userId },
     organizationId,
   });
-  if (
-    grants.isOrgMember ||
-    grants.bindings.length > 0 ||
-    grants.legacyTeamMemberships.length > 0
-  ) {
+  if (grants.isOrgMember || grants.bindings.length > 0) {
     throw new OffboardIncompleteError({
       userId,
       organizationId,
       remainingBindings: grants.bindings.length,
-      remainingLegacyRows: grants.legacyTeamMemberships.length,
       stillOrgMember: grants.isOrgMember,
     });
   }

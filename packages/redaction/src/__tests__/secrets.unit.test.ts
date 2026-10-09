@@ -7,6 +7,7 @@ import {
   isSensitiveAttributeKey,
   overBroadSecretPatternProbe,
   redactSecretsInText,
+  SHAPE_ONLY_SECRET_RULE_IDS,
 } from "../secrets.js";
 
 const redact = (text: string, customPatterns?: readonly RegExp[]) =>
@@ -90,6 +91,44 @@ describe("redactSecretsInText", () => {
     it("redacts only the password and keeps scheme, user, host, and database", () => {
       const { text } = redact("postgres://app:hunter2@db.internal:5432/app");
       expect(text).toBe("postgres://app:[SECRET]@db.internal:5432/app");
+    });
+
+    /** @scenario "A connection URL keeps its scheme whatever shape the scheme has" */
+    it("keeps every shape of scheme and redacts only the password", () => {
+      const cases: Array<[string, string]> = [
+        [
+          "redis://default:Ab3xY9zQ@cache-01:6379",
+          "redis://default:[SECRET]@cache-01:6379",
+        ],
+        [
+          "mongodb+srv://admin:p%40ss@cluster0.mongodb.net",
+          "mongodb+srv://admin:[SECRET]@cluster0.mongodb.net",
+        ],
+        [
+          "git+ssh://git:token123@github.com/langwatch/langwatch.git",
+          "git+ssh://git:[SECRET]@github.com/langwatch/langwatch.git",
+        ],
+        [
+          "jdbc:postgresql://svc:9f8e7d6c@10.0.0.4:5432/app",
+          "jdbc:postgresql://svc:[SECRET]@10.0.0.4:5432/app",
+        ],
+        ["HTTPS://USER:PASS@EXAMPLE.COM", "HTTPS://USER:[SECRET]@EXAMPLE.COM"],
+      ];
+      for (const [input, expected] of cases) {
+        expect(redact(input).text).toBe(expected);
+      }
+    });
+
+    /** @scenario "Text that only looks like a connection URL is left alone" */
+    it("leaves alone a colon-slash-slash with no scheme in front of it", () => {
+      for (const input of [
+        "://user:password@host",
+        "no scheme here: user:password@host",
+        "See https://app.langwatch.ai/api/trace/abc123?include=spans",
+        "mail someone@example.com and read @langwatch/redaction",
+      ]) {
+        expect(redact(input).text).toBe(input);
+      }
     });
   });
 
@@ -670,6 +709,12 @@ describe("redactSecretsInText, given a payload the size of the scan budget", () 
       ["a keyword followed by filler", `api_key: ${"a".repeat(100_000)}`],
       ["repeated keywords", "password=".repeat(20_000)],
       ["repeated open quotes", `${'api_key:"'.repeat(20_000)}x`],
+      // Lowercase prose is the worst case for the connection-URL rule, whose
+      // scheme is a run of letters. With the scheme leading the match every
+      // letter in the text started a scan for a "://" that is not there.
+      ["lowercase prose with no URL in it", "the dashboard stopped loading ".repeat(8_000)],
+      ["one URL per line", "postgres://svc:pw@10.0.0.4:5432/app\n".repeat(6_000)],
+      ["a scheme-shaped run with no separator", `${"a".repeat(100_000)}://`],
     ];
 
     for (const [label, input] of adversarial) {
@@ -925,6 +970,51 @@ describe("redactSecretsInText, given a whitespace separator", () => {
       expect(redact(terraform).text).toBe(terraform);
     });
   });
+
+  describe("given a skip list", () => {
+    const RUN_ID = "unlisted_0005FFcHZ7IBvPE1OSWymml0ikKqB";
+
+    it("leaves the named rules out of the scan", () => {
+      expect(redact(RUN_ID).text).toBe("[SECRET]");
+      expect(
+        redactSecretsInText({
+          text: RUN_ID,
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }).text,
+      ).toBe(RUN_ID);
+    });
+
+    it("keeps every other rule running", () => {
+      const key = `sk-ant-api03-${BODY}`;
+      expect(
+        redactSecretsInText({
+          text: key,
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }).text,
+      ).toBe("[SECRET]");
+    });
+
+    // A custom pattern is the customer's own decision about their own data, so
+    // a skip list the platform passes must not reach it.
+    it("keeps the custom patterns running", () => {
+      expect(
+        redactSecretsInText({
+          text: RUN_ID,
+          customPatterns: compileSecretPatterns(["unlisted_[A-Za-z0-9]+"]),
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }).text,
+      ).toBe("[SECRET]");
+    });
+
+    it("scans a payload over the budget with the same skip list", () => {
+      const filler = "x".repeat(SCAN_BUDGET);
+      const { text } = redactSecretsInText({
+        text: `${filler} ${RUN_ID}`,
+        skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+      });
+      expect(text).toContain(RUN_ID);
+    });
+  });
 });
 
 describe("compileSecretPatterns", () => {
@@ -979,6 +1069,17 @@ describe("BUILTIN_SECRET_RULES", () => {
   });
 });
 
+describe("SHAPE_ONLY_SECRET_RULE_IDS", () => {
+  // A skip list is silent when it misses: a renamed rule leaves the caller
+  // asking for a rule that no longer exists, the scan runs every rule, and
+  // nothing says so until an id is eaten in production again.
+  it("names rules that exist", () => {
+    const ids = new Set(BUILTIN_SECRET_RULES.map((rule) => rule.id));
+    const unknown = SHAPE_ONLY_SECRET_RULE_IDS.filter((id) => !ids.has(id));
+    expect(unknown).toEqual([]);
+  });
+});
+
 describe("detectSecretsInText", () => {
   describe("given text with a provider key", () => {
     it("reports the rule that matched and where, without altering the text", () => {
@@ -988,6 +1089,30 @@ describe("detectSecretsInText", () => {
       expect(matches[0]!.ruleId).toBe("provider_api_key");
       // The detector never mutates the input.
       expect(input).toContain("sk-proj-");
+    });
+  });
+
+  describe("given text with a connection URL", () => {
+    /** @scenario "A reported connection URL spans the whole URL" */
+    it("reports a span that starts at the scheme, not at the colon", () => {
+      // The rule reads the scheme in a lookbehind so that it can anchor on the
+      // literal, which keeps the scheme out of the regex match. The credential
+      // still begins at the scheme, so the reported span has to as well.
+      const input = "db postgres://user:hunter2@db.internal:5432/app end";
+      const matches = detectSecretsInText({ text: input });
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.ruleId).toBe("url_credentials");
+      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe(
+        "postgres://user:hunter2@",
+      );
+    });
+
+    it("starts the span at the scheme that introduces the URL", () => {
+      const input = "jdbc:postgresql://svc:9f8e7d6c@10.0.0.4:5432/app";
+      const matches = detectSecretsInText({ text: input });
+      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe(
+        "postgresql://svc:9f8e7d6c@",
+      );
     });
   });
 
@@ -1016,6 +1141,21 @@ describe("detectSecretsInText", () => {
   describe("given ordinary text", () => {
     it("returns no matches", () => {
       expect(detectSecretsInText({ text: "the user said thanks" })).toEqual([]);
+    });
+  });
+
+  describe("given a skip list", () => {
+    // The evaluator reports what redaction scrubs, so the two read the same
+    // skip list or they disagree about the same string.
+    it("leaves the named rules out of the report", () => {
+      const runId = "unlisted_0005FFcHZ7IBvPE1OSWymml0ikKqB";
+      expect(detectSecretsInText({ text: runId })).toHaveLength(1);
+      expect(
+        detectSecretsInText({
+          text: runId,
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }),
+      ).toEqual([]);
     });
   });
 

@@ -52,9 +52,12 @@ class RagasSQLQueryEquivalenceEvaluator(
     def evaluate(self, entry: RagasSQLQueryEquivalenceEntry) -> SingleEvaluationResult:
         llm, _ = prepare_llm(self, self.settings)
 
+        # The scorer reads the expected contexts as the table schemas it
+        # compares the two queries against, so they count towards the payload.
         skip = check_max_tokens(
             output=entry.output,
             expected_output=entry.expected_output,
+            contexts=entry.expected_contexts,
             settings=self.settings,
         )
         if skip:

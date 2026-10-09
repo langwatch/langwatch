@@ -110,14 +110,14 @@ export function assignSessionsToPullRequests({
  * you start the next. Reading the last branch alone charges the whole session
  * to the last pull request and leaves the one it opened first reading as free.
  *
- * Still at most one, and that is a limit of the data rather than of the rule.
- * A session reports one set of token and cost totals for its whole life, and
- * the per-call events carry no branch, so there is nothing to divide by. Giving
- * every pull request the session drove that same full total would make a
- * repository's pull requests sum to more than was ever spent, which on a page
- * about cost is the one error worth refusing. The trade is named rather than
- * hidden: a session that drove two pull requests counts toward one of them, and
- * the sessions list is where all of them are shown.
+ * At most one, because this rule prices what has no finer record: the tokens a
+ * session spent with NO stamped working context — history from before the
+ * stamp existed, and sessions that never declared where they were. Giving
+ * every pull request that same full total would make a repository's pull
+ * requests sum to more than was ever spent, which on a page about cost is the
+ * one error worth refusing. Stamped tokens split per branch through
+ * `assignDrivingSessionsToPullRequestsPerBranch` instead, and the sessions
+ * list is where all of a session's pull requests are shown.
  *
  * The winner is the earliest-created pull request the rule matched, tie-broken
  * by number. A session is anchored on where it STARTED, so the pull request it
@@ -144,6 +144,39 @@ export function assignDrivingSessionsToPullRequests({
       if (match && (!winner || isEarlier(match, winner))) winner = match;
     }
     if (winner) assignments.set(session.sessionId, winner.prNumber);
+  }
+
+  return assignments;
+}
+
+/**
+ * The tenure rule answered PER BRANCH: for each branch the session drove, the
+ * pull request its work on that branch belongs to. This is what stamped fact
+ * rows attribute through — tokens stamped with branch B go to B's winner — so
+ * one session's cost lands on every pull request it drove, each by the work it
+ * did there. A branch with no pull request alive in the session's era is
+ * simply absent from the map.
+ */
+export function assignDrivingSessionsToPullRequestsPerBranch({
+  sessions,
+  pullRequests,
+}: {
+  sessions: readonly AssignableDrivingSession[];
+  pullRequests: readonly AssignablePullRequest[];
+}): Map<string, ReadonlyMap<string, number>> {
+  const byBranch = groupPullRequestsByBranch(pullRequests);
+  const assignments = new Map<string, ReadonlyMap<string, number>>();
+
+  for (const session of sessions) {
+    const perBranch = new Map<string, number>();
+    for (const headBranch of session.headBranches) {
+      const match = firstAliveAt({
+        candidates: byBranch.get(headBranch),
+        startedAtMs: session.startedAtMs,
+      });
+      if (match) perBranch.set(headBranch, match.prNumber);
+    }
+    if (perBranch.size > 0) assignments.set(session.sessionId, perBranch);
   }
 
   return assignments;

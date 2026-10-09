@@ -87,6 +87,13 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
       if (!handoff || handoff.projectId !== projectId) return null;
       return handoff.runToken || null;
     },
+    // Every heartbeat extends the handoff, so a turn that outlives the handoff
+    // TTL keeps the record it would be revived from. One EXPIRE and no read:
+    // the relay only calls this after the frame's MAC has checked out, so the
+    // conversation and turn are already proven to belong to this project.
+    refreshHandoffTtl: async ({ conversationId, turnId }) => {
+      await handoffStore.refresh({ conversationId, turnId });
+    },
     resourceLinks: createLangyResourceLinkStore({ redis: connection }),
     resolveResourceUrl: resolveNavigateFallbackUrl,
     logger,

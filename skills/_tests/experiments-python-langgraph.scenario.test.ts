@@ -1,11 +1,9 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 
 import {
-	assertSkillWasRead,
 	createClaudeCodeAgent,
 	SKILL_TESTS_SET_ID,
-	toolCallFix,
 } from "./helpers/claude-code-adapter";
 import {
 	experimentsJudgeModel,
@@ -53,7 +51,6 @@ describe("Experiments Skill for a Python LangGraph agent", () => {
 							),
 							scenario.agent(),
 							(state) => {
-								toolCallFix(state);
 								assertSkillWasRead(state, "experiments");
 								const createdFiles = findFilesCreatedSince({
 									directory: workingDirectory,

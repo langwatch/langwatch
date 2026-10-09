@@ -1,10 +1,13 @@
+import { internalActor } from "@langwatch/actor";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
+import { AuthorizedClickHouse } from "../../app-layer/clients/clickhouse/authorized-reads";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
+import { SimulationRunStateFoldStore } from "../pipelines/simulation-processing/projections/simulationRunState.store";
 import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
 import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
@@ -76,22 +79,45 @@ export function createReplayRuntime(config: {
   }
 
   const clientResolver = getApp().clickhouse.resolveClient;
+  // Replay reads back the rows it rewrites through the same proof-fenced
+  // client the live stores use (ADR-144 block C), minted for the replay.
+  const authorizedClickHouse = new AuthorizedClickHouse({
+    resolveClient: clientResolver,
+  });
 
   // Raw CH stores (no Redis cache) — keyed by pipeline name
   const storeByPipeline = new Map<string, FoldProjectionStore<any>>([
     [
       "trace_processing",
-      new TraceSummaryStore(
-        new TraceSummaryClickHouseRepository(clientResolver),
-      ),
+      new TraceSummaryStore({
+        repository: new TraceSummaryClickHouseRepository({
+          resolveClient: clientResolver,
+          clickhouse: authorizedClickHouse,
+        }),
+        authorize: ({ projectId, purpose }) =>
+          getApp().authorization.authorizeInternal({
+            actor: internalActor("event-sourcing/replay/replayPreset"),
+            projectId,
+            permission: "traces:view",
+            purpose,
+          }),
+      }),
     ],
     [
       "evaluation_processing",
-      new EvaluationRunStore(
-        new EvaluationRunClickHouseRepository({
+      new EvaluationRunStore({
+        repository: new EvaluationRunClickHouseRepository({
           resolveClient: clientResolver,
+          clickhouse: authorizedClickHouse,
         }),
-      ),
+        authorize: ({ projectId, purpose }) =>
+          getApp().authorization.authorizeInternal({
+            actor: internalActor("event-sourcing/replay/replayPreset"),
+            projectId,
+            permission: "traces:view",
+            purpose,
+          }),
+      }),
     ],
     [
       "experiment_run_processing",
@@ -101,10 +127,12 @@ export function createReplayRuntime(config: {
     ],
     [
       "simulation_processing",
-      new RepositoryFoldStore(
-        new SimulationRunStateRepositoryClickHouse(clientResolver),
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      // The same store the pipeline writes through, so a replay obeys the same
+      // gate: an aggregate holding cost and no lifecycle event writes no run.
+      new SimulationRunStateFoldStore({
+        repository: new SimulationRunStateRepositoryClickHouse(clientResolver),
+        version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      }),
     ],
     [
       "suite_run_processing",

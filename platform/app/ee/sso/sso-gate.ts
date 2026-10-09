@@ -2,12 +2,17 @@
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
+import { configuredSignedLicenseKey } from "../licensing/configuredLicenseKey";
 import {
   isExpired,
   parseLicenseKey,
   verifySignature,
 } from "../licensing/validation";
-import { buildGenericOAuthConfigs, buildSocialProviders } from "./providers";
+import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+  socialProviderKeyFor,
+} from "./providers";
 import {
   type ISsoLicenseRepository,
   SsoLicenseRepository,
@@ -31,11 +36,14 @@ const logger = createLogger("langwatch:sso:gate");
  * current, and for the Cloud override leg, where a lapsed license steps aside
  * so the Stripe subscription underneath takes over.
  *
- * The gate is decided once per process (Decision 3, "startup semantics"):
- * the underlying computation is memoized, but ONLY on successful resolution
- * (resolved `true` or `false` from a completed scan). A thrown DB error is
- * never cached — the memo is evicted on rejection so the next request
- * retries and self-heals as soon as the DB answers (Decision 6).
+ * The gate is memoized per process. An allow is kept for the life of the
+ * process: a license we signed keeps SSO on (Decision 1). A deny is kept for
+ * {@link DENIED_GATE_TTL_MS} and then asked again, so a license activated on
+ * any replica (the License page, or an activation code redeemed at boot)
+ * turns SSO on in every replica within a minute, with no restart. The process
+ * that stored the license calls {@link invalidateSsoGate} and sees it at once.
+ * A thrown DB error is never cached: the memo is evicted on rejection so the
+ * next request retries and self-heals as soon as the DB answers (Decision 6).
  */
 
 const defaultRepository = new SsoLicenseRepository(prisma);
@@ -54,13 +62,42 @@ export function __setSsoLicenseRepositoryForTests(
 const getRepository = (): ISsoLicenseRepository =>
   repositoryOverride ?? defaultRepository;
 
-// Memoized once-per-process gate promise. Reset only by
-// `__resetSsoGateForTests()` (test-only — production has no reset, matching
-// "frozen until restart" semantics).
+/**
+ * How long a deny is trusted before the licensing store is read again. Short
+ * enough that an activation on another replica reaches this one quickly, long
+ * enough that a deployment without a license reads the store about once a
+ * minute rather than on every sign-in request.
+ */
+export const DENIED_GATE_TTL_MS = 60_000;
+
 let memoizedGate: Promise<boolean> | null = null;
+/** When the memo resolved to a deny; null while pending or once allowed. */
+let deniedAt: number | null = null;
+/** Set once the memo resolved to an allow, which is kept for the process. */
+let allowedForProcess = false;
+/** The email-mode warning is logged once per process, not once per re-read. */
+let warnedEmailMode = false;
+
+/**
+ * Forgets a deny or a pending read, so the next request decides again. Called
+ * by the process that just stored a license, which then sees SSO on at once
+ * instead of after {@link DENIED_GATE_TTL_MS}. An allow is kept: re-reading it
+ * could only turn into a deny during a licensing-store outage.
+ */
+export function invalidateSsoGate(): void {
+  if (allowedForProcess) return;
+  forgetGate();
+}
+
+function forgetGate(): void {
+  memoizedGate = null;
+  deniedAt = null;
+}
 
 export function __resetSsoGateForTests(): void {
-  memoizedGate = null;
+  forgetGate();
+  allowedForProcess = false;
+  warnedEmailMode = false;
   repositoryOverride = null;
 }
 
@@ -123,9 +160,11 @@ function warnIfExpired(
 
 /**
  * Checks the `LANGWATCH_LICENSE_KEY` env var (instance-level entitlement,
- * Decision 5) — no DB required.
+ * Decision 5) — no DB required. Only its signed license key form counts: an
+ * activation code there is redeemed before the server listens and lands on an
+ * organization, where the scan below finds it.
  */
-function hasSignedInstanceLicense(licenseKey: string | undefined): boolean {
+function hasSignedInstanceLicense(licenseKey: string | null): boolean {
   if (!licenseKey) return false;
   const license = inspectCandidateLicense(licenseKey, { source: "instance" });
   if (!license) return false;
@@ -181,7 +220,7 @@ class SsoGateTimeoutError extends Error {
  * MINOR-4 / the "IS_SAAS never touches DB" invariant).
  */
 async function computeGate(): Promise<boolean> {
-  if (hasSignedInstanceLicense(env.LANGWATCH_LICENSE_KEY)) return true;
+  if (hasSignedInstanceLicense(configuredSignedLicenseKey())) return true;
 
   let timer: NodeJS.Timeout | undefined;
   try {
@@ -203,6 +242,48 @@ async function computeGate(): Promise<boolean> {
 }
 
 /**
+ * One gate computation, with the bookkeeping that keeps the memo right: the
+ * deny stamp for the TTL, the once-per-process email-mode warning, and the
+ * eviction on a failed read.
+ */
+function startGateComputation(): Promise<boolean> {
+  const pending: Promise<boolean> = computeGate()
+    .then((allowed) => {
+      // Only this computation may stamp the deny: an invalidation that
+      // landed while it was in flight has already replaced the memo.
+      if (memoizedGate === pending) {
+        deniedAt = allowed ? null : Date.now();
+        allowedForProcess = allowed;
+      }
+      if (!allowed) warnEmailModeOnce();
+      return allowed;
+    })
+    .catch((err) => {
+      // Evict on reject (Decision 6): the next call recomputes from
+      // scratch instead of freezing a DB-blip denial for the rest of the
+      // process.
+      if (memoizedGate === pending) memoizedGate = null;
+      throw err;
+    });
+  return pending;
+}
+
+/**
+ * Logged once per process (Decision 8a), not on every re-read and not per
+ * request (that's the separate per-blocked-request log, Decision 8d, which
+ * lives at the hook call site where the request path is known).
+ */
+function warnEmailModeOnce(): void {
+  if (warnedEmailMode || env.NEXTAUTH_PROVIDER === "email") return;
+  warnedEmailMode = true;
+  logger.warn(
+    {},
+    "SSO is configured but no genuine license was found, so sign-in uses email mode; " +
+      "set LANGWATCH_LICENSE_KEY or activate an organization license, and SSO turns on within a minute",
+  );
+}
+
+/**
  * `platformSSOAllowed()` — see module docblock. `IS_SAAS` is checked BEFORE
  * anything else and before the memoized promise is ever touched, so a SaaS
  * deployment never performs a DB read for this gate (Decision 1, MINOR-4).
@@ -210,29 +291,11 @@ async function computeGate(): Promise<boolean> {
 export async function platformSSOAllowed(): Promise<boolean> {
   if (env.IS_SAAS) return true;
 
-  if (!memoizedGate) {
-    memoizedGate = computeGate()
-      .then((allowed) => {
-        // Logged once, at gate resolution (Decision 8a) — not per request
-        // (that's the separate per-blocked-request log, Decision 8d, which
-        // lives at the hook call site where the request path is known).
-        if (!allowed && env.NEXTAUTH_PROVIDER !== "email") {
-          logger.warn(
-            {},
-            "SSO is configured but no genuine license was found — starting in email mode; " +
-              "set LANGWATCH_LICENSE_KEY or activate an organization license to enable SSO",
-          );
-        }
-        return allowed;
-      })
-      .catch((err) => {
-        // Evict on reject (Decision 6): the next call recomputes from
-        // scratch instead of freezing a DB-blip denial for the rest of the
-        // process.
-        memoizedGate = null;
-        throw err;
-      });
+  if (deniedAt !== null && Date.now() - deniedAt >= DENIED_GATE_TTL_MS) {
+    invalidateSsoGate();
   }
+
+  if (!memoizedGate) memoizedGate = startGateComputation();
 
   try {
     return await memoizedGate;
@@ -248,11 +311,14 @@ export async function platformSSOAllowed(): Promise<boolean> {
 /**
  * Did the configured provider actually get wired into BetterAuth?
  *
- * Both builders only ever produce an entry for `NEXTAUTH_PROVIDER`, so
- * "produced nothing" means the deployment named a provider that this build
- * cannot mount: an id it does not know (`azureAd` for `azure-ad`, or one
- * that was never implemented), or a known id whose client credentials are
- * missing.
+ * The NAMED provider, specifically. The social map mounts on credentials now
+ * rather than on `NEXTAUTH_PROVIDER`, so "anything mounted" stopped meaning
+ * "the named provider mounted": a deployment that names a provider this
+ * build cannot mount — an id it does not know (`azureAd` for `azure-ad`), or
+ * a known id whose client credentials are missing — must land in email mode
+ * even while some other social provider's credentials are present. The
+ * generic-OAuth builder still produces only the named provider, so its
+ * length still answers for auth0, okta and the OIDC table.
  *
  * Exported because the authentication settings page reports this state. Email
  * mode is the safe landing for it (see `resolveAuthProvider`), but it is
@@ -261,10 +327,11 @@ export async function platformSSOAllowed(): Promise<boolean> {
  * federation is being enforced when it is not.
  */
 export function authProviderIsMounted(): boolean {
-  return (
-    Object.keys(buildSocialProviders(env)).length > 0 ||
-    buildGenericOAuthConfigs(env).length > 0
-  );
+  const namedSocialKey = socialProviderKeyFor(env.NEXTAUTH_PROVIDER);
+  if (namedSocialKey !== null) {
+    return namedSocialKey in buildSocialProviders(env);
+  }
+  return buildGenericOAuthConfigs(env).length > 0;
 }
 
 /**

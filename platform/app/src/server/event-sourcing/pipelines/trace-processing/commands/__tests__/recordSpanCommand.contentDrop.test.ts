@@ -106,8 +106,12 @@ function command({
         spanId: "span-1",
         name: "test-span",
         kind: 1,
-        startTimeUnixNano: { low: 0, high: 0 },
-        endTimeUnixNano: { low: 1_000_000, high: 0 },
+        // A real instant (1_700_000_000_500 ms, two seconds long) in the
+        // protobuf high/low halves. Not the epoch: a span starting at time
+        // zero is not a storable span time, so the fold now passes it over and
+        // this file would be testing nothing.
+        startTimeUnixNano: { low: 1_408_722_176, high: 395_812_094 },
+        endTimeUnixNano: { low: 3_408_722_176, high: 395_812_094 },
         attributes: kv(attributes),
         events: [],
         links: [],

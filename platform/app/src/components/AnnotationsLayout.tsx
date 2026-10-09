@@ -44,12 +44,13 @@ function QueueSidebarEntry({
     // exactly on the row.
     <Box width="full" borderRadius="lg" position="relative" className="group">
       <MenuLink
+        paddingX={2.5}
         href={href}
         isSelectedAnnotation={isSelected}
         icon={icon}
         menuEnd={
           <Text
-            fontSize="xs"
+            fontSize="10.5px"
             fontWeight="500"
             opacity={canEdit && menuOpen ? 0 : 1}
             _groupHover={canEdit ? { opacity: 0 } : undefined}
@@ -130,18 +131,18 @@ export default function AnnotationsLayout({
   );
 
   const menuItems = {
-    inbox: <Inbox width={20} height={20} />,
-    queues: <Users width={20} height={20} />,
+    inbox: <Inbox width={15} height={15} />,
+    queues: <Users width={15} height={15} />,
     myQueues: (
       <RandomColorAvatar
         size="2xs"
-        width={5}
-        height={5}
+        width={4}
+        height={4}
         name={user?.name ?? ""}
       />
     ),
-    all: <Edit width={20} height={20} />,
-    done: <Check width={20} height={20} />,
+    all: <Edit width={15} height={15} />,
+    done: <Check width={15} height={15} />,
   };
 
   // The concrete path the browser is on. `router.pathname` is a route PATTERN
@@ -161,24 +162,30 @@ export default function AnnotationsLayout({
       >
         <VStack
           align="start"
-          paddingY={5}
+          paddingY={4}
           borderRightWidth="1px"
           borderColor="border.emphasized"
-          fontSize="14px"
-          minWidth="240px"
+          fontSize="12.5px"
+          minWidth="218px"
           height="full"
-          gap={1}
+          gap={0.5}
           display={isSubscription ? "none" : "flex"}
         >
-          <Text fontSize="md" fontWeight="500" paddingX={4} paddingY={2}>
+          <Text
+            fontSize="14px"
+            fontWeight="semibold"
+            paddingX={3}
+            paddingY={1.5}
+          >
             Annotations
           </Text>
-          <VStack px={2} w="full">
+          <VStack px={2} gap={0.5} w="full">
             <MenuLink
+              paddingX={2.5}
               href={`/${project?.slug}/annotations`}
               icon={menuItems.inbox}
               menuEnd={
-                <Text fontSize="xs" fontWeight="500">
+                <Text fontSize="10.5px" fontWeight="500">
                   {pendingItemsCount.data && pendingItemsCount.data > 0
                     ? pendingItemsCount.data
                     : ""}
@@ -191,13 +198,14 @@ export default function AnnotationsLayout({
               Inbox
             </MenuLink>
             <MenuLink
+              paddingX={2.5}
               href={`/${project?.slug}/annotations/me`}
               isSelectedAnnotation={
                 pathname === `/${project?.slug}/annotations/me`
               }
               icon={menuItems.myQueues}
               menuEnd={
-                <Text fontSize="xs" fontWeight="500">
+                <Text fontSize="10.5px" fontWeight="500">
                   {assignedItemsCount.data && assignedItemsCount.data > 0
                     ? assignedItemsCount.data
                     : ""}
@@ -207,6 +215,7 @@ export default function AnnotationsLayout({
               {user?.name?.split(" ")[0]} (You)
             </MenuLink>
             <MenuLink
+              paddingX={2.5}
               href={`/${project?.slug}/annotations/all`}
               icon={menuItems.all}
               isSelectedAnnotation={
@@ -216,15 +225,28 @@ export default function AnnotationsLayout({
               All
             </MenuLink>
             <Separator />
-            <HStack width="full" justify="space-between" paddingRight={3}>
-              <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
+            <HStack
+              width="full"
+              justify="space-between"
+              paddingRight={2}
+              paddingTop={1.5}
+            >
+              <Text
+                fontSize="10px"
+                fontWeight="semibold"
+                textTransform="uppercase"
+                letterSpacing="0.025em"
+                color="fg.muted"
+                paddingX={2.5}
+                paddingY={0.5}
+              >
                 My Queues
               </Text>
               {!isLiteMember && (
                 <Plus
                   onClick={() => openDrawer("addAnnotationQueue", undefined)}
-                  width={18}
-                  height={18}
+                  width={14}
+                  height={14}
                   cursor="pointer"
                 />
               )}

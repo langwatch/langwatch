@@ -138,10 +138,20 @@ describe("buildSlimTimeseriesQuery", () => {
     filters: { "metadata.user_id": ["alice"] },
   });
 
-  it("emits the deduped FROM trace_analytics IN-tuple pattern", () => {
-    expect(sql).toContain("FROM trace_analytics");
-    expect(sql).toContain("(TenantId, TraceId, UpdatedAt) IN (");
+  /** @scenario Dashboard panels dedup traces with a collapse that can spill to disk */
+  it("dedups trace_analytics to the latest version with the spillable argMax collapse", () => {
+    expect(sql).toContain("FROM trace_analytics AS ta");
+    expect(sql).toContain("argMax(__latest_row, __version)");
     expect(sql).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+    expect(sql).not.toContain("(TenantId, TraceId, UpdatedAt) IN (");
+  });
+
+  it("carries only the columns the query reads, never the Attributes map", () => {
+    const latestRow = sql.match(/tuple\(([\s\S]+?)\) AS __latest_row/)?.[1];
+    expect(latestRow).toContain("ta.OccurredAt");
+    expect(latestRow).toContain("ta.TotalDurationMs");
+    expect(latestRow).not.toMatch(/(?<!\[')ta\.Attributes(?!\[)/);
+    expect(sql).not.toMatch(/SELECT\s+\*/);
   });
 
   it("filters on TenantId first", () => {
@@ -165,8 +175,44 @@ describe("buildSlimTimeseriesQuery", () => {
     expect(sql).toContain("OccurredAt >= {previousStart:DateTime64(3)}");
   });
 
-  it("uses quantileExact for percentile aggregations on slim", () => {
-    expect(sql).toContain("quantileExact(0.95)(ta.TotalDurationMs)");
+  /** @scenario Dashboard percentiles use a bounded-memory estimator */
+  it("uses quantileTDigest for percentile aggregations on slim", () => {
+    expect(sql).toContain("quantileTDigest(0.95)(ta.TotalDurationMs)");
+    expect(sql).not.toContain("quantileExact");
+  });
+
+  describe("when the query leaves out trace origins", () => {
+    /** @scenario Leaving out an origin keeps the rest of the count intact */
+    it("adds a NOT IN on the origin column after the filters", () => {
+      const { sql, params } = buildSlimTimeseriesQuery({
+        projectId: "tenant-slim",
+        ...baseDates,
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        timeScale: "full",
+        filters: { "metadata.user_id": ["alice"] },
+        excludeOrigins: ["langy"],
+      });
+
+      expect(sql).toContain(
+        "ta.Origin NOT IN ({slim_excludeOrigins:Array(String)})",
+      );
+      expect(params.slim_excludeOrigins).toEqual(["langy"]);
+      expect(sql.indexOf("ta.UserId IN")).toBeLessThan(
+        sql.indexOf("ta.Origin NOT IN"),
+      );
+    });
+
+    it("adds nothing when the exclusion is empty", () => {
+      const { sql } = buildSlimTimeseriesQuery({
+        projectId: "tenant-slim",
+        ...baseDates,
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        timeScale: "full",
+        excludeOrigins: [],
+      });
+
+      expect(sql).not.toContain("ta.Origin NOT IN");
+    });
   });
 
   describe("when grouped by metadata.model", () => {

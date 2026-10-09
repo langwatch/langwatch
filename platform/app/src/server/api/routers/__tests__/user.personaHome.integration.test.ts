@@ -20,10 +20,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
+import { ProjectService } from "../../../app-layer/projects/project.service";
+import { PrismaProjectRepository } from "../../../app-layer/projects/repositories/project.prisma.repository";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
 import {
@@ -52,6 +55,8 @@ describe("user.persona-home customization integration", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: async (): Promise<PlanInfo> => FREE_PLAN,
       }),
+      // The picker's first project is the project repository's landing pick.
+      projects: new ProjectService(new PrismaProjectRepository(prisma)),
     });
 
     await prisma.organization.create({
@@ -67,14 +72,12 @@ describe("user.persona-home customization integration", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
     const team = await prisma.team.create({
       data: {
@@ -154,6 +157,7 @@ describe("user.persona-home customization integration", () => {
       where: { team: { organizationId: ORG_ID } },
     });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.organizationUser.deleteMany({
       where: { organizationId: ORG_ID },

@@ -14,6 +14,11 @@ export interface LangyConversationRow {
    */
   currentTurnId: string | null;
   lastError: string | null;
+  /**
+   * The model the latest accepted turn ran on, or null before any turn
+   * recorded one. Reopening the conversation seeds the composer from it.
+   */
+  lastModel: string | null;
   messageCount: number;
   lastActivityAtMs: number;
   /** Raw nullable sort value; unlike lastActivityAtMs, this never falls back. */
@@ -44,7 +49,7 @@ export interface LangyConversationRepository {
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<"owned" | "other" | "missing">;
+  }): Promise<"owned" | "other" | "archived" | "missing">;
 
   findAllForUser(params: {
     projectId: string;
@@ -68,6 +73,20 @@ export interface LangyConversationRepository {
     projectId: string;
     conversationId: string;
   }): Promise<string | null>;
+
+  /**
+   * True when this user has sent a turn on this conversation: a turn receipt
+   * (`LangyTurnRequest`) exists for the triple. The receipt is written in the
+   * admission transaction at send time, before any event is folded, so it is
+   * the one piece of evidence that a conversation is being created while its
+   * projection row has not landed yet. The projection row, and the handoff
+   * fields on it, are folded from events and cannot arrive earlier.
+   */
+  hasAdmittedTurn(params: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<boolean>;
 
   /**
    * True when a turn projection row exists for this exact
@@ -110,6 +129,10 @@ export class NullLangyConversationRepository
 
   async findRunToken(): Promise<null> {
     return null;
+  }
+
+  async hasAdmittedTurn(): Promise<boolean> {
+    return false;
   }
 
   async turnExists(): Promise<boolean> {

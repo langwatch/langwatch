@@ -11,6 +11,12 @@ import * as path from "node:path";
 
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 
+/** Where a CLI runs from: the node binary and the entry script, both absolute. */
+export interface CliLocation {
+  node: string;
+  entry: string;
+}
+
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
   gateway_url: string;
@@ -52,6 +58,34 @@ export interface GovernanceConfig {
      * gone. See cli/utils/apiKey.ts resolveSessionProjectKey.
      */
     validated_at?: number;
+  };
+
+  /**
+   * The user-scoped API key minted for this login by
+   * `POST /api/auth/cli/exchange`, in the `sk-lw-{lookupId}_{secret}` shape.
+   * It reaches every project the user picked on the authorize screen, so data
+   * and management commands use it instead of the personal project's own key
+   * and `--project <id|slug>` can point them at another project. Absent when
+   * the server predates the feature; the resolver then falls back to
+   * `personal_project.api_key`, exactly as before.
+   * Spec: specs/typescript-sdk/cli-cross-project-access.feature
+   */
+  cli_api_key?: string;
+
+  /**
+   * What `cli_api_key` reaches, as the exchange reported it. `organization`
+   * means every project of the organization, now and later; `projects` means
+   * the listed ids only. Read by `langwatch whoami` to summarise the login.
+   */
+  cli_api_key_scope?: {
+    kind: "organization" | "projects";
+    project_ids: string[];
+    /**
+     * The permission slugs the key was minted with, so `whoami` can say what
+     * the key can do beside where it reaches. Absent when the login predates
+     * the field.
+     */
+    permissions?: string[];
   };
 
   /**
@@ -133,6 +167,22 @@ export interface GovernanceConfig {
   claude_plugin_last_update_check?: number;
 
   /**
+   * How to run this CLI from a process that cannot resolve it on PATH: the
+   * absolute path of the node binary it last ran under and of its own entry
+   * script. Written by `langwatch login`, `langwatch claude` and `langwatch
+   * instrument`, only when the values changed (see cli-location.ts).
+   *
+   * Read by the Claude Code plugin's launcher (`plugins/langwatch/scripts/
+   * launch.mjs`), which runs the hook commands through it before falling back
+   * to `langwatch` on PATH. A Claude Code started from a desktop app inherits
+   * a PATH with no version manager on it, and this is what still finds the
+   * CLI there. The launcher checks both paths exist before using them, so a
+   * node upgraded through a version manager leaves a stale record that is
+   * simply skipped.
+   */
+  cli_location?: CliLocation;
+
+  /**
    * Per-wrapped-tool routing mode answer.
    *
    *   "gateway"   — Path A: route the tool's HTTP calls through
@@ -176,9 +226,11 @@ export interface GovernanceConfig {
   daemon?: "on" | "off";
 
   /**
-   * The agent last chosen by `langwatch agent dev`, keyed by the project
+   * The agent last chosen by `langwatch agent tunnel`, keyed by the project
    * directory (absolute path) the command ran in, so the next run in the
-   * same folder skips the picker. `--agent` always overrides.
+   * same folder skips the picker. `--agent` always overrides. The field name
+   * on disk is fixed as `agent_dev_agents`: changing it would drop every
+   * user's remembered agents.
    */
   agent_dev_agents?: Record<string, string>;
 }
@@ -227,6 +279,27 @@ export function isCanonicalVkSecret(secret: string | undefined): boolean {
   return !!secret && secret.startsWith(VK_SECRET_PREFIX);
 }
 
+/** Whether a stored `cli_api_key_scope` is in the shape `whoami` can read. */
+function isWellFormedCliKeyScope(
+  scope: GovernanceConfig["cli_api_key_scope"],
+): boolean {
+  if (!scope) return false;
+  if (scope.kind !== "organization" && scope.kind !== "projects") return false;
+  if (
+    !Array.isArray(scope.project_ids) ||
+    !scope.project_ids.every((id) => typeof id === "string")
+  ) {
+    return false;
+  }
+  // An organization scope carries no project ids by definition. A scope
+  // holding both would have `whoami` report "whole organization" while the
+  // list says otherwise, so refuse it as malformed.
+  if (scope.kind === "organization" && scope.project_ids.length > 0) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Returns the absolute path to the config file. Override with
  * LANGWATCH_CLI_CONFIG for tests / non-default homes.
@@ -234,7 +307,37 @@ export function isCanonicalVkSecret(secret: string | undefined): boolean {
 export function configPath(): string {
   const env = process.env.LANGWATCH_CLI_CONFIG;
   if (env) return env;
+  return defaultConfigPath();
+}
+
+/** Where the config lives when nothing relocates it. */
+export function defaultConfigPath(): string {
   return path.join(os.homedir(), ".langwatch", "config.json");
+}
+
+/** The config path as shown to a person: the home is written `~`. */
+export function displayConfigPath(): string {
+  const file = configPath();
+  const home = os.homedir();
+  return file.startsWith(`${home}${path.sep}`)
+    ? `~${file.slice(home.length)}`
+    : file;
+}
+
+/**
+ * True when this process runs on a config of its own: LANGWATCH_CLI_CONFIG
+ * names a file other than the home's default one.
+ *
+ * The tool wiring under the home (`~/.claude/settings.json`, the `[otel]`
+ * block of `~/.codex/config.toml`, the shell rc functions) belongs to the
+ * login in the home's default config. A login kept in another file, which is
+ * what a test, a dogfood run or a second account does, is not the machine's
+ * login, so it never rewrites that wiring.
+ */
+export function isIsolatedConfig(): boolean {
+  const env = process.env.LANGWATCH_CLI_CONFIG?.trim();
+  if (!env) return false;
+  return path.resolve(env) !== path.resolve(defaultConfigPath());
 }
 
 /**
@@ -275,6 +378,19 @@ export function loadConfig(): GovernanceConfig {
           ([, pin]) => typeof pin?.secret === "string" && pin.secret !== "",
         ),
       );
+    }
+    // A blank or non-string `cli_api_key` is a hand-edit, not a credential.
+    // Kept, it would win over the personal-project key in the resolver and
+    // send `Basic base64(projectId:undefined)` at every command; dropped, the
+    // resolver degrades to the pre-feature path and the next login writes a
+    // working key again. The scope goes with it: it describes a key that is
+    // no longer there, and `whoami` would otherwise report a reach the CLI
+    // cannot use.
+    if (typeof cfg.cli_api_key !== "string" || cfg.cli_api_key.trim() === "") {
+      delete cfg.cli_api_key;
+      delete cfg.cli_api_key_scope;
+    } else if (!isWellFormedCliKeyScope(cfg.cli_api_key_scope)) {
+      delete cfg.cli_api_key_scope;
     }
     return cfg;
   } catch (err) {

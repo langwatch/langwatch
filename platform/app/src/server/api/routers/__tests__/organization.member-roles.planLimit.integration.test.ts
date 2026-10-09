@@ -1,3 +1,6 @@
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 /**
  * @vitest-environment node
  *
@@ -19,11 +22,7 @@ import {
   it,
   vi,
 } from "vitest";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
@@ -112,12 +111,10 @@ describe("organization member role plan limit enforcement", () => {
     });
 
     // Create a custom role with non-view permissions (makes EXTERNAL user a FullMember)
-    const customRole = await prisma.customRole.create({
-      data: {
-        organizationId: organization.id,
-        name: `test-editor-${testNamespace}`,
-        permissions: ["project:create", "project:update"],
-      },
+    const customRole = await seedCustomRole(prisma, {
+      organizationId: organization.id,
+      name: `test-editor-${testNamespace}`,
+      permissions: ["project:create", "project:update"],
     });
     customRoleId = customRole.id;
 
@@ -149,8 +146,10 @@ describe("organization member role plan limit enforcement", () => {
 
   beforeEach(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     mockGetActivePlan = vi.fn();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -166,6 +165,26 @@ describe("organization member role plan limit enforcement", () => {
       ),
     });
 
+    await cleanupTestRows(prisma, [
+      [
+        "grant",
+        {
+          organizationId,
+          principalType: "USER",
+          principalId: targetUserId,
+        },
+      ],
+    ]);
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId, userId: targetUserId }],
+    ]);
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: targetUserId,
+      role: TeamUserRole.MEMBER,
+      scopeType: "TEAM",
+      scopeId: teamId,
+    });
     // Guarantee target user starts as MEMBER with built-in MEMBER team role
     await prisma.organizationUser.update({
       where: {
@@ -189,6 +208,7 @@ describe("organization member role plan limit enforcement", () => {
 
   afterEach(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
   });
 
   afterAll(async () => {
@@ -196,8 +216,10 @@ describe("organization member role plan limit enforcement", () => {
     // they go first; the organization cascade would take them anyway, but
     // deleting them explicitly means a broken teardown says so.
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { teamId }],
+      ["role", { organizationId }],
       ["customRole", { organizationId }],
       ["team", { id: teamId }],
       ["organizationUser", { organizationId }],
@@ -206,6 +228,7 @@ describe("organization member role plan limit enforcement", () => {
     ]);
 
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
   });
 
   function createCaller() {
@@ -390,18 +413,17 @@ describe("organization member role plan limit enforcement", () => {
         // replaces the TEAM-scoped RoleBinding and leaves the legacy row
         // untouched — asserting on `TeamUser.role` here would fail against
         // correct behaviour, which is what the original assertion did.
-        const binding = await prisma.roleBinding.findFirst({
+        const binding = await prisma.grant.findFirst({
           where: {
             organizationId,
-            userId: targetUserId,
-            scopeType: RoleBindingScopeType.TEAM,
+            principalType: "USER",
+            principalId: targetUserId,
+            scopeType: "TEAM",
             scopeId: teamId,
+            revokedAt: null,
           },
         });
-        expect(binding?.role).toBe(TeamUserRole.VIEWER);
-        // The custom role is cleared, not carried over — the point of the
-        // full-to-lite change under test.
-        expect(binding?.customRoleId).toBeNull();
+        expect(binding?.roleKey).toBe("viewer");
       });
     });
   });

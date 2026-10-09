@@ -74,6 +74,24 @@ Feature: Batch Evaluation Results Visualization
     Then I see the latency displayed
     And I can access cost information
 
+  # A saved run holds only the rows it produced, so its pass rate covers those
+  # rows and no others. The results page draws the rate on the column header
+  # with nothing to say how much of the dataset it describes, and a reader then
+  # compares one column over 30 rows against another over 40. The workbench
+  # header says the same thing the same way, so the two surfaces read alike.
+
+  @integration
+  Scenario: A column header says how much of the dataset its score covers
+    Given a saved run holds results for 5 of the dataset's 10 rows
+    When the results table renders the column header
+    Then the header shows the score together with "5/10"
+
+  @integration
+  Scenario: A column that covers the whole dataset shows the score on its own
+    Given a saved run holds results for every row of the dataset
+    When the results table renders the column header
+    Then the header shows the score with no row count beside it
+
   @unimplemented
   Scenario: Display error state in target cell
     Given a target execution failed with error "Rate limit exceeded"

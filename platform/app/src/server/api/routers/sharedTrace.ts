@@ -4,6 +4,10 @@ import { Prisma } from "~/generated/prisma/client";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
+import {
   ShareLinkNotFoundError,
   ShareReadRateLimitedError,
 } from "~/server/app-layer/share/errors";
@@ -15,11 +19,7 @@ import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redac
 import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { getClientIp } from "~/utils/getClientIp";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  skipPermissionCheck,
-} from "../rbac";
+import { ownOnlyTraceReadAuthorization } from "../authorization";
 import { getUserProtectionsForProject } from "../utils";
 import type { SharedTraceDto } from "./sharedTrace.schemas";
 import {
@@ -112,23 +112,18 @@ export const sharedTraceRouter = createTRPCRouter({
     // `.output()` comes after `.use()`: the app's permission builder exposes
     // only `input`/`use` so every procedure is forced through the permission
     // middleware, and it is that `use` which hands back the full tRPC builder.
-    .use(skipPermissionCheck)
+    .noPermission({
+      reason:
+        "the share token in the input is the whole authorization; see ADR-057",
+    })
     .output(sharedTraceDtoSchema)
     .query(async ({ input, ctx }) => {
       const viewer: ShareViewer = {
         isOrgMember: async (organizationId) =>
           !!ctx.session?.user &&
-          hasOrganizationPermission(
-            { prisma: ctx.prisma, session: ctx.session },
-            organizationId,
-            "organization:view",
-          ),
+          probeOrganizationPermission(ctx, organizationId, "organization:view"),
         isProjectMember: async (projectId) =>
-          hasProjectPermission(
-            { prisma: ctx.prisma, session: ctx.session },
-            projectId,
-            "traces:view",
-          ),
+          probeProjectPermission(ctx, projectId, "traces:view"),
       };
 
       // This is the one trace read the open internet can drive, and each call
@@ -195,6 +190,14 @@ export const sharedTraceRouter = createTRPCRouter({
       }
 
       const app = getApp();
+      // The share link admitted the viewer; the span reads are fenced to the
+      // shared trace's own project and nothing more. A public read never
+      // widens through a grant (ADR-144 block C).
+      const authorization = await ownOnlyTraceReadAuthorization({
+        codePath: "api/routers/sharedTrace",
+        projectId,
+        route: "sharedTrace.get",
+      });
 
       // Cache lookup happens AFTER the token resolved and protections were
       // computed — never before. Authorization is re-run on every request, so
@@ -222,7 +225,9 @@ export const sharedTraceRouter = createTRPCRouter({
       // the same generic NOT_FOUND as a bad token.
       let summary;
       try {
-        summary = await app.traces.summary.getByTraceId(projectId, traceId, {
+        summary = await app.traces.summary.getByTraceId({
+          authorization,
+          traceId,
           visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
         });
       } catch (error) {
@@ -242,28 +247,28 @@ export const sharedTraceRouter = createTRPCRouter({
       ] = await Promise.all([
         app.projects.getById(projectId),
         app.traces.spans.getSpanSummaryByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),
         app.traces.spans.getSpansByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
           ...occurredAtHint,
         }),
         app.traces.spans.getLangwatchSignalsByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),
         app.traces.spans.getSpanResourcesByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),
         app.traces.spans.getTraceEventsByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),

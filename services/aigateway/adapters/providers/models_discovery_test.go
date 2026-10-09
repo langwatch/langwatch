@@ -778,3 +778,54 @@ func TestListModels_HonorsCustomerEndpointPolicy(t *testing.T) {
 		t.Fatalf("models = %v, want none from a policy-blocked endpoint", models)
 	}
 }
+
+// A routing handle rides on every model the credential contributes, so a
+// rename must not keep serving the old spelling for a full TTL.
+func TestListModels_CacheKeyCoversRoutingHandle(t *testing.T) {
+	router := &BifrostRouter{hostedCatalogs: noHostedCatalogs}
+	first, _, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-azure", ProviderID: domain.ProviderAzure, Handle: "eu", DeploymentMap: map[string]string{"gpt-5-mini": "prod-mini"}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	second, _, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-azure", ProviderID: domain.ProviderAzure, Handle: "europe", DeploymentMap: map[string]string{"gpt-5-mini": "prod-mini"}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(first) != 1 || first[0].Handle != "eu" {
+		t.Fatalf("first = %v, want the original handle", first)
+	}
+	if len(second) != 1 || second[0].Handle != "europe" {
+		t.Fatalf("second = %v, want the renamed handle, not a stale cache entry", second)
+	}
+}
+
+// Two instances of one family serve the same model ids. Deduping on the id
+// alone dropped the second instance's catalog entirely, which is exactly the
+// instance a routing handle exists to address.
+func TestListModels_KeepsOneModelPerInstance(t *testing.T) {
+	router := &BifrostRouter{hostedCatalogs: noHostedCatalogs}
+	models, _, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-azure-us", ProviderID: domain.ProviderAzure, DeploymentMap: map[string]string{"gpt-5-mini": "us-mini"}},
+		{ID: "mp-azure-eu", ProviderID: domain.ProviderAzure, Handle: "eu", DeploymentMap: map[string]string{"gpt-5-mini": "eu-mini"}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(models) != 2 {
+		t.Fatalf("models = %v, want one entry per instance", models)
+	}
+	handles := map[string]bool{}
+	for _, m := range models {
+		if m.ID != "gpt-5-mini" {
+			t.Errorf("model %v has an unexpected id", m)
+		}
+		handles[m.Handle] = true
+	}
+	if !handles[""] || !handles["eu"] {
+		t.Errorf("handles = %v, want both the unhandled and the handled instance", handles)
+	}
+}

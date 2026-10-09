@@ -1,7 +1,7 @@
 /**
  * Recognising a `langwatch` CLI invocation inside a shell command.
  *
- * Langy reaches LangWatch through the `langwatch` CLI, which opencode runs in
+ * Langy reaches LangWatch through the `langwatch` CLI, which the worker runs in
  * its `bash` tool — so what arrives on the wire is a command STRING, and the
  * capability it invoked (`trace search`, `dataset list`) has to be read back out
  * of it. We own the CLI, so its grammar is a contract, not a guess:
@@ -275,7 +275,10 @@ export function parseLangwatchCommand(
     const verb = tokens[at + 1];
     if (!resource || !verb) return null;
     if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
-    return { resource, verb, args: parseArgs(tokens, at + 2) };
+    const args = parseArgs(tokens, at + 2);
+    // `trigger create --help` reads help; it must not render as "Created".
+    if (args.help !== undefined || args.h !== undefined) return null;
+    return { resource, verb, args };
   }
   return null;
 }

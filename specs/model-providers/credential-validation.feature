@@ -416,10 +416,16 @@ Feature: Credential Validation
   # key the form deliberately never shows them.
   #
   # The whole section rests on one rule. A check that cannot run is not a
-  # check that passed. Six of the sixteen providers cannot be probed at all,
-  # and for those the honest answer is that we did not look — reporting them
-  # as working would be worse than offering nothing, because the customer
-  # would stop looking too.
+  # check that passed. For a provider that cannot be reached at all the
+  # answer is that we did not look: reporting it as working would be worse
+  # than offering nothing, because the customer would stop looking too.
+  #
+  # And for a chat provider, what proves it works is a generation, not a
+  # listing. An account with no credit left lists its models happily and
+  # refuses the first completion; a plan-billed lane lists nothing at all
+  # while working perfectly. So the test sends one token's worth of real
+  # call down the same road the product uses, and answers with what comes
+  # back.
   # ──────────────────────────────────────────────────────────────────────
 
   @unit
@@ -448,6 +454,70 @@ Feature: Credential Validation
     When I test the connection
     Then I am told the connection could not be checked
     And I am not told the connection works
+
+  @unit
+  Scenario: A chat provider is proven by a generation, not by a listing
+    Given I have a configured chat provider
+    When I test the connection
+    Then one generation of a single token is sent through the same path the product uses
+    And it runs the cheapest chat model the provider lists
+    And it runs against the credential on the row I asked about, not another row of the same provider
+
+  @unit
+  Scenario: An account with no credit left is reported as out of credit
+    Given I have a configured chat provider whose account has no credit
+    When I test the connection
+    Then the listing does not decide it
+    And I am told the account is out of credit
+    And I am not told to check the API key
+
+  @unit
+  Scenario: A plan over its usage limit is reported as such
+    Given I have a configured chat provider billed against a plan that is over its limit
+    When I test the connection
+    Then I am told the plan is over its usage limit
+    And I am not told the credential is wrong
+
+  @unit
+  Scenario: A subscription-billed provider with no listing endpoint is testable
+    Given I have a Codex provider connected to an OpenAI account
+    When I test the connection
+    Then the connection is tested through the AI gateway, the way Langy reaches it
+    And I am told whether it works, rather than that it cannot be tested
+
+  # "It answered and would not confirm the key" is the wrong thing to read
+  # when the address was never opened. What separates the two is whether
+  # anything came back, not the words the SDK wrapped the failure in.
+  @unit
+  Scenario: A generation that never reached the provider is not read as a refusal
+    Given I have a configured provider whose endpoint nothing answers on
+    When I test the connection
+    Then I am told the provider could not be reached
+    And I am not told the credential was refused
+
+  @unit
+  Scenario: A refused credential is not asked twice
+    Given I have a configured provider whose credential the provider refuses
+    When I test the connection
+    Then no generation is sent
+    And I am told the credential was refused
+
+  @unit
+  Scenario: A provider with no chat model to name reports as unchecked
+    Given I have a configured provider with no chat model in the catalogue or on the row
+    When I test the connection
+    Then no generation is sent
+    And the verdict is whatever the credential probe said
+
+  # The runtime falls back to the host environment key for a row that carries
+  # none, so a generation on such a row would answer for a credential the row
+  # does not hold and report it as working.
+  @unit
+  Scenario: A row whose credential could not be read is not pinged
+    Given I have a provider row with no readable credential of its own
+    When I test the connection
+    Then no generation is sent
+    And I am told the connection could not be checked
 
   @unit
   Scenario: Testing an organization-scoped provider reaches its credential
@@ -543,3 +613,42 @@ Feature: Credential Validation
     Given a credential whose check did not run
     When it is saved
     Then the save proceeds exactly as it did before
+
+  # ============================================================================
+  # The check asks the address the gateway will call
+  # ============================================================================
+  #
+  # For the providers whose base URL the gateway normalises (openai, custom,
+  # anthropic) a trailing "/v1" is optional at runtime: the gateway drops it
+  # and appends the full "/v1/..." path. The check appended "/models" to the
+  # URL exactly as typed, so "https://api.openai.com" was refused with a 404
+  # here and then worked. Only the gateway's address is asked: a key that
+  # answers at another address would pass the check and fail on every request.
+  #
+  # Bindings: platform/app/src/server/modelProviders/__tests__/providerValidation.unit.test.ts
+
+  @unit
+  Scenario Outline: A base URL is checked at the address the gateway will call
+    Given an "openai" provider with OPENAI_BASE_URL set to "<base URL>"
+    When the API key is validated
+    Then the first request goes to "<models URL>"
+
+    Examples:
+      | base URL                          | models URL                               |
+      | https://api.openai.com            | https://api.openai.com/v1/models         |
+      | https://api.openai.com/           | https://api.openai.com/v1/models         |
+      | https://api.openai.com/v1/        | https://api.openai.com/v1/models         |
+      | https://proxy.acme.test/openai/v1 | https://proxy.acme.test/openai/v1/models |
+
+  @unit
+  Scenario: An address the gateway will not call cannot pass the check
+    Given an "openai" provider whose endpoint lists models at "https://llm.acme.test/api/models" only
+    When the API key is validated
+    Then only the gateway's address is asked
+    And the key is not reported as verified
+
+  @unit
+  Scenario: A key the gateway address refuses is refused
+    Given an "openai" provider whose key the gateway's address refuses
+    When the API key is validated
+    Then the key is reported as invalid

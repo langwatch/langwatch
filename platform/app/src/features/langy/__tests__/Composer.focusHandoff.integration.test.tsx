@@ -1,10 +1,15 @@
 /**
  * @vitest-environment jsdom
  *
- * After an `askLangy` handoff the reader expects to keep typing: the panel's
- * composer takes focus, once, without being asked twice. The hero composer on
- * the home page is the origin of a handoff, never the destination, so it must
- * leave the request alone. Spec: specs/langy/langy-command-bar-activation.feature
+ * Three gestures end with the reader about to type, so all three hand the
+ * cursor to the panel's composer: an `askLangy` handoff, a new chat, and a
+ * dialog closing over the panel. Focus is taken once, without being asked
+ * twice. The hero composer on the home page is the origin of a handoff, never
+ * the destination, so it must leave the request alone.
+ *
+ * Specs: specs/langy/langy-command-bar-activation.feature,
+ * specs/langy/langy-navigation-persistence.feature,
+ * specs/langy/langy-model-selection.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -84,6 +89,33 @@ describe("given the Langy composer after an askLangy handoff", () => {
         useLangyStore.getState().askLangy("find the slowest traces");
       });
       renderComposer();
+
+      await waitFor(() => expect(composerField()).toHaveFocus());
+      expect(useLangyStore.getState().composerFocusRequested).toBe(false);
+    });
+  });
+
+  describe("when the reader starts a new chat", () => {
+    /** @scenario A new chat opens with the cursor in the composer */
+    it("focuses the message field so the next message can just be typed", async () => {
+      renderComposer();
+
+      act(() => {
+        useLangyStore.getState().startNewConversation();
+      });
+
+      await waitFor(() => expect(composerField()).toHaveFocus());
+    });
+  });
+
+  describe("when a dialog hands the cursor back", () => {
+    /** @scenario A dialog gives the cursor back to the composer when it closes */
+    it("focuses the message field on request", async () => {
+      renderComposer();
+
+      act(() => {
+        useLangyStore.getState().requestComposerFocus();
+      });
 
       await waitFor(() => expect(composerField()).toHaveFocus());
       expect(useLangyStore.getState().composerFocusRequested).toBe(false);

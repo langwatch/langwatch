@@ -22,36 +22,43 @@ const ORG_ID = "org_1";
 const ANCHOR_VK_ID = "vk_anchor";
 const ANCHOR_PROJECT_ID = "project_anchor";
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    };
+  },
+);
 
 const breakdown = vi.hoisted(() => vi.fn());
 
 // The router takes the budget ledger from the App, so standing in for the
 // store means standing in for `getApp()`.
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    gateway: {
-      budgets: {
-        getSpendForBudgetsAcrossTenants: async () => [],
-        getBucketSpendBreakdownForBudget: breakdown,
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      gateway: {
+        budgets: {
+          getSpendForBudgetsAcrossTenants: async () => [],
+          getBucketSpendBreakdownForBudget: breakdown,
+        },
+        virtualKeySpend: undefined,
       },
-      virtualKeySpend: undefined,
-    },
-  }),
-}));
+    }),
+  };
+});
 
 vi.mock("~/server/gateway/providerLabels", () => ({
   resolveProviderLabels: async () => new Map(),
@@ -121,6 +128,11 @@ function mockPrisma(budgets: Array<Record<string, unknown>>): PrismaClient {
 function callerFor(budgets: Array<Record<string, unknown>>) {
   return gatewayBudgetsRouter.createCaller({
     ...createInnerTRPCContext({
+      // Not a suite about the second-factor gate. Without this the gate runs
+      // inside the permission middleware, reads the scope's owner from a Prisma
+      // double that has only this router's models, and fails there instead of
+      // here — and only where the deployment switches it on.
+      mfaGate: { offered: () => false },
       session: { user: { id: "usr_1" }, expires: "1" },
     }),
     prisma: mockPrisma(budgets),

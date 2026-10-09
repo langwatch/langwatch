@@ -6,7 +6,7 @@
  * binding.
  */
 
-import { DuplicateBindingError } from "@langwatch/authz-server";
+import { DuplicateBindingError, grantFactToRow } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type PrismaClient,
@@ -35,8 +35,47 @@ const bindingFindMany = vi.fn();
 const bindingCreate = vi.fn();
 const bindingUpdate = vi.fn();
 const bindingDeleteMany = vi.fn();
-const customRoleFindMany = vi.fn();
+const roleFindMany = vi.fn();
+const grantFindMany = vi.fn();
 const transaction = vi.fn();
+
+function grantRow({
+  id,
+  principalType = "USER",
+  principalId = "user_1",
+  scopeType = RoleBindingScopeType.TEAM,
+  scopeId = "team_1",
+}: {
+  id: string;
+  principalType?: "USER" | "GROUP" | "API_KEY";
+  principalId?: string;
+  scopeType?: RoleBindingScopeType;
+  scopeId?: string;
+}) {
+  let principalKind: "user" | "group" | "apiKey";
+  if (principalType === "USER") principalKind = "user";
+  else if (principalType === "GROUP") principalKind = "group";
+  else principalKind = "apiKey";
+
+  return {
+    ...grantFactToRow({
+      organizationId: "org_1",
+      grant: {
+        grantId: id,
+        principal: {
+          type: principalKind,
+          id: principalId,
+        },
+        roleKey: "member",
+        legacyRole: TeamUserRole.MEMBER,
+        scope: { type: scopeType, id: scopeId },
+        source: "grants-service",
+        occurredAtMs: 0,
+      },
+    }),
+    updatedAt: new Date(0),
+  };
+}
 
 const prisma = {
   organizationUser: {
@@ -63,7 +102,8 @@ const prisma = {
     update: bindingUpdate,
     deleteMany: bindingDeleteMany,
   },
-  customRole: { findMany: customRoleFindMany },
+  grant: { findMany: grantFindMany },
+  role: { findMany: roleFindMany },
   $transaction: transaction,
 } as unknown as PrismaClient;
 
@@ -98,7 +138,8 @@ beforeEach(() => {
   revokeBindings.mockResolvedValue(undefined);
   bindingFindFirst.mockResolvedValue(null);
   bindingFindMany.mockResolvedValue([]);
-  customRoleFindMany.mockResolvedValue([]);
+  grantFindMany.mockResolvedValue([]);
+  roleFindMany.mockResolvedValue([]);
   organizationUserFindMany.mockResolvedValue([]);
   groupUpdate.mockResolvedValue(undefined);
   groupMembershipDeleteMany.mockResolvedValue(undefined);
@@ -107,7 +148,7 @@ beforeEach(() => {
     cb(prisma),
   );
   // A real RoleService over the same mocked client: the org-exclusive scope
-  // guard lives there and reads `customRole.findMany`, so a hand-written
+  // guard lives there and reads the canonical `role.findMany`, so a hand-written
   // double would pin the delegation rather than the rule.
   const roleService = new RoleService(prisma);
   vi.spyOn(roleService, "filterAssignableRoleIds").mockImplementation(
@@ -171,7 +212,7 @@ describe("RoleBindingService create", () => {
       expect(attachBindings).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A grant write states a fact instead of writing the table" */
+    /** @scenario "Every write goes through the group queue" */
     it("stores the binding against the key", async () => {
       await service.create({ ...bindingInput, apiKeyId: "key_1" });
 
@@ -217,7 +258,7 @@ describe("RoleBindingService create", () => {
 
     it("refuses an organization-exclusive permission at team scope", async () => {
       filterAssignableRoleIds.mockResolvedValue(["cr_1"]);
-      customRoleFindMany.mockResolvedValue([
+      roleFindMany.mockResolvedValue([
         { id: "cr_1", permissions: ["organization:manage", "traces:view"] },
       ]);
 
@@ -250,7 +291,7 @@ describe("RoleBindingService create", () => {
       });
 
       // No permission inspection is needed at organization scope.
-      expect(customRoleFindMany).not.toHaveBeenCalled();
+      expect(roleFindMany).not.toHaveBeenCalled();
       expect(attachBindings).toHaveBeenCalled();
     });
   });
@@ -276,7 +317,7 @@ describe("RoleBindingService create", () => {
 
 describe("RoleBindingService update", () => {
   it("answers not found for a binding outside the organization", async () => {
-    bindingFindFirst.mockResolvedValue(null);
+    grantFindMany.mockResolvedValue([]);
 
     await expect(
       service.update({
@@ -289,13 +330,9 @@ describe("RoleBindingService update", () => {
   });
 
   it("refuses an organization-exclusive permission on a team-scoped binding", async () => {
-    bindingFindFirst.mockResolvedValue({
-      id: "binding_1",
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: "team_1",
-    });
+    grantFindMany.mockResolvedValue([grantRow({ id: "binding_1" })]);
     filterAssignableRoleIds.mockResolvedValue(["cr_1"]);
-    customRoleFindMany.mockResolvedValue([
+    roleFindMany.mockResolvedValue([
       { id: "cr_1", permissions: ["governance:manage"] },
     ]);
 
@@ -316,7 +353,7 @@ describe("RoleBindingService update", () => {
 describe("RoleBindingService applyMemberBindings", () => {
   it("refuses an organization-exclusive permission before emitting anything", async () => {
     filterAssignableRoleIds.mockResolvedValue(["cr_1"]);
-    customRoleFindMany.mockResolvedValue([
+    roleFindMany.mockResolvedValue([
       { id: "cr_1", permissions: ["organization:manage"] },
     ]);
 
@@ -356,12 +393,12 @@ describe("RoleBindingService applyGroupEdits", () => {
   describe("when the edit both revokes a group binding and removes a member", () => {
     /** @scenario "Revoking an orphaned group binding runs before the membership edit commits" */
     it("revokes the group's bindings before applying the membership edit", async () => {
-      bindingFindMany.mockResolvedValue([
-        {
+      grantFindMany.mockResolvedValue([
+        grantRow({
           id: "binding_1",
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: "team_1",
-        },
+          principalType: "GROUP",
+          principalId: "group_1",
+        }),
       ]);
 
       await service.applyGroupEdits({
@@ -390,12 +427,12 @@ describe("RoleBindingService applyGroupEdits", () => {
     });
 
     it("never opens the membership transaction when the revoke fails", async () => {
-      bindingFindMany.mockResolvedValue([
-        {
+      grantFindMany.mockResolvedValue([
+        grantRow({
           id: "binding_1",
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: "team_1",
-        },
+          principalType: "GROUP",
+          principalId: "group_1",
+        }),
       ]);
       revokeBindings.mockRejectedValue(new Error("ledger unavailable"));
 
@@ -415,7 +452,7 @@ describe("RoleBindingService applyGroupEdits", () => {
 
   describe("when no requested delete resolves to a live binding", () => {
     it("skips the revoke call but still applies the membership edit", async () => {
-      bindingFindMany.mockResolvedValue([]);
+      grantFindMany.mockResolvedValue([]);
 
       await service.applyGroupEdits({
         ...groupEditInput,
@@ -424,6 +461,57 @@ describe("RoleBindingService applyGroupEdits", () => {
 
       expect(revokeBindings).not.toHaveBeenCalled();
       expect(groupMembershipDeleteMany).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * A group the directory owns is edited by the directory or not at all,
+   * whichever way its access is stored underneath. These three used to throw
+   * a raw TRPCError whose `code` published as "BAD_REQUEST" and whose message
+   * was the whole contract, so the `scim_managed_group` anchor in
+   * specs/groups/groups-rest-api.feature held on `group.service.ts`'s path
+   * only. Both paths answer the customer the same code now.
+   */
+  describe("when the group is managed by an identity provider", () => {
+    beforeEach(() => {
+      groupFindFirst.mockResolvedValue({ id: "group_1", scimSource: "okta" });
+    });
+
+    it("refuses a rename with scim_managed_group", async () => {
+      await expect(
+        service.applyGroupEdits({
+          ...groupEditInput,
+          memberUserIdsToRemove: [],
+          bindingIdsToDelete: [],
+          rename: { name: "New Name", slug: "new-name" },
+        }),
+      ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
+
+      expect(groupUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a member removal with scim_managed_group", async () => {
+      await expect(
+        service.applyGroupEdits({
+          ...groupEditInput,
+          bindingIdsToDelete: [],
+        }),
+      ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
+
+      expect(groupMembershipDeleteMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a member addition with scim_managed_group", async () => {
+      await expect(
+        service.applyGroupEdits({
+          ...groupEditInput,
+          memberUserIdsToRemove: [],
+          memberUserIdsToAdd: ["user_added"],
+          bindingIdsToDelete: [],
+        }),
+      ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
+
+      expect(groupMembershipCreateMany).not.toHaveBeenCalled();
     });
   });
 });

@@ -3,17 +3,27 @@
  *
  * The stored-objects read route authorizes by the OBJECT's purpose, not by a
  * single hardwired permission: trace media guards on `traces:view`, scenario
- * media on `scenarios:view` — separate permission categories that custom
- * roles can grant independently. This pins the mapping the route's
- * post-read gate (`authorizeFilePurpose`) applies.
+ * media on `scenarios:view`, and a file attached to a dataset cell on
+ * `datasets:view`. They are separate permission categories that custom roles grant
+ * independently. This pins the mapping the route's post-read gate
+ * (`authorizeFilePurpose`) applies.
  */
 import { describe, expect, it } from "vitest";
-import { requiredPermissionForPurpose } from "../[[...route]]/app";
+import { requiredPermissionForPurpose } from "~/server/stored-objects/purpose-permission";
 
 describe("requiredPermissionForPurpose", () => {
   describe("given a trace-content object", () => {
     it("requires traces:view", () => {
       expect(requiredPermissionForPurpose("trace_content")).toBe("traces:view");
+    });
+  });
+
+  describe("given a dataset attachment", () => {
+    /** @scenario "Reading a dataset attachment needs permission to view datasets" */
+    it("requires datasets:view", () => {
+      expect(requiredPermissionForPurpose("dataset_attachment")).toBe(
+        "datasets:view",
+      );
     });
   });
 

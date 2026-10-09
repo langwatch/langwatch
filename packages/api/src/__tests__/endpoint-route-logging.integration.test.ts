@@ -58,7 +58,7 @@ describe("the endpoint a request matched", () => {
         .version("2026-08-07", (v) => {
           v.get(
             "/things/:id",
-            { output: z.object({ id: z.string() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.string() }) },
             async (c) => ({ id: c.req.param("id") as string }),
           );
         })
@@ -97,7 +97,7 @@ describe("the endpoint a request matched", () => {
       it("reports the same route as the bare alias", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
           .version("2026-08-07", (v) => {
-            v.get("/widgets", { output: z.array(z.string()) }, async () => []);
+            v.get("/widgets", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => []);
           })
           .build();
 
@@ -118,7 +118,7 @@ describe("the endpoint a request matched", () => {
       it("still says which endpoint they were calling", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
           .version("2026-08-07", (v) => {
-            v.get("/legacy", { output: z.string() }, async () => "x");
+            v.get("/legacy", { noPermission: { reason: "framework test endpoint" }, output: z.string() }, async () => "x");
           })
           .version("2026-09-01", (v) => {
             v.withdraw("get", "/legacy");
@@ -146,7 +146,7 @@ describe("the endpoint a request matched", () => {
           .version("2026-08-07", (v) => {
             v.get(
               "/broken",
-              { output: z.object({ id: z.number() }) },
+              { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.number() }) },
               // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
               async () => ({ id: "not-a-number" }) as any,
             );
@@ -168,7 +168,7 @@ describe("the endpoint a request matched", () => {
           .version("2026-08-07", (v) => {
             v.get(
               "/broken",
-              { output: z.object({ id: z.number() }) },
+              { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.number() }) },
               // biome-ignore lint/suspicious/noExplicitAny: returning the wrong shape is the case under test.
               async () => ({ id: "not-a-number" }) as any,
             );

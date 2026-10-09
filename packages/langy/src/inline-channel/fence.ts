@@ -29,6 +29,21 @@ export type LangyCardFenceSegment =
       closed: boolean;
     };
 
+/**
+ * True when the text could open a card block, for callers that want to skip
+ * the line scan on the common fence-less stream. Conservative by
+ * construction: every opening the grammar accepts spells the tag out, so
+ * testing for the tag alone can say yes too often but never no too often.
+ *
+ * It belongs here rather than at the call site. A caller that writes its own
+ * substring test writes the fence and the tag together, misses the openings
+ * that put a space or an indent in between, and renders a card's JSON to the
+ * reader as a code block.
+ */
+export function mightContainLangyCardFence(text: string): boolean {
+  return text.includes(LANGY_CARD_FENCE_TAG);
+}
+
 /** `["```", "langy-card"]` for a fence line, or null. */
 function fenceLine(line: string): { ticks: number; tag: string } | null {
   const match = /^ {0,3}(`{3,})([^`]*)$/.exec(line);

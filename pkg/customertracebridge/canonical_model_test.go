@@ -46,6 +46,11 @@ func TestEndSpan_CanonicalModelID(t *testing.T) {
 			canonicalModelID(domain.ProviderID("openai_codex"), "openai_codex/gpt-5.6-terra"))
 	})
 
+	t.Run("prefixes a model with slashes of its own", func(t *testing.T) {
+		assert.Equal(t, "custom/Qwen/Qwen2.5-32B-Instruct",
+			canonicalModelID(domain.ProviderID("custom"), "Qwen/Qwen2.5-32B-Instruct"))
+	})
+
 	t.Run("reports an empty model as empty", func(t *testing.T) {
 		assert.Empty(t, canonicalModelID(domain.ProviderAnthropic, ""))
 	})

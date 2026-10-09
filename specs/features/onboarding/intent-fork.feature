@@ -81,6 +81,18 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       Then the user is taken to their personal usage page
       And the CLI setup guidance they see there is the existing personal-page surface, unchanged by onboarding
 
+  Rule: founder access is available only after its grants are confirmed
+
+    @integration @regression
+    Scenario: Founder organization is committed before grants and stays inaccessible until confirmation
+      Given a new founder organization is being initialized
+      When its grants are still being projected
+      Then the organization exists for tenant routing
+      And the founder membership remains disabled
+      And the shared authorization reader returns no founder bindings
+      When both founder grants are confirmed
+      Then the founder membership becomes active
+
   Rule: the governance track provisions the organization without a shared project (v6)
 
     @unit

@@ -26,7 +26,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
@@ -34,6 +35,8 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("user.personalBudget integration", () => {
   const ns = `pbudget-${nanoid(8)}`;
@@ -66,17 +69,13 @@ describe("user.personalBudget integration", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    // RoleBindings are required by hasOrganizationPermission — without
-    // one (or a TeamUser legacy fallback), MEMBER-role users fail the
-    // organization:view permission check.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    // Seed the organization grant required by the permission check.
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
 
     caller = appRouter.createCaller(
@@ -102,6 +101,9 @@ describe("user.personalBudget integration", () => {
       where: { team: { organizationId: { in: orgIds } } },
     });
     await prisma.team.deleteMany({ where: { organizationId: { in: orgIds } } });
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
@@ -117,7 +119,7 @@ describe("user.personalBudget integration", () => {
     it("rejects with UNAUTHORIZED via the checkOrganizationPermission middleware", async () => {
       await expect(
         caller.user.personalBudget({ organizationId: OTHER_ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

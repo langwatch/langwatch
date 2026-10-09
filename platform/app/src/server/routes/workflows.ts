@@ -24,12 +24,13 @@ import {
   type StudioServerEvent,
   studioClientEventSchema,
 } from "~/optimization_studio/types/events";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { getApp } from "~/server/app-layer/app";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "~/server/datasets/errors";
-import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
@@ -63,8 +64,8 @@ secured
       return c.json({ error: "Project ID is required." }, { status: 400 });
     }
 
-    const hasPermission = await hasProjectPermission(
-      { prisma, session },
+    const hasPermission = await probeProjectPermission(
+      { session },
       projectId,
       "workflows:manage",
     );
@@ -156,8 +157,8 @@ secured
         );
       }
 
-      const hasPermission = await hasProjectPermission(
-        { prisma, session },
+      const hasPermission = await probeProjectPermission(
+        { session },
         projectId,
         "workflows:manage",
       );
@@ -167,6 +168,14 @@ secured
           { status: 403 },
         );
       }
+
+      // ADR-144 decision 8: nothing is written under an aggregate's tenant.
+      // The tRPC door refuses it for mutations; this route checks its own
+      // permission, so it asks the guard itself.
+      await assertProjectAcceptsWrites({
+        kinds: getApp().projectKinds,
+        projectId,
+      });
 
       let message: StudioClientEvent;
       try {

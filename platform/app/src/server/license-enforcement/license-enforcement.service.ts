@@ -5,15 +5,23 @@ import type { ILicenseEnforcementRepository } from "./license-enforcement.reposi
 import type { LimitCheckResult, LimitType, limitTypes } from "./types";
 
 /**
+ * Where a limit type's current count comes from. Members, scenarios and
+ * evaluators are Postgres counts; simulations are distinct scenario sets,
+ * which live in ClickHouse and are counted by the usage service.
+ */
+export interface LimitCountSources {
+  repository: ILicenseEnforcementRepository;
+  countScenarioSets: (organizationId: string) => Promise<number>;
+}
+
+/**
  * Configuration for a single limit type.
  * Associates each LimitType with functions to get count and max.
  */
 type LimitTypeConfig = {
-  getCount: (
-    repo: ILicenseEnforcementRepository,
-    orgId: string,
-  ) => Promise<number>;
-  getMax: (plan: PlanInfo) => number;
+  getCount: (sources: LimitCountSources, orgId: string) => Promise<number>;
+  /** The plan's cap, or `undefined` when the plan sets none (uncapped). */
+  getMax: (plan: PlanInfo) => number | undefined;
 };
 
 /**
@@ -27,14 +35,42 @@ type LimitTypeConfig = {
  */
 const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
   members: {
-    getCount: (repo, orgId) => repo.getMemberCount(orgId),
+    getCount: ({ repository }, orgId) => repository.getMemberCount(orgId),
     getMax: (plan) => plan.maxMembers,
   },
   membersLite: {
-    getCount: (repo, orgId) => repo.getMembersLiteCount(orgId),
+    getCount: ({ repository }, orgId) => repository.getMembersLiteCount(orgId),
     getMax: (plan) => plan.maxMembersLite,
   },
+  scenarios: {
+    getCount: ({ repository }, orgId) =>
+      repository.getActiveScenarioCount(orgId),
+    getMax: (plan) => plan.maxScenarios,
+  },
+  scenarioSets: {
+    getCount: ({ countScenarioSets }, orgId) => countScenarioSets(orgId),
+    getMax: (plan) => plan.maxScenarioSets,
+  },
+  evaluators: {
+    getCount: ({ repository }, orgId) => repository.getEvaluatorCount(orgId),
+    getMax: (plan) => plan.maxEvaluators,
+  },
 };
+
+/**
+ * Reported as `max` when the plan sets no cap. A finite number so it survives
+ * JSON (Infinity serializes to null), and the same sentinel the seat views
+ * read as unlimited.
+ */
+export const UNCAPPED_LIMIT = Number.MAX_SAFE_INTEGER;
+
+/** The plan's cap for a limit type, or `undefined` when it sets none. */
+export function planLimitFor(
+  plan: PlanInfo,
+  limitType: LimitType,
+): number | undefined {
+  return LIMIT_TYPE_CONFIG[limitType].getMax(plan);
+}
 
 // Compile-time check: ensure all LimitTypes are covered in config
 // This will fail to compile if a LimitType is added but not configured
@@ -67,10 +103,15 @@ export type MinimalUser = {
  * - Throws domain errors when limits are exceeded
  */
 export class LicenseEnforcementService {
+  private readonly countSources: LimitCountSources;
+
   constructor(
-    private readonly repository: ILicenseEnforcementRepository,
+    repository: ILicenseEnforcementRepository,
     private readonly planProvider: PlanProvider,
-  ) {}
+    countScenarioSets: (organizationId: string) => Promise<number>,
+  ) {
+    this.countSources = { repository, countScenarioSets };
+  }
 
   /**
    * Checks if an organization can create another resource of the given type.
@@ -90,18 +131,19 @@ export class LicenseEnforcementService {
       user,
     });
 
+    const max = this.getMaxForType(plan, limitType);
+
     // If plan has override flag, skip enforcement (e.g., unlimited OSS plan)
     if (plan.overrideAddingLimitations) {
-      return {
-        allowed: true,
-        current: 0,
-        max: this.getMaxForType(plan, limitType),
-        limitType,
-      };
+      return { allowed: true, current: 0, max, limitType };
+    }
+
+    // A plan that sets no cap for this type is uncapped: nothing to count.
+    if (planLimitFor(plan, limitType) === undefined) {
+      return { allowed: true, current: 0, max, limitType };
     }
 
     const current = await this.getCountForType(organizationId, limitType);
-    const max = this.getMaxForType(plan, limitType);
 
     return { allowed: current < max, current, max, limitType };
   }
@@ -157,15 +199,14 @@ export class LicenseEnforcementService {
     limitType: LimitType,
   ): Promise<number> {
     const config = LIMIT_TYPE_CONFIG[limitType];
-    return config.getCount(this.repository, organizationId);
+    return config.getCount(this.countSources, organizationId);
   }
 
   /**
-   * Gets the maximum allowed for a resource type from the plan.
-   * Uses LIMIT_TYPE_CONFIG mapping for OCP compliance.
+   * Gets the maximum allowed for a resource type from the plan, with
+   * {@link UNCAPPED_LIMIT} standing in for a cap the plan does not set.
    */
   private getMaxForType(plan: PlanInfo, limitType: LimitType): number {
-    const config = LIMIT_TYPE_CONFIG[limitType];
-    return config.getMax(plan);
+    return planLimitFor(plan, limitType) ?? UNCAPPED_LIMIT;
   }
 }

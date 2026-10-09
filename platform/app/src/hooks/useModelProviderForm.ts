@@ -79,6 +79,12 @@ export type UseModelProviderFormState = {
    * so the list and model-selector groups stay distinguishable.
    */
   name: string;
+  /**
+   * The slug that addresses this instance in a gateway model string
+   * ("eu/claude-sonnet-5"). Empty when the operator set none, in which case
+   * the provider is reached by its family prefix like any other.
+   */
+  routingHandle: string;
   useApiGateway: boolean;
   customKeys: Record<string, string>;
   displayKeys: Record<string, any>;
@@ -115,8 +121,8 @@ export type UseModelProviderFormState = {
 };
 
 export type UseModelProviderFormActions = {
-  setEnabled: (enabled: boolean) => Promise<void>;
   setName: (name: string) => void;
+  setRoutingHandle: (routingHandle: string) => void;
   setScopes: (scopes: ScopeSelection[]) => void;
   setScopeType: (scope: ModelProviderScopeType) => void;
   setUseApiGateway: (use: boolean) => void;
@@ -163,6 +169,13 @@ export function useModelProviderForm(
     (provider as { name?: string }).name ??
     humanizeProviderName(provider.provider);
   const [name, setName] = useState<string>(initialName);
+
+  // Routing handle — stored lowercased, so the input shows what the gateway
+  // will actually answer to rather than what was typed.
+  const initialRoutingHandle =
+    (provider as { routingHandle?: string | null }).routingHandle ?? "";
+  const [routingHandle, setRoutingHandle] =
+    useState<string>(initialRoutingHandle);
 
   // Scope state — defaults to the stored provider's scope set when
   // editing. For brand-new providers we open at the widest scope the
@@ -251,6 +264,7 @@ export function useModelProviderForm(
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -271,6 +285,7 @@ export function useModelProviderForm(
       defaultProviderHook.projectTopicClusteringModel,
       defaultProviderHook.projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -294,6 +309,10 @@ export function useModelProviderForm(
       (provider as { name?: string }).name ??
       humanizeProviderName(provider.provider);
     if (name.trim() !== initialName.trim()) return true;
+
+    const storedHandle =
+      (provider as { routingHandle?: string | null }).routingHandle ?? "";
+    if (routingHandle.trim().toLowerCase() !== storedHandle) return true;
 
     // The same helper the submit path uses to decide whether to send
     // credentials at all, so the button and the payload cannot disagree.
@@ -368,6 +387,7 @@ export function useModelProviderForm(
   }, [
     provider,
     name,
+    routingHandle,
     credentialKeysHook.customKeys,
     credentialKeysHook.originalStoredKeysRef,
     credentialKeysHook.useApiGateway,
@@ -405,6 +425,9 @@ export function useModelProviderForm(
       (provider as { name?: string }).name ??
         humanizeProviderName(provider.provider),
     );
+    setRoutingHandle(
+      (provider as { routingHandle?: string | null }).routingHandle ?? "",
+    );
   }, [
     provider.provider,
     provider.id,
@@ -437,6 +460,7 @@ export function useModelProviderForm(
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       isSaving: formSubmitHook.isSaving,
@@ -444,8 +468,8 @@ export function useModelProviderForm(
       isDirty,
     },
     {
-      setEnabled: formSubmitHook.setEnabled,
       setName,
+      setRoutingHandle,
       setScopes,
       setScopeType,
       setUseApiGateway,

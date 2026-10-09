@@ -100,6 +100,167 @@ describe("emitsResult", () => {
       expect(logged).toEqual([]);
     });
   });
+
+  // Counting is a normal thing to want, and the CLI answered it two ways:
+  // `pagination.total` on the resource lists, `pagination.totalHits` on the
+  // search-backed ones. A caller reading the first got null on a trace search.
+  describe("when a paginated envelope names its total", () => {
+    const withPagination = (pagination: Record<string, unknown>) =>
+      buildProgram((p) => {
+        emitsResult(p.command("envelope"), () => ({
+          data: { experiments: PAYLOAD, pagination },
+          table: () => console.log("HUMAN TABLE"),
+        }));
+      });
+
+    /** @scenario "A search-backed list also carries the total under the common name" */
+    it("adds total beside totalHits", async () => {
+      const program = withPagination({ totalHits: 2, hasMore: false });
+      await program.parseAsync(["envelope", "-o", "json"], { from: "user" });
+
+      expect(JSON.parse(logged[0]!)).toEqual({
+        experiments: PAYLOAD,
+        pagination: { totalHits: 2, hasMore: false, total: 2 },
+      });
+    });
+
+    it("leaves a pagination that already names its total alone", async () => {
+      const program = withPagination({ total: 7, page: 1 });
+      await program.parseAsync(["envelope", "-o", "json"], { from: "user" });
+
+      expect(JSON.parse(logged[0]!)).toEqual({
+        experiments: PAYLOAD,
+        pagination: { total: 7, page: 1 },
+      });
+    });
+
+    /** @scenario "A result with no pagination is left alone" */
+    it("leaves a result with no pagination as it was", async () => {
+      const program = buildProgram((p) => {
+        emitsResult(p.command("bare"), () => ({
+          data: { id: "a1", name: "one" },
+          table: () => console.log("HUMAN TABLE"),
+        }));
+      });
+      await program.parseAsync(["bare", "-o", "json"], { from: "user" });
+
+      expect(JSON.parse(logged[0]!)).toEqual({ id: "a1", name: "one" });
+    });
+  });
+
+  // `--limit` is the flag about twenty commands page with, so a caller reads it
+  // as universal and the rest answered "unknown option '--limit'" plus a usage
+  // dump. It is a projection here, like `--jq`: the command fetched what it
+  // fetched, this decides how many rows are printed.
+  describe("when --limit caps the result", () => {
+    /** @scenario "A list is cut to the first rows on any list command" */
+    it("keeps the first n rows of a top-level array", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toEqual([PAYLOAD[0]]);
+    });
+
+    /** @scenario "A cut list envelope keeps everything it says about itself" */
+    it("cuts the rows of a list envelope and keeps its other fields", async () => {
+      const program = buildProgram((p) => {
+        emitsResult(p.command("envelope"), () => ({
+          data: { experiments: PAYLOAD, pagination: { totalHits: 2 } },
+          table: () => console.log("HUMAN TABLE"),
+        }));
+      });
+      await program.parseAsync(["envelope", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      // `total` is added beside the field the API sent, so a caller has one
+      // name to read on every list. Nothing is taken away.
+      expect(JSON.parse(logged[0]!)).toEqual({
+        experiments: [PAYLOAD[0]],
+        pagination: { totalHits: 2, total: 2 },
+      });
+    });
+
+    /** @scenario "The total survives a capped page" */
+    it("keeps the total of the whole list, not the size of the page", async () => {
+      const program = buildProgram((p) => {
+        emitsResult(p.command("envelope"), () => ({
+          data: { experiments: PAYLOAD, pagination: { totalHits: 40 } },
+          table: () => console.log("HUMAN TABLE"),
+        }));
+      });
+      await program.parseAsync(["envelope", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      const printed = JSON.parse(logged[0]!) as {
+        experiments: unknown[];
+        pagination: { total: number };
+      };
+      expect(printed.experiments).toHaveLength(1);
+      expect(printed.pagination.total).toBe(40);
+    });
+
+    /** @scenario "A payload that is not a list is left whole" */
+    it("leaves a payload with no single list alone", async () => {
+      const program = buildProgram((p) => {
+        emitsResult(p.command("one"), () => ({
+          data: { id: "a1", tags: ["x"], versions: ["v1", "v2"] },
+          table: () => console.log("HUMAN TABLE"),
+        }));
+      });
+      await program.parseAsync(["one", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toEqual({
+        id: "a1",
+        tags: ["x"],
+        versions: ["v1", "v2"],
+      });
+    });
+
+    /** @scenario "A command with its own paging flag keeps it" */
+    it("never caps on top of a command's own --limit", async () => {
+      let seen: string | undefined;
+      const program = buildProgram((p) => {
+        emitsResult(
+          p
+            .command("paged")
+            .option("--limit <n>", "Rows fetched per page; the walk covers all"),
+          (options: { limit?: string }) => {
+            seen = options.limit;
+            return { data: PAYLOAD, table: () => console.log("HUMAN TABLE") };
+          },
+        );
+      });
+      await program.parseAsync(["paged", "-o", "json", "--limit", "1"], {
+        from: "user",
+      });
+      expect(seen).toBe("1");
+      expect(JSON.parse(logged[0]!)).toEqual(PAYLOAD);
+    });
+
+    it("counts what is left when --jq follows it", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "--limit", "1", "--jq", "length"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toBe(1);
+    });
+
+    it("ignores a limit that is not a positive number", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "-o", "json", "--limit", "nonsense"], {
+        from: "user",
+      });
+      expect(JSON.parse(logged[0]!)).toEqual(PAYLOAD);
+    });
+
+    it("leaves the human table alone", async () => {
+      const program = buildProgram(registerListing);
+      await program.parseAsync(["list", "--limit", "1"], { from: "user" });
+      expect(logged).toEqual(["HUMAN TABLE"]);
+    });
+  });
 });
 
 describe("isOutputAware", () => {

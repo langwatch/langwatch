@@ -8,6 +8,13 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
+import type { AggregateRule } from "../aggregate-rule";
+import {
+  AGGREGATE_PROJECT_KIND,
+  NEVER_LANDED_ON_PROJECT_KINDS,
+  projectKindsHiddenFrom,
+} from "../project-kinds";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -104,6 +111,8 @@ export class PrismaProjectRepository implements ProjectRepository {
             organization: {
               select: {
                 id: true,
+                createdAt: true,
+                signupData: true,
                 members: {
                   where: { role: "ADMIN" },
                   select: { userId: true },
@@ -124,6 +133,8 @@ export class PrismaProjectRepository implements ProjectRepository {
       firstMessage: project.firstMessage,
       organizationId: org?.id ?? null,
       adminUserId: org?.members?.[0]?.userId ?? null,
+      onboardingVariant: parseOnboardingVariant(org?.signupData),
+      organizationCreatedAt: org?.createdAt ?? null,
     };
   }
 
@@ -224,16 +235,68 @@ export class PrismaProjectRepository implements ProjectRepository {
     return this.prisma.project.findUnique({ where: { id } });
   }
 
+  async updateAggregateRule({
+    id,
+    organizationId,
+    aggregateRule,
+  }: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project | null> {
+    const result = await this.prisma.project.updateMany({
+      where: {
+        id,
+        kind: AGGREGATE_PROJECT_KIND,
+        archivedAt: null,
+        team: { organizationId, archivedAt: null },
+      },
+      data: { aggregateRule },
+    });
+    if (result.count === 0) return null;
+    return this.prisma.project.findUnique({ where: { id } });
+  }
+
+  async findLandingProjectSlug({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        team: { organizationId, members: { some: { userId } } },
+        archivedAt: null,
+        // An aggregate is opened on purpose (ADR-144 block F) and the
+        // governance project is never user-visible: neither is landed on.
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { slug: true },
+    });
+    return project?.slug ?? null;
+  }
+
   async findAllByOrganization({
     organizationId,
     page,
     limit,
+    projectIds,
+    callerOrganizationRole,
   }: {
     organizationId: string;
     page: number;
     limit: number;
+    projectIds?: string[];
+    callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>> {
-    const where = { archivedAt: null, team: { organizationId } };
+    const where = {
+      archivedAt: null,
+      team: { organizationId },
+      kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
+      ...(projectIds ? { id: { in: projectIds } } : {}),
+    };
     const [data, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
@@ -246,6 +309,20 @@ export class PrismaProjectRepository implements ProjectRepository {
     return { data, pagination: { page, limit, total } };
   }
 
+  async findAllIdsByOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    // No `archivedAt` or `kind` filter on purpose — see the interface doc.
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    return projects.map((project) => project.id);
+  }
+
   async findBySlugInTeam({
     slug,
     teamId,
@@ -254,6 +331,19 @@ export class PrismaProjectRepository implements ProjectRepository {
     teamId: string;
   }): Promise<Project | null> {
     return this.prisma.project.findFirst({ where: { slug, teamId } });
+  }
+
+  async findLiveKindsByTeam({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<Pick<Project, "id" | "kind">[]> {
+    return this.prisma.project.findMany({
+      where: { teamId, archivedAt: null, team: { organizationId } },
+      select: { id: true, kind: true },
+    });
   }
 
   async findActiveTeamInOrganization({

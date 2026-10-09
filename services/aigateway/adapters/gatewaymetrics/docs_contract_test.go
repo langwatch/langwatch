@@ -34,6 +34,16 @@ var selectorPattern = regexp.MustCompile(`(?:^|[^A-Za-z0-9_])(gateway_[a-z0-9_]+
 // labelNamePattern picks label names out of a selector body.
 var labelNamePattern = regexp.MustCompile(`([a-zA-Z_][a-zA-Z0-9_]*)\s*[=!~]`)
 
+// lwqlViewsBlockPattern matches the generated LangWatchQL catalog table in
+// docs/api-reference/query/overview.mdx (between the lwql-views-start/end
+// MDX comments). That table documents queryable views, not metrics, but
+// several view names share the `gateway_` prefix with real metrics
+// (gateway_realtime_sessions, gateway_budgets, ...) because they name the
+// same subsystem. Scanning it for metric names produces false positives,
+// so it is stripped before either the metric-name or the selector-label
+// pattern runs.
+var lwqlViewsBlockPattern = regexp.MustCompile(`(?s)\{/\* lwql-views-start \*/\}.*?\{/\* lwql-views-end \*/\}`)
+
 // scrapeTimeLabels are attached by Prometheus service discovery, not by
 // the gateway, so a doc may legitimately filter on them.
 var scrapeTimeLabels = map[string]bool{
@@ -62,6 +72,8 @@ var notMetrics = map[string]string{
 	"gateway_budget_ledger_events":   "ClickHouse table",
 	"gateway_budget_scope_totals":    "ClickHouse rollup table",
 	"gateway_budget_scope_totals_mv": "ClickHouse materialized view",
+	"gateway_budget_totals":          "LWQL view merging the budget rollup",
+	"gateway_request_spend":          "LWQL view over per-request spend records",
 	"gateway_spend":                  "ClickHouse table (the billing spend ledger)",
 
 	// Structured log event names. gateway_draining is deliberately absent
@@ -74,6 +86,19 @@ var notMetrics = map[string]string{
 
 	// Log fields and JSON keys.
 	"gateway_request_id": "log field and response-header value",
+
+	// Field names in the usage report a self-hosted install sends, listed
+	// on the dictionary page. They are keys in a JSON document, counted on
+	// the control plane from the spend ledger, not series the gateway
+	// exposes.
+	"gateway_configured":    "usage report field",
+	"gateway_request_at":    "usage report field",
+	"gateway_requests":      "usage report field",
+	"gateway_requests_7d":   "usage report field",
+	"gateway_requests_28d":  "usage report field",
+	"gateway_spend_usd":     "usage report field",
+	"gateway_spend_usd_7d":  "usage report field",
+	"gateway_spend_usd_28d": "usage report field",
 
 	// `error.code` values on the REST error envelope. They share the
 	// `gateway_` prefix with the metrics because they name the same
@@ -169,8 +194,9 @@ func TestDocumentedLabelsExist(t *testing.T) {
 		body, err := os.ReadFile(path)
 		require.NoError(t, err)
 		rel, _ := filepath.Rel(root, path)
+		text := lwqlViewsBlockPattern.ReplaceAll(body, nil)
 
-		for _, sel := range selectorPattern.FindAllStringSubmatch(string(body), -1) {
+		for _, sel := range selectorPattern.FindAllStringSubmatch(string(text), -1) {
 			name := trimHistogramSuffix(sel[1])
 			declared, ok := labels[name]
 			if !ok {
@@ -202,7 +228,8 @@ func documentedNames(t *testing.T) map[string][]string {
 		body, err := os.ReadFile(path)
 		require.NoError(t, err)
 		rel, _ := filepath.Rel(root, path)
-		for _, m := range metricNamePattern.FindAllStringSubmatch(string(body), -1) {
+		text := lwqlViewsBlockPattern.ReplaceAll(body, nil)
+		for _, m := range metricNamePattern.FindAllStringSubmatch(string(text), -1) {
 			name := trimHistogramSuffix(m[1])
 			if _, skip := notMetrics[name]; skip {
 				continue

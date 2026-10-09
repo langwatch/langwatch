@@ -4,7 +4,7 @@ LangChain callback handler.
     uv run --with langwatch --with langchain --with langgraph --with langchain-openai python langgraph_openai.py
 
 Image only. The callback is passed into the node's `RunnableConfig`, so the
-model call becomes a span nested under the trace. The image rides an
+model call becomes a span nested under the trace. The image goes in an
 `image_url` content block, the shape Chat Completions accepts.
 """
 

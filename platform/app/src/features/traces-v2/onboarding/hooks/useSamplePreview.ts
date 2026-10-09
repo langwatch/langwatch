@@ -1,4 +1,4 @@
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import type { TraceListItem } from "../../types/trace";
 import { shouldShowArrivals } from "../chapters/onboardingJourneyConfig";
 import {
@@ -40,7 +40,7 @@ export interface SamplePreviewResult {
  */
 export function useSamplePreview(): SamplePreviewResult | null {
   const previewActive = usePreviewTracesActive();
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
   // Stage is still used by the legacy tourActive path. Phase 2 (spotlights)
   // doesn't gate sample data by stage.
   const onboardingStage = useOnboardingStore((s) => s.stage);

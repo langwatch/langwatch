@@ -320,6 +320,10 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "prompt.id",
   "event.sequence",
   "speed",
+  // The llm_request span's request context ("interaction" for the main
+  // thread, "tool" for a sub-agent call), which decides the cache-write
+  // lifetime the fold prices the call's writes at.
+  "llm_request.context",
   "decision_type",
   "decision_source",
   // Sub-agent lineage, for agents that stamp it (the claude_code

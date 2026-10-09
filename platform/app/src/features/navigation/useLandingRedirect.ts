@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useLocalStorage } from "usehooks-ts";
+import { carryLangyConversation } from "~/features/langy/logic/langyConversationDeepLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  type LastVisitedHomeKind,
-  resolveHomeDestination,
-} from "~/utils/resolveHomeDestination";
+import { belongsToNoOrganization } from "./logic/belongsToNoOrganization";
 import { readLastVisitedProduct } from "./logic/productMemory";
 import { resolveLandingDestination } from "./logic/resolveLandingDestination";
+import { resolveOrglessDestination } from "./logic/resolveOrglessDestination";
 import type { ProductId } from "./products";
 import { useLlmOpsProjectSlug } from "./useLlmOpsProjectSlug";
-import { useNavigationMode } from "./useNavigationMode";
 import { useReachableProducts } from "./useReachableProducts";
 
 /** What the server home resolver answered, flattened for the pickers. */
@@ -53,8 +50,19 @@ function toResolvedHome(query: {
   };
 }
 
+/**
+ * What `/` has to draw, for the one case where it cannot redirect.
+ *
+ * Every other outcome is a destination, and a destination that has not been
+ * decided yet is a loading screen. A refused graph is neither: it will never
+ * decide, so a page that keeps waiting for it waits forever.
+ */
+export interface LandingRedirect {
+  /** The refusal the workspace read came back with. Absent until one does. */
+  workspaceError: unknown;
+}
+
 interface LandingInput {
-  isV2: boolean;
   resolved: ResolvedHome;
   isReachableLoading: boolean;
   reachableProducts: ProductId[];
@@ -68,21 +76,23 @@ interface LandingInput {
    */
   projectHomeSlug: string | null;
   isOrgless: boolean;
-  lastVisitedHomeKind: LastVisitedHomeKind;
+  /**
+   * Whether this session was opened by a test sign-in through a connection
+   * that is not live yet — answered by the server, never by the query string.
+   * `isPending` holds the redirect while the question is still out, rather
+   * than racing it to the bootstrap screen.
+   */
+  testArrival: { isPending: boolean; isTestArrival: boolean };
 }
 
 /**
- * Where `/` goes. In a new navigation mode the per-organization product
- * memory outranks the server resolver, which is the deliberate ADR-038
- * deviation; legacy mode keeps the persona resolver. Both fall through to
- * the same safety nets. Null means nothing has an answer yet, so the page
- * stays on the loading screen.
+ * Where `/` goes. The per-organization product memory outranks the
+ * server resolver, which is the deliberate ADR-038 deviation. Falls
+ * through to the safety nets. Null means nothing has an answer yet, so
+ * the page stays on the loading screen.
  */
 function landingDestination(input: LandingInput): string | null {
-  const picked = input.isV2
-    ? productLandingDestination(input)
-    : personaHomeDestination(input);
-  return picked ?? fallbackDestination(input);
+  return productLandingDestination(input) ?? fallbackDestination(input);
 }
 
 function productLandingDestination({
@@ -103,30 +113,7 @@ function productLandingDestination({
 }
 
 /**
- * The persona resolver picks the DEFAULT for a user with no history. On
- * top of that we honor the last-visited home so it sticks both ways: a
- * user whose persona default is /me still returns to the project they
- * last opened, and /me sticks for someone who last sat there. An explicit
- * picker pin (isOverride) always wins.
- */
-function personaHomeDestination({
-  resolved,
-  lastVisitedHomeKind,
-  projectHomeSlug,
-}: LandingInput): string | null {
-  if (!resolved.destination) return null;
-  return resolveHomeDestination({
-    resolverDestination: resolved.destination,
-    isOverride: resolved.isOverride,
-    intentPinned: resolved.isIntentPinned,
-    governanceUiEnabled: resolved.governanceUiEnabled,
-    lastVisitedHomeKind,
-    lastProjectSlug: projectHomeSlug,
-  });
-}
-
-/**
- * The safety nets, shared by both modes. A failed resolver keeps the
+ * The safety nets. A failed resolver keeps the
  * LLMOps majority on their project home, so a transient backend error
  * never strands them.
  *
@@ -141,10 +128,11 @@ function fallbackDestination({
   resolved,
   projectSlug,
   isOrgless,
+  testArrival,
 }: LandingInput): string | null {
   if (resolved.hasError && projectSlug) return `/${projectSlug}`;
-  if (isOrgless) return "/onboarding/welcome";
-  return null;
+  if (!isOrgless) return null;
+  return resolveOrglessDestination(testArrival);
 }
 
 /**
@@ -181,48 +169,60 @@ function useReplaceOnce(): (destination: string | null) => void {
  * Specs: specs/ai-gateway/governance/persona-home-resolver.feature
  *        specs/navigation/navigation-v2-landing.feature
  */
-export function useLandingRedirect(): void {
-  const { project, organization, organizations, isLoading } =
+export function useLandingRedirect(): LandingRedirect {
+  const { project, organization, organizations, isLoading, workspaceError } =
     useOrganizationTeamProject({ redirectToOnboarding: false });
   const resolved = api.governance.resolveHome.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization?.id, staleTime: 60_000, retry: false },
   );
-  // Implicit home-kind preference written from MyLayout (personal) and
-  // useOrganizationTeamProject (project). Honored only when the user has
-  // no explicit pin via the picker, so /me AND the last-visited project
-  // both stick, without overriding the user's deliberate choice.
-  const [lastVisitedHomeKind] = useLocalStorage<LastVisitedHomeKind>(
-    "lastVisitedHomeKind",
-    "",
-  );
-  const navigationResolution = useNavigationMode();
-  const isV2 =
-    navigationResolution.status === "ready" &&
-    navigationResolution.mode !== "legacy";
-  // Legacy mode never reads the product list, and must not pay for the
-  // flag queries behind it.
   const { reachableProducts, isLoading: isReachableLoading } =
-    useReachableProducts({ enabled: isV2 });
+    useReachableProducts({ enabled: true });
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const replaceOnce = useReplaceOnce();
+  // One reading of "belongs to nobody", shared by the redirect and by the
+  // question below it. An unanswered organization graph is not an empty one:
+  // reading the first as the second is what briefly put a member with
+  // organizations on the bootstrap screen, and it would also have asked the
+  // test-arrival question of people it cannot be true of.
+  const isOrgless = belongsToNoOrganization({
+    isWorkspaceResolving: isLoading,
+    organization,
+    organizations,
+  });
+  // Asked only of the people it can be true of, which is the dead end itself:
+  // everybody with an organization is already past this branch.
+  const testArrival = api.identity.myTestArrival.useQuery(
+    {},
+    { enabled: isOrgless, staleTime: 60_000, retry: false },
+  );
 
   useEffect(() => {
-    if (navigationResolution.status === "loading") return;
     replaceOnce(
-      landingDestination({
-        isV2,
-        resolved: toResolvedHome(resolved),
-        isReachableLoading,
-        reachableProducts,
-        rememberedProduct: organization
-          ? readLastVisitedProduct({ organizationId: organization.id })
-          : null,
-        projectSlug: project?.slug ?? null,
-        projectHomeSlug: llmOpsProjectSlug,
-        isOrgless:
-          !isLoading && !organization && (organizations?.length ?? 0) === 0,
-        lastVisitedHomeKind,
+      // `/` is the only link the Langy command line can build, because it knows
+      // the conversation and not the project the reader lands in. This redirect
+      // drops the query string, so the one parameter that names a conversation
+      // travels with it.
+      carryLangyConversation({
+        destination: landingDestination({
+          resolved: toResolvedHome(resolved),
+          isReachableLoading,
+          reachableProducts,
+          rememberedProduct: organization
+            ? readLastVisitedProduct({ organizationId: organization.id })
+            : null,
+          projectSlug: project?.slug ?? null,
+          projectHomeSlug: llmOpsProjectSlug,
+          isOrgless,
+          testArrival: {
+            // A failed read must not hold the redirect forever; it falls
+            // through to the bootstrap screen, which is what this branch did
+            // before the question existed.
+            isPending: isOrgless && testArrival.isLoading,
+            isTestArrival: testArrival.data != null,
+          },
+        }),
+        search: window.location.search,
       }),
     );
   }, [
@@ -232,12 +232,14 @@ export function useLandingRedirect(): void {
     organization,
     organizations,
     isLoading,
+    isOrgless,
+    testArrival.data,
+    testArrival.isLoading,
     replaceOnce,
-    lastVisitedHomeKind,
-    navigationResolution.status,
-    isV2,
     isReachableLoading,
     reachableProducts,
     llmOpsProjectSlug,
   ]);
+
+  return { workspaceError };
 }

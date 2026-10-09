@@ -1,28 +1,7 @@
 /**
- * ADR-092 delivery-plan PR 3 follow-up — the Access surface's read port.
- *
- * Decisions moved onto the ledger's head at cutover
- * (`authz-read.cutover.repository.ts`); this port moves what people SEE. Every
- * settings page that renders access - the bindings table, a member's own
- * breakdown, team member lists, a group's bindings, the API key drawer, the
- * role editor - lists through it, and the cutover-aware implementation serves
- * a cut-over organization from `Grant`/`Role` and everyone else from the
- * legacy `RoleBinding`/`CustomRole` heads, behind the same gate the decision
- * fork reads. A page that renders one head while the engine decides from the
- * other could show access that does not exist or hide access that does.
- *
- * The rows speak the LEGACY vocabulary (`TeamUserRole`,
- * `RoleBindingScopeType`, a `customRole` object) on purpose: it is what every
- * consumer renders today, and the grants head can always translate into it -
- * the fold performs the identical translation onto the compat rows
- * (`grantFactToCompatBinding` in @langwatch/authz-server). Row ids are stable
- * across the heads by construction: an imported grant ADOPTS its binding's
- * row id, and a ledger-born grant's id IS the compat row's id.
- *
- * Dormant facts (lite-member, project-credential, platform grants - delivery
- * plan decision 13) never surface here: the legacy page never carried them,
- * so a cut-over listing that showed them would be a parity break in what
- * people see, not extra honesty.
+ * Access surface repository port. Runtime callers use the grants projection
+ * so listings and authorization share one head; the migration retains its
+ * legacy adapter for parity checks.
  */
 import type {
   CustomRole,
@@ -57,6 +36,7 @@ export type AccessListingBindingRow = {
   scopeType: RoleBindingScopeType;
   scopeId: string;
   createdAt: Date;
+  updatedAt: Date;
   user: {
     id: string;
     name: string | null;
@@ -112,6 +92,19 @@ export interface AccessListingRepository {
     organizationId: string;
     groupId: string;
   }): Promise<AccessListingBindingRow[]>;
+
+  /** All bindings carried by the named groups, decorated in one query. */
+  findGroupsBindings(args: {
+    organizationId: string;
+    groupIds: readonly string[];
+  }): Promise<Map<string, AccessListingBindingRow[]>>;
+
+  /** API-key bindings for one organization, grouped by key for credential
+   *  reads. The caller supplies keys already loaded from that organization. */
+  findApiKeyBindings(args: {
+    organizationId: string;
+    apiKeyIds: readonly string[];
+  }): Promise<Map<string, AccessListingBindingRow[]>>;
 
   /** Direct user members of these teams, shaped for the team-settings member
    *  list. Every requested teamId is present in the map (empty array if

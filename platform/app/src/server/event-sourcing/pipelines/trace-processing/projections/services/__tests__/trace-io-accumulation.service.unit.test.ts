@@ -370,7 +370,7 @@ describe("TraceIOAccumulationService: media refs", () => {
   });
 
   /**
-   * A span the way the wire records it: the picture rides the span attribute,
+   * A span the way the wire records it: the picture is on the span attribute,
    * and what the extraction service reports about the span is a separate
    * question. Instrumentation for several SDKs reports the text alone.
    */

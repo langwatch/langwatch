@@ -1,0 +1,315 @@
+/**
+ * The identity ledger writer: the app's implementation of
+ * `@langwatch/identity-server`'s IdentityLedger port, in the shape the
+ * grants ledger already has (`app-layer/authz/ledger.ts`, ADR-110):
+ *
+ *   1. the command staged onto the per-user GroupQueue — the queued run is
+ *      what APPENDS, re-running the same guard the calling path ran;
+ *   2. a bounded read-your-writes wait, watching the projection's cursor
+ *      reach the events the guard decided.
+ *
+ * The staged command is the SOLE appender, and that is the correction ADR-110
+ * already made for grants. Appending here as well and staging the command
+ * afterwards writes every fact twice: the queued run re-executes the handler
+ * against heads the fold has not advanced yet, so it restates and appends a
+ * second row. The projection converges either way — the store dedupes
+ * `commandId:index` on read — but the log would carry two rows per ceremony,
+ * and "a re-run costs no row" would not be true.
+ *
+ * `commit` runs both legs back to back, which is what every ceremony wants
+ * and — since ADR-116 §3's entrance was retired — what every ceremony does.
+ * Staging FIRST is what keeps a loud failure honest: an engine that cannot
+ * take the command fails the ceremony before it reports success.
+ *
+ * The wait is an OBSERVATION, not inline processing. A fold that cannot run
+ * makes it time out; the command is still queued, the caller still succeeds,
+ * and the rows appear when the queue drains. That is why the guards read the
+ * heads and state only what the heads do not carry (#7429): a pass that runs
+ * against a lagging projection restates, and restating is the repair.
+ *
+ * Identity used to fold on the calling path here, to keep ceremonies working
+ * through a Redis outage (the D02 deliverable). That requirement was dropped
+ * — the complexity was not worth it at ceremony volume — so identity no
+ * longer diverges from ADR-110's queue-only rule and this writer has no
+ * second apply path to keep in agreement with the fold.
+ *
+ * Like the grants ledger, the pipeline handle is resolved lazily off the
+ * App: better-auth constructs its adapter at module load, before any App
+ * exists, and a bare script that never composes one must still be able to
+ * import the runtime.
+ */
+import {
+  ATTACH_IDENTIFIER_COMMAND_TYPE,
+  CONFIRM_LINK_COMMAND_TYPE,
+  DETACH_IDENTIFIER_COMMAND_TYPE,
+  ERASE_USER_COMMAND_TYPE,
+  type IdentifierFact,
+  type IdentityCommand,
+  type IdentityCommandType,
+  type IdentityFact,
+  type IdentityFactInput,
+  MARK_PRIMARY_COMMAND_TYPE,
+  PROPOSE_LINK_COMMAND_TYPE,
+  REJECT_LINK_COMMAND_TYPE,
+  reduceIdentity,
+  VERIFY_IDENTIFIER_COMMAND_TYPE,
+} from "@langwatch/identity";
+import type {
+  IdentityHeadsRepository,
+  IdentityLedger,
+} from "@langwatch/identity-server";
+import { createLogger } from "@langwatch/observability";
+import type { Event } from "~/server/event-sourcing/domain/types";
+import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
+import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
+import { IDENTITY_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/identity/schemas/constants";
+import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
+import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
+import {
+  identityCommitDurationSeconds,
+  identityProjectionConvergenceTimeoutsTotal,
+} from "./metrics";
+import {
+  awaitedAppPipelineSender,
+  resolveAppEventStore,
+  StagedLedgerWriter,
+  type StagedSender,
+} from "./staged-ledger-writer";
+
+const logger = createLogger("langwatch:identity:ledger");
+
+/**
+ * A person is on the other end of every identity ceremony this ledger writes
+ * — a sign-in, an address being attached — so it waits on the interactive
+ * window. The values used to be stated here, and identically in three sibling
+ * ledgers; see `_shared/read-your-writes-window.ts` for why one number could
+ * not have been right for all five callers.
+ */
+const IDENTITY_CONVERGENCE = INTERACTIVE_READ_YOUR_WRITES;
+
+const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
+  [ATTACH_IDENTIFIER_COMMAND_TYPE]: "attachIdentifier",
+  [VERIFY_IDENTIFIER_COMMAND_TYPE]: "verifyIdentifier",
+  [MARK_PRIMARY_COMMAND_TYPE]: "markPrimary",
+  [DETACH_IDENTIFIER_COMMAND_TYPE]: "detachIdentifier",
+  [ERASE_USER_COMMAND_TYPE]: "eraseUser",
+  [PROPOSE_LINK_COMMAND_TYPE]: "proposeLink",
+  [CONFIRM_LINK_COMMAND_TYPE]: "confirmLink",
+  [REJECT_LINK_COMMAND_TYPE]: "rejectLink",
+};
+
+/**
+ * The App's event store, waited for.
+ *
+ * Exported because the identity log has a second reader now (D05's operator
+ * lookup, which folds proposals and renders history out of the same events),
+ * and two copies of "wait for the App handle, then ask for the store" is two
+ * places for the deadline to drift.
+ */
+export async function resolveIdentityEventStore(): Promise<
+  EventStore<IdentityEvent>
+> {
+  return resolveEventStore<IdentityEvent>();
+}
+
+/**
+ * The same store, typed for whichever identity-area stream is being read.
+ *
+ * There is ONE store; the type parameter is the caller saying which stream's
+ * events it is about to narrow. The scim_sync log (ADR-126) reads through
+ * here rather than casting the identity resolver, which would have made the
+ * types say "identity events" about a stream that holds none.
+ */
+export async function resolveEventStore<TEvent extends Event>(): Promise<
+  EventStore<TEvent>
+> {
+  return resolveAppEventStore<TEvent>({
+    unavailableMessage:
+      "identity ledger cannot append: the event-sourcing stack is unavailable",
+  });
+}
+
+const resolveStagedSender = awaitedAppPipelineSender({
+  pipelineName: IDENTITY_PIPELINE_NAME,
+});
+
+/**
+ * The projection's one write that is not the fold's: a newborn's heads, rows
+ * only, before the first fold lands. The cursor is never part of it.
+ */
+export interface ProvisionalHeadsWriter {
+  writeProvisionalHeads(args: { facts: IdentifierFact[] }): Promise<void>;
+}
+
+export interface IdentityLedgerWriterDeps {
+  projectionStore: StateProjectionStore<IdentityFoldState> &
+    ProvisionalHeadsWriter;
+  /** Whether the user has folded, and what their heads hold now — the two
+   *  reads the provisional write needs to know whether it applies and what
+   *  it implies. */
+  heads: Pick<IdentityHeadsRepository, "hasFolded" | "findHeads">;
+  /** Production resolves the pipeline handle lazily; tests hand one in. */
+  stagedSender?: (name: string) => Promise<StagedSender | null>;
+  /** The read-your-writes window; production uses the constants above. */
+  convergence?: { timeoutMs: number; pollMs: number };
+}
+
+export class IdentityLedgerWriter
+  extends StagedLedgerWriter<IdentityCommand, IdentityEvent, IdentityFoldState>
+  implements IdentityLedger
+{
+  private readonly heads: IdentityLedgerWriterDeps["heads"];
+  private readonly provisionalHeads: ProvisionalHeadsWriter;
+
+  constructor(deps: IdentityLedgerWriterDeps) {
+    const convergence = deps.convergence ?? IDENTITY_CONVERGENCE;
+    super({
+      stagedSender: deps.stagedSender ?? resolveStagedSender,
+      // No append of its own: the staged command is the sole appender
+      // (ADR-110), which is what keeps one ceremony to one event row.
+      waitedAppend: null,
+      readYourWrites: {
+        projectionStore: deps.projectionStore,
+        timeoutMs: convergence.timeoutMs,
+        pollMs: convergence.pollMs,
+        onTimeout: ({ aggregateId, eventCount }) => {
+          identityProjectionConvergenceTimeoutsTotal.inc();
+          logger.warn(
+            { userId: aggregateId, commandCount: eventCount },
+            "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",
+          );
+        },
+        onUnreadableProjection: ({ aggregateId, error }) => {
+          logger.warn(
+            { userId: aggregateId, error },
+            "could not read the identity projection while waiting for convergence; continuing",
+          );
+        },
+      },
+    });
+    this.heads = deps.heads;
+    this.provisionalHeads = deps.projectionStore;
+  }
+
+  protected senderNameFor(command: IdentityCommand): string {
+    return SENDER_NAME_BY_COMMAND[command.type];
+  }
+
+  protected onMissingSender({ senderName }: { senderName: string }): never {
+    // A wiring defect, not a transient: the pipeline exposed no sender for
+    // a command type it declares. Loud, because nothing downstream folds.
+    throw new Error(
+      `identity ledger cannot stage: the identity pipeline exposes no "${senderName}" sender`,
+    );
+  }
+
+  async commit({
+    command,
+    facts,
+  }: {
+    command: IdentityCommand;
+    facts: IdentityFactInput[];
+  }): Promise<IdentityFact[]> {
+    const events = identityEventsFor({ command, facts });
+    if (events.length === 0) return [];
+    const done = identityCommitDurationSeconds.startTimer();
+    try {
+      await this.writeProvisionalHeads({ command, events });
+      await this.stageAndAwait({ command, events });
+      return events;
+    } finally {
+      done();
+    }
+  }
+
+  /**
+   * A NEWBORN's heads, on the calling path, before the command is staged.
+   *
+   * The front door reads the `Identifier` projection and nothing else, and
+   * the fold that writes it runs on the queue — so between a sign-up
+   * returning and its fold landing, the address just registered is an
+   * address nobody holds. For a user whose projection has never folded there
+   * is no event truth the rows could disagree with, so the ledger writes the
+   * heads the decided facts imply, ROWS ONLY. The cursor stays unwritten:
+   * it is the log's commit marker, the fold's own write overwrites these rows
+   * whole and sets it, and its absence is how the attach guard tells a
+   * provisional head from a folded one when the queued run re-runs it. A
+   * user who has folded gets no provisional write; their heads are event
+   * truth already, and the guard dedupes against them as before.
+   *
+   * Only an attach can make a newborn, so only an attach writes this. A
+   * failure here never fails the ceremony: the fold writes the same rows when
+   * the queue drains and the read-your-writes wait observes it. Staging
+   * failing AFTER this write leaves a row with no event behind it — a replay
+   * drops it, and the next pass over the user restates the attach, because
+   * the projection has still never folded.
+   */
+  private async writeProvisionalHeads({
+    command,
+    events,
+  }: {
+    command: IdentityCommand;
+    events: IdentityEvent[];
+  }): Promise<void> {
+    if (command.type !== ATTACH_IDENTIFIER_COMMAND_TYPE) return;
+    const { userId } = command.data;
+    try {
+      if (await this.heads.hasFolded({ userId })) return;
+      const current = await this.heads.findHeads({ userId });
+      const heads = events.reduce(
+        (folded, event) => reduceIdentity({ heads: folded, fact: event }),
+        current,
+      );
+      const facts = events.flatMap((event) => {
+        const identifierId =
+          "identifierId" in event.data ? event.data.identifierId : null;
+        const head = identifierId ? heads.identifiers[identifierId] : undefined;
+        return head ? [head] : [];
+      });
+      if (facts.length === 0) return;
+      await this.provisionalHeads.writeProvisionalHeads({ facts });
+    } catch (error) {
+      logger.warn(
+        { userId, error },
+        "could not write a newborn's provisional identifier heads; the fold writes them when the queue drains",
+      );
+    }
+  }
+
+  /**
+   * Both legs: staging — the queued run appends and folds, so this is how the
+   * log and the projection ever learn, and a failure here is a real failure
+   * because nothing else would state these events — followed by the bounded
+   * read-your-writes wait. The backfill's own pass depends on that wait: it
+   * verifies an identifier the same pass just attached.
+   */
+  async stageAndAwait({
+    command,
+    events,
+  }: {
+    command: IdentityCommand;
+    events: IdentityEvent[];
+  }): Promise<void> {
+    const { userId, tenantId } = command.data;
+    await this.stage({ command });
+    await this.awaitFold({ userId, tenantId, events });
+  }
+
+  /**
+   * Leg two: wait for the projection's cursor to reach the last event the
+   * guard decided. Keyed by `userId`, which is the aggregate.
+   */
+  private async awaitFold({
+    userId,
+    tenantId,
+    events,
+  }: {
+    userId: string;
+    tenantId: string;
+    events: IdentityEvent[];
+  }): Promise<void> {
+    await this.awaitConvergence({ aggregateId: userId, tenantId, events });
+  }
+}

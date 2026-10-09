@@ -1,20 +1,22 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
-import {
+import type {
   OrganizationUserRole,
-  type PrismaClient,
+  PrismaClient,
 } from "~/generated/prisma/client";
-
-import type { Session } from "~/server/auth";
+import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
-  type Permission,
-} from "../api/rbac";
-import { resolveApiKeyPermission } from "../rbac/role-binding-resolver";
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
+} from "~/server/app-layer/permissions/imperative";
+import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
+import type { Session } from "~/server/auth";
+import { resolveApiKeyPermission } from "../app-layer/authz/credential-permissions";
 import {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
+  GatewayTraceProjectNotADestinationError,
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "./errors";
@@ -22,33 +24,9 @@ import type { GuardrailAttachment } from "./virtualKey.config";
 import type { VirtualKeyService } from "./virtualKey.service";
 
 /**
- * Scope-aware authorization for VirtualKey write paths.
- *
- * A VirtualKey carries N `VirtualKeyScope` rows (ORGANIZATION / TEAM /
- * PROJECT). The org-wide `virtualKeys:manage` gate on the router was too
- * coarse: a team admin could mint or mutate org-level keys, and an
- * org-level grant was required even to manage a single team's keys. These
- * helpers move enforcement onto the individual scopes the call actually
- * touches, using the existing `virtualKeys:*` permission vocabulary.
- *
- * Two shapes, matching the feature contract
- * (specs/ai-gateway/governance/vk-scope-rbac.feature):
- *
- *   - CREATE authorizes against the *requested* scope set: the caller must
- *     hold `virtualKeys:manage` on EVERY scope (fail-closed intersection,
- *     so a team admin can't sneak a second team onto the key).
- *   - UPDATE / ROTATE / DELETE authorize against the key's *existing*
- *     scope set: the caller must hold the op permission on AT LEAST ONE of
- *     the scopes the key is already reachable from.
- *
- * The upward cascade (a broader grant covers narrower scopes) is handled
- * inside the rbac helpers: `hasTeamPermission` also reads the org-scoped
- * binding, `hasProjectPermission` reads the team + org bindings.
- *
- * No new code here relies on the legacy `TeamUserRole.ADMIN` short-circuit
- * in rbac.ts — every gate is an explicit per-scope permission check, so
- * the eventual legacy-role-removal drops the short-circuit without a sweep
- * (the @no-short-circuit invariant in the feature file).
+ * Creation requires virtualKeys:manage on every requested scope. Updates,
+ * rotation and deletion require the operation on at least one existing scope.
+ * The authz engine handles organization and team grant inheritance.
  */
 export type RBACContext = { prisma: PrismaClient; session: Session | null };
 
@@ -62,7 +40,7 @@ export type Scope = {
  * into the service layer, so REST and tRPC cannot enforce different rules:
  *
  *   - `session`          — a browser session (tRPC). Checked through the
- *                          role-binding cascade exactly as before.
+ *                          current grants for that user.
  *   - `apiKey`           — a scoped API key (public REST). Checked through
  *                          the API-key ceiling (`effective = key ∩ user`)
  *                          at each scope the call touches.
@@ -99,12 +77,16 @@ async function actorHasPermissionAtScope(
       if (!actor.session) return false;
       const sessionCtx = { prisma, session: actor.session };
       if (scope.scopeType === "ORGANIZATION") {
-        return hasOrganizationPermission(sessionCtx, scope.scopeId, permission);
+        return probeOrganizationPermission(
+          sessionCtx,
+          scope.scopeId,
+          permission,
+        );
       }
       if (scope.scopeType === "TEAM") {
-        return hasTeamPermission(sessionCtx, scope.scopeId, permission);
+        return probeTeamPermission(sessionCtx, scope.scopeId, permission);
       }
-      return hasProjectPermission(sessionCtx, scope.scopeId, permission);
+      return probeProjectPermission(sessionCtx, scope.scopeId, permission);
     }
     case "apiKey": {
       const scopeRef = await scopeRefFor(prisma, scope);
@@ -182,6 +164,41 @@ export async function assertActorCanManageAllScopes(
 }
 
 /**
+ * Create gate for a caller that speaks for one project (the public REST
+ * door). A key scoped to nothing but the caller's own project needs
+ * `virtualKeys:create` there and nothing more: issuing a project's own keys
+ * is the day job of anyone driving the gateway from it, and the Langy session
+ * key holds `create` while `manage` is withheld from it on purpose, since
+ * `manage` implies `rotate` (see `langyPermissionPolicy.ts`). Every other
+ * shape, an organization or team scope, another project, or several scopes
+ * at once, still needs `virtualKeys:manage` on every scope requested, the
+ * same fail-closed intersection as {@link assertActorCanManageAllScopes}.
+ */
+export async function assertActorCanCreateScopes(
+  ctx: ActorContext,
+  { scopes, callerProjectId }: { scopes: Scope[]; callerProjectId: string },
+): Promise<void> {
+  const [only] = scopes;
+  const ownProjectOnly =
+    scopes.length === 1 &&
+    only !== undefined &&
+    only.scopeType === "PROJECT" &&
+    only.scopeId === callerProjectId;
+  if (!ownProjectOnly) {
+    return assertActorCanManageAllScopes(ctx, scopes);
+  }
+  if (ctx.actor.kind === "session" && !ctx.actor.session) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
+  }
+  if (!(await actorHasPermissionAtScope(ctx, only, "virtualKeys:create"))) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `permission_denied: virtualKeys:create at ${scopeLabel(only)}`,
+    });
+  }
+}
+
+/**
  * Update / rotate / delete gate: require the op permission on at least one
  * of the key's existing scopes. Throws FORBIDDEN when the caller holds it
  * on none of them.
@@ -232,7 +249,11 @@ export async function assertCanOperateOnAnyScope(
 
 /**
  * The set of scopes a user can reach by *membership* within one org:
- *   - `isOrgMember`  — has an OrganizationUser row for the org.
+ *   - `isOrgMember`  — holds an active seat that shares in the org's keys:
+ *                      a Full seat or an administrator. A Lite Member sees
+ *                      no gateway page and a Developer (ADR-143) nothing
+ *                      shared, so neither sees an organization-scoped key
+ *                      through membership alone.
  *   - `teamIds`      — teams in the org the user belongs to (TeamUser).
  *   - `projectIds`   — projects living in any of those teams.
  *
@@ -244,46 +265,71 @@ export async function assertCanOperateOnAnyScope(
  */
 export type MembershipSet = {
   isOrgMember: boolean;
-  /**
-   * The caller is an ORG-level admin. Admins manage the whole org, so VK
-   * visibility short-circuits to "sees everything in the org" (see
-   * `isVisibleToMembership`). Real org owners hold no per-team `TeamUser`
-   * rows, so without this the per-project auto-provisioned Langy VK is
-   * invisible to the very admin who owns it.
-   */
-  isOrgAdmin: boolean;
+  canViewAllScopes: boolean;
   teamIds: Set<string>;
   projectIds: Set<string>;
 };
+
+/**
+ * Whether a seat takes part in the organization's shared gateway keys. The
+ * seat is the gate because neither restricted seat holds a binding at the
+ * organization scope, so no permission check can tell them apart from a
+ * Full member who simply lacks `virtualKeys:view` there.
+ */
+function seatSharesOrganizationKeys(role: OrganizationUserRole): boolean {
+  return role !== "DEVELOPER" && role !== "EXTERNAL";
+}
 
 export async function loadMembershipSet(
   prisma: PrismaClient,
   organizationId: string,
   userId: string,
 ): Promise<MembershipSet> {
-  const [orgMembership, teamMemberships] = await Promise.all([
-    prisma.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true },
-    }),
-    prisma.teamUser.findMany({
-      where: { userId, team: { organizationId } },
-      select: { teamId: true },
+  const member = await prisma.organizationUser.findFirst({
+    where: { userId, organizationId, disabledAt: null },
+    select: { userId: true, role: true },
+  });
+  const empty: MembershipSet = {
+    isOrgMember: member !== null && seatSharesOrganizationKeys(member.role),
+    canViewAllScopes: false,
+    teamIds: new Set(),
+    projectIds: new Set(),
+  };
+  if (!member) return empty;
+
+  const authz = authzChecksFor(prisma);
+  const principal = { type: "user", id: userId } as const;
+  const organizationAccess = await authz.checkByIds({
+    principal,
+    organizationId,
+    permission: "virtualKeys:view",
+  });
+  if (organizationAccess.allowed) return { ...empty, canViewAllScopes: true };
+
+  const [teams, projects] = await Promise.all([
+    prisma.team.findMany({ where: { organizationId }, select: { id: true } }),
+    prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true, teamId: true },
     }),
   ]);
-  const teamIds = new Set(teamMemberships.map((t) => t.teamId));
-  const projects =
-    teamIds.size > 0
-      ? await prisma.project.findMany({
-          where: { teamId: { in: [...teamIds] } },
-          select: { id: true },
-        })
-      : [];
+  const decisions = await authz.canBatchByIds({
+    principal,
+    organizationId,
+    permission: "virtualKeys:view",
+    teams: teams.map(({ id }) => ({ teamId: id })),
+    projects: projects.map(({ id, teamId }) => ({ projectId: id, teamId })),
+  });
   return {
-    isOrgMember: orgMembership !== null,
-    isOrgAdmin: orgMembership?.role === OrganizationUserRole.ADMIN,
-    teamIds,
-    projectIds: new Set(projects.map((p) => p.id)),
+    ...empty,
+    teamIds: new Set(
+      teams.filter(({ id }) => decisions.teams.get(id)).map(({ id }) => id),
+    ),
+    projectIds: new Set(
+      projects
+        .filter(({ id }) => decisions.projects.get(id))
+        .map(({ id }) => id),
+    ),
   };
 }
 
@@ -398,10 +444,15 @@ export async function assertTraceProjectBelongsToOrg(
   if (!traceProjectId) return;
   const project = await prisma.project.findFirst({
     where: { id: traceProjectId, team: { organizationId } },
-    select: { id: true },
+    select: { id: true, kind: true },
   });
   if (!project) {
     throw new GatewayScopeOrgMismatchError("project");
+  }
+  // ADR-144 decision 7: an aggregate owns no traces, so it is never where a
+  // key's traces (and their budget debits) land.
+  if (traceDestinationViolation(project.kind)) {
+    throw new GatewayTraceProjectNotADestinationError();
   }
 }
 
@@ -459,13 +510,7 @@ export function isVisibleToMembership(
   membership: MembershipSet,
   scopes: Scope[],
 ): boolean {
-  // Org admins manage the whole org, so list/get visibility mirrors the
-  // permission cascade (an org binding already covers team + project). The
-  // list/get procedures only ever pass VKs already scoped to the caller's
-  // org, so a blanket `true` here can't leak another org's keys. Without
-  // this, the auto-provisioned per-project Langy VK is invisible to the org
-  // admin who owns it (real admins hold no per-team TeamUser rows).
-  if (membership.isOrgAdmin) return true;
+  if (membership.canViewAllScopes) return true;
   return scopes.some((scope) => {
     if (scope.scopeType === "ORGANIZATION") return membership.isOrgMember;
     if (scope.scopeType === "TEAM")

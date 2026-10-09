@@ -21,14 +21,14 @@ function buildRpcService() {
     .version("2026-08-07", (v) => {
       v.rpc(
         "/things.create",
-        {
+        { noPermission: { reason: "framework test endpoint" },
           input: z.object({ name: z.string() }),
           output: z.object({ name: z.string() }),
           status: 201,
         },
         async (_c, { input }) => input,
       );
-      v.rpc("/things.list", { output: z.array(z.string()) }, async () => [
+      v.rpc("/things.list", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => [
         "one",
       ]);
     })
@@ -120,14 +120,14 @@ describe("v.rpc", () => {
     function buildTwoVersionService() {
       return createService({ name: "things", basePath: "/api/things" })
         .version("2026-08-07", (v) => {
-          v.rpc("/things.list", { output: z.array(z.string()) }, async () => [
+          v.rpc("/things.list", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => [
             "old",
           ]);
-          v.rpc("/things.get", { output: z.string() }, async () => "kept");
-          v.rpc("/things.count", { output: z.number() }, async () => 1);
+          v.rpc("/things.get", { noPermission: { reason: "framework test endpoint" }, output: z.string() }, async () => "kept");
+          v.rpc("/things.count", { noPermission: { reason: "framework test endpoint" }, output: z.number() }, async () => 1);
         })
         .version("2026-09-01", (v) => {
-          v.rpc("/things.list", { output: z.array(z.string()) }, async () => [
+          v.rpc("/things.list", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => [
             "new",
           ]);
           v.withdraw("post", "/things.get");
@@ -185,7 +185,10 @@ describe("v.rpc", () => {
           .version("2026-08-07", (v) => {
             (v.rpc as (p: string, c: unknown, h: unknown) => void)(
               path,
-              { output: z.string() },
+              {
+                noPermission: { reason: "framework test endpoint" },
+                output: z.string(),
+              },
               async () => "x",
             );
           })
@@ -237,7 +240,7 @@ describe("v.rpc", () => {
           .version("2026-08-07", (v) => {
             v.rpc(
               "/things.get",
-              { output: z.string(), ...config },
+              { noPermission: { reason: "framework test endpoint" }, output: z.string(), ...config },
               async () => "x",
             );
           })

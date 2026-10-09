@@ -14,7 +14,14 @@ import * as React from "react";
  * consumers instead of silently no-op'ing them.
  */
 export interface SwitchProps extends Omit<ChakraSwitch.RootProps, "onChange"> {
-  inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
+  /**
+   * Props for the hidden input the switch is driven by. Data attributes are
+   * allowed here: the input is the element that carries the checked state, so
+   * it is what a test addresses.
+   */
+  inputProps?: React.InputHTMLAttributes<HTMLInputElement> & {
+    [key: `data-${string}`]: string | undefined;
+  };
   rootRef?: React.Ref<HTMLLabelElement>;
   trackLabel?: { on: React.ReactNode; off: React.ReactNode };
   thumbLabel?: { on: React.ReactNode; off: React.ReactNode };

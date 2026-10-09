@@ -22,6 +22,9 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
@@ -79,27 +82,23 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
     });
 
     // RoleBinding #1: scopeType=ORGANIZATION, role=MEMBER
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-org-${nanoid(8)}`,
-        organizationId,
-        userId: memberUserId,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-org-${nanoid(8)}`,
+      organizationId,
+      userId: memberUserId,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // RoleBinding #2: scopeType=TEAM, role=MEMBER
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-team-${nanoid(8)}`,
-        organizationId,
-        userId: memberUserId,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-team-${nanoid(8)}`,
+      organizationId,
+      userId: memberUserId,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
     });
 
     // Deliberately NO TeamUser row — this is the bug-reproducing state.
@@ -110,7 +109,9 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
     // the tracing proxy turned synchronous service methods into Promises.
     // createTestApp's default uses NullOrganizationRepository which would
     // return no orgs and mask the behavior under test.
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       organizations: traced(
         new OrganizationService(
           new PrismaOrganizationRepository(prisma),
@@ -131,8 +132,10 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
 
   afterAll(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
 
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { teamId }],
       ["organizationUser", { organizationId }],

@@ -36,6 +36,7 @@ function row(overrides: Partial<Row> = {}): Row {
     LastActivityAt: 150,
     CurrentTurnId: null,
     LastError: null,
+    LastModel: null,
     PendingHandoffToken: null,
     PendingHandoffTurnId: null,
     RunToken: "run-token",
@@ -71,6 +72,7 @@ function context(projectId: string): ProjectionStoreContext {
 }
 
 describe("PrismaLangyConversationProjectionRepository", () => {
+  /** @scenario "Every conversation read is scoped to the project" */
   it("loads solely through the project-scoped conversation key", async () => {
     const { findUnique, repository } = setup(async (args) => {
       const key = args.where.projectId_ConversationId;

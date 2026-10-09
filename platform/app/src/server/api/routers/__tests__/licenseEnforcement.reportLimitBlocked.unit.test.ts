@@ -78,13 +78,19 @@ vi.mock("~/server/license-enforcement", () => {
   };
 });
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    usageLimits: mockUsageLimits,
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      usageLimits: mockUsageLimits,
+    }),
+  };
+});
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
@@ -92,18 +98,19 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
 }));
 
 // Mock RBAC to allow all permission checks (unit test, not testing auth)
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    checkOrganizationPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    };
+  },
+);
 
 // Dynamically import the router after mocks are in place
 const { licenseEnforcementRouter } = await import("../licenseEnforcement");

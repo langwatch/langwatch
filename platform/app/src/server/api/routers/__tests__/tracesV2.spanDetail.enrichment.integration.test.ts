@@ -97,21 +97,44 @@ const { mocks } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    traces: {
-      spans: {
-        getSpanById: mocks.getSpanById,
-        getSpanEvents: mocks.getSpanEvents,
-        getSpanSummaryByTraceId: mocks.getSpanSummaryByTraceId,
-        getSpansByTraceId: vi.fn().mockResolvedValue([]),
+// `.permission()` procedures decide through getApp().permissions (ADR-092),
+// so the fake carries the real composition over the real test database.
+vi.mock("~/server/app-layer/app", async () => {
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { authorizationServiceFor } = await import(
+    "~/server/app-layer/authz/checks"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const { TraceSummaryService } = await import(
+    "~/server/app-layer/traces/trace-summary.service"
+  );
+  const { NullTraceSummaryRepository } = await import(
+    "~/server/app-layer/traces/repositories/trace-summary.repository"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: permissionsServiceFor(dbForPermissions),
+      // A trace route's permission check mints the proof it carries (ADR-144).
+      authorization: authorizationServiceFor(dbForPermissions),
+      traces: {
+        // The detail proof narrows on an aggregate only; a plain project's
+        // proof passes through without a read (ADR-144 block F).
+        summary: new TraceSummaryService(new NullTraceSummaryRepository()),
+        spans: {
+          getSpanById: mocks.getSpanById,
+          getSpanEvents: mocks.getSpanEvents,
+          getSpanSummaryByTraceId: mocks.getSpanSummaryByTraceId,
+          getSpansByTraceId: vi.fn().mockResolvedValue([]),
+        },
+        logRecords: { getLogsByTraceId: mocks.getLogsByTraceId },
       },
-      logRecords: { getLogsByTraceId: mocks.getLogsByTraceId },
-    },
-  }),
-}));
+    }),
+  };
+});
 
 // Protections resolve per test case; RBAC/session still run for real.
 const { protectionsMock } = vi.hoisted(() => ({

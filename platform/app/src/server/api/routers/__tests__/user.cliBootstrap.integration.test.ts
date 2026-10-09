@@ -35,10 +35,12 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   getTestClickHouseClient,
@@ -47,6 +49,8 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("user.cliBootstrap integration", () => {
   const ns = `cliboot-${nanoid(8)}`;
@@ -89,14 +93,12 @@ describe("user.cliBootstrap integration", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
 
     caller = appRouter.createCaller(
@@ -126,6 +128,9 @@ describe("user.cliBootstrap integration", () => {
       where: { team: { organizationId: { in: orgIds } } },
     });
     await prisma.team.deleteMany({ where: { organizationId: { in: orgIds } } });
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
@@ -141,7 +146,7 @@ describe("user.cliBootstrap integration", () => {
     it("rejects via the checkOrganizationPermission middleware", async () => {
       await expect(
         caller.user.cliBootstrap({ organizationId: OTHER_ORG_ID }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

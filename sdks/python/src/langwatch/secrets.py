@@ -6,7 +6,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -71,6 +71,43 @@ class SecretsFacade:
         response = self._http().get(f"/api/secrets/{_quote(secret_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
+
+    def set(self, name: str, value: str) -> Dict[str, Any]:
+        """
+        Store a value under a name, whether or not the secret exists yet.
+
+        Creates the secret on the first call and replaces its value on every
+        call after that. When another caller creates the same name first, the
+        create is refused as a conflict and this call updates that secret
+        instead, so the last write wins rather than failing.
+
+        Args:
+            name: Secret name (UPPER_SNAKE_CASE).
+            value: Secret value (will be encrypted server-side).
+        """
+        secret_id = self._find_id_by_name(name)
+
+        if secret_id is None:
+            response = self._http().post(
+                "/api/secrets", json={"name": name, "value": value}
+            )
+            if response.status_code != 409:
+                _raise_for_status(response, operation="set")
+                return response.json()
+
+            secret_id = self._find_id_by_name(name)
+            if secret_id is None:
+                raise RuntimeError(
+                    f"Secret {name} was reported as existing but is not listed"
+                )
+
+        return self.update(secret_id, value=value)
+
+    def _find_id_by_name(self, name: str) -> Optional[str]:
+        for secret in self.list():
+            if secret.get("name") == name:
+                return secret.get("id")
+        return None
 
     def create(self, *, name: str, value: str) -> Dict[str, Any]:
         """

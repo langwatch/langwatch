@@ -1,7 +1,7 @@
 Feature: Scenario Archiving
   As a LangWatch user
   I want to archive scenarios from the library
-  So that I can remove test cases I no longer need while preserving history
+  So that I can remove scenarios I no longer need while preserving history
 
   Background:
     Given I am logged into project "my-project"

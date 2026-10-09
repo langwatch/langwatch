@@ -82,6 +82,57 @@ describe("the session context hook", () => {
       expect(attributes).not.toHaveProperty("vcs.ref.head.name");
       expect(attributes).not.toHaveProperty("vcs.worktree.name");
     });
+
+    /** @scenario "A native worktree switch changes the reported checkout" */
+    it("reports the payload's cwd over the launch directory variable", async () => {
+      const byDirectory: Record<string, Record<string, string>> = {
+        "/launch/checkout": {
+          "remote get-url origin": "git@github.com:langwatch/langwatch.git",
+          "branch --show-current": "main",
+          "rev-parse --git-dir": "/launch/checkout/.git",
+          "rev-parse --git-common-dir": "/launch/checkout/.git",
+        },
+        "/repo/worktrees/pr-123": {
+          "remote get-url origin": "git@github.com:langwatch/langwatch.git",
+          "branch --show-current": "fix/the-pr-branch",
+          "rev-parse --git-dir": "/repo/.git/worktrees/pr-123",
+          "rev-parse --git-common-dir": "/repo/.git",
+          "rev-parse --show-toplevel": "/repo/worktrees/pr-123",
+        },
+      };
+      await hook.runHook({
+        input: { session_id: SESSION_ID, cwd: "/repo/worktrees/pr-123" },
+        env: { CLAUDE_PROJECT_DIR: "/launch/checkout" },
+        runGit: ({ args, cwd }) => byDirectory[cwd]?.[args.join(" ")] ?? null,
+      });
+
+      expect(attributesOf(posted[0]!)).toMatchObject({
+        "vcs.ref.head.name": "fix/the-pr-branch",
+        "vcs.worktree.name": "pr-123",
+      });
+    });
+
+    /** @scenario "A payload with no cwd falls back to the launch directory" */
+    it("reads the launch directory variable when the payload has no cwd", async () => {
+      await hook.runHook({
+        input: { session_id: SESSION_ID },
+        env: { CLAUDE_PROJECT_DIR: "/launch/checkout" },
+        runGit: ({ args, cwd }) =>
+          cwd === "/launch/checkout"
+            ? {
+                "remote get-url origin":
+                  "git@github.com:langwatch/langwatch.git",
+                "branch --show-current": "main",
+                "rev-parse --git-dir": "/launch/checkout/.git",
+                "rev-parse --git-common-dir": "/launch/checkout/.git",
+              }[args.join(" ")] ?? null
+            : null,
+      });
+
+      expect(attributesOf(posted[0]!)).toMatchObject({
+        "vcs.ref.head.name": "main",
+      });
+    });
   });
 
   describe("given a session claude holds a name for", () => {

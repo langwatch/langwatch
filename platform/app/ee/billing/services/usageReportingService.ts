@@ -5,9 +5,27 @@ import { UsageReportFailedError } from "../errors";
 
 const logger = createLogger("langwatch:billing:usageReportingService");
 
+/** Fractional digits a meter value may carry. Stripe accepts decimals on a
+ *  meter; a dollar-denominated meter reports to four places. */
+export const METER_VALUE_MAX_DECIMALS = 4;
+
+/** The value as the wire carries it: an integer as itself, a fraction to the
+ *  fixed number of places, so a float never reaches Stripe with its tail. */
+export function formatMeterValue(value: number): string {
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(METER_VALUE_MAX_DECIMALS);
+}
+
 const meterEventSchema = z.object({
   eventName: z.string().min(1),
-  value: z.number().int().nonnegative(),
+  value: z
+    .number()
+    .nonnegative()
+    .refine(
+      (value) => Number(value.toFixed(METER_VALUE_MAX_DECIMALS)) === value,
+      { message: `value carries at most ${METER_VALUE_MAX_DECIMALS} decimals` },
+    ),
   /** Unix SECONDS since epoch. NOT milliseconds, NOT ISO string. */
   timestamp: z.number().int().positive(),
   /** Caller-constructed idempotency key. 24-hour rolling uniqueness window in Stripe. */
@@ -95,7 +113,7 @@ export class StripeUsageReportingService implements UsageReportingService {
         event_name: eventName,
         payload: {
           stripe_customer_id: stripeCustomerId,
-          value: String(value),
+          value: formatMeterValue(value),
         },
         identifier,
         timestamp,

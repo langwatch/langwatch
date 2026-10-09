@@ -8,8 +8,8 @@ import (
 // @scenario "A fresh worktree starts lean"
 func TestDefaultSelectionIsLean(t *testing.T) {
 	sel := DefaultSelection()
-	if !sel.Gateway || !sel.NLP {
-		t.Error("gateway and nlp run by default")
+	if !sel.Gateway || !sel.NLP || !sel.IDP {
+		t.Error("gateway, nlp and the idp simulator run by default")
 	}
 	if sel.Langy {
 		t.Error("langy is opt-in — a fresh worktree must not start it")

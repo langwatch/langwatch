@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
@@ -5,7 +6,10 @@ import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEd
 import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
 import { traceEditOverlayPatchSchema } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import type { Protections } from "~/server/traces/protections";
-import { checkProjectPermission } from "../rbac";
+import {
+  ownOnlyTraceReadAuthorization,
+  requireRouteAuthorization,
+} from "../authorization";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -20,11 +24,12 @@ const logger = createLogger("langwatch:api:trace-edit-overlay");
  * must not open it.
  */
 async function isTraceWindowRedacted({
-  projectId,
+  authorization,
   traceId,
   protections,
 }: {
-  projectId: string;
+  /** Fences the summary read (ADR-144 block C). */
+  authorization: Authorization;
   traceId: string;
   protections: Protections;
 }): Promise<boolean> {
@@ -33,19 +38,41 @@ async function isTraceWindowRedacted({
     return false;
   }
   try {
-    const summary = await getApp().traces.summary.getByTraceId(
-      projectId,
+    const summary = await getApp().traces.summary.getByTraceId({
+      authorization,
       traceId,
-      { visibilityCutoffMs, full: false },
-    );
+      visibilityCutoffMs,
+      full: false,
+    });
     return summary.redactedByVisibilityWindow === true;
   } catch (error) {
     logger.warn(
-      { error, projectId, traceId },
+      { error, traceId },
       "trace summary unreadable; withholding corrected content",
     );
     return true;
   }
+}
+
+/**
+ * The proof the correction's own summary read is fenced by. A reviewer
+ * holds annotation permissions, not trace ones, so the write procedures
+ * mint no proof of their own: the server reads the summary for the project
+ * the correction belongs to, own-only, to decide what the plan's window
+ * withholds. The read widens through no grant, the same as before.
+ */
+function authorizeOverlaySummaryRead({
+  projectId,
+  route,
+}: {
+  projectId: string;
+  route: string;
+}): Promise<Authorization> {
+  return ownOnlyTraceReadAuthorization({
+    codePath: "api/routers/traceEditOverlay",
+    projectId,
+    route,
+  });
 }
 
 /**
@@ -63,7 +90,7 @@ async function isTraceWindowRedacted({
 export const traceEditOverlayRouter = createTRPCRouter({
   getByTraceId: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const overlay = await getApp().traces.editOverlay.getByTraceId({
         projectId: input.projectId,
@@ -75,7 +102,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       const isWindowRedacted = await isTraceWindowRedacted({
-        projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         protections,
       });
@@ -106,7 +133,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         patch: traceEditOverlayPatchSchema,
       }),
     )
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
       const editOverlay = getApp().traces.editOverlay;
       const stored = await editOverlay.getByTraceId({
@@ -129,7 +156,10 @@ export const traceEditOverlayRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       const isWindowRedacted = await isTraceWindowRedacted({
-        projectId: input.projectId,
+        authorization: await authorizeOverlaySummaryRead({
+          projectId: input.projectId,
+          route: "traceEditOverlay.upsert",
+        }),
         traceId: input.traceId,
         protections,
       });
@@ -158,7 +188,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkProjectPermission("annotations:update"))
+    .permission("annotations:update")
     .mutation(async ({ input }) => {
       await getApp().traces.editOverlay.delete({
         projectId: input.projectId,

@@ -29,7 +29,7 @@ func expiringBundle(vkID string, jwtExp, keyExpiry time.Time) *domain.Bundle {
 
 func deadlines(t *testing.T, svc *Service, rawKey string) (soft, hard time.Time) {
 	t.Helper()
-	e, ok := svc.l1.Get(hashKey(rawKey))
+	e, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok, "the entry should be cached")
 	_, soft, hard = e.snapshot()
 	return soft, hard
@@ -43,7 +43,7 @@ func TestStoreL1_KeyExpiryCapsBothDeadlines(t *testing.T) {
 
 	t.Run("when the token already ends at the key's expiration date", func(t *testing.T) {
 		rawKey := "vk-lw-capped-clamped"
-		svc.storeL1(hashKey(rawKey), expiringBundle("vk_clamped", keyExpiry, keyExpiry), "")
+		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_clamped", keyExpiry, keyExpiry), "")
 
 		soft, hard := deadlines(t, svc, rawKey)
 		assert.True(t, soft.Equal(keyExpiry), "soft expiry tracks the token, which ends with the key")
@@ -53,7 +53,7 @@ func TestStoreL1_KeyExpiryCapsBothDeadlines(t *testing.T) {
 
 	t.Run("when the token outlives the key", func(t *testing.T) {
 		rawKey := "vk-lw-capped-longer-token"
-		svc.storeL1(hashKey(rawKey), expiringBundle("vk_longer", time.Now().Add(15*time.Minute), keyExpiry), "")
+		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_longer", time.Now().Add(15*time.Minute), keyExpiry), "")
 
 		soft, hard := deadlines(t, svc, rawKey)
 		assert.True(t, soft.Equal(keyExpiry), "no deadline may sit past the key's expiration date")
@@ -63,7 +63,7 @@ func TestStoreL1_KeyExpiryCapsBothDeadlines(t *testing.T) {
 	t.Run("when the key has no expiration date", func(t *testing.T) {
 		rawKey := "vk-lw-never-expires"
 		jwtExp := time.Now().Add(15 * time.Minute)
-		svc.storeL1(hashKey(rawKey), freshBundle("vk_never", jwtExp), "")
+		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_never", jwtExp), "")
 
 		soft, hard := deadlines(t, svc, rawKey)
 		assert.True(t, soft.Equal(jwtExp), "a key with no date keeps the deadlines it always had")
@@ -82,9 +82,9 @@ func TestResolve_OutageAcrossKeyExpiry_FailsClosedWithTheKeysOwnError(t *testing
 	// The key ran out a minute ago, and its token with it. Without the cap
 	// this entry is stale rather than dead, so the grace window would serve it.
 	ranOut := time.Now().Add(-1 * time.Minute)
-	svc.storeL1(hashKey(rawKey), expiringBundle("vk_ran_out", ranOut, ranOut), "")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle("vk_ran_out", ranOut, ranOut), "")
 
-	bundle, err := svc.Resolve(context.Background(), rawKey)
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
 	assert.Nil(t, bundle, "an expired key must never be served from cache")
 	require.Error(t, err)
@@ -92,7 +92,7 @@ func TestResolve_OutageAcrossKeyExpiry_FailsClosedWithTheKeysOwnError(t *testing
 		"the customer needs the key's own answer, not a retryable upstream failure")
 	assert.Equal(t, int64(0), resolver.calls.Load(),
 		"the date came with the token, so the answer needs no control-plane round trip")
-	_, cached := svc.l1.Get(hashKey(rawKey))
+	_, cached := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	assert.False(t, cached, "the entry must be evicted")
 
 	var evicted bool
@@ -111,14 +111,14 @@ func TestResolve_OutageBeforeKeyExpiry_StillServesStale(t *testing.T) {
 	}}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	rawKey := "vk-lw-outage-before-expiry"
-	svc.storeL1(hashKey(rawKey), expiringBundle(
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), expiringBundle(
 		"vk_still_good",
 		time.Now().Add(-30*time.Second),
 		time.Now().Add(1*time.Hour),
 	), "")
 	beforeSoft, _ := deadlines(t, svc, rawKey)
 
-	bundle, err := svc.Resolve(context.Background(), rawKey)
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
 	require.NoError(t, err, "a key that has not run out keeps its grace window")
 	require.NotNil(t, bundle)
@@ -167,7 +167,7 @@ func newExpiryService(t *testing.T, fetcher *expiryConfigFetcher, rawKey string,
 		ConfigTTL:        60 * time.Second,
 		RefreshThreshold: time.Millisecond,
 	})
-	svc.storeL1(hashKey(rawKey), bundle, "42")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "42")
 	return svc, backdateConfig(t, svc, rawKey, 2*time.Minute)
 }
 
@@ -179,18 +179,18 @@ func TestResolve_ConfigRefreshShortensKeyExpiry_FailsClosed(t *testing.T) {
 	// refresh can tell it the key now ends.
 	svc, e := newExpiryService(t, fetcher, rawKey, freshBundle("vk_shortened", time.Now().Add(1*time.Hour)))
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err, "the triggering request still serves; it is what kicks the refresh")
 	awaitConfigRefresh(t, e)
 
-	bundle, err := svc.Resolve(context.Background(), rawKey)
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
 	assert.Nil(t, bundle, "a key the control plane says has run out must not be served")
 	require.ErrorIs(t, err, domain.ErrKeyExpired,
 		"the shortened date is the key's own answer, not a retryable upstream failure")
 	assert.Equal(t, int64(0), fetcher.calls.Load(),
 		"the config channel carried the date, so no auth round trip is needed to act on it")
-	_, cached := svc.l1.Get(hashKey(rawKey))
+	_, cached := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	assert.False(t, cached, "the entry must be evicted")
 }
 
@@ -202,7 +202,7 @@ func TestResolve_ConfigRefreshExtendsKeyExpiry_ServesPastTheOldDate(t *testing.T
 	svc, e := newExpiryService(t, fetcher, rawKey,
 		expiringBundle("vk_extended", time.Now().Add(1*time.Hour), oldBoundary))
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	awaitConfigRefresh(t, e)
 
@@ -211,7 +211,7 @@ func TestResolve_ConfigRefreshExtendsKeyExpiry_ServesPastTheOldDate(t *testing.T
 	assert.True(t, hard.After(oldBoundary), "and so must the hard cap")
 
 	time.Sleep(time.Until(oldBoundary) + 20*time.Millisecond)
-	bundle, err := svc.Resolve(context.Background(), rawKey)
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
 	require.NoError(t, err, "a date the control plane has already moved must not refuse a request")
 	require.NotNil(t, bundle)
@@ -230,11 +230,11 @@ func TestResolve_ConfigRefreshWithoutExpiryField_KeepsTheCachedDate(t *testing.T
 	svc, e := newExpiryService(t, fetcher, rawKey,
 		expiringBundle("vk_skew", time.Now().Add(1*time.Hour), keyExpiry))
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
 	awaitConfigRefresh(t, e)
 
-	live, ok := svc.l1.Peek(hashKey(rawKey))
+	live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok)
 	assert.Equal(t, "cred-current", live.bundle.Credentials[0].ID,
 		"the config itself still lands; only the date is left alone")

@@ -174,6 +174,39 @@ describe("AnalyticsService", () => {
         expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
       });
 
+      /** @scenario The evaluations summary reads the slim evaluation table */
+      it("dispatches the evaluations summary, which sends an empty evaluator key, to the slim evaluation table", async () => {
+        const { deps, spies } = makeDeps();
+        await new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "evaluations.evaluation_runs" as const,
+              aggregation: "cardinality" as const,
+              key: "",
+            },
+          ],
+          groupBy: "evaluations.evaluation_passed",
+          timeScale: "full",
+        } as never);
+
+        expect(spies.runEvalSlimTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).not.toHaveBeenCalled();
+        const [{ series }] = spies.runEvalSlimTimeseries.mock.calls[0]!;
+        expect(series[0].key).toBeUndefined();
+      });
+
+      it("dispatches the error trend, grouped by error state, to the slim table", async () => {
+        const { deps, spies } = makeDeps();
+        await new AnalyticsService(deps).getTimeseries({
+          ...input,
+          groupBy: "error.has_error",
+        });
+
+        expect(spies.runSlimTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).not.toHaveBeenCalled();
+      });
+
       it("still uses the legacy shim for a shape neither table can serve", async () => {
         const { deps, spies } = makeDeps();
         await new AnalyticsService(deps).getTimeseries({
@@ -189,6 +222,83 @@ describe("AnalyticsService", () => {
 
         expect(spies.runLegacy).toHaveBeenCalledTimes(1);
       });
+    });
+
+    // #8009 — evaluation_runs declares allowedAggregations: ["cardinality"],
+    // but nothing enforced it: a "sum" request reached the slim builder,
+    // which unconditionally emits sum(EvaluationId) on a String column and
+    // ClickHouse rejects it with Code: 43 ILLEGAL_TYPE_OF_ARGUMENT. The
+    // service must reject the aggregation itself, before any repository
+    // (and therefore before ClickHouse) is ever called.
+    it("rejects a series whose aggregation is not allowed for its metric", async () => {
+      const { deps, spies } = makeDeps();
+
+      await expect(
+        new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "evaluations.evaluation_runs" as const,
+              aggregation: "sum" as const,
+            },
+          ],
+        }),
+      ).rejects.toThrow(/evaluations\.evaluation_runs.*sum/);
+
+      expect(spies.runLegacy).not.toHaveBeenCalled();
+      expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
+      expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
+      expect(spies.runEvalRollupTimeseries).not.toHaveBeenCalled();
+      expect(spies.runEvalSlimTimeseries).not.toHaveBeenCalled();
+    });
+
+    // graph-trigger-evaluation.service.ts builds series from stored
+    // custom-graph JSON and casts past zod — a metric renamed or removed
+    // from the registry since the graph was saved must fail clearly here,
+    // not as an undefined-property TypeError out of the aggregation guard.
+    it("rejects a series naming a metric absent from the registry", async () => {
+      const { deps, spies } = makeDeps();
+
+      await expect(
+        new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "evaluations.a_metric_removed_from_the_registry" as never,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        }),
+      ).rejects.toThrow(/a_metric_removed_from_the_registry/);
+
+      expect(spies.runLegacy).not.toHaveBeenCalled();
+      expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
+      expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
+    });
+
+    // Unlike an unknown metric within a known group, an unknown GROUP means
+    // `analyticsMetrics[group]` itself is undefined — indexing straight into
+    // that (no optional chaining) throws a raw TypeError before the
+    // ValidationError guard ever runs. Same crash shape as #8009, different
+    // trigger.
+    it("rejects a series naming a metric group absent from the registry", async () => {
+      const { deps, spies } = makeDeps();
+
+      await expect(
+        new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "a_group_removed_from_the_registry.some_metric" as never,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        }),
+      ).rejects.toThrow(/a_group_removed_from_the_registry/);
+
+      expect(spies.runLegacy).not.toHaveBeenCalled();
+      expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
+      expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
     });
 
     describe("when the tripwire flag is ON", () => {

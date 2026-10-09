@@ -90,7 +90,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiTriggersResponse400
     | GetApiTriggersResponse401
@@ -98,7 +98,7 @@ def sync_detailed(
     | GetApiTriggersResponse500
     | list[GetApiTriggersResponse200Item]
 ]:
-    """List all active triggers (automations) for the project
+    """List the project's automations, newest first. Paused automations are included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -119,7 +119,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiTriggersResponse400
     | GetApiTriggersResponse401
@@ -128,7 +128,7 @@ def sync(
     | list[GetApiTriggersResponse200Item]
     | None
 ):
-    """List all active triggers (automations) for the project
+    """List the project's automations, newest first. Paused automations are included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -145,7 +145,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiTriggersResponse400
     | GetApiTriggersResponse401
@@ -153,7 +153,7 @@ async def asyncio_detailed(
     | GetApiTriggersResponse500
     | list[GetApiTriggersResponse200Item]
 ]:
-    """List all active triggers (automations) for the project
+    """List the project's automations, newest first. Paused automations are included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -172,7 +172,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiTriggersResponse400
     | GetApiTriggersResponse401
@@ -181,7 +181,7 @@ async def asyncio(
     | list[GetApiTriggersResponse200Item]
     | None
 ):
-    """List all active triggers (automations) for the project
+    """List the project's automations, newest first. Paused automations are included.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

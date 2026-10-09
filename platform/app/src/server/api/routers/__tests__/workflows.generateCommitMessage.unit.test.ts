@@ -11,6 +11,14 @@ import { workflowRouter } from "../workflows";
 // plain-text completion with no function-tool round-trip.
 
 const mockGetVercelAIModel = vi.fn();
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("../../../modelProviders/utils", () => ({
   getVercelAIModel: (...args: unknown[]) => mockGetVercelAIModel(...args),
 }));
@@ -26,24 +34,22 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-type MiddlewareParams = {
-  ctx: Record<string, unknown>;
-  next: () => Promise<unknown>;
-};
-
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: MiddlewareParams) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 describe("workflowRouter.generateCommitMessage()", () => {
   let caller: ReturnType<typeof workflowRouter.createCaller>;

@@ -1,4 +1,5 @@
 import type { Node } from "@xyflow/react";
+import isEqual from "lodash-es/isEqual";
 import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { PromptScope } from "~/generated/prisma/client";
@@ -377,7 +378,7 @@ export function inputsAndOutputsToDemostrationColumns(
 ): { name: string; type: DatasetColumnType; id: string }[] {
   return [
     ...(inputs ?? [])
-      .filter(({ type }) => type !== "image")
+      .filter(({ type }) => type !== "image" && type !== "file")
       .map((input) => ({
         id: input.identifier,
         name: input.identifier,
@@ -389,6 +390,43 @@ export function inputsAndOutputsToDemostrationColumns(
       type: inputOutputTypeToDatasetColumnType(output.type),
     })),
   ];
+}
+
+/**
+ * The demonstrations a stored prompt settles on once it is in the form.
+ *
+ * The columns of the demonstrations dataset are DERIVED from the prompt's
+ * inputs and outputs: the form recomputes them on load and writes them into
+ * itself (`usePromptConfigForm`). A stored prompt carries no columns of its
+ * own, so a dirty baseline taken straight from the document differs from the
+ * form the moment it loads, and an untouched prompt reads as modified. Deriving
+ * them here is what keeps both sides the same shape.
+ *
+ * Returns the demonstrations untouched, undefined included, when the columns
+ * already match: the form leaves them alone in that case, and adding an empty
+ * dataset would be the same difference in the other direction.
+ */
+export function withDerivedDemonstrationColumns({
+  demonstrations,
+  inputs,
+  outputs,
+}: {
+  demonstrations: NodeDataset | undefined;
+  inputs: PromptConfigFormValues["version"]["configData"]["inputs"];
+  outputs: PromptConfigFormValues["version"]["configData"]["outputs"];
+}): NodeDataset | undefined {
+  const columnTypes = inputsAndOutputsToDemostrationColumns(inputs, outputs);
+  const current = demonstrations?.inline?.columnTypes ?? [];
+  if (isEqual(columnTypes, current)) return demonstrations;
+
+  return {
+    ...demonstrations,
+    inline: {
+      ...demonstrations?.inline,
+      columnTypes,
+      records: demonstrations?.inline?.records ?? {},
+    },
+  };
 }
 
 function inputOutputTypeToDatasetColumnType(
@@ -405,6 +443,8 @@ function inputOutputTypeToDatasetColumnType(
       return "list";
     case "image":
       throw new Error("Image is not supported in demonstrations");
+    case "file":
+      throw new Error("File is not supported in demonstrations");
     case "json_schema":
       return "json";
     case "list[float]":
@@ -619,7 +659,11 @@ export function versionedPromptToPromptConfigFormValues(
         messages: prompt.messages.filter((msg) => msg.role !== "system"),
         inputs: prompt.inputs,
         outputs: prompt.outputs,
-        demonstrations: prompt.demonstrations,
+        demonstrations: withDerivedDemonstrationColumns({
+          demonstrations: prompt.demonstrations,
+          inputs: prompt.inputs,
+          outputs: prompt.outputs,
+        }),
         promptingTechnique: prompt.promptingTechnique,
         responseFormat: prompt.responseFormat,
         llm: {

@@ -276,11 +276,118 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   experiment_run_items: "experiments",
 } as const satisfies Record<string, RetentionCategory>;
 
+/**
+ * Durable authentication and authorization state is not customer telemetry.
+ * These names cover the PostgreSQL projections/row-truth today and reserve
+ * their ClickHouse-style spellings against accidental future TTL enrollment.
+ */
+export const SECURITY_RETENTION_EXEMPT_TABLES = [
+  "identity_projection_cursor",
+  "identifier",
+  "identifier_reservation",
+  "sso_connection",
+  "join_request",
+  "scim_sync_state",
+  "scim_external_id",
+  "scim_token",
+  "authz_projection_cursor",
+  "role_binding",
+  "grant",
+  "grant_usage",
+  "role",
+  "account",
+  "account_credential",
+  "passkey",
+  "two_factor",
+  "mfa_enrollment",
+  "organization_user",
+  "team_user",
+  "group",
+  "group_membership",
+  "custom_role",
+] as const;
+
+const securityRetentionExemptTables = new Set<string>(
+  SECURITY_RETENTION_EXEMPT_TABLES,
+);
+
+for (const table of Object.keys(RETENTION_TABLE_CATEGORY_MAP)) {
+  if (securityRetentionExemptTables.has(table)) {
+    throw new Error(
+      `${table} is durable security state and cannot be enrolled in tenant retention`,
+    );
+  }
+}
+
 export type RetentionManagedTable = keyof typeof RETENTION_TABLE_CATEGORY_MAP;
 
 export const RETENTION_MANAGED_TABLES = Object.keys(
   RETENTION_TABLE_CATEGORY_MAP,
 ) as RetentionManagedTable[];
+
+/**
+ * Tables that carry the `_retention_days` column but are NOT part of the
+ * customer retention cascade — their column DEFAULTS TO 0
+ * (`INDEFINITE_RETENTION_DAYS`), so nothing is ever deleted unless a day count
+ * is deliberately stamped on a row.
+ *
+ * These MUST NOT be moved into `RETENTION_TABLE_CATEGORY_MAP`, and the
+ * temptation to "tidy" them in is exactly what this comment exists to stop.
+ * Three separate things would break:
+ *
+ *  1. The map's values are `RetentionCategory` — traces / scenarios /
+ *     experiments. Governance cost is none of those, so it would have to be
+ *     mislabelled as one of them to typecheck.
+ *  2. `resolveRetention` floors every mapped category to
+ *     PLATFORM_DEFAULT_RETENTION_DAYS (49) when no override exists. Mapping
+ *     these tables would therefore turn "keep forever" into "delete after
+ *     seven weeks" — the precise inverse of the intent — for money records.
+ *  3. Map membership is what enrolls a table in the customer storage meter
+ *     (`PRODUCTION_STORAGE_METER_TABLES`). These tables are platform
+ *     bookkeeping, not customer payload, and must not be billed as storage.
+ *
+ * What they DO share with the mapped tables is the TTL mechanism itself: the
+ * reconciler installs the same
+ * `IF(_retention_days > 0, ... , toDateTime('2106-01-01')) DELETE` clause, and
+ * a non-zero value in the column expires the row exactly the same way. The
+ * difference is only where the number comes from and what it defaults to.
+ *
+ * Introduced with the governance cost tables' move off a hardcoded 13-month
+ * TTL (migration 00095); see that migration's header for the full reasoning.
+ */
+export const INDEFINITE_DEFAULT_RETENTION_TABLES = [
+  "governance_cost_rollup_1d",
+  "governance_cost_rollup_restatement_index",
+  // An Instant Eval judgement carries no customer content, only a probability,
+  // a score or a label, never the text it judged, so none of the reasons above
+  // applies to it either: there is no trace-shaped category to map it to, a
+  // 49-day floor would delete the answer to a question about last quarter, and
+  // there is nothing to bill as storage. Migration 00097 creates the table with
+  // this clause already in place.
+  "instant_eval_judgments",
+  // The run's own row: its counters and the caller's statement. Deleting it on
+  // a timer would orphan the judgements it explains, so it keeps the same
+  // indefinite default. Migration 00098.
+  "instant_eval_runs",
+] as const;
+
+export type IndefiniteDefaultRetentionTable =
+  (typeof INDEFINITE_DEFAULT_RETENTION_TABLES)[number];
+
+/**
+ * Every table the TTL reconciler installs a `_retention_days` DELETE clause on.
+ *
+ * This is the RECONCILER's gate, and it is deliberately wider than
+ * `RETENTION_MANAGED_TABLES`, which is the CUSTOMER-facing set (the category
+ * cascade, the settings UI, and the storage meter). Anything asking "does a
+ * customer's retention policy govern this table?" wants
+ * RETENTION_MANAGED_TABLES; only the reconciler, which asks "does this table's
+ * TTL reference `_retention_days` at all?", wants this one.
+ */
+export const RETENTION_TTL_MANAGED_TABLES: readonly string[] = [
+  ...RETENTION_MANAGED_TABLES,
+  ...INDEFINITE_DEFAULT_RETENTION_TABLES,
+];
 
 /**
  * Tables included in the customer-visible production storage meter. Canonical

@@ -13,11 +13,21 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { tryGetApp } from "~/server/app-layer/app";
+import { AggregateProjectHasNoCredentialError } from "~/server/api-key/errors";
+import { sessionRevocation } from "~/server/app-layer/identity/runtime";
+import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
 import { getServerAuthSession } from "~/server/auth";
-import { auth } from "~/server/better-auth";
+import { requestStatingCaller } from "~/server/auth/caller-header";
+import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
+import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
+import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
+import {
+  redirectFailedSignInCallback,
+  withholdInternalSignInError,
+} from "~/server/better-auth/signin-error-redirect";
 import { prisma } from "~/server/db";
+import { handleAuthRequest } from "~/server/routes/auth-request";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -42,6 +52,11 @@ secured.access(authPolicy()).post("/auth/validate", async (c) => {
 
   if (!project) {
     return c.json({ message: "Invalid auth token." }, 401);
+  }
+  // ADR-144 decision 7: an aggregate accepts no key, so an SDK must not be
+  // told its stored one is good to send traces with.
+  if (traceDestinationViolation(project.kind)) {
+    throw new AggregateProjectHasNoCredentialError();
   }
 
   return c.json({ projectSlug: project.slug });
@@ -86,35 +101,15 @@ const logoutHandler = async (c: Context) => {
     extractCookie(cookies, "better-auth.session_token");
 
   if (sessionToken) {
-    try {
-      const headers = new Headers();
-      headers.set("cookie", cookies);
-      const session = await auth.api.getSession({ headers });
+    const headers = new Headers();
+    headers.set("cookie", cookies);
+    const session = await auth.api.getSession({ headers });
 
-      if (session) {
-        const token = session.session.token;
-
-        try {
-          await prisma.session.delete({
-            where: { sessionToken: token },
-          });
-        } catch {
-          // Session may already be deleted
-        }
-
-        const redisConnection = tryGetApp()?.redis ?? null;
-        if (redisConnection) {
-          try {
-            await redisConnection.del(`better-auth:${token}`);
-            const listKey = `better-auth:active-sessions-${session.user.id}`;
-            await redisConnection.del(listKey);
-          } catch {
-            // Redis cleanup is best-effort
-          }
-        }
-      }
-    } catch {
-      // Session lookup failed — still clear cookies below
+    if (session) {
+      await sessionRevocation().revokeOne({
+        token: session.session.token,
+        userId: session.user.id,
+      });
     }
   }
 
@@ -146,11 +141,13 @@ const logoutHandler = async (c: Context) => {
       env.AUTH0_ISSUER &&
       env.AUTH0_CLIENT_ID
     ) {
-      const returnTo = encodeURIComponent(`${env.NEXTAUTH_URL}/auth/signin`);
+      const returnTo = encodeURIComponent(
+        `${env.NEXTAUTH_URL}/auth/signin?signedOut=1`,
+      );
       const federatedLogoutUrl = `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
       return c.redirect(federatedLogoutUrl, 302);
     } else {
-      return c.redirect("/auth/signin", 302);
+      return c.redirect("/auth/signin?signedOut=1", 302);
     }
   } else {
     return c.json({ success: true });
@@ -161,11 +158,13 @@ secured.access(authPolicy()).get("/auth/logout", logoutHandler);
 secured.access(authPolicy()).post("/auth/logout", logoutHandler);
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
+
 const betterAuthCatchAll = async (c: Context) => {
   // Origin gate for state-changing requests
   if (
     !isAllowedAuthOrigin({
       method: c.req.method,
+      pathname: c.req.path,
       origin: c.req.header("origin"),
       referer: c.req.header("referer"),
       baseUrl: env.NEXTAUTH_URL,
@@ -188,8 +187,50 @@ const betterAuthCatchAll = async (c: Context) => {
     return c.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
   }
 
-  // BetterAuth's auth.handler is fetch-compatible (Request => Response)
-  return auth.handler(c.req.raw);
+  // BetterAuth's auth.handler is fetch-compatible (Request => Response). The
+  // marker only changes which BRANCH the writes inside it take; the answer
+  // that comes back is the same shape either way, and is translated the same
+  // way below. Handling the two through one `response` is what stops them
+  // drifting: the entrance used to return straight out of here, so a sign-up
+  // the allowlist had opted IN was the one sign-up whose refusals skipped the
+  // handled-error contract and reached the browser in better-auth's own
+  // vocabulary.
+  // Better Auth decides its own rate-limit buckets from the request it is
+  // handed, so it is handed the caller this application already resolved from
+  // the connection. See `auth/caller-header.ts`.
+  const caller = getAuthRateLimitClientIpFromHonoContext(c);
+  const response = await handleAuthRequest({
+    request: c.req.raw,
+    handler: (request) =>
+      auth.handler(requestStatingCaller({ request, caller })),
+  });
+  // better-auth's refusals speak its own vocabulary, which is neither a
+  // registered code nor copy anybody wrote for a customer. This is where the
+  // families we have translated join the handled-error contract; everything
+  // else passes through byte for byte. See `better-auth/handled-errors.ts`.
+  const answered = await translateBetterAuthError({
+    response,
+    path: c.req.path,
+  });
+  // AND THE SAME RULE FOR THE ANSWERS THAT ARE NOT BODIES. A sign-in that
+  // fails REDIRECTS, so its reason travels in a query string somebody can
+  // read, copy and paste into a ticket rather than in a body only code sees.
+  // The two are one doctrine — only a refusal we have written down crosses —
+  // applied to the two shapes an answer takes.
+  // See `better-auth/signin-error-redirect.ts`.
+  const traceId = c.get("traceId") as string | undefined;
+  // The two act on different statuses (a 3xx to the error page, a 5xx on a
+  // callback), so each answer passes through at most one of them.
+  return await redirectFailedSignInCallback({
+    response: withholdInternalSignInError({
+      response: answered,
+      errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
+      traceId,
+    }),
+    path: c.req.path,
+    errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
+    traceId,
+  });
 };
 
 // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach

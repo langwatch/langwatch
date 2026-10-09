@@ -547,6 +547,11 @@ func (a *shimAdapter) DispatchStream(ctx context.Context, req playgroundProxyReq
 //   - Authorization / X-Auth-Token — never expected from a /v1beta caller
 //     in our deployment shape; if present, it's almost certainly meant
 //     for the LangWatch app surface, not the upstream.
+//   - X-LangWatch-NLP-Secret — the credential the app authenticates this
+//     hop with. It is consumed by RequireInternalSecret before the request
+//     reaches here, and this list is a denylist over everything else, so
+//     leaving it out would hand our own internal secret to whichever
+//     provider or customer-configured endpoint the call fans out to.
 //   - Hop-by-hop headers per RFC 7230 §6.1.
 //   - Host (the upstream provider sets its own).
 //   - Content-Length (the dispatcher recomputes this for the outbound
@@ -574,6 +579,9 @@ func filterPassthroughHeaders(in http.Header) map[string]string {
 			continue
 		}
 		if _, ok := dyn[lk]; ok {
+			continue
+		}
+		if strings.EqualFold(lk, InternalSecretHeader) {
 			continue
 		}
 		switch lk {

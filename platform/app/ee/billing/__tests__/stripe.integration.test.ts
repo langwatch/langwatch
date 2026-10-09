@@ -5,7 +5,10 @@ import {
   getItemsToUpdate,
   prices,
 } from "../services/subscriptionItemCalculator";
-import { STRIPE_PRICE_NAMES } from "../stripe/stripePrices.types";
+import {
+  OPTIONAL_STRIPE_PRICE_NAMES,
+  STRIPE_PRICE_NAMES,
+} from "../stripe/stripePrices.types";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
@@ -95,7 +98,13 @@ describeIfStripeKey("Stripe billing integration", () => {
     it("confirms all mapped price IDs are active in Stripe", async () => {
       for (const priceName of STRIPE_PRICE_NAMES) {
         const priceId = prices[priceName];
-        expect(priceId).toBeDefined();
+        // Skipped rather than failed for a name this mode does not map: the
+        // optional ones are provisioned per mode by hand, and a suite that
+        // failed on one would fail on every mode until the last sync ran.
+        if (!priceId) {
+          expect(OPTIONAL_STRIPE_PRICE_NAMES).toContain(priceName);
+          continue;
+        }
 
         const stripePrice = await stripe.prices.retrieve(priceId);
 

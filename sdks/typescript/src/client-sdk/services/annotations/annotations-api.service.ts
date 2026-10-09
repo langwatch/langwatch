@@ -8,6 +8,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type AnnotationResponse = components["schemas"]["Annotation"];
 
@@ -37,13 +38,14 @@ export class AnnotationsApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new AnnotationsApiError(message, operation, error);
   }
 
   async getAll(): Promise<AnnotationResponse[]> {
     const { data, error } = await this.apiClient.GET("/api/annotations");
     if (error) this.handleApiError("fetch all annotations", error);
-    return data;
+    return data.data;
   }
 
   async get(id: string): Promise<AnnotationResponse> {
@@ -52,7 +54,7 @@ export class AnnotationsApiService {
     });
     if (error)
       this.handleApiError(`fetch annotation with ID "${id}"`, error);
-    return data;
+    return data.data;
   }
 
   async getByTrace(traceId: string): Promise<AnnotationResponse[]> {
@@ -64,7 +66,7 @@ export class AnnotationsApiService {
     );
     if (error)
       this.handleApiError(`fetch annotations for trace "${traceId}"`, error);
-    return data;
+    return data.data;
   }
 
   async create(traceId: string, params: CreateAnnotationBody): Promise<AnnotationResponse> {
@@ -76,7 +78,7 @@ export class AnnotationsApiService {
       },
     );
     if (error) this.handleApiError("create annotation", error);
-    return data;
+    return data.data;
   }
 
   async delete(id: string): Promise<{ status?: string; message?: string }> {

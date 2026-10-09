@@ -8,6 +8,7 @@ import {
   RoleBindingScopeType,
   type TeamUserRole,
 } from "~/generated/prisma/client";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
@@ -29,7 +30,8 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../../api/enterprise";
-import { getApp } from "../app";
+import { getApp, tryGetApp } from "../app";
+import { grantsService } from "../authz/runtime";
 import type { PlanProviderUser } from "../subscription/plan-provider";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import {
@@ -40,11 +42,11 @@ import {
 } from "./errors";
 import type {
   AuditLogFilters,
+  BillingOrganizationLookup,
   CreateAndAssignResult,
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
-  OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
@@ -168,7 +170,7 @@ async function collectCustomRolePermissions({
     .map((binding) => binding.customRoleId)
     .filter((id): id is string => !!id);
   if (customRoleIds.length === 0) return undefined;
-  const customRoles = await prisma.customRole.findMany({
+  const customRoles = await liveRoles(prisma).findMany({
     where: { id: { in: customRoleIds }, organizationId },
     select: { permissions: true },
   });
@@ -308,7 +310,7 @@ export class OrganizationService {
 
   async getOrganizationForBilling(
     organizationId: string,
-  ): Promise<OrganizationForBilling | null> {
+  ): Promise<BillingOrganizationLookup> {
     return this.repo.getOrganizationForBilling(organizationId);
   }
 
@@ -316,11 +318,10 @@ export class OrganizationService {
    * Creates an organization with a default team and assigns the given user as
    * admin.
    *
-   * The repository writes the organization, the membership row and the first
-   * team in one transaction. The founder's two ADMIN grants cannot join it —
-   * they are ledger facts (ADR-092 delivery-plan PR 2) — so they follow it,
-   * and a crash in between leaves an organization its founder has a seat in
-   * and no grants on, which the next sign-in is what surfaces.
+   * The founder's organization and disabled membership commit before its
+   * grants are confirmed so tenant routing can resolve the new organization.
+   * The membership becomes active only after both grants are confirmed; a
+   * failed confirmation compensates the bootstrap rows before reporting it.
    */
   async createAndAssign(params: {
     userId: string;
@@ -599,12 +600,9 @@ export class OrganizationService {
   }
 
   /**
-   * Removes a user from an organization and all its teams.
-   *
-   * Not one transaction, and deliberately ordered instead: the grants they
-   * hold are revoked first and the membership row goes after, so a crash
-   * leaves somebody holding a seat and no access rather than grants nobody
-   * can reach.
+   * Removes a user from an organization and all its teams. The canonical
+   * offboard transaction also removes group/team memberships and archives the
+   * personal workspace before its proof commits.
    *
    * Refuses to remove the acting user's own membership so an organization
    * cannot lose its last acting administrator by accident; a credential that
@@ -618,18 +616,21 @@ export class OrganizationService {
     if (params.actingUserId != null && params.actingUserId === params.userId) {
       throw new CannotRemoveSelfError();
     }
-    const membership = await this.repo.findMembership({
+    await grantsService().offboard({
+      actor:
+        params.actingUserId != null
+          ? { userId: params.actingUserId }
+          : { type: "system", name: "organizationService" },
       organizationId: params.organizationId,
       userId: params.userId,
     });
-    if (!membership) {
-      throw new MemberNotFoundError(params.userId);
-    }
-    return this.repo.deleteMember({
-      organizationId: params.organizationId,
-      userId: params.userId,
-      actingUserId: params.actingUserId ?? null,
-    });
+    // ADR-144 block E: offboarding archived the member's personal project,
+    // which no aggregate may read any more. After the offboard has committed,
+    // and never failing it: the member is gone either way, and each
+    // aggregate's nightly sweep is the retry.
+    await tryGetApp()?.projects.aggregateReconciler?.reconcileOrganizationOrLog(
+      { organizationId: params.organizationId, trigger: "member-offboarded" },
+    );
   }
 
   /**
@@ -685,7 +686,14 @@ export class OrganizationService {
       }
     }
 
-    return this.repo.setMemberDisabled({ organizationId, userId, disabled });
+    await this.repo.setMemberDisabled({ organizationId, userId, disabled });
+
+    // Disabling is a plain column write, not a grant write, so nothing else
+    // retires the authorization snapshots cached for this organization. An
+    // admin who has just revoked someone's access must not have to wait for a
+    // cache to age out before it is true, and re-enabling must not leave the
+    // person locked out for the same window.
+    await grantsService().invalidateOrganization({ organizationId });
   }
 
   /**
@@ -745,15 +753,13 @@ export class OrganizationService {
       organizationId,
     });
 
-    const currentTeamBindings = await prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        userId,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: { in: organizationTeamIds },
-      },
-      select: { scopeId: true, role: true, customRoleId: true },
-    });
+    const currentTeamBindings = (
+      await this.repo.findMemberTeamBindings({ organizationId, userId })
+    ).map((binding) => ({
+      scopeId: binding.teamId,
+      role: binding.role,
+      customRoleId: binding.customRoleId,
+    }));
 
     const currentMemberships = currentTeamBindings.map((binding) => ({
       teamId: binding.scopeId,

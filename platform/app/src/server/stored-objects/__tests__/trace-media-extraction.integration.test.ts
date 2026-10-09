@@ -610,7 +610,7 @@ describe("trace media extraction at the ingestion edge", () => {
     });
 
     /** @scenario "The same bytes in two attributes of one span are stored once" */
-    it("stores one object when the same image rides two attributes of one span", async () => {
+    it("stores one object when the same image is on two attributes of one span", async () => {
       // What a managed-prompt run produces: the engine compiles the prompt from
       // the dataset value (prompt variables), then sends the message built from
       // it. The same picture legitimately appears twice in one span.

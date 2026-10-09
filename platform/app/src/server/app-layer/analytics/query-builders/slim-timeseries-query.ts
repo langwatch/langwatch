@@ -17,14 +17,22 @@
  *     (multi-tenancy contract, CLAUDE.md);
  *   * filter on the partition column `OccurredAt` so ClickHouse prunes
  *     partitions (clickhouse-queries best-practices);
- *   * dedup the slim table via the IN-tuple pattern — slim is
- *     `ReplacingMergeTree(UpdatedAt)`; same dedup discipline as the legacy
- *     `dedupedTraceSummaries` helper.
+ *   * dedup the slim table (`ReplacingMergeTree(UpdatedAt)`) to the latest
+ *     version of each trace with the spillable `argMax` collapse of
+ *     `latestVersionSubquery`.
  */
 
+import {
+  type LatestVersionColumn,
+  latestVersionSubquery,
+} from "~/server/analytics/clickhouse/latest-version-dedup";
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import {
+  customMetadataKeyCondition,
+  customMetadataValueCondition,
+} from "~/server/filters/clickhouse";
 import type { FilterField } from "~/server/filters/types";
 import {
   isSlimEligibleTraceMetricKey,
@@ -40,6 +48,7 @@ import {
   hasFilterValues,
   isPercentile,
   percentileFor,
+  referencedAliasColumns,
 } from "./_shared";
 
 const SLIM_TABLE = "trace_analytics" as const;
@@ -54,6 +63,7 @@ const ta = "ta";
  * them to `trace_summaries`; see SLIM_TRACE_GROUP_BY_KEYS in route-table.ts.
  */
 export type SlimGroupByKey =
+  | "error.has_error"
   | "topics.topics"
   | "traces.trace_name"
   | "metadata.user_id"
@@ -120,6 +130,7 @@ function slimColumnFor(metric: SlimTraceMetricKey): string {
 
 function isSlimGroupByKey(groupBy: string): groupBy is SlimGroupByKey {
   switch (groupBy) {
+    case "error.has_error":
     case "topics.topics":
     case "traces.trace_name":
     case "metadata.user_id":
@@ -141,6 +152,10 @@ function slimGroupByExpression(groupBy?: string): string | null {
     throw new Error(`Slim builder cannot group by "${groupBy}".`);
   }
   switch (groupBy) {
+    case "error.has_error":
+      // Trace-level error flag, the slim twin of the legacy builder's
+      // `ContainsErrorStatus` bucket (same labels, so the two paths agree).
+      return `if(${ta}.HasError, 'with error', 'without error')`;
     case "topics.topics":
       return `${ta}.TopicId`;
     case "traces.trace_name":
@@ -168,20 +183,21 @@ function slimGroupByExpression(groupBy?: string): string | null {
  * `HAVING group_key != ''` clause.
  */
 function slimGroupByHandlesUnknown(groupBy?: string): boolean {
-  return groupBy === "traces.trace_name";
+  return groupBy === "traces.trace_name" || groupBy === "error.has_error";
 }
 
 // isPercentile + percentileFor are shared with eval-slim-timeseries-query.ts
 // via ~/analytics/query-builders/_shared.
 
 /**
- * Slim aggregation expression. Slim has typed columns, so percentiles use
- * `quantileExact` directly (matches the legacy builder's behaviour to keep
- * parity).
+ * Slim aggregation expression. Percentiles use `quantileTDigest`, the same
+ * estimator the legacy builder uses for `performance.*` metrics (`perfAgg`):
+ * bounded memory per group, where `quantileExact` keeps every value of the
+ * range in memory.
  */
 function slimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {
-    return `quantileExact(${percentileFor(agg)})(${column})`;
+    return `quantileTDigest(${percentileFor(agg)})(${column})`;
   }
   switch (agg) {
     case "sum":
@@ -201,40 +217,58 @@ function slimAggExpression(agg: AggregationTypes, column: string): string {
 }
 
 /**
- * Build a deduped FROM-clause for the slim table — IN-tuple dedup against
- * `(TenantId, TraceId, UpdatedAt)` because slim is
- * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the legacy
- * `dedupedTraceSummaries` helper, parameterised for the slim table + its
- * OccurredAt partition column.
+ * Deduped FROM-clause for the slim table: the latest version of each trace in
+ * range, collapsed with `argMax` so the per-trace state can spill to disk (see
+ * {@link latestVersionSubquery}; the IN-tuple form held one hash-set entry per
+ * trace and failed on high-volume tenants).
  *
- * `TRACE_ANALYTICS_HAS_SIGNAL_SQL`: the store now writes dimension-only
- * states — a topic, an annotation, a rename, with no span or log record —
- * where it used to not write them at all (that always-write is what lets the
- * fold trust an absent read). This filter is what keeps such rows out of the
- * product's numbers: a row on this table is otherwise counted as A TRACE by
- * every aggregate below. The verdict is DERIVED from columns the row already
- * carries — no schema change — and defined next to the in-memory predicate it
- * mirrors, so the two cannot drift apart silently. Outer SELECT only: the
- * verdict is monotonic non-decreasing across a trace's versions (spans only
- * accumulate), so the latest version speaks for the trace and the
- * max(UpdatedAt) grouping needs no second filter.
+ * Only the columns the outer query reads are carried, plus two verdicts
+ * evaluated on each version row and kept from the latest one:
+ *
+ *   - `HasSignal` (`TRACE_ANALYTICS_HAS_SIGNAL_SQL`): the store writes
+ *     dimension-only states (a topic, an annotation, a rename, with no span or
+ *     log record) that must not count as A TRACE. The verdict is DERIVED from
+ *     columns the row already carries and defined next to the in-memory
+ *     predicate it mirrors, so the two cannot drift apart. It is monotonic
+ *     non-decreasing across a trace's versions (spans only accumulate), so the
+ *     latest version speaks for the trace.
+ *   - `MatchesFilters`: the user's filters and the caller's origin exclusion,
+ *     so the map they read (`Attributes`) is never carried per trace.
  */
-function dedupedSlim(alias: string, dateClause: string): string {
-  return `(
-    SELECT *
-    FROM ${SLIM_TABLE}
-    WHERE TenantId = {tenantId:String}
-      AND ${TRACE_ANALYTICS_HAS_SIGNAL_SQL}
-      ${dateClause}
-      AND (TenantId, TraceId, UpdatedAt) IN (
-        SELECT TenantId, TraceId, max(UpdatedAt)
-        FROM ${SLIM_TABLE}
-        WHERE TenantId = {tenantId:String}
-          ${dateClause}
-        GROUP BY TenantId, TraceId
-      )
-  ) ${alias}`;
+function dedupedSlim({
+  alias,
+  dateClause,
+  columns,
+  filterPredicates,
+}: {
+  alias: string;
+  dateClause: string;
+  columns: readonly string[];
+  filterPredicates: readonly string[];
+}): string {
+  const carried: LatestVersionColumn[] = columns.map((name) => ({ name }));
+  carried.push({
+    name: SLIM_HAS_SIGNAL,
+    expression: `(${TRACE_ANALYTICS_HAS_SIGNAL_SQL})`,
+  });
+  if (filterPredicates.length > 0) {
+    carried.push({
+      name: SLIM_MATCHES_FILTERS,
+      expression: `(${filterPredicates.join(" AND ")})`,
+    });
+  }
+  return latestVersionSubquery({
+    table: SLIM_TABLE,
+    alias,
+    sourceAlias: alias,
+    keyColumns: ["TenantId", "TraceId"],
+    columns: carried,
+    where: `TenantId = {tenantId:String} ${dateClause}`,
+  });
 }
+
+const SLIM_HAS_SIGNAL = "HasSignal";
+const SLIM_MATCHES_FILTERS = "MatchesFilters";
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
@@ -248,8 +282,8 @@ const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTim
  */
 function buildSlimFilterClauses(
   filters: AnalyticsTimeseriesBuilderInput["filters"],
-): { whereClause: string; params: Record<string, unknown> } {
-  if (!filters) return { whereClause: "", params: {} };
+): { clauses: string[]; params: Record<string, unknown> } {
+  if (!filters) return { clauses: [], params: {} };
 
   const clauses: string[] = [];
   const params: Record<string, unknown> = {};
@@ -333,28 +367,33 @@ function buildSlimFilterClauses(
       case "metadata.key": {
         const keys = collectStringValues(rawValue);
         if (keys.length === 0) break;
-        // Filter: trace has AT LEAST ONE of these keys in its (trimmed)
-        // Attributes map. mapContains() works on Map(String, String).
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ta}.Attributes, {${p}:String})`;
+        const condition = customMetadataKeyCondition({
+          values: keys,
+          paramId: next("metaKey"),
+          alias: ta,
         });
-        clauses.push(`(${exprs.join(" OR ")})`);
+        clauses.push(condition.sql);
+        Object.assign(params, condition.params);
         break;
       }
       case "metadata.value": {
-        // Shape: Record<metaKey, string[]>
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
+        // Shape: Record<metaKey, string[]>. Values with no key match
+        // nothing, as on trace_summaries.
+        if (Array.isArray(rawValue)) {
+          clauses.push("1=0");
+          break;
+        }
+        if (typeof rawValue !== "object") break;
         for (const [metaKey, vals] of Object.entries(rawValue)) {
           if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(
-            `${ta}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
+          const condition = customMetadataValueCondition({
+            values: vals,
+            paramId: next("metaValue"),
+            key: metaKey,
+            alias: ta,
+          });
+          clauses.push(condition.sql);
+          Object.assign(params, condition.params);
         }
         break;
       }
@@ -365,8 +404,7 @@ function buildSlimFilterClauses(
     }
   }
 
-  const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
-  return { whereClause, params };
+  return { clauses, params };
 }
 
 /**
@@ -424,8 +462,11 @@ export function buildSlimTimeseriesQuery(
   if (typeof input.timeScale === "number") groupByExprs.push("date");
   if (groupByColumn) groupByExprs.push("group_key");
 
-  const { whereClause: filterWhere, params: filterParams } =
+  const { clauses: filterClauses, params: filterParams } =
     buildSlimFilterClauses(input.filters);
+  const { clauses: excludeClauses, params: excludeParams } =
+    buildSlimOriginExclusion(input.excludeOrigins);
+  const filterPredicates = [...filterClauses, ...excludeClauses];
 
   // Mirror the legacy builder's `handlesUnknown` contract
   // (`aggregation-builder.ts` → `buildGroupKeyHavingClause`): a group-by whose
@@ -440,14 +481,24 @@ export function buildSlimTimeseriesQuery(
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
-    FROM ${dedupedSlim(ta, SLIM_DATE_FILTER_BOTH_PERIODS)}
+    FROM ${dedupedSlim({
+      alias: ta,
+      dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
+      columns: referencedAliasColumns({
+        alias: ta,
+        expressions: selectExprs,
+        keyColumns: ["TenantId", "TraceId"],
+      }),
+      filterPredicates,
+    })}
     WHERE ${ta}.TenantId = {tenantId:String}
       AND (
         (${ta}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.OccurredAt < {currentEnd:DateTime64(3)})
         OR
         (${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)})
       )
-      ${filterWhere}
+      AND ${ta}.${SLIM_HAS_SIGNAL}
+      ${filterPredicates.length > 0 ? `AND ${ta}.${SLIM_MATCHES_FILTERS}` : ""}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -462,6 +513,23 @@ export function buildSlimTimeseriesQuery(
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
       ...filterParams,
+      ...excludeParams,
     },
+  };
+}
+
+/**
+ * The caller's own origin exclusion, ANDed after the user's filters. It is
+ * not one of them: a negated filter selection never inverts it.
+ */
+function buildSlimOriginExclusion(
+  excludeOrigins: AnalyticsTimeseriesBuilderInput["excludeOrigins"],
+): { clauses: string[]; params: Record<string, unknown> } {
+  if (!excludeOrigins || excludeOrigins.length === 0) {
+    return { clauses: [], params: {} };
+  }
+  return {
+    clauses: [`${ta}.Origin NOT IN ({slim_excludeOrigins:Array(String)})`],
+    params: { slim_excludeOrigins: excludeOrigins },
   };
 }

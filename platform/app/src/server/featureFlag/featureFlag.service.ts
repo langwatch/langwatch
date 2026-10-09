@@ -6,6 +6,7 @@ import {
 } from "./featureFlagStore.postgres";
 import type { FeatureFlagKey } from "./registry";
 import { resolveFlagDefinition } from "./registry";
+import { toRuleContextId } from "./targeting";
 import type {
   FeatureFlagEvaluateOptions,
   FeatureFlagServiceInterface,
@@ -99,8 +100,12 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     }
 
     const storeCtx = {
-      projectId: opts.projectId,
-      organizationId: opts.organizationId,
+      projectId: toRuleContextId(opts.projectId),
+      organizationId: toRuleContextId(opts.organizationId),
+      // The caller's identity is what a percentage rollout rule buckets on.
+      distinctId: opts.distinctId,
+      // The session's email is what an email domain rule compares against.
+      userEmail: opts.userEmail ?? undefined,
     };
 
     if (definition?.scope === "SYSTEM" || definition?.scope === "PRODUCT") {

@@ -2,7 +2,7 @@
  * The CLI envelope: re-typing a shell tool call as the LangWatch capability it
  * really was.
  *
- * Langy runs on opencode and reaches LangWatch through the `langwatch` CLI, so
+ * Langy reaches LangWatch through the `langwatch` CLI, so
  * every tool call arrives named `bash` with the intent buried in a command
  * string. Left alone that flattens the product: the durable event log records
  * "the agent ran bash" instead of "the agent searched traces", and the browser
@@ -44,7 +44,7 @@ import {
 } from "./langwatchCommand";
 
 /**
- * A tool-call lifecycle frame the manager forwards from opencode (`langy.tool`).
+ * A tool-call lifecycle frame the manager forwards from the worker (`langy.tool`).
  * `phase:"start"` carries the tool name + input; `phase:"end"` carries the
  * result (`output`, a string) and whether it errored. Paired by `id`.
  *
@@ -63,12 +63,22 @@ export interface LangyToolFrame {
   digest?: CliResultDigest;
   /** Validated polymorphic payload for a successful LangWatch CLI call. */
   result?: CliToolResult;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Absent means the sandbox.
+   */
+  local?: boolean;
 }
 
-/** opencode's shell tools — any of these may be carrying a `langwatch` call. */
-const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute"]);
+/**
+ * The tools a `langwatch` call can arrive through: the worker's own shells,
+ * and the shell that runs in the folder the developer shared from their
+ * machine (ADR-129). A call is the CLI's whichever shell ran it, so it is
+ * re-typed, its link remembered and its navigate intercepted the same way.
+ */
+const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
 
-/** Keys a shell tool may pass its command under. opencode's bash uses `command`. */
+/** Keys a shell tool may pass its command under. The bash tool uses `command`. */
 const COMMAND_KEYS = ["command", "cmd", "script"];
 
 export class LangyCliEnvelopeService {
@@ -208,7 +218,7 @@ export class LangyCliEnvelopeService {
 
   /**
    * The command string behind a shell tool call, or null when the frame is not a
-   * shell call at all. opencode's bash tool passes `{ command: "…" }`, but the
+   * shell call at all. The bash tool passes `{ command: "…" }`, but the
    * input is whatever the model produced, so a bare string is tolerated too.
    */
   /**

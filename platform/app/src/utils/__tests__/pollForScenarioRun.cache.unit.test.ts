@@ -20,7 +20,7 @@ import { shouldRetryQuery } from "../queryRetryPolicy";
  * would keep passing if those options stopped defeating the cache.
  *
  * @see ../pollForScenarioRun.ts
- * @see ../../hooks/useRunScenario.tsx
+ * @see ../../hooks/useRunScenario.ts
  */
 
 const POLL_PARAMS = {

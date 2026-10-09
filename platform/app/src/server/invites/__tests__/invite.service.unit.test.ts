@@ -1,11 +1,9 @@
 /**
  * Unit tests for InviteService.
  *
- * Covers the @unit scenarios from specs/members/update-pending-invitation.feature:
- * - Pending invites query returns both PENDING and WAITING_APPROVAL invites
- * - createAdminInviteRecord creates record without sending email
- *
- * Tests the service in isolation with mocked dependencies.
+ * Tests the service in isolation with mocked dependencies. The invitation
+ * lifecycle scenarios live in specs/identity/resilient-invitations.feature
+ * (D11); the resilience-specific claims are in invite-resilience.unit.test.ts.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,7 +43,9 @@ vi.mock("../../../env.mjs", async (importOriginal) => {
     ...original,
     env: {
       ...original.env,
-      SENDGRID_API_KEY: "test-sendgrid-key",
+      EMAIL_PROVIDER: "smtp",
+      SMTP_URL: "smtp://127.0.0.1:1025",
+      SENDGRID_API_KEY: void 0,
     },
   };
 });
@@ -84,6 +84,23 @@ describe("classifyInvitesByMemberType()", () => {
 
       expect(result.fullMembers).toBe(0);
       expect(result.liteMembers).toBe(1);
+    });
+  });
+
+  describe("when invites have DEVELOPER role", () => {
+    /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+    it("counts them as developers, in neither metered pool", () => {
+      const invites = [
+        { role: OrganizationUserRole.DEVELOPER },
+        { role: OrganizationUserRole.DEVELOPER, teams: [] },
+      ];
+      const customRoleMap = new Map();
+
+      const result = classifyInvitesByMemberType(invites, customRoleMap);
+
+      expect(result.developers).toBe(2);
+      expect(result.fullMembers).toBe(0);
+      expect(result.liteMembers).toBe(0);
     });
   });
 
@@ -152,16 +169,24 @@ describe("InviteService", () => {
     mockPrisma = {
       // The membership row and the invite's acceptance are one transaction:
       // a PENDING invite must never be one that has already granted access.
-      // The stub runs the batch it is handed, and `$connect` is what marks it
+      // The stub runs the batch it is handed — or, for the claim's callback
+      // form, hands itself back as `tx` — and `$connect` is what marks it
       // as a root client rather than somebody else's transaction.
       $connect: vi.fn(),
-      $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
+      $transaction: (arg: unknown) =>
+        typeof arg === "function"
+          ? (arg as (tx: unknown) => unknown)(mockPrisma)
+          : Promise.all(arg as Promise<unknown>[]),
       organizationInvite: {
         findFirst: vi.fn(),
         findMany: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
+      // The acceptance claim and the revoke are SQL; the resend and extend
+      // claims still go through `updateMany`.
+      $executeRaw: vi.fn().mockResolvedValue(1),
       organization: {
         findFirst: vi.fn(),
       },
@@ -169,7 +194,7 @@ describe("InviteService", () => {
         findFirst: vi.fn(),
         findUnique: vi.fn(),
       },
-      customRole: {
+      role: {
         findMany: vi.fn(),
       },
     };
@@ -248,6 +273,50 @@ describe("InviteService", () => {
       });
     });
 
+    describe("when a Developer invitation names a team", () => {
+      /** @scenario A Developer cannot be given a role on a shared team */
+      it("refuses it naming the seat", async () => {
+        mockPrisma.organization.findFirst.mockResolvedValue({
+          id: "org-1",
+          name: "ACME",
+        });
+
+        await expect(
+          service.createAdminInviteRecord({
+            email: "dev@example.com",
+            role: OrganizationUserRole.DEVELOPER,
+            organizationId: "org-1",
+            teamIds: "team-1",
+            teamAssignments: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
+          }),
+        ).rejects.toMatchObject({ code: "developer_seat_no_shared_access" });
+
+        expect(mockPrisma.organizationInvite.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a Developer invitation names no team", () => {
+      /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+      it("lets it through", async () => {
+        mockPrisma.organization.findFirst.mockResolvedValue({
+          id: "org-1",
+          name: "ACME",
+        });
+        mockPrisma.organizationInvite.create.mockResolvedValue({
+          id: "invite-dev",
+        });
+
+        await expect(
+          service.createAdminInviteRecord({
+            email: "dev@example.com",
+            role: OrganizationUserRole.DEVELOPER,
+            organizationId: "org-1",
+            teamIds: "",
+          }),
+        ).resolves.toMatchObject({ invite: { id: "invite-dev" } });
+      });
+    });
+
     describe("when a Lite Member invitation carries Viewer access", () => {
       it("lets it through", async () => {
         mockPrisma.organization.findFirst.mockResolvedValue({
@@ -272,6 +341,26 @@ describe("InviteService", () => {
   });
 
   describe("resolveInviteTeamMemberships()", () => {
+    describe("when a stored Developer invitation carries teams in either form", () => {
+      /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+      it("grants no team at all", () => {
+        expect(
+          resolveInviteTeamMemberships({
+            role: OrganizationUserRole.DEVELOPER,
+            teamIds: "team-1,team-2",
+            teamAssignments: null,
+          }),
+        ).toEqual([]);
+        expect(
+          resolveInviteTeamMemberships({
+            role: OrganizationUserRole.DEVELOPER,
+            teamIds: "",
+            teamAssignments: [{ teamId: "team-1", role: TeamUserRole.ADMIN }],
+          }),
+        ).toEqual([]);
+      });
+    });
+
     describe("when a stored Lite Member invitation carries team access above Viewer", () => {
       /** @scenario An invitation cannot carry team access above the invited seat */
       it("corrects it to Viewer at acceptance", () => {
@@ -413,7 +502,7 @@ describe("InviteService", () => {
       });
     });
 
-    describe("when a WAITING_APPROVAL invite exists for the email", () => {
+    describe("when a PAYMENT_PENDING invite exists for the email", () => {
       it("returns the existing invite", async () => {
         const existingInvite = { id: "inv-2", email: "test@example.com" };
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(
@@ -445,7 +534,7 @@ describe("InviteService", () => {
 
   describe("checkLicenseLimits()", () => {
     beforeEach(() => {
-      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.role.findMany.mockResolvedValue([]);
     });
 
     describe("when member limit is exceeded", () => {
@@ -539,6 +628,48 @@ describe("InviteService", () => {
       });
     });
 
+    describe("when the organization is already over both seat limits", () => {
+      beforeEach(() => {
+        vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(12);
+        vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(7);
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
+          maxMembers: 10,
+          maxMembersLite: 5,
+          overrideAddingLimitations: false,
+        } as any);
+      });
+
+      /** @scenario Developers are counted and never capped */
+      it("still lets a batch of Developer invitations through", async () => {
+        await expect(
+          service.checkLicenseLimits({
+            organizationId: "org-1",
+            newInvites: [
+              { role: OrganizationUserRole.DEVELOPER },
+              { role: OrganizationUserRole.DEVELOPER },
+            ],
+            user: { id: "user-1" } as any,
+          }),
+        ).resolves.toBeUndefined();
+      });
+
+      it("refuses a batch that adds a Full seat", async () => {
+        const error = await service
+          .checkLicenseLimits({
+            organizationId: "org-1",
+            newInvites: [
+              { role: OrganizationUserRole.DEVELOPER },
+              { role: OrganizationUserRole.MEMBER },
+            ],
+            user: { id: "user-1" } as any,
+          })
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(LimitExceededError);
+        expect(error.limitType).toBe("members");
+      });
+    });
+
     describe("when overrideAddingLimitations is true", () => {
       it("does not enforce limits", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(1000);
@@ -618,39 +749,37 @@ describe("InviteService", () => {
     });
   });
 
-  describe("approveInvite()", () => {
-    describe("when email service fails", () => {
+  describe("resendInvite()", () => {
+    describe("when the email service fails", () => {
       const mockOrganization = { id: "org-1", name: "Test Org" };
       const mockInvite = {
         id: "inv-1",
         email: "user@example.com",
         inviteCode: "abc123",
-        status: "WAITING_APPROVAL",
-        organization: mockOrganization,
-      };
-      const updatedInvite = {
-        ...mockInvite,
         status: "PENDING",
-        organization: undefined,
+        expiration: new Date(Date.now() - 1000),
+        organization: mockOrganization,
       };
 
       beforeEach(() => {
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(mockInvite);
-        mockPrisma.organizationInvite.update.mockResolvedValue(updatedInvite);
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
         mockSendInviteEmail.mockRejectedValue(new Error("SMTP failure"));
       });
 
-      it("still approves the invitation", async () => {
-        const result = await service.approveInvite({
+      it("still resends the invitation with a fresh code", async () => {
+        const result = await service.resendInvite({
           inviteId: "inv-1",
           organizationId: "org-1",
         });
 
-        expect(result.invite.status).toBe("PENDING");
+        expect(result.invite.inviteCode).not.toBe("abc123");
       });
 
-      it("returns emailNotSent as true", async () => {
-        const result = await service.approveInvite({
+      it("returns emailNotSent as true so the fresh link is shown instead", async () => {
+        const result = await service.resendInvite({
           inviteId: "inv-1",
           organizationId: "org-1",
         });
@@ -780,7 +909,8 @@ describe("InviteService", () => {
         expect(firstCall.data.expiration).toBeInstanceOf(Date);
       });
 
-      it("sends invite emails for each invite", async () => {
+      /** @scenario Invitations use the configured email provider */
+      it("sends each invite through SMTP without a SendGrid key", async () => {
         await service.approvePaymentPendingInvites({
           subscriptionId: "sub-1",
           organizationId: "org-1",
@@ -924,12 +1054,16 @@ describe("InviteService", () => {
         expect(teamBinding!.principal).toEqual({ userId: "user-flow-1" });
         expect(teamBinding!.scopeId).toBe("team-1");
 
-        // Verify: invite was marked ACCEPTED
-        expect(mockPrisma.organizationInvite.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: { status: "ACCEPTED" },
-          }),
+        // Verify: invite was claimed ACCEPTED — a conditional update on the
+        // PENDING status, recording who accepted. The claim binds the
+        // acceptor first.
+        const claims = mockPrisma.$executeRaw.mock.calls.filter(
+          ([statement]: [TemplateStringsArray]) =>
+            statement.join("?").includes("'ACCEPTED'"),
         );
+        expect(claims).toHaveLength(1);
+        expect(claims[0]?.[0].join("?")).toMatch(/"status" = 'PENDING'/);
+        expect(claims[0]?.[1]).toBe("user-flow-1");
       });
     });
   });
@@ -948,7 +1082,7 @@ describe("InviteService", () => {
 
       beforeEach(() => {
         (mockPrisma as any).organizationUser = { createMany: vi.fn() };
-        mockPrisma.organizationInvite.update.mockResolvedValue({});
+        mockPrisma.$executeRaw.mockResolvedValue(1);
         // The writer is module-level and shared, so what the previous test
         // sent it would otherwise be counted as this one's.
         ledger.attachBindings.mockClear();
@@ -963,9 +1097,9 @@ describe("InviteService", () => {
       describe("when it is applied", () => {
         it("accepts the invite before granting anything, so a pending invite never carries access", async () => {
           const order: string[] = [];
-          mockPrisma.organizationInvite.update.mockImplementation(() => {
+          mockPrisma.$executeRaw.mockImplementation(() => {
             order.push("accepted");
-            return Promise.resolve({});
+            return Promise.resolve(1);
           });
           ledger.attachBindings.mockImplementation(() => {
             order.push("granted");
@@ -1004,6 +1138,7 @@ describe("InviteService", () => {
           expect(order).toContain("emitted");
         });
 
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("names the inviter as the actor, not the person receiving the access", async () => {
           await service.applyInvite({ userId: "user-flow-2", invite });
 
@@ -1037,6 +1172,7 @@ describe("InviteService", () => {
       });
 
       describe("when the invite records no sender", () => {
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("attributes the grants to the service rather than to the invitee", async () => {
           await service.applyInvite({
             userId: "user-flow-2",

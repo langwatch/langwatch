@@ -20,13 +20,25 @@
  *       specs/ai-governance/personal-portal/default-catalog.feature
  */
 import { STARTER_PACK_TILES } from "@ee/governance/services/aiToolEntry.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { GrantPrincipalType, GrantScopeType } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import { PrismaAuthzAuditTrailRepository } from "~/server/app-layer/authz/repositories/authz-audit-trail.prisma.repository";
+import { PrismaAuthzGrantsWriteRepository } from "~/server/app-layer/authz/repositories/authz-grants-write.prisma.repository";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import {
+  cleanupTestData,
+  startTestContainers,
+  stopTestContainers,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
+import { createAuthzGrantsPipeline } from "~/server/event-sourcing/pipelines/authz-grants/pipeline";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createInnerTRPCContext } from "../../../trpc";
@@ -37,6 +49,7 @@ const suffix = nanoid(8);
 /** Users created here, torn down with everything hanging off them. */
 const createdUserIds: string[] = [];
 const createdOrganizationIds: string[] = [];
+let eventSourcing: EventSourcing;
 
 async function seedUser(label: string) {
   const user = await prisma.user.create({
@@ -84,10 +97,28 @@ describe("onboarding.initializeOrganization personal workspace", () => {
     // so the App singleton needs a real Prisma repository. Same shape as
     // rbac.member-leak-coverage.integration.test.ts — createTestApp with one
     // real repo, avoiding initializeDefaultApp's require() chain.
+    const { clickHouseClient, redisConnection } = await startTestContainers();
+    eventSourcing = new EventSourcing({
+      clickhouse: async () => clickHouseClient,
+      redis: redisConnection,
+      enabled: true,
+      processRole: "all",
+    });
+    const pipeline = eventSourcing.register(
+      createAuthzGrantsPipeline({
+        authzGrantsWriteStore: new PrismaAuthzGrantsWriteRepository(prisma),
+        authzAuditTrailStore: new PrismaAuthzAuditTrailRepository(prisma),
+      }),
+    );
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       organizations: new OrganizationService(
-        new PrismaOrganizationRepository(prisma),
+        new PrismaOrganizationRepository(
+          prisma,
+          new GrantsLedgerWriter(prisma, {
+            commands: async () => ({ commands: pipeline.commands }),
+          }),
+        ),
         {
           seedForOrg: async () => {
             /* noop */
@@ -113,6 +144,9 @@ describe("onboarding.initializeOrganization personal workspace", () => {
         });
       }
       await cleanupTestRows(prisma, [
+        ["grantUsage", { organizationId }],
+        ["grant", { organizationId }],
+        ["role", { organizationId }],
         ["project", { team: { organizationId } }],
         ["aiToolEntry", { organizationId }],
         ["roleBinding", { organizationId }],
@@ -124,11 +158,17 @@ describe("onboarding.initializeOrganization personal workspace", () => {
     }
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await resetApp();
+    await eventSourcing.close();
+    for (const organizationId of createdOrganizationIds) {
+      await cleanupTestData(organizationId);
+    }
+    await stopTestContainers();
   });
 
   describe("given the user picked the coding-agent tracking intent", () => {
     let userId: string;
     let organizationId: string;
+    let teamId: string;
 
     beforeAll(async () => {
       const user = await seedUser("governance");
@@ -142,6 +182,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       });
 
       organizationId = result.organizationId;
+      teamId = result.teamId;
       createdOrganizationIds.push(organizationId);
     });
 
@@ -157,10 +198,19 @@ describe("onboarding.initializeOrganization personal workspace", () => {
 
     /** @scenario Governance signup creates organization and team, but no shared project */
     it("creates no shared project", async () => {
+      // The population first, in the same query minus the predicate under
+      // test: this organization does hold a project. An organization holding
+      // none at all would satisfy the assertion below without the filter
+      // doing any work, and so would a query that had stopped returning rows.
+      const allProjects = await prisma.project.findMany({
+        where: { team: { organizationId } },
+      });
       const sharedProjects = await prisma.project.findMany({
         where: { team: { organizationId }, isPersonal: false },
       });
 
+      expect(allProjects).toHaveLength(1);
+      expect(allProjects[0]!.isPersonal).toBe(true);
       expect(sharedProjects).toHaveLength(0);
     });
 
@@ -189,11 +239,48 @@ describe("onboarding.initializeOrganization personal workspace", () => {
       expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
 
+    it("confirms the creator's canonical organization and team ADMIN grants", async () => {
+      const grants = await prisma.grant.findMany({
+        where: {
+          organizationId,
+          principalType: GrantPrincipalType.USER,
+          principalId: userId,
+          roleKey: "admin",
+          revokedAt: null,
+        },
+        orderBy: { scopeType: "asc" },
+        select: {
+          organizationId: true,
+          principalId: true,
+          roleKey: true,
+          scopeType: true,
+          scopeId: true,
+          source: true,
+        },
+      });
+
+      expect(grants).toEqual([
+        {
+          organizationId,
+          principalId: userId,
+          roleKey: "admin",
+          scopeType: GrantScopeType.ORGANIZATION,
+          scopeId: organizationId,
+          source: "grants-service",
+        },
+        {
+          organizationId,
+          principalId: userId,
+          roleKey: "admin",
+          scopeType: GrantScopeType.TEAM,
+          scopeId: teamId,
+          source: "grants-service",
+        },
+      ]);
+    });
+
     /** @scenario The personal workspace stays separate from the shared workspace */
     it("is idempotent, so a later CLI login adds no second workspace", async () => {
-      const { PersonalWorkspaceService } = await import(
-        "@ee/governance/services/personalWorkspace.service"
-      );
       const again = await new PersonalWorkspaceService(prisma).ensure({
         userId,
         organizationId,

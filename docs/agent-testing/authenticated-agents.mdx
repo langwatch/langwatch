@@ -1,0 +1,350 @@
+---
+title: Testing Agents Behind Authentication
+sidebarTitle: Authenticated agents
+keywords: langwatch, agent testing, agent simulations, auth0, oauth2, client credentials, code agent, http agent, secrets, secret references, machine-to-machine
+description: Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch agent testing using a custom code agent.
+---
+
+## Static credential or token exchange
+
+Many production agents are behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough when the API accepts a fixed token, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
+
+Start with the HTTP target below. When the credential must be exchanged, use a **custom code agent**. It is a few lines of Python that fetch the token and call your API with it. The credentials stay in your project's encrypted secret store, never in the agent's stored source.
+
+## Referencing project secrets from an HTTP target
+
+An HTTP target reads a project secret as `{{ secrets.NAME }}`. You then do not type the API key into the target's configuration, where all users who can open the target can read it. Store the credential in **Settings → Secrets**, then reference it by name.
+
+References resolve in these fields:
+
+| Field | Resolves |
+|---|---|
+| URL | Yes |
+| Header values | Yes, the header name is left alone |
+| Auth: bearer token | Yes |
+| Auth: API key value | Yes, the header name is left alone |
+| Auth: basic username and password | Yes |
+| Body template | No |
+
+A reference in the body template is sent as written. A reference to a secret name the project does not have also stays as written, and does not become an empty string. The request then fails as a missing secret, and not as an unauthenticated call.
+
+Substitution runs when each request is built. A secret that you rotate applies on the next turn, and you do not change the target. The run removes resolved values from everything it shows back. An error from a rejected request gives the failure and shows `[redacted]` where the credential was.
+
+Auth fields typed in directly still work exactly as typed. A value with no `{{ secrets.NAME }}` in it is sent unchanged.
+
+Code agents and workflow targets read the same `secrets.NAME` namespace.
+
+A value that is not a credential, for example a tenant or a fixture id, goes in a [run parameter](/agent-testing/run-parameters). A run parameter is read as `{{ params.NAME }}`. You can change it when the run starts, and it is recorded on the run.
+
+Also check: [Secret parameters](/agent-testing/run-parameters#secret-parameters), for a credential that changes per run. You supply the value when the run starts, the target reads it as `{{ secrets.NAME }}`, and the run records the name without the value. A run value takes the place of a project secret of the same name, for that run only.
+
+## How it fits together
+
+1. **Project secrets** store the client ID and client secret, encrypted at rest. They are exposed to your code agent's Python as the injected `secrets` namespace.
+2. **The code agent** exchanges the credentials for an access token and calls your protected API with it.
+3. **A scenario** talks to the agent like a real user and judges the answers. The agent only passes if it got through the auth wall.
+
+## 1. Store the credentials as project secrets
+
+In **Settings → Secrets**, create the credentials **and** the endpoint coordinates. Keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API.
+
+Create **`AUTH0_CLIENT_SECRET` through the Settings → Secrets UI**, not on a command line: a secret passed as a CLI argument stays in your shell history and the process listing, and can end up in CI logs. The non-sensitive coordinates are fine to create via the CLI:
+
+```bash
+langwatch secret create AUTH0_CLIENT_ID --value "<your client id>"
+langwatch secret create AUTH0_TOKEN_URL --value "https://your-tenant.us.auth0.com/oauth/token"
+langwatch secret create AUTH0_AUDIENCE --value "https://api.your-company.internal"
+langwatch secret create AUTH0_API_URL --value "https://api.your-company.internal/chat"
+```
+
+Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted and never returned by any API.
+
+<Warning>
+  Never paste the client secret into the agent's Python. The stored code is readable by anyone with project access; the `secrets` namespace exists so the credential is stored encrypted at rest and never persisted in the agent's source. At run time it is injected into the execution's memory and sent only to your token endpoint.
+</Warning>
+
+## 2. Write the code agent
+
+Create a **code agent** with a single input `message` and a single declared output `output`: the declared output key must match the key the Python returns, or the run fails with `missing_output`. Use this Python:
+
+```python
+import requests
+
+
+class Code:
+    def __call__(self, message: str):
+        # Step 1: exchange the client credentials for an access token.
+        token_response = requests.post(
+            secrets.AUTH0_TOKEN_URL,
+            json={
+                "grant_type": "client_credentials",
+                "client_id": secrets.AUTH0_CLIENT_ID,
+                "client_secret": secrets.AUTH0_CLIENT_SECRET,
+                "audience": secrets.AUTH0_AUDIENCE,
+            },
+            timeout=10,
+            # A 307/308 redirect would re-send the POST body, credential
+            # included, to wherever the response points. Never follow one.
+            allow_redirects=False,
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json()["access_token"]
+
+        # Step 2: call the protected API with the minted token.
+        api_response = requests.post(
+            secrets.AUTH0_API_URL,
+            json={"message": message},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        api_response.raise_for_status()
+
+        return {"output": api_response.json()["reply"]}
+```
+
+Things the sandbox enforces, in the order people trip on them:
+
+- **Entry point**: `class Code` with `__call__` (no constructor arguments).
+- **`secrets` is injected** into the module globals. It is *not* the Python stdlib `secrets` module. Do **not** `import secrets`; that would shadow the injected namespace. `os.environ` is *not* populated in the sandbox.
+- **Return every declared output key**, or the run fails with `missing_output`.
+- **Available packages**: `requests`, `httpx`, `pydantic`, `langwatch`.
+- **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default). Keep explicit timeouts on both requests.
+- **Failure behavior**: `raise_for_status()` puts the URL and status code in the error, never the request body, so a rejected credential fails with a clear error and does not expose the secret.
+
+## 3. Map the agent's input for scenarios
+
+Because every credential comes from the secrets namespace, the agent has a **single input**, the conversation message, and needs exactly one mapping: `message` from the scenario's `input`. You create that mapping in the agent editor.
+
+<Note>
+  Keeping the endpoint coordinates in secrets is deliberate: the alternative, static `value` mappings on extra inputs, currently cannot be created from the editor UI, only via the agents API. UI support for static value mappings is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
+</Note>
+
+## 4. Run a scenario against it
+
+Create a scenario whose criteria can only pass if the agent got through the auth wall, for example facts that only your protected API returns. File it into a [test suite](/agent-testing/test-suites), and run the test suite against the agent. The simulation transcript shows the agent's answers; the run fails if the exchange breaks.
+
+```text
+[user]      where is my order #1042?
+[assistant] Order #1042 shipped from the Rotterdam warehouse on Tuesday
+            and arrives Thursday before noon.
+```
+
+That answer exists only behind the auth wall, so the scenario passing is the proof that authentication works.
+
+## Reusing one login across the rows of a run
+
+Rows are isolated and run in parallel, so by default each row logs in on its own. You can use the **agent cache** to store the login credential after the first row and read it back on every row that follows, so the run authenticates once instead of once per row.
+
+The cache is encrypted at rest and entries expire on their own. The platform puts a short-lived credential scoped to the cache inside the sandbox, shared by the runs of the project, so no `langwatch.setup()` call or LangWatch secret is required.
+
+The agent:
+
+```python shared_session_code_agent.py
+# Log in once and share the session across the rows of a run.
+#
+# Rows are isolated, so each one starts cold and logs in on its own. This agent
+# keeps the session in the project's agent cache. Of the rows that start
+# together, one takes the claim and logs in while the rest wait for what it
+# stores. A row the target refuses logs in again and stores the new session.
+#
+# The platform gives the sandbox its own LangWatch credential, so there is no
+# setup call to write and no LangWatch secret to create. The runner injects
+# `secrets` as a namespace (not the stdlib module of that name), the entry
+# point is `class Code` with `__call__`, and every declared output key must be
+# returned.
+
+import sys
+import time
+
+import langwatch
+import requests
+
+SESSION_NAME = "ACME_SESSION"  # the cache entry, and the claim that guards it
+SESSION_TTL_SECONDS = 14 * 60  # under what the target gives, so it is never stale
+LOGIN_SECONDS = 15  # over what a login takes: how long one row holds the claim
+REFUSED = object()
+
+
+class Code:
+    def __call__(self, message: str):
+        reply = self.ask(message, get_session())
+        if reply is REFUSED:
+            # A target ends a session whenever it likes: a restart, an operator
+            # closing it, a password change. The lifetime it returned is the
+            # most this agent can assume, so a refusal costs one login.
+            report("was refused", "this row logs in again")
+            reply = self.ask(message, renew_session())
+            if reply is REFUSED:
+                raise RuntimeError("ACME refused a session obtained a moment ago.")
+        return {"output": reply}
+
+    def ask(self, message, session):
+        """Send one row, or report that the session was refused."""
+        response = requests.post(
+            secret("ACME_API_URL"),
+            json={"message": message},
+            headers={"Authorization": f"Bearer {session}"},
+            timeout=30,
+        )
+        if response.status_code == 401:
+            return REFUSED
+        # raise_for_status names the URL and the status code and nothing else.
+        response.raise_for_status()
+        return response.json()["reply"]
+
+
+def get_session():
+    """Return a session, stored by another row or obtained by this one.
+
+    The loop always ends: either a session appears, or the claim comes free.
+    A row that takes the claim and then stops frees it after LOGIN_SECONDS,
+    and the next pass is where another row picks the work up.
+    """
+    while True:
+        stored = read_session()
+        if stored:
+            return stored
+        if take_the_login():
+            return renew_session()
+        time.sleep(1)
+
+
+def read_session():
+    """The stored session, or None. A cache that cannot answer is a miss."""
+    try:
+        return langwatch.cache.get(SESSION_NAME)
+    except Exception:  # noqa: BLE001 - the row must still answer
+        report("could not be read", "this row logs in")
+        return None
+
+
+def take_the_login():
+    """Whether this row is the one that logs in.
+
+    A cache that cannot answer means every row logs in, which is the result
+    with no claim at all, so the row goes on rather than stopping.
+    """
+    try:
+        return langwatch.cache.claim(
+            f"{SESSION_NAME}_CLAIM", "taken", ttl_seconds=LOGIN_SECONDS
+        )
+    except Exception:  # noqa: BLE001 - the row must still answer
+        return True
+
+
+def renew_session():
+    """Log in, and store the session for the rows that follow."""
+    session = login()
+    store_session(session)
+    return session
+
+
+def login():
+    """Log in to the target system and return the session it gives back."""
+    response = requests.post(
+        secret("ACME_LOGIN_URL"),
+        json={
+            "username": secret("ACME_USERNAME"),
+            "password": secret("ACME_PASSWORD"),
+        },
+        timeout=10,
+        # A 307 or 308 redirect re-sends the POST body, password included.
+        allow_redirects=False,
+    )
+    response.raise_for_status()
+    return response.json()["session"]
+
+
+def store_session(session):
+    """Store it for the rows that follow. A failure here costs the next row a
+    login, never this row's answer."""
+    try:
+        langwatch.cache.set(SESSION_NAME, session, ttl_seconds=SESSION_TTL_SECONDS)
+    except Exception:  # noqa: BLE001 - the row must still answer
+        report("could not be stored", "the next row will log in again")
+
+
+def report(state, consequence):
+    """Say on stderr what the cache did, in this agent's own fixed words. An
+    exception text can quote the credential that caused it, and a run shows
+    what it printed."""
+    print(f"{SESSION_NAME} {state}, {consequence}", file=sys.stderr)
+
+
+def secret(name):
+    """Read a project secret, and name it when the project does not hold it."""
+    namespace = globals().get("secrets")
+    value = getattr(namespace, name, None) if namespace else None
+    if not value:
+        raise RuntimeError(
+            f"project secret {name} is missing. Add it in Settings -> Secrets."
+        )
+    return value
+```
+
+<Note>
+  Requires `langwatch` **1.3.0** or later.
+</Note>
+
+### Tuning the TTL
+
+`SESSION_TTL_SECONDS` is how long a stored session stays in the cache. Set it below the session lifetime the target system returns, minus the duration of your slowest row, so a row never reads a session that is about to expire.
+
+The agent also treats a `401` as an expired session: it logs in again and retries once, so an early expiration costs one extra login instead of failing the run.
+
+### Cache limits
+
+| Rule | Value |
+|---|---|
+| Entry name | `UPPER_SNAKE_CASE`, up to 64 characters |
+| Value type | `str`, `dict` or `list`. The SDK stores a `dict` or `list` as JSON and `get` returns it parsed. Over REST the value is always a string |
+| Value size | Up to 32 KB |
+| Lifetime | 5 seconds to 24 hours, 15 minutes by default |
+
+### Behavior
+
+- Each run logs in only once. Every later row reads the stored session from the cache.
+- When rows start at the same time, one of them takes the claim and logs in. The rest wait and read the session it stores.
+- Entries are scoped to the project, not to a single run. A second run reuses the session the first run stored. If two concurrent runs write the same entry name, the last write wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
+- If a read fails, the row treats it as a miss and logs in. If a write fails, the row still succeeds; only the next row has to log in again.
+
+Source: [`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
+
+### One login when rows start together
+
+The rows that start at the same moment all read an empty cache, so without a claim they all log in. The agent above takes a claim first. A claim writes only when the name does not exist yet, and answers `True` for the row that took it and `False` for the rows that did not, so one row logs in and the rest wait for the session it stores.
+
+`LOGIN_SECONDS` is how long a row keeps the claim. Set it above the time your login takes.
+
+The same number ends the wait. When a row takes the claim and then stops, the claim expires after `LOGIN_SECONDS` and the next waiting row takes it.
+
+If you set it below your login time, the claim expires while the first row is still logging in, so a second row takes it and logs in as well, and the rows that follow read the last session written. Both sessions are valid, so the cost is extra logins, the same as with no claim at all. The same applies when the cache cannot answer.
+
+The claim uses the entry's own name with `_CLAIM` after it, so there is no second name to pick. It has to be a separate entry: the claim is taken before the login, and the session can only be stored after it.
+
+### Cache API
+
+```python
+langwatch.cache.set("ACME_SESSION", session, ttl_seconds=840)
+langwatch.cache.get("ACME_SESSION", default=None)
+langwatch.cache.claim("ACME_SESSION_CLAIM", "taken", ttl_seconds=15)
+langwatch.cache.delete("ACME_SESSION")
+```
+
+`get` returns `default` on a miss. `claim` returns `True` when it stored the value and `False` when another row already has the claim. Every other failure raises, with the rejected field in the message: `400 (validation_error: ttl_seconds: ttl_seconds must be at least 5)`.
+
+Pass a `str`, a `dict` or a `list` as the value. The SDK stores a `dict` or `list` as JSON and `get` returns it parsed, so JSON types apply: a tuple comes back as a `list`, a non-string key as a string, and a value JSON cannot encode (`nan`, `inf`, a set, a datetime) raises `TypeError` before the call.
+
+Text that is a JSON object or array also comes back parsed, including an entry written over REST or by an older SDK. Any other text comes back unchanged.
+
+Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry).
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| Agent answers are empty | The token exchange or API call raised. Check the credentials and endpoint URLs. (Improved error surfacing is tracked in [#6340](https://github.com/langwatch/langwatch/issues/6340).) |
+| `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
+| `langwatch.cache.set` raises `400 (validation_error: value: Expected string, received object)` | The SDK in the sandbox predates dict values; it sends the object as is and the route takes a string. Pass `json.dumps(session)` and `json.loads` it after `get`, or update the SDK. |
+| Credential works locally but not on the platform | The secret name in `secrets.NAME` does not match a stored project secret, or the value was stored in a different project. |
+| Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |

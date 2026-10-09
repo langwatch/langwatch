@@ -135,7 +135,7 @@ export const CUSTOM_PRESET_VALUE = "custom";
  *  mutation route authorizes it independently. */
 export const INDEFINITE_PRESET_VALUE = String(INDEFINITE_RETENTION_DAYS);
 
-export const SCOPE_TIER_ORDER: Record<ScopeTriadType, number> = {
+export const BINDING_SCOPE_TIERS: Record<ScopeTriadType, number> = {
   ORGANIZATION: 0,
   TEAM: 1,
   PROJECT: 2,

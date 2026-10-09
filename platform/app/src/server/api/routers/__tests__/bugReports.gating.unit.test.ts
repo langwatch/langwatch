@@ -25,20 +25,26 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: mockAuditLog,
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  const passthrough = async ({ ctx, next }: any) => {
-    ctx.permissionChecked = true;
-    return next();
-  };
-  return {
-    ...actual,
-    // Mirrors the real overload: usable directly as a middleware
-    // (`.use(skipPermissionCheck)`) or as a factory (`.use(skipPermissionCheck())`).
-    skipPermissionCheck: (arg?: any) =>
-      arg && typeof arg.next === "function" ? passthrough(arg) : passthrough,
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    const passthrough = async ({ ctx, next }: any) => {
+      ctx.permissionChecked = true;
+      return next();
+    };
+    return {
+      ...actual,
+      // Mirrors the real overload: usable directly as a middleware
+      // (`.use(skipPermissionCheck)`) or as a factory (`.use(skipPermissionCheck())`).
+      skipPermissionCheck: (arg?: any) =>
+        arg && typeof arg.next === "function" ? passthrough(arg) : passthrough,
+    };
+  },
+);
 
 function buildCaller(email: string) {
   const ctx = createInnerTRPCContext({

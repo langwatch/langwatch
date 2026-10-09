@@ -70,5 +70,13 @@ describe("origin display mapping", () => {
         expect(originColorPalette("mystery")).toBe("gray");
       });
     });
+
+    describe("when the origin is one of Langy's own turns", () => {
+      /** @scenario "The origin facet still offers Langy" */
+      it("reads Langy in the facet and on the badge", () => {
+        expect(facetLabel("langy", "origin")).toBe("Langy");
+        expect(renderOriginBadge("langy").props.children).toBe("Langy");
+      });
+    });
   });
 });

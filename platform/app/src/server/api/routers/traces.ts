@@ -5,6 +5,7 @@ import shuffle from "lodash-es/shuffle";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { EvaluationNotFoundError } from "~/server/app-layer/evaluations/errors";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
@@ -15,9 +16,18 @@ import {
   evaluatePreconditions,
 } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types";
-import { checkProjectPermission } from "../rbac";
+import {
+  namedTenantAuthorization,
+  traceDetailAuthorization,
+  traceTenantShape,
+} from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
-import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
+import {
+  getAllForDownloadInput,
+  getAllForProjectInput,
+  MAX_TRACE_DOWNLOAD_PAGE_SIZE,
+  tracesFilterInput,
+} from "./traces.schemas";
 
 export { getAllForProjectInput };
 
@@ -33,7 +43,7 @@ const withEditOverlayInput = z.boolean().default(false);
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(getAllForProjectInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -53,7 +63,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -77,22 +87,31 @@ export const tracesRouter = createTRPCRouter({
       return trace;
     }),
 
+  /**
+   * The evaluations panel of the trace drawer. Read through the detail proof
+   * (ADR-144 block F): on an aggregate the proof is narrowed to the member
+   * that holds the trace, the one the list row or the header named, so the
+   * panel shows that member's evaluations next to its spans.
+   */
   getEvaluations: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...traceTenantShape,
+      }),
+    )
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
+      const authorization = await traceDetailAuthorization({ ctx, input });
+      return TraceService.create(ctx.prisma).getEvaluationsForTrace({
+        authorization,
+        traceId: input.traceId,
+        protections: await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+          authorization,
+        }),
       });
-
-      const traceService = TraceService.create(ctx.prisma);
-      const evaluations = await traceService.getEvaluationsMultiple(
-        input.projectId,
-        [input.traceId],
-        protections,
-      );
-
-      return evaluations[input.traceId];
     }),
 
   // Protected (not public-share): the read is keyed by evaluationId, which is
@@ -100,21 +119,31 @@ export const tracesRouter = createTRPCRouter({
   // public-share token is scoped to a single trace and could otherwise be used
   // to read any evaluation's inputs in the project by supplying another
   // evaluationId. Public-shared trace drawers already get inputs eagerly from
-  // the public `getEvaluations`; this lazy fallback stays project-gated.
+  // the public `getEvaluations`; this lazy fallback stays project-gated. On an
+  // aggregate the drawer names the member, and the proof is narrowed to it.
   getEvaluationInputs: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         evaluationId: z.string(),
+        ...traceTenantShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(ctx.prisma);
-      return traceService.getEvaluationInputs(
-        input.projectId,
-        input.evaluationId,
-      );
+      const authorization = namedTenantAuthorization({
+        ctx,
+        tenantId: input.tenantId,
+        notFound: () => new EvaluationNotFoundError(input.evaluationId),
+      });
+      return TraceService.create(ctx.prisma).getEvaluationInputs({
+        authorization,
+        evaluationId: input.evaluationId,
+        protections: await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+          authorization,
+        }),
+      });
     }),
 
   getEvaluationsMultiple: protectedProcedure
@@ -124,7 +153,7 @@ export const tracesRouter = createTRPCRouter({
         traceIds: z.array(z.string()),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -140,7 +169,7 @@ export const tracesRouter = createTRPCRouter({
 
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const traceService = TraceService.create(ctx.prisma);
       const result = await traceService.getTopicCounts(input);
@@ -189,7 +218,7 @@ export const tracesRouter = createTRPCRouter({
 
   getCustomersAndLabels: protectedProcedure
     .input(tracesFilterInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const traceService = TraceService.create(ctx.prisma);
       return traceService.getCustomersAndLabels(input);
@@ -202,7 +231,7 @@ export const tracesRouter = createTRPCRouter({
         threadId: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
 
@@ -236,7 +265,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -264,7 +293,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -306,7 +335,7 @@ export const tracesRouter = createTRPCRouter({
         withEditOverlay: withEditOverlayInput,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const { projectId, threadIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -334,7 +363,7 @@ export const tracesRouter = createTRPCRouter({
         sortBy: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -381,7 +410,7 @@ export const tracesRouter = createTRPCRouter({
         endDate: z.number(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const traceService = TraceService.create(ctx.prisma);
       return traceService.getDistinctFieldNames(
@@ -403,7 +432,7 @@ export const tracesRouter = createTRPCRouter({
         expectedResults: z.number(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -481,12 +510,8 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getAllForDownload: protectedProcedure
-    .input(
-      getAllForProjectInput.extend({
-        includeSpans: z.boolean(),
-      }),
-    )
-    .use(checkProjectPermission("traces:view"))
+    .input(getAllForDownloadInput)
+    .permission("traces:view")
     .mutation(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -505,7 +530,7 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getAllTracesForProject(
         {
           ...input,
-          pageSize: input.pageSize ?? 10_000,
+          pageSize: input.pageSize ?? MAX_TRACE_DOWNLOAD_PAGE_SIZE,
         },
         protections,
         {
@@ -519,7 +544,7 @@ export const tracesRouter = createTRPCRouter({
 
   onTraceUpdate: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);

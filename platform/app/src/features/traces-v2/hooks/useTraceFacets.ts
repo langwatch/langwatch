@@ -4,7 +4,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sampleDescriptors";
 import { usePreviewTracesActive } from "../onboarding/hooks/usePreviewTracesActive";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import {
   type DiscoverDescriptors,
   getCachedDiscover,
@@ -20,7 +20,7 @@ const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
 export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
   // Sample-preview rows are a client-side fixture with no ClickHouse
   // footprint, so the real `discover` query returns nothing useful.
   // Hand the sidebar a hardcoded descriptor set derived from the

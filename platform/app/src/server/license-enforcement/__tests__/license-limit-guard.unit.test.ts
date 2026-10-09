@@ -47,6 +47,9 @@ describe("assertMemberTypeLimitNotExceeded", () => {
     return {
       getMemberCount: vi.fn().mockResolvedValue(memberCount),
       getMembersLiteCount: vi.fn().mockResolvedValue(membersLiteCount),
+      getMembersDeveloperCount: vi.fn().mockResolvedValue(0),
+      getActiveScenarioCount: vi.fn().mockResolvedValue(0),
+      getEvaluatorCount: vi.fn().mockResolvedValue(0),
       getCurrentMonthCost: vi.fn(),
       getCurrentMonthCostForProjects: vi.fn(),
     };
@@ -87,6 +90,27 @@ describe("assertMemberTypeLimitNotExceeded", () => {
         limits,
       );
 
+      expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when changeType is to-developer", () => {
+    /** @scenario Developers are counted and never capped */
+    it("does not check any limit, even with both pools full", async () => {
+      const mockRepo = createMockRepo(5, 10);
+      const limits = createLimits(5, 10);
+
+      await expect(
+        assertMemberTypeLimitNotExceeded(
+          "to-developer",
+          organizationId,
+          mockRepo,
+          limits,
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(mockRepo.getMemberCount).not.toHaveBeenCalled();
+      expect(mockRepo.getMembersLiteCount).not.toHaveBeenCalled();
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
   });
@@ -155,6 +179,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
     });
 
     /** @scenario Blocks upgrade from Lite Member to full member when at member limit */
+    /** @scenario The licensed seat count is the hard cap */
     it("throws when at limit", async () => {
       const mockRepo = createMockRepo(5); // 5 members, limit is 5
       const limits = createLimits(5);

@@ -56,6 +56,11 @@ export const UNPUBLISHED = [
     why: "the app's own tRPC transport; its contract is the TypeScript router, not an HTTP schema",
   },
   {
+    match: "POST /api/scenario/execute-sync",
+    category: "internal",
+    why: "the scenario child process asking the control plane to run one turn on this project's own engine, because the credential that invokes it may invoke any project's",
+  },
+  {
     match: "/api/sse",
     category: "internal",
     why: "server-sent event channels the dashboard subscribes to, with no stable per-message contract to publish",
@@ -79,6 +84,11 @@ export const UNPUBLISHED = [
     match: "/api/internal",
     category: "internal",
     why: "control-plane calls from the gateway and langy workers, authenticated by an internal shared secret",
+  },
+  {
+    match: "/api/connect/v1",
+    category: "internal",
+    why: "the connect host a self-hosted install syncs its license and its anonymous statistics to; the caller is the install's own worker and the contract is ADR-141, not something a customer writes by hand",
   },
   {
     match: "/api/admin",
@@ -151,6 +161,11 @@ export const UNPUBLISHED = [
     why: "in-app report form intake",
   },
   {
+    match: "/api/v1/onboarding/guided",
+    category: "internal",
+    why: "the guided onboarding state of the caller's organization, read and completed by Langy through the CLI. It reports on the organization an application runs inside rather than on the application's own data, so it is not exported from the client SDK's public index and there is nothing for an API-key caller to do with it",
+  },
+  {
     match: "/api/unsubscribe",
     category: "internal",
     why: "RFC 8058 one-click unsubscribe, addressed by mail clients from a link we send",
@@ -206,6 +221,11 @@ export const UNPUBLISHED = [
     category: "internal",
     why: "the dashboard's download button for scenario runs, session-authenticated in the same way as the trace export",
   },
+  {
+    match: "/api/voice",
+    category: "internal",
+    why: "the Talk to it panel's own back channel: the browser mints a short-lived voice session, reports the finished call and streams its recording through a same-origin proxy. Every call carries a signed session token the panel just received, so an API-key caller has nothing to send; scenario runs against voice agents go through the documented scenario routes",
+  },
   // ── Aliases: older paths kept working ──────────────────────────────────
   {
     match: "/api/github-langy",
@@ -244,6 +264,24 @@ export const UNPUBLISHED = [
     match: "GET /api/openapi.json",
     category: "elsewhere",
     why: "serves the document itself, for the same reason /api/gateway/v1/openapi.json above is absent: an operation inside the document describing where to fetch that same document is circular, and a reader holding it has already answered the question",
+  },
+
+  {
+    match: "/api/langy/local",
+    category: "internal",
+    why: "the Langy worker's door onto a folder the developer shared from their own machine (ADR-129). Every call is bound to the conversation the caller's own session key was minted for and only answers while that turn runs, so no reader of the API reference can call it; the payload contract is the in-repo local control protocol, which the command line and the worker both ship with",
+  },
+
+  {
+    match: "/api/langy/waits",
+    category: "internal",
+    why: "the other half of the same worker surface: it parks a tool while a card waits for the developer's answer in the chat. Same session key, same conversation binding, same in-repo contract",
+  },
+
+  {
+    match: "/api/langy/ui",
+    category: "internal",
+    why: "the live UI-action channel between a Langy worker and the user's open browser tab. It only answers mid-turn, for the conversation the caller's own session key was minted for, so no reader of the API reference can call it: outside a turn every request is refused, and the payload contract is the in-repo action manifest, not a stable public schema",
   },
 
   // ── Gap: public, should be documented, not yet ─────────────────────────

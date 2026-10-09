@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PRODUCTS, productById, productFromPathname } from "../products";
+import {
+  PRODUCTS,
+  productById,
+  productFromPathname,
+  seatReachesProduct,
+} from "../products";
 
 describe("product registry", () => {
   describe("given the four products the registry declares", () => {
@@ -82,5 +87,39 @@ describe("productFromPathname", () => {
   it("does not confuse a project whose slug starts like a product word", () => {
     expect(productFromPathname("/gateway-team-abc123/traces")).toBe("llm-ops");
     expect(productFromPathname("/mekong-xyz/analytics")).toBe("llm-ops");
+  });
+
+  describe("given the seat the reader holds", () => {
+    describe("when the reader is a Developer", () => {
+      /** @scenario A Developer is offered the Me product and nothing organisation-wide */
+      it("reaches the personal and project products and no organization-wide one", () => {
+        const reaches = (id: Parameters<typeof productById>[0]) =>
+          seatReachesProduct({
+            product: productById(id),
+            organizationRole: "DEVELOPER",
+          });
+        expect(reaches("me")).toBe(true);
+        expect(reaches("llm-ops")).toBe(true);
+        expect(reaches("gateway")).toBe(false);
+        expect(reaches("governance")).toBe(false);
+      });
+    });
+
+    describe("when the reader holds any other seat, or none is known yet", () => {
+      it("leaves every product to its own gates", () => {
+        for (const organizationRole of [
+          "ADMIN",
+          "MEMBER",
+          "EXTERNAL",
+          undefined,
+        ] as const) {
+          for (const product of PRODUCTS) {
+            expect(seatReachesProduct({ product, organizationRole })).toBe(
+              true,
+            );
+          }
+        }
+      });
+    });
   });
 });

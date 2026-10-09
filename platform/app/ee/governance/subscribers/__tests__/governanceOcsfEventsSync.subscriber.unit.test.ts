@@ -230,6 +230,54 @@ describe("governanceOcsfEventsSync subscriber", () => {
       expect(row.eventTime.getTime()).toBe(FIXED_OCCURRED_AT_MS);
     });
 
+    /** @scenario "An actor the trace names by an opaque id is exported as a user id, never as an email" */
+    it("records an email attribute that is not an address as the actor's user id", async () => {
+      const { deps, insertEvent } = mockDeps();
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
+      // The attribute is NAMED user.email; nothing upstream checks that what
+      // sits in it is an address, and a SIEM reads the column it lands in as
+      // one. With no user id attribute to hold it, the identifier belongs in
+      // the user id column and the email column stays empty.
+      const state = createFoldState({
+        "langwatch.origin.kind": "ingestion_source",
+        "langwatch.ingestion_source.id": "is-1",
+        "langwatch.ingestion_source.source_type": "otel_generic",
+        "user.email": "user-A1b2C3d4E5",
+        "tool.name": "search_logs",
+      });
+
+      await subscriber(event, ctx(state));
+
+      const [row] = insertEvent.mock.calls[0]!;
+      expect(row.actorUserId).toBe("user-A1b2C3d4E5");
+      expect(row.actorEmail).toBe("");
+      const ocsf = JSON.parse(row.rawOcsfJson);
+      expect(ocsf.actor.user.uid).toBe("user-A1b2C3d4E5");
+      expect(ocsf.actor.user.email_addr).toBe("");
+    });
+
+    /** @scenario "An opaque email attribute beside a user id attribute is dropped, not exported as an email" */
+    it("drops an email attribute that is not an address when a user id is present", async () => {
+      const { deps, insertEvent } = mockDeps();
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
+      // The user id column is already taken by the attribute that means it,
+      // so the non-address string has nowhere honest to go. Leaving it in the
+      // email column would be the bug this fixes, wearing a different hat.
+      const state = createFoldState({
+        "langwatch.origin.kind": "ingestion_source",
+        "langwatch.ingestion_source.id": "is-1",
+        "langwatch.ingestion_source.source_type": "otel_generic",
+        "langwatch.user_id": "user-42",
+        "user.email": "not-an-address",
+      });
+
+      await subscriber(event, ctx(state));
+
+      const [row] = insertEvent.mock.calls[0]!;
+      expect(row.actorUserId).toBe("user-42");
+      expect(row.actorEmail).toBe("");
+    });
+
     it("emits valid OCSF JSON in rawOcsfJson", async () => {
       const { deps, insertEvent } = mockDeps();
       const subscriber = createGovernanceOcsfEventsSyncHandler(deps);

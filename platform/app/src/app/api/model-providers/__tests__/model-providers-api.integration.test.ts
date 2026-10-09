@@ -5,8 +5,11 @@ import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 describe("Model Providers API", () => {
   let testApiKey: string;

@@ -13,6 +13,7 @@
  * takes the invariant with it.
  */
 
+import { grantFactToRow } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type Prisma,
@@ -29,12 +30,32 @@ const teamFindUnique = vi.fn();
 const teamUpdate = vi.fn();
 const bindingFindMany = vi.fn();
 const bindingFindFirst = vi.fn();
+const grantFindMany = vi.fn();
 const groupMembershipFindMany = vi.fn();
 const teamUserDeleteMany = vi.fn();
+
+function grantRow({ id, userId }: { id: string; userId: string }) {
+  return {
+    ...grantFactToRow({
+      organizationId: "org_1",
+      grant: {
+        grantId: id,
+        principal: { type: "user", id: userId },
+        roleKey: "admin",
+        legacyRole: TeamUserRole.ADMIN,
+        scope: { type: RoleBindingScopeType.TEAM, id: "team_1" },
+        source: "grants-service",
+        occurredAtMs: 0,
+      },
+    }),
+    updatedAt: new Date(0),
+  };
+}
 
 const transactionClient = {
   team: { findUnique: teamFindUnique, update: teamUpdate },
   roleBinding: { findMany: bindingFindMany, findFirst: bindingFindFirst },
+  grant: { findMany: grantFindMany },
   groupMembership: { findMany: groupMembershipFindMany },
   teamUser: { deleteMany: teamUserDeleteMany },
 } as unknown as Prisma.TransactionClient;
@@ -71,6 +92,18 @@ beforeEach(() => {
         : teamBindings,
   );
   bindingFindFirst.mockResolvedValue({ role: TeamUserRole.ADMIN });
+  grantFindMany.mockImplementation(
+    async ({ where }: { where?: Record<string, unknown> }) => {
+      const rows = [
+        grantRow({ id: "rb_a", userId: "user_a" }),
+        grantRow({ id: "rb_b", userId: "user_b" }),
+      ];
+      const whereText = JSON.stringify(where);
+      if (whereText.includes("user_a")) return rows.slice(0, 1);
+      if (whereText.includes("user_b")) return rows.slice(1);
+      return rows;
+    },
+  );
   groupMembershipFindMany.mockResolvedValue([]);
   teamUserDeleteMany.mockResolvedValue({ count: 1 });
   revokeBindings.mockResolvedValue(undefined);
@@ -119,6 +152,9 @@ describe("given a team whose only admin is the person being removed", () => {
       bindingFindMany.mockResolvedValue([
         { id: "rb_a", userId: "user_a", groupId: null },
       ]);
+      grantFindMany.mockResolvedValue([
+        grantRow({ id: "rb_a", userId: "user_a" }),
+      ]);
 
       await expect(
         service.removeMember({
@@ -143,6 +179,21 @@ describe("given the scope of the revocation", () => {
         { id: "rb_a2", userId: "user_a", groupId: null },
         { id: "rb_b", userId: "user_b", groupId: null },
       ];
+      grantFindMany.mockImplementation(
+        async ({ where }: { where?: Record<string, unknown> }) => {
+          const rows = teamBindings.map(({ id, userId }) =>
+            grantRow({ id, userId }),
+          );
+          const whereText = JSON.stringify(where);
+          if (whereText.includes("user_a")) {
+            return rows.filter((row) => row.principalId === "user_a");
+          }
+          if (whereText.includes("user_b")) {
+            return rows.filter((row) => row.principalId === "user_b");
+          }
+          return rows;
+        },
+      );
       bindingFindMany.mockImplementation(
         async ({ where }: { where?: Record<string, unknown> }) =>
           where?.userId
@@ -156,7 +207,7 @@ describe("given the scope of the revocation", () => {
         currentUserId: "user_b",
       });
 
-      expect(bindingFindMany).toHaveBeenCalledWith(
+      expect(grantFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             scopeType: RoleBindingScopeType.TEAM,

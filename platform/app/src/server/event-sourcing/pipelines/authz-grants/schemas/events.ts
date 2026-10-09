@@ -1,14 +1,12 @@
+import { grantConditionSchema } from "@langwatch/actor";
+import { PROJECT_READER_ROLE_KEY } from "@langwatch/authz";
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import {
-  CUTOVER_COMPLETED_EVENT_TYPE,
-  CUTOVER_ROLLED_BACK_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
-  MEMBER_OFFBOARDED_EVENT_TYPE,
-  MIGRATION_PARITY_PROVED_EVENT_TYPE,
-  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -43,7 +41,7 @@ export const ledgerPrincipalSchema = z
   .object({
     type: z.enum([
       "user",
-      "api_key",
+      "apiKey",
       "group",
       "team",
       "organization",
@@ -81,15 +79,9 @@ export const ledgerScopeSchema = z.object({
   id: z.string(),
 });
 
-export const grantEventSourceSchema = z.enum([
-  "grants-service",
-  "scim",
-  "invite",
-  "backfill-b",
-  "genesis-import",
-  "read-through-mint",
-  "cutover-import",
-]);
+/** Derived, never restated: a source added to the vocabulary is accepted on
+ *  the wire with no edit here. */
+export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 
 export const grantsLedgerActorSchema = z.object({
   type: z.enum(["user", "system"]),
@@ -132,16 +124,26 @@ export const resourceGrantTermsSchema = z.object({
  * revocable by no principal. It is only meaningful paired with a token, and
  * tokens exist at RESOURCE scope alone.
  *
- * The `project` principal has exactly two legal placements: the resource tier
- * (a share link whose audience is "members who can see this project"), and
- * its OWN project's PROJECT scope — the project-credential self-grant the
- * cutover imports, `Project.apiKey` acting as the project it belongs to. The
- * self-grant is the contract the edge will resolve a project credential
- * against once bare column comparison retires; it is dormant until then (no
- * collector returns PROJECT-principal rows for a user or an api key). Any
- * other placement — a project principal on a foreign project, a team, or the
- * organization — would be a standing cross-scope credential nobody holds, and
- * is refused.
+ * The `project` principal has exactly three legal placements: the resource
+ * tier (a share link whose audience is "members who can see this project"),
+ * its OWN project's PROJECT scope (the project-credential self-grant the
+ * cutover imports, `Project.apiKey` acting as the project it belongs to), and
+ * the shared project read of ADR-144: a `project-reader` role on ANOTHER
+ * project's PROJECT scope that carries a condition. The self-grant is the
+ * contract the edge will resolve a project credential against once bare
+ * column comparison retires; it is dormant until then (no collector returns
+ * PROJECT-principal rows for a user or an api key). Any other placement, a
+ * project principal on a foreign project under any other role, on a team, or
+ * on the organisation, would be a standing cross-scope credential nobody
+ * holds, and is refused.
+ *
+ * The shared read is the only shape that carries a condition and the only
+ * one that carries the `project-reader` role; both halves are checked so a
+ * user cannot hold `project-reader` and an own grant cannot carry a window.
+ * The condition's `where` slot is refused while non-empty: nothing compiles
+ * OTTL yet, and a predicate the client cannot apply must not be stored as
+ * if it narrowed anything. Same-organisation placement is a question for
+ * storage, asked by the writer, not the wire.
  */
 export const grantShapeRefinement = {
   check: (grant: {
@@ -149,6 +151,7 @@ export const grantShapeRefinement = {
     roleKey: string | null;
     scope: { type: string; id: string };
     resource?: unknown;
+    condition?: { where?: string };
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) {
@@ -156,11 +159,25 @@ export const grantShapeRefinement = {
     }
     const isOwnProjectCredential =
       grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
+    const isSharedProjectRead =
+      grant.principal.type === "project" &&
+      grant.scope.type === "PROJECT" &&
+      grant.principal.id !== grant.scope.id &&
+      grant.roleKey === PROJECT_READER_ROLE_KEY &&
+      grant.condition !== undefined &&
+      (grant.condition.where === undefined || grant.condition.where === "");
     if (
       grant.principal.type === "project" &&
       !isResourceScope &&
-      !isOwnProjectCredential
+      !isOwnProjectCredential &&
+      !isSharedProjectRead
     ) {
+      return false;
+    }
+    if ((grant.condition !== undefined) !== isSharedProjectRead) {
+      return false;
+    }
+    if ((grant.roleKey === PROJECT_READER_ROLE_KEY) !== isSharedProjectRead) {
       return false;
     }
     return (
@@ -169,7 +186,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope; a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where; only that shared read carries a condition or the `project-reader` role",
   path: ["resource"] as const,
 };
 
@@ -182,13 +199,23 @@ export const grantAttachedEventSchema = EventSchema.extend({
       roleKey: z.string().min(1).nullable(),
       scope: ledgerScopeSchema,
       resource: resourceGrantTermsSchema.optional(),
+      /** Present only on a shared project-reader grant (ADR-144). */
+      condition: grantConditionSchema.optional(),
       legacyRole: legacyBindingRoleSchema.optional(),
       source: grantEventSourceSchema,
       actor: grantsLedgerActorSchema,
+      /** Present on live USER grants; absent on imported history. */
+      membershipStamp: z.string().min(1).optional(),
+      /** Founder-only marker for a membership created in the same transaction. */
+      membershipBootstrap: z.boolean().optional(),
     })
     .refine(grantShapeRefinement.check, {
       message: grantShapeRefinement.message,
       path: [...grantShapeRefinement.path],
+    })
+    .refine((grant) => !grant.membershipBootstrap || grant.membershipStamp, {
+      message: "membershipBootstrap requires membershipStamp",
+      path: ["membershipStamp"],
     }),
 });
 export type GrantAttachedEvent = z.infer<typeof grantAttachedEventSchema>;
@@ -204,43 +231,15 @@ export const grantRoleChangedEventSchema = EventSchema.extend({
 });
 export type GrantRoleChangedEvent = z.infer<typeof grantRoleChangedEventSchema>;
 
-/**
- * Which grants a revocation names by IDENTITY rather than by id.
- *
- * A revoke-by-filter resolves its ids from the compat projection, and that
- * projection lags the ledger by a fold: a grant appended a moment earlier is
- * invisible to the query, so an id list alone leaves it standing. Carrying the
- * identity the caller filtered on lets the FOLD — which sees what the stream
- * itself produced — remove every grant that matches. The reducer applies it
- * against the state at that point in the stream, so a replay reproduces the
- * same removal (`GrantRevocationSelector` in @langwatch/authz-server).
- */
-export const grantRevocationSelectorSchema = z.object({
-  principal: ledgerPrincipalSchema,
-  /** Present when the caller filtered on one scope; absent means the
-   *  principal's grants at every scope. */
-  scope: ledgerScopeSchema.optional(),
-});
-
+/** A revoke names its grant, and only its grant: the aggregate IS the grant,
+ *  so an event cannot address a set of them. */
 export const grantRevokedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_REVOKED_EVENT_TYPE),
-  data: z
-    .object({
-      /** Absent only on a revoke-by-identity whose lagging projection listed
-       *  no id at all — the selector is then the whole instruction. */
-      grantId: z.string().min(1).optional(),
-      selector: grantRevocationSelectorSchema.optional(),
-      reason: z.string().min(1).optional(),
-      actor: grantsLedgerActorSchema,
-    })
-    .refine(
-      (data) => data.grantId !== undefined || data.selector !== undefined,
-      {
-        message:
-          "a revocation names a grant id, an identity selector, or both — never neither",
-        path: ["grantId"],
-      },
-    ),
+  data: z.object({
+    grantId: z.string().min(1),
+    reason: z.string().min(1).optional(),
+    actor: grantsLedgerActorSchema,
+  }),
 });
 export type GrantRevokedEvent = z.infer<typeof grantRevokedEventSchema>;
 
@@ -280,74 +279,6 @@ export const roleDeletedEventSchema = EventSchema.extend({
 });
 export type RoleDeletedEvent = z.infer<typeof roleDeletedEventSchema>;
 
-export const memberOffboardedEventSchema = EventSchema.extend({
-  type: z.literal(MEMBER_OFFBOARDED_EVENT_TYPE),
-  data: z.object({
-    userId: z.string().min(1),
-    /** The ids the writer could see — the audit trail's record of the
-     *  revocation. The fold does not depend on the list being complete: it
-     *  sweeps every grant the principal holds (ADR-092 §13, the reducer's
-     *  `grantIdsForUser`). */
-    revokedGrantIds: z.array(z.string().min(1)),
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type MemberOffboardedEvent = z.infer<typeof memberOffboardedEventSchema>;
-
-export const migrationParityProvedEventSchema = EventSchema.extend({
-  type: z.literal(MIGRATION_PARITY_PROVED_EVENT_TYPE),
-  data: z.object({
-    /** Empty means clean — the organization may finalize. */
-    diffs: z.array(z.string().min(1)),
-  }),
-});
-export type MigrationParityProvedEvent = z.infer<
-  typeof migrationParityProvedEventSchema
->;
-
-export const cutoverCompletedEventSchema = EventSchema.extend({
-  type: z.literal(CUTOVER_COMPLETED_EVENT_TYPE),
-  data: z.object({
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type CutoverCompletedEvent = z.infer<typeof cutoverCompletedEventSchema>;
-
-export const cutoverRolledBackEventSchema = EventSchema.extend({
-  type: z.literal(CUTOVER_ROLLED_BACK_EVENT_TYPE),
-  data: z.object({
-    reason: z.string().min(1).optional(),
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type CutoverRolledBackEvent = z.infer<
-  typeof cutoverRolledBackEventSchema
->;
-
-/** The runner's per-(migration, tenant) status vocabulary — mirrored from
- *  @langwatch/system-migrations without importing it (the wire schema must
- *  not couple to the runner package). */
-export const migrationTenantStatusSchema = z.enum([
-  "migrated",
-  "finalized",
-  "parked",
-  "rolled_back",
-]);
-
-export const migrationTenantStateChangedEventSchema = EventSchema.extend({
-  type: z.literal(MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE),
-  data: z.object({
-    migrationName: z.string().min(1),
-    status: migrationTenantStatusSchema,
-    /** The runner's report for the transition, JSON as stored. */
-    report: z.unknown().nullish(),
-    actor: grantsLedgerActorSchema,
-  }),
-});
-export type MigrationTenantStateChangedEvent = z.infer<
-  typeof migrationTenantStateChangedEventSchema
->;
-
 export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   grantAttachedEventSchema,
   grantRoleChangedEventSchema,
@@ -355,10 +286,5 @@ export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   roleDefinedEventSchema,
   rolePermissionsChangedEventSchema,
   roleDeletedEventSchema,
-  memberOffboardedEventSchema,
-  migrationParityProvedEventSchema,
-  cutoverCompletedEventSchema,
-  cutoverRolledBackEventSchema,
-  migrationTenantStateChangedEventSchema,
 ]);
 export type AuthzGrantsEvent = z.infer<typeof authzGrantsEventSchema>;

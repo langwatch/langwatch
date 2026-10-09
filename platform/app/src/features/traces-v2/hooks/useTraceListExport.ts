@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { useExportTraces } from "./useExportTraces";
 
 /**
@@ -11,8 +11,8 @@ import { useExportTraces } from "./useExportTraces";
  */
 export function useTraceListExport() {
   const { project } = useOrganizationTeamProject();
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
 
   return useExportTraces({
     projectId: project?.id,

@@ -13,7 +13,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Organization } from "~/generated/prisma/client";
-
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   cleanupTestData,
@@ -252,7 +252,10 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   describe("given spend across personal, team, and agent projects", () => {
     /** @scenario Spend by department aggregates across every project in the org */
     it("rolls personal, agent, and unattributed spend up by department across all projects", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,
@@ -273,7 +276,10 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   describe("given another org with spend under a like-named department", () => {
     /** @scenario Spend-by-department query stays tenant-isolated */
     it("never includes the other org's spend in this org's rollup", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,
@@ -291,7 +297,10 @@ describe("ActivityMonitorService.spendByDepartment", () => {
   describe("given members with personal spend in different departments", () => {
     /** @scenario Marketing-versus-engineering comparison reads from departments */
     it("shows each department's combined personal and project spend", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByDepartment({
         organizationId: org.id,
         windowDays: 7,

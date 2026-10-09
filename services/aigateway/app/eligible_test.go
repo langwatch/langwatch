@@ -92,7 +92,7 @@ func TestEligibleCredentials(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := eligibleCredentials(context.Background(), mkCreds(), tc.resolved)
+			got, err := eligibleCredentials(context.Background(), credentialChoice{creds: mkCreds(), resolved: tc.resolved, cfg: domain.BundleConfig{Credentials: mkCreds()}})
 			if tc.wantErr != "" {
 				if !herr.IsCode(err, tc.wantErr) {
 					t.Fatalf("got err %v, want code %s", err, tc.wantErr)
@@ -114,7 +114,7 @@ func TestEligibleCredentials(t *testing.T) {
 }
 
 func TestEligibleCredentialsEmptyChain(t *testing.T) {
-	got, err := eligibleCredentials(context.Background(), nil, &domain.ResolvedModel{ModelID: "gpt-4o"})
+	got, err := eligibleCredentials(context.Background(), credentialChoice{creds: nil, resolved: &domain.ResolvedModel{ModelID: "gpt-4o"}, cfg: domain.BundleConfig{}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestEligibleCredentialsPreservesPriority(t *testing.T) {
 		{ID: "openai_first", ProviderID: domain.ProviderOpenAI},
 		{ID: "secondary_anthropic", ProviderID: domain.ProviderAnthropic},
 	}
-	got, err := eligibleCredentials(context.Background(), creds, &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic})
+	got, err := eligibleCredentials(context.Background(), credentialChoice{creds: creds, resolved: &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic}, cfg: domain.BundleConfig{Credentials: creds}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestEligibleCredentialsImplicitNoMatchKeepsSafetyNet(t *testing.T) {
 	creds := []domain.Credential{
 		{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
 	}
-	got, err := eligibleCredentials(context.Background(), creds, &domain.ResolvedModel{ProviderID: "", ModelID: "gemini-2.5-pro"})
+	got, err := eligibleCredentials(context.Background(), credentialChoice{creds: creds, resolved: &domain.ResolvedModel{ProviderID: "", ModelID: "gemini-2.5-pro"}, cfg: domain.BundleConfig{Credentials: creds}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,9 +178,9 @@ func TestEligibleCredentialsEmptyChainDefersToNoProviderConfigured(t *testing.T)
 	// "bind a bedrock slot" is the wrong advice. This helper stays silent
 	// and lets candidateChain raise no_provider_configured, which names
 	// the actual next step. Both are 400s, so the status contract holds.
-	got, err := eligibleCredentials(context.Background(), nil, &domain.ResolvedModel{
+	got, err := eligibleCredentials(context.Background(), credentialChoice{creds: nil, resolved: &domain.ResolvedModel{
 		ProviderID: domain.ProviderBedrock, ModelID: "anthropic.claude-3-5-sonnet",
-	})
+	}, cfg: domain.BundleConfig{}})
 	if err != nil {
 		t.Fatalf("empty chain must not hard-fail here: %v", err)
 	}
@@ -319,8 +319,11 @@ func TestEligibleCredentialsBareNameKeepsAnotherVendorsGateway(t *testing.T) {
 	// fallthrough would refuse every Azure-only key that names a bare
 	// OpenAI model, which is the common way to configure one.
 	creds := []domain.Credential{{ID: "azure_1", ProviderID: domain.ProviderAzure}}
-	got, err := eligibleCredentials(context.Background(), creds,
-		&domain.ResolvedModel{ProviderID: "", ModelID: "gpt-4o", Source: domain.ModelSourceImplicit})
+	got, err := eligibleCredentials(context.Background(), credentialChoice{
+		creds:    creds,
+		resolved: &domain.ResolvedModel{ProviderID: "", ModelID: "gpt-4o", Source: domain.ModelSourceImplicit},
+		cfg:      domain.BundleConfig{Credentials: creds},
+	})
 	if err != nil {
 		t.Fatalf("a bare model name must not hard-fail: %v", err)
 	}

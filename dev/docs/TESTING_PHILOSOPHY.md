@@ -92,6 +92,10 @@ it("does X when Y given Z", () => {
 });
 ```
 
+## Stories, acceptance criteria, and feature files
+
+Issues are authored as Scrum stories (As a / I want / so that) with acceptance criteria (Given/When/Then) and a separate Definition of Done. When picked up, the story becomes the Feature narrative and each AC becomes one Scenario in `specs/**/*.feature`, bound to tests via `/** @scenario` JSDoc. See `specs/README.md` for complete binding details.
+
 ## Coverage is Mandatory
 
 Every change ships with tests. No exceptions. This is not aspirational — it is a hard requirement.
@@ -229,6 +233,16 @@ Adding a new entry to `LEGACY_UNBOUND` should require justification — prefer b
 When a scenario in a legacy feature file describes behavior that has no matching test *and* the test has not yet been written, tag the scenario `@unimplemented` alongside its pyramid tag (`@unit` / `@integration`) and file a tracking issue for the missing test. The parity checker treats `@unimplemented` as a non-binding signal — scenarios so tagged are not expected to resolve to a `@scenario` annotation.
 
 `@unimplemented` is a lightweight promise that the gap is tracked, not ignored. Every removal of an `@unimplemented` tag must land with either a new `@scenario` binding or a feature-file edit that removes the scenario entirely.
+
+## Use-proof
+
+A use-proof is a concrete, observable demonstration that the feature works as intended. It can be:
+- A screenshot of the rendered UI showing the feature in action
+- A command-line output demonstrating the API response
+- A browser-test report with screenshots of the full workflow
+- A trace or log showing the expected behavior occurred
+
+Use-proofs are embedded in PR descriptions or linked from the PR body, providing visual evidence that every acceptance criterion was validated before merge.
 
 ## Workflow
 

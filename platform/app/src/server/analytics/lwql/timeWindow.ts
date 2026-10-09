@@ -1,18 +1,25 @@
 /**
- * LangWatchQL analytics SQL — the time-window vocabulary.
+ * LangWatchQL analytics SQL — the time-window and granularity vocabulary.
  *
  * A statement says whether it follows the surface's period by *declaring* two
- * reserved bound parameters, `{period_start:DateTime}` and
- * `{period_end:DateTime}`. Nothing else records the fact: a field on the saved
+ * reserved bound parameters, `{dashboard_context_period_start:DateTime}` and
+ * `{dashboard_context_period_end:DateTime}`. Nothing else records the fact: a field on the saved
  * record would be a second source of truth able to disagree with the statement
  * it describes, and the disagreement would surface as a chart quietly showing a
  * different period from the one beside it — which is the whole failure this
  * contract exists to prevent.
  *
- * The interval those two names describe is half-open, `[period_start,
- * period_end)`. A convention this module documents rather than something it can
+ * The interval those two names describe is half-open, `[dashboard_context_period_start,
+ * dashboard_context_period_end)`. A convention this module documents rather than something it can
  * enforce — the author writes the comparison — and it is what the schema
  * browser tells a member writing SQL.
+ *
+ * A third reserved name, `{dashboard_context_granularity_seconds:UInt32}`, opts a
+ * statement into the surface's datapoint bucket size on the same terms. The
+ * three together are the surface's — {@link LWQL_SURFACE_PARAMETERS} — and a
+ * request carrying a value for any of them is refused. The steps the surface
+ * offers are {@link LWQL_GRANULARITY_STEPS}, and they are the only values the
+ * policy accepts, because coarsening picks its answer from that same list.
  *
  * ## This module has no imports, and must not gain any
  *
@@ -24,7 +31,7 @@
  * `./resolveTimeWindow.ts`, which the browser never loads.
  *
  * @see ./resolveTimeWindow.ts — what a surface may and may not do with these
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 /** The window a surface hands a statement, as instants. Half-open: `[start, end)`. */
@@ -34,17 +41,17 @@ export interface LangWatchQLTimeWindow {
 }
 
 /** Inclusive lower bound of the period the surface is showing. */
-export const LWQL_PERIOD_START_PARAMETER = "period_start";
+export const LWQL_PERIOD_START_PARAMETER = "dashboard_context_period_start";
 
 /** Exclusive upper bound of the period the surface is showing. */
-export const LWQL_PERIOD_END_PARAMETER = "period_end";
+export const LWQL_PERIOD_END_PARAMETER = "dashboard_context_period_end";
 
 /**
  * The names a statement may declare to follow the surface's period.
  *
- * Namespaced with a `period_` prefix so that a later well-known parameter —
- * `period_granularity`, `period_timezone` — cannot collide with a name a member
- * was already using for something of their own.
+ * Namespaced with a `dashboard_context_` prefix so that a later well-known
+ * parameter — `dashboard_context_timezone` — cannot collide with a name a
+ * member was already using for something of their own.
  */
 export const LWQL_TIME_WINDOW_PARAMETERS = [
   LWQL_PERIOD_START_PARAMETER,
@@ -53,6 +60,132 @@ export const LWQL_TIME_WINDOW_PARAMETERS = [
 
 export type LangWatchQLTimeWindowParameter =
   (typeof LWQL_TIME_WINDOW_PARAMETERS)[number];
+
+/**
+ * The datapoint-bucket size the surface sets for charts that opt into it,
+ * in seconds.
+ *
+ * Declared in a statement as `{dashboard_context_granularity_seconds:UInt32}` and used
+ * as the multiplier of a fixed-unit interval -- `INTERVAL
+ * {dashboard_context_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles
+ * `INTERVAL 1 HOUR` to a *function name* (`toIntervalHour`), so the unit of
+ * an offered step cannot itself be a bound value. Fixing the unit at seconds
+ * and making the multiplier the bound parameter is what leaves the surface
+ * one value to inject.
+ */
+export const LWQL_PERIOD_GRANULARITY_PARAMETER =
+  "dashboard_context_granularity_seconds";
+
+/**
+ * Every reserved name the surface owns: the two window bounds and the
+ * granularity. A request carrying a value for any of them is refused --
+ * each is set by whatever is showing the chart, and a caller that sets one
+ * is pinning something that will then ignore its surface.
+ */
+export const LWQL_SURFACE_PARAMETERS = [
+  LWQL_PERIOD_START_PARAMETER,
+  LWQL_PERIOD_END_PARAMETER,
+  LWQL_PERIOD_GRANULARITY_PARAMETER,
+] as const;
+
+export type LangWatchQLSurfaceParameter =
+  (typeof LWQL_SURFACE_PARAMETERS)[number];
+
+/** Whether a parameter name belongs to the surface rather than the caller. */
+export function isLangWatchQLSurfaceParameter(
+  name: string,
+): name is LangWatchQLSurfaceParameter {
+  return (LWQL_SURFACE_PARAMETERS as readonly string[]).includes(name);
+}
+
+/**
+ * Exactly `UInt32`.
+ *
+ * The same strictness decision as the date-time types above, applied to an
+ * unsigned count: one spelling, no widened aliases. `UInt32` is the smallest
+ * unsigned ClickHouse integer every offered step fits inside (`UInt16` tops
+ * out below a day's seconds), and a count of seconds has no reason to be
+ * nullable, signed, or floating.
+ */
+const LWQL_GRANULARITY_PARAMETER_TYPE = /^UInt32$/;
+
+/** Whether a declared ClickHouse type can carry the granularity multiplier. */
+export function isLangWatchQLGranularityParameterType(type: string): boolean {
+  return LWQL_GRANULARITY_PARAMETER_TYPE.test(type.trim());
+}
+
+/**
+ * The datapoint granularities the surface offers, in seconds: one second,
+ * one minute, one hour.
+ *
+ * Deliberately sub-day. A fixed 86,400-second interval carries no notion of
+ * a local day: on a DST-transition day (25 or 23 hours) the bucket boundary
+ * drifts off local midnight -- verified against ClickHouse 25.10, where over
+ * the Europe/Amsterdam fallback night the timezone-argument form buckets
+ * 22:00-00:00 local to `02:00` and 01:00-04:00 local to `01:00`, while
+ * `toStartOfDay(t, 'Europe/Amsterdam')` stays at `00:00` throughout. A
+ * member asking for daily buckets would get silently misaligned ones.
+ * Day-scale waits on a reserved `period_timezone` parameter (the namespace
+ * already anticipates it) and is tracked as a follow-up.
+ */
+export const LWQL_GRANULARITY_STEPS = [1, 60, 3600] as const;
+
+/** One of the offered steps — the only values any door accepts. */
+export type LangWatchQLGranularityStep =
+  (typeof LWQL_GRANULARITY_STEPS)[number];
+
+/**
+ * The unit each offered step is named by, keyed off the steps themselves so a
+ * step added to {@link LWQL_GRANULARITY_STEPS} without a name here is a
+ * compile error rather than a card rendering a bare number.
+ */
+const LWQL_GRANULARITY_STEP_UNITS: Readonly<
+  Record<(typeof LWQL_GRANULARITY_STEPS)[number], string>
+> = {
+  1: "second",
+  60: "minute",
+  3600: "hour",
+};
+
+/**
+ * How a datapoint step is named in member-facing copy.
+ *
+ * One naming table for every surface that says a step out loud — the card
+ * menu's picker and the widget's coarsened notice — because two tables drift,
+ * and the drift shows up as a member being offered "1 minute" and then told
+ * their card is running at "1-minute" buckets as if they were different things.
+ *
+ * The two forms differ only in their separator: `"noun"` reads as a menu label
+ * ("1 minute"), `"adjective"` as a modifier of what follows ("1-minute
+ * buckets"). A step the surface does not offer falls back to seconds, a shape
+ * this should never be handed but must not crash on.
+ */
+export function describeLangWatchQLGranularityStep(
+  seconds: number,
+  form: "noun" | "adjective" = "noun",
+): string {
+  const separator = form === "adjective" ? "-" : " ";
+  const unit = (
+    LWQL_GRANULARITY_STEP_UNITS as Readonly<Record<number, string | undefined>>
+  )[seconds];
+
+  return unit === undefined
+    ? `${seconds}${separator}second${form === "noun" ? "s" : ""}`
+    : `1${separator}${unit}`;
+}
+
+/**
+ * The ceiling on datapoint buckets one governed run may produce through the
+ * granularity contract.
+ *
+ * Vocabulary rather than policy, and so it lives here: the dashboard widget
+ * cites this number in the notice it shows when a period forced its step
+ * coarser, and that notice renders in the browser. The arithmetic that enforces
+ * the ceiling stays in `./resolveTimeWindow.ts`, which the browser never loads
+ * — importing that module for the constant alone would ship the handled-error
+ * registry and everything it reaches to every page.
+ */
+export const LWQL_GRANULARITY_MAX_BUCKETS = 10_000;
 
 /** Whether a parameter name is one the surface owns. */
 export function isLangWatchQLTimeWindowParameter(

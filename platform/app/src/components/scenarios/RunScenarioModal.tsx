@@ -7,7 +7,7 @@ import { TargetSelector, type TargetValue } from "./TargetSelector";
 interface RunScenarioModalProps {
   open: boolean;
   onClose: () => void;
-  onRun: (target: TargetValue, remember: boolean) => void;
+  onRun: (target: TargetValue, shouldRemember: boolean) => void;
   initialTarget?: TargetValue;
   isLoading?: boolean;
 }

@@ -116,7 +116,7 @@ func TestEngineExecute_SignatureNodeEmitsLLMChildSpan(t *testing.T) {
 
 	// Reserved gen_ai attrs Studio reads to render token counts + cost.
 	assert.Equal(t, "openai", llmAttrs["gen_ai.system"])
-	assert.Equal(t, "gpt-5-mini", llmAttrs["gen_ai.request.model"])
+	assert.Equal(t, "openai/gpt-5-mini", llmAttrs["gen_ai.request.model"])
 	assert.EqualValues(t, 12, llmAttrs["gen_ai.usage.input_tokens"])
 	assert.EqualValues(t, 1, llmAttrs["gen_ai.usage.output_tokens"])
 	assert.InDelta(t, 0.00018, toFloat(llmAttrs["langwatch.cost"]), 1e-9)

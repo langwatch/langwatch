@@ -1,8 +1,11 @@
+import type {
+  ContentBlock,
+  ConversationTurn,
+} from "~/shared/traces/transcript/types";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { AssistantTurnCard } from "./AssistantTurnCard";
 import { BlockStack } from "./BlockStack";
 import { SystemTurnView } from "./SystemTurnView";
-import type { ContentBlock, ConversationTurn } from "./types";
 import { UserTurnBubble } from "./UserTurnBubble";
 
 export function TurnView({

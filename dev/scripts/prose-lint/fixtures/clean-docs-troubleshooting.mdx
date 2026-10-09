@@ -1,0 +1,15 @@
+---
+title: Instant Evals troubleshooting
+description: The errors a run can stop on, what each one means, and the fix.
+---
+
+## The run stopped with judge_unavailable
+
+The judge endpoint answered 503 for longer than the run's retry window of five minutes. The rows judged before the outage keep their judgements, and the platform charges only for the rows it judged.
+
+1. Run `langwatch instant-eval status <id>` to see how many rows are left.
+2. Start a new run over the same window, with `--start` and `--end` copied from the status output.
+
+## The estimate is higher than the run cost
+
+`estimate` measures a sample of the rows and multiplies, so it overshoots when the sample includes long conversations. The run itself charges for the tokens it sends, which you can read from `langwatch instant-eval status <id>` after it finishes. A difference of more than 30 percent between the two points at a window where a few conversations are far longer than the rest; narrow it with `--filter tokens:<20000` to keep the price steady.

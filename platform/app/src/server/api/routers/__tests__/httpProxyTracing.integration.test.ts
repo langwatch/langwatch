@@ -32,22 +32,38 @@ vi.mock("~/optimization_studio/server/addEnvs", () => ({
 const { mockScheduleTrace } = vi.hoisted(() => ({
   mockScheduleTrace: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    traces: {
-      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
-    },
-  }),
-}));
-vi.mock("../../../app-layer/app", () => ({
-  getApp: () => ({
-    traces: {
-      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
-    },
-  }),
-}));
+// `.permission()` procedures decide through getApp().permissions (ADR-092),
+// so both fakes carry the real composition over the real test database.
+vi.mock("~/server/app-layer/app", async () => {
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: permissionsServiceFor(dbForPermissions),
+      traces: {
+        recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+      },
+    }),
+  };
+});
+vi.mock("../../../app-layer/app", async () => {
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  return {
+    getApp: () => ({
+      permissions: permissionsServiceFor(dbForPermissions),
+      traces: {
+        recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+      },
+    }),
+  };
+});
 
 type OtlpAttr = {
   key: string;

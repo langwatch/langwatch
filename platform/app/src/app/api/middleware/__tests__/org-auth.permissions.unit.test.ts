@@ -15,10 +15,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 const resolveApiKeyPermission = vi.fn();
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
   resolveApiKeyPermission: (...args: unknown[]) =>
     resolveApiKeyPermission(...args),
 }));
+
+// The middleware resolves its service from the App on the request context.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appCredentialPermissionsMock } = await import(
+    "~/test-utils/appCredentialPermissionsMock"
+  );
+  return appCredentialPermissionsMock();
+});
 
 import { requireOrgPermission, requireOrgPermissionOrThrow } from "../org-auth";
 

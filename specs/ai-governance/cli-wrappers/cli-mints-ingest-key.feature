@@ -44,6 +44,19 @@ Feature: CLI Wrappers — `langwatch <tool>` mints and uses an ingestion key (Pa
     Then the wrapper reuses the cached `ik-lw-` token
     And it does NOT mint a new key
 
+  # A device that cannot reach the platform keeps exporting with the key it
+  # has, which is what an offline laptop needs. A device the platform refuses
+  # to authenticate looks the same from here and is not the same thing: its
+  # key may have been revoked weeks ago, and no mint can replace it while the
+  # session is dead. The key is still used, and the run says so.
+
+  @unit @cli-wrappers @ingest-key @reuse
+  Scenario: A signed-out device is told its wiring was not confirmed
+    Given a cached ingestion key and a platform that refuses the device session
+    When the user runs `langwatch instrument claude`
+    Then the tool is wired with the cached key
+    And the run says the machine is signed out and names how to sign it in
+
   @bdd @cli-wrappers @ingest-key @per-tool
   Scenario Outline: Each tool gets an ingest key for its own sourceType
     When the user runs `langwatch <tool>` in ingestion mode

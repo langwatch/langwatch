@@ -5,10 +5,13 @@
  * (monitor) into another project, through the real tRPC + Prisma layer.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("monitors.copy", () => {
   const sourceProjectId = "test-project-id";

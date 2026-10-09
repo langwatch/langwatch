@@ -14,13 +14,22 @@ export function IconGlyph({
   icon,
   monochrome = false,
   size = "16px",
+  testId,
 }: {
   icon: React.ReactNode;
   monochrome?: boolean;
   size?: string | number;
+  /**
+   * The mark carries no text, so a test asserting a surface shows a vendor
+   * has nothing else to find it by. Goes on this Box rather than a wrapper:
+   * a wrapper would become the flex item in every render site and swallow
+   * the flexShrink and inline-flex below.
+   */
+  testId?: string;
 }) {
   return (
     <Box
+      data-testid={testId}
       width={size}
       height={size}
       flexShrink={0}

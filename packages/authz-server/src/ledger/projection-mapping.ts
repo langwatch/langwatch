@@ -1,4 +1,16 @@
-import type { TeamUserRole } from "@langwatch/authz";
+import {
+  PRINCIPAL_KIND_FROM_STORED,
+  STORED_PRINCIPAL_KIND,
+} from "@langwatch/authz";
+import type {
+  BindingRoleKey,
+  StoredPrincipalKind,
+  StoredScopeTier,
+  TeamUserRole,
+} from "@langwatch/authz";
+
+import { type GrantCondition, grantConditionSchema } from "@langwatch/actor";
+import { BindingMissingError } from "../authz-grants.repository";
 import type {
   GrantEventSource,
   GrantFact,
@@ -7,7 +19,7 @@ import type {
   LegacyBindingRole,
   ResourceGrantTerms,
   RoleFact,
-} from "./grants-ledger.reducer";
+} from "./facts";
 
 /** The single permission a share link has ever conferred (ADR-057) - the one
  *  spelling every minter and every importer of a share-link grant uses
@@ -27,43 +39,17 @@ export const SHARE_LINK_PERMISSION = "traces:view";
  * structurally — its generated enums are these same string literals.
  */
 
-/** The Grant table's principal vocabulary (uppercase, the DB's spelling). */
-export type GrantPrincipalTypeDb =
-  | "USER"
-  | "API_KEY"
-  | "GROUP"
-  | "TEAM"
-  | "ORGANIZATION"
-  | "PROJECT"
-  | "ANYONE";
+/** The Grant table's principal and scope vocabularies. Both are the stored
+ *  spellings from `@langwatch/authz`, not restatements of them — a kind
+ *  added to the vocabulary appears in the column type with no edit here. */
+export type GrantPrincipalTypeDb = StoredPrincipalKind;
+export type GrantScopeTypeDb = StoredScopeTier;
 
-/** The Grant table's scope vocabulary — same five names as the ledger's. */
-export type GrantScopeTypeDb = LedgerScopeType;
+/** Kept as a name because call sites read better for it; the translation
+ *  itself is the vocabulary's, so there is no second table to go stale. */
+export const PRINCIPAL_TO_DB = STORED_PRINCIPAL_KIND;
 
-/** The ledger's principal vocabulary → the Grant table's, the only place this
- *  translation may be written (module docblock, decision 10). Every other
- *  site that needs it - the cutover import's diff report, the read
- *  repository's exclusivity check - imports this map rather than restating
- *  it, so a vocabulary added here cannot go stale anywhere else. */
-export const PRINCIPAL_TO_DB: Record<LedgerPrincipalType, GrantPrincipalTypeDb> = {
-  user: "USER",
-  api_key: "API_KEY",
-  group: "GROUP",
-  team: "TEAM",
-  organization: "ORGANIZATION",
-  project: "PROJECT",
-  anyone: "ANYONE",
-};
-
-const PRINCIPAL_FROM_DB: Record<GrantPrincipalTypeDb, LedgerPrincipalType> = {
-  USER: "user",
-  API_KEY: "api_key",
-  GROUP: "group",
-  TEAM: "team",
-  ORGANIZATION: "organization",
-  PROJECT: "project",
-  ANYONE: "anyone",
-};
+const PRINCIPAL_FROM_DB = PRINCIPAL_KIND_FROM_STORED;
 
 /** The Grant table's resource-kind vocabulary. Uppercase, because the
  *  column restates ShareLink's own Prisma enum — same reasoning as
@@ -92,7 +78,23 @@ const RESOURCE_KIND_FROM_DB: Record<
 };
 
 /**
- * The stored column is a plain `TEXT` — Prisma has no enum behind it, and the
+ * A stored grant condition, parsed. The column is JSONB with no schema
+ * behind it, so a row's condition has to PARSE through the same schema the
+ * event wire uses before it becomes a fact: an object that names a type the
+ * vocabulary lacks, carries a non-string field, or has a `from`/`until` that
+ * is not an ISO instant returns `undefined`. `grantRowToFact` then builds the
+ * fact with no condition, and the shared-read minter leaves the row out of
+ * every proof, so a malformed window is never read as a wider one.
+ */
+export function grantConditionFromDb(
+  value: unknown,
+): GrantCondition | undefined {
+  const parsed = grantConditionSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+/**
+ * The stored column is a plain `TEXT`: Prisma has no enum behind it, and the
  * row can be read back from a database an older writer, a hand-run statement
  * or a partially applied migration also touched. So the value is PARSED, not
  * asserted: `undefined` for anything that is not one of the two kinds, which
@@ -100,7 +102,7 @@ const RESOURCE_KIND_FROM_DB: Record<
  *
  * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
  * engine as `kind: undefined`, which reads as a resource grant that names no
- * kind of thing — a share row that matches whichever resource is asked about.
+ * kind of thing, a share row that matches whichever resource is asked about.
  */
 function resourceKindFromDb(
   value: string | null,
@@ -131,8 +133,17 @@ export interface GrantRowShape {
   createdByUserId: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
+  /** The shared grant's window (ADR-144); absent on own grants, which is
+   *  what lets the row go straight into a Prisma create. */
+  condition?: GrantCondition;
   occurredAt: Date;
 }
+
+/** A row as storage hands it back: the JSONB column is untyped until
+ *  `grantRowToFact` parses it, so a reader never has to pretend otherwise. */
+export type GrantRowRead = Omit<GrantRowShape, "condition"> & {
+  condition?: unknown;
+};
 
 export function grantFactToRow({
   grant,
@@ -163,15 +174,20 @@ export function grantFactToRow({
         ? new Date(grant.resource.expiresAtMs)
         : null,
     maxViews: grant.resource?.maxViews ?? null,
+    ...(grant.condition !== undefined ? { condition: grant.condition } : {}),
     occurredAt: new Date(grant.occurredAtMs),
   };
 }
 
-export function grantRowToFact(row: GrantRowShape): GrantFact {
+export function grantRowToFact(row: GrantRowRead): GrantFact {
   const resourceKind = resourceKindFromDb(row.resourceKind);
+  const condition = grantConditionFromDb(row.condition);
   return {
     grantId: row.id,
-    principal: { type: PRINCIPAL_FROM_DB[row.principalType], id: row.principalId },
+    principal: {
+      type: PRINCIPAL_FROM_DB[row.principalType],
+      id: row.principalId,
+    },
     roleKey: row.roleKey,
     scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
     ...(row.legacyRole != null
@@ -201,6 +217,7 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
           },
         }
       : {}),
+    ...(condition !== undefined ? { condition } : {}),
     source: row.source as GrantEventSource,
     occurredAtMs: row.occurredAt.getTime(),
   };
@@ -259,27 +276,40 @@ export interface CompatBindingRowShape {
   scopeId: string;
 }
 
+type BindingGrant = GrantFact & {
+  principal: { type: "user" | "group" | "apiKey"; id: string };
+  scope: { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string };
+  roleKey: BindingRoleKey;
+};
+
+/** Select binding facts from streams that also contain resource and platform grants. */
+export function isBindingGrant(grant: GrantFact): grant is BindingGrant {
+  const { scope, principal, roleKey } = grant;
+  const bindingScope =
+    scope.type === "ORGANIZATION" ||
+    scope.type === "TEAM" ||
+    scope.type === "PROJECT";
+  const bindingPrincipal =
+    principal.type === "user" ||
+    principal.type === "group" ||
+    principal.type === "apiKey";
+  const bindingRole =
+    roleKey === "admin" ||
+    roleKey === "member" ||
+    roleKey === "viewer" ||
+    (roleKey !== null &&
+      roleKey.startsWith("custom:") &&
+      roleKey.length > "custom:".length);
+  return (
+    bindingScope && bindingPrincipal && principal.id !== null && bindingRole
+  );
+}
+
 /**
- * The compat head projects only what the legacy tables can express:
- * scope ∈ ORGANIZATION|TEAM|PROJECT, principal ∈ user|group|api_key, and a
- * roleKey the `TeamUserRole` enum can carry. RESOURCE and PLATFORM rows,
- * collective principals (team/organization/project/anyone), and
- * `lite-member` (an org-level concept `RoleBinding` never represented) are
- * future-head-only; the legacy resolver never answered for them, so their
- * absence from the compat view changes nothing it reads.
- *
- * roleKey → (role, customRoleId), the inverse of
- * `roleKeyForTeamRole` in @langwatch/authz (roles.ts): admin→ADMIN,
- * member→MEMBER, viewer→VIEWER, custom:<id>→(`legacyRole` ?? CUSTOM, id).
- *
- * That last arm is not cosmetic. `roleKey` alone cannot say which built-in
- * role a custom binding ALSO carried, and the legacy resolver reads it: a
- * custom role with an empty permission list falls through to the row's own
- * `role`, so writing CUSTOM where the legacy row said ADMIN silently
- * downgrades the principal to viewer (matchers.ts, `roleKeyForTeamRole`).
- * Imported facts therefore carry `legacyRole` and the compat row reproduces
- * it; ledger-born custom grants have no legacy row to preserve and stay
- * CUSTOM.
+ * Map a binding fact to the existing API shape. Imported custom grants retain
+ * their original built-in role for API compatibility. Runtime authorization
+ * uses the canonical custom role key.
+ * @throws BindingMissingError when the fact does not represent a role binding.
  */
 export function grantFactToCompatBinding({
   grant,
@@ -287,35 +317,18 @@ export function grantFactToCompatBinding({
 }: {
   grant: GrantFact;
   organizationId: string;
-}): CompatBindingRowShape | null {
+}): CompatBindingRowShape {
+  if (!isBindingGrant(grant)) throw new BindingMissingError();
   const { scope, principal, roleKey } = grant;
-  if (
-    scope.type !== "ORGANIZATION" &&
-    scope.type !== "TEAM" &&
-    scope.type !== "PROJECT"
-  ) {
-    return null;
-  }
-  if (
-    principal.type !== "user" &&
-    principal.type !== "group" &&
-    principal.type !== "api_key"
-  ) {
-    return null;
-  }
-  if (roleKey == null || principal.id == null) return null;
 
   let role: TeamUserRole;
   let customRoleId: string | null = null;
   if (roleKey === "admin") role = "ADMIN";
   else if (roleKey === "member") role = "MEMBER";
   else if (roleKey === "viewer") role = "VIEWER";
-  else if (roleKey.startsWith("custom:")) {
+  else {
     role = grant.legacyRole ?? "CUSTOM";
     customRoleId = roleKey.slice("custom:".length);
-  } else {
-    // lite-member (and any future key the enum cannot carry).
-    return null;
   }
 
   return {
@@ -323,7 +336,7 @@ export function grantFactToCompatBinding({
     organizationId,
     userId: principal.type === "user" ? principal.id : null,
     groupId: principal.type === "group" ? principal.id : null,
-    apiKeyId: principal.type === "api_key" ? principal.id : null,
+    apiKeyId: principal.type === "apiKey" ? principal.id : null,
     role,
     customRoleId,
     scopeType: scope.type,
@@ -387,9 +400,11 @@ export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
   string,
   CompatShareLinkRowShape["visibility"] | undefined
 > = Object.fromEntries(
-  (Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as Array<
-    [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]]
-  >).map(([principalType, visibility]) => [
+  (
+    Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as Array<
+      [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]]
+    >
+  ).map(([principalType, visibility]) => [
     PRINCIPAL_TO_DB[principalType],
     visibility,
   ]),

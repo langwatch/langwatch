@@ -2,17 +2,13 @@
   "name": "@langwatch/authz",
   "version": "0.1.0",
   "private": true,
-  "description": "The unified authorization engine (ADR-092): the permission registry, built-in roles, the pure decide() walk, and the witness/passport primitives. Storage adapters (collector, cache, grants) live in the app.",
+  "description": "The isomorphic authorization core (ADR-092): the vocabulary, the permission registry, built-in roles and the pure decide() walk. No node imports, so the frontend and the backend share it verbatim. Server-side services live in @langwatch/authz-server.",
   "license": "MIT",
   "type": "module",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    },
-    "./passport": {
-      "types": "./src/passport.ts",
-      "default": "./src/passport.ts"
     },
     "./witness": {
       "types": "./src/witness.ts",

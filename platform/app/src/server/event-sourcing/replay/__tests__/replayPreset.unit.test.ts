@@ -4,6 +4,9 @@ import { createReplayRuntime } from "../replayPreset";
 
 vi.mock("ioredis", () => ({
   default: class {
+    on() {
+      return this;
+    }
     disconnect() {}
   },
 }));
@@ -42,6 +45,11 @@ vi.mock(
 vi.mock(
   "../../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository",
   () => ({ SimulationRunStateRepositoryClickHouse: class {} }),
+);
+
+vi.mock(
+  "../../pipelines/simulation-processing/projections/simulationRunState.store",
+  () => ({ SimulationRunStateFoldStore: class {} }),
 );
 
 vi.mock("../../pipelines/simulation-processing/schemas/constants", () => ({

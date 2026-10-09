@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/actor";
+import { tenantScopeKey } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import {
   deriveScenarioRoleMetricsFromSpans,
   type ScenarioRoleMetrics,
@@ -9,20 +11,21 @@ import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-pro
 /** Minimal span reader this service needs (satisfied by SpanStorageService). */
 export interface NormalizedSpanReader {
   getNormalizedSpansByTraceId(params: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
     limit?: number;
   }): Promise<NormalizedSpan[]>;
   getTraceEventsByTraceId(params: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
   }): Promise<DerivedTraceEvent[]>;
 }
 
 interface DeriveParams {
-  tenantId: string;
+  /** The proof the span read is fenced by (ADR-144 block C). */
+  authorization: Authorization;
   traceId: string;
   /**
    * ClickHouse partition hint (the trace's EARLIEST span time). It narrows the
@@ -90,7 +93,7 @@ export class TraceReadDerivationService {
   ): Promise<ScenarioRoleMetrics> {
     return this.memoize(this.scenarioRoleMetricsMemo, params, async () => {
       const spans = await this.spans.getNormalizedSpansByTraceId({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         traceId: params.traceId,
         occurredAtMs: params.occurredAtMs,
       });
@@ -104,7 +107,7 @@ export class TraceReadDerivationService {
   async deriveEvents(params: DeriveParams): Promise<DerivedTraceEvent[]> {
     return this.memoize(this.eventsMemo, params, () =>
       this.spans.getTraceEventsByTraceId({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         traceId: params.traceId,
         occurredAtMs: params.occurredAtMs,
       }),
@@ -116,10 +119,18 @@ export class TraceReadDerivationService {
    * version (spanCount), so a cached read is reused within one fold version and
    * re-issued as soon as the fold advances. Without a watermark the read is
    * non-deterministic over time and is left to pass straight through.
+   *
+   * Keyed on the fence the proof allows, not on a tenant id, so two proofs
+   * that read the same projects share an entry and an aggregate never shares
+   * one with a member.
    */
   private memoKey(params: DeriveParams): string | null {
     if (params.foldVersion === undefined) return null;
-    return `${params.tenantId}:${params.traceId}:${params.foldVersion}`;
+    const scope = tenantScopeKey({
+      authorization: params.authorization,
+      reads: "traces",
+    });
+    return `${scope}:${params.traceId}:${params.foldVersion}`;
   }
 
   private memoize<T>(

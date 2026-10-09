@@ -12,7 +12,7 @@ sidebarTitle: Generic OTel
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
+- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-governance/ingestion-sources/claude-cowork)).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
@@ -76,7 +76,7 @@ If a field doesn't resolve from the precedence list, the fold projection stores 
 
 ## What is still envelope-only, follow-up work
 
-- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli accepted via the shared parser). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
+- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli and zstd accepted via the shared parser; gzip and zstd bodies are recognised even without a correct Content-Encoding). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
 - **Span events, span links.** Not extracted into separate fold dimensions in this slice; the parent span's data is surfaced. Span events appear in the trace viewer's drill-down.
 
 ## Verify with CLI + web

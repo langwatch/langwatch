@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { previewCostRuleMatchingSpans } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import { prisma } from "~/server/db";
 import { assertCanManageScope } from "~/server/modelProviders/modelProvider.authz";
@@ -11,7 +12,7 @@ import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
 import { isSafeRegex } from "~/utils/safeRegex";
 import { getModelLimits } from "../../../utils/modelLimits";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
-import { authorizeInResolver, checkProjectPermission } from "../rbac";
+import { requireRouteAuthorization } from "../authorization";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -45,7 +46,7 @@ export const llmModelCostsRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => {
       return await getLLMModelCosts(input);
     }),
@@ -72,7 +73,12 @@ export const llmModelCostsRouter = createTRPCRouter({
         }),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "assertCanManageScope: manage is required on the written scope, which defaults to this project; the scope then resolves to a single organization the cost is anchored to",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -161,7 +167,12 @@ export const llmModelCostsRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "not trusted — the scope is derived from the stored row and assertCanManageScope runs against that scope, never the caller-supplied projectId",
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       // Derive the scope from the row itself, then authorize manage on that
       // scope. Never trust a caller-supplied scope for a delete.
@@ -189,7 +200,7 @@ export const llmModelCostsRouter = createTRPCRouter({
    */
   getModelLimits: protectedProcedure
     .input(z.object({ projectId: z.string(), model: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .permission("project:view")
     .query(async ({ input }) => getModelLimits(input.model)),
 
   /**
@@ -218,8 +229,12 @@ export const llmModelCostsRouter = createTRPCRouter({
         cacheCreation1hCostPerToken: z.number().nonnegative().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) =>
-      previewCostRuleMatchingSpans({ spans: getApp().traces.spans, input }),
+    .permission("traces:view")
+    .query(async ({ input, ctx }) =>
+      previewCostRuleMatchingSpans({
+        spans: getApp().traces.spans,
+        authorization: requireRouteAuthorization(ctx),
+        input,
+      }),
     ),
 });

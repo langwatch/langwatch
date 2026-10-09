@@ -21,11 +21,14 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { ModelProviderScopeForbiddenError } from "../errors";
 import { ModelProviderService } from "../modelProvider.service";
+
+wireDefaultTestApp();
 
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
@@ -112,14 +115,12 @@ describe.skipIf(!hasCredentialsSecret)(
           role: OrganizationUserRole.ADMIN,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: orgAdmin.id,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId,
+        userId: orgAdmin.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
       });
 
       // Team A admin: org MEMBER + TeamUser ADMIN on A only. Should pass
@@ -169,15 +170,25 @@ describe.skipIf(!hasCredentialsSecret)(
           role: TeamUserRole.MEMBER,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: teamAMember.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId,
+        userId: teamAMember.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
       });
+
+      for (const member of [
+        { userId: teamAAdminUserId, role: TeamUserRole.ADMIN },
+        { userId: teamAMemberUserId, role: TeamUserRole.MEMBER },
+      ]) {
+        await seedRoleBinding(prisma, {
+          organizationId,
+          ...member,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamAId,
+        });
+      }
 
       // Unrelated user: no membership anywhere in this org.
       const unrelated = await prisma.user.create({
@@ -190,6 +201,7 @@ describe.skipIf(!hasCredentialsSecret)(
       // Order matters: providers (scopes cascade via onDelete: Cascade)
       // → teamUser/orgUser → team/project → user → org.
       await cleanupTestRows(prisma, [
+        ["grant", { organizationId }],
         ["roleBinding", { organizationId }],
         [
           "modelProvider",

@@ -1,9 +1,11 @@
 /** @vitest-environment node */
 
 /**
- * The tRPC adapter's own behaviour: which id becomes the scope, what an
- * unauthenticated or miswired call gets, and the SHAPE of a refusal. The
- * engine's verdicts are @langwatch/authz's business and are stubbed here.
+ * The declared seam's own behaviour: which input id becomes the check scope
+ * (the registry decides, not blind precedence), what an unauthenticated or
+ * miswired call gets, and the SHAPE of a refusal. The fork-aware resolvers
+ * are `rbac.ts`'s business and are stubbed here — decision-neutrality against
+ * them is their own suite's job.
  *
  * The refusal shape is the sharp part. An unknown id and a denied id have to
  * come out identical: when the unknown branch answered with a bare
@@ -11,41 +13,84 @@
  * and left the client rendering "unknown error" for a denial it could have
  * named.
  */
-import { PermissionDeniedError } from "@langwatch/authz";
+import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
-import { TRPCError } from "@trpc/server";
+import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 
-const checkDetailed = vi.fn();
-const resolveScopeRef = vi.fn();
+/**
+ * Severity is behaviour here, not decoration: the blank-id split exists so a
+ * caller's empty string stops being logged as a platform fault, and only an
+ * assertion on the error channel can hold that.
+ */
+const loggedError = vi.fn();
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createLogger: () => ({
+      error: (...args: unknown[]) => loggedError(...args),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      trace: vi.fn(),
+    }),
+  };
+});
 
-vi.mock("~/server/app-layer/authz/runtime", () => ({
-  authz: {
-    checkDetailed: (...args: unknown[]) => checkDetailed(...args),
-  },
-  authzCollector: {
-    resolveScopeRef: (...args: unknown[]) => resolveScopeRef(...args),
-  },
+const resolveProjectPermission = vi.fn();
+const resolveTeamPermission = vi.fn();
+const hasOrganizationPermission = vi.fn();
+const resolveProjectPermissionAny = vi.fn();
+
+vi.mock("~/server/app-layer/authz/permission-adapters", () => ({
+  resolveProjectPermission: (...args: unknown[]) =>
+    resolveProjectPermission(...args),
+  resolveTeamPermission: (...args: unknown[]) => resolveTeamPermission(...args),
+  hasOrganizationPermission: (...args: unknown[]) =>
+    hasOrganizationPermission(...args),
+  // Only consulted on a refusal, to say WHY. Nothing in this suite is about a
+  // disabled seat, so it answers "nothing more useful to say" and the generic
+  // denial the assertions below expect is what comes out.
+  organizationDenialReason: async () => undefined,
+  resolveProjectPermissionAny: (...args: unknown[]) =>
+    resolveProjectPermissionAny(...args),
 }));
 
-const { checkPermissionV2 } = await import("../trpc-middleware");
+// The seam resolves its service from the App; this fake App runs the REAL
+// service + repository over the rbac stubs above.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
 
-const PROJECT_SCOPE = {
-  type: "project" as const,
-  id: "proj-1",
-  teamId: "team-1",
-  organizationId: "org-1",
-};
+const {
+  checkDeclaredPermission,
+  checkDeclaredPermissionAny,
+  declaredNoPermission,
+  declaredServiceAuthorization,
+} = await import("../trpc-middleware");
+const { authzDeclarationOf } = await import("@langwatch/authz");
 
 const session = { user: { id: "alice" } };
 
-const paramsFor = (input: Record<string, string | undefined>) => ({
+const paramsFor = (
+  input: Record<string, string | undefined>,
+  { authed = true }: { authed?: boolean } = {},
+) => ({
   ctx: {
-    session: session as any,
+    session: (authed ? session : null) as any,
     permissionChecked: false,
-    organizationRole: undefined as "ADMIN" | "MEMBER" | "EXTERNAL" | undefined,
+    organizationRole: undefined as any,
+    // The seam's own suite, not the second-factor gate's: the gate runs after
+    // the permission and reads the organization it guards, which no fixture
+    // here creates. Handed in through the ctx slot that exists for exactly
+    // this — `mfa-gate`'s behaviour is asserted by its own tests.
+    mfaGate: { offered: () => false } as any,
   },
   input,
   next: vi.fn().mockReturnValue("next-called"),
@@ -63,175 +108,766 @@ const rejection = async (run: () => Promise<unknown>): Promise<TRPCError> => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveScopeRef.mockResolvedValue(PROJECT_SCOPE);
-  checkDetailed.mockResolvedValue({
-    decision: { allowed: true },
-    grants: { organizationRole: "MEMBER" },
+  resolveProjectPermission.mockResolvedValue({
+    permitted: true,
+    organizationRole: "MEMBER",
+  });
+  resolveTeamPermission.mockResolvedValue({
+    permitted: true,
+    organizationRole: "MEMBER",
+  });
+  hasOrganizationPermission.mockResolvedValue(true);
+  resolveProjectPermissionAny.mockResolvedValue({
+    permitted: true,
+    organizationRole: "MEMBER",
   });
 });
 
-describe("checkPermissionV2", () => {
+describe("checkDeclaredPermission", () => {
   describe("given input carrying every scope id", () => {
-    it("checks the most specific one, projectId first", async () => {
+    /** @scenario "The most specific tier the permission allows decides the check scope" */
+    it("checks the most specific tier the permission is grantable at", async () => {
       const params = paramsFor({
         projectId: "proj-1",
         teamId: "team-1",
         organizationId: "org-1",
       });
+      await checkDeclaredPermission({ permission: "traces:view" })(
+        params as any,
+      );
+      expect(resolveProjectPermission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session: { user: { id: "alice" }, expires: "" },
+        }),
+        "proj-1",
+        "traces:view",
+      );
+      expect(resolveTeamPermission).not.toHaveBeenCalled();
+      expect(hasOrganizationPermission).not.toHaveBeenCalled();
+      expect(params.ctx.permissionChecked).toBe(true);
+      expect(params.ctx.organizationRole).toBe("MEMBER");
+    });
 
-      await checkPermissionV2("prompts:update")(params);
-
-      expect(resolveScopeRef).toHaveBeenCalledWith({
+    it("skips tiers an organization-only permission cannot be granted at", async () => {
+      const params = paramsFor({
         projectId: "proj-1",
-        teamId: undefined,
-        organizationId: undefined,
-      });
-    });
-  });
-
-  describe("given input carrying a team and an organization", () => {
-    it("checks the team, the more specific of the two", async () => {
-      resolveScopeRef.mockResolvedValue({
-        type: "team",
-        id: "team-1",
         organizationId: "org-1",
       });
-
-      await checkPermissionV2("prompts:update")(
-        paramsFor({ teamId: "team-1", organizationId: "org-1" }),
+      await checkDeclaredPermission({ permission: "organization:manage" })(
+        params as any,
       );
-
-      expect(resolveScopeRef).toHaveBeenCalledWith({
-        projectId: undefined,
-        teamId: "team-1",
-        organizationId: undefined,
-      });
+      expect(hasOrganizationPermission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session: { user: { id: "alice" }, expires: "" },
+        }),
+        "org-1",
+        "organization:manage",
+      );
+      expect(resolveProjectPermission).not.toHaveBeenCalled();
     });
   });
 
-  describe("given input carrying only an organization", () => {
-    it("checks the organization", async () => {
-      resolveScopeRef.mockResolvedValue({ type: "organization", id: "org-1" });
-
-      await checkPermissionV2("organization:manage")(
-        paramsFor({ organizationId: "org-1" }),
+  describe("given a via derivation", () => {
+    /** @scenario "A scope derivation is written at the call site, never inferred" */
+    it("checks at the named field's own tier", async () => {
+      const params = paramsFor({ teamId: "team-1" });
+      await checkDeclaredPermission({
+        permission: "organization:manage",
+        via: "teamId",
+      })(params as any);
+      expect(resolveTeamPermission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session: { user: { id: "alice" }, expires: "" },
+        }),
+        "team-1",
+        "organization:manage",
       );
-
-      expect(resolveScopeRef).toHaveBeenCalledWith({
-        projectId: undefined,
-        teamId: undefined,
-        organizationId: "org-1",
-      });
+      expect(hasOrganizationPermission).not.toHaveBeenCalled();
     });
   });
 
-  describe("given no session", () => {
-    it("refuses as unauthenticated before any id is looked at", async () => {
+  describe("given the request context carries an App", () => {
+    /** @scenario "Every grant check decides through the App the request context carries" */
+    it("decides through the injected App, never composing its own", async () => {
+      const getDecision = vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" });
       const params = paramsFor({ projectId: "proj-1" });
-      params.ctx.session = null as any;
+      (params.ctx as { app?: unknown }).app = {
+        permissions: { getDecision },
+        authorization: {
+          authorize: vi.fn().mockResolvedValue({ grants: [] }),
+        },
+      };
 
-      const error = await rejection(() =>
-        checkPermissionV2("prompts:update")(params),
+      await checkDeclaredPermission({ permission: "traces:view" })(
+        params as any,
       );
 
-      expect(error).toBeInstanceOf(TRPCError);
-      expect(error.code).toBe("UNAUTHORIZED");
-      expect(resolveScopeRef).not.toHaveBeenCalled();
-      expect(params.next).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given a procedure whose input carries no scope id at all", () => {
-    it("fails as a wiring bug, with copy that promises the caller nothing", async () => {
-      resolveScopeRef.mockResolvedValue(null);
-
-      const error = await rejection(() =>
-        checkPermissionV2("prompts:update")(paramsFor({})),
-      );
-
-      expect(error.code).toBe("INTERNAL_SERVER_ERROR");
-      // The permission name and the miswiring go to the log, not to the user.
-      expect(error.message).not.toContain("prompts:update");
-      expect(error.cause).toBeUndefined();
-    });
-  });
-
-  describe("given an id the engine cannot resolve", () => {
-    it("denies exactly as an engine denial does, leaking no existence", async () => {
-      resolveScopeRef.mockResolvedValue(null);
-      const params = paramsFor({ projectId: "ghost" });
-
-      const unknown = await rejection(() =>
-        checkPermissionV2("prompts:update")(params),
-      );
-
-      checkDetailed.mockResolvedValue({
-        decision: { allowed: false, denialReason: "no-binding" },
-        grants: { organizationRole: "MEMBER" },
+      expect(getDecision).toHaveBeenCalledWith({
+        userId: "alice",
+        permission: "traces:view",
+        scope: { tier: "project", id: "proj-1" },
       });
-      resolveScopeRef.mockResolvedValue(PROJECT_SCOPE);
-      const denied = await rejection(() =>
-        checkPermissionV2("prompts:update")(paramsFor({ projectId: "proj-1" })),
+      // The module-level App was never consulted — the context's instance is
+      // the one that decides.
+      expect(resolveProjectPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the caller is unauthenticated", () => {
+    it("answers UNAUTHORIZED before reading any id", async () => {
+      const params = paramsFor({ projectId: "proj-1" }, { authed: false });
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(params as any),
+      );
+      expect(error.code).toBe("UNAUTHORIZED");
+      expect(resolveProjectPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the input names no scope id at all", () => {
+    /** @scenario "An input carrying no scope id at all is still a wiring bug" */
+    it("fails loudly as a wiring bug, not a denial", async () => {
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({}) as any,
+        ),
+      );
+      expect(error.code).toBe("INTERNAL_SERVER_ERROR");
+      expect(loggedError).toHaveBeenCalledWith(
+        expect.objectContaining({ permission: "traces:view" }),
+        "declared permission's input carries no usable scope id",
+      );
+    });
+  });
+
+  describe("when the caller leaves the scope id blank", () => {
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("answers invalid input, naming the field, without deciding anything", async () => {
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({ projectId: "" }) as any,
+        ),
       );
 
-      for (const error of [unknown, denied]) {
-        expect(error.code).toBe("UNAUTHORIZED");
-        expect(error.cause).toBeInstanceOf(PermissionDeniedError);
-        expect(HandledError.isHandled(error.cause)).toBe(true);
-        expect((error.cause as HandledError).code).toBe("permission_denied");
-      }
-      expect(unknown.message).toBe(denied.message);
-      expect(params.next).not.toHaveBeenCalled();
+      expect(error.code).toBe("BAD_REQUEST");
+      const cause = error.cause as BlankScopeIdError;
+      expect(cause).toBeInstanceOf(BlankScopeIdError);
+      expect(cause.code).toBe("validation_error");
+      expect(cause.fault).toBe("customer");
+      expect(cause.httpStatus).toBe(400);
+      expect(cause.meta.fieldErrors).toEqual({ projectId: ["Required"] });
+      // The caller's own blank string never becomes a probe for someone
+      // else's scope, so no decision is asked for.
+      expect(resolveProjectPermission).not.toHaveBeenCalled();
     });
 
-    it("names the tier the caller asked for, so the denial is about that scope", async () => {
-      resolveScopeRef.mockResolvedValue(null);
-
-      const error = await rejection(() =>
-        checkPermissionV2("team:manage")(paramsFor({ teamId: "ghost-team" })),
+    /**
+     * The regression this whole split exists for: a routine bad request used
+     * to land on the error dashboard as a platform fault and page the team.
+     *
+     */
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("does not report the caller's blank id as an internal error", async () => {
+      await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({ projectId: "" }) as any,
+        ),
       );
+      expect(loggedError).not.toHaveBeenCalled();
+    });
 
-      expect((error.cause as HandledError).meta).toMatchObject({
-        scopeType: "team",
+    /** @scenario "A blank scope id never shadows one the caller did fill in" */
+    it("still checks at a wider tier the caller did fill in", async () => {
+      const params = paramsFor({
+        projectId: "",
+        organizationId: "org-1",
+      });
+
+      await expect(
+        checkDeclaredPermission({ permission: "traces:view" })(params as any),
+      ).resolves.toBe("next-called");
+
+      expect(hasOrganizationPermission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session: { user: { id: "alice" }, expires: "" },
+        }),
+        "org-1",
+        "traces:view",
+      );
+    });
+  });
+
+  describe("when the resolver denies", () => {
+    /** @scenario "A denial carries a stable code the client can present" */
+    it("refuses with the one handled code, permission and tier in meta", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+      });
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({ projectId: "proj-1" }) as any,
+        ),
+      );
+      expect(error.cause).toBeInstanceOf(PermissionDeniedError);
+      const cause = error.cause as PermissionDeniedError;
+      expect(cause.code).toBe("permission_denied");
+      expect(cause.meta).toMatchObject({
+        permission: "traces:view",
+        scopeType: "project",
+      });
+    });
+
+    /** @scenario "A scope id that resolves to nothing is denied like one the caller may not touch" */
+    it("answers an unknown id identically to a denied one", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: null,
+      });
+      const denied = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({ projectId: "does-not-exist" }) as any,
+        ),
+      );
+      expect((denied.cause as PermissionDeniedError).code).toBe(
+        "permission_denied",
+      );
+      expect(denied.message).not.toContain("does-not-exist");
+    });
+
+    it("can conceal a project outside the caller's organization as not found", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: null,
         denialReason: "no-membership",
       });
-    });
-  });
-
-  describe("given the engine denies a lite member", () => {
-    it("carries the restriction cause the client's modal keys on", async () => {
-      checkDetailed.mockResolvedValue({
-        decision: { allowed: false, denialReason: "lite-member-restricted" },
-        grants: { organizationRole: "EXTERNAL" },
+      const middleware = checkDeclaredPermission({
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
       });
 
       const error = await rejection(() =>
-        checkPermissionV2("prompts:update")(paramsFor({ projectId: "proj-1" })),
+        middleware(paramsFor({ projectId: "project-foreign" }) as any),
       );
 
+      expect(error).toMatchObject({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "permission",
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
+      });
+    });
+
+    it("does not conceal a same-organization permission denial", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+        denialReason: "no-binding",
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({
+          permission: "project:manage",
+          nondisclosure: "not-found-outside-organization",
+        })(paramsFor({ projectId: "project-own" }) as any),
+      );
+
+      expect(error.cause).toBeInstanceOf(PermissionDeniedError);
+    });
+
+    /** @scenario "A lite member's denial is distinguishable from a missing grant" */
+    it("carries the lite-member restriction for an EXTERNAL caller", async () => {
+      resolveTeamPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "EXTERNAL",
+      });
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "team:manage" })(
+          paramsFor({ teamId: "team-1" }) as any,
+        ),
+      );
       expect(error.cause).toBeInstanceOf(LiteMemberRestrictedError);
-      expect((error.cause as HandledError).code).toBe("lite_member_restricted");
-      expect((error.cause as HandledError).meta).toMatchObject({
-        resource: "prompts",
+    });
+
+    it("denies at the organization tier without a lite-member special case", async () => {
+      hasOrganizationPermission.mockResolvedValue(false);
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "organization:manage" })(
+          paramsFor({ organizationId: "org-1" }) as any,
+        ),
+      );
+      expect((error.cause as PermissionDeniedError).code).toBe(
+        "permission_denied",
+      );
+    });
+  });
+});
+
+describe("checkDeclaredPermissionAny", () => {
+  /** @scenario "Any one of several declared permissions is enough" */
+  it("permits on the resolver's any-of answer and names the first permission when denied", async () => {
+    const params = paramsFor({ projectId: "proj-1" });
+    await checkDeclaredPermissionAny(["traces:view", "scenarios:view"])(
+      params as any,
+    );
+    expect(resolveProjectPermissionAny).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session: { user: { id: "alice" }, expires: "" },
+      }),
+      "proj-1",
+      ["traces:view", "scenarios:view"],
+    );
+    expect(params.ctx.permissionChecked).toBe(true);
+
+    resolveProjectPermissionAny.mockResolvedValue({
+      permitted: false,
+      organizationRole: "MEMBER",
+    });
+    const error = await rejection(() =>
+      checkDeclaredPermissionAny(["traces:view", "scenarios:view"])(
+        paramsFor({ projectId: "proj-1" }) as any,
+      ),
+    );
+    expect((error.cause as PermissionDeniedError).meta).toMatchObject({
+      permission: "traces:view",
+    });
+  });
+
+  /** @scenario "A blank project id on a multi-permission check is answered the same way" */
+  it("answers a blank project id as invalid input, not an internal error", async () => {
+    const error = await rejection(() =>
+      checkDeclaredPermissionAny(["traces:view", "scenarios:view"])(
+        paramsFor({ projectId: "" }) as any,
+      ),
+    );
+
+    expect(error.code).toBe("BAD_REQUEST");
+    expect(error.cause).toBeInstanceOf(BlankScopeIdError);
+    expect(resolveProjectPermissionAny).not.toHaveBeenCalled();
+    expect(loggedError).not.toHaveBeenCalled();
+  });
+});
+
+describe("declaredNoPermission", () => {
+  /** @scenario "Opting out of permission checks requires a written reason" */
+  it("runs for any authenticated caller and records its reason", async () => {
+    const middleware = declaredNoPermission({
+      reason: "user-scoped preferences only",
+    });
+    const params = paramsFor({});
+    await middleware(params as any);
+    expect(params.ctx.permissionChecked).toBe(true);
+    expect(authzDeclarationOf(middleware)).toMatchObject({
+      kind: "no-permission",
+      reason: "user-scoped preferences only",
+    });
+  });
+
+  /** @scenario "An opted-out procedure cannot silently read scoped input" */
+  it("still refuses an unallowed scope id at runtime, defense in depth", async () => {
+    const middleware = declaredNoPermission({ reason: "nothing scoped" });
+    await expect(
+      middleware(paramsFor({ projectId: "proj-1" }) as any),
+    ).rejects.toThrow("projectId is not allowed");
+    await expect(
+      declaredNoPermission({
+        reason: "creation flow",
+        allow: { organizationId: "creating inside this organization" },
+      })(paramsFor({ organizationId: "org-1" }) as any),
+    ).resolves.toBe("next-called");
+  });
+
+  /** @scenario "An opted-out procedure cannot silently read scoped input" */
+  it("passes a procedure that declares no input at all, rather than throwing on it", async () => {
+    // `in` throws on `undefined`, so a procedure with no `.input()` used to
+    // fail here — every call became a 500 at the boundary before the handler
+    // ran, which is how `identity.myIdentifiers` took the authentication
+    // settings page down. Nothing is skipped by allowing it: an input that
+    // does not exist carries no scope id to smuggle past the check.
+    const middleware = declaredNoPermission({ reason: "no input at all" });
+    const params = { ...paramsFor({}), input: undefined };
+
+    await expect(middleware(params as any)).resolves.toBe("next-called");
+    expect(params.ctx.permissionChecked).toBe(true);
+  });
+
+  describe("given an organization that holds this member at its MFA gate", () => {
+    const heldParams = () => {
+      const standingForSession = vi.fn(async () => ({
+        satisfaction: { satisfied: false } as const,
+      }));
+      const params = paramsFor({ organizationId: "org-acme" });
+      params.ctx.mfaGate = {
+        offered: () => true,
+        organizationMfa: () => ({ standingForSession }),
+      } as any;
+      return { params, standingForSession };
+    };
+
+    it("still blocks an ordinary no-permission route such as an API-key mutation", async () => {
+      const { params } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own API keys",
+        allow: {
+          organizationId: "creating a key in the caller's organization",
+        },
+      });
+
+      await expect(middleware(params as any)).rejects.toMatchObject({
+        code: "identity_mfa_enrollment_required",
+      });
+      expect(params.next).not.toHaveBeenCalled();
+    });
+
+    it("allows only an explicitly declared recovery read past the MFA gate", async () => {
+      const { params, standingForSession } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own MFA standing",
+        allow: { organizationId: "the organization whose gate they reached" },
+        mfaRecovery: {
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+
+      await expect(middleware(params as any)).resolves.toBe("next-called");
+      expect(standingForSession).not.toHaveBeenCalled();
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "no-permission",
+        mfaRecovery: {
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+    });
+  });
+});
+
+describe("declaredServiceAuthorization", () => {
+  /** @scenario "A service-authorized procedure declares the permissions its service enforces" */
+  it("marks the check as deferred and names the enforced permissions", async () => {
+    const middleware = declaredServiceAuthorization({
+      reason: "the row's own scope set decides",
+      permissions: ["traces:view"],
+    });
+    const params = paramsFor({});
+    await middleware(params as any);
+    expect(params.ctx.permissionChecked).toBe(true);
+    expect(authzDeclarationOf(middleware)).toMatchObject({
+      kind: "service-authorized",
+      permissions: ["traces:view"],
+    });
+  });
+});
+
+describe("ADR-144: the proof a trace route carries", () => {
+  const SEALED = { sealed: "proof", grants: [] };
+  const appWith = (authorize = vi.fn().mockResolvedValue(SEALED)) => ({
+    permissions: {
+      getDecision: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+    },
+    authorization: { authorize },
+  });
+
+  describe("given a procedure checked under a permission a store reads under", () => {
+    describe("when the check admits the caller", () => {
+      it("mints the proof for the project and names the route as its purpose", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "traces:view" })({
+          ...params,
+          path: "tracesV2.list",
+        } as any);
+
+        expect(app.authorization.authorize).toHaveBeenCalledWith({
+          actor: { type: "user", id: "alice" },
+          principal: { type: "user", id: "alice" },
+          permission: "traces:view",
+          scope: { projectId: "proj-1" },
+          purpose: { kind: "route", route: "tracesV2.list" },
+        });
+        expect((params.ctx as { authorization?: unknown }).authorization).toBe(
+          SEALED,
+        );
+        expect(params.next).toHaveBeenCalled();
+      });
+
+      it("refuses the request when the door disagrees with the check, rather than reading wider", async () => {
+        const app = appWith(
+          vi.fn().mockRejectedValue(new Error("not granted")),
+        );
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await expect(
+          checkDeclaredPermission({ permission: "traces:view" })(params as any),
+        ).rejects.toThrow("not granted");
+        expect(params.next).not.toHaveBeenCalled();
       });
     });
   });
 
-  describe("given the engine allows the check", () => {
-    it("hands the organization role to the context and records that a check ran", async () => {
-      const params = paramsFor({ projectId: "proj-1" });
+  describe("given a procedure checked under a permission no store reads under", () => {
+    describe("when the check admits the caller", () => {
+      it("mints nothing", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
 
-      const result = await checkPermissionV2("prompts:update")(params);
+        await checkDeclaredPermission({ permission: "project:manage" })(
+          params as any,
+        );
 
-      expect(checkDetailed).toHaveBeenCalledWith({
-        principal: { type: "user", id: "alice" },
-        permission: "prompts:update",
-        scope: PROJECT_SCOPE,
+        expect(app.authorization.authorize).not.toHaveBeenCalled();
+        expect(
+          (params.ctx as { authorization?: unknown }).authorization,
+        ).toBeUndefined();
       });
-      expect(params.ctx.organizationRole).toBe("MEMBER");
-      expect(params.ctx.permissionChecked).toBe(true);
-      expect(params.next).toHaveBeenCalledTimes(1);
-      expect(result).toBe("next-called");
+    });
+  });
+
+  describe("given a procedure checked under analytics view", () => {
+    describe("when the check admits the caller", () => {
+      it("mints nothing, since no analytics read applies a proof", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "analytics:view" })(
+          params as any,
+        );
+
+        expect(app.authorization.authorize).not.toHaveBeenCalled();
+        expect(
+          (params.ctx as { authorization?: unknown }).authorization,
+        ).toBeUndefined();
+        expect(params.next).toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+describe("ADR-144: an aggregate read is audited at the door", () => {
+  const SHARED_PROOF = {
+    scope: { organizationId: "org-1" },
+    grants: [
+      { kind: "own", projectId: "proj-1" },
+      { kind: "shared", projectId: "proj-member" },
+    ],
+  };
+  const setup = ({
+    proof = SHARED_PROOF,
+    kind = "aggregate",
+    record = vi.fn().mockResolvedValue(undefined),
+  }: {
+    proof?: unknown;
+    kind?: string;
+    record?: ReturnType<typeof vi.fn>;
+  } = {}) => {
+    const kindOf = vi.fn().mockResolvedValue(kind);
+    const params = paramsFor({ projectId: "proj-1" });
+    Object.assign(params.ctx, {
+      app: {
+        permissions: {
+          getDecision: vi
+            .fn()
+            .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+        },
+        authorization: { authorize: vi.fn().mockResolvedValue(proof) },
+        aggregateReadAudit: { recordAggregateRead: record },
+      },
+      projectKinds: { kindOf, kindsOf: vi.fn() },
+    });
+    const run = () =>
+      checkDeclaredPermission({ permission: "traces:view" })(params as any);
+    return { params, kindOf, record, run };
+  };
+
+  describe("when the proof reads shared grants on an aggregate", () => {
+    it("records the read for the caller and the aggregate", async () => {
+      const { record, run } = setup();
+
+      await run();
+
+      expect(record).toHaveBeenCalledWith({
+        actorUserId: "alice",
+        organizationId: "org-1",
+        aggregateProjectId: "proj-1",
+      });
+    });
+  });
+
+  describe("when recording the read fails", () => {
+    it("lets the read go on", async () => {
+      const { params, run } = setup({
+        record: vi.fn().mockRejectedValue(new Error("audit store down")),
+      });
+
+      await run();
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the proof reads no shared grant", () => {
+    it("neither reads the kind nor records anything", async () => {
+      const { kindOf, record, run } = setup({
+        proof: { scope: { organizationId: "org-1" }, grants: [] },
+      });
+
+      await run();
+
+      expect(kindOf).not.toHaveBeenCalled();
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project reading shared grants is not an aggregate", () => {
+    it("records nothing", async () => {
+      const { record, run } = setup({ kind: "application" });
+
+      await run();
+
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("ADR-144: a write under an aggregate is refused at the door", () => {
+  const setup = ({
+    kind = "aggregate",
+    type = "mutation",
+  }: {
+    kind?: string;
+    type?: "query" | "mutation";
+  } = {}) => {
+    const params = paramsFor({ projectId: "proj-1" });
+    Object.assign(params.ctx, {
+      app: {
+        permissions: {
+          getDecision: vi
+            .fn()
+            .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+        },
+        authorization: { authorize: vi.fn() },
+      },
+      projectKinds: {
+        kindOf: vi.fn().mockResolvedValue(kind),
+        kindsOf: vi.fn(),
+      },
+    });
+    const run = (
+      permission: Parameters<typeof checkDeclaredPermission>[0]["permission"],
+    ) => checkDeclaredPermission({ permission })({ ...params, type } as any);
+    return { params, run };
+  };
+
+  describe("when a mutation writes data under an aggregate", () => {
+    it("refuses with the read-only code before the handler runs", async () => {
+      const { params, run } = setup();
+
+      const refusal = await rejection(() => run("workflows:create"));
+
+      expect(HandledError.isHandled(refusal) && refusal.code).toBe(
+        "aggregate_project_is_read_only",
+      );
+      expect(params.next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a mutation manages the aggregate itself", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup();
+
+      await run("project:update");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when a query is declared under a write permission on an aggregate", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup({ type: "query" });
+
+      await run("workflows:create");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the mutation writes under any other kind of project", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup({ kind: "application" });
+
+      await run("workflows:create");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when a mutation is declared with any of several permissions", () => {
+    const setupAny = ({ kind = "aggregate" }: { kind?: string } = {}) => {
+      const params = paramsFor({ projectId: "proj-1" });
+      Object.assign(params.ctx, {
+        app: {
+          permissions: {
+            getProjectAnyDecision: vi.fn().mockResolvedValue({
+              permitted: true,
+              organizationRole: "ADMIN",
+            }),
+          },
+        },
+        projectKinds: {
+          kindOf: vi.fn().mockResolvedValue(kind),
+          kindsOf: vi.fn(),
+        },
+      });
+      const run = (
+        permissions: Parameters<typeof checkDeclaredPermissionAny>[0],
+      ) =>
+        checkDeclaredPermissionAny(permissions)({
+          ...params,
+          type: "mutation",
+        } as any);
+      return { params, run };
+    };
+
+    it("refuses it on an aggregate when any of them writes", async () => {
+      const { params, run } = setupAny();
+
+      const refusal = await rejection(() =>
+        run(["traces:view", "workflows:create"]),
+      );
+
+      expect(HandledError.isHandled(refusal) && refusal.code).toBe(
+        "aggregate_project_is_read_only",
+      );
+      expect(params.next).not.toHaveBeenCalled();
+    });
+
+    it("lets it through on an aggregate when every one of them reads", async () => {
+      const { params, run } = setupAny();
+
+      await run(["traces:view", "scenarios:view"]);
+
+      expect(params.next).toHaveBeenCalled();
+    });
+
+    it("lets it through on any other kind of project", async () => {
+      const { params, run } = setupAny({ kind: "application" });
+
+      await run(["traces:view", "workflows:create"]);
+
+      expect(params.next).toHaveBeenCalled();
     });
   });
 });

@@ -9,7 +9,7 @@ import (
 )
 
 // Spec: specs/model-providers/codex-account-provider.feature — codex turns
-// run opencode's native openai provider, and the proxy restores the full
+// run the native openai provider, and the proxy restores the full
 // provider-prefixed model id on the wire so the gateway routes to the codex
 // credential.
 

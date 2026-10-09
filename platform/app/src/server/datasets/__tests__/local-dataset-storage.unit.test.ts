@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the fs boundary so we can drive the write path into specific errno
@@ -41,24 +42,42 @@ beforeEach(() => {
 describe("LocalDatasetStorage", () => {
   describe("writeChunks()", () => {
     describe("when the storage path is not writable", () => {
-      it("throws an actionable error naming the root and the S3 / LANGWATCH_LOCAL_STORAGE_PATH fix", async () => {
+      /** @scenario The refusal carries the storage_not_writable code */
+      it("refuses with the storage_not_writable code, attributed to the platform", async () => {
         mkdir.mockRejectedValue(errnoError("EACCES"));
 
-        const promise = writeOneRecord();
+        const error = await writeOneRecord().catch((e: unknown) => e);
 
-        await expect(promise).rejects.toThrow(ROOT);
-        await expect(promise).rejects.toThrow("is not writable");
-        await expect(promise).rejects.toThrow("S3_BUCKET_NAME");
-        await expect(promise).rejects.toThrow("LANGWATCH_LOCAL_STORAGE_PATH");
+        expect(HandledError.isHandled(error)).toBe(true);
+        expect((error as HandledError).code).toBe("storage_not_writable");
+        expect((error as HandledError).fault).toBe("platform");
+      });
+
+      /** @scenario The message names no environment variable and no path */
+      it("keeps the environment variables and the root out of the message", async () => {
+        mkdir.mockRejectedValue(errnoError("EROFS"));
+
+        const error = (await writeOneRecord().catch(
+          (e: unknown) => e,
+        )) as HandledError;
+
+        expect(error.message).not.toContain("S3_BUCKET_NAME");
+        expect(error.message).not.toContain("LANGWATCH_LOCAL_STORAGE_PATH");
+        expect(error.message).not.toContain(ROOT);
+        expect(error.message).not.toContain("/");
       });
     });
 
     describe("when the write fails for an unrelated reason", () => {
+      /** @scenario A permission failure that is not a write refusal stays unknown */
       it("re-throws the original error as-is without wrapping it", async () => {
         const original = errnoError("ENOSPC");
         mkdir.mockRejectedValue(original);
 
-        await expect(writeOneRecord()).rejects.toBe(original);
+        const error = await writeOneRecord().catch((e: unknown) => e);
+
+        expect(error).toBe(original);
+        expect(HandledError.isHandled(error)).toBe(false);
       });
     });
   });

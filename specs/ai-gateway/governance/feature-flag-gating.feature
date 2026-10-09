@@ -25,6 +25,12 @@ Feature: Governance visibility rides a single feature flag
       | App     | release_ui_ai_governance_enabled     |
     And the AI Gateway product itself ships unblocked on its own flag
       `release_ui_ai_gateway_menu_enabled` (separate concern, not gated)
+    And unreleased governance sub-surfaces may carry an ADDITIONAL
+      release flag composed on top of (never instead of) the section
+      gate — today `release_ui_governance_billed_cost_enabled` for the
+      Costs/Billed placeholders
+      (specs/ai-gateway/governance/governance-home-routing.feature);
+      flipping the section flag off still hides everything
 
   Scenario: A default installation enables governance without configuration
     Given a self-hosted installation with no PostHog key and no flag overrides

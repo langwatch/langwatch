@@ -55,15 +55,23 @@ function renderRouterAt(initialEntries: string[]) {
       element: <div>routing policies</div>,
     },
     {
+      // Mirrors the routes.tsx stanza: retargeted straight to People so the
+      // departments rename never adds a hop.
       path: "/governance/cost-centers",
       element: (
         <LegacyPrefixRedirect
           from="/governance/cost-centers"
-          to="/governance/departments"
+          to="/governance/people"
         />
       ),
     },
-    { path: "/governance/departments", element: <div>departments</div> },
+    { path: "/governance/people", element: <div>people</div> },
+    { path: "/governance/users/:id", element: <div>user detail</div> },
+    { path: "/governance/inventory", element: <div>inventory page</div> },
+    {
+      path: "/governance/inventory/:id",
+      element: <div>inventory detail</div>,
+    },
   ];
   const router = createMemoryRouter(routes, {
     initialEntries,
@@ -191,13 +199,181 @@ describe("legacy governance redirects", () => {
     });
   });
 
+  describe("when the retired ingestion sources address is cold-loaded", () => {
+    /** @scenario The retired ingestion sources address lands on the inventory Sources tab */
+    it("lands on the inventory Sources tab and replaces the history entry", async () => {
+      const router = renderRouterAt([
+        "/start",
+        "/governance/ingestion-sources",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      expect(router.state.location.pathname).toBe("/start");
+    });
+
+    /** @scenario A stale tab value on a retired sources address still lands on Sources */
+    it("overrides a stale tab value instead of carrying it to a different pane", async () => {
+      const router = renderRouterAt([
+        "/governance/ingestion-sources?tab=catalog",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
+    });
+
+    /** @scenario An old ingestion source deep link lands on the inventory detail page */
+    it("lands on the inventory detail page with the query intact", async () => {
+      const router = renderRouterAt([
+        "/governance/ingestion-sources/src_123?range=30d",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(
+          "/governance/inventory/src_123",
+        );
+      });
+      expect(router.state.location.search).toBe("?range=30d");
+    });
+  });
+
+  describe("when the retired catalog address is cold-loaded", () => {
+    /** @scenario The retired catalog address keeps meaning the sources surface */
+    it("lands on the inventory Sources tab, not the new default tab", async () => {
+      const router = renderRouterAt(["/governance/catalog"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
+    });
+
+    /** @scenario The retired catalog address keeps meaning the sources surface */
+    it("keeps an existing query while pinning the sources tab", async () => {
+      const router = renderRouterAt(["/governance/catalog?range=30d"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      const params = new URLSearchParams(router.state.location.search);
+      expect(params.get("tab")).toBe("sources");
+      expect(params.get("range")).toBe("30d");
+    });
+
+    /** @scenario A stale tab value on a retired sources address still lands on Sources */
+    it("overrides a stale tab value instead of carrying it to a different pane", async () => {
+      const router = renderRouterAt(["/governance/catalog?tab=catalog"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
+    });
+
+    /** @scenario An old catalog detail deep link lands on the inventory detail page */
+    it("lands on the inventory detail page with the query intact", async () => {
+      const router = renderRouterAt(["/governance/catalog/src_123?range=30d"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(
+          "/governance/inventory/src_123",
+        );
+      });
+      expect(router.state.location.search).toBe("?range=30d");
+    });
+  });
+
+  describe("when the retired tool-catalog address is cold-loaded", () => {
+    /** @scenario The retired tool-catalog address lands on the inventory page */
+    it("lands on the bare inventory address", async () => {
+      const router = renderRouterAt(["/governance/tool-catalog"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("");
+    });
+  });
+
+  describe("when the retired anomaly rules address is cold-loaded", () => {
+    // The redirect is unchanged and still pins the tab it was written for.
+    // That tab has since been removed from the inventory, so the pinned value
+    // now degrades to the Catalog pane rather than selecting nothing; the tab
+    // shell's own test covers where it lands. Repointing this redirect at the
+    // rules' eventual home is a routing change and is not made here.
+    /** @scenario "The retired anomaly rules address still resolves" */
+    it("lands on the inventory and replaces the history entry", async () => {
+      const router = renderRouterAt(["/start", "/governance/anomaly-rules"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=anomaly-rules");
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      expect(router.state.location.pathname).toBe("/start");
+    });
+  });
+
+  describe("when the retired users listing address is cold-loaded", () => {
+    /** @scenario "The retired users listing address lands on the People tab" */
+    it("lands on the people page with the People tab pinned", async () => {
+      const router = renderRouterAt(["/governance/users?range=30d"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
+      expect(router.state.location.search).toBe("?range=30d&tab=people");
+    });
+
+    /** @scenario "A user detail deep link keeps its own page" */
+    it("leaves the per-user detail address alone", async () => {
+      const router = renderRouterAt(["/governance/users/user_123"]);
+
+      expect(router.state.location.pathname).toBe("/governance/users/user_123");
+      await waitFor(() => {
+        expect(document.body.textContent).toContain("user detail");
+      });
+    });
+  });
+
+  describe("when the retired departments address is cold-loaded", () => {
+    /** @scenario The retired departments address lands on People */
+    it("lands on the people page", async () => {
+      const router = renderRouterAt(["/governance/departments"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
+    });
+  });
+
   describe("when the retired cost centers address is cold-loaded", () => {
-    /** @scenario The retired cost centers address lands on departments */
-    it("chains through to the departments page", async () => {
+    /** @scenario The cost-centers redirect is retargeted to People in one hop */
+    it("lands on the people page without chaining through departments", async () => {
+      const router = renderRouterAt(["/governance/cost-centers"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
+    });
+
+    /** @scenario The retired cost centers address lands on People */
+    it("lands on the people page from the legacy settings prefix too", async () => {
       const router = renderRouterAt(["/settings/governance/cost-centers"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe("/governance/departments");
+        expect(router.state.location.pathname).toBe("/governance/people");
       });
     });
   });

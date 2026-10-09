@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import { z } from "zod";
 import type { DrawerType } from "~/components/drawerRegistry";
+import type { ProjectNavigationSection } from "~/components/sidebar/projectKindNavigation";
+import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 export type CommandCategory = "navigation" | "actions" | "search" | "projects";
 
@@ -18,6 +20,20 @@ export interface Command {
   externalUrl?: string;
   /** Action function for action commands */
   action?: () => void;
+  /**
+   * Release flag that decides whether the command is offered, and the value
+   * the command needs. A destination that replaces another one is offered on
+   * `enabled: true`, and the one it replaces on `enabled: false`, so Quick
+   * Search never lists two routes to the same work.
+   */
+  featureFlag?: { flag: FrontendFeatureFlag; enabled: boolean };
+  /**
+   * The navigation section the command belongs to. Quick Search offers it
+   * only on a project whose navigation shows that section, so the bar and
+   * the sidebar agree on what a project of each kind offers (ADR-144). A
+   * command with none, such as settings, is offered on every project.
+   */
+  navigationSection?: ProjectNavigationSection;
 }
 
 export const RecentItemTypeSchema = z.enum([

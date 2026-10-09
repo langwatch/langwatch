@@ -10,12 +10,12 @@ import (
 )
 
 // The process watch (ADR-095): every daemon tick samples the machine's
-// dev-tooling processes — tsgo, gopls, biome, vitest workers, node, bun,
-// claude — however they were spawned, ships the footprint to the local
-// observability stack, and enforces limits on the one class that has them
-// (tsgo). Admission controls bound how much tooling *starts*; this bounds how
-// much *exists*, and records enough history to decide which class earns
-// limits next.
+// dev-tooling processes — the TypeScript compiler (`tsc` or `tsgo`, one
+// class), gopls, biome, vitest workers, node, bun, claude — however they were
+// spawned, ships the footprint to the local observability stack, and enforces
+// limits on the one class that has them (the compiler). Admission controls
+// bound how much tooling *starts*; this bounds how much *exists*, and records
+// enough history to decide which class earns limits next.
 
 // tsgoSeen is the cross-tick memory behind idle detection: a process whose CPU
 // clock moved since the last tick was active then.
@@ -41,9 +41,9 @@ func (o *Orchestrator) governProcesses() {
 	for _, k := range domain.GovernTsgo(tsgo, o.cfg.Tsgo) {
 		o.sys.Kill(k.PID)
 		if o.procTel != nil {
-			o.procTel.RecordKill("tsgo", k.Reason)
+			o.procTel.RecordKill(domain.TypeScriptCompilerClass, k.Reason)
 		}
-		o.recordReap("tsgo", fmt.Sprintf("pid %d (%s, %s)", k.PID, k.Class, domain.HumanBytes(k.RSS)), k.Reason)
+		o.recordReap(domain.TypeScriptCompilerClass, fmt.Sprintf("pid %d (%s, %s)", k.PID, k.Class, domain.HumanBytes(k.RSS)), k.Reason)
 		o.log.Warn("process governor reclaimed tsgo",
 			zap.Int("pid", k.PID),
 			zap.String("role", string(k.Class)),
@@ -54,8 +54,9 @@ func (o *Orchestrator) governProcesses() {
 }
 
 // sampleWatched classifies the live process listing and maintains the
-// cross-tick idle memory. Returns every watched process plus the tsgo subset
-// the governor rules on.
+// cross-tick idle memory. Returns every watched process plus the compiler
+// subset the governor rules on — both binary names land in that one subset, so
+// a `tsc` run and a `tsgo` run are weighed against one combined budget.
 func (o *Orchestrator) sampleWatched(now time.Time) (watched []domain.WatchedProcess, tsgo []domain.TsgoProcess) {
 	live := map[int]bool{}
 	for _, s := range o.sys.ProcessSamples() {
@@ -76,7 +77,7 @@ func (o *Orchestrator) sampleWatched(now time.Time) (watched []domain.WatchedPro
 		w.PID, w.RSS = s.PID, s.RSSBytes
 		w.Started, w.IdleFor = now.Add(-s.Elapsed), now.Sub(seen.activeAt)
 		watched = append(watched, w)
-		if w.Class == "tsgo" {
+		if w.Class == domain.TypeScriptCompilerClass {
 			tsgo = append(tsgo, domain.TsgoProcess{
 				PID: w.PID, Class: w.Role, RSS: w.RSS, Started: w.Started, IdleFor: w.IdleFor,
 			})

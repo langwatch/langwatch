@@ -211,26 +211,10 @@ Feature: Langy lights up what it can use as context ("glow and go")
       | annotations | annotation queue |
       | dashboards  | dashboard card   |
 
-  Scenario: A first-time hint teaches the gesture once
-    Given I have never absorbed anything into Langy
-    When I open the Langy panel on a page with things Langy can use
-    Then a single dismissible hint above the composer explains the gesture
-    And the hint mentions both pressing "#" and dragging a thing onto Langy
-
-  Scenario: The hint never returns after I dismiss it
-    Given I dismissed the context hint
-    When I open the Langy panel again, on any page, any day
-    Then the hint does not appear
-
-  Scenario: Doing the thing retires the hint by itself
-    Given the context hint is showing
-    When I absorb my first thing into Langy
-    Then the hint goes away and never returns
-
-  Scenario: No hint on a page with nothing to point at
-    Given I am on a page with nothing Langy can use
-    When I open the Langy panel
-    Then no hint appears
+  Scenario: No teaching banner above the composer
+    Given I open the Langy panel on a page with things Langy can use
+    Then no hint banner renders above the composer
+    And the "#" key on the composer rail is the discoverable door to context
 
   Scenario: Reduced motion swaps the shimmer for a still highlight
     Given my system asks for reduced motion

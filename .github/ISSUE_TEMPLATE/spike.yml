@@ -31,8 +31,22 @@ body:
     validations:
       required: true
   - type: textarea
+    id: questions
+    attributes:
+      label: Questions to answer
+      description: Each question becomes an acceptance criterion on the follow-on story.
+    validations:
+      required: true
+  - type: textarea
     id: deliverable
     attributes:
       label: Deliverable
       description: What gets updated/produced? (Default - update this issue body with results)
       value: Update this issue body with results and recommendation.
+  - type: checkboxes
+    id: findings-recorded
+    attributes:
+      label: Findings
+      options:
+        - label: Findings recorded as decisions on the follow-on story
+          required: false

@@ -3,7 +3,7 @@
     uv run --with langwatch --with openai python openai_official.py image
     uv run --with langwatch --with openai python openai_official.py pdf
 
-An image rides an `image_url` part carrying a data URL. A document rides a
+An image goes in an `image_url` part, as a data URL. A document goes in a
 `file` part carrying `file_data`, which is the shape Chat Completions accepts
 for PDFs.
 """

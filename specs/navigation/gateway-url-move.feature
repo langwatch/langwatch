@@ -50,9 +50,13 @@ Feature: Gateway and Governance URLs move to the top level
     And a query string and a hash on the old address survive the move
 
   @integration
-  Scenario: The retired cost centers address lands on departments
+  Scenario: The retired cost centers address lands on People
     When I cold-load "/settings/governance/cost-centers"
-    Then I land on "/governance/departments"
+    Then I land on "/governance/people"
+    # Two hops (settings prefix → /governance/cost-centers → people); the
+    # cost-centers redirect itself is retargeted straight to People so the
+    # departments rename never adds a third hop
+    # (specs/ai-gateway/governance/governance-home-routing.feature).
 
   @unit
   Scenario: The CLI prints the new gateway address for a virtual key

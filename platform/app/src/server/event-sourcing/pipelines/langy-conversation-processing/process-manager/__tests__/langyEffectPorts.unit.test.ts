@@ -34,6 +34,7 @@ function makeDeps(value: LangyTurnHandoff | null = handoff()) {
     handoffStore: {
       read: vi.fn().mockResolvedValue(value),
       stash: vi.fn().mockResolvedValue(undefined),
+      isStopped: vi.fn().mockResolvedValue(false),
     },
     worker: { dispatch: vi.fn().mockResolvedValue("accepted") },
     mintSessionKey: vi.fn().mockResolvedValue({
@@ -56,6 +57,19 @@ const dispatchParams = {
 };
 
 describe("createLangyEffectPorts", () => {
+  describe("given the user stopped the turn before its worker started", () => {
+    /** @scenario A stop before the worker starts still stops the turn */
+    it("does not dispatch the work", async () => {
+      const deps = makeDeps();
+      deps.handoffStore.isStopped = vi.fn().mockResolvedValue(true);
+      const ports = createLangyEffectPorts(deps);
+
+      await ports.workerDispatch.dispatchTurn(dispatchParams);
+
+      expect(deps.worker.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
   describe.each([
     {
       label: "create",

@@ -252,3 +252,13 @@ Feature: Shared ops snapshot with a single elected writer
     Given a read found an artifact it could not understand
     When a readable artifact is stored and read
     Then the reader returns it
+
+  # The staging rate is derived from the change in in-flight work, so a state
+  # that holds staged-but-unfinished work has to count as in flight or the
+  # rate reads work as leaving the system when it merely parked.
+  @unit
+  Scenario: Parked work counts as in flight
+    Given a queue holding pending, active, and parked work
+    When the dashboard totals what is in flight
+    Then the total includes the parked groups
+    And work moving from pending into parked leaves the total unchanged

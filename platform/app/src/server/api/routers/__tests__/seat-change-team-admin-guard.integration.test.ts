@@ -16,6 +16,7 @@
  * Requires: PostgreSQL database (Prisma)
  */
 
+import { roleKeyForTeamRole } from "@langwatch/authz";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -163,17 +164,32 @@ describe("given a member who is the only admin of a shared team", () => {
   });
 
   describe("given a seat correction left the team with no admin at all", () => {
-    beforeEach(() =>
-      prisma.roleBinding.updateMany({
+    beforeEach(async () => {
+      const where = {
+        organizationId: fixture.organizationId,
+        userId: fixture.soloUserId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: fixture.onlyAdminTeamId,
+      } as const;
+      await prisma.roleBinding.updateMany({
+        where,
+        data: { role: TeamUserRole.VIEWER },
+      });
+      await prisma.grant.updateMany({
         where: {
           organizationId: fixture.organizationId,
-          userId: fixture.soloUserId,
+          principalType: "USER",
+          principalId: fixture.soloUserId,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: fixture.onlyAdminTeamId,
+          revokedAt: null,
         },
-        data: { role: TeamUserRole.VIEWER },
-      }),
-    );
+        data: {
+          roleKey: roleKeyForTeamRole(TeamUserRole.VIEWER),
+          legacyRole: TeamUserRole.VIEWER,
+        },
+      });
+    });
 
     describe("when a member's role on the team is edited", () => {
       /** @scenario A team already without a team admin stays editable */

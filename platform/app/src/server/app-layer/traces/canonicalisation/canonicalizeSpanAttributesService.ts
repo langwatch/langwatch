@@ -45,7 +45,7 @@ export class CanonicalizeSpanAttributesService {
     new VercelExtractor(),
     // ClaudeCode + Codex + SpringAI register here too so their span-side
     // `apply()` runs on Path B emitters that ship native spans (codex
-    // 0.137+ Rust CLI under scope `codex_cli_rs`, future ClaudeCode/
+    // 0.137+ Rust CLI under the scopes `isCodexScope` accepts, future ClaudeCode/
     // Spring observation spans). Today the latter two are no-ops on
     // spans; CodexExtractor lifts session_task.turn into gen_ai.*.
     new ClaudeCodeExtractor(),

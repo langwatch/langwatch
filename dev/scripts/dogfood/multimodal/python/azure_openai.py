@@ -3,7 +3,7 @@
     uv run --with langwatch --with openai python azure_openai.py image
 
 Image only: the deployment below is a Chat Completions model, and the
-picture rides the same `image_url` data-URL part the OpenAI cell uses. The
+picture goes in the same `image_url` data-URL part the OpenAI cell uses. The
 deployment name is an Azure resource setting, not a model id, so it is read
 from AZURE_OPENAI_DEPLOYMENT with a fallback that matches this project's
 Azure resource.

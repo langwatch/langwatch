@@ -4,8 +4,6 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 import { getApp } from "~/server/app-layer/app";
 
-import { checkProjectPermission } from "../rbac";
-
 const resourceType = z.enum(["TRACE", "THREAD"]);
 const visibility = z.enum(["PUBLIC", "ORGANIZATION", "PROJECT"]);
 
@@ -30,7 +28,7 @@ export const shareRouter = createTRPCRouter({
         resourceId: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:share"))
+    .permission("traces:share")
     .query(async ({ input }) => {
       return getApp().share.listForResource(input);
     }),
@@ -52,7 +50,7 @@ export const shareRouter = createTRPCRouter({
         maxViews: z.number().int().positive().nullish(),
       }),
     )
-    .use(checkProjectPermission("traces:share"))
+    .permission("traces:share")
     .mutation(async ({ input, ctx }) => {
       return getApp().share.createShare({
         projectId: input.projectId,
@@ -68,14 +66,14 @@ export const shareRouter = createTRPCRouter({
   /** Revoke a single link by id. */
   revoke: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("traces:share"))
+    .permission("traces:share")
     .mutation(async ({ input }) => {
       await getApp().share.revokeById(input);
     }),
 
   revokeAllTraceShares: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:update"))
+    .permission("project:update")
     .mutation(async ({ input }) => {
       await getApp().share.revokeAllTraceShares(input.projectId);
     }),

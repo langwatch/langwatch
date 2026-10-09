@@ -16,12 +16,14 @@
 
 import { spawn } from "node:child_process";
 import { normalizeEndpoint } from "../../../internal/endpoint";
+import { createSpinner } from "../spinner";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
+import { recordCliLocation } from "./cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import {
 	copilotGatewayModelPreflight,
@@ -34,6 +36,12 @@ import {
 	SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
 import { envForTool } from "./tool-env";
+import {
+	aliasShellFor,
+	infoRunKind,
+	runInfoRun,
+	toolNotFoundMessage,
+} from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
 	parseProjectScopeFlags,
@@ -310,12 +318,52 @@ export function buildShellReapply(args: {
 }
 
 /**
+ * Run one telemetry setup step behind a spinner. Setting a tool up can
+ * reach the control plane (confirming the cached ingest key is live, minting
+ * a fresh one after a logout), and that used to happen in silence long
+ * enough to read as a hang. The spinner is stopped before the result, or the
+ * error, reaches the caller, so everything printed after it lands on a clean
+ * line.
+ *
+ * discardStdin:false for the same reason login-flow sets it: ora's default
+ * flips stdin to raw mode and swallows Ctrl+C, making the wait unkillable.
+ */
+export async function withTelemetrySetupSpinner<T>({
+	tool,
+	run,
+}: {
+	tool: string;
+	run: () => Promise<T>;
+}): Promise<T> {
+	const spinner = createSpinner({
+		text: `Setting up telemetry for ${tool}...`,
+		discardStdin: false,
+	});
+	spinner.start();
+	try {
+		return await run();
+	} finally {
+		spinner.stop();
+	}
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
  * code (or 2 if the budget pre-check fired).
  */
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
+	// A help or version run starts no session: it goes to the tool before
+	// anything below reads the config, signs in, mints a key or writes wiring.
+	const infoRun = infoRunKind(args);
+	if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
+	// Before the config is read, so every save below carries it. The Claude
+	// Code plugin's hooks run the CLI through this record when PATH cannot
+	// resolve it, which is the case for a Claude Code started from a desktop
+	// app.
+	recordCliLocation();
 	let cfg = loadConfig();
 	if (!isLoggedIn(cfg)) {
 		if (!shouldAutoLogin()) {
@@ -419,13 +467,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	const gatewayClears = toolEnv.clears ?? [];
 	let modeResult;
 	try {
-		modeResult = await resolveWrapperMode(
-			cfg,
+		modeResult = await withTelemetrySetupSpinner({
 			tool,
-			gatewayVars,
-			gatewayClears,
-			pathChoice.mode,
-		);
+			run: () =>
+				resolveWrapperMode(
+					cfg,
+					tool,
+					gatewayVars,
+					gatewayClears,
+					pathChoice.mode,
+				),
+		});
 	} catch (err) {
 		// Direct-OTLP setup can fail at mint time: an expired device session,
 		// no personal workspace yet, an unreachable control plane. None of
@@ -448,13 +500,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			// derived from the expired session.
 			const refreshedEnv = envForTool(cfg, tool);
 			try {
-				modeResult = await resolveWrapperMode(
-					cfg,
+				modeResult = await withTelemetrySetupSpinner({
 					tool,
-					refreshedEnv.vars,
-					refreshedEnv.clears ?? [],
-					"ingestion",
-				);
+					run: () =>
+						resolveWrapperMode(
+							cfg,
+							tool,
+							refreshedEnv.vars,
+							refreshedEnv.clears ?? [],
+							"ingestion",
+						),
+				});
 			} catch (err2) {
 				process.stderr.write(
 					`${lwTag()} still could not set up direct OTLP telemetry for ` +
@@ -464,7 +520,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			}
 		} else {
 			process.stderr.write(
-				`mode resolution failed: ${(err as Error).message}\n`,
+				`${lwTag()} could not set up telemetry for ${tool}: ` +
+					`${(err as Error).message}\n`,
 			);
 			process.exit(2);
 		}
@@ -672,14 +729,9 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// so a user's rc can't clobber the gateway / OTLP wiring. Args ride
 	// positional params ("$@") and are never re-quoted. `tool` is whitelisted
 	// (claude/codex/copilot/cursor/gemini/opencode) so the command string is safe.
-	const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
-	const aliasShell =
-		process.platform !== "win32" &&
-		(shellName === "zsh" || shellName === "bash")
-			? process.env.SHELL!
-			: null;
+	const aliasShell = aliasShellFor();
 
-	const notFoundMessage = `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
+	const notFoundMessage = toolNotFoundMessage(tool);
 
 	// Stamp the session start so the codex rollout harvest only reads rollout
 	// files this run produced (codex names them by start time + mtime).

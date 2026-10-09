@@ -35,8 +35,9 @@ import {
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { resetCutoverGateForTesting } from "../../authz/cutover-gate";
+import { resetAuthzEngineGateForTesting } from "../../authz/engine-gate";
 import type { GrantsLedgerWriter } from "../../authz/ledger";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
 import { GrantsAuthzReadRepository } from "../../authz/repositories/authz-read.grants.repository";
 import { LedgerShareRepository } from "../repositories/share.ledger.repository";
 import { PrismaShareRepository } from "../repositories/share.prisma.repository";
@@ -114,10 +115,15 @@ describe("given a cut-over organization's capped share link", () => {
     traceId = `trace_${ns}`;
     token = `--test-share-token-${ns}`;
 
-    // The organization as a finished cutover leaves it: on the engine, with
-    // the link's fact on the grant head and its compat row alongside.
-    await prisma.authzCutoverProjection.create({
-      data: { organizationId: organization.id, onEngine: true },
+    // The organization as a finished migration leaves it: on the engine,
+    // with the link's fact on the grant head.
+    await prisma.systemMigrationTenantState.create({
+      data: {
+        migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+        tenantId: organization.id,
+        status: "finalized",
+        occurredAt: new Date(),
+      },
     });
     const shareLink = await prisma.shareLink.create({
       data: {
@@ -152,7 +158,7 @@ describe("given a cut-over organization's capped share link", () => {
   });
 
   beforeEach(async () => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     // Every case starts from the handed-over budget, whatever the last one
     // spent.
     await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
@@ -171,13 +177,13 @@ describe("given a cut-over organization's capped share link", () => {
   });
 
   afterAll(async () => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
     if (!organization?.id) return;
     await cleanupTestRows(prisma, [
       ["grantUsage", { organizationId: organization.id }],
       ["shareLink", { projectId: project.id }],
       ["grant", { organizationId: organization.id }],
-      ["authzCutoverProjection", { organizationId: organization.id }],
+      ["systemMigrationTenantState", { tenantId: organization.id }],
       ["project", { id: project.id }],
       ["team", { id: team.id }],
       ["organization", { id: organization.id }],

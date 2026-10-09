@@ -78,9 +78,14 @@ async function main() {
     ),
   );
 
-  const { afterUserCreate, beforeAccountCreate } = await import(
-    "../../src/server/better-auth/hooks"
+  // The hooks are a class composed by the identity runtime (ADR-129); the
+  // runtime's Prisma client reads the same DATABASE_URL this script guards.
+  const { databaseHooks } = await import(
+    "../../src/server/app-layer/identity/runtime"
   );
+  const hooks = databaseHooks();
+  const afterUserCreate = hooks.afterUserCreate.bind(hooks);
+  const beforeAccountCreate = hooks.beforeAccountCreate.bind(hooks);
   const { __resetSsoGateForTests } = await import("../../ee/sso/sso-gate");
   const { env: appEnv } = await import("../../src/env.mjs");
 
@@ -160,7 +165,6 @@ async function main() {
     },
   });
   await afterUserCreate({
-    prisma,
     user: {
       id: "sso_smoke_newuser1",
       email: "alice@google-corp.test",
@@ -191,7 +195,6 @@ async function main() {
     },
   });
   await afterUserCreate({
-    prisma,
     user: {
       id: "sso_smoke_newuser2",
       email: "bob@unrelated.test",
@@ -223,7 +226,6 @@ async function main() {
     },
   });
   await beforeAccountCreate({
-    prisma,
     account: {
       userId: "sso_smoke_existing1",
       providerId: "google",
@@ -268,11 +270,11 @@ async function main() {
       userId: "sso_smoke_existing2",
       type: "oauth",
       provider: "okta",
+      issuer: "local:oauth:okta",
       providerAccountId: "okta-dave-456-original",
     },
   });
   await beforeAccountCreate({
-    prisma,
     account: {
       userId: "sso_smoke_existing2",
       providerId: "google", // WRONG — org wants okta
@@ -308,7 +310,6 @@ async function main() {
   let hardBlockThrew = false;
   try {
     await beforeAccountCreate({
-      prisma,
       account: {
         userId: "sso_smoke_newsignup2",
         providerId: "google", // WRONG — org wants okta
@@ -338,7 +339,6 @@ async function main() {
     },
   });
   await beforeAccountCreate({
-    prisma,
     account: {
       userId: "sso_smoke_existing3",
       providerId: "auth0",
@@ -373,11 +373,13 @@ async function main() {
       userId: "sso_smoke_existing4",
       type: "oauth",
       provider: "google",
+      // Google declares a real issuer of its own, so this is NOT the
+      // synthetic `local:oauth:google` the other providers get.
+      issuer: "https://accounts.google.com",
       providerAccountId: "google-oauth2|frank-OLD-id",
     },
   });
   await beforeAccountCreate({
-    prisma,
     account: {
       userId: "sso_smoke_existing4",
       providerId: "google",
@@ -410,7 +412,6 @@ async function main() {
   let threw = false;
   try {
     await beforeAccountCreate({
-      prisma,
       account: {
         userId: "sso_smoke_deactivated",
         providerId: "google",
@@ -436,7 +437,6 @@ async function main() {
     },
   });
   await beforeAccountCreate({
-    prisma,
     account: {
       userId: "sso_smoke_noorg",
       providerId: "google",
@@ -464,7 +464,6 @@ async function main() {
     },
   });
   await afterUserCreate({
-    prisma,
     user: {
       id: "sso_smoke_mixedcase",
       email: "Isaac@GOOGLE-CORP.TEST",
@@ -496,7 +495,6 @@ async function main() {
     },
   });
   await afterUserCreate({
-    prisma,
     user: {
       id: "sso_smoke_denied",
       email: "denied@google-corp.test",
@@ -525,7 +523,6 @@ async function main() {
   let secondAddThrew = false;
   try {
     await afterUserCreate({
-      prisma,
       user: {
         id: "sso_smoke_newuser1",
         email: "alice@google-corp.test",

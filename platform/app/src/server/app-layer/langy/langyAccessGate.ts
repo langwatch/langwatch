@@ -1,8 +1,11 @@
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { LANGY_RELEASE_FLAG } from "~/utils/langyReleaseFlag";
 
 type LangyAccessUser = {
   id: string;
+  /** Present on a session user; an API key's owner carries none. */
+  email?: string | null;
 };
 
 type LangyFlagEvaluator = Pick<typeof featureFlagService, "isEnabled">;
@@ -15,7 +18,7 @@ type LangyFlagEvaluator = Pick<typeof featureFlagService, "isEnabled">;
  * `release_langy_enabled` evaluation; there is no identity-based bypass, so the
  * flag is a true kill switch rather than one with a hole in it.
  *
- * That matters while Langy's OpenCode workers still share the manager pod's
+ * That matters while Langy's workers still share the manager pod's
  * network namespace: a prompt-injected worker can reach a sibling's
  * unauthenticated control port and lift that user's live credentials, so the
  * cohort must stay exactly who was deliberately opted in (ADR-033). UI hiding is
@@ -39,7 +42,8 @@ export async function hasLangyAccess({
 }): Promise<boolean> {
   return flags.isEnabled(LANGY_RELEASE_FLAG, {
     distinctId: user.id,
-    ...(projectId ? { projectId } : {}),
-    ...(organizationId ? { organizationId } : {}),
+    userEmail: user.email,
+    projectId: projectId ?? NOT_TARGETED,
+    organizationId: organizationId ?? NOT_TARGETED,
   });
 }

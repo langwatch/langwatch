@@ -20,6 +20,7 @@
 import { relative } from "node:path";
 
 import {
+  hardFloorReport,
   shardModuleTally,
   shardSawFailure,
 } from "./test-utils/shardFailureReporter";
@@ -55,60 +56,6 @@ export function resolveHardFloorMs(): number | null {
   }
 
   return process.env.CI ? DEFAULT_HARD_FLOOR_MS : null;
-}
-
-/**
- * What the floor prints and the code it exits with, given what the shard knew
- * when it fired. Split out from the timer so the exit contract can be asserted
- * without wedging a real run.
- */
-export function hardFloorReport({
-  hardFloorMs,
-  sawFailure,
-  modules,
-}: {
-  hardFloorMs: number;
-  sawFailure: boolean;
-  modules: {
-    selected: number;
-    started: number;
-    reported: number;
-    unreportedFiles: readonly string[];
-  };
-}): { exitCode: 0 | 1; lines: string[] } {
-  const { selected, started, reported, unreportedFiles } = modules;
-  const exitCode = sawFailure || unreportedFiles.length > 0 ? 1 : 0;
-  const minutes = Number((hardFloorMs / 60_000).toFixed(2));
-
-  const causes: string[] = [];
-  if (sawFailure) causes.push("failures were reported before the wedge");
-  if (unreportedFiles.length > 0) {
-    causes.push(
-      `${unreportedFiles.length} test ${unreportedFiles.length === 1 ? "file" : "files"} started and never reported a result`,
-    );
-  }
-  const suffix = causes.length > 0 ? ` (${causes.join(", and ")})` : "";
-
-  const lines = [
-    `[unit globalSetup] hard floor reached at ${minutes} min - forcing process.exit(${exitCode}) to release the CI step from a vitest finalize wedge${suffix}`,
-    `[unit globalSetup] test files: ${selected} selected, ${started} started, ${reported} reported a result`,
-  ];
-
-  if (started < selected) {
-    lines.push(
-      "[unit globalSetup] the shard still had files to start, so the floor cut a run that was working rather than one that was wedged. Read that as a shard too slow for the floor, not as a hang.",
-    );
-  }
-
-  if (unreportedFiles.length > 0) {
-    lines.push(
-      "[unit globalSetup] these test files never completed, so the tests in them did not run and this shard is red rather than green:",
-      ...unreportedFiles.map((file) => `[unit globalSetup]   ${file}`),
-      "[unit globalSetup] a file that starves the event loop, an infinite render loop or a synchronous spin, never trips vitest's own testTimeout, so it leaves no failed test behind. Run each file on its own with `pnpm test:unit run <file>` to see where it hangs.",
-    );
-  }
-
-  return { exitCode, lines };
 }
 
 export async function setup(): Promise<void> {

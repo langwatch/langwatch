@@ -10,6 +10,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
+import {
+  type GrantFixtureQuery,
+  grantRowsForKeyResult,
+} from "./api-key-grant-fixture";
 
 vi.mock("../api-key-token.utils", () => ({
   generateApiKeyToken: () => ({
@@ -23,25 +27,25 @@ vi.mock("../api-key-token.utils", () => ({
 }));
 
 const mockCheckPermission = vi.fn().mockResolvedValue(true);
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: (...args: unknown[]) =>
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: (...args: unknown[]) =>
     mockCheckPermission(...args),
-  // These cases are about the binding path; the legacy fallback grants
-  // nothing so the binding decision is the only one under test.
-  resolveLegacyCeiling: () => ({ grants: () => false }),
 }));
 
-vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/rbac/custom-role-permissions")
-    >();
-  return {
-    ...actual,
-    parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
-    MalformedCustomRolePermissionsError: class extends Error {},
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/custom-role-permissions",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/custom-role-permissions")
+      >();
+    return {
+      ...actual,
+      parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
+      MalformedCustomRolePermissionsError: class extends Error {},
+    };
+  },
+);
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -85,6 +89,20 @@ function buildPrisma() {
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
     },
+    // A revoke writes through the fenced SQL statement and reads the row
+    // back. The statement binds the cause, then the key id.
+    $executeRaw: vi
+      .fn()
+      .mockImplementation(
+        (_sql: TemplateStringsArray, ...values: unknown[]) => {
+          txState.updatedApiKey = {
+            ...txState.createdApiKey,
+            revokedAt: new Date(),
+            revocationCause: values[0],
+          };
+          return Promise.resolve(1);
+        },
+      ),
     apiKey: {
       findFirst: vi.fn(),
       create: vi.fn().mockImplementation((args: any) => {
@@ -105,12 +123,38 @@ function buildPrisma() {
         txState.updatedApiKey = { ...txState.createdApiKey, ...args.data };
         return txState.updatedApiKey;
       }),
+      findUniqueOrThrow: vi
+        .fn()
+        .mockImplementation(
+          () => txState.updatedApiKey ?? txState.createdApiKey,
+        ),
     },
     roleBinding: {
       findFirst: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
       // Nothing but this key holds the key's private role.
       count: vi.fn().mockResolvedValue(0),
+    },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi
+        .fn()
+        .mockImplementation(
+          ({ where }: { where: { name?: string; id?: string } }) =>
+            where.name
+              ? null
+              : {
+                  id: where.id ?? "cr_existing",
+                  organizationId: ORG_ID,
+                  name: `apikey:${where.id ?? "cr_existing"}`,
+                  description: null,
+                  permissions: [],
+                  kind: "system_api_key",
+                  occurredAt: new Date(),
+                  updatedAt: new Date(),
+                },
+        ),
     },
     teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {
@@ -149,6 +193,13 @@ function buildPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
     },
   };
+
+  prisma.grant.findMany.mockImplementation(
+    async (args: GrantFixtureQuery = {}) => {
+      const lastResult = prisma.apiKey.findUnique.mock.results.at(-1)?.value;
+      return grantRowsForKeyResult(lastResult, args);
+    },
+  );
 
   return { prisma: prisma as any, txState };
 }
@@ -218,6 +269,36 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             permissions: ["annotations:manage", "traces:view"],
           }),
         );
+      });
+
+      /** @scenario "A new restricted key is usable the moment it is returned" */
+      it("finishes the role definition before attaching the binding", async () => {
+        const order: string[] = [];
+        ledger.defineRole.mockImplementation(async () => {
+          // The writer holds for the role projection inside this call.
+          await Promise.resolve();
+          order.push("defineRole");
+        });
+        ledger.attachBindings.mockImplementation(async () => {
+          order.push("attachBindings");
+          return { attached: [], duplicates: [] };
+        });
+
+        await service.create({
+          name: "Restricted Key",
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["traces:view"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        });
+
+        // The binding row carries a foreign key to the role row, so the role
+        // has to be projected first. Command jobs are grouped per command
+        // name, so the attach cannot stand in for the definition's hold.
+        expect(order).toEqual(["defineRole", "attachBindings"]);
       });
     });
 
@@ -448,7 +529,25 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithShared);
         // Another credential still holds the role after this key's grants go.
-        prisma.roleBinding.count.mockResolvedValue(1);
+        prisma.grant.findMany.mockImplementation(
+          async (args: GrantFixtureQuery = {}) => {
+            const rows = await grantRowsForKeyResult(keyWithShared, args);
+            const otherKeyRows = await grantRowsForKeyResult(
+              {
+                ...keyWithShared,
+                id: "ak_other",
+                roleBindings: keyWithShared.roleBindings.map((binding) => ({
+                  ...binding,
+                  id: "rb_other",
+                })),
+              },
+              args,
+            );
+            return args.where?.AND?.some((filter) => filter.NOT)
+              ? otherKeyRows
+              : rows;
+          },
+        );
 
         await service.revoke({
           id: "ak_1",

@@ -12,19 +12,19 @@
  * Every case here is a denial in the router's own middleware, which runs ahead
  * of the plan check and the resolver, so no App or plan wiring is needed.
  */
-import { generate } from "@langwatch/ksuid";
+
+import { roleFactToRow } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 const ns = `role-authz-${nanoid(8)}`;
 
@@ -56,15 +56,13 @@ describe("Feature: role router caller authorization", () => {
     await prisma.organizationUser.create({
       data: { userId: user.id, organizationId: orgId, role },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: orgId,
-        userId: user.id,
-        role: bindingRole,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: orgId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `role-authz-${label}-${ns}`,
+      organizationId: orgId,
+      userId: user.id,
+      role: bindingRole,
+      scopeType: "ORGANIZATION",
+      scopeId: orgId,
     });
     return user.id;
   };
@@ -108,14 +106,27 @@ describe("Feature: role router caller authorization", () => {
       TeamUserRole.ADMIN,
     );
 
+    const permissions = ["traces:view"];
     const customRole = await prisma.customRole.create({
       data: {
         organizationId,
         name: `Role ${ns}`,
-        permissions: ["traces:view"],
+        permissions,
       },
     });
     customRoleId = customRole.id;
+    await prisma.role.create({
+      data: roleFactToRow({
+        organizationId,
+        role: {
+          roleId: customRole.id,
+          name: customRole.name,
+          permissions,
+          kind: "custom",
+          occurredAtMs: customRole.createdAt.getTime(),
+        },
+      }),
+    });
 
     adminCaller = callerFor(adminUserId);
     memberCaller = callerFor(memberUserId);
@@ -125,6 +136,12 @@ describe("Feature: role router caller authorization", () => {
   afterAll(async () => {
     for (const orgId of [organizationId, otherOrganizationId]) {
       await prisma.roleBinding
+        .deleteMany({ where: { organizationId: orgId } })
+        .catch(() => {});
+      await prisma.grant
+        .deleteMany({ where: { organizationId: orgId } })
+        .catch(() => {});
+      await prisma.role
         .deleteMany({ where: { organizationId: orgId } })
         .catch(() => {});
       await prisma.customRole
@@ -152,7 +169,7 @@ describe("Feature: role router caller authorization", () => {
     it("refuses to list the organization's roles", async () => {
       await expect(
         memberCaller.role.getAll({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     /** A member who could mint roles could mint themselves any permission. */
@@ -163,7 +180,7 @@ describe("Feature: role router caller authorization", () => {
           name: `Escalated ${ns}`,
           permissions: ["organization:manage"],
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("refuses to delete a role", async () => {
@@ -173,13 +190,17 @@ describe("Feature: role router caller authorization", () => {
     });
 
     it("refuses to assign a role to a user", async () => {
+      // FORBIDDEN, not UNAUTHORIZED: the declared check
+      // (`.permission("organization:manage", { via: "teamId" })`) derives its
+      // wire code from the engine denial's 403, where the old hand-rolled
+      // middleware threw a bare UNAUTHORIZED.
       await expect(
         memberCaller.role.assignToUser({
           userId: memberUserId,
           teamId,
           customRoleId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("refuses to remove a role from a user", async () => {
@@ -189,7 +210,7 @@ describe("Feature: role router caller authorization", () => {
           teamId,
           customRoleId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("leaves the role untouched after the refused calls", async () => {
@@ -206,7 +227,7 @@ describe("Feature: role router caller authorization", () => {
     it("refuses to list this organization's roles", async () => {
       await expect(
         outsiderAdminCaller.role.getAll({ organizationId }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("refuses to read one of its roles by id", async () => {

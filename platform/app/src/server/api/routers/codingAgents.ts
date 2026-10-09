@@ -9,7 +9,6 @@ import {
 } from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { canReadCapturedContent } from "~/server/traces/protections";
-import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import {
   gatePullRequestSessionTitles,
@@ -44,7 +43,7 @@ export const codingAgentsRouter = createTRPCRouter({
         toMs: z.number().int().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       const toMs = input.toMs ?? Date.now();
@@ -70,7 +69,7 @@ export const codingAgentsRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       const toMs = input.toMs ?? Date.now();
@@ -99,7 +98,7 @@ export const codingAgentsRouter = createTRPCRouter({
    */
   sessionsList: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -125,7 +124,7 @@ export const codingAgentsRouter = createTRPCRouter({
    */
   pullRequestUsage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const app = getApp();
       const scope = await scopeFor({
@@ -160,7 +159,7 @@ export const codingAgentsRouter = createTRPCRouter({
         prNumber: z.number().int().positive(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(input.projectId);
       if (!organizationId) {

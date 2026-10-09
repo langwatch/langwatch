@@ -3,6 +3,7 @@ import { resolveEndpoint } from "@/internal/endpoint";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export type ModelDefaultScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -74,7 +75,7 @@ export class ModelDefaultsApiService {
     path: string,
     options?: RequestInit & { allowNoContent?: boolean },
   ): Promise<T> {
-    const response = await fetch(`${this.endpoint}${path}`, {
+    const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
       headers: {
         ...buildAuthHeaders({ apiKey: this.apiKey }),

@@ -3,8 +3,8 @@
     uv run --with langwatch --with anthropic --with openinference-instrumentation-anthropic python anthropic_official.py image
     uv run --with langwatch --with anthropic --with openinference-instrumentation-anthropic python anthropic_official.py pdf
 
-An image rides an `image` content block carrying base64 source data. A
-document rides a `document` content block the same way, with media type
+An image goes in an `image` content block with a base64 source. A
+document goes in a `document` content block the same way, with media type
 application/pdf. `AnthropicInstrumentor` patches the client globally, so a
 plain `client.messages.create` call is enough to produce a span.
 """

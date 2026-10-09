@@ -62,6 +62,46 @@ func TestResolveCheckSlots(t *testing.T) {
 			t.Fatalf("CI must stay unqueued under pressure, got %d from %q", slots, source)
 		}
 	})
+
+	// @scenario "haven ignores an agent's gate-off the same way"
+	t.Run("given a gate-off from an agent shell", func(t *testing.T) {
+		machine := CheckMachine{TotalRAMBytes: 18 * checkGiB, NumCPU: 11, Pressure: Green}
+		for _, raw := range []string{"0", "off", "none", "unlimited", "false"} {
+			if slots, source := ResolveCheckSlots(machine, CheckEnv{CheckSlots: raw, Claudecode: "1"}); slots != 2 || source != "machine" {
+				t.Fatalf("CHECK_SLOTS=%s from an agent shell must fall back to the derived limit, got %d from %q", raw, slots, source)
+			}
+		}
+		if slots, source := ResolveCheckSlots(machine, CheckEnv{CheckSlots: "0", Claudecode: ""}); slots != 0 || source != "CHECK_SLOTS" {
+			t.Fatalf("a person's gate-off must still work, got %d from %q", slots, source)
+		}
+		if slots, source := ResolveCheckSlots(machine, CheckEnv{CheckSlots: "0", Claudecode: "1", HeldByQueue: true}); slots != 0 || source != "held" {
+			t.Fatalf("a run the queue spawned must stay unqueued, got %d from %q", slots, source)
+		}
+		if slots, source := ResolveCheckSlots(machine, CheckEnv{CheckSlots: "1", Claudecode: "1"}); slots != 1 || source != "CHECK_SLOTS" {
+			t.Fatalf("an explicit positive limit is not a gate-off and must win, got %d from %q", slots, source)
+		}
+	})
+}
+
+func TestGateOffIgnored(t *testing.T) {
+	cases := []struct {
+		name string
+		env  CheckEnv
+		want bool
+	}{
+		{"an agent's gate-off is the refused case", CheckEnv{CheckSlots: "0", Claudecode: "1"}, true},
+		{"a person's gate-off is honored", CheckEnv{CheckSlots: "0"}, false},
+		{"a run the queue spawned is honored", CheckEnv{CheckSlots: "0", Claudecode: "1", HeldByQueue: true}, false},
+		{"a positive limit asks for no gate-off", CheckEnv{CheckSlots: "2", Claudecode: "1"}, false},
+		{"an unset variable asks for nothing", CheckEnv{Claudecode: "1"}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := GateOffIgnored(c.env); got != c.want {
+				t.Fatalf("GateOffIgnored = %v, want %v", got, c.want)
+			}
+		})
+	}
 }
 
 // @scenario "A forced pressure level overrides the measurement"

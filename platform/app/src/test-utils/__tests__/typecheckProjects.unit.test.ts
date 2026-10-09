@@ -101,8 +101,18 @@ describe("given the repository's typecheck projects", () => {
   });
 
   describe("when the combined project replaces the two it merges", () => {
+    /**
+     * Three whole-repository programs, one per project, and the compiler
+     * builds each one before it can list what is in it. That is 26 to 36
+     * seconds on a CI runner already running the rest of the shard, so the
+     * 30-second default this suite gives a component test decided the result
+     * by the runner's mood rather than by the projects. The limit here is
+     * what the work costs, with room for a bad day.
+     */
     // @scenario "The combined project checks every file the split projects checked"
-    it("leaves no file that was checked before unchecked", () => {
+    it("leaves no file that was checked before unchecked", {
+      timeout: 180_000,
+    }, () => {
       expect(existsSync(resolve(APP_ROOT, ALL_PROJECT))).toBe(true);
 
       const combined = programFiles(ALL_PROJECT);

@@ -15,7 +15,7 @@
  * one deliberate same-origin call through each channel has to show up in its
  * recorder, because an absence assertion that cannot fail is worth nothing.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

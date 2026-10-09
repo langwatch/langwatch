@@ -8,6 +8,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type SuiteResponse = NonNullable<
   paths["/api/suites"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -46,7 +47,16 @@ export interface SuiteRunOptions {
    * that name.
    */
   parameters?: Record<string, string | number | boolean>;
+  /**
+   * One short line saying why this batch was run, e.g. a commit hash or what
+   * changed. Every run of the batch carries it. Spaces around it are removed,
+   * and a note of only spaces is sent as no note at all.
+   */
+  note?: string;
 }
+
+/** Which kind of suite `getAll` returns. Defaults to run plans. */
+export type SuiteKind = "custom" | "folder";
 
 export class SuitesApiError extends Error {
   constructor(
@@ -59,6 +69,9 @@ export class SuitesApiError extends Error {
   }
 }
 
+/**
+ * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+ */
 export class SuitesApiService {
   private readonly apiClient: LangwatchApiClient;
 
@@ -70,11 +83,16 @@ export class SuitesApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new SuitesApiError(message, operation, error);
   }
 
-  async getAll(): Promise<SuiteResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/suites");
+  async getAll(options?: { kind?: SuiteKind }): Promise<SuiteResponse[]> {
+    const { data, error } = await this.apiClient.GET("/api/suites", {
+      ...(options?.kind !== undefined && {
+        params: { query: { kind: options.kind } },
+      }),
+    });
     if (error) this.handleApiError("list suites", error);
     return data;
   }
@@ -130,12 +148,17 @@ export class SuitesApiService {
     const body: {
       idempotencyKey: string;
       parameters?: Record<string, string | number | boolean>;
+      note?: string;
     } = {
       idempotencyKey:
         options.idempotencyKey ??
         `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     };
     if (options.parameters !== undefined) body.parameters = options.parameters;
+    // A note of only spaces is no note: sending "" would store an empty string
+    // every reader then has to filter out.
+    const note = options.note?.trim();
+    if (note) body.note = note;
 
     const { data, error } = await this.apiClient.POST("/api/suites/{id}/run", {
       params: { path: { id } },

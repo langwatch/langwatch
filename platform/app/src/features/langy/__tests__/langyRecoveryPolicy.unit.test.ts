@@ -77,7 +77,7 @@ describe("langyRecoveryPolicy", () => {
 
     it("tells the user it is picking up where it left off", () => {
       expect(policy.recoveringMessage).toContain(
-        "picking up where it left off",
+        "Picking up where it left off",
       );
     });
   });
@@ -200,6 +200,15 @@ describe("langyRecoveryPolicy", () => {
       expect(langyRecoveryPolicy("langy_conversation_not_owned").retry).toBe(
         false,
       );
+    });
+  });
+
+  describe("when the turn was refused because the project is an aggregate", () => {
+    it("never retries, the same turn is refused the same way", () => {
+      const policy = langyRecoveryPolicy("aggregate_project_is_read_only");
+
+      expect(policy.disposition).toBe("terminal");
+      expect(policy.retry).toBe(false);
     });
   });
 

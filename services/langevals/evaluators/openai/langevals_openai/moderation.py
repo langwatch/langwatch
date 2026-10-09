@@ -1,6 +1,7 @@
+import time
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 from langevals_core.base_evaluator import (
     BaseEvaluator,
@@ -9,9 +10,30 @@ from langevals_core.base_evaluator import (
     SingleEvaluationResult,
     BatchEvaluationResult,
     EvaluatorEntry,
+    EvaluationResultError,
     EvaluationResultSkipped,
+    evaluation_timed_out_result,
 )
 from tqdm.auto import tqdm
+
+
+class _DeadlinePassed(Exception):
+    """The batch ran out of time before this call could be made."""
+
+
+def _moderate(client: OpenAI, contents: list[str], deadline: Optional[float]):
+    """One moderation call, bounded by whatever is left of the batch deadline.
+
+    Both calls this evaluator makes cover the whole batch, so the budget is
+    read again before each one rather than split in half up front: the second
+    call gets whatever the first did not spend.
+    """
+    if deadline is None:
+        return client.moderations.create(input=contents)
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise _DeadlinePassed()
+    return client.with_options(timeout=remaining).moderations.create(input=contents)
 
 
 class OpenAIModerationEntry(EvaluatorEntry):
@@ -72,70 +94,122 @@ class OpenAIModerationEvaluator(
     is_guardrail = True
 
     def evaluate_batch(
-        self, data: list[OpenAIModerationEntry], index=0
+        self,
+        data: list[OpenAIModerationEntry],
+        index=0,
+        # The server calls every evaluator through the base signature. This
+        # one sends the whole batch in two moderation calls rather than one
+        # call per entry, so the per-entry knobs have nothing to act on here:
+        # they are accepted so the call works, and ignored.
+        max_evaluations_in_parallel=50,
+        retries=3,
+        max_seconds=None,
+        _executor_ref=None,
     ) -> BatchEvaluationResult:
-        client = OpenAI(api_key=self.get_env("OPENAI_API_KEY"))
+        # `max_seconds` bounds the whole batch, and this override has to keep
+        # that promise itself: it never reaches the base class, which is where
+        # the deadline usually lives. A moderation call over the network can
+        # stall for as long as the socket stays open, and the caller holds a
+        # gate slot the whole time, so an unbounded call here is the wedge the
+        # deadline exists to stop.
+        # An empty batch has nothing to moderate. Calling the provider with an
+        # empty input list spends a request the API rejects, and the base class
+        # answers [] for the same case.
+        if not data:
+            return []
+
+        deadline = None if max_seconds is None else time.monotonic() + max_seconds
+        # No SDK retries: each attempt gets the full timeout, so the default of
+        # two would let one call run for three times the budget.
+        client = OpenAI(api_key=self.get_env("OPENAI_API_KEY"), max_retries=0)
 
         results: list[SingleEvaluationResult] = []
 
         contents_input = [entry.input or "" for entry in data]
         contents_output = [entry.output or "" for entry in data]
-        response_input = client.moderations.create(input=contents_input)
-        response_output = client.moderations.create(input=contents_output)
+        try:
+            response_input = _moderate(client, contents_input, deadline)
+            response_output = _moderate(client, contents_output, deadline)
+        except (APITimeoutError, _DeadlinePassed):
+            # Both calls cover the whole batch, so when either runs out of
+            # time no entry has an answer.
+            return [evaluation_timed_out_result(max_seconds)] * len(data)
+
+        # The same for every entry, so it is read once rather than per entry.
+        enabled_categories = self.settings.categories.model_dump()
 
         for i, (input_result, output_result) in enumerate(
             zip(response_input.results, response_output.results)
         ):
-
             if not contents_input[i] and not contents_output[i]:
                 results.append(
                     EvaluationResultSkipped(details="Input and output are both empty")
                 )
-            continue
+                continue
 
-        # Combine results by taking the maximum scores for each category
-        combined_category_scores = {
-            category: max(
-                input_result.category_scores.model_dump().get(category, 0),
-                output_result.category_scores.model_dump().get(category, 0),
+            # Combine results by taking the maximum scores for each category
+            input_scores = input_result.category_scores.model_dump()
+            output_scores = output_result.category_scores.model_dump()
+            combined_category_scores = {
+                category: max(
+                    input_scores.get(category, 0),
+                    output_scores.get(category, 0),
+                )
+                for category in enabled_categories.keys()
+            }
+
+            detected_categories = {
+                category: score > 0.5  # You may want to adjust this threshold
+                for category, score in combined_category_scores.items()
+                if enabled_categories.get(category, False)
+            }
+
+            highest_categories = sorted(
+                combined_category_scores.items(),
+                key=lambda x: x[1],
+                reverse=True,
             )
-            for category in self.settings.categories.model_dump().keys()
-        }
+            score = (
+                max(combined_category_scores.values())
+                if combined_category_scores
+                else 0
+            )
 
-        detected_categories = {
-            category: score > 0.5  # You may want to adjust this threshold
-            for category, score in combined_category_scores.items()
-            if self.settings.categories.model_dump().get(category, False)
-        }
+            passed = not any(detected_categories.values())
 
-        highest_categories = sorted(
-            combined_category_scores.items(),
-            key=lambda x: x[1],
-            reverse=True,
-        )
-        score = (
-            max(combined_category_scores.values()) if combined_category_scores else 0
-        )
+            details = (
+                (
+                    "Detected "
+                    + ", ".join(
+                        [
+                            f"{category} ({score * 100:.2f}% confidence)"
+                            for category, score in highest_categories
+                            if detected_categories.get(category, False)
+                        ]
+                    )
+                )
+                if not passed
+                else None
+            )
 
-        passed = not any(detected_categories.values())
+            results.append(
+                OpenAIModerationResult(score=score, passed=passed, details=details)
+            )
 
-        details = (
-            (
-                "Detected "
-                + ", ".join(
-                    [
-                        f"{category} ({score * 100:.2f}% confidence)"
-                        for category, score in highest_categories
-                        if detected_categories.get(category, False)
-                    ]
+        # `zip` stops at the shorter list, so a provider answer with fewer
+        # results than entries would return a short list and every caller
+        # reading answers by position would read them against the wrong entries.
+        # Every entry gets an answer, and one the provider did not cover says so.
+        while len(results) < len(data):
+            results.append(
+                EvaluationResultError(
+                    error_type="ModerationResultMissing",
+                    details=(
+                        "The moderation API answered fewer entries than were "
+                        "sent, so this entry has no result."
+                    ),
+                    traceback=[],
                 )
             )
-            if not passed
-            else None
-        )
-
-        results.append(
-            OpenAIModerationResult(score=score, passed=passed, details=details)
-        )
 
         return results

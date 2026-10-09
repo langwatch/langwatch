@@ -9,6 +9,8 @@ import {
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { CachedLuaScript } from "./cachedLuaScript";
+import { resolveDispatchAllowListRedisKey } from "./dispatch-scope";
+import { gqJobsDispatchedOverrideTotal } from "./metrics";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -915,6 +917,7 @@ local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
 local totalPendingKey  = KEYS[4]
+local allowedGroupsKey = KEYS[5]
 
 local keyPrefix      = ARGV[1]
 local nowMs          = tonumber(ARGV[2])
@@ -929,6 +932,7 @@ local staticCap      = tonumber(ARGV[5]) or 0
 -- hard ceiling = pods x concurrency; the water-fill divides the WHOLE capacity.
 -- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
 local globalBudget   = tonumber(ARGV[6]) or 0
+local restrictedDispatch = ARGV[7] == "1"
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
@@ -987,7 +991,12 @@ local function scanBatch(effCap, bypassPark, dispatched)
   local tenantCapCache = {}
 
   while scanned < scanBudget and dispatched < maxJobs do
-    local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+    local groups
+    if not restrictedDispatch then
+      groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+    else
+      groups = redis.call("ZRANGE", allowedGroupsKey, offset, offset + pageSize - 1)
+    end
     if #groups == 0 then break end
     scanned = scanned + #groups
 
@@ -999,9 +1008,28 @@ local function scanBatch(effCap, bypassPark, dispatched)
     -- tenant, the scan could page past a quiet tenant's only group and return
     -- empty while eligible work existed.
     local removed = 0
+    local removedAllowed = 0
 
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
+
+      -- A preflight's complete target set is registered before its root command.
+      -- Keep every target in the candidate index until the preflight key expires:
+      -- an older worker may enqueue a downstream job without knowing how to add
+      -- it back. Moving examined targets to the tail gives pending targets a
+      -- bounded path through a set that also contains not-yet-enqueued groups.
+      if restrictedDispatch then
+        redis.call("ZADD", allowedGroupsKey, nowMs, groupId)
+        removedAllowed = removedAllowed + 1
+      end
+
+      local readyScore = nil
+      local groupDue = true
+      if restrictedDispatch then
+        readyScore = redis.call("ZSCORE", readyKey, groupId)
+        groupDue = readyScore and tonumber(readyScore) <= nowMs
+      end
+      if groupDue then
 
       -- Tenant cap check (no-op when effCap == 0). capTenantId resolved
       -- regardless of bypassPark so the slot is still recorded; only the PARK
@@ -1025,7 +1053,6 @@ local function scanBatch(effCap, bypassPark, dispatched)
           end
         end
       end
-
       -- Tenant-level pause: park OUT of ready instead of skip-in-place so a large
       -- paused backlog cannot plug the bounded scan and starve others.
       local tenantPaused = false
@@ -1124,7 +1151,8 @@ local function scanBatch(effCap, bypassPark, dispatched)
             end
             removed = removed + 1
           end
-        end
+      end
+      end
       end
       end
     end
@@ -1132,13 +1160,23 @@ local function scanBatch(effCap, bypassPark, dispatched)
     if #groups < pageSize then break end
     -- Advance only past the entries that stayed in the due window; the removed
     -- ones shifted everything after them left by exactly that many positions.
-    offset = offset + #groups - removed
+    if not restrictedDispatch then
+      offset = offset + #groups - removed
+    else
+      offset = offset + #groups - removedAllowed
+    end
   end
 
   return dispatched
 end
 
 local dispatched = scanBatch(tenantCap, false, 0)
+
+-- Slots this eval filled by overriding the cap, reported alongside the results.
+-- Without it a high parked count is unreadable: "the cap is throttling work"
+-- and "the fleet is saturated so the override had no slot to give" produce the
+-- same gauge, and only this number tells them apart.
+local overrideDispatched = 0
 
 -- Work-conserving override: spare local slots remain (dispatched < maxJobs) but
 -- nothing more was admittable under the cap, while over-cap work sits parked.
@@ -1148,10 +1186,12 @@ local dispatched = scanBatch(tenantCap, false, 0)
 -- remaining slots; this pod's free-slot budget keeps the fleet total at G.
 if globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
   unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs, maxJobs - dispatched)
+  local beforeOverride = dispatched
   dispatched = scanBatch(tenantCap, true, dispatched)
+  overrideDispatched = dispatched - beforeOverride
 end
 
-return results
+return {results, overrideDispatched}
 `;
 
 /**
@@ -1948,6 +1988,138 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
+
+/**
+ * A group's failure state as one comparable token: the timestamp of the error
+ * hash the last failure left (empty when there is none), and whether the group
+ * is blocked. Registration stores it, inspection compares against it — that
+ * difference is what separates this preflight's own damage from the wedge some
+ * earlier release left behind (specs/event-sourcing/migration-preflight-barrier).
+ */
+const PREFLIGHT_GROUP_STATE_LUA = `
+local function gqPreflightGroupState(keyPrefix, blockedKey, groupId)
+  local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
+  local stamp = ""
+  if redis.call("EXISTS", errorKey) == 1 then
+    stamp = redis.call("HGET", errorKey, "timestamp") or "present"
+  end
+  return stamp .. "|" .. redis.call("SISMEMBER", blockedKey, groupId)
+end
+`;
+
+const REGISTER_PREFLIGHT_TARGETS_LUA =
+  PREFLIGHT_GROUP_STATE_LUA +
+  `
+local targetKey = KEYS[1]
+local candidatesKey = KEYS[2]
+local signalKey = KEYS[3]
+local blockedKey = KEYS[4]
+local baselineKey = KEYS[5]
+local keyPrefix = ARGV[1]
+local ttlSec = tonumber(ARGV[2])
+for index = 3, #ARGV do
+  local groupId = ARGV[index]
+  redis.call("SADD", targetKey, groupId)
+  -- Registration puts a target ahead of the dispatch loop's wall-clock
+  -- rotation scores. This also re-activates a target when an older worker
+  -- stages it without knowing the preflight protocol.
+  redis.call("ZADD", candidatesKey, index - 2, groupId)
+  -- HSETNX: the first registration is the seam before this preflight's work
+  -- reaches the group, so only it may say what was already wedged there.
+  redis.call("HSETNX", baselineKey, groupId, gqPreflightGroupState(keyPrefix, blockedKey, groupId))
+end
+redis.call("EXPIRE", targetKey, ttlSec)
+redis.call("EXPIRE", candidatesKey, ttlSec)
+redis.call("EXPIRE", baselineKey, ttlSec)
+redis.call("LPUSH", signalKey, "1")
+redis.call("LTRIM", signalKey, 0, 999)
+return #ARGV - 2
+`;
+const registerPreflightTargetsScript = new CachedLuaScript(
+  REGISTER_PREFLIGHT_TARGETS_LUA,
+);
+
+const INSPECT_PREFLIGHT_TARGETS_LUA =
+  PREFLIGHT_GROUP_STATE_LUA +
+  `
+local targetKey = KEYS[1]
+local blockedKey = KEYS[2]
+local baselineKey = KEYS[3]
+local keyPrefix = ARGV[1]
+local maxIds = tonumber(ARGV[2])
+local groups = redis.call("SMEMBERS", targetKey)
+local pending = 0
+local active = 0
+local failed = 0
+local blocked = 0
+local held = 0
+local pendingGroups = 0
+local failedIds = {}
+local blockedIds = {}
+local pendingIds = {}
+local heldIds = {}
+local function gqNameGroup(ids, groupId)
+  if #ids < maxIds then ids[#ids + 1] = groupId end
+end
+for _, groupId in ipairs(groups) do
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  -- A target registered outside the preflight protocol has no baseline, and
+  -- reads as unwedged: an unexplained failure refuses rather than settles.
+  local baseStamp, baseBlocked = string.match(redis.call("HGET", baselineKey, groupId) or "|0", "^(.*)|([01])$")
+  if not baseBlocked then baseStamp, baseBlocked = "", "0" end
+  local stamp, isBlocked = string.match(gqPreflightGroupState(keyPrefix, blockedKey, groupId), "^(.*)|([01])$")
+  if baseBlocked == "1" then
+    -- Already blocked when the preflight adopted it: its jobs cannot dispatch
+    -- and never will, so counting them would only hang the barrier out.
+    held = held + 1
+    gqNameGroup(heldIds, groupId)
+  else
+    local groupPending = redis.call("ZCARD", groupPrefix .. ":jobs")
+    local groupActive = redis.call("EXISTS", groupPrefix .. ":active")
+    pending = pending + groupPending
+    active = active + groupActive
+    if groupPending > 0 or groupActive == 1 then
+      pendingGroups = pendingGroups + 1
+      gqNameGroup(pendingIds, groupId)
+    end
+    if isBlocked == "1" then
+      blocked = blocked + 1
+      gqNameGroup(blockedIds, groupId)
+    end
+  end
+  if stamp ~= "" and stamp ~= baseStamp then
+    failed = failed + 1
+    gqNameGroup(failedIds, groupId)
+  end
+end
+return {pending, active, failed, blocked, #groups, held, pendingGroups, failedIds, blockedIds, pendingIds, heldIds}
+`;
+const inspectPreflightTargetsScript = new CachedLuaScript(
+  INSPECT_PREFLIGHT_TARGETS_LUA,
+);
+
+/** How many group ids a single refusal names before it says "and N more". */
+export const PREFLIGHT_NAMED_GROUP_LIMIT = 20;
+
+/**
+ * What the barrier sees across a preflight's target groups. Counts drive the
+ * wait; the id lists are what an operator needs to act, so every refusal names
+ * groups rather than totals. `heldFromBefore` groups were already blocked when
+ * the preflight adopted them and are excluded from `pending`/`active`.
+ */
+export type PreflightTargetsState = {
+  pending: number;
+  active: number;
+  failed: number;
+  blocked: number;
+  groups: number;
+  heldFromBefore: number;
+  pendingGroups: number;
+  failedGroupIds: string[];
+  blockedGroupIds: string[];
+  pendingGroupIds: string[];
+  heldFromBeforeGroupIds: string[];
+};
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
@@ -2175,10 +2347,12 @@ export class GroupStagingScripts {
     nowMs,
     activeTtlSec,
     maxJobs,
+    allowedGroupsKey,
   }: {
     nowMs: number;
     activeTtlSec: number;
     maxJobs: number;
+    allowedGroupsKey?: string;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -2189,30 +2363,67 @@ export class GroupStagingScripts {
 
     const result = await dispatchBatchScript.run(
       this.redis,
-      4,
+      5,
       readyKey,
       blockedKey,
       pausedJobKey,
       totalPendingKey,
+      resolveDispatchAllowListRedisKey({
+        keyPrefix: this.keyPrefix,
+        allowedGroupsKey,
+      }),
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
       String(maxJobs),
       String(tenantCap),
       String(readGlobalBudget()),
+      allowedGroupsKey ? "1" : "",
     );
 
-    if (!result || !Array.isArray(result) || result.length < 4) {
+    // The script returns [flatResults, overrideDispatched]. The count rides
+    // back with the results rather than living in a Redis key because a
+    // Prometheus counter has to be per-process: one shared key reported by
+    // every pod would multiply under sum(), the way the blocked-groups gauge
+    // already does.
+    if (!Array.isArray(result)) {
+      return [];
+    }
+
+    const [rawResults, rawOverride] = result as [unknown, unknown];
+    const flat = Array.isArray(rawResults) ? rawResults : [];
+
+    // A layout the script cannot produce (partial tuples) means the reply is
+    // corrupt: don't count anything from it, and dispatch nothing.
+    if (flat.length % 4 !== 0) {
+      return [];
+    }
+
+    // Override dispatches are a subset of this batch's dispatches, so the
+    // count can never exceed the tuples that came back with it.
+    const overrideDispatched = Number(rawOverride);
+    if (
+      Number.isSafeInteger(overrideDispatched) &&
+      overrideDispatched > 0 &&
+      overrideDispatched <= flat.length / 4
+    ) {
+      gqJobsDispatchedOverrideTotal.inc(
+        { queue_name: this.queueName },
+        overrideDispatched,
+      );
+    }
+
+    if (flat.length === 0) {
       return [];
     }
 
     const dispatched: DispatchResult[] = [];
-    for (let i = 0; i < result.length; i += 4) {
+    for (let i = 0; i < flat.length; i += 4) {
       dispatched.push({
-        stagedJobId: String(result[i]),
-        groupId: String(result[i + 1]),
-        jobDataJson: String(result[i + 2]),
-        originalScore: Number(result[i + 3]),
+        stagedJobId: String(flat[i]),
+        groupId: String(flat[i + 1]),
+        jobDataJson: String(flat[i + 2]),
+        originalScore: Number(flat[i + 3]),
       });
     }
 
@@ -2688,6 +2899,57 @@ export class GroupStagingScripts {
    */
   async getReadySize(): Promise<number> {
     return this.redis.zcard(`${this.keyPrefix}ready`);
+  }
+
+  async inspectPreflightTargets(
+    targetKey: string,
+  ): Promise<PreflightTargetsState> {
+    const result = (await inspectPreflightTargetsScript.run(
+      this.redis,
+      3,
+      targetKey,
+      `${this.keyPrefix}blocked`,
+      `${targetKey}:baseline`,
+      this.keyPrefix,
+      String(PREFLIGHT_NAMED_GROUP_LIMIT),
+    )) as (number | string[])[];
+    const names = (index: number): string[] =>
+      (result[index] as string[] | undefined)?.map(String) ?? [];
+    return {
+      pending: Number(result[0] ?? 0),
+      active: Number(result[1] ?? 0),
+      failed: Number(result[2] ?? 0),
+      blocked: Number(result[3] ?? 0),
+      groups: Number(result[4] ?? 0),
+      heldFromBefore: Number(result[5] ?? 0),
+      pendingGroups: Number(result[6] ?? 0),
+      failedGroupIds: names(7),
+      blockedGroupIds: names(8),
+      pendingGroupIds: names(9),
+      heldFromBeforeGroupIds: names(10),
+    };
+  }
+
+  async registerPreflightTargets({
+    targetKey,
+    groupIds,
+  }: {
+    targetKey: string;
+    groupIds: readonly string[];
+  }): Promise<void> {
+    if (groupIds.length === 0) return;
+    await registerPreflightTargetsScript.run(
+      this.redis,
+      5,
+      targetKey,
+      `${targetKey}:candidates`,
+      this.getSignalKey(),
+      `${this.keyPrefix}blocked`,
+      `${targetKey}:baseline`,
+      this.keyPrefix,
+      "3600",
+      ...groupIds,
+    );
   }
 
   /**

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -95,6 +96,50 @@ func TestLLMProxyStreamCut_InStreamHardLimit(t *testing.T) {
 	}
 }
 
+// The gateway forwarding an upstream rejection under a 200 stream content
+// type: ONE bare JSON error object, no SSE framing, no trailing newline (the
+// shape observed live for an Anthropic invalid_request_error).
+const bareJSONErrorBody = `{"type":"error","error":{"type":"invalid_request_error","message":"thinking.type.enabled is not supported for this model."}}`
+
+// @scenario "A bare JSON error body under a stream content type is captured as the cause"
+func TestLLMProxyStreamCut_BareJSONErrorBody(t *testing.T) {
+	frames := bareJSONErrorBody
+	gateway := sseStreamGateway(t, &frames)
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-bare-json", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	// The body passes through untouched for the worker's SDK.
+	resp := rateLimitCall(t, relay, token)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("call answered %d, want the 200 passed through", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != bareJSONErrorBody {
+		t.Errorf("body was altered in flight:\n got %s\nwant %s", body, bareJSONErrorBody)
+	}
+
+	// Reading to EOF must CAPTURE the rejection, not clear it as a clean end.
+	e, ok := relay.LastLLMError(token)
+	if !ok {
+		t.Fatal("a bare JSON error body must leave a captured cause")
+	}
+	if _, hasMessage := e.Meta["message"]; hasMessage {
+		t.Errorf("captured message = %v, want the provider's prose dropped", e.Meta["message"])
+	}
+	hasDiscriminant := e.Code == "invalid_request_error"
+	for _, reason := range e.Reasons {
+		var cause herr.E
+		if errors.As(reason, &cause) && cause.Code == "invalid_request_error" {
+			hasDiscriminant = true
+		}
+	}
+	if !hasDiscriminant {
+		t.Errorf("captured code = %q, reasons = %v, want the invalid_request_error discriminant", e.Code, e.Reasons)
+	}
+}
+
 // @scenario "A clean stream clears the in-stream failure capture"
 func TestLLMProxyStreamCut_CleanStreamClears(t *testing.T) {
 	frames := cleanStream
@@ -142,4 +187,68 @@ func TestLLMProxyStreamCut_CleanStreamClears(t *testing.T) {
 		t.Fatalf("call after a clean stream answered %d, want 200: the capture must be cleared", final.StatusCode)
 	}
 	_, _ = io.ReadAll(final.Body)
+}
+
+// An overloaded provider failing inside a 200 stream, the way it did in the
+// prod turn that ended with a manual "Try again".
+const overloadedStream = "event: response.created\n" +
+	`data: {"type":"response.created","sequence_number":0}` + "\n\n" +
+	"event: error\n" +
+	`data: {"type":"error","error":{"type":"server_error","message":"Our servers are currently overloaded. Please try again later."},"sequence_number":1}` + "\n\n"
+
+// @scenario "An in-stream error that is not a plan limit is left to the worker's retries"
+func TestLLMProxyStreamCut_TransientInStreamErrorNeverCuts(t *testing.T) {
+	frames := overloadedStream
+	gateway := sseStreamGateway(t, &frames)
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-stream-overloaded", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	// More consecutive failures than the rate-limit cut allows, plus the
+	// worker's own retry budget: every call still reaches the provider.
+	for i := 0; i < rateLimitCutAfter+3; i++ {
+		resp := rateLimitCall(t, relay, token)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("call %d answered %d, want the provider's 200 stream: a transient in-stream error must not arm the cut", i+1, resp.StatusCode)
+		}
+		_, _ = io.ReadAll(resp.Body)
+		if _, ok := relay.LastLLMError(token); !ok {
+			t.Fatalf("call %d left no captured cause", i+1)
+		}
+	}
+}
+
+// In-stream errors are not rejected calls, so they do not count toward the
+// consecutive-429 cut: a 429 after several of them is still a first strike.
+func TestLLMProxyStreamCut_InStreamErrorsDoNotCountTowardRateLimitCut(t *testing.T) {
+	var streaming atomic.Bool
+	streaming.Store(true)
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if streaming.Load() {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(overloadedStream))
+			return
+		}
+		w.Header().Set("Retry-After", "1")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(rateLimitBurstBody))
+	}))
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-stream-then-429", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	for i := 0; i < rateLimitCutAfter; i++ {
+		resp := rateLimitCall(t, relay, token)
+		_, _ = io.ReadAll(resp.Body)
+	}
+	streaming.Store(false)
+
+	resp := rateLimitCall(t, relay, token)
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("first 429 after in-stream errors answered %d, want the 429 passed through for the SDK's own backoff", resp.StatusCode)
+	}
 }

@@ -17,9 +17,12 @@ import {
   OrganizationUserRole,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { UNLIMITED_PLAN } from "../../../../../ee/licensing/constants";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
-import { globalForApp, resetApp } from "../../../app-layer/app";
+import { getApp, globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "../../../app-layer/presets";
@@ -100,21 +103,21 @@ describe("organization.setMemberDisabled", () => {
 
     // role=ADMIN on its own is not enough for `organization:manage`; the
     // permission check reads the binding.
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-${nanoid(8)}`,
-        organizationId,
-        userId: adminUserId,
-        role: OrganizationUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-${nanoid(8)}`,
+      organizationId,
+      userId: adminUserId,
+      role: OrganizationUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     repo = new PrismaOrganizationRepository(prisma);
     seats = new LicenseEnforcementRepository(prisma);
 
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       organizations: traced(
         new OrganizationService(repo, new PromptTagRepository(prisma)),
         "OrganizationService",
@@ -143,7 +146,9 @@ describe("organization.setMemberDisabled", () => {
 
   afterAll(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["department", { organizationId }],
@@ -151,6 +156,29 @@ describe("organization.setMemberDisabled", () => {
       ["user", { email: { in: emails() } }],
     ]);
   });
+
+  /**
+   * Whether the person can actually ACT in the organization, asked the way a
+   * request asks it: through the authorization engine.
+   *
+   * Deliberately NOT `repo.getUserOrgRole`, which is what this file used to
+   * assert on. That reader filtered `disabledAt` for as long as disabling has
+   * existed - but nothing on the permission path did, so a disabled member
+   * kept every permission while this scenario went on passing. An access
+   * assertion has to go through the thing that grants access.
+   *
+   * `organization:view` is the right probe because this member holds no
+   * binding at all: it is the floor every org member gets, so it is exactly
+   * the access that disabling has to take away.
+   */
+  const canActInOrganization = async (userId: string): Promise<boolean> =>
+    (
+      await getApp().permissions.getDecision({
+        userId,
+        permission: "organization:view",
+        scope: { tier: "organization", id: organizationId },
+      })
+    ).permitted;
 
   // Placed first, while every member is still active: these describe the state
   // an organization lands in the moment it activates a license for fewer seats
@@ -161,9 +189,7 @@ describe("organization.setMemberDisabled", () => {
       licensedSeats = 1;
 
       for (const userId of [adminUserId, secondAdminUserId, memberUserId]) {
-        expect(
-          await repo.getUserOrgRole({ userId, organizationId }),
-        ).not.toBeNull();
+        expect(await canActInOrganization(userId)).toBe(true);
       }
 
       licensedSeats = 50;
@@ -198,13 +224,24 @@ describe("organization.setMemberDisabled", () => {
     });
 
     /** @scenario A disabled member loses access but keeps their record */
+    /** @scenario A disabled member cannot act through any permission path */
     it("revokes their access to the organization", async () => {
-      const role = await repo.getUserOrgRole({
+      expect(await canActInOrganization(memberUserId)).toBe(false);
+    });
+
+    /** @scenario A disabled member cannot act through any permission path */
+    it("tells them their access was disabled, not that they are a stranger here", async () => {
+      // They ARE still a member. A denial reading "no membership" would be
+      // both wrong and unactionable; naming the seat points them at the admin
+      // who can return it.
+      const decision = await getApp().permissions.getDecision({
         userId: memberUserId,
-        organizationId,
+        permission: "organization:view",
+        scope: { tier: "organization", id: organizationId },
       });
 
-      expect(role).toBeNull();
+      expect(decision.permitted).toBe(false);
+      expect(decision.denialReason).toBe("membership-disabled");
     });
 
     /** @scenario A disabled member loses access but keeps their record */
@@ -231,12 +268,10 @@ describe("organization.setMemberDisabled", () => {
         disabled: false,
       });
 
-      const role = await repo.getUserOrgRole({
-        userId: memberUserId,
-        organizationId,
-      });
-
-      expect(role).toBe(OrganizationUserRole.MEMBER);
+      expect(await canActInOrganization(memberUserId)).toBe(true);
+      expect(
+        await repo.getUserOrgRole({ userId: memberUserId, organizationId }),
+      ).toBe(OrganizationUserRole.MEMBER);
     });
   });
 
