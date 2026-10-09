@@ -13,7 +13,8 @@ import { imageContractSteps } from "../image-tree.ts";
 describe("imageContractSteps()", () => {
   describe("given one dropping and one adding migration per engine", () => {
     /** @scenario "A schema step is a contract when its SQL carries the retirement note" */
-    it("names only the dropping ones", () => {
+    /** @scenario "A contract step's SQL names the background steps it runs after" */
+    it("names only the dropping ones, each with the steps its after notes name", () => {
       const root = mkdtempSync(join(tmpdir(), "contract-steps-"));
       const directories = { prisma: join(root, "prisma"), goose: join(root, "goose") };
       const write = (path: string, sql: string) => {
@@ -23,7 +24,7 @@ describe("imageContractSteps()", () => {
       try {
         write(
           join(directories.prisma, "20270101000000_drop_legacy_key", "migration.sql"),
-          '-- contract: retired in 3.20.1\nALTER TABLE "Project" DROP COLUMN "legacyKey";\n',
+          '-- contract: retired in 3.20.1\n-- after: identity:copy-legacy-key\nALTER TABLE "Project" DROP COLUMN "legacyKey";\n',
         );
         write(
           join(directories.prisma, "20270102000000_add_identifier", "migration.sql"),
@@ -39,7 +40,10 @@ describe("imageContractSteps()", () => {
         );
 
         expect(imageContractSteps({ directories })).toEqual(
-          new Set(["prisma:20270101000000_drop_legacy_key", "clickhouse:00110"]),
+          new Map([
+            ["prisma:20270101000000_drop_legacy_key", ["identity:copy-legacy-key"]],
+            ["clickhouse:00110", []],
+          ]),
         );
       } finally {
         rmSync(root, { recursive: true, force: true });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { upgradeStepKindSchema, upgradeStepModeSchema } from "../ledger.ts";
+import type { CodeStepId } from "./code-step-ids.generated.ts";
 
 /**
  * The kinds a module declares with `.withMigrations` (rethink 6.1). A subset of the ledger's
@@ -54,9 +55,12 @@ export type MigrationStepRefusal =
   | "blocking_not_data"
   | "after_not_background";
 
-/** What a module writes: `after` names step values, so a missing step fails typecheck. */
+/**
+ * What a module writes: `after` names step values or, across modules, a generated `CodeStepId`
+ * (Alex, 2026-10-09, STEP-AFTER-2), so a missing or mistyped step fails typecheck.
+ */
 export type MigrationStepDefinition = Omit<MigrationStepDeclaration, "after"> & {
-  after?: readonly MigrationStep[];
+  after?: readonly (MigrationStep | CodeStepId)[];
   run: MigrationStepRun;
 };
 
@@ -108,8 +112,9 @@ export function defineMigrationStep(step: MigrationStepDefinition): MigrationSte
       detail: `it is blocking but of kind "${step.kind}"; only a data step blocks (frozen SQL).`,
     });
   }
-  const after = step.after?.map((named) => named.id);
-  if (after && [step, ...(step.after ?? [])].some((each) => each.mode !== "background")) {
+  const after = step.after?.map((named) => (typeof named === "string" ? named : named.id));
+  const values = step.after?.filter((named) => typeof named !== "string") ?? [];
+  if (after && [step, ...values].some((each) => each.mode !== "background")) {
     throw new MigrationStepDeclarationError({
       step: step.id,
       refusal: "after_not_background",

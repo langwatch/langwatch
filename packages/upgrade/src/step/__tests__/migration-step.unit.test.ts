@@ -152,20 +152,36 @@ describe("defineMigrationStep after", () => {
     });
   });
 
-  describe("when a step names another by a string", () => {
+  describe("when a step names another module's step by its generated id", () => {
+    /** @scenario "A step names another module's step by its generated id" */
+    it("keeps the id", () => {
+      const spend = defineMigrationStep({
+        id: "instant-eval:copy-spend",
+        kind: "data",
+        mode: "background",
+        description: "Copies spend.",
+        after: ["billing:record-usage-billing-catch-up"],
+        run: noReport,
+      });
+
+      expect(spend.after).toEqual(["billing:record-usage-billing-catch-up"]);
+    });
+  });
+
+  describe("when a step names another by a mistyped id", () => {
     /** @scenario "A step named by a mistyped id fails typecheck" */
-    it("fails typecheck and is refused at runtime", () => {
-      expect(() =>
-        defineMigrationStep({
-          id: "evaluation:purge-inputs",
-          kind: "data",
-          mode: "background",
-          description: "Purges copied evaluation inputs.",
-          // @ts-expect-error a step runs after step values, never a free string
-          after: ["evaluation:copy-inptus"],
-          run: noReport,
-        }),
-      ).toThrow("only a background step runs after others");
+    it("fails typecheck; the plan refuses it as an unknown step", () => {
+      const purge = defineMigrationStep({
+        id: "evaluation:purge-inputs",
+        kind: "data",
+        mode: "background",
+        description: "Purges copied evaluation inputs.",
+        // @ts-expect-error a step names a step value or a generated CodeStepId, never a free string
+        after: ["evaluation:copy-inptus"],
+        run: noReport,
+      });
+
+      expect(purge.after).toEqual(["evaluation:copy-inptus"]);
     });
   });
 

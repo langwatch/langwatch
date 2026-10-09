@@ -3,7 +3,9 @@
 # one is applied, every unfinished background step shipped in an earlier release runs inline under
 # the upgrade, forced and blocking, so a contract never drops data a background step still needs.
 # A background step may run `after` other background steps, named by their step values (Alex,
-# 2026-10-09, STEP-AFTER), so a mistyped id fails typecheck and the planner orders them.
+# 2026-10-09, STEP-AFTER), so a mistyped id fails typecheck and the planner orders them. Another
+# module's step is named by its generated `CodeStepId`, and a contract's SQL may name a background
+# step with `-- after: <step id>` beside its contract note (Alex, 2026-10-09, STEP-AFTER-2).
 
 Feature: A contract step waits for the background steps shipped before it
   As an operator of a LangWatch installation
@@ -98,10 +100,35 @@ Feature: A contract step waits for the background steps shipped before it
     Then it keeps the named step's id
 
   @unit
+  Scenario: A step names another module's step by its generated id
+    Given a background step that runs after a step id in the image's generated code step ids
+    When it is defined
+    Then it keeps the id
+
+  @unit
   Scenario: A step named by a mistyped id fails typecheck
-    Given a background step that names the step it runs after by a string
+    Given a background step that names the step it runs after by an id the image does not collect
     When the package is typechecked
     Then the declaration is a type error
+
+  @unit
+  Scenario: A contract step's SQL names the background steps it runs after
+    Given a dropping migration whose SQL carries an after note beside its contract note
+    When the image's contract steps are read
+    Then the contract step carries the named step id
+
+  @unit
+  Scenario: A contract step runs after the background step its SQL names, released or not
+    Given a contract step in 3.23.0 whose SQL names a background step not released yet
+    And that step runs after another unreleased background step
+    When 3.20.1 upgrades to 3.23.0
+    Then both run before 3.23.0's schema, the named one last
+
+  @unit
+  Scenario: A contract step naming a step the image does not have is refused at plan time
+    Given a contract step whose SQL names a step that is not a background code step of the image
+    When the upgrade is planned
+    Then it is refused as step_after_unknown, naming both steps
 
   @unit
   Scenario: Only a background step runs after others, and only after background steps

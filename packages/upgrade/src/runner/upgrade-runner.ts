@@ -53,8 +53,8 @@ export interface UpgradeRunnerOptions {
   releases: { manifests: readonly ReleaseManifest[]; floor: LtsFloor };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
-  /** Schema step ids that are contracts; read from the image's SQL when not given. */
-  contracts?: ReadonlySet<string>;
+  /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
+  contracts?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
   identity: { image: string; host: string };
   log: UpgradeRunnerLog;

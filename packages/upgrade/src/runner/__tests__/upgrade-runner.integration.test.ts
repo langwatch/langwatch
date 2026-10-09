@@ -798,7 +798,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
             steps: manifests.filter((m) => m.release <= release).flatMap((m) => m.steps),
           },
           releases: { manifests, floor: FLOOR },
-          contracts: new Set(["prisma:20261003000000_drop_old"]),
+          contracts: new Map([["prisma:20261003000000_drop_old", []]]),
           codeSteps: [
             defineMigrationStep({
               id: "dataset:copy-keys",

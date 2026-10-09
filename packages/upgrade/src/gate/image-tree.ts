@@ -78,22 +78,35 @@ export function imageSteps({
 /** The note the migration-safety rules require above every destructive statement. */
 const CONTRACT_NOTE = /--[ \t]*contract:[ \t]*retired in[ \t]+\S+/i;
 
-/** The schema steps whose SQL carries `-- contract: retired in <release>`: the destructive ones. */
+/** A contract's `-- after: <step id>`: a background step that runs before it (STEP-AFTER-2). */
+const AFTER_NOTE = /^[ \t]*--[ \t]*after:[ \t]*(\S+)/gim;
+
+/**
+ * The schema steps whose SQL carries `-- contract: retired in <release>`, the destructive ones,
+ * each with the background step ids its `-- after:` notes name.
+ */
 export function imageContractSteps({
   directories = IMAGE_MIGRATION_DIRECTORIES,
   tree = readImageTree({ directories }),
 }: {
   directories?: { prisma: string; goose: string };
   tree?: ReleaseTreeSteps;
-} = {}): Set<string> {
-  const contract = (path: string) =>
-    existsSync(path) && CONTRACT_NOTE.test(readFileSync(path, "utf8"));
-  return new Set([
-    ...tree.prismaFolders
-      .filter((folder) => contract(join(directories.prisma, folder, "migration.sql")))
-      .map((folder) => prismaStepId({ folder })),
-    ...tree.gooseFiles
-      .filter((file) => contract(join(directories.goose, file)))
-      .flatMap((file) => gooseStepId({ file }) ?? []),
-  ]);
+} = {}): Map<string, string[]> {
+  const contracts = new Map<string, string[]>();
+  const read = ({ id, path }: { id: string | null; path: string }) => {
+    if (!id || !existsSync(path)) return;
+    const sql = readFileSync(path, "utf8");
+    if (!CONTRACT_NOTE.test(sql)) return;
+    contracts.set(
+      id,
+      [...sql.matchAll(AFTER_NOTE)].flatMap((note) => note[1] ?? []),
+    );
+  };
+  for (const folder of tree.prismaFolders) {
+    read({ id: prismaStepId({ folder }), path: join(directories.prisma, folder, "migration.sql") });
+  }
+  for (const file of tree.gooseFiles) {
+    read({ id: gooseStepId({ file }), path: join(directories.goose, file) });
+  }
+  return contracts;
 }

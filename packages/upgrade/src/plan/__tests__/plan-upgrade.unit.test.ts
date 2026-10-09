@@ -211,7 +211,7 @@ describe("planUpgrade()", () => {
 });
 
 describe("inlineBeforeContracts()", () => {
-  const contracts = new Set(["prisma:20270101000000_drop_legacy_key"]);
+  const contracts = new Map([["prisma:20270101000000_drop_legacy_key", []]]);
   const background = [
     { id: "dataset:content-to-object-storage", release: "3.21.0" },
     { id: "identity:identifier-backfill", release: "3.22.0" },
@@ -253,7 +253,7 @@ describe("inlineBeforeContracts()", () => {
       expect(
         inlineBeforeContracts({
           releases: planned(),
-          contracts: new Set(),
+          contracts: new Map(),
           background,
           settled: new Set(),
         }),
@@ -270,7 +270,10 @@ describe("inlineBeforeContracts()", () => {
             { release: "3.21.0", schema: ["prisma:20261101000000_drop_a"] },
             { release: null, schema: ["prisma:20261201000000_drop_b"] },
           ],
-          contracts: new Set(["prisma:20261101000000_drop_a", "prisma:20261201000000_drop_b"]),
+          contracts: new Map([
+            ["prisma:20261101000000_drop_a", []],
+            ["prisma:20261201000000_drop_b", []],
+          ]),
           background: [
             { id: "dataset:same-release", release: "3.21.0" },
             { id: "trace:unreleased", release: null },
@@ -319,6 +322,39 @@ describe("inlineBeforeContracts()", () => {
           settled: new Set(["evaluation:copy-inputs"]),
         }),
       ).toEqual([[], [], ["stored-object:purge-inputs"]]);
+    });
+  });
+
+  describe("when a contract's SQL names a background step not released yet", () => {
+    /** @scenario "A contract step runs after the background step its SQL names, released or not" */
+    it("runs the named step, and each step it runs after, before the contract's schema", () => {
+      expect(
+        inlineBeforeContracts({
+          releases: planned(),
+          contracts: new Map([["prisma:20270101000000_drop_legacy_key", ["instant-eval:copy"]]]),
+          background: [
+            { id: "instant-eval:copy", release: null, after: ["billing:catch-up"] },
+            { id: "billing:catch-up", release: null },
+          ],
+          settled: new Set(),
+        }),
+      ).toEqual([[], [], ["billing:catch-up", "instant-eval:copy"]]);
+    });
+  });
+
+  describe("when a contract's SQL names a step the image does not have", () => {
+    /** @scenario "A contract step naming a step the image does not have is refused at plan time" */
+    it("refuses with step_after_unknown, naming both", () => {
+      const run = () =>
+        inlineBeforeContracts({
+          releases: [],
+          contracts: new Map([["clickhouse:00110", ["instant-eval:copy-judge-spnd"]]]),
+          background: [],
+          settled: new Set(["instant-eval:copy-judge-spnd"]),
+        });
+      expect(run).toThrow(
+        "contract step clickhouse:00110 runs after instant-eval:copy-judge-spnd, which is not a background code step of this image",
+      );
     });
   });
 

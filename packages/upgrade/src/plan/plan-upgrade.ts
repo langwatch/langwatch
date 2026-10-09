@@ -208,9 +208,9 @@ function pullDue({
 }
 
 /**
- * Before a release whose schema holds a contract step, every unfinished background step shipped in
- * an earlier release runs inline, forced and blocking (Alex, 2026-10-09, UPGRADE-FIXES), and ahead
- * of it each step it runs `after`, released or not (STEP-AFTER). Per planned release, the ids.
+ * Before a contract's release, every unfinished background step an earlier release shipped runs
+ * inline (UPGRADE-FIXES), and so does each step a contract's `-- after:` note names (STEP-AFTER-2);
+ * each runs after every step it names, released or not (STEP-AFTER). Per planned release, the ids.
  */
 export function inlineBeforeContracts({
   releases,
@@ -219,19 +219,32 @@ export function inlineBeforeContracts({
   settled,
 }: {
   releases: readonly Pick<PlannedRelease, "release" | "schema">[];
-  contracts: ReadonlySet<string>;
+  contracts: ReadonlyMap<string, readonly string[]>;
   background: readonly (OrderedStep & { release: string | null })[];
   settled: ReadonlySet<string>;
 }): string[][] {
   const order = orderAfter({ steps: background, settled });
   const after = new Map(background.map((step) => [step.id, step.after ?? []]));
+  for (const [contract, named] of contracts) {
+    const unknown = named.find((id) => !after.has(id));
+    if (unknown) {
+      throw new StepOrderError({
+        code: "step_after_unknown",
+        message: `contract step ${contract} runs after ${unknown}, which is not a background code step of this image`,
+      });
+    }
+  }
   const inlined = new Set<string>();
   const skip = (id: string) => settled.has(id) || inlined.has(id);
   return releases.map(({ release, schema }) => {
-    if (!schema.some((id) => contracts.has(id))) return [];
+    const held = schema.filter((id) => contracts.has(id));
+    if (held.length === 0) return [];
     const due = new Set<string>();
     for (const step of background.filter((each) => releasedBefore(each.release, release))) {
       pullDue({ id: step.id, after, skip, due });
+    }
+    for (const id of held.flatMap((contract) => contracts.get(contract) ?? [])) {
+      pullDue({ id, after, skip, due });
     }
     for (const id of due) inlined.add(id);
     return order.filter((id) => due.has(id));

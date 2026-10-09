@@ -1,3 +1,4 @@
+export type { CodeStepId } from "./code-step-ids.generated.ts";
 export {
   type MigrationStep,
   type MigrationStepCheckpoint,
