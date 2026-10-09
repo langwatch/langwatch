@@ -164,6 +164,32 @@ served from the host root. The product's `AUTH_PROVIDER=azure-ad` hard-wires
 `https://login.microsoftonline.com`, so resolve that host to idpsim over https;
 `legacy env <t>` prints `AZURE_AD_TENANT_ID` (the GUID) instead of an issuer.
 
+### Social sign-in (Google, GitHub, GitLab, Microsoft)
+
+Every tenant also plays the four social providers the sign-in page offers,
+under `/t/<n>/social/<provider>`, in each provider's own path layout and
+response shapes, signing in as the tenant's users. Any client id and secret
+are accepted, as for an unregistered OIDC client.
+
+| Provider  | Base (`<b>` = `…/t/<n>/social/<provider>`) | Endpoints under it                                                                                                  |
+| --------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Google    | `<b>` is the issuer                        | `/.well-known/openid-configuration`, `/o/oauth2/v2/auth`, `/token`, `/oauth2/v3/userinfo`, `/oauth2/v3/certs`       |
+| GitHub    | `<b>`                                      | `/login/oauth/authorize`, `/login/oauth/access_token` (a form unless `Accept` asks for JSON), `/user`, `/user/emails` |
+| GitLab    | `<b>` is Better Auth's `issuer`            | `/oauth/authorize`, `/oauth/token`, `/api/v4/user`                                                                  |
+| Microsoft | `<b>` is Better Auth's `authority`         | `/<directory>/oauth2/v2.0/authorize`, `/<directory>/oauth2/v2.0/token`, `/<directory>/discovery/v2.0/keys`          |
+
+Google and Microsoft return a signed ID token (a 21-digit Google `sub`; Entra
+v2.0 `oid`, `tid`, `ver` under the issuer `<b>/<tenant GUID>/v2.0`). GitHub and
+GitLab return numeric account ids, and GitHub's emails call answers one primary
+verified address. Better Auth's built-in Google and GitHub providers hard-wire
+their hosts, so the app side needs its own switch to reach these.
+
+Without a login hint the authorize endpoint serves the account picker, which
+names the provider it plays and has a **Cancel** button: that sends the client
+`error=access_denied` with its state (scripts: `cancel=1` on the authorize
+request). Every step lands in the tenant's activity feed as
+`social.<provider>.authorize|token|userinfo` (and `social.github.emails`).
+
 ## Provisioning into LangWatch
 
 SCIM runs one way: the identity provider sends its directory to the

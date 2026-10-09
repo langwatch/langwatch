@@ -104,6 +104,10 @@ export const signInSchema = z.object({
   domain: z.string(),
   refusal: refusalSchema.nullable(),
   users: listOf(z.object({ name: z.string(), email: z.string(), href: z.string() })),
+  /** The social provider being played; absent for the tenant's own OIDC. */
+  provider: z.string().optional(),
+  /** Declines the sign-in: the client gets access_denied back. */
+  cancelHref: z.string().optional(),
 });
 export type SignInView = z.infer<typeof signInSchema>;
 
