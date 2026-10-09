@@ -488,6 +488,23 @@ func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 	return env
 }
 
+// PaymentSimSecretKey and PaymentSimWebhookSecret are the dev-only pair haven
+// gives billing when it points Stripe at paymentsim.
+const (
+	PaymentSimSecretKey     = "sk_test_paymentsim"
+	PaymentSimWebhookSecret = "whsec_paymentsim"
+)
+
+// PaymentProviderEnv points billing's Stripe client at paymentsim, only when the
+// resolved environment names neither Stripe credential: billing refuses half a
+// pair, and a developer's own Stripe test account is never rewired.
+func PaymentProviderEnv(resolved map[string]string, endpoint string) []string {
+	if resolved["STRIPE_SECRET_KEY"] != "" || resolved["STRIPE_WEBHOOK_SECRET"] != "" || resolved["STRIPE_API_BASE"] != "" {
+		return nil
+	}
+	return []string{"STRIPE_API_BASE=" + endpoint, "STRIPE_SECRET_KEY=" + PaymentSimSecretKey, "STRIPE_WEBHOOK_SECRET=" + PaymentSimWebhookSecret}
+}
+
 // llmProbeProviders are the providers whose credential probe the model-provider
 // module aims at the API root named by <PROVIDER>_BASE_URL. They get the base URL
 // only: a dummy key would seed an organization-level row for each one.

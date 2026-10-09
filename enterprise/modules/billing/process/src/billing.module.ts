@@ -116,6 +116,7 @@ export const billingProcessModule: PublishedProcessModule<
           const { prices, meters } = composeHttpBillingStripe({
             secretKey,
             nodeEnvironment: config.nodeEnvironment,
+            apiBase: config.stripeApiBase,
           });
           return { environment: detectEnvironment(secretKey), prices, meters };
         },
@@ -137,10 +138,14 @@ export function createBillingOrganizationCache(options: {
 export function createStripeUsageReporting(options: {
   secretKey: string | undefined;
   nodeEnvironment: string | undefined;
+  /** Another origin speaking Stripe's API (paymentsim); unset is Stripe itself. */
+  apiBase?: string;
 }): UsageReportingService {
-  const { secretKey, nodeEnvironment } = options;
+  const { secretKey, nodeEnvironment, apiBase } = options;
   return StripeUsageReportingBuilder.create({
-    meters: secretKey ? composeHttpBillingStripe({ secretKey, nodeEnvironment }).meters : void 0,
+    meters: secretKey
+      ? composeHttpBillingStripe({ secretKey, nodeEnvironment, apiBase }).meters
+      : void 0,
     nodeEnvironment,
   }).build();
 }

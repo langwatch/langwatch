@@ -204,6 +204,7 @@ func (o *Orchestrator) seedWhenReady(ctx context.Context, seed KeeperSeed) {
 	sayPhase(seed.Since, "seed")
 	if o.runSeedJob(ctx, seed.Job) {
 		sayPhase(seed.Since, "seed done")
+		o.AutoSeed(ctx, seed)
 		return
 	}
 	sayPhase(seed.Since, "seed failed (continuing); `haven db seed` runs it again")

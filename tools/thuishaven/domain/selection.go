@@ -69,6 +69,9 @@ type Selection struct {
 	// default: it keeps the product's outbound messages from their real
 	// destinations. `haven up +outbound` once.
 	Outbound bool `json:"outbound"`
+	// Payment is the Stripe stand-in (paymentsim). Off by default; when on and
+	// .env names no Stripe key, billing talks to it. `haven up +payment` once.
+	Payment bool `json:"payment"`
 	// Telemetry is the OTLP sender (telemetrysim). On by default like Mail: one
 	// small Go process that sends nothing until asked, and its console is
 	// always routed. Worktrees that don't want it say `haven up -telemetry`.
@@ -83,7 +86,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "telemetry", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "design-system", "mail-room", "langevals"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -181,6 +184,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Analytics = on
 	case OutboundService:
 		sel.Outbound = on
+	case PaymentService:
+		sel.Payment = on
 	case TelemetryService:
 		sel.Telemetry = on
 	default:
@@ -222,6 +227,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Analytics = local
 		case OutboundService:
 			sel.Outbound = local
+		case PaymentService:
+			sel.Payment = local
 		case TelemetryService:
 			sel.Telemetry = local
 		}
@@ -288,6 +295,7 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.LLM, LLMService)
 	add(s.Analytics, AnalyticsService)
 	add(s.Outbound, OutboundService)
+	add(s.Payment, PaymentService)
 	add(s.Telemetry, TelemetryService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")

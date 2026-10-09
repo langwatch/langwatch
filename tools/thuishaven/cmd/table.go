@@ -190,7 +190,6 @@ var removed = map[string]string{
 	"postgres":      "haven db url postgres (the server is managed automatically)",
 	"obs":           "haven status — the observability stack is managed automatically (haven restart obs bounces it)",
 	"observability": "haven status — the observability stack is managed automatically (haven restart obs bounces it)",
-	"seed":          "haven db seed [preset] (reseed in place) or haven db reset [preset] (fresh database)",
 	"tc":            "haven typecheck",
 	"oc":            "haven clean",
 	"cleanup":       "haven clean",
@@ -238,8 +237,12 @@ var baseTable = []commandSpec{
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
+			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			if inv.has("--no-seed") {
+				disableAutoSeed()
+			}
 			if err := rejectRemovedSelectionEnv(); err != nil {
 				return err
 			}
@@ -406,6 +409,21 @@ var baseTable = []commandSpec{
 		run: runOutbound,
 	},
 	{
+		name:    "payment",
+		summary: "paymentsim, the Stripe stand-in: status | events | usage | advance | fail | deliver | hold | release | reset",
+		args:    "<status|events|usage|advance|fail|deliver|hold|release|reset>",
+		maxArgs: 1,
+		flags: simFlags(
+			flagSpec{long: "--type", takesValue: true, value: "<event type>", summary: "events: only this type"},
+			flagSpec{long: "--customer", takesValue: true, value: "<id>", summary: "usage/fail: the customer"},
+			flagSpec{long: "--seconds", takesValue: true, value: "<n>", summary: "advance: move the test clock on this far"},
+			flagSpec{long: "--times", takesValue: true, value: "<n>", summary: "fail: decline this many charges (default 1, -1 every one)"},
+			flagSpec{long: "--ids", takesValue: true, value: "<a,b>", summary: "deliver: event ids, in the order to send them; repeat one for a duplicate"},
+			flagSpec{long: "--secret", takesValue: true, value: "<whsec>", summary: "deliver: sign with this secret instead (tests the refusal)"},
+		),
+		run: runPayment,
+	},
+	{
 		name:    "feedback",
 		summary: "notes readers sent from the haven orb in the app page: list | show | resolve | wait",
 		args:    "<list|show|resolve|wait> [id]",
@@ -472,6 +490,7 @@ var baseTable = []commandSpec{
 		run: runLogsCmd,
 	},
 	querySpec(),
+	seedSpec(),
 	telemetrySpec(),
 	{
 		name:    "status",
