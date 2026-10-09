@@ -5,6 +5,7 @@ import {
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
 import type { NormalizedSpan } from "../../schemas/spans";
+import { RESERVED_INPUT_SPAN_START_MS } from "./trace-io-accumulation.service";
 import type { TraceOriginService } from "./trace-origin.service";
 import { parseJsonStringArray, stringAttr } from "./trace-summary.utils";
 
@@ -415,6 +416,7 @@ export class TraceAttributeAccumulationService {
     outputSource,
     inputIsFallback,
     outputIsFallback,
+    inputSpanStartTimeMs,
     inputMediaRefs,
     outputMediaRefs,
   }: {
@@ -423,6 +425,7 @@ export class TraceAttributeAccumulationService {
     outputSource: string;
     inputIsFallback: boolean;
     outputIsFallback: boolean;
+    inputSpanStartTimeMs: number | null;
     /** Compact JSON media refs following the winning IO, or null to clear. */
     inputMediaRefs: string | null;
     outputMediaRefs: string | null;
@@ -545,6 +548,11 @@ export class TraceAttributeAccumulationService {
       merged["langwatch.reserved.output_is_fallback"] = "true";
     } else {
       delete merged["langwatch.reserved.output_is_fallback"];
+    }
+    if (inputSpanStartTimeMs === null) {
+      delete merged[RESERVED_INPUT_SPAN_START_MS];
+    } else {
+      merged[RESERVED_INPUT_SPAN_START_MS] = String(inputSpanStartTimeMs);
     }
 
     // Media refs ride the summary so the trace list and drawer summary can

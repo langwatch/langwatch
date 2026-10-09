@@ -397,6 +397,7 @@ describe("evaluationTrigger subscriber", () => {
         outputSource: "span",
         inputIsFallback: false,
         outputIsFallback: false,
+        inputSpanStartTimeMs: null,
         inputMediaRefs: null,
         outputMediaRefs: null,
       });
@@ -454,6 +455,7 @@ describe("evaluationTrigger subscriber", () => {
         outputSource: "span",
         inputIsFallback: false,
         outputIsFallback: false,
+        inputSpanStartTimeMs: null,
         inputMediaRefs: null,
         outputMediaRefs: null,
       });

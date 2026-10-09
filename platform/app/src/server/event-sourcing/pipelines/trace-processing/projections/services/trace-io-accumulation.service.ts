@@ -40,6 +40,13 @@ export const CLAUDE_CODE_SCOPE_NAMES = new Set([
 const CODEX_EVENT_NAME_PREFIX = "codex.";
 
 /**
+ * Start time of the span whose input is the trace input; 0 when a root set it.
+ * Lets the top-most span present win when no span has a null parent.
+ */
+export const RESERVED_INPUT_SPAN_START_MS =
+  "langwatch.reserved.input_span_start_ms";
+
+/**
  * Priority: root (latest-finishing among roots) > explicit > last-finishing.
  * @internal Exported for unit testing
  */
@@ -248,6 +255,7 @@ export class TraceIOAccumulationService {
     blockedByGuardrail: boolean;
     inputIsFallback: boolean;
     outputIsFallback: boolean;
+    inputSpanStartTimeMs: number | null;
     /** Compact JSON media refs for the winning input/output, or null. */
     inputMediaRefs: string | null;
     outputMediaRefs: string | null;
@@ -268,6 +276,9 @@ export class TraceIOAccumulationService {
     let outputSource = currentOutputSource;
     let blockedByGuardrail = state.blockedByGuardrail;
     let inputIsFallback = currentInputIsFallback;
+    const storedInputStartMs = state.attributes[RESERVED_INPUT_SPAN_START_MS];
+    let inputSpanStartTimeMs =
+      storedInputStartMs === undefined ? null : Number(storedInputStartMs);
     let outputIsFallback = currentOutputIsFallback;
     // Media refs accumulate across EVERY span of the trace, unlike the computed
     // text, which belongs to one winning span. Those are two different
@@ -331,6 +342,7 @@ export class TraceIOAccumulationService {
         blockedByGuardrail,
         inputIsFallback,
         outputIsFallback,
+        inputSpanStartTimeMs,
         inputMediaRefs,
         outputMediaRefs,
       };
@@ -344,7 +356,16 @@ export class TraceIOAccumulationService {
     );
     let inputWins = false;
     if (inputResult) {
-      inputWins = isRoot || computedInput === null || currentInputIsFallback;
+      // No null-parent span (its parent was never exported): the top-most span
+      // present, the earliest-starting one, wins over its descendants.
+      const startsAtOrBeforeCurrent =
+        inputSpanStartTimeMs !== null &&
+        span.startTimeUnixMs <= inputSpanStartTimeMs;
+      inputWins =
+        isRoot ||
+        computedInput === null ||
+        currentInputIsFallback ||
+        startsAtOrBeforeCurrent;
       if (inputWins) {
         // Use the EXTRACTED text: extractRichIOFromSpan already runs
         // messagesToText / extractTextFromPlainJson to pull the clean
@@ -355,6 +376,7 @@ export class TraceIOAccumulationService {
         // instead of the actual text.
         computedInput = preferText(inputResult.text, inputResult.raw);
         inputIsFallback = false;
+        inputSpanStartTimeMs = isRoot ? 0 : span.startTimeUnixMs;
       }
     } else if (computedInput === null) {
       // Semantic heuristics didn't find anything. Fall back to the
@@ -366,6 +388,7 @@ export class TraceIOAccumulationService {
       if (inputFallback) {
         computedInput = preferText(inputFallback.text, inputFallback.raw);
         inputIsFallback = true;
+        inputSpanStartTimeMs = null;
         inputWins = true;
       }
     }
@@ -440,6 +463,7 @@ export class TraceIOAccumulationService {
       blockedByGuardrail,
       inputIsFallback,
       outputIsFallback,
+      inputSpanStartTimeMs,
       inputMediaRefs,
       outputMediaRefs,
     };
