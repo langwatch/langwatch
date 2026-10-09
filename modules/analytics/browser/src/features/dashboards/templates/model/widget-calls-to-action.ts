@@ -41,7 +41,7 @@ const CHIP_ICON = `<rect width="16" height="16" x="4" y="4" rx="2" />
 export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
   traces: {
     title: "Connect traces to light up this widget",
-    line: "Once traces flow in you'll see request volume, success rate, p95 latency, cost and the traces that explain every spike.",
+    line: "Once traces flow in you'll see request volume, success rate, response time, cost and the traces that explain every spike.",
     icon: TRACES_ICON,
     button: "Connect traces",
     quiet: "No traces in this period.",

@@ -425,8 +425,8 @@ describe("a member's board", () => {
     });
 
     describe("when the write fails", () => {
-      /** @scenario "AC12c A failed add keeps the picker open and does not seed Langy" */
-      it("keeps the picker open, seeds no Langy conversation, and stores no widget", async () => {
+      /** @scenario "AC12c A failed add takes the widget off again and does not seed Langy" */
+      it("closes the picker, says the add failed, seeds no Langy conversation, and stores no widget", async () => {
         const user = userEvent.setup();
         const server = inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true });
         const { host } = openPicker(server);
@@ -439,7 +439,12 @@ describe("a member's board", () => {
         );
 
         await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
-        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        await waitFor(() =>
+          expect(host.failures).toEqual([
+            expect.objectContaining({ fallbackTitle: "Couldn't add the widget" }),
+          ]),
+        );
+        expect(host.lastQuery).toEqual({ addBlock: void 0 });
         expect(host.langyAsks).toEqual([]);
         expect(server.state.widgets).toEqual([]);
       });

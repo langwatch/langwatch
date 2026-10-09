@@ -54,10 +54,29 @@ describe("given a widget card with no description", () => {
   });
 
   describe("when its widget's data is complete", () => {
+    it("shows an (i) that says how much the widget checked", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderWithAnalyticsHost(
+        <WidgetCardShell name="Spend">
+          <PublishingWidget
+            reports={[{ state: "complete", unit: "traces", total: 1000, fields: [] }]}
+          />
+        </WidgetCardShell>,
+      );
+
+      await user.hover(await screen.findByRole("button", { name: "About Spend" }));
+
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        "Checked 1,000 traces in this period.",
+      );
+    });
+  });
+
+  describe("when its widget reports nothing about its data", () => {
     it("shows no (i)", () => {
       renderWithAnalyticsHost(
         <WidgetCardShell name="Spend">
-          <PublishingWidget reports={[{ ...PARTIAL, state: "complete", fields: [] }]} />
+          <PublishingWidget reports={[]} />
         </WidgetCardShell>,
       );
 

@@ -252,13 +252,16 @@ describe("registerChunkReloadListener", () => {
     Object.assign(new Event("vite:preloadError", { cancelable: true }), { payload });
 
   /** @scenario "Vite's preload error never turns a failure into an empty module" */
-  it("never prevents Vite from rejecting the import", () => {
+  it("never prevents Vite from rejecting the import", async () => {
+    serverUnreachable();
     registerChunkReloadListener();
     const event = preloadError(dropped());
 
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(false);
+    // The listener probes on a timer; it must run here, not inside the next test.
+    await settle();
   });
 
   describe("given a failure a loader owns", () => {

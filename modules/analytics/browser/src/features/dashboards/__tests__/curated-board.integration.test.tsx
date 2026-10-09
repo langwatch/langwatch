@@ -38,7 +38,7 @@ function openCurated(templateId: string, flags: Record<string, boolean> = LANGY_
   const host = new StubAnalyticsHost({
     flags,
     permissions: MEMBER,
-    route: { params: { templateId } },
+    route: { params: { templateId }, query: {} },
   });
   renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
   return { host, server };
@@ -82,7 +82,7 @@ describe("given a member opens a From LangWatch board", () => {
 
       await screen.findByRole("heading", { name: "Release check" });
       const asks = screen.getAllByRole("button", { name: /^Ask Langy about / });
-      expect(asks.map((button) => button.getAttribute("aria-label")).toSorted()).toEqual(
+      expect(asks.map((button) => button.getAttribute("aria-label") ?? "").toSorted()).toEqual(
         names.map((name) => `Ask Langy about ${name}`).toSorted(),
       );
 

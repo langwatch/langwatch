@@ -62,7 +62,7 @@ describe("given the board period control", () => {
     /** @scenario "AC19 One control sets the range, the grain and the refresh" */
     it("names a grain the member picked on the pill", () => {
       openControl({ range: "30d", grain: "1d" });
-      expect(screen.getByRole("button", { name: "Period" })).toHaveTextContent("30d · 1d");
+      expect(screen.getByRole("button", { name: "Period" })).toHaveTextContent(/30d\s*· 1d/);
     });
 
     /** @scenario "AC7 Refresh sits inside the period menu" */

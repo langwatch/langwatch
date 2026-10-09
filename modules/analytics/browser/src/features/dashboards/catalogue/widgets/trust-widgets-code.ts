@@ -197,7 +197,7 @@ const sourceName = (source) => ORIGIN_NAMES[source] ||
     <Panel>
       <Headline value={share(ratio(add(...noise.map((row) => row.traces)), traffic))}
         label={label} />
-      <Table columns={columns} rows={noise.slice(0, 5)} rowPadding={3} />
+      <Table columns={columns} rows={noise.slice(0, 4)} rowPadding={3} />
     </Panel>
   );`,
 });

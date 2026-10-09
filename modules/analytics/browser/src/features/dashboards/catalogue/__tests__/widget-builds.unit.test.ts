@@ -18,6 +18,7 @@ import {
   implementedWidget,
   PICKER_SECTIONS,
 } from "../index.ts";
+import { isCodingWidget } from "../model/catalogue-widgets.ts";
 
 const built = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
 const tables = built.filter(({ definition }) => definition.code.includes("<table"));
@@ -84,8 +85,18 @@ describe("given every built catalogue widget", () => {
     const pickerPrompts = new Map(
       PICKER_SECTIONS.flatMap(({ questions }) => questions).map(({ id, prompt }) => [id, prompt]),
     );
-    for (const { key, definition } of built) {
+    const offered = built.filter(({ key }) => pickerPrompts.has(key));
+    const leftOut = built.filter(({ key }) => !pickerPrompts.has(key));
+    expect(offered.length).toBeGreaterThan(0);
+    for (const { key, definition } of offered) {
       expect(definition.prompt, key).toBe(pickerPrompts.get(key));
+    }
+    // The picker leaves coding-agent widgets out; they carry their own prompt all the same.
+    for (const { key, definition } of leftOut) {
+      expect(isCodingWidget(CATALOGUE_WIDGETS.find(({ id }) => id === key)!), key).toBe(true);
+      expect(definition.prompt, key).toBeTruthy();
+    }
+    for (const { key, definition } of built) {
       expect(() => dashboardWidgetDefinitionSchema.parse(definition), key).not.toThrow();
     }
   });

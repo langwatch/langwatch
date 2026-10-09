@@ -149,13 +149,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Evidence: screenshot of the picker without Langy and the board with the new widget
 
   @integration
-  Scenario: AC12c A failed add keeps the picker open and does not seed Langy
+  Scenario: AC12c A failed add takes the widget off again and does not seed Langy
     Given a board with Langy enabled and the member may start a conversation
     When the member picks a question and the widget write is rejected
-    Then the picker stays open
+    Then the picker has closed and the board says the widget could not be added
     And no widget is stored on the board
     And Langy opens no conversation
-    # Evidence: the failed create call and the still-open picker
+    # Changed 2026-10-08 (owner list): a pick closes the picker at once, see "Add a widget: a
+    # picked widget shows on the board at once" in dashboards-widget-flow.feature
 
   # ---------------------------------------------------------------------------
   # Empty widgets
@@ -1179,7 +1180,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
   # AC 19: "One control for range, grain and refresh, with Live" (added by langwatch/tasks#911: the refresh menu moves into the period control) → Scenario: AC19 One control sets the range, the grain and the refresh; Scenario: AC19b A grain that does not fit the range cannot be picked; Scenario: AC19c Live is the last hour, rolling, refreshed every minute
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
-  # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add keeps the picker open and does not seed Langy
+  # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add takes the widget off again and does not seed Langy
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
   # AC 14: "Reviewer thumbs are named as reviewer thumbs" (added by langwatch/tasks#911: the annotations table holds reviewer thumbs, not user feedback) → Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
   # AC 15: "One catalogue of widgets and templates, from the dashboards library" (added by langwatch/tasks#911: the library is the guide for what to build) → Scenario: AC15 Every widget answers a question from the question tree; Scenario: AC15b A project's preloaded boards never repeat a widget; Scenario: AC15c The prototype's boards are the starter set, under the Agent health name

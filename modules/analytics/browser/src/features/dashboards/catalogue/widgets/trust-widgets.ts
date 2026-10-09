@@ -53,7 +53,7 @@ export function trustWidgetBuilds({
       code: NOISE_CODE,
       queries: { sources: sql.NOISE_SOURCES_SQL },
       width: "half",
-      rows: 5,
+      rows: 4,
     },
   };
 }
