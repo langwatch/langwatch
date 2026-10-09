@@ -84,6 +84,7 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
 
   /** Read from `system.backup_log` rather than `system.backups`. */
   async findBackupStatuses(): Promise<BackupStatusRow[]> {
+    if (!(await this.hasBackupLog())) return [];
     const result = await this.clickhouse.query<{
       status: string;
       cnt: string;
@@ -111,5 +112,17 @@ export class ClickHouseStorageFootprintRepository extends StorageFootprintReposi
       lastSuccessTime: row.last_success_time,
       lastSuccessSizeBytes: Number.parseInt(row.last_success_size, 10),
     }));
+  }
+
+  /** Asked first: a server without the table would log an HTTP error for the query. */
+  private async hasBackupLog(): Promise<boolean> {
+    const result = await this.clickhouse.query<{ present: string }>({
+      tenantId: "",
+      sql: "SELECT count() AS present FROM system.tables WHERE database = 'system' AND name = 'backup_log'",
+      unscoped: {
+        reason: "system.tables carries no tenant column: this asks what the server has.",
+      },
+    });
+    return Number.parseInt(result.rows[0]?.present ?? "0", 10) > 0;
   }
 }

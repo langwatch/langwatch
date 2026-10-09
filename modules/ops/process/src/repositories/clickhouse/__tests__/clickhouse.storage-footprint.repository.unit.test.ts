@@ -6,11 +6,12 @@ import { describe, expect, it } from "vitest";
 import { ClickHouseStorageFootprintRepository } from "../clickhouse.storage-footprint.repository.ts";
 
 /** The routed member, answering every statement with `rows` and recording what it was asked. */
-function repoAnswering(rows: Record<string, string>[]) {
+function repoAnswering(rows: Record<string, string>[], backupLogPresent = "1") {
   const statements: QueryRequest[] = [];
   const clickhouse = clickHouseQueryClientDouble({
     query: async (request: QueryRequest) => {
       statements.push(request);
+      if (request.sql.includes("system.tables")) return { rows: [{ present: backupLogPresent }] };
       return { rows };
     },
   });
@@ -53,7 +54,14 @@ describe("given an endpoint's system tables", () => {
           lastSuccessSizeBytes: 4096,
         },
       ]);
-      expect(statements[0]?.sql).toContain("FROM system.backup_log");
+      expect(statements[1]?.sql).toContain("FROM system.backup_log");
+    });
+
+    it("skips the query, so nothing errors, on a server without the table", async () => {
+      const { repo, statements } = repoAnswering([], "0");
+
+      expect(await repo.findBackupStatuses()).toEqual([]);
+      expect(statements.map(({ sql }) => sql).join()).not.toContain("FROM system.backup_log");
     });
   });
 });
