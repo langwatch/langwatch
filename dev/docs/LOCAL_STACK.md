@@ -44,6 +44,12 @@ The seeded admin login, slugs and access tokens are fixed. `haven seed` ends by
 printing all of them, masked (`--reveal` shows the values, `--json` gives one
 object); `haven env --reveal` has the same credentials.
 
+`haven auth <admin|email>` signs in to this stack's own app through the normal email
+sign-in with the credentials above and writes a Playwright storage-state file (mode 600) without printing the password; it refuses any app that is not `*.localhost`.
+`haven browser open|snap|shot|eval|close --lane <name> --as <who>` drives one shared
+headless shell per stack with a signed-in context per lane, for agent testers: see the
+`haven` skill.
+
 Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
 billing at it unless `.env` or the shell sets `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.

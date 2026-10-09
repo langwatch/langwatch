@@ -301,6 +301,9 @@ var baseTable = []commandSpec{
 			if inv.has("--all") {
 				return d.orch.DownAll(ctx)
 			}
+			if slug, err := d.orch.ResolveSlug(d.params); err == nil {
+				stopBrowser(slug)
+			}
 			return d.orch.Down(ctx, d.params, inv.has("--force"))
 		},
 	},
@@ -509,6 +512,8 @@ var baseTable = []commandSpec{
 	querySpec(),
 	seedSpec(),
 	telemetrySpec(),
+	authSpec(),
+	browserSpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",
