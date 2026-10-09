@@ -23,11 +23,11 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Secret } from "@langwatch/secret-contract";
+import { readableDate } from "@langwatch/time";
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { secretApi } from "../../behavior/secret-api.ts";
-import { readableDate } from "../../model/readable-date.ts";
 import { SECRET_MANAGE_PERMISSION, useSecretHost } from "../../model/secret-host.ts";
 import { describeSecretRefusal } from "../../model/secret-refusal-copy.ts";
 

@@ -43,6 +43,11 @@ import {
 export interface ErrorPresentation {
   title: string;
   /**
+   * A headline for one variant of the code, when a single code covers
+   * failures with different fixes. Returning nothing keeps `title`.
+   */
+  titleFor?: (error: HandledErrorShape) => string | undefined;
+  /**
    * Optional body copy. Receives the error so it can use `meta` — but only
    * where this registry knows the shape of that meta, which is the whole
    * point: `meta` is a contract per code, not a bag to rummage through.
@@ -155,6 +160,13 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
   membersLite: "Lite Member seats",
 };
 
+/** Creation caps the cloud Free plan sets, named as the pricing page does. */
+const CREATION_LIMIT_LABELS: Record<string, string> = {
+  scenarios: "scenarios",
+  scenarioSets: "simulations",
+  evaluators: "custom evaluators",
+};
+
 /**
  * Registered migration names, in the operator's words rather than the
  * column's. Stable identifiers (renaming one orphans its state rows), so
@@ -213,6 +225,20 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * What a provider slot is missing when the gateway answers
+ * `provider_config_invalid`, as `meta.problem` (ConfigProblem in
+ * services/aigateway/domain/errors.go). A closed set: the sentence is picked
+ * by matching it, and a value outside it reads as the remainder.
+ */
+export const PROVIDER_CONFIG_PROBLEMS: ReadonlySet<string> = new Set([
+  "api_key_missing",
+  "endpoint_missing",
+  "deployment_missing",
+  "operation_unsupported",
+  "model_not_served",
+]);
+
+/**
  * The upstream-HTTP-status fallback reasons (llmproxy.go's
  * upstreamReasonCodes), used when the provider's own body carried no
  * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
@@ -232,6 +258,15 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "permission_error",
   "invalid_api_key",
   "AccessDeniedException",
+  // A wrong AWS secret, an unknown or expired AWS access key.
+  "InvalidSignatureException",
+  "UnrecognizedClientException",
+  "ExpiredTokenException",
+  "InvalidClientTokenId",
+  "SignatureDoesNotMatch",
+  // Google's statuses for the same two refusals.
+  "UNAUTHENTICATED",
+  "PERMISSION_DENIED",
 ]);
 
 /**
@@ -334,6 +369,15 @@ const presentations = {
       return maxIds
         ? `This plan allows at most ${maxIds} trace or thread ids per request. Split it into smaller batches.`
         : "Split the request into smaller batches.";
+    },
+  },
+  trace_page_size_too_large: {
+    title: "Too many traces requested in one page",
+    describe: (error) => {
+      const maxPageSize = str(error, "maxPageSize", "");
+      return maxPageSize
+        ? `This plan reads at most ${maxPageSize} traces in one page. Ask for a smaller page and page forward.`
+        : "Ask for a smaller page and page forward.";
     },
   },
   span_not_found: {
@@ -519,6 +563,10 @@ const presentations = {
     title: "This dashboard widget can't be opened",
     describe: () => "We can't read what was stored for it. Rebuild the widget and save it again.",
   },
+  dashboard_widget_definition_refused: {
+    title: "This dashboard widget can't be saved",
+    describe: () => "Its definition isn't valid. Check the widget's queries and try again.",
+  },
 
   // ---- dashboards, graphs & saved views ----
   // The reorder pair reads the same to a customer whichever list they were
@@ -608,6 +656,12 @@ const presentations = {
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
+  },
+  // A link or button named a drawer no installed module declares (ADR-148 §8).
+  browser_drawer_undeclared: {
+    title: "That panel isn't available here",
+    describe: () =>
+      "The link points to a panel this deployment doesn't have. Carry on from the page.",
   },
 
   // ---- workflows ----
@@ -1028,17 +1082,6 @@ const presentations = {
     title: "That email already has an account",
     describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
-  registration_not_available: {
-    // This install signs people in through its own identity provider, so there
-    // is no password account to create here. Naming the provider is the
-    // operator's job, not ours: we do not know what they called it.
-    title: "You can't create an account here",
-    describe: () => "This workspace signs you in through your organization. Use that sign-in.",
-  },
-  signup_throttled: {
-    title: "Too many signup attempts",
-    describe: () => "Wait a few minutes, then try again.",
-  },
   password_auth_not_available: {
     title: "Passwords aren't used here",
     describe: () =>
@@ -1124,6 +1167,12 @@ const presentations = {
   prompt_handle_taken: {
     title: "That handle is already in use",
     describe: () => "Pick a different handle, or open the prompt that already has it.",
+  },
+  prompt_author_unknown: {
+    // Only a REST body names an author; a session-derived author is never refused.
+    title: "That author can't write prompts here",
+    describe: () =>
+      "Name a person who can create or edit prompts in this project, or leave the author out.",
   },
   system_prompt_required: {
     title: "A system prompt is required",
@@ -1567,6 +1616,10 @@ const presentations = {
     title: "Your personal project can't be archived",
     describe: () =>
       "Every personal workspace keeps its own project. Archive a team project instead.",
+  },
+  personal_workspace_pending: {
+    title: "Your personal workspace is still being set up",
+    describe: () => "Try again in a moment.",
   },
   organization_not_found: {
     title: "Organization not found",
@@ -2463,7 +2516,14 @@ const presentations = {
     // avoid. Most seat refusals arrive as the upgrade modal rather than a toast,
     // and it says the same thing.
     describe: (error) => {
-      const label = SEAT_LIMIT_LABELS[str(error, "limitType", "")];
+      const limitType = str(error, "limitType", "");
+      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      if (creationLabel) {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
+        return `Your plan includes ${included}. Upgrade to create more. Everything you already have keeps working.`;
+      }
+      const label = SEAT_LIMIT_LABELS[limitType];
       if (!label) return "Upgrade your plan to raise it.";
       return `Your plan's ${label} are all in use. Upgrade to raise the allowance, or disable a membership from the members page to free one, which is reversible.`;
     },
@@ -3322,7 +3382,7 @@ const presentations = {
   instant_eval_classifier_not_configured: {
     title: "Instant Evals need a judge on this installation",
     describe: () =>
-      "Instant Evals are on for this project, but this installation has nothing to judge with yet. Ask whoever runs it to add a judge key or connect it to LangWatch.",
+      "Instant Evals are on for this project, but this installation has nothing to judge with yet. Ask whoever runs it to connect it to LangWatch with a license that includes Instant Evals.",
   },
   instant_eval_classifier_unavailable: {
     title: "The judgements couldn't be made right now",
@@ -3359,8 +3419,10 @@ const presentations = {
   },
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
-    describe: () =>
-      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
+    describe: (error) =>
+      error.meta.deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
   },
   instant_eval_query_budget_exceeded: {
     title: "That's too much text to judge in one query",
@@ -4789,6 +4851,14 @@ const presentations = {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
   },
+  upgrade_not_found: {
+    title: "That upgrade record wasn't found",
+    describe: () => "The step or run may be from another installation. Reload the upgrades page.",
+  },
+  upgrade_invalid_cursor: {
+    title: "That page of upgrade runs couldn't be read",
+    describe: () => "Reload the upgrades page to start from the newest run.",
+  },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
   // cmd/herrgen). They reach the browser whenever the control plane proxies a
@@ -4889,6 +4959,12 @@ const presentations = {
     title: "Couldn't start the voice session",
     describe: () => "No session was created. Try again in a moment.",
   },
+  voice_broker_unavailable: {
+    // No call was created. This instance is full or shutting down, and
+    // another one answers the retry.
+    title: "Couldn't start the voice call",
+    describe: () => "No call was created. Try again in a few seconds.",
+  },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",
@@ -4952,8 +5028,37 @@ const presentations = {
   },
   provider_config_invalid: {
     title: "This provider is not set up to serve that model",
+    // The body names the gap, so the headline has to name the same one.
+    titleFor: (error) => {
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This provider has no API key saved";
+        case "endpoint_missing":
+          return "This provider has no endpoint URL saved";
+        case "deployment_missing":
+          return "This provider has no deployment for that model";
+        case "operation_unsupported":
+          return "This provider does not support this kind of request";
+      }
+      return undefined;
+    },
     describe: (error) => {
       const model = str(error, "model", "");
+      // One code, several different things to change. Telling a customer whose
+      // provider was saved with no API key to "add the model" sends them to the
+      // wrong field, so the gateway names the gap and each gets its sentence.
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.";
+        case "endpoint_missing":
+          return "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.";
+        case "deployment_missing":
+          return model
+            ? `This model provider has no deployment mapped for ${model}. Add the deployment mapping in Settings → Model Providers.`
+            : "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.";
+        case "operation_unsupported":
+          return "This model provider does not support this kind of request. Pick a model from a provider that does.";
+      }
       if (model) {
         return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
       }
@@ -4970,6 +5075,11 @@ const presentations = {
   request_abandoned: {
     title: "The request was cancelled before the provider answered",
     describe: () => "Send it again if you still need the answer.",
+  },
+  checkup_clickhouse_migration_failed: {
+    title: "A ClickHouse migration failed",
+    describe: () =>
+      "A ClickHouse migration failed on at least one target. Fix the cause it names, then run the upgrade again.",
   },
   checkup_clickhouse_migrations_pending: {
     title: "ClickHouse migrations are pending",
@@ -5483,6 +5593,11 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" scenario, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
+    // A refused key has one fix, so the headline names it like the body does.
+    titleFor: (error) =>
+      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+        ? "This provider rejected the API key"
+        : undefined,
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
@@ -5907,7 +6022,7 @@ const presentations = {
   connected_billing_unavailable: {
     title: "Connected billing is not available here",
     describe: () =>
-      "Invoicing a connected self-hosted customer runs on LangWatch Cloud only. Do this from the LangWatch Cloud backoffice.",
+      "Invoicing a connected self-hosted customer runs on LangWatch Cloud only. Do this from the LangWatch Cloud admin console.",
   },
   activation_code_already_redeemed: {
     title: "Activation code already used",
@@ -6166,7 +6281,7 @@ export function explainHandledError(error: HandledErrorShape): ErrorExplanation 
   }
 
   return {
-    title: presentation.title,
+    title: presentation.titleFor?.(error) ?? presentation.title,
     description: presentation.describe?.(error) ?? "",
     isRegistered: true,
   };

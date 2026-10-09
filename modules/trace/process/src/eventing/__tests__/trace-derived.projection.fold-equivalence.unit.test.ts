@@ -12,7 +12,7 @@ import {
 } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,

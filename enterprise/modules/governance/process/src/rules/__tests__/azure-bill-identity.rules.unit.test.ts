@@ -6,7 +6,7 @@ import {
   azureBillSourceId,
   findAzureBillHistoryComplaints,
   withAzureBillIdentity,
-} from "../azure-bill-identity.rules.ts";
+} from "../../features/microsoft/rules/azure-bill-identity.rules.ts";
 
 const subscription = "aaaaaaaa-0000-4000-8000-000000000001";
 

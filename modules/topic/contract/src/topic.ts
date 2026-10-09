@@ -1,3 +1,4 @@
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import { TOPIC_CLUSTERING_TRIGGER } from "./topic-clustering.constants.ts";
@@ -75,3 +76,36 @@ export const topicClusteringRunHistoryEntrySchema = z
   .strict();
 
 export type TopicClusteringRunHistoryEntry = z.infer<typeof topicClusteringRunHistoryEntrySchema>;
+
+/** What a manual clustering trigger did, which is not always "started a run". */
+export const topicClusteringTriggerResultSchema = z.union([
+  z.object({ started: z.literal(true) }).strict(),
+  z.object({ started: z.literal(false), reason: z.literal("already_running") }).strict(),
+]);
+export type TopicClusteringTriggerResult = z.infer<typeof topicClusteringTriggerResultSchema>;
+
+/** The named topic and subtopic counts the trace filters render. */
+export const namedTopicCountsSchema = z.object({
+  topicCounts: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() })),
+  subtopicCounts: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      count: z.number(),
+      parentId: z.string().nullable().optional(),
+    }),
+  ),
+});
+export type NamedTopicCounts = z.infer<typeof namedTopicCountsSchema>;
+
+/** The project's conversation topics, and what the last clustering run did. */
+export interface TopicApi {
+  getAll(input: TopicProjectInput): Promise<Topic[]>;
+  getNamesByIds(input: TopicNamesInput): Promise<Map<string, string>>;
+  getClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatus>;
+  getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
+  /** Asks the project's clustering process for a run; ports main's `requestClustering`. */
+  requestClustering(input: TopicClusteringRequestInput): Promise<void>;
+}
+
+export const TopicApi = moduleApi<TopicApi>()("topic");

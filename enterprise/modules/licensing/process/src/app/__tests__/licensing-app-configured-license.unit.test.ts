@@ -3,6 +3,7 @@
  * specs/licensing/sso-license-gating.feature
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,9 +43,19 @@ function activations(host: ScriptedConnectHost) {
     }));
 }
 
+/** One organization: licensing keeps the licence it stores, and organization is told it too. */
+function organizationRow() {
+  const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org-old", null]]));
+  const organizations = createApiFixture<OrganizationApi>({
+    countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+    setLicense: async () => undefined,
+  });
+  return { licenses, organizations };
+}
+
 async function bootWithConfiguredValue(value: string) {
   const host = connectHost();
-  const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org-old", null]]));
+  const { licenses, organizations } = organizationRow();
   const resources = new ResourceScope();
   const app = await createTestLicensingApp({
     repositories: {
@@ -68,6 +79,7 @@ async function bootWithConfiguredValue(value: string) {
       }),
     },
     dependencies: {
+      organizations,
       gateway: createApiFixture<GatewayApi>({
         setConnectUpstreamInternal: async () => undefined,
         clearConnectUpstreamInternal: async () => undefined,

@@ -5,39 +5,14 @@ import type {
   CioPersonTraits,
 } from "@langwatch/enterprise-nurturing-contract";
 
-import { customerIoChannels } from "../channels/customer-io-channels.registry.ts";
-import type {
-  CustomerIoChannel,
-  CustomerIoChannelOptions,
-} from "../channels/customer-io.channel.ts";
-
-type NurturingServiceOptions = {
-  config: {
-    customerIoApiKey?: string;
-    customerIoRegion?: string;
-    customerIoBaseUrl?: string;
-  };
-  fetchFn?: typeof fetch;
-  errorReporter?: CustomerIoChannelOptions["errorReporter"];
-  channel?: CustomerIoChannel;
-};
+import type { CustomerIoChannel } from "../channels/customer-io.channel.ts";
 
 /** Nurturing's named Customer.io operations over the configured delivery channel. */
 export class NurturingService {
-  private readonly channel: CustomerIoChannel;
+  private constructor(private readonly channel: CustomerIoChannel) {}
 
-  private constructor(options: NurturingServiceOptions) {
-    this.channel =
-      options.channel ??
-      customerIoChannels.live.create({
-        config: options.config,
-        fetchFn: options.fetchFn,
-        errorReporter: options.errorReporter,
-      });
-  }
-
-  static create(options: NurturingServiceOptions): NurturingService {
-    return new NurturingService(options);
+  static create({ channel }: { channel: CustomerIoChannel }): NurturingService {
+    return new NurturingService(channel);
   }
 
   async identifyUser({

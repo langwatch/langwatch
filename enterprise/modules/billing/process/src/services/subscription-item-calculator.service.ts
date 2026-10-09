@@ -6,14 +6,11 @@ import {
   type StripePriceMap,
   type StripePriceName,
 } from "@langwatch/enterprise-billing-contract";
-import type Stripe from "stripe";
 
-export type SubscriptionItemUpdate = {
-  id?: string;
-  price?: string;
-  quantity?: number;
-  deleted?: boolean;
-};
+import type {
+  BillingSubscriptionItem,
+  SubscriptionItemUpdate,
+} from "../rules/billing-stripe-shapes.rules.ts";
 
 type AddOnPlan =
   | typeof PlanTypes.LAUNCH
@@ -29,10 +26,10 @@ type StripePlanPriceConfig = {
 };
 
 type ExistingPlanItems = {
-  tracesItem: Stripe.SubscriptionItem | undefined;
-  userItem: Stripe.SubscriptionItem | undefined;
-  planItem: Stripe.SubscriptionItem | undefined;
-  deleteItems: Stripe.SubscriptionItem[];
+  tracesItem: BillingSubscriptionItem | undefined;
+  userItem: BillingSubscriptionItem | undefined;
+  planItem: BillingSubscriptionItem | undefined;
+  deleteItems: readonly BillingSubscriptionItem[];
 };
 
 const STRIPE_PLAN_CONFIG: Record<AddOnPlan, StripePlanPriceConfig> = {
@@ -73,7 +70,7 @@ export class SubscriptionItemCalculatorService {
   }
 
   getItemsToUpdate(input: {
-    currentItems: Stripe.SubscriptionItem[];
+    currentItems: readonly BillingSubscriptionItem[];
     plan: PlanType;
     tracesToAdd: number;
     membersToAdd: number;
@@ -113,7 +110,7 @@ export class SubscriptionItemCalculatorService {
 
   private appendTracesUpdate(input: {
     updates: SubscriptionItemUpdate[];
-    item: Stripe.SubscriptionItem | undefined;
+    item: BillingSubscriptionItem | undefined;
     planConfig: StripePlanPriceConfig | undefined;
     totalTraces: number;
   }): void {
@@ -134,7 +131,7 @@ export class SubscriptionItemCalculatorService {
 
   private appendMembersUpdate(input: {
     updates: SubscriptionItemUpdate[];
-    item: Stripe.SubscriptionItem | undefined;
+    item: BillingSubscriptionItem | undefined;
     planConfig: StripePlanPriceConfig | undefined;
     totalMembers: number;
   }): void {
@@ -152,7 +149,7 @@ export class SubscriptionItemCalculatorService {
 
   private appendBasePlanUpdate(input: {
     updates: SubscriptionItemUpdate[];
-    item: Stripe.SubscriptionItem | undefined;
+    item: BillingSubscriptionItem | undefined;
     plan: PlanType;
   }): void {
     if (input.item) {
@@ -172,7 +169,7 @@ export class SubscriptionItemCalculatorService {
   }
 
   private findExistingPlanItems(
-    currentItems: Stripe.SubscriptionItem[],
+    currentItems: readonly BillingSubscriptionItem[],
     planConfig: StripePlanPriceConfig | undefined,
   ): ExistingPlanItems {
     if (!planConfig) {
@@ -189,14 +186,12 @@ export class SubscriptionItemCalculatorService {
       this.prices[planConfig.userPriceKey],
       this.prices[planConfig.tracesPriceKey],
     ]);
-    const keepItems = currentItems.filter((item) => keepPriceIds.has(item.price.id));
+    const keepItems = currentItems.filter((item) => keepPriceIds.has(item.priceId));
 
     return {
-      tracesItem: keepItems.find(
-        (item) => item.price.id === this.prices[planConfig.tracesPriceKey],
-      ),
-      userItem: keepItems.find((item) => item.price.id === this.prices[planConfig.userPriceKey]),
-      planItem: keepItems.find((item) => item.price.id === this.prices[planConfig.basePriceKey]),
+      tracesItem: keepItems.find((item) => item.priceId === this.prices[planConfig.tracesPriceKey]),
+      userItem: keepItems.find((item) => item.priceId === this.prices[planConfig.userPriceKey]),
+      planItem: keepItems.find((item) => item.priceId === this.prices[planConfig.basePriceKey]),
       deleteItems: currentItems.filter((item) => !keepItems.includes(item)),
     };
   }

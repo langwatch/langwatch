@@ -13,6 +13,7 @@ import {
   agentSchema,
   agentSyncFromSourceSchema,
   agentWithFieldsSchema,
+  findLinkedWorkflowIds,
   relatedAgentEntitiesSchema,
   type AgentApiAgentInput,
   type CreateAgentCommand,
@@ -20,6 +21,7 @@ import {
 } from "@langwatch/agent-contract";
 import type { UiRpc } from "@langwatch/browser-host/capabilities";
 import { Temporal, toDate } from "@langwatch/time";
+import { workflowListRowSchema } from "@langwatch/workflow-contract";
 
 import type {
   AgentClient,
@@ -31,6 +33,7 @@ import type {
 } from "../model/agent-client.ts";
 
 const agentCopiesSchema = agentCopySchema.array();
+const workflowSummariesSchema = workflowListRowSchema.pick({ id: true, name: true }).array();
 
 const WIRE_DATE_KEYS = ["archivedAt", "createdAt", "updatedAt", "lastSeenAt"] as const;
 
@@ -68,9 +71,13 @@ export class TrpcAgentClient implements AgentClient {
     return agentWithFieldsSchema.parse(withDates(output));
   }
 
+  /** The linked workflow, named by Workflow's own list: archived graphs are absent there. */
   async relatedEntities(input: AgentApiAgentInput) {
-    const output = await this.rpc.query("agents.getRelatedEntities", input);
-    return relatedAgentEntitiesSchema.parse(output);
+    const [workflowId] = findLinkedWorkflowIds(await this.getById(input));
+    if (!workflowId) return relatedAgentEntitiesSchema.parse({ workflow: null });
+    const output = await this.rpc.query("workflow.getAll", { projectId: input.projectId });
+    const workflow = workflowSummariesSchema.parse(output).find((row) => row.id === workflowId);
+    return relatedAgentEntitiesSchema.parse({ workflow: workflow ?? null });
   }
 
   async cascadeArchive(input: AgentApiAgentInput) {
@@ -89,7 +96,7 @@ export class TrpcAgentClient implements AgentClient {
   }
 
   async copy(input: AgentCopyInput) {
-    const output = await this.rpc.mutate("agents.copy", input);
+    const output = await this.rpc.mutate("workflow.copyAgent", input);
     return agentCopyCreatedSchema.parse(output);
   }
 

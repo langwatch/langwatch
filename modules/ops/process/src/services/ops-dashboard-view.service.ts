@@ -16,9 +16,9 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
+import { OpsMetricsSamplingService } from "../features/metrics/services/ops-metrics-sampling.service.ts";
+import type { OpsMetricsWindowService } from "../features/metrics/services/ops-metrics-window.service.ts";
 import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules.ts";
-import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
-import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 
 type PipelineCounts = Map<
   string,

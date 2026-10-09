@@ -4,7 +4,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { PullDestinationService } from "../services/pull-destination.service.ts";
+import { PullDestinationService } from "../features/ingestion-pull/services/pull-destination.service.ts";
 
 const pullDestination = PullDestinationService.create();
 

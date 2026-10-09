@@ -36,9 +36,9 @@ var fixtureSymbols = map[string]string{
 }
 
 // seedFixtures files the fixture ids and ingests the fixture trace on both
-// sides. The wait for each side to read it back runs in the background; only
-// an operation that reads traces waits for it (awaitFixtureTraceFor).
-func (engine *probeEngine) seedFixtures() {
+// sides, then holds the run until each side reads the trace back. It answers
+// the message the run stops on, or "" when both sides hold the trace.
+func (engine *probeEngine) seedFixtures() string {
 	buckets := make([]string, 0, len(fixtureSymbols))
 	for bucket := range fixtureSymbols {
 		buckets = append(buckets, bucket)
@@ -49,17 +49,14 @@ func (engine *probeEngine) seedFixtures() {
 		engine.symbolsB.file(bucket, fixtureSymbols[bucket])
 	}
 	accepted := engine.ingestFixtureTrace()
-	done := make(chan struct{})
-	engine.fixtureTrace = done
-	go func() {
-		defer close(done)
-		engine.awaitFixtureTrace(accepted)
-	}()
+	unreadable := make(chan string, 1)
+	go func() { unreadable <- engine.awaitFixtureTrace(accepted) }()
 	engine.ingestCodingAgentLog()
 	var group sync.WaitGroup
 	group.Go(func() { engine.mintCLISession(engine.options.A, engine.credsA) })
 	engine.mintCLISession(engine.options.B, engine.credsB)
 	group.Wait()
+	return <-unreadable
 }
 
 func (engine *probeEngine) ingestFixtureTrace() []string {
@@ -79,64 +76,56 @@ func (engine *probeEngine) ingestFixtureTrace() []string {
 }
 
 // awaitFixtureTrace polls each side that accepted the trace until it reads
-// back, both sides at once, so the trace routes compare a real trace rather
-// than two 404s. A side that never reads it back is said so loudly.
-func (engine *probeEngine) awaitFixtureTrace(baseURLs []string) {
+// back, both sides at once. It answers the message a run stops on when a side
+// never reads it back: with no trace every trace route compares two 404s, and
+// the usual cause is a worker that is not projecting.
+func (engine *probeEngine) awaitFixtureTrace(baseURLs []string) string {
 	started := time.Now()
 	deadline := started.Add(fixtureTraceWait)
 	var group sync.WaitGroup
+	var mu sync.Mutex
+	var unreadable []string
 	for _, baseURL := range baseURLs {
 		group.Go(func() {
-			status := engine.readFixtureTrace(baseURL)
-			for status != http.StatusOK && time.Now().Before(deadline) && engine.backoff(1) {
-				status = engine.readFixtureTrace(baseURL)
+			status := engine.pollFixtureTrace(baseURL, deadline)
+			switch {
+			case status == http.StatusOK:
+				engine.progress("fixture trace readable on %s: %d after %s\n", baseURL, status, time.Since(started).Round(time.Second))
+			case engine.ctx.Err() == nil:
+				mu.Lock()
+				defer mu.Unlock()
+				unreadable = append(unreadable, engine.fixtureTraceUnreadable(baseURL, status, time.Since(started)))
 			}
-			if status != http.StatusOK {
-				engine.progress("WARNING fixture trace never readable on %s (last %d after %s): its trace routes compare without the trace; is its worker projecting?\n",
-					baseURL, status, time.Since(started).Round(time.Second))
-				return
-			}
-			engine.progress("fixture trace readable on %s: %d after %s\n", baseURL, status, time.Since(started).Round(time.Second))
 		})
 	}
 	group.Wait()
+	sort.Strings(unreadable)
+	return strings.Join(unreadable, "\n")
 }
 
-// traceReadingPaths mark the operations whose answer depends on the fixture
-// trace having landed: the trace routes and the analytics that count it.
-var traceReadingPaths = []string{"trace", "span", "analytics"}
-
-// awaitFixtureTraceFor holds every trace-reading operation until the
-// background fixture-trace wait is over; once it is, none waits or logs.
-func (engine *probeEngine) awaitFixtureTraceFor(operation Operation) {
-	if engine.fixtureTrace == nil || !readsTraces(operation.Path) {
-		return
+// pollFixtureTrace reads the fixture trace until it answers 200 or the
+// deadline passes, and answers the last status.
+func (engine *probeEngine) pollFixtureTrace(baseURL string, deadline time.Time) int {
+	status := engine.readFixtureTrace(baseURL)
+	for status != http.StatusOK && time.Now().Before(deadline) && engine.backoff(1) {
+		status = engine.readFixtureTrace(baseURL)
 	}
-	select {
-	case <-engine.fixtureTrace:
-		return
-	default:
-	}
-	started := time.Now()
-	<-engine.fixtureTrace
-	engine.progress("fixture trace: %s %s waited %s for it\n", operation.Method, operation.Path, time.Since(started).Round(time.Millisecond))
+	return status
 }
 
-// fixtureTraceSettled waits out the background wait before the run returns.
-func (engine *probeEngine) fixtureTraceSettled() {
-	if engine.fixtureTrace != nil {
-		<-engine.fixtureTrace
+// fixtureTraceUnreadable names the side whose fixture trace never read back
+// and the worker log to read next.
+func (engine *probeEngine) fixtureTraceUnreadable(baseURL string, status int, waited time.Duration) string {
+	side, workerLog := "base (main)", engine.options.WorkerLogB
+	if baseURL == engine.options.A {
+		side, workerLog = "branch", engine.options.WorkerLogA
 	}
-}
-
-func readsTraces(path string) bool {
-	lower := strings.ToLower(path)
-	for _, marker := range traceReadingPaths {
-		if strings.Contains(lower, marker) {
-			return true
-		}
+	message := fmt.Sprintf("fixture trace never readable on the %s side %s (last status %d after %s): its worker is not projecting",
+		side, baseURL, status, waited.Round(time.Second))
+	if workerLog != "" {
+		message += "; see " + workerLog
 	}
-	return false
+	return message
 }
 
 func (engine *probeEngine) readFixtureTrace(baseURL string) int {

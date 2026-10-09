@@ -17,8 +17,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { VoiceNonceRegistryService } from "../../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryVoiceNonceRepository } from "../../repositories/memory/memory.voice-nonce.repository.ts";
-import { VoiceNonceRegistryService } from "../../services/voice-nonce-registry.service.ts";
 import {
   handleVoiceNonceRegisterMessage,
   raceAgainstUpgradeRefusal,

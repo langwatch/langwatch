@@ -2,7 +2,7 @@
   "name": "@langwatch/ops-process",
   "version": "0.1.0",
   "private": true,
-  "description": "Platform operations and backoffice server implementation.",
+  "description": "Platform operations and admin server implementation.",
   "files": [
     "src"
   ],
@@ -38,7 +38,6 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
-    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
@@ -64,7 +63,6 @@
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
-    "@langwatch/platform-health-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
@@ -79,6 +77,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "catalog:",

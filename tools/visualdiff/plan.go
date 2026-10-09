@@ -122,7 +122,10 @@ type Plan struct {
 	RunDir     string
 	RoutesOnly bool
 	RouteCount int
+	Routes     []string
 	FlowIDs    []string
+	// Shard is the slice of routes and flows this run renders; zero is all.
+	Shard Shard
 	// UseHaven and RunID are set once the plan decides to boot through haven;
 	// RunID is what both stacks' haven slugs are derived from (see haven.go).
 	UseHaven bool
@@ -254,3 +257,65 @@ func (stack Stack) ReadinessURLs() []string {
 
 // HealthPath is the API's health endpoint on both layouts.
 const HealthPath = "/api/health"
+
+// Shard is one slice of a run split across machines: Index of Count, from 1.
+// The zero value is the whole run. CI runs one shard per job, so no single
+// job outlives its timeout (.github/workflows/visualdiff.yml).
+type Shard struct {
+	Index int
+	Count int
+}
+
+// ParseShard reads "i/n"; an empty value is the whole run.
+func ParseShard(value string) (Shard, error) {
+	if strings.TrimSpace(value) == "" {
+		return Shard{}, nil
+	}
+	index, count, found := strings.Cut(value, "/")
+	shard := Shard{}
+	var indexErr, countErr error
+	shard.Index, indexErr = strconv.Atoi(strings.TrimSpace(index))
+	shard.Count, countErr = strconv.Atoi(strings.TrimSpace(count))
+	if !found || indexErr != nil || countErr != nil || shard.Count < 1 || shard.Index < 1 || shard.Index > shard.Count {
+		return Shard{}, fmt.Errorf("-shard %q: want i/n with 1 <= i <= n", value)
+	}
+	return shard, nil
+}
+
+// Sharded reports whether the run is one slice of several.
+func (shard Shard) Sharded() bool { return shard.Count > 1 }
+
+// String is the shard as -shard takes it, "i/n"; empty for the whole run.
+func (shard Shard) String() string {
+	if shard.Count == 0 {
+		return ""
+	}
+	return strconv.Itoa(shard.Index) + "/" + strconv.Itoa(shard.Count)
+}
+
+// Apply keeps this shard's routes and flows: every Count-th of each, by its
+// position in the configuration, starting at Index. Round robin spreads each
+// area's flows (declared together) over every shard. DeclaredRoutes is kept,
+// so coverage is never narrowed.
+func (shard Shard) Apply(config *Config) *Config {
+	if !shard.Sharded() {
+		return config
+	}
+	narrowed := *config
+	narrowed.declared = config.DeclaredRoutes()
+	narrowed.Routes = shardSlice(config.Routes, shard)
+	narrowed.Flows = shardSlice(config.Flows, shard)
+	return &narrowed
+}
+
+// OwnsCoverage reports whether this shard records the uncovered routes: the
+// first, so a merged run counts each once.
+func (shard Shard) OwnsCoverage() bool { return shard.Index <= 1 }
+
+func shardSlice[T any](items []T, shard Shard) []T {
+	var kept []T
+	for position := shard.Index - 1; position < len(items); position += shard.Count {
+		kept = append(kept, items[position])
+	}
+	return kept
+}

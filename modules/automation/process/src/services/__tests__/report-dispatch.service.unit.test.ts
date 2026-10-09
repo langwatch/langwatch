@@ -17,14 +17,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createTestSlackDestinations } from "../../__tests__/testing.ts";
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
-import { toReportTraceRow } from "../../rules/report-trace-row.rules.ts";
-import { ReportChartService } from "../report-chart.service.ts";
+import { ReportChartService } from "../../features/report/services/report-chart.service.ts";
 import {
   ReportDispatchService,
   type ReportDispatchDeps,
   type ReportFire,
-} from "../report-dispatch.service.ts";
-import { ReportTraceListService } from "../report-trace-list.service.ts";
+} from "../../features/report/services/report-dispatch.service.ts";
+import { ReportTraceListService } from "../../features/report/services/report-trace-list.service.ts";
+import { toReportTraceRow } from "../../rules/report-trace-row.rules.ts";
 
 const BASE_HOST = "https://app.langwatch.test";
 const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout" };

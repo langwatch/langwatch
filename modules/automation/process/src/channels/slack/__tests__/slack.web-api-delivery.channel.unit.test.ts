@@ -106,3 +106,52 @@ describe("SlackWebApiDeliveryChannel.post", () => {
     });
   });
 });
+
+describe("SlackWebApiDeliveryChannel.list", () => {
+  describe("given a bot token Slack accepts", () => {
+    describe("when the channel picker asks for its channels", () => {
+      /** @scenario "The Slack channel picker lists a bot connection's channels" */
+      it("offers the channels conversations.list returns, sorted by name", async () => {
+        const { transport, requests } = transportAnswering({
+          status: 200,
+          body: JSON.stringify({
+            ok: true,
+            channels: [
+              { id: "C2", name: "zeta", is_private: true },
+              { id: "C1", name: "alerts" },
+            ],
+          }),
+        });
+
+        const listing = await SlackWebApiDeliveryChannel.create(transport).list("xoxb-secret");
+
+        expect(listing).toEqual({
+          channels: [
+            { id: "C1", name: "alerts", isPrivate: false },
+            { id: "C2", name: "zeta", isPrivate: true },
+          ],
+          error: null,
+          gaps: [],
+        });
+        expect(requests[0]?.url).toBe("https://slack.com/api/conversations.list");
+        expect(requests[0]?.headers.Authorization).toBe("Bearer xoxb-secret");
+      });
+    });
+  });
+
+  describe("given a bot token Slack refuses", () => {
+    describe("when the channel picker asks for its channels", () => {
+      /** @scenario "The Slack channel picker names the error when Slack refuses the token" */
+      it("offers no channels and carries Slack's error code", async () => {
+        const { transport } = transportAnswering({
+          status: 200,
+          body: JSON.stringify({ ok: false, error: "invalid_auth" }),
+        });
+
+        await expect(
+          SlackWebApiDeliveryChannel.create(transport).list("xoxb-revoked"),
+        ).resolves.toEqual({ channels: [], error: "invalid_auth", gaps: [] });
+      });
+    });
+  });
+});

@@ -7,9 +7,9 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 
-import { CloseButton } from "../../src/components/close-button.tsx";
-import { Dialog } from "../../src/components/dialog.tsx";
-import { SearchInput } from "../../src/components/search-input.tsx";
+import { SearchInput } from "../../src/components/forms/search-input.tsx";
+import { CloseButton } from "../../src/components/overlays/close-button.tsx";
+import { Dialog } from "../../src/components/overlays/dialog.tsx";
 import { renderWithDesignSystem } from "../../src/testing/index.tsx";
 
 afterEach(() => {

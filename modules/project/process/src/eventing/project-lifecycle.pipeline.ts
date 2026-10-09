@@ -5,8 +5,16 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 import {
+  PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
+  personalWorkspaceArchivedEventDataSchema,
+  personalWorkspaceFeaturesChangedEventDataSchema,
   personalWorkspaceProvisionedEventDataSchema,
+  personalWorkspaceRevivedEventDataSchema,
+  personalTeamCreatedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
   PROJECT_AGGREGATE_TYPE,
@@ -15,12 +23,15 @@ import {
 
 import type { ProjectModule } from "../app/project.app.ts";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
+import type { PersonalProjectService } from "../services/personal-project.service.ts";
 import {
   RecordProjectCreatedCommand,
   RecordProjectLegacyKeyRevokedCommand,
   RecordProjectPresenceSettingChangedCommand,
   RecordProjectMovedCommand,
   RecordProjectArchivedCommand,
+  RecordProjectDepartmentAssignedCommand,
+  RecordProjectTraceSharingDisabledCommand,
 } from "./project-lifecycle.commands.ts";
 import {
   projectCreatedEventSchema,
@@ -28,6 +39,8 @@ import {
   projectPresenceSettingChangedEventSchema,
   projectMovedEventSchema,
   projectArchivedEventSchema,
+  projectDepartmentAssignedEventSchema,
+  projectTraceSharingDisabledEventSchema,
 } from "./project-lifecycle.events.ts";
 
 function lifecycleCommands() {
@@ -41,22 +54,28 @@ function lifecycleCommands() {
       projectPresenceSettingChangedEventSchema,
       projectMovedEventSchema,
       projectArchivedEventSchema,
+      projectDepartmentAssignedEventSchema,
+      projectTraceSharingDisabledEventSchema,
     ])
     .withCommand("recordProjectCreated", RecordProjectCreatedCommand)
     .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand)
     .withCommand("recordPresenceSettingChanged", RecordProjectPresenceSettingChangedCommand)
     .withCommand("recordProjectMoved", RecordProjectMovedCommand)
-    .withCommand("recordProjectArchived", RecordProjectArchivedCommand);
+    .withCommand("recordProjectArchived", RecordProjectArchivedCommand)
+    .withCommand("recordProjectDepartmentAssigned", RecordProjectDepartmentAssignedCommand)
+    .withCommand("recordProjectTraceSharingDisabled", RecordProjectTraceSharingDisabledCommand);
 }
 
 type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
 /**
- * project_lifecycle: project records its facts; peers react from their own side (§9). Organization
- * writes a personal workspace's project row itself, so project records that project as created.
+ * project_lifecycle: project records its facts; peers react from their own side (§9). Project
+ * creates a personal team's project on organization's fact and records the team's real project as
+ * created; workspaces provisioned before it are recorded.
  */
 export function buildProjectLifecyclePipeline(deps: {
   recordProjectCreated: (input: { projectId: string; organizationId: string }) => Promise<void>;
+  personalProjects: Pick<PersonalProjectService, "create" | "archive" | "revive" | "setFeatures">;
 }): ProjectLifecycleDefinition {
   return lifecycleCommands()
     .withPeerSubscriber("recordPersonalWorkspaceProject", {
@@ -64,6 +83,30 @@ export function buildProjectLifecyclePipeline(deps: {
       data: personalWorkspaceProvisionedEventDataSchema,
       handle: ({ projectId, organizationId }) =>
         deps.recordProjectCreated({ projectId, organizationId }),
+    })
+    .withPeerSubscriber("createPersonalWorkspaceProject", {
+      eventType: PERSONAL_TEAM_CREATED_EVENT_TYPE,
+      data: personalTeamCreatedEventDataSchema,
+      handle: async (fact) => {
+        const projectId = await deps.personalProjects.create(fact);
+        await deps.recordProjectCreated({ projectId, organizationId: fact.organizationId });
+      },
+    })
+    .withPeerSubscriber("archivePersonalWorkspaceProjects", {
+      eventType: PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE,
+      data: personalWorkspaceArchivedEventDataSchema,
+      handle: ({ teamIds, occurredAt }) => deps.personalProjects.archive({ teamIds, occurredAt }),
+    })
+    .withPeerSubscriber("revivePersonalWorkspaceProject", {
+      eventType: PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE,
+      data: personalWorkspaceRevivedEventDataSchema,
+      handle: ({ teamId }) => deps.personalProjects.revive({ teamId }),
+    })
+    .withPeerSubscriber("setPersonalWorkspaceFeatures", {
+      eventType: PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE,
+      data: personalWorkspaceFeaturesChangedEventDataSchema,
+      handle: ({ projectId, features }) =>
+        deps.personalProjects.setFeatures({ projectId, features }),
     })
     .build();
 }
@@ -73,6 +116,7 @@ export const projectLifecycleEventing = defineEventingModule({
   build: ({ app }: EventingSetup<ProjectRepositories, ProjectModule>) =>
     buildProjectLifecyclePipeline({
       recordProjectCreated: (input) => app.recordProjectCreated(input),
+      personalProjects: app.personalProjects(),
     }),
   connect: ({ app, commands }) => app.connectLifecycle(commands),
 });

@@ -16,7 +16,10 @@ import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-vie
 
 /** One outbox row as the browser receives it: a key holding `undefined` is absent. */
 type ProcessOutboxMessageView = WireOf<StoredProcessOutboxMessageView>;
-import { type GrafanaDeepLinkConfig, grafanaTraceUrl } from "../../../../model/grafana-links.ts";
+import {
+  type GrafanaDeepLinkConfig,
+  grafanaTraceUrl,
+} from "@langwatch/observability/grafana-links";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
 

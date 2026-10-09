@@ -50,19 +50,19 @@ import {
   isAzureResourceManagerUrl,
   nextAzureCostCursor,
   readAzureCostRows,
-} from "../../rules/azure-cost-management.rules.ts";
-import { COPILOT_CONVERSATION_ACTION } from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
+} from "../../features/microsoft/rules/azure-cost-management.rules.ts";
+import { COPILOT_CONVERSATION_ACTION } from "../../features/microsoft/rules/copilot-studio-trace-mapper-service.rules.ts";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   isEnvironmentOrigin,
   isSameEnvironment,
-} from "../../rules/dataverse-environment-service.rules.ts";
+} from "../../features/microsoft/rules/dataverse-environment-service.rules.ts";
 import {
   type DirectoryUser,
   directoryReadIsDue,
   microsoftDirectoryEvents,
   nextDirectoryCursor,
-} from "../../rules/microsoft-graph-directory.rules.ts";
+} from "../../features/microsoft/rules/microsoft-graph-directory.rules.ts";
 import {
   MICROSOFT_GRAPH_SCOPE,
   microsoftSeatEvents,
@@ -70,7 +70,7 @@ import {
   readSubscribedSkuRows,
   seatsReadIsDue,
   seatsReportDay,
-} from "../../rules/microsoft-graph-seats.rules.ts";
+} from "../../features/microsoft/rules/microsoft-graph-seats.rules.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 export { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import type { CopilotBotsChannel } from "../copilot-bots.channel.ts";

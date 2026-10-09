@@ -15,7 +15,7 @@ import {
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useMemo, type ReactNode } from "react";
 
 import type { AgentClient } from "../model/agent-client.ts";

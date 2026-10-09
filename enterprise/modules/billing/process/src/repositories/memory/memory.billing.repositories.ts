@@ -4,9 +4,10 @@ import type { BillingOrganizationCacheRepository } from "../billing-organization
 import type { BillingReportOrganizationLookup } from "../billing-report-organization.repository.ts";
 import type { BillingRepositories } from "../billing.repositories.ts";
 import { OrganizationPricingRepository } from "../organization-pricing.repository.ts";
-import { MemoryBillableEventsRepository } from "./memory.billable-events.repository.ts";
 import { MemoryBillingOrganizationRepository } from "./memory.billing-account-facts.repository.ts";
 import { MemoryBillingCheckpointRepository } from "./memory.billing-checkpoint.repository.ts";
+import { MemoryBillingGatewaySpendRepository } from "./memory.billing-gateway-spend.repository.ts";
+import { MemoryBillingProjectDirectoryRepository } from "./memory.billing-project-directory.repository.ts";
 import { MemoryBillingReportOrganizationRepository } from "./memory.billing-report-organization.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "./memory.billing-webhook-organization.repository.ts";
 import { MemoryBillingWebhookSubscriptionRepository } from "./memory.billing-webhook-subscription.repository.ts";
@@ -65,13 +66,14 @@ export class MemoryBillingRepositories {
     const subscriptions = MemoryBillingSubscriptionRepository.create(store);
 
     return {
-      billableEvents: MemoryBillableEventsRepository.create(store),
       checkpoints: MemoryBillingCheckpointRepository.create(store),
       connectedBilling: MemoryConnectedBillingRepository.create(store),
       duplicateSubscriptionsReports: MemoryDuplicateSubscriptionsReportRepository.create(store),
+      gatewaySpend: MemoryBillingGatewaySpendRepository.create(store),
       organizations: MemoryBillingOrganizationRepository.create(store),
       organizationCache: MemoryBillingOrganizationCacheRepository.create(),
       organizationPricing: MemoryOrganizationPricingRepository.create(store),
+      projects: MemoryBillingProjectDirectoryRepository.create(store),
       reportOrganizations: MemoryBillingReportOrganizationRepository.create(store),
       seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),
       subscriptions,

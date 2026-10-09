@@ -69,6 +69,18 @@ Feature: The linter keeps one clock
       Then it reports nothing
 
     @unit
+    Scenario: Auth's memory rows keep their Date
+      Given auth's memory row file, which holds what Better Auth's memory adapter stores
+      When the rule runs
+      Then it reports nothing
+
+    @unit
+    Scenario: Another memory repository is not a seam
+      Given a memory repository beside auth's memory row file that mints a Date
+      When the rule runs
+      Then it reports the Date
+
+    @unit
     Scenario: A module's adapters folder is not a seam
       Given a module file under an adapters folder that holds a Date
       When the rule runs
@@ -101,6 +113,12 @@ Feature: The linter keeps one clock
     @unit
     Scenario: The time package keeps its Date
       Given a file in the time package itself
+      When the rule runs
+      Then it reports nothing
+
+    @unit
+    Scenario: The generated charts bundle keeps its Date
+      Given a file in analytics' generated chartsLib bundle
       When the rule runs
       Then it reports nothing
 

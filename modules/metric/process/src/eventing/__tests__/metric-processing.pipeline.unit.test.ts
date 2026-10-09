@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { point } from "../../app/__tests__/metric.fixture.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
-import { MetricDataPointClickHouseRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
 import { buildMetricProcessingPipeline } from "../metric.pipeline.ts";
 
 function client(overrides: Partial<MetricClickHouseClient> = {}): MetricClickHouseClient {
@@ -57,45 +56,6 @@ describe("ClickHouseMetricProcessingAdapter", () => {
         "metric_data_points",
         "metric_usage_estimates",
       ]);
-    });
-  });
-
-  describe("given the port durable processing appends through", () => {
-    /** @scenario "The append surface offers no read" */
-    it("carries no usage-estimate query", () => {
-      const appendOnly = ClickHouseMetricDataPointAppendRepository.create({
-        resolveClient: async () => client(),
-        defaultRetentionDays: 49,
-      });
-
-      // Named against the object rather than the type, because the type is
-      // what a `resolveOrganizationClient` reintroduced here would satisfy
-      // again without anything failing.
-      expect("queryUsageEstimates" in appendOnly).toBe(false);
-      expect("findSeriesTotalsByPointAttribute" in appendOnly).toBe(false);
-    });
-  });
-
-  describe("given the full repository and the append-only one", () => {
-    /** @scenario "Both graphs append through one implementation" */
-    it("runs the same append path for both", async () => {
-      const wideInsert = vi.fn<MetricClickHouseClient["insert"]>(async () => undefined);
-      const narrowInsert = vi.fn<MetricClickHouseClient["insert"]>(async () => undefined);
-      const sample = point({ tenantId: "project_alpha", timeUnixMs: 1_800_000_000_000 });
-
-      await MetricDataPointClickHouseRepository.create({
-        resolveClient: async () => client({ insert: wideInsert }),
-        resolveOrganizationClient: async () => client(),
-        defaultRetentionDays: 49,
-      }).ensureDataPoint({ point: sample });
-      await ClickHouseMetricDataPointAppendRepository.create({
-        resolveClient: async () => client({ insert: narrowInsert }),
-        defaultRetentionDays: 49,
-      }).ensureDataPoint({ point: sample });
-
-      expect(narrowInsert.mock.calls.map(([call]) => call)).toEqual(
-        wideInsert.mock.calls.map(([call]) => call),
-      );
     });
   });
 });

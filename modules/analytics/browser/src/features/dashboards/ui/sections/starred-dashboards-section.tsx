@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import type { StarredDashboardsProps } from "@langwatch/analytics-contract";
+import type { StarredDashboardsProps } from "@langwatch/analytics-client";
 import { Box, Link as ChakraLink, Text, VStack } from "@langwatch/design-system/primitives";
 import { Star } from "lucide-react";
 

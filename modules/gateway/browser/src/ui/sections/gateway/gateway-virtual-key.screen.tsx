@@ -22,7 +22,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
-import { Temporal, formatDistanceToNow, toEpochMs } from "@langwatch/time";
+import { Temporal, formatDistanceToNow, toEpochMs, readableDate } from "@langwatch/time";
 import { Bird, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -61,7 +61,6 @@ import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sectio
 import { VirtualKeyUsageSnippet } from "../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx";
 import type { GatewayTeam } from "../../../model/gateway-host.ts";
 import { keepPreviousData } from "../../../model/keep-previous-data.ts";
-import { readableDate } from "../../../model/readable-date.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 

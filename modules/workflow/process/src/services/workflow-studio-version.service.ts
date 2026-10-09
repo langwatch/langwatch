@@ -17,11 +17,18 @@ import type { WorkflowService } from "./workflow.service.ts";
 
 const logger = createLogger("langwatch:workflows:auto-compute");
 
-export type WorkflowStudioVersionServiceOptions = {
+type WorkflowStudioVersionServiceOptions = {
   workflows: WorkflowService;
   studioDsl: WorkflowStudioDsl;
   httpSecrets: WorkflowHttpSecrets;
   agentMappings: WorkflowAgentMapping;
+  /** Records the saved version as a fact; never fails or delays the save. */
+  recordVersionSaved(input: {
+    projectId: string;
+    workflowId: string;
+    versionId: string;
+    authorId: string;
+  }): void;
 };
 
 export type SaveStudioWorkflowVersionInput = {
@@ -81,6 +88,13 @@ export class WorkflowStudioVersionService {
       commitMessage: input.commitMessage,
       authorId: input.authorId,
       setAsLatestVersion: input.setAsLatestVersion ?? true,
+    });
+
+    this.options.recordVersionSaved({
+      projectId: input.projectId,
+      workflowId: input.workflowId,
+      versionId: version.id,
+      authorId: input.authorId,
     });
 
     // Fire-and-forget: the recompute handles its own errors internally, but the

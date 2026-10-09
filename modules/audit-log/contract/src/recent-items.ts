@@ -18,13 +18,11 @@ export const recentItemsInputSchema = z.object({
 });
 export type RecentItemsInput = z.infer<typeof recentItemsInputSchema>;
 
-/** One entity the caller touched recently, as the home strip renders it. */
+/** One entity the caller touched recently; the browser names and links it from its owner's list. */
 export const recentItemSchema = z
   .object({
     id: z.string().min(1),
     type: recentItemTypeSchema,
-    name: z.string(),
-    href: z.string(),
     updatedAt: z.date(),
   })
   .strict();

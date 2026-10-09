@@ -10,6 +10,7 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
+import { defineIdentityPipeline } from "../eventing/user-identity.pipeline.ts";
 import {
   ConfirmMfaCommand,
   ConsumeBackupCodeCommand,
@@ -18,13 +19,12 @@ import {
   ExpireMfaEnrollmentCommand,
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
-} from "../eventing/mfa.intent.ts";
-import { defineIdentityPipeline } from "../eventing/user-identity.pipeline.ts";
+} from "../features/mfa/eventing/mfa.intent.ts";
+import type { MfaEnrollmentRepository } from "../features/mfa/repositories/mfa-enrollment.repository.ts";
+import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts";
 import { MemoryIdentityHistoryRepository } from "../repositories/memory/memory.identity-history.repository.ts";
 import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
-import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
-import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

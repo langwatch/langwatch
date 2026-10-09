@@ -11,13 +11,14 @@ import { Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
   BillingSubscriptionLifecycleService,
-  type SeatRetentionRules,
+  type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
@@ -26,27 +27,27 @@ const logger = createLogger("langwatch:billing:checkoutCompletion");
 const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
-export type InviteApprover = {
-  approvePaymentPendingInvites(params: {
-    subscriptionId: string;
-    organizationId: string;
-  }): Promise<unknown>;
-};
-
 type BillingCheckoutCompletionOptions = {
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
-  stripe: Stripe;
+  stripeSubscriptions: Pick<
+    StripeSubscriptionsChannel,
+    "getSubscription" | "updateSubscription" | "cancelSubscription"
+  >;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
-  inviteApprover?: InviteApprover;
+  licenses: LicenseClearer;
   host: BillingWebhookHost;
-  retention: SeatRetentionRules;
   /** Records the checkout and subscription changes for peers; absent where none is composed. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
-    "checkoutCompleted" | "subscriptionActivated" | "subscriptionCancelled"
+    | "checkoutCompleted"
+    | "subscriptionActivated"
+    | "subscriptionCancelled"
+    | "checkoutCurrencySelected"
+    | "seatCheckoutPaid"
+    | "pricingModelChanged"
   >;
 };
 
@@ -57,7 +58,6 @@ export class BillingCheckoutCompletionService {
 
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
-  private readonly inviteApprover?: InviteApprover;
   private readonly host: BillingWebhookHost;
   private readonly announcer: BillingCheckoutCompletionOptions["announcer"];
   private readonly annualThreshold: AnnualEventsBillingThresholdService;
@@ -66,20 +66,19 @@ export class BillingCheckoutCompletionService {
   private constructor(options: BillingCheckoutCompletionOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
     this.organizationRepository = options.organizationRepository;
-    this.inviteApprover = options.inviteApprover;
     this.host = options.host;
     this.announcer = options.announcer;
     this.annualThreshold = AnnualEventsBillingThresholdService.create({
-      stripe: options.stripe,
+      subscriptions: options.stripeSubscriptions,
       prices: options.itemCalculator.prices,
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository: options.subscriptionRepository,
       organizationRepository: options.organizationRepository,
-      stripe: options.stripe,
+      licenses: options.licenses,
+      stripeSubscriptions: options.stripeSubscriptions,
       itemCalculator: options.itemCalculator,
       host: options.host,
-      retention: options.retention,
       ...(options.announcer ? { announcer: options.announcer } : {}),
     });
   }
@@ -173,7 +172,7 @@ export class BillingCheckoutCompletionService {
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
       try {
-        await this.organizationRepository.updateCurrency({
+        await this.announcer?.checkoutCurrencySelected({
           organizationId: subscriptionRecord.organizationId,
           currency: normalizedCurrency,
         });
@@ -186,10 +185,10 @@ export class BillingCheckoutCompletionService {
       }
     }
 
-    // Approve PAYMENT_PENDING invites linked to this subscription
-    if (this.inviteApprover && subscriptionRecord) {
+    // Organization opens the PAYMENT_PENDING invites linked to this subscription from the fact.
+    if (this.announcer && subscriptionRecord) {
       try {
-        await this.inviteApprover.approvePaymentPendingInvites({
+        await this.announcer.seatCheckoutPaid({
           subscriptionId: subscriptionRecord.id,
           organizationId: subscriptionRecord.organizationId,
         });

@@ -21,3 +21,20 @@ export type ModelProviderPingReply =
 export abstract class ModelProviderConnectionPing {
   abstract ping(request: ModelProviderPingRequest): Promise<ModelProviderPingReply>;
 }
+
+/** The address a resolved model executes against when no NLP engine is configured. */
+const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
+
+/** Where nlpgo answers the execution proxy, once an engine address is named. */
+const EXECUTION_PROXY_PATH = "/go/proxy/v1";
+
+/** The execution proxy a deployment's engine address implies, fully formed. */
+export function executionProxyBaseUrlOf({
+  nlpServiceUrl,
+}: {
+  nlpServiceUrl: string | undefined;
+}): string {
+  return nlpServiceUrl
+    ? `${nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
+    : UNCONFIGURED_EXECUTION_PROXY;
+}

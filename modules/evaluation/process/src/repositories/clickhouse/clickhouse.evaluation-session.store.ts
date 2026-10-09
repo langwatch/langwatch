@@ -1,5 +1,5 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 type EvaluationClickHouseResult = {
   json<T>(): Promise<T[]>;
@@ -36,7 +36,7 @@ export type EvaluationClickHouseResolver = (
  */
 export class ClickHouseEvaluationSession implements EvaluationClickHouseClient {
   constructor(
-    private readonly clickhouse: ProcessMembers["clickhouse"],
+    private readonly clickhouse: ClickHouseQueryClient,
     private readonly tenantId: string,
   ) {}
 

@@ -909,6 +909,14 @@ Messages:
   - what: `{{specifier}}` reaches past `{{module}}`'s browser declaration, the only door a browser package has.
   - fix: Read what `{{module}}` lends through its token from `{{module}}`'s contract with `useLent(Token)`, the owner declaring `.lends(Token, { load })`, or move a shared component into `@langwatch/design-system`.
   - why: Past the declaration is the module's private browser code, which it may change without telling anyone.
+- `clientConsumer`
+  - what: `{{specifier}}` is `{{module}}`'s client, and only browser packages and apps/ui read a client.
+  - fix: Call `{{api}}` from `{{contract}}` instead, or move this read into a browser package (ARCHITECTURE.md §2, §3.4).
+  - why: A client carries React hooks and lent tokens, browser code a server graph must not hold.
+- `clientRuntime`
+  - what: `{{specifier}}` is a runtime, store, component or another package's implementation, and this is a module's client package.
+  - fix: Import only this module's contract, `@langwatch/api`, `@langwatch/browser-host` and `react` here; restate another module's type as a structural shape, and move the rest into the module's browser package (ARCHITECTURE.md §3.4, §10.1).
+  - why: Every browser that reads a client takes all it imports, so it stays light.
 - `compositionRoot`
   - what: `{{specifier}}` is `{{module}}`'s process package, and an application composes modules without naming one.
   - fix: Take `{{module}}` from the app's generated `process-modules.generated.ts` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it. Read the `module` skill.
@@ -1069,7 +1077,7 @@ Messages:
 
 - `requestDeliveryOutsideIntent`
   - what: `{{callee}}.requestDelivery(...)` is called outside an outbox intent executor.
-  - fix: Record a deliver intent in the producer's commit and call requestDelivery from that intent's `IntentExecutor` (ADR-167).
+  - fix: Record a deliver intent in the producer's commit and call requestDelivery from that intent's `IntentExecutor` (ADR-167). Read the `eventing-and-worker` skill.
   - why: Outside an intent it sends for a step that may roll back, or loses the request if the process dies mid-step.
 
 ## `langwatch/require-fetch-timeout`

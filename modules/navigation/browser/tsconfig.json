@@ -19,7 +19,7 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../analytics/contract/tsconfig.build.json"
+      "path": "../../analytics/client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -40,6 +40,9 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluator/client/tsconfig.build.json"
     },
     {
@@ -52,7 +55,16 @@
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
       "path": "../../ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/client/tsconfig.build.json"
     },
     {
       "path": "../../prompt/client/tsconfig.build.json"

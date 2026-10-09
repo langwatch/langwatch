@@ -1,7 +1,7 @@
 /**
- * Regression: gateway secret keys in .env.example must carry a non-empty sentinel placeholder
- * and the generation command (`openssl rand -hex 32`) within 5 lines above each key — a
- * verbatim fresh clone otherwise ships empty secrets and 503s on the first VK request.
+ * Gateway secret keys in .env.example ship EMPTY, so a copied file never carries a known
+ * secret: the gateway stays off and the process boots clean until real values are set
+ * (round 17). The generation command (`openssl rand -hex 32`) sits within 5 lines above.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -50,28 +50,25 @@ function getPrecedingLines(key: string, windowSize = 5): string[] {
 
 describe(".env.example", () => {
   describe("when the gateway-secret declarations are inspected", () => {
-    /** @scenario .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER */
-    it("declares a non-empty sentinel value for LW_VIRTUAL_KEY_PEPPER", () => {
+    /** @scenario .env.example ships an empty value for LW_VIRTUAL_KEY_PEPPER */
+    it("declares an empty value for LW_VIRTUAL_KEY_PEPPER", () => {
       const value = getSentinelValue("LW_VIRTUAL_KEY_PEPPER");
-      expect(value, "LW_VIRTUAL_KEY_PEPPER must have a sentinel value").not.toBeNull();
-      expect(value!.length, "LW_VIRTUAL_KEY_PEPPER sentinel must be non-empty").toBeGreaterThan(0);
+      expect(value, "LW_VIRTUAL_KEY_PEPPER must be declared").not.toBeNull();
+      expect(value, "LW_VIRTUAL_KEY_PEPPER must ship empty").toBe("");
     });
 
-    /** @scenario .env.example ships a sentinel placeholder for LW_GATEWAY_INTERNAL_SECRET */
-    it("declares a non-empty sentinel value for LW_GATEWAY_INTERNAL_SECRET", () => {
+    /** @scenario .env.example ships an empty value for LW_GATEWAY_INTERNAL_SECRET */
+    it("declares an empty value for LW_GATEWAY_INTERNAL_SECRET", () => {
       const value = getSentinelValue("LW_GATEWAY_INTERNAL_SECRET");
-      expect(value, "LW_GATEWAY_INTERNAL_SECRET must have a sentinel value").not.toBeNull();
-      expect(
-        value!.length,
-        "LW_GATEWAY_INTERNAL_SECRET sentinel must be non-empty",
-      ).toBeGreaterThan(0);
+      expect(value, "LW_GATEWAY_INTERNAL_SECRET must be declared").not.toBeNull();
+      expect(value, "LW_GATEWAY_INTERNAL_SECRET must ship empty").toBe("");
     });
 
-    /** @scenario .env.example ships a sentinel placeholder for LW_GATEWAY_JWT_SECRET */
-    it("declares a non-empty sentinel value for LW_GATEWAY_JWT_SECRET", () => {
+    /** @scenario .env.example ships an empty value for LW_GATEWAY_JWT_SECRET */
+    it("declares an empty value for LW_GATEWAY_JWT_SECRET", () => {
       const value = getSentinelValue("LW_GATEWAY_JWT_SECRET");
-      expect(value, "LW_GATEWAY_JWT_SECRET must have a sentinel value").not.toBeNull();
-      expect(value!.length, "LW_GATEWAY_JWT_SECRET sentinel must be non-empty").toBeGreaterThan(0);
+      expect(value, "LW_GATEWAY_JWT_SECRET must be declared").not.toBeNull();
+      expect(value, "LW_GATEWAY_JWT_SECRET must ship empty").toBe("");
     });
 
     it("preceding comment for LW_VIRTUAL_KEY_PEPPER mentions openssl rand -hex 32", () => {

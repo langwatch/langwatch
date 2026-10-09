@@ -6,33 +6,19 @@
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { authTrpc } from "@langwatch/auth-contract";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
-import type { personalVirtualKeysTrpc } from "@langwatch/enterprise-gateway-contract";
+import type {
+  personalVirtualKeysTrpc,
+  routingPolicyTrpc,
+} from "@langwatch/enterprise-gateway-contract";
 import type {
   AiToolEntry,
+  governanceTrpc,
   ingestionKeyTrpc,
   personalSessionsTrpc,
 } from "@langwatch/enterprise-governance-contract";
+import type { gatewayBudgetTrpc } from "@langwatch/gateway-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { userTrpc } from "@langwatch/user-contract";
-
-/**
- * The workspace a person is given inside an organization. `EnsuredPersonalWorkspace` in
- * `@langwatch/organization-contract`, written out here rather than imported: three fields,
- * against a dependency this package would otherwise not have.
- */
-export type PersonalWorkspaceContext = {
-  workspace: {
-    team: { id: string; name: string; slug: string; createdAtMs: number };
-    project: {
-      id: string;
-      name: string;
-      slug: string;
-      createdAtMs: number;
-    };
-    created: boolean;
-  };
-  routingPolicy: { id: string; name: string } | null;
-};
 
 /**
  * The budget that binds this person, as the banners read it. A union, and the narrow arm is a
@@ -155,11 +141,6 @@ type BorrowedProcedures = {
       query: { input: { organizationId: string }; output: IngestionTemplateView[] };
     };
   };
-  governance: {
-    resolveHome: {
-      query: { input: { organizationId: string }; output: PersonaResolutionView };
-    };
-  };
   codingAgents: {
     usageTotals: {
       query: {
@@ -187,8 +168,11 @@ export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
   ContractApiMap<typeof authTrpc> &
   ContractApiMap<typeof identityTrpc> &
   ContractApiMap<typeof personalVirtualKeysTrpc> &
+  ContractApiMap<typeof routingPolicyTrpc> &
   ContractApiMap<typeof personalSessionsTrpc> &
+  ContractApiMap<typeof governanceTrpc> &
   ContractApiMap<typeof ingestionKeyTrpc> &
+  ContractApiMap<typeof gatewayBudgetTrpc> &
   BorrowedProcedures;
 
 /**

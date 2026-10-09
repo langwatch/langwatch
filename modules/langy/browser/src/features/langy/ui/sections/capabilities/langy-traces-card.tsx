@@ -10,21 +10,21 @@ import { Search } from "lucide-react";
 
 import { useTraceExplorerScope } from "../../../../../behavior/trace-explorer-scope.ts";
 import {
-  collectionOf,
-  textValue,
-  totalOf,
-} from "../../../../../model/langy-cli-result-document.ts";
-import {
-  buildTraceExplorerHref,
-  readTraceSearchQuery,
-} from "../../../../../model/langy-trace-explorer-link.ts";
-import {
   buildSurfaceHref,
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
   summaryLines,
-} from "../../../model/capabilities/capability-registry.ts";
+} from "../../../../../model/langy-capability-registry.ts";
+import {
+  collectionOf,
+  textValue,
+  totalOf,
+} from "../../../../tools/model/langy-cli-result-document.ts";
+import {
+  buildTraceExplorerHref,
+  readTraceSearchQuery,
+} from "../../../../transcript/model/langy-trace-explorer-link.ts";
 import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 interface ParsedTrace {

@@ -5,13 +5,13 @@
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import {
-  useUiCapabilities,
-  useUiDeclarations,
-  useUiScope,
-} from "@langwatch/browser-host/capabilities";
-import type { UiLangyGuidedOnboarding } from "@langwatch/browser-host/declarations";
-import { lazy, useMemo, type ReactNode } from "react";
+import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useLent, useLentHooks } from "@langwatch/browser-host/lent";
+import { SampleChoiceToken } from "@langwatch/enterprise-governance-client";
+import { GuidedOnboardingToken, type LangyGuidedOnboarding } from "@langwatch/langy-client";
+import { SidebarToken } from "@langwatch/navigation-client";
+import { JoinOfferToken } from "@langwatch/organization-client";
+import { useMemo, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
 
 import {
@@ -59,7 +59,7 @@ const INERT_LANGY: OnboardingLangyCapability = {
   },
 };
 /** Langy's lent capability, keyed by the organization its scope must announce. */
-function langyCapabilityOf(lent: UiLangyGuidedOnboarding | undefined): OnboardingLangyCapability {
+function langyCapabilityOf(lent: LangyGuidedOnboarding | undefined): OnboardingLangyCapability {
   if (!lent) return INERT_LANGY;
   return {
     dock: () => lent.dock(),
@@ -215,30 +215,19 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
   });
   const sessionActor = session.currentUser();
   const reading = route.reading();
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so the offer is not remounted.
+  // `useLent` makes the component once per declaration set, so the offer is not remounted.
+  const LentJoinOffer = useLent(JoinOfferToken);
   const joinOffers = useMemo(
-    () =>
-      declarations
-        .declared("joinOffer")
-        .map(({ module, capability }) => ({ key: module, JoinOffer: lazy(capability.load) })),
-    [declarations],
+    () => (LentJoinOffer ? [{ key: JoinOfferToken.owner, JoinOffer: LentJoinOffer }] : []),
+    [LentJoinOffer],
   );
 
-  const langy = useMemo(
-    () => langyCapabilityOf(declarations.declared("guidedOnboarding")[0]?.capability),
-    [declarations],
-  );
+  const lentLangy = useLentHooks(GuidedOnboardingToken);
+  const langy = useMemo(() => langyCapabilityOf(lentLangy), [lentLangy]);
 
-  const sidebar = useMemo(
-    () => declarations.declared("sidebar")[0]?.capability ?? INERT_SIDEBAR,
-    [declarations],
-  );
+  const sidebar = useLentHooks(SidebarToken) ?? INERT_SIDEBAR;
 
-  const governance = useMemo(
-    () => declarations.declared("sampleChoice")[0]?.capability ?? INERT_GOVERNANCE,
-    [declarations],
-  );
+  const governance = useLentHooks(SampleChoiceToken) ?? INERT_GOVERNANCE;
 
   const scope: OnboardingScope = useMemo(
     () => ({

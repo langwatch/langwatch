@@ -45,7 +45,7 @@ type Proxy interface {
 }
 
 // Store persists everything under the thuishaven home dir plus the worktree-local
-// files (the slug cache, the sticky selection and the HMR gate marker).
+// files (the slug cache and the sticky selection).
 type Store interface {
 	SaveStack(domain.Stack) error
 	RemoveStack(slug string)
@@ -71,10 +71,6 @@ type Store interface {
 	// which is what makes haven fall back to looking.
 	ReadContainerPosture() string
 	WriteContainerPosture(string) error
-	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
-	WriteHMRGate(lwDir string, expiryUnixMs int64) error
-	ReadHMRGate(lwDir string) (int64, bool)
-	ClearHMRGate(lwDir string)
 	// TouchDBActivity records "slug's databases were in use now" — the clock the
 	// daemon's idle-database pruning reads. Touched on every `up` and refreshed
 	// by the daemon while a stack stays registered.
@@ -470,6 +466,8 @@ type ContainerRuntime interface {
 	// resolved from before the stack is built — "can a container tier run here?"
 	// — which Ensure can only answer by doing the work.
 	Available(ctx context.Context) bool
+	// IsRunning reports whether the VM is up, without starting it.
+	IsRunning(ctx context.Context) bool
 }
 
 // ContainerJanitor sweeps containers a testcontainers run left behind in the

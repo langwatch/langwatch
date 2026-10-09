@@ -29,6 +29,13 @@ type fakeTools struct {
 	failOn   string
 	// sysctl answers Sysctl by name; an absent name is an unreadable setting.
 	sysctl map[string]string
+	// fetched records every pinned download asked for, by destination.
+	fetched []string
+}
+
+func (f *fakeTools) Fetch(_ context.Context, _ domain.PinnedArtifact, dest string) error {
+	f.fetched = append(f.fetched, dest)
+	return nil
 }
 
 func (f *fakeTools) Sysctl(_ context.Context, name string) (string, error) {
@@ -513,5 +520,25 @@ func TestSomaxconnIsNotApplicableOffDarwin(t *testing.T) {
 		if s.Key == "somaxconn" && s.State != domain.PrereqNotApplicable {
 			t.Errorf("linux somaxconn state = %v, want not applicable", s.State)
 		}
+	}
+}
+
+// @scenario "A failed recommended install does not stop the run"
+func TestInstallPrereqsCarriesOnPastAFailedRecommendedRow(t *testing.T) {
+	tools := &fakeTools{failOn: "loki"}
+	o := installOrchestrator(tools, &fakeStore{}, &fakeProxy{})
+	var out bytes.Buffer
+	err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{
+		{Key: "observability", Candidate: "observability"},
+		{Key: "runtime", Candidate: "colima"},
+	})
+	if err != nil {
+		t.Fatalf("a failed recommended row must not fail the run: %v", err)
+	}
+	if len(tools.ran) != 2 || !strings.Contains(tools.ran[1], "colima") {
+		t.Errorf("ran %v, want the runtime install after the failed observability row", tools.ran)
+	}
+	if !strings.Contains(out.String(), "not installed") || !strings.Contains(out.String(), "observability") {
+		t.Errorf("the summary must name the failed row, got %q", out.String())
 	}
 }

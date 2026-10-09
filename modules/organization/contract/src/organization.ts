@@ -92,16 +92,6 @@ export const organizationBillingProfileSchema = z
   .strict();
 export type OrganizationBillingProfile = z.infer<typeof organizationBillingProfileSchema>;
 
-export const claimOrganizationBillingCustomerInputSchema = z
-  .object({
-    organizationId: organizationIdSchema,
-    billingCustomerId: z.string().min(1),
-  })
-  .strict();
-export type ClaimOrganizationBillingCustomerInput = z.infer<
-  typeof claimOrganizationBillingCustomerInputSchema
->;
-
 /** Audit log row with resolved actor and project; nullable userId for system actors. */
 export type EnrichedAuditLog = {
   id: string;
@@ -129,3 +119,59 @@ export type EnrichedAuditLog = {
   /** Gateway-side diff (after state). Only set when source="gateway". */
   after: unknown;
 };
+
+/**
+ * How colleagues on a matching domain get into an organization; identity's join ledger
+ * reads and writes it through OrganizationApi. Keep in step with
+ * `modules/identity/contract/src/features/join-request/join-matching.ts`.
+ */
+
+export const organizationJoinSettingSchema = z
+  .object({
+    domainJoin: z.enum(["off", "request", "auto"]),
+    joinDomains: z.array(z.string()),
+    joinerRole: z.enum(["MEMBER", "DEVELOPER"]),
+  })
+  .strict();
+export type OrganizationJoinSetting = z.infer<typeof organizationJoinSettingSchema>;
+
+/** Where a join request was made (ADR-171 v6), written on a Developer admission's audit row. */
+export const organizationJoinOriginSchema = z.enum(["web", "cli"]);
+export type OrganizationJoinOrigin = z.infer<typeof organizationJoinOriginSchema>;
+
+/**
+ * The two sign-in security rules an organization sets, in the four columns it
+ * owns: account lockout (GAC-09) and session limits (GAC-10).
+ * specs/identity/org-account-lockout.feature, specs/identity/org-session-lifetime.feature
+ */
+
+export const signInSecurityPolicySchema = z.object({
+  /** Consecutive failures before a lock. 0 = never lock. */
+  lockoutAfterFailedAttempts: z.number().int().min(0).max(20),
+  /** How long a lock lasts, in minutes. */
+  lockoutMinutes: z.number().int().min(1).max(1440),
+  /** Minutes a session may sit idle before it ends. 0 = no idle timeout. */
+  sessionIdleTimeoutMinutes: z.number().int().min(0).max(10080),
+  /** Minutes from sign-in after which a session ends regardless. 0 = no ceiling. */
+  sessionMaxLifetimeMinutes: z.number().int().min(0).max(10080),
+});
+export type SignInSecurityPolicy = z.infer<typeof signInSecurityPolicySchema>;
+
+/**
+ * Who may create an account on this installation, and who may found an
+ * organization once they have one (specs/auth/sign-up-restriction.feature).
+ */
+
+/** `open` admits anybody who reaches the installation; `invite_only` admits invited addresses. */
+export type SignUpMode = "open" | "invite_only";
+
+export type SignUpVerdict =
+  | {
+      allowed: true;
+      via: "open" | "instance_admin" | "invitation" | "first_account";
+    }
+  | { allowed: false; reason: "invite_only" | "domain_not_allowed" };
+
+export type OrganizationCreationVerdict =
+  | { allowed: true; via: "open" | "instance_admin" | "first_organization" }
+  | { allowed: false; reason: "invite_only" };

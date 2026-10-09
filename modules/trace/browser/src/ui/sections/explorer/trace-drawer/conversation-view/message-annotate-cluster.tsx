@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability/browser";
 import { Edit3, Languages, Lightbulb } from "lucide-react";
 
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   isSameAnnotationTarget,
   useAnnotationDraftStore,
-} from "../../../../../behavior/annotation-draft.store.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+} from "../../../../../features/annotation/behavior/annotation-draft.store.ts";
 import {
   HoverActionButton,
   HoverActionCluster,

@@ -18,11 +18,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
 import { summarizeEvaluations } from "../../../../../model/agent-testing/results/evaluation-summaries.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config.ts";
+import { RunResultsTable } from "../../../../sections/agent-testing/results/run-results-table.tsx";
 import {
   RunPlanDetailHeader,
   type RunPlanDetailHeaderProps,
-} from "../../../../sections/agent-testing/results/run-plan-detail-header.tsx";
-import { RunResultsTable } from "../../../../sections/agent-testing/results/run-results-table.tsx";
+} from "../../../../sections/agent-testing/run-plan-results/run-plan-detail-header.tsx";
 import { RunVerdictPanel } from "../../drawers/run-verdict-panel.tsx";
 import { LastResultLabel } from "../last-result-label.tsx";
 import { passRateColor } from "../pass-rate-color.ts";

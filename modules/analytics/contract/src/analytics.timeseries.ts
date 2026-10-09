@@ -205,3 +205,7 @@ export function isZeroWhenAbsentSeries(series: AnalyticsSeries): boolean {
     series.aggregation === "sum"
   );
 }
+
+export interface AnalyticsTimeseriesReadOptions {
+  readonly maxResultRows?: number;
+}

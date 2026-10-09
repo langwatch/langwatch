@@ -3,7 +3,6 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -15,13 +14,13 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: vi.fn(), warn: logWarn, error: vi.fn(), debug: vi.fn() }),
 }));
 
+import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryScenarioCancellationRepository } from "../repositories/memory/memory.scenario-cancellation.repository.ts";
 import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
 import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import type { ScenarioService } from "../services/scenario.service.ts";
-import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 import {
   scenarioExecutorPeers,
   scenarioTestVoicePublicUrl,
@@ -42,7 +41,6 @@ function harness({
     peers: {
       ...scenarioExecutorPeers(),
       agents: createApiFixture<AgentApi>(),
-      suites: createApiFixture<SuiteApi>(),
       traces: createApiFixture<TraceApi>(),
       projects: createApiFixture<ProjectApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),

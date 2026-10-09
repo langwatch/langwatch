@@ -4,10 +4,10 @@ import {
   logFactsContributedEventSchema,
 } from "@langwatch/coding-agent-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
-import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { ClaudeAnswersTraceCanonicalisation } from "../../__tests__/fixtures/trace-canonicalisation.fixture.ts";
 import { OtelCodingAgentCostMetricsService } from "../../services/coding-agent-cost-metrics.service.ts";
 import { createCodingAgentCostDriftSubscriber } from "../coding-agent-cost-drift.subscriber.ts";
 
@@ -28,7 +28,7 @@ describe("codingAgentCostDrift subscriber redelivery", () => {
     const subscriber = createCodingAgentCostDriftSubscriber({
       metrics,
       modelProviders: new TestModelProviderService(),
-      traceCanonicalisation: TraceCanonicalisationService.create(),
+      traceCanonicalisation: ClaudeAnswersTraceCanonicalisation.create(),
     });
     const event = logFactsContributedEventSchema.parse({
       id: "cost-event-1",

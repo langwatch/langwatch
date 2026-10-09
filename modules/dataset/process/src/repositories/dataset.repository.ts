@@ -1,4 +1,10 @@
-import type { Dataset, DatasetColumns, DatasetSummary } from "@langwatch/dataset-contract";
+import type {
+  Dataset,
+  DatasetColumns,
+  DatasetStorageEntry,
+  DatasetStoragePageInput,
+  DatasetSummary,
+} from "@langwatch/dataset-contract";
 import type { Instant } from "@langwatch/time";
 
 /** Raw storage row (scalar columns only), not parsed Dataset. Keeps
@@ -69,4 +75,6 @@ export interface DatasetRepository {
     mapping: Record<string, unknown>;
   }): Promise<Dataset>;
   count(input: { projectId: string; slug: string }): Promise<number>;
+  /** Archived rows included, ordered by id, strictly after `afterId`. */
+  findStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]>;
 }

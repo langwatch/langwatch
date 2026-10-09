@@ -4,7 +4,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MemoryProductAnalyticsChannel } from "../../channels/memory/memory.product-analytics.channel.ts";
+import { MemoryProductAnalyticsChannel } from "../../channels/memory/memory.saas.channels.ts";
 import { MemorySaasRateLimitRepository } from "../../repositories/memory/memory.saas-rate-limit.repository.ts";
 import type { SaasRateLimitRepository } from "../../repositories/saas-rate-limit.repository.ts";
 import { LangWatchCloudService } from "../langwatch-cloud.service.ts";
@@ -32,8 +32,10 @@ function setup({
     recorded.push(report);
     return Promise.resolve([]);
   },
+  release = {},
 }: {
   isSaas?: boolean;
+  release?: Partial<Parameters<typeof UsageReportReceiverService.create>[0]["release"]>;
   rateLimits?: SaasRateLimitRepository;
   recordUsageReport?: LicensingApi["recordUsageReport"];
 } = {}) {
@@ -45,6 +47,12 @@ function setup({
     registry: createApiFixture<LicensingApi>({ recordUsageReport }),
     analytics,
     logger,
+    release: {
+      latestRelease: void 0,
+      latestReleaseCommit: void 0,
+      releaseFloor: void 0,
+      ...release,
+    },
   });
   return { receiver, analytics, lines };
 }
@@ -126,6 +134,34 @@ describe("UsageReportReceiverService", () => {
       await expect(receiver.receive(report())).resolves.toEqual({ message: "Event captured" });
       expect(analytics.captured).toHaveLength(1);
       expect(lines.findLine("error", "not recorded in the install registry")).toBeDefined();
+    });
+  });
+
+  describe("when Cloud names the latest release and the floor", () => {
+    /** @scenario "Cloud's answer names the latest release with its commit, and the floor" */
+    it("answers with the release, its commit and the floor", async () => {
+      const { receiver } = setup({
+        release: {
+          latestRelease: "3.21.0",
+          latestReleaseCommit: "0a1b2c3d",
+          releaseFloor: "3.20.1",
+        },
+      });
+
+      await expect(receiver.receive(report())).resolves.toEqual({
+        message: "Event captured",
+        latest_release: { release: "3.21.0", commit: "0a1b2c3d" },
+        floor: "3.20.1",
+      });
+    });
+  });
+
+  describe("when Cloud names no release", () => {
+    /** @scenario "Cloud names no release when none is configured" */
+    it("answers exactly as before", async () => {
+      const { receiver } = setup();
+
+      await expect(receiver.receive(report())).resolves.toEqual({ message: "Event captured" });
     });
   });
 

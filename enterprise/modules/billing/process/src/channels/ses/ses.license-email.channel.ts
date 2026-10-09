@@ -1,6 +1,6 @@
 import { sendLicenseEmail, type MailSender } from "@langwatch/mail";
 
-import type { LicenseEmailDelivery } from "../../services/license-purchase.service.ts";
+import type { LicenseEmailDelivery } from "../../features/license-purchase/services/license-purchase.service.ts";
 import { LicenseEmailChannel } from "../license-email.channel.ts";
 
 /** Main's licence email over notification's sender. */

@@ -1,16 +1,10 @@
 import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
-import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
-import { AgentCopyService } from "../../services/agent-copy.service.ts";
-import { AgentVoiceReleaseService } from "../../services/agent-voice-release.service.ts";
-import { agentWorkflowCopyFixture, createAgentAppFixture } from "./agent.fixture.ts";
+import { createAgentAppFixture } from "./agent.fixture.ts";
 
 const reference = { id: "agent_1", projectId: "project_1" };
 const workflowAgent = {
@@ -24,7 +18,6 @@ const copyInput = {
   sourceAgentId: reference.id,
   sourceProjectId: reference.projectId,
   targetProjectId: "project_2",
-  actorUserId: "user_1",
 };
 
 describe("AgentModule workflow and audit ownership", () => {
@@ -46,86 +39,20 @@ describe("AgentModule workflow and audit ownership", () => {
     );
   });
 
-  /** @scenario "Workflow fields describe the current graph" */
-  it("maps workflow field metadata into an Agent view", async () => {
-    const listFields = vi.fn(async () => ({
-      workflow_1: {
-        fieldsResolved: true,
-        inputFields: [{ identifier: "question", type: "str" as const }],
-        outputFields: [
-          { identifier: "answer", type: "str" as const },
-          { identifier: "score", type: "float" as const },
-        ],
-      },
-    }));
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ listFields }),
-    });
+  it("reads no fields from Workflow and leaves a graph with no recorded fields unresolved", async () => {
+    const { app, repositories } = createAgentAppFixture();
     await repositories.agents.create(workflowAgent);
 
     expect(await app.getById(reference)).toMatchObject({
-      fieldsResolved: true,
-      inputFields: [{ identifier: "question", type: "str" }],
-      outputFields: [
-        { identifier: "answer", type: "str" },
-        { identifier: "score", type: "float" },
-      ],
-    });
-    expect(listFields).toHaveBeenCalledWith({
-      projectId: reference.projectId,
-      workflowIds: ["workflow_1"],
-    });
-  });
-
-  it.each(["archived", "malformed"])(
-    "keeps an Agent readable when its %s graph resolves no fields",
-    async () => {
-      const { app, repositories } = createAgentAppFixture({
-        workflows: createApiFixture<WorkflowApi>({ listFields: async () => ({}) }),
-      });
-      await repositories.agents.create(workflowAgent);
-
-      expect(await app.getById(reference)).toMatchObject({
-        fieldsResolved: false,
-        inputFields: [],
-        outputFields: [],
-      });
-    },
-  );
-
-  it("returns the related Workflow identity", async () => {
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({
-        listSummaries: async () => [{ id: "workflow_1", name: "Answering workflow" }],
-      }),
-    });
-    await repositories.agents.create(workflowAgent);
-
-    expect(await app.relatedEntities(reference)).toEqual({
-      workflow: { id: "workflow_1", name: "Answering workflow" },
-    });
-  });
-
-  it("scopes the related Workflow query and preserves an absent summary", async () => {
-    const listSummaries = vi.fn(async () => []);
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ listSummaries }),
-    });
-    await repositories.agents.create(workflowAgent);
-
-    expect(await app.relatedEntities(reference)).toEqual({ workflow: null });
-    expect(listSummaries).toHaveBeenCalledWith({
-      projectId: reference.projectId,
-      workflowIds: ["workflow_1"],
+      fieldsResolved: false,
+      inputFields: [],
+      outputFields: [],
     });
   });
 
   /** @scenario "Cascade archive uses the workflow owner" */
-  it("archives the linked graph and Agent together", async () => {
-    const archiveLinked = vi.fn(async () => ({ id: "workflow_1" }));
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ archiveLinked }),
-    });
+  it("archives the Agent and records the archive naming the linked graph for Workflow", async () => {
+    const { app, repositories, archivedFacts } = createAgentAppFixture();
     await repositories.agents.create(workflowAgent);
 
     const result = await app.cascadeArchive(reference);
@@ -135,14 +62,25 @@ describe("AgentModule workflow and audit ownership", () => {
     expect((await repositories.agents.getByIdIncludingArchived(reference)).archivedAt).toEqual(
       result.agent.archivedAt,
     );
-    expect(archiveLinked).toHaveBeenCalledWith({
-      workflowId: "workflow_1",
-      projectId: reference.projectId,
-    });
+    expect(archivedFacts).toMatchObject([
+      { agentId: reference.id, projectId: reference.projectId, cascadedWorkflowId: "workflow_1" },
+    ]);
+  });
+
+  /** @scenario "A plain archive records the agent archived with no graph to cascade" */
+  it("records the archive with no graph when the agent is archived alone", async () => {
+    const { app, repositories, archivedFacts } = createAgentAppFixture();
+    await repositories.agents.create(workflowAgent);
+
+    await app.archive(reference);
+
+    expect(archivedFacts).toMatchObject([
+      { agentId: reference.id, projectId: reference.projectId, cascadedWorkflowId: null },
+    ]);
   });
 
   async function history() {
-    const listEntityHistory = vi.fn(async (): Promise<AuditLogHistoryEntry[]> => [
+    const entries: AuditLogHistoryEntry[] = [
       {
         id: "entry_new",
         action: "agents.update",
@@ -164,7 +102,18 @@ describe("AgentModule workflow and audit ownership", () => {
         userId: "user_gone",
         args: { newAgentId: reference.id },
       },
-    ]);
+      {
+        id: "entry_workflow_copy",
+        action: "workflow.copyAgent",
+        createdAt: new Date("2026-07-30"),
+        userId: null,
+        args: { newAgentId: reference.id },
+      },
+    ];
+    const listEntityHistory = vi.fn(
+      async (input: { actionPrefix: string }): Promise<AuditLogHistoryEntry[]> =>
+        entries.filter((entry) => entry.action.startsWith(input.actionPrefix)),
+    );
     const getProfiles = vi.fn(async () => [
       {
         id: "user_1",
@@ -200,7 +149,12 @@ describe("AgentModule workflow and audit ownership", () => {
     const { app, getProfiles } = await history();
     const entries = await app.getHistory({ agentId: reference.id, projectId: reference.projectId });
 
-    expect(entries.map((entry) => entry.id)).toEqual(["entry_new", "entry_old", "entry_copy"]);
+    expect(entries.map((entry) => entry.id)).toEqual([
+      "entry_new",
+      "entry_old",
+      "entry_copy",
+      "entry_workflow_copy",
+    ]);
     expect(entries[0]?.user).toEqual({ id: "user_1", name: "Alex", email: "alex@langwatch.ai" });
     expect(getProfiles).toHaveBeenCalledWith({ userIds: ["user_1", "user_gone"] });
   });
@@ -226,6 +180,13 @@ describe("AgentModule workflow and audit ownership", () => {
       argumentNames: ["id", "agentId", "newAgentId"],
       limit: 100,
     });
+    expect(listEntityHistory).toHaveBeenCalledWith({
+      projectId: reference.projectId,
+      entityId: reference.id,
+      actionPrefix: "workflow.copyAgent",
+      argumentNames: ["id", "agentId", "newAgentId"],
+      limit: 100,
+    });
     listEntityHistory.mockClear();
     await expect(
       app.getHistory({ agentId: reference.id, projectId: "other_project" }),
@@ -242,7 +203,7 @@ describe("AgentModule workflow and audit ownership", () => {
       config: {},
     });
 
-    const copied = await app.copy(copyInput);
+    const copied = await app.createCopy(copyInput);
 
     expect(copied).toMatchObject({ projectId: "project_2", copiedFromAgentId: reference.id });
     expect(
@@ -250,96 +211,17 @@ describe("AgentModule workflow and audit ownership", () => {
     ).toMatchObject({ type: "signature", workflowId: null });
   });
 
-  it("fails before persistence when its Workflow dependency refuses a copy", async () => {
-    const failure = new Error("Workflow copying unavailable");
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({
-        copy: async () => {
-          throw failure;
-        },
-      }),
-    });
-    await repositories.agents.create(workflowAgent);
-
-    await expect(app.copy(copyInput)).rejects.toBe(failure);
-    expect(await repositories.agents.findAll({ projectId: "project_2" })).toEqual([]);
-  });
-
-  /** @scenario "A workflow copy owns its copied graph" */
-  /** @scenario "A copied workflow agent points at the graph the workflow module copied" */
-  it("points a copied Agent at the Workflow copy returned by its owner", async () => {
-    const copy = vi.fn(async () => agentWorkflowCopyFixture());
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ copy }),
-    });
+  /** @scenario "A copy's row points at the graph workflow copied" */
+  it("points a copied Agent at the graph its caller copied and leaves the source alone", async () => {
+    const { app, repositories } = createAgentAppFixture();
     await repositories.agents.create(workflowAgent);
     const source = await repositories.agents.getById(reference);
 
-    const result = await app.copy(copyInput);
+    const result = await app.createCopy({ ...copyInput, workflowId: "workflow_copy" });
 
-    expect(copy).toHaveBeenCalledWith(
-      {
-        sourceWorkflowId: "workflow_1",
-        sourceProjectId: "project_1",
-        targetProjectId: "project_2",
-        copiedFromWorkflowId: "workflow_1",
-      },
-      { id: "user_1" },
-    );
     expect(
       await repositories.agents.getById({ id: result.id, projectId: "project_2" }),
     ).toMatchObject({ workflowId: "workflow_copy", copiedFromAgentId: reference.id });
     expect(await repositories.agents.getById(reference)).toEqual(source);
-  });
-
-  /** @scenario "Failed persistence compensates the graph copy" */
-  it("requests copied Workflow cleanup while preserving the original Agent write error", async () => {
-    const deleteUncommitted = vi.fn(async () => {});
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({
-        copy: async () => agentWorkflowCopyFixture(),
-        deleteUncommitted,
-      }),
-    });
-    await repositories.agents.create(workflowAgent);
-    const failure = new Error("agent row rejected");
-    vi.spyOn(repositories.agents, "create").mockRejectedValueOnce(failure);
-
-    await expect(app.copy(copyInput)).rejects.toBe(failure);
-    expect(deleteUncommitted).toHaveBeenCalledWith({
-      workflowId: "workflow_copy",
-      projectId: "project_2",
-    });
-    expect(await repositories.agents.findAll({ projectId: "project_2" })).toEqual([]);
-  });
-
-  /** @scenario "Failed persistence compensates the graph copy" */
-  it("logs a failed graph cleanup without replacing the original persistence failure", async () => {
-    const rollbackError = new Error("workflow cleanup refused");
-    const repositories = MemoryAgentRepositories.create();
-    const { logger, lines } = createTestLogger();
-    const copies = AgentCopyService.create({
-      voiceRelease: AgentVoiceReleaseService.create({
-        featureFlags: createApiFixture<FeatureFlagApi>(),
-        projects: createApiFixture<ProjectApi>(),
-      }),
-      repository: repositories.agents,
-      workflows: createApiFixture<WorkflowApi>({
-        copy: async () => agentWorkflowCopyFixture(),
-        deleteUncommitted: async () => {
-          throw rollbackError;
-        },
-      }),
-      logger,
-    });
-    await repositories.agents.create(workflowAgent);
-    const failure = new Error("agent row rejected");
-    vi.spyOn(repositories.agents, "create").mockRejectedValueOnce(failure);
-
-    await expect(copies.copy(copyInput)).rejects.toBe(failure);
-    expect(lines.findLine("error", "Failed to remove uncommitted workflow copy")).toMatchObject({
-      workflowId: "workflow_copy",
-    });
-    expect(await repositories.agents.findAll({ projectId: "project_2" })).toEqual([]);
   });
 });

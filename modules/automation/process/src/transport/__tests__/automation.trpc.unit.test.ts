@@ -106,6 +106,33 @@ describe("the automation tRPC namespace", () => {
         ).rejects.toMatchObject({ code: "FORBIDDEN" });
       });
     });
+
+    describe("when a Slack write is called", () => {
+      /** @scenario "Only a caller who may change automations lists Slack channels or test-fires" */
+      it("asks triggers:update, as main did, and refuses both", async () => {
+        const asked: string[] = [];
+        const { caller } = mount({
+          permits: (permission) => {
+            asked.push(permission);
+            return permission === "triggers:view";
+          },
+        });
+
+        await expect(
+          caller.listSlackChannels({ projectId: "project-1", slackIntegrationId: "slack-1" }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(
+          caller.testFireTemplate({
+            projectId: "project-1",
+            channel: "slack",
+            trigger: { name: "Nightly", alertType: null },
+            draft: {},
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect(asked).toEqual(["triggers:update", "triggers:update"]);
+      });
+    });
   });
 
   describe("given the signed-in author", () => {

@@ -11,10 +11,12 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
 import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
@@ -47,13 +49,24 @@ function withRateLimits(
   memory: MemoryAuthRepositories,
   rateLimits: AuthRepositories["rateLimits"],
 ): AuthRepositories {
-  const { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity } = memory;
-  return { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity, rateLimits };
+  return {
+    sessions: memory.sessions,
+    cliSessions: memory.cliSessions,
+    signUpTokens: memory.signUpTokens,
+    signInLocks: memory.signInLocks,
+    rateLimits,
+    betterAuthStorage: memory.betterAuthStorage,
+    betterAuthSecondaryStorage: memory.betterAuthSecondaryStorage,
+    betterAuthHooks: memory.betterAuthHooks,
+    directory: memory.directory,
+    pendingSsoSetup: memory.pendingSsoSetup,
+    sessionCache: memory.sessionCache,
+  };
 }
 
 async function appFor(
   limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
-  identity: IdentityApi = createApiFixture<IdentityApi>(),
+  identity: IdentityApi = createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
   mailDelivery: { provider?: string; misconfigured?: boolean } = { provider: "smtp" },
 ): Promise<AuthModule> {
   return AuthModule.create({
@@ -66,6 +79,7 @@ async function appFor(
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
       signUpMode: "open",
@@ -74,6 +88,7 @@ async function appFor(
     },
     repositories: withRateLimits(MemoryAuthRepositories.create(), limiter),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: {
         findResolvedToken: async () => ({ project: { slug: "acme" } }),
@@ -97,14 +112,7 @@ async function appFor(
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      prisma: {} as never,
-      redis: null as never,
-      identityEmails: undefined as never,
-      invites: null,
-      processName: "langwatch-api",
-    },
+    channels: MemoryAuthChannels.create(),
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });
@@ -166,6 +174,7 @@ describe("given a signed-in caller asking for their own confirmation link", () =
       const app = await appFor(
         rateLimiter,
         createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
           sendOwnAddressConfirmation: async (input) => {
             started.push(input);
             return { identifierId: "idf_own" };
@@ -190,7 +199,7 @@ describe("given a signed-in caller asking for their own confirmation link", () =
     /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
     it("says a confirmation cannot be sent", async () => {
       const { rateLimiter } = countingLimiter();
-      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>(), {});
+      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }), {});
 
       await expect(app.getMyAddressConfirmation({ email: null })).resolves.toEqual({
         email: null,
@@ -202,7 +211,7 @@ describe("given a signed-in caller asking for their own confirmation link", () =
     /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
     it("refuses to send with a named error before spending budget or starting a ceremony", async () => {
       const { rateLimiter, windows } = countingLimiter();
-      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>(), {});
+      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }), {});
 
       await expect(
         app.sendMyAddressConfirmation({

@@ -9,7 +9,7 @@ import {
   useUiScope,
   type UiFeedback,
 } from "@langwatch/browser-host/capabilities";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {

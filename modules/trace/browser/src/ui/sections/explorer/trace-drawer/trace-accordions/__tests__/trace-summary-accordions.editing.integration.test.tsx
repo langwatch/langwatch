@@ -25,13 +25,13 @@ vi.mock("../../../../use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
+vi.mock("../../../../../../behavior/explorer/use-trace-edit-overlay.ts", () => ({
   useAppliedTraceEditPatch: () => null,
 }));
 
 // The trace's comments are read once per surface. This suite is about the
 // correction, so the surface reads none.
-vi.mock("../../../hooks/use-anchored-annotations.ts", () => ({
+vi.mock("../../../../../../features/annotation/behavior/use-anchored-annotations.ts", () => ({
   useAnchoredAnnotations: () => ({
     commentsAt: () => [],
     all: [],
@@ -45,15 +45,15 @@ vi.mock("../../anchored-comments/anchor-comment-button.tsx", () => ({
   AnchorCommentButton: () => null,
 }));
 
-vi.mock("../../../hooks/use-trace-header.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
-vi.mock("../../../hooks/use-trace-events.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-events.ts", () => ({
   useTraceEvents: () => ({ events: [], isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-trace-evaluations.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-evaluations.ts", () => ({
   useTraceEvaluations: () => ({
     rich: [],
     pendingCount: 0,
@@ -79,7 +79,7 @@ import {
 import {
   buildTraceEditPatch,
   useTraceEditStore,
-} from "../../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { TraceSummaryAccordions } from "../trace-summary-accordions.tsx";
 
 const TRACE_ID = "trace-1";

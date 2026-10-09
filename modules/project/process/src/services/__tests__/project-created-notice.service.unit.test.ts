@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type {
   RecordProjectCreatedCommandData,
+  RecordProjectDepartmentAssignedCommandData,
   RecordProjectPresenceSettingChangedCommandData,
 } from "../../eventing/project-lifecycle.events.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
@@ -69,8 +70,10 @@ function projectWithTeam(input: { id: string; organizationId: string }): Project
 function noticeOver() {
   const sent: RecordProjectCreatedCommandData[] = [];
   const presence: RecordProjectPresenceSettingChangedCommandData[] = [];
+  const departments: RecordProjectDepartmentAssignedCommandData[] = [];
+  const logger = { error: vi.fn() };
   const notice = ProjectCreatedNoticeService.create({
-    logger: { error: vi.fn() },
+    logger,
     projects: {
       findIdsByOrganization: async () => Object.keys(admins),
       findWithTeam: async (id) => {
@@ -99,11 +102,48 @@ function noticeOver() {
     },
     recordProjectMoved: { send: async () => undefined },
     recordProjectArchived: { send: async () => undefined },
+    recordProjectDepartmentAssigned: {
+      send: async (payload) => {
+        departments.push(payload);
+      },
+    },
+    recordProjectTraceSharingDisabled: { send: async () => undefined },
   });
-  return { notice, sent, presence };
+  return { notice, sent, presence, departments, logger };
 }
 
 describe("ProjectCreatedNoticeService", () => {
+  /** @scenario "A failed project created fact logs the catch-up that recovers it" */
+  it("names the backfill-project-created task when recording a new project fails", async () => {
+    const { notice, logger } = noticeOver();
+    notice.connect({
+      recordProjectCreated: {
+        send: async () => {
+          throw new Error("event store down");
+        },
+      },
+      recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      recordPresenceSettingChanged: { send: async () => undefined },
+      recordProjectMoved: { send: async () => undefined },
+      recordProjectArchived: { send: async () => undefined },
+      recordProjectDepartmentAssigned: { send: async () => undefined },
+      recordProjectTraceSharingDisabled: { send: async () => undefined },
+    });
+
+    await notice.created({
+      projectId: "project-1",
+      organizationId: "org-1",
+      createdByUserId: null,
+      teamId: "team-1",
+      isPersonal: false,
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-1" }),
+      expect.stringContaining("backfill-project-created"),
+    );
+  });
+
   /** @scenario "A new project's created event names the organization's admin" */
   it("records a new project with the organization's admin at that moment", async () => {
     const { notice, sent } = noticeOver();
@@ -170,5 +210,28 @@ describe("ProjectCreatedNoticeService", () => {
       },
     ]);
     expect(presence.map(({ occurredAt: _at, ...rest }) => rest)).toEqual(firstRun);
+  });
+
+  /** @scenario "Existing projects' departments and teams are recorded by the backfill, idempotently" */
+  it("records each project's stored department and team once per run, marked backfilled", async () => {
+    const { notice, departments } = noticeOver();
+
+    await notice.recordExistingDepartmentAssignments({ organizationId: "org-1" });
+    const firstRun = departments.map(({ occurredAt: _at, ...rest }) => rest);
+    departments.length = 0;
+    await notice.recordExistingDepartmentAssignments({ organizationId: "org-1" });
+
+    expect(firstRun).toEqual(
+      ["project-1", "project-2"].map((projectId) => ({
+        tenantId: projectId,
+        projectId,
+        organizationId: "org-1",
+        departmentId: null,
+        teamId: "team-1",
+        isPersonal: false,
+        backfilled: true,
+      })),
+    );
+    expect(departments.map(({ occurredAt: _at, ...rest }) => rest)).toEqual(firstRun);
   });
 });

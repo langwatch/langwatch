@@ -267,7 +267,7 @@ describe("Autosave evaluation state", () => {
     });
 
     expect(captureException).toHaveBeenCalled();
-    const captured = vi.mocked(captureException).mock.calls.at(-1)?.[1];
+    const captured = vi.mocked(captureException).mock.calls.at(-1)?.[0].options;
     expect(JSON.stringify(captured?.extra)).not.toContain(customerContent);
     expect(captured?.extra).toMatchObject({
       context: "Failed to autosave evaluations v3",

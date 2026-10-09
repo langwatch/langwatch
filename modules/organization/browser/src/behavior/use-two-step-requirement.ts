@@ -1,9 +1,18 @@
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import type { OrganizationMemberFactor } from "@langwatch/identity-contract";
+import type {
+  OrganizationMemberFactor,
+  twoStepVerificationTrpc,
+} from "@langwatch/identity-contract";
 import { useCallback, useMemo } from "react";
 
 import { useOrganizationHost } from "../model/organization-host.ts";
-import { twoStepVerificationApi } from "./two-step-verification-api.ts";
+
+/**
+ * The two-step verification procedures the members area calls, derived from
+ * identity's contract: the requirement is identity's, the page is the organization's.
+ */
+const twoStepVerificationApi = createModuleApi<ContractApiMap<typeof twoStepVerificationTrpc>>();
 
 const NO_MEMBERS: readonly OrganizationMemberFactor[] = [];
 const NO_CONNECTION = { connected: false, assertedFactors: [], assertsSecondFactor: false };

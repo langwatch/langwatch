@@ -691,7 +691,7 @@ describe("transcriptTraceCommand()", () => {
   it("fetches the transcript endpoint and prints the entries", async () => {
     await transcriptTraceCommand("trace_abc", {});
 
-    expect(String(fetchMock.mock.calls[0]![0])).toContain("/api/traces/trace_abc/transcript");
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/api/v1/traces/trace_abc/transcript");
     const printed = logSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(printed).toContain("summarise the repo");
     expect(printed).toContain("Here is the summary.");
@@ -743,6 +743,49 @@ describe("getTraceCommand()", () => {
       mockGet.mockRejectedValue(new TracesApiError("Not found", "get trace"));
 
       await expect(getTraceCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+    });
+  });
+});
+
+describe("given a trace ID copied from the `trace search` table", () => {
+  const fullTraceId = "0123456789abcdef0123456789abcdef";
+  let mockSearch: ReturnType<typeof vi.fn>;
+  let mockGet: ReturnType<typeof vi.fn>;
+  let logSpy: MockInstance<typeof console.log>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearch = vi.fn();
+    mockGet = vi.fn();
+    // biome-ignore lint/complexity/useArrowFunction: needs a constructible function.
+    vi.mocked(TracesApiService).mockImplementation(function () {
+      return { search: mockSearch, get: mockGet } as unknown as TracesApiService;
+    });
+    logSpy = vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  describe("when `trace get` is run with that truncated ID", () => {
+    /** @scenario "CLI `trace get` with truncated ID from `trace search` succeeds" */
+    it("asks the backend for the 20-character prefix and prints the full trace it resolves to", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [{ traceId: fullTraceId, input: "hello", output: "world" }],
+        pagination: { totalHits: 1 },
+      });
+      await searchTracesCommand({ limit: "1" });
+      const searchOutput = logSpy.mock.calls.flat().join("\n");
+      const displayedId = fullTraceId.substring(0, 20);
+      expect(searchOutput).toContain(displayedId);
+      expect(searchOutput).not.toContain(fullTraceId);
+
+      logSpy.mockClear();
+      const digest = `Trace ${fullTraceId}\nInput: hello\nOutput: world`;
+      mockGet.mockResolvedValue(digest);
+      await getTraceCommand(displayedId, {});
+
+      expect(mockGet).toHaveBeenCalledWith(displayedId, { format: "digest" });
+      expect(logSpy.mock.calls.flat().join("\n")).toContain(digest);
     });
   });
 });

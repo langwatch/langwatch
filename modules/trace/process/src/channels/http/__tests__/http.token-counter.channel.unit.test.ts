@@ -43,6 +43,7 @@ describe("HttpTokenCounterChannel", () => {
       channel = HttpTokenCounterChannel.create({
         bpeDirectory: directory,
         fetchTimeoutMs: undefined,
+        disabled: false,
       });
 
       await expect(channel.computeTokenCount("openai/gpt-5-mini", "hello")).resolves.toBe(5);
@@ -54,6 +55,7 @@ describe("HttpTokenCounterChannel", () => {
       channel = HttpTokenCounterChannel.create({
         bpeDirectory: directory,
         fetchTimeoutMs: undefined,
+        disabled: false,
       });
 
       await expect(channel.computeTokenCount("acme/unknown-model", "hi")).resolves.toBe(2);
@@ -65,6 +67,7 @@ describe("HttpTokenCounterChannel", () => {
     channel = HttpTokenCounterChannel.create({
       bpeDirectory: directory,
       fetchTimeoutMs: undefined,
+      disabled: false,
     });
 
     await expect(channel.computeTokenCount("gpt-5-mini", "hello")).resolves.toBeUndefined();
@@ -82,15 +85,33 @@ describe("HttpTokenCounterChannel", () => {
           init.signal.addEventListener("abort", () => reject(init.signal.reason));
         }),
     );
-    channel = HttpTokenCounterChannel.create({ bpeDirectory: undefined, fetchTimeoutMs: "20" });
+    channel = HttpTokenCounterChannel.create({
+      bpeDirectory: undefined,
+      fetchTimeoutMs: "20",
+      disabled: false,
+    });
 
     await expect(channel.computeTokenCount("gpt-5-mini", "hello")).resolves.toBeUndefined();
+  });
+
+  /** @scenario "DISABLE_TOKENIZATION stops every count" */
+  it("answers undefined and loads no table when tokenization is disabled", async () => {
+    await writeFile(path.join(directory, "o200k_base.tiktoken"), byteRanks);
+    channel = HttpTokenCounterChannel.create({
+      bpeDirectory: directory,
+      fetchTimeoutMs: undefined,
+      disabled: true,
+    });
+
+    await expect(channel.computeTokenCount("gpt-5-mini", "hello")).resolves.toBeUndefined();
+    expect(fetched).toEqual([]);
   });
 
   it("answers undefined for empty text without loading a table", async () => {
     channel = HttpTokenCounterChannel.create({
       bpeDirectory: undefined,
       fetchTimeoutMs: undefined,
+      disabled: false,
     });
 
     await expect(channel.computeTokenCount("gpt-5-mini", "")).resolves.toBeUndefined();

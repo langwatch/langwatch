@@ -2,6 +2,7 @@ import { BillingPriceCatalogue } from "@langwatch/enterprise-billing-contract";
 import Stripe from "stripe";
 import { afterAll, describe, expect, it } from "vitest";
 
+import { HttpStripeMetersChannel } from "../channels/http/http.stripe-meters.channel.ts";
 import { StripeUsageReportingService } from "../services/usage-reporting.service.ts";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -22,7 +23,7 @@ const describeIfStripeKey = STRIPE_SECRET_KEY ? describe : describe.skip;
 describeIfStripeKey("Usage reporting integration", () => {
   const stripe = new Stripe(STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
   const service = StripeUsageReportingService.create({
-    stripe,
+    meters: HttpStripeMetersChannel.create({ stripe }),
     meterId: BillingPriceCatalogue.create("test").meters.BILLABLE_EVENTS,
   });
 

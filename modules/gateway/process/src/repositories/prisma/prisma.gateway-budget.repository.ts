@@ -1199,6 +1199,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           projectId: input.projectId,
           virtualKeyId: input.virtualKeyId,
           principalUserId: input.principalUserId,
+          endUserId: input.endUserId,
           memberGroupIds: input.memberGroupIds,
         },
       })

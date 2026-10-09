@@ -284,6 +284,20 @@ jobs:
         if: "!cancelled()"
         run: ./tests/sign-up-env.sh
 
+      # A CREDENTIALS_SECRET rotation needs the previous key on every process
+      # that holds the new one, and an install that names no previous key must
+      # carry no such variable. Both are only visible in the render.
+      - name: "assert the previous credentials key renders only when set, on every process"
+        if: "!cancelled()"
+        run: ./tests/credentials-secret-previous.sh
+
+      # Both scrape jobs discover every pod in the namespace. Which pods each
+      # one keeps, and whether the workers pods carry what their job keeps on,
+      # is relabeling against pod metadata: only the render shows it.
+      - name: "assert each Prometheus scrape job selects only its own pods"
+        if: "!cancelled()"
+        run: ./tests/prometheus-scrape-targets.sh
+
       # apps/api and apps/worker parse one config at each owner (ADR-132), so a
       # variable nothing declares is dead and a missing store URL refuses the
       # boot. Both are only visible by setting the render beside the source.

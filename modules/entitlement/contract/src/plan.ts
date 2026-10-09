@@ -22,6 +22,10 @@ export const planSchema = z.object({
   daysSinceCreation: z.number().optional(),
   overrideAddingLimitations: z.boolean().optional(),
   ...planSeatsAndVolumeShape,
+  /** Cloud Free creation caps; absent means uncapped (plan-creation-caps.ts). */
+  maxScenarios: z.number().optional(),
+  maxScenarioSets: z.number().optional(),
+  maxEvaluators: z.number().optional(),
   webhookEndpointsEnabled: z.boolean().optional(),
   ...planDispatchCeilingsShape,
   usageUnit: z.string().optional(),

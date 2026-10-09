@@ -136,7 +136,7 @@ func (stacks *stacks) resolveBranch(ctx context.Context, request stackRequest) e
 		if err := stacks.startBranch(ctx, request); err != nil {
 			return err
 		}
-		stacks.branch, err = haven.read(ctx, havenrun.Slug("diffsuite", request.stamp, branchKind(flags)))
+		stacks.branch, err = readWhenReady(ctx, havenrun.Slug("diffsuite", request.stamp, branchKind(flags)))
 	case flags.deployment == selfHosted:
 		slug := cmp.Or(flags.stack, selfHostedSlug)
 		if stacks.branch, err = haven.read(ctx, slug); err != nil {
@@ -212,6 +212,25 @@ func answersAsSaaS(apiOrigin string) bool {
 	}
 	response.Body.Close()
 	return response.StatusCode == http.StatusNotFound
+}
+
+// readyWait bounds readWhenReady: `haven up --detach` returns before the lanes listen.
+var readyWait, readyPoll = 15 * time.Minute, 10 * time.Second
+
+// readWhenReady reads the stack -up started, polling until both lanes listen.
+func readWhenReady(ctx context.Context, slug string) (diffkit.SharedStack, error) {
+	deadline := time.Now().Add(readyWait)
+	for {
+		stack, err := haven.read(ctx, slug)
+		if err == nil || time.Now().After(deadline) {
+			return stack, err
+		}
+		select {
+		case <-ctx.Done():
+			return stack, ctx.Err()
+		case <-time.After(readyPoll):
+		}
+	}
 }
 
 func havenUp(ctx context.Context, request upRequest) error {

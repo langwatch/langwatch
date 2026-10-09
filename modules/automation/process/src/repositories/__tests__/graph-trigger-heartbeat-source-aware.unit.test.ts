@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type GraphTriggerHeartbeatDeps,
   GraphTriggerHeartbeatService,
-} from "../../services/graph-trigger-heartbeat.service.ts";
+} from "../../features/graph-alert/services/graph-trigger-heartbeat.service.ts";
 import type { GraphTriggerSentRepository } from "../graph-trigger-sent.repository.ts";
 import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes.ts";
 

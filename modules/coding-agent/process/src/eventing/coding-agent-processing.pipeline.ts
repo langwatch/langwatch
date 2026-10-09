@@ -1,10 +1,13 @@
 import {
+  admitsCodingAgentSpan,
   type CodingAgentProjectionPersistence,
   CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
   type CodingAgentProcessingEvent,
   spanFactsContributedEventSchema,
   logFactsContributedEventSchema,
   metricFactsContributedEventSchema,
+  parseSpanFactsLiftedPayload,
+  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
 } from "@langwatch/coding-agent-contract";
 import {
   defineAggregate,
@@ -15,7 +18,12 @@ import {
   type RegisteredCommand,
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
+  type LaneAlias,
 } from "@langwatch/eventing";
+import {
+  GITHUB_INSTALLATION_CONNECTED_EVENT_TYPE,
+  githubInstallationConnectedEventDataSchema,
+} from "@langwatch/github-contract";
 import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   canonicalLogRecordSchema,
@@ -24,9 +32,16 @@ import {
   canonicalMetricDataPointSchema,
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
 } from "@langwatch/metric-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  spanReceivedEventDataSchema,
+  type SpanReceivedEventData,
+  type TraceApi,
+} from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { CodingAgentModule } from "../app/coding-agent.app.ts";
+import type { CodingAgentPullRequestMappingBackfill } from "../features/pull-requests/services/coding-agent-pull-request-mapping-backfill.service.ts";
 import type { CodingAgentSessionFoldCacheRepository } from "../repositories/coding-agent-session-fold-cache.repository.ts";
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
@@ -57,6 +72,16 @@ import { createPullRequestMappingSubscriber } from "./pull-request-mapping.subsc
 import { SessionMetricSeriesMapProjection } from "./session-metric-series.projection.ts";
 
 const metricPointIdOf = canonicalMetricDataPointSchema.pick({ pointId: true });
+const connectedAtOf = githubInstallationConnectedEventDataSchema.pick({ occurredAt: true });
+const spanIdOf = z.object({ span: spanReceivedEventDataSchema.shape.span.pick({ spanId: true }) });
+
+/** Only spans a coding agent claims by name and scope mint a job (main's dispatch filter). */
+function isCodingAgentSpan(data: SpanReceivedEventData): boolean {
+  return admitsCodingAgentSpan({
+    name: data.span.name,
+    scopeName: data.instrumentationScope?.name ?? null,
+  });
+}
 
 export interface CodingAgentProcessingPipelineDeps {
   traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">;
@@ -73,10 +98,12 @@ export interface CodingAgentProcessingPipelineDeps {
   sessionFoldCache: CodingAgentSessionFoldCacheRepository;
   /** Absent where there is no GitHub connection to ask: no mapping subscriber is mounted. */
   github?: CodingAgentPullRequestMapping;
+  /** Relinks an organization's sessions when GitHub records a connect; absent, no lane mounts. */
+  installationBackfill?: CodingAgentPullRequestMappingBackfill;
   /** Lifts what log and metric received into this pipeline's contribution commands. */
   receivedFacts: Pick<
     CodingAgentReceivedFactsService,
-    "contributeReceivedLogRecord" | "contributeReceivedMetricPoint"
+    "contributeReceivedSpan" | "contributeReceivedLogRecord" | "contributeReceivedMetricPoint"
   >;
 }
 
@@ -162,6 +189,26 @@ export class EventingCodingAgentProcessingAdapter {
           traceCanonicalisation: deps.traceCanonicalisation,
         }),
       )
+      .withPeerSubscriber("codingAgentSpanFactsDispatch", {
+        eventType: SPAN_RECEIVED_EVENT_TYPE,
+        data: spanReceivedEventDataSchema,
+        options: {
+          delay: 2_000,
+          deduplication: {
+            // Span ids are unique only within a trace, so the key carries the trace too.
+            makeId: (event) =>
+              `coding-agent-span-facts:${event.tenantId}:${String(event.aggregateId)}:${spanIdOf.parse(event.data).span.spanId}`,
+            ttlMs: 60_000,
+          },
+          enqueue: { filter: isCodingAgentSpan },
+        },
+        handle: (data, context) =>
+          deps.receivedFacts.contributeReceivedSpan({
+            tenantId: String(context.tenantId),
+            occurredAt: context.occurredAt,
+            data,
+          }),
+      })
       .withPeerSubscriber("codingAgentLogFactsDispatch", {
         eventType: CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
         data: canonicalLogRecordSchema,
@@ -186,6 +233,7 @@ export class EventingCodingAgentProcessingAdapter {
         },
         handle: (point) => deps.receivedFacts.contributeReceivedMetricPoint(point),
       })
+      .withLaneAliases(MAIN_FACTS_DISPATCH_ALIASES)
       // ADR-066 pillar 2: coalesce contributions preserving order; sharding would break
       // order-dependent model-call derivations. The log lane fills the session-context
       // memo from a declaration; the span lane only reads it.
@@ -210,12 +258,28 @@ export class EventingCodingAgentProcessingAdapter {
         },
       });
 
-    const configured = github
+    const mapped = github
       ? builder.withProjectionSubscriber(
           "pullRequestMapping",
           createPullRequestMappingSubscriber(github),
         )
       : builder;
+    const backfill = deps.installationBackfill;
+    // The backfill re-asks idempotent branch mappings, so a redelivered connect is harmless.
+    const configured = backfill
+      ? mapped.withPeerSubscriber("codingAgentInstallationBackfill", {
+          eventType: GITHUB_INSTALLATION_CONNECTED_EVENT_TYPE,
+          data: githubInstallationConnectedEventDataSchema,
+          options: {
+            deduplication: {
+              makeId: (event) =>
+                `coding-agent-installation-backfill:${event.tenantId}:${String(event.aggregateId)}:${connectedAtOf.parse(event.data).occurredAt}`,
+              ttlMs: 60_000,
+            },
+          },
+          handle: ({ organizationId }) => backfill.backfillPullRequestMappings({ organizationId }),
+        })
+      : mapped;
 
     return (deps.retention ? configured.withRetention(deps.retention) : configured).build();
   }
@@ -236,3 +300,36 @@ export const codingAgentEventing = defineEventingModule({
     app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });
+
+/**
+ * Main's dispatch lanes on trace, log and metric, consumed here until 3.21.0 is cut (round 49 E4).
+ * Main staged a coding-agent span as its lifted facts, which are this command's data, or whole.
+ */
+const MAIN_FACTS_DISPATCH_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "trace_processing:subscriber:codingAgentSpanFactsDispatch",
+    to: { jobType: "command", lane: "contributeSpanFacts" },
+    eventTypes: [SPAN_FACTS_LIFTED_PAYLOAD_TYPE],
+    data: (stored) => {
+      const lifted = parseSpanFactsLiftedPayload(stored);
+      return lifted ? { ...lifted.data, tenantId: lifted.tenantId } : stored;
+    },
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "trace_processing:subscriber:codingAgentSpanFactsDispatch",
+    to: { jobType: "subscriber", lane: "codingAgentSpanFactsDispatch" },
+    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "log_processing:subscriber:codingAgentLogFactsDispatch",
+    to: { jobType: "subscriber", lane: "codingAgentLogFactsDispatch" },
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "metric_processing:subscriber:codingAgentMetricFactsDispatch",
+    to: { jobType: "subscriber", lane: "codingAgentMetricFactsDispatch" },
+    removeAfter: "3.21.0",
+  },
+];

@@ -22,7 +22,8 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) =
   useLangyStore: (selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown) =>
     selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
 }));
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({

@@ -39,6 +39,9 @@
       "path": "../../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -54,16 +57,28 @@
       "path": "../../../../modules/langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/model-provider/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/onboarding/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/client/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/webhook/client/tsconfig.build.json"
     }
   ]
 }

@@ -13,6 +13,7 @@ import type {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
+import { buildSeatLimitInfo } from "../rules/seat-limit.rules.ts";
 import { USAGE_UNKNOWN, type UsageCounter } from "./usage-enforcement.service.ts";
 
 /**
@@ -178,6 +179,11 @@ export class UsageStatsService {
       membersLiteCount: seats.liteMembers,
       membersDeveloperCount: seats.developers,
       messageLimitInfo,
+      seatLimitInfo: buildSeatLimitInfo({
+        plan: activePlan,
+        membersCount: seats.fullMembers,
+        membersLiteCount: seats.liteMembers,
+      }),
       usageUnit,
     };
   }

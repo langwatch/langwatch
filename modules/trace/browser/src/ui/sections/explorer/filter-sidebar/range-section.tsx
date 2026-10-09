@@ -4,7 +4,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 
-import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
+import { useFacetLensStore } from "../../../../features/facet/behavior/facet-lens.store.ts";
 import {
   commitRange as commitRangeShared,
   RangeEndpointInput,

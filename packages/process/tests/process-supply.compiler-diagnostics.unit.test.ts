@@ -51,9 +51,9 @@ const statements = {
   configTypo:
     'createApp({ role: "api" }).withModules([configModule]).withConfig({ "api-key": { peper: "test" } });',
   peer: 'createApp({ role: "api" }).withModules([peerModule]).boot();',
-  supplyTokenMissing: 'createApp({ role: "api" }).withModules([licenseConsumerModule]).boot();',
-  supplyTokenType:
-    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licenseSource: { resolve: () => 42 } });',
+  unservedPeerMissing: 'createApp({ role: "api" }).withModules([licenseConsumerModule]).boot();',
+  unservedPeerType:
+    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licensing: { resolve: () => 42 } });',
   peerType:
     'createApp({ role: "api" }).withModules([peerModule]).provide({ project: { other: () => "wrong" } });',
   peerEarlier:
@@ -91,8 +91,6 @@ const statements = {
     'function installNameEvidenceErased(module: Omit<typeof clockModule, "name"> & { readonly name: string }) { return createApp({ role: "api" }).withModules([module]); }',
   broadSchema:
     'function installBroadSchema(module: Omit<typeof clockModule, "configSchema"> & Pick<SupplyModule, "configSchema">) { return createApp({ role: "api" }).withModules([module]); }',
-  membersEvidenceErased:
-    'function installMembersEvidenceErased(module: Omit<typeof clockModule, "members">) { return createApp({ role: "api" }).withModules([module]); }',
   unionArray:
     'const unionArray: (typeof peerModule | typeof projectModule)[] = [peerModule]; createApp({ role: "api" }).withModules(unionArray);',
   unionTuples:
@@ -121,8 +119,8 @@ const statements = {
   goodMemory:
     'createApp({ role: "api" }).withModules([memoryRepositoryModule]).withClock(clock).boot();',
   goodPeer: 'createApp({ role: "api" }).withModules([peerModule]).provide({ project }).boot();',
-  goodSupplyToken:
-    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licenseSource }).boot();',
+  goodUnservedPeer:
+    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licensing: licenseSource }).boot();',
   installedLater:
     'createApp({ role: "api" }).withModules([peerModule]).withModules([projectModule]).boot();',
   noModules: 'createApp({ role: "worker" }).boot();',
@@ -211,8 +209,8 @@ describe("compiler checked process supply", () => {
     "configSlice",
     "configType",
     "peer",
-    "supplyTokenMissing",
-    "supplyTokenType",
+    "unservedPeerMissing",
+    "unservedPeerType",
     "peerType",
     "peerEarlier",
     "widened",
@@ -234,7 +232,6 @@ describe("compiler checked process supply", () => {
     "namedWidenedModuleParameter",
     "nameEvidenceErased",
     "broadSchema",
-    "membersEvidenceErased",
     "unionArray",
     "unionTuples",
     "indexedPeer",
@@ -254,7 +251,7 @@ describe("compiler checked process supply", () => {
   /** @scenario "Supplying nothing names everything missing at once" */
   it("names the whole missing supply in one refusal", () => {
     const refusal = diagnostics.get("all")?.join("\n");
-    const outstanding = refusal?.match(/MissingSupply<([^']+)>/)?.[1];
+    const outstanding = refusal?.match(/MissingRequirement<([^']+)>/)?.[1];
     for (const name of [
       "relational",
       "keyvalue",
@@ -279,9 +276,11 @@ describe("compiler checked process supply", () => {
   });
 
   it("names declared custom members and external supplies", () => {
-    expect(diagnostics.get("customMissing")?.join("\n")).toContain('MissingSupply<"connections">');
-    expect(diagnostics.get("supplyTokenMissing")?.join("\n")).toContain(
-      'MissingSupply<"peer.licenseSource">',
+    expect(diagnostics.get("customMissing")?.join("\n")).toContain(
+      'MissingRequirement<"connections">',
+    );
+    expect(diagnostics.get("unservedPeerMissing")?.join("\n")).toContain(
+      'MissingRequirement<"peer.licensing">',
     );
   });
 
@@ -290,9 +289,11 @@ describe("compiler checked process supply", () => {
   });
 
   it("keeps config slices, members and peer gaps at 49 modules", () => {
-    expect(diagnostics.get("scale")?.join("\n")).toContain('MissingSupply<"clock">');
+    expect(diagnostics.get("scale")?.join("\n")).toContain('MissingRequirement<"clock">');
     expect(diagnostics.get("scaleConfig")?.join("\n")).toContain("m48");
-    expect(diagnostics.get("scalePeer")?.join("\n")).toContain('MissingSupply<"peer.project">');
+    expect(diagnostics.get("scalePeer")?.join("\n")).toContain(
+      'MissingRequirement<"peer.project">',
+    );
   });
 
   it("records the default diagnostic truncation boundary", () => {
@@ -300,7 +301,7 @@ describe("compiler checked process supply", () => {
       const count = index + 1;
       const name = `missing${String(count).padStart(2, "0")}`;
       const refusal = diagnostics.get(name)?.join("\n");
-      const outstanding = refusal?.match(/MissingSupply<([^']+)>/)?.[1];
+      const outstanding = refusal?.match(/MissingRequirement<([^']+)>/)?.[1];
       return { count, truncated: outstanding?.includes("more") ?? true };
     });
     expect(measured.filter(({ truncated }) => !truncated).at(-1)?.count).toBe(15);
@@ -309,7 +310,7 @@ describe("compiler checked process supply", () => {
 
   it("shows the real-scale all-missing diagnostic is truncated", () => {
     const refusal = diagnostics.get("scaleAll")?.join("\n");
-    const outstanding = refusal?.match(/MissingSupply<([^']+)>/)?.[1];
+    const outstanding = refusal?.match(/MissingRequirement<([^']+)>/)?.[1];
     expect(outstanding).toContain("more");
   });
 
@@ -319,7 +320,7 @@ describe("compiler checked process supply", () => {
     "goodCustom",
     "goodMemory",
     "goodPeer",
-    "goodSupplyToken",
+    "goodUnservedPeer",
     "installedLater",
     "noModules",
     "noAnalytics",

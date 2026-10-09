@@ -7,6 +7,7 @@ import { lintFrameworkModuleContracts } from "./boundaries/framework-module-cont
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
 import { lintPlatformOperatorCalls } from "./boundaries/platform-operator-calls.ts";
+import { lintRestNamespaceOwners } from "./boundaries/rest-namespace-owners.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
@@ -19,11 +20,13 @@ import {
 import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
 import { lintEventingTableAccess } from "./persistence/eventing-table-access.ts";
 import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
+import { lintMigrationOwners } from "./persistence/migration-owners.ts";
 import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
 import {
   lintPrismaTableOwnership,
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
+import { lintRerunnableMigrations } from "./persistence/rerunnable-migrations.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
@@ -116,6 +119,16 @@ export const POLICIES: readonly PolicyDefinition[] = [
     run: lintClickhouseTableOwnership,
   }),
   definePolicy({
+    id: "migration-owners",
+    spec: "specs/migration-owners.feature",
+    run: lintMigrationOwners,
+  }),
+  definePolicy({
+    id: "rerunnable-migrations",
+    spec: "specs/rerunnable-migrations.feature",
+    run: lintRerunnableMigrations,
+  }),
+  definePolicy({
     id: "prisma-migration-access",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintPrismaMigrationAccessPolicy,
@@ -189,6 +202,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "platform-operator-calls",
     spec: "specs/tooling/lint-platform-operator-calls.feature",
     run: lintPlatformOperatorCalls,
+  }),
+  definePolicy({
+    id: "rest-namespace-owners",
+    spec: "specs/rest-namespace-owners.feature",
+    run: lintRestNamespaceOwners,
   }),
   definePolicy({
     id: "framework-module-contracts",

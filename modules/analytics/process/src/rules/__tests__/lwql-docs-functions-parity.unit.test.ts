@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_ALLOWED_FUNCTION_NAMES } from "../langwatch-ql-functions.rules.ts";
+import { LWQL_ALLOWED_FUNCTION_NAMES } from "../../features/app-functions/rules/langwatch-ql-functions.rules.ts";
 
 const DOCS_PATH = fileURLToPath(
   new URL("../../../../../../docs/api-reference/query/overview.mdx", import.meta.url),

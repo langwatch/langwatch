@@ -5,6 +5,7 @@ import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
 import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types.ts";
+import { WHOLE_RUN_COMPLETENESS } from "./run-completeness.fixture.ts";
 
 // Helper to create base timestamps
 const createTimestamps = () => ({
@@ -19,6 +20,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [],
         evaluations: [],
         timestamps: {
@@ -40,6 +42,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [],
         evaluations: [],
         timestamps: createTimestamps(),
@@ -58,6 +61,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [],
         evaluations: [],
         timestamps: {
@@ -78,6 +82,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [],
         evaluations: [],
         timestamps: createTimestamps(),
@@ -95,6 +100,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           { index: 0, entry: { input: "hello" } },
           { index: 1, entry: { input: "world" } },
@@ -118,6 +124,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           {
             index: 0,
@@ -172,6 +179,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           {
             index: 0,
@@ -199,6 +207,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           {
             index: 0,
@@ -225,6 +234,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [{ index: 0, entry: { input: "test" }, predicted: { out: "x" } }],
         evaluations: [
           {
@@ -250,6 +260,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           {
             index: 0,
@@ -279,6 +290,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [
           { id: "target-1", name: "gpt-5-mini", type: "prompt", model: "gpt-5-mini" },
           { id: "target-2", name: "Claude", type: "prompt", model: "claude-3" },
@@ -339,6 +351,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [{ id: "target-1", name: "gpt-5-mini", type: "prompt" }],
         dataset: [
           {
@@ -391,6 +404,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [
           {
             id: "agent-1",
@@ -422,6 +436,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [
           {
             id: "prompt-1",
@@ -458,6 +473,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           {
             index: 0,
@@ -486,6 +502,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           {
             index: 0,
@@ -524,6 +541,7 @@ describe("transformBatchEvaluationData", () => {
           experimentId: "exp-1",
           runId: "run-1",
           projectId: "proj-1",
+          completeness: WHOLE_RUN_COMPLETENESS,
           dataset: [{ index: 0, entry: { img: url } }],
           evaluations: [],
           timestamps: createTimestamps(),
@@ -541,6 +559,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           { index: 0, entry: { input: "row0" } },
           { index: 2, entry: { input: "row2" } },
@@ -565,6 +584,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [{ index: 0, entry: { input: "test" }, predicted: { out: "x" } }],
         evaluations: [
           {
@@ -591,6 +611,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           { index: 0, entry: { question: "What is 2+2?" } },
           { index: 1, entry: { question: "What is 3+3?" } },
@@ -653,6 +674,7 @@ describe("transformBatchEvaluationData", () => {
           experimentId: "exp-1",
           runId: "run-1",
           projectId: "proj-1",
+          completeness: WHOLE_RUN_COMPLETENESS,
           dataset: [{ index: 0, entry: { input: "test" } }],
           evaluations: [
             {
@@ -681,6 +703,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
         evaluations: [
           {
@@ -732,6 +755,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
         evaluations: [
           {
@@ -764,6 +788,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         dataset: [
           {
             index: 0,
@@ -796,6 +821,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: null,
         dataset: [
           {
@@ -849,6 +875,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: null,
         dataset: [
           { index: 0, entry: { question: "What is 2+2?" } },
@@ -874,6 +901,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [
           {
             id: "gpt-4",
@@ -990,6 +1018,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [
           { id: "gpt-4", name: "GPT-4", type: "custom" },
           { id: "claude-3", name: "Claude-3", type: "custom" },
@@ -1062,6 +1091,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
         targets: [{ id: "gpt-4", name: "GPT-4", type: "custom" }],
         dataset: [{ index: 0, entry: { question: "Test" } }],
         evaluations: [

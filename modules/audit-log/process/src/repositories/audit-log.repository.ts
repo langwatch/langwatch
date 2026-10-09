@@ -1,6 +1,8 @@
 import type {
   AuditLogEntry,
   AuditLogHistoryEntry,
+  AuditLogTargetEntry,
+  FindAuditLogByTargetKindInput,
   ListAuditLogEntityHistoryInput,
   RecordedAuditLogEntry,
   RecordedSinceInput,
@@ -8,12 +10,14 @@ import type {
 
 export interface AuditLogRepository {
   create(entry: AuditLogEntry): Promise<RecordedAuditLogEntry>;
-  /** Writes the row under `id` unless one exists; either way answers the stored row. */
+  /** Writes the row unless one holds `idempotencyKey`; either way answers the stored row. */
   createOnce(keyed: {
     entry: AuditLogEntry;
-    id: string;
+    idempotencyKey: string;
     occurredAt: number;
   }): Promise<RecordedAuditLogEntry>;
   findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
+  /** Newest first, at most `limit`. */
+  findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]>;
 }

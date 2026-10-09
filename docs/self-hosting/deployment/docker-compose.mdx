@@ -37,6 +37,7 @@ Docker Compose starts the following services:
 | Service         | Image                                   | Host port | Description                 |
 | --------------- | --------------------------------------- | --------- | --------------------------- |
 | `app`           | `langwatch/langwatch:latest`            | 5560      | Main application            |
+| `migrate`       | `langwatch/langwatch:latest`            | -         | One-shot: runs `pnpm task upgrade`, then exits |
 | `workers`       | `langwatch/langwatch:latest`            | -         | Background job processing   |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest`        | -         | NLP processing, workflows   |
 | `langevals`     | `langwatch/langevals:latest`            | 5562      | Evaluators, guardrails      |
@@ -69,7 +70,7 @@ LANGWATCH_NLP_INTERNAL_SECRET=
 LANGWATCH_LICENSE_KEY=
 ```
 
-See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. See [Security](/self-hosting/security#credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. To replace it, see [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
@@ -101,6 +102,8 @@ docker compose -f infra/compose.yml --project-directory . down
 docker compose -f infra/compose.yml --project-directory . pull
 docker compose -f infra/compose.yml --project-directory . up -d
 ```
+
+The one-shot `migrate` service runs `pnpm task upgrade` on the new image on every `up`; the app and the workers start only after it completes successfully. On a current installation it applies no step. If it fails, read `docker compose logs migrate`; the exit code is explained in the [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ### Reset data
 

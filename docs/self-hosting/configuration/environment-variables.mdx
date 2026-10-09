@@ -20,8 +20,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                          | Description                                                                                                                             | Required | Default                       |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------- |
 | `DATABASE_URL`                    | PostgreSQL connection string                                                                                                            | Yes      | -                             |
-| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`)                                                         | Yes      | -                             |
-| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection         | No       | `180`                         |
+| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`). Without it the app and workers refuse to start| Yes      | -                             |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds `pnpm task upgrade` waits for ClickHouse to accept connections before failing. `0` fails on the first refused connection     | No       | `180`                         |
 | `REDIS_URL`                       | Redis connection string                                                                                                                 | Yes      | -                             |
 | `NODE_ENV`                        | Environment (`production`, `development`)                                                                                               | No       | `production`                  |
 | `BASE_HOST`                       | Public URL of the application, used in invite links, emails and the links the app hands out                                             | Yes      | -                             |
@@ -39,7 +39,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                              | Description                                                                                                                                                                                                                                                                                                                                                                                                           | Required           |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | `NEXTAUTH_SECRET`                     | Signs sessions, keys the sign-in lock-out records and unsubscribe links, and encrypts two-step verification backup codes. Changing it signs every user out                                                                                                                                                                                                                                                            | Yes                |
-| `CREDENTIALS_SECRET`                  | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes                |
+| `CREDENTIALS_SECRET`                  | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it without a rotation makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes                |
+| `CREDENTIALS_SECRET_PREVIOUS`         | The old `CREDENTIALS_SECRET` during a rotation. Read-only: values encrypted or hashed with it are still accepted, and new writes use `CREDENTIALS_SECRET`. Same 64 hex format. Unset it when the rotation is done. See [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) | No                 |
 | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | Key for the stand-in that replaces an erased identifier. At least 32 characters. Needed once anyone is erased, with the same value on the app and the workers (Helm: `app.extraEnvs` and `workers.extraEnvs`). Never change it after the first erasure                                                                                                                                                                | For erasure        |
 | `LANGWATCH_INSTANCE_ADMIN_API_KEY`    | Bearer credential for the organization provisioning API (`/api/organizations`). At least 32 characters. Unset, that API answers 404                                                                                                                                                                                                                                                                                   | No                 |
 | `API_TOKEN_JWT_SECRET`                | Not used by any feature. No code reads it; it can be left unset                                                                                                                                                                                                                                                                                                                                                       | No                 |
@@ -156,6 +157,8 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | - |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
+| `OBJECT_RETENTION_CONFIRMED` | Set to `true` to confirm that the container has a lifecycle rule for every prefix in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle). Azure refuses oversized writes until it is set; the local filesystem always refuses them | `false` |
+| `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | Earlier, spool-only spelling of `OBJECT_RETENTION_CONFIRMED`. Still confirms when `OBJECT_RETENTION_CONFIRMED` is unset | `false` |
 
 <Warning>
 When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below).
@@ -334,11 +337,23 @@ Model providers for evaluators, including Azure OpenAI, are configured per proje
 | `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. Phone runs fail when `VOICE_PUBLIC_BASE_URL` is unset and no tunnel is open. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
 | `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
-## Feature Flags
+## Upgrade
 
-| Variable              | Description                                     | Default |
-| --------------------- | ----------------------------------------------- | ------- |
-| `SKIP_PRISMA_MIGRATE` | `true` skips PostgreSQL migrations on startup | `false` |
+The app and the workers never migrate on startup: `pnpm task upgrade` does, before they start, and they refuse to start until it has run. See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade).
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SKIP_PRISMA_MIGRATE` | `1` or `true` makes `pnpm task upgrade` leave PostgreSQL alone, and unable to mark a failed migration rolled back. The app and workers refuse to start until an upgrade runs without it | `false` |
+| `SKIP_CLICKHOUSE_MIGRATE` | `true` (only) makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence | `false` |
+| `SKIP_LWQL_PROVISION` | `1` or `true` makes `pnpm task upgrade` skip LangWatchQL provisioning | `false` |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Listed under [Core Configuration](#core-configuration) | `180` |
+| `CLICKHOUSE_CLUSTER` | Cluster name. When set, the upgrade creates Replicated engines and replicates DDL across nodes | - |
+| `CLICKHOUSE_COLD_STORAGE_ENABLED` | `true` makes the upgrade's reconcile phase write TTLs that move aged data to the cold volume | `false` |
+| `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` | Hot days for every table without its own `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS` | each table's built-in default |
+| `BASE_HOST` | The upgrade's last log line reads it to say where the UI is | - |
+| `BUILD_TIME` | Set while building an image: the upgrade applies no ClickHouse migration. Leave unset at runtime | unset |
+
+Exit codes, outcome codes and the log lines are in [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ## Cloud admin
 
@@ -379,6 +394,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.signUp.allowedDomains` | `SIGN_UP_ALLOWED_DOMAINS` (joined with commas) |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
+| `app.credentialsEncryptionKey.previous.value` | `CREDENTIALS_SECRET_PREVIOUS`, only when set. With `secrets.existingSecret`, name its key in `secrets.secretKeys.credentialsEncryptionKeyPrevious` instead |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
 | `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
@@ -390,11 +406,10 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.email.providers.smtp.user` | `SMTP_USER` |
 | `app.email.providers.smtp.password.value` | `SMTP_PASSWORD` |
 | `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
-| `app.evaluators.azureOpenAI.endpoint.value` / `.apiKey.value` | `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY` when `app.evaluators.azureOpenAI.enabled` is on. The app does not read them; configure Azure OpenAI in **Settings > Model Providers** |
 | `app.evaluators.google.credentials.value` | `GOOGLE_APPLICATION_CREDENTIALS` when `app.evaluators.google.enabled` is on |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.telemetry.metrics.apiKey.value` | `METRICS_API_KEY` when `app.telemetry.metrics.enabled` is on |
-| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
+| `app.telemetry.metrics.apiKey.value` | `LANGWATCH_METRICS_TOKEN`, with `LANGWATCH_METRICS_MODE=prometheus`, when `app.telemetry.metrics.enabled` is on |
+| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
 | `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
@@ -402,6 +417,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.objectRetentionConfirmed` | `OBJECT_RETENTION_CONFIRMED`. Confirms the lifecycle rules in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle) |
+| `app.dataplane.providers.azureBlob.spoolRetentionConfirmed` | Earlier spelling; either value sets `OBJECT_RETENTION_CONFIRMED=true` |
 | `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST`. Required alongside a sovereign endpoint in a token-based mode |
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |

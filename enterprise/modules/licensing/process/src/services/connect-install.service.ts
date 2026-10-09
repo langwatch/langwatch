@@ -10,6 +10,7 @@ import {
   type ConnectCredential,
   type ConnectDeploymentView,
   type ConnectService,
+  type ConnectServiceState,
   type ConnectStatus,
   type ConnectSyncView,
   ConnectDisabledError,
@@ -125,6 +126,21 @@ export class ConnectInstallService {
   }): Promise<boolean> {
     const enabled = await this.findEnabledServices(organizationId);
     return enabled.includes(service);
+  }
+
+  /** Both halves of one service's answer apart, from one read of the organization's row. */
+  async getServiceState({
+    organizationId,
+    service,
+  }: {
+    organizationId: string;
+    service: ConnectService;
+  }): Promise<ConnectServiceState> {
+    if (!this.deps.deployment.permitted) return { isEntitled: false, isSwitchedOn: false };
+    const organization = await this.deps.organizations.findById(organizationId);
+    const isEntitled = this.entitledOf(organization).includes(service);
+    const isSwitchedOff = (organization?.servicesDisabled ?? []).includes(service);
+    return { isEntitled, isSwitchedOn: isEntitled && !isSwitchedOff };
   }
 
   /**

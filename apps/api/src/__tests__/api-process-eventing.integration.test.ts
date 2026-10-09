@@ -1,14 +1,17 @@
 /**
- * The api's Eventing runtime as the api role composes it: producer-only, with no event log.
+ * The api's Eventing runtime as the api role composes it: producer-only, with no event log, and
+ * a one-event read seat beside its store.
  * @vitest-environment node
  * @see specs/server/api-process-eventing.feature
  */
 import {
   createTenantId,
+  EventLogReadSeat,
   EventSourcing,
   EventStoreProducerOnly,
   InMemoryProcessStore,
 } from "@langwatch/eventing";
+import { EventRepositoryMemory } from "@langwatch/eventing/testing";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
@@ -48,7 +51,62 @@ function stagingApiEventing() {
   return { eventing, staged };
 }
 
+/** The api runtime with the read seat `buildEventing` composes beside the refusing store. */
+async function apiEventingWithReadSeat() {
+  const repository = EventRepositoryMemory.createForTesting();
+  await repository.insertEventRecords([
+    {
+      TenantId: "project-1",
+      AggregateType: "trace",
+      AggregateId: "trace-1",
+      EventId: "event-1",
+      EventTimestamp: 1_700_000_000_000,
+      EventOccurredAt: 1_700_000_000_000,
+      EventType: "lw.obs.trace.span_received",
+      EventVersion: "2025-12-14",
+      EventPayload: { body: "the whole log line" },
+      ProcessingTraceparent: "",
+      IdempotencyKey: "event-1",
+    },
+  ]);
+  return new EventSourcing({
+    enabled: true,
+    eventStore: EventStoreProducerOnly.create({ processName: PROCESS_NAME }),
+    eventReadSeat: EventLogReadSeat.create({ repository }),
+    consumersEnabled: false,
+    participation: "produce",
+    processManagerMode: "producer-only",
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
+}
+
 describe("the api process's Eventing runtime", () => {
+  describe("when it composes a read seat beside its producer-only store", () => {
+    /** @scenario "The API process answers one event through its read seat" */
+    it("answers one event through the seat while its store still refuses reads", async () => {
+      const eventing = await apiEventingWithReadSeat();
+      const { runtime } = await bootApi({ eventing });
+      const read = {
+        tenantId: createTenantId("project-1"),
+        aggregateType: "trace" as const,
+        aggregateId: "trace-1",
+        eventId: "event-1",
+      };
+
+      try {
+        await expect(eventing.eventReadSeat?.getEvent(read)).resolves.toMatchObject({
+          id: "event-1",
+          data: { body: "the whole log line" },
+        });
+        await expect(eventing.eventStore!.getEvent(read)).rejects.toThrow(
+          new RegExp(`${PROCESS_NAME}.*getEvent`, "s"),
+        );
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when every installed module registers its pipelines on it", () => {
     /** @scenario "The API process's Eventing runtime owns no event log" */
     it("refuses an append and names the process", async () => {

@@ -16,7 +16,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PersonalWorkspaceIdentityService } from "../../../services/personal-workspace-identity.service.ts";
+import { PersonalWorkspaceIdentityService } from "../../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
@@ -82,9 +82,22 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
       data: { userId: leaverUserId, organizationId, role: OrganizationUserRole.MEMBER },
     });
 
-    const workspace = await ensureLeaverWorkspace();
-    personalTeamId = workspace.workspace.team.id;
-    personalProjectId = workspace.workspace.project.id;
+    const first = await ensureLeaverWorkspace();
+    if (first.kind !== "pending") throw new Error("a first ensure leaves the project to project");
+    personalTeamId = first.team.id;
+    personalProjectId = identities.newProjectId();
+    // Stands in for project's subscriber, which creates the personal project.
+    await prisma!.project.create({
+      data: {
+        id: personalProjectId,
+        name: "Personal",
+        slug: `personal-${testNamespace}`,
+        apiKey: `sk-lw-${testNamespace}`,
+        teamId: personalTeamId,
+        language: "other",
+        framework: "other",
+      },
+    });
   });
 
   afterAll(async () => {
@@ -102,8 +115,12 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
   });
 
   describe("when an admin removes that member from the organization", () => {
+    let archivedTeamIds: string[] = [];
     beforeAll(async () => {
-      await membershipRepository.deleteMember({ organizationId, userId: leaverUserId });
+      archivedTeamIds = await membershipRepository.deleteMember({
+        organizationId,
+        userId: leaverUserId,
+      });
     });
 
     /** @scenario Removing a member takes their personal workspace with them */
@@ -112,9 +129,10 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
     });
 
     /** @scenario Removing a member takes their personal workspace with them */
-    it("archives its project with it", async () => {
+    it("answers the archived team and leaves the project to project", async () => {
+      expect(archivedTeamIds).toEqual([personalTeamId]);
       const rows = await workspaceRows();
-      expect(rows?.projects).toEqual([{ id: personalProjectId, archivedAt: expect.any(Date) }]);
+      expect(rows?.projects).toEqual([{ id: personalProjectId, archivedAt: null }]);
     });
 
     /** @scenario Removing a member takes their personal workspace with them */
@@ -142,9 +160,8 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
       it("hands back the same workspace rather than a new one", async () => {
         const result = await ensureLeaverWorkspace();
 
-        expect(result.created).toBe(false);
-        expect(result.workspace.team.id).toBe(personalTeamId);
-        expect(result.workspace.project.id).toBe(personalProjectId);
+        // Pending until project revives the personal project on organization's fact.
+        expect(result).toMatchObject({ kind: "pending", team: { id: personalTeamId } });
       });
 
       /** @scenario Inviting a removed member back gives them their workspace again */

@@ -155,8 +155,9 @@ Feature: haven service selection
 
     Scenario: Adding both developer tools is one command and it sticks
       When the developer runs "haven up +design-system +mail-room"
-      Then the design-system lane and the mail-room lane start as part of this stack
-      And a later plain "haven up" in this worktree still runs both
+      Then both developer-tool hostnames are routed for this stack
+      And neither tool is started until someone visits it
+      And a later plain "haven up" in this worktree still routes both
 
     # The lanes used to be called "storybook" and "mail"; the old names are
     # refused by name, naming the flag that replaced each one, the same way
@@ -167,27 +168,28 @@ Feature: haven service selection
       When the developer runs "haven up +mail"
       Then the command is refused, naming "+mail-room" as the replacement
 
+    # Haven runs no lane for either tool: the ui lane's dev server holds each
+    # tool's port, starts it on the first visit and stops it once idle, the same
+    # with or without haven (specs/setup/dev-process-topology.feature).
     Scenario: A selected developer tool is reached by hostname
-      Given a worktree running both developer tools
+      Given a worktree that selected both developer tools
       Then the Storybook is served at "design-system.<slug>.langwatch.localhost"
       And the mail studio is served at "mail-room.<slug>.langwatch.localhost"
       And each is healthy once its root answers
-      And "haven logs design-system" shows that lane's own output
+      And the tool's output appears in "haven logs ui"
 
-    # The application already frames the Storybook at /design-system and starts
-    # one itself on the first visit unless something already answers on the port
-    # it derives. Handing it haven's port is what stops a second Storybook
-    # building the same stories beside the one the stack is already running.
-    Scenario: The application frames the Storybook the stack is already running
-      Given a worktree running the Storybook lane
+    # Haven hands the ui lane the port design-system.<slug> routes to, so the
+    # hostname and the application's /design-system reach the same Storybook.
+    Scenario: The application frames the Storybook the stack routes to
+      Given a worktree that selected the Storybook
       When someone opens "/design-system" in the application
-      Then the page frames the Storybook haven supervises
+      Then the page frames the Storybook behind "design-system.<slug>.langwatch.localhost"
       And no second Storybook is started
 
     # A stack missing one of the three Node lanes serves pages and quietly
     # processes no jobs. Neither developer tool can be mistaken for one of them.
     Scenario: A developer tool is not one of the three Node lanes
-      Given a worktree running both developer tools
+      Given a worktree that selected both developer tools
       When a reader asks which Node lanes the stack supervises
       Then the answer is still ui, api and workers
       And neither developer tool appears among them

@@ -4,9 +4,7 @@
  * we still hold names it — absence is not "never used".
  */
 
-import { type Instant, nowInstant, Temporal } from "@langwatch/time";
-
-import { readableDate } from "../../../model/display-formatters.ts";
+import { type Instant, nowInstant, Temporal, readableDate } from "@langwatch/time";
 
 const DAY_MS = 86_400_000;
 

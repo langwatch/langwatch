@@ -116,7 +116,7 @@ pnpm start:prepare:files            # generated files (Prisma client, etc.); fix
 pnpm generate:modules               # after editing modules/catalogue.json
 pnpm sync:references                # after adding/removing a workspace package
 pnpm test:affected / typecheck:affected   # Nx: only packages this change reached, cached
-pnpm prisma:migrate / clickhouse:migrate  # run via @langwatch/tasks
+pnpm start:prepare:db                # upgrade + system-migrations pass; the api refuses until it ran
 make go-lint-changed                # Go: lints your uncommitted edits (never raw golangci-lint)
 ```
 

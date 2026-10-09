@@ -14,7 +14,7 @@ import {
   filedCellSchema,
   filedCellFor,
   isReissuedElsewhere,
-} from "../rules/pulled-usage-reissue.rules.ts";
+} from "../features/ingestion-pull/rules/pulled-usage-reissue.rules.ts";
 import {
   PulledUsageLedgerIntent,
   type PulledUsagePricingDeps,

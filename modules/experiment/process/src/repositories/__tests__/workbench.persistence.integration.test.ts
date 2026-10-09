@@ -17,11 +17,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { UnavailableExperimentExecution } from "../../services/experiment-run-command-dispatcher.service.ts";
-import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
+import { UnavailableExperimentExecution } from "../../features/run/services/experiment-run-command-dispatcher.service.ts";
+import { NoopExperimentWorkbenchUpdates } from "../../features/workbench/services/experiment-workbench.service.ts";
 import {
   ExperimentService,
   type ExperimentService as ExperimentServiceContract,
@@ -96,6 +97,7 @@ const service = (): ExperimentServiceContract =>
     newId: () => `experiment_${randomUUID()}`,
     references,
     execution: UnavailableExperimentExecution.create(),
+    traces: createApiFixture<TraceApi>(),
     updates: NoopExperimentWorkbenchUpdates.create(),
   });
 

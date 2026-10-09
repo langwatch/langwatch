@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TraceModule } from "#app/trace.app";
-import { TraceQueryFieldValuesRepository } from "#repositories/query-field-values.repository";
+import { TraceQueryFieldValuesRepository } from "#features/query/repositories/query-field-values.repository";
 import { TracePayloadReaderRepository } from "#repositories/trace-payload-reader.repository";
 import { TraceSummaryReaderRepository } from "#repositories/trace-summary-reader.repository";
 
@@ -12,7 +12,7 @@ import type {
   TraceClickHouseResolver,
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
-import type { TraceFullIo } from "../services/trace-read-full-io.service.ts";
+import type { TraceFullIo } from "../features/read/services/trace-read-full-io.service.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
 import { traceReadPorts } from "./support/trace-read-ports.fake.ts";

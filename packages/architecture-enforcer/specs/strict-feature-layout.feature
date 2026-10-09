@@ -27,6 +27,21 @@ Feature: Strict versioned feature source layout
     And server-only artifact suffixes are rejected from contract source
 
   @unit @architecture
+  Scenario: A contract that records callable false declares no feature API
+    Given a strict contract package that declares no callable feature API
+    Then it is reported as missing its feature API
+    When its package.json records "callable": false
+    Then it is no longer reported
+
+  @unit @architecture
+  Scenario: A process package that records the plan it is staged on holds no service yet
+    Given a strict process package with no subject-named service
+    Then it is reported as missing its service
+    When its package.json records "staged" naming a plan under dev/docs/plans/ that exists
+    Then it is no longer reported
+    And a "staged" plan that does not exist leaves the finding in place
+
+  @unit @architecture
   Scenario: Behaviour-bearing modules are classes
     Given a layout-version-0 service, store, projection, API, migration, or repository module
     When Oxlint checks the module
@@ -46,6 +61,14 @@ Feature: Strict versioned feature source layout
     And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, a transport still built on a legacy REST or tRPC builder, unselected repositories, Prisma repositories without memory twins, a memory twin no contract test runs against both backends, a nested web entry, a refusing composition twin, a missing installer or app, or an installer no process boots
     When architecture lint checks the workspace
     Then the piece is reported with the reference shape it should take
+
+  @unit @architecture
+  Scenario: A staged module is not asked for its app or installer
+    Given a catalogue feature whose process package has no installer and no app
+    Then the missing installer and app are reported
+    When its package.json records "staged" naming a plan under dev/docs/plans/ that exists
+    Then neither is reported
+    And every other legacy piece it carries is still reported
 
   @integration @architecture
   Scenario: The reference feature carries no legacy piece
@@ -87,15 +110,6 @@ Feature: Strict versioned feature source layout
     When an API imports persistence or a service imports API, migration, or a concrete adapter
     Then Oxlint reports a feature-layer violation
     And the diagnostic identifies the allowed dependency direction
-
-  @unit @architecture
-  Scenario: API handlers use the composed request context
-    Given a layout-version-0 API class handles a request
-    When Oxlint checks its source
-    Then a service, actor, or tenant resolver callback receiving context is rejected
-    And casting the context or constructing a service or repository is rejected
-    And awaiting a resolver before awaiting the service operation is rejected
-    And direct context.app, context.actor(), and context.authorize() delegation is accepted
 
   @unit @architecture
   Scenario: A concern's repositories are held to the module's one registry, memory twin and contract test

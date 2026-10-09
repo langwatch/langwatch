@@ -85,7 +85,7 @@ function toIngestionSource({
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type IngestionSourceDatabase = Pick<PrismaClient, "ingestionSource" | "$transaction">;
+type IngestionSourceDatabase = Pick<PrismaClient, "ingestionSource" | "$transaction">;
 
 /**
  * Sources as Postgres holds them. `parserConfig.credentials` is sealed on every write and opened

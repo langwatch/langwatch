@@ -124,6 +124,12 @@ export interface ProcessTransaction<State = unknown> {
 /** {@link CommitResult} minus the outcome `transact` exists to remove. */
 export type TransactResult = Exclude<CommitResult, { outcome: "revisionConflict" }>;
 
+/**
+ * A caller's open database transaction, opaque here as the process database handle is; the durable
+ * adapter checks it at runtime and writes the outbox rows through it (Alex, audit R1, 2026-10-06).
+ */
+export type CallerTransaction = object;
+
 /** Transient append: intents only; deterministic messageKeys required. */
 export interface AppendIntentsResult {
   insertedMessageKeys: string[];
@@ -175,6 +181,8 @@ export interface ProcessStore {
     sourceEventId: string | null;
     messages: NewOutboxMessage[];
     now: number;
+    /** The caller's open transaction: the intents commit or roll back with its change. */
+    transaction?: CallerTransaction;
   }): Promise<AppendIntentsResult>;
 
   /** All messages for one process, primarily for diagnostics and tests. */

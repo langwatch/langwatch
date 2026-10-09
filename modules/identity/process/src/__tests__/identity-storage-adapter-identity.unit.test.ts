@@ -195,6 +195,7 @@ describe("better-auth over the identity storage adapter", () => {
             emailVerified: true,
             createdAtMs: attachedAtMs,
             userHashKey: null,
+            lastLoginAtMs: null,
           },
           accounts: [
             {
@@ -1277,7 +1278,7 @@ describe("the atomic passkey-delete adapter boundary", () => {
     });
 
     expect(remove).toHaveBeenCalledOnce();
-    expect(remove).toHaveBeenCalledWith({ passkeyId: "passkey-1" });
+    expect(remove).toHaveBeenCalledWith(expect.objectContaining({ passkeyId: "passkey-1" }));
   });
 
   /** @scenario "The passkey removal route refuses the last way in the same way" */

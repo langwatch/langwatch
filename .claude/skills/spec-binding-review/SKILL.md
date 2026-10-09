@@ -66,7 +66,7 @@ including what its setup builds.
 ## Level tags
 
 A binding lane may add a level tag to an untagged scenario and nothing else in a feature file
-(the owned paths of every `.claude/manifests/parity-bind-*.md`). Changing an existing tag to match
+(the owned paths of every local parity-bind manifest (gitignored)). Changing an existing tag to match
 the test (`@integration` to `@unit`) changes the requirement, so it goes to the coordinator as a
 behaviour question, never into the bind.
 

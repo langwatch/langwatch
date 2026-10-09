@@ -49,7 +49,7 @@ vi.mock("../../../behavior/annotation-api.ts", () => ({
       personalWorkspaceFeatures: { get: { invalidate: vi.fn() } },
     }),
     annotationScore: { getAll: { useQuery: () => ({ data: [] }) } },
-    project: {
+    traces: {
       getFieldRedactionStatus: {
         useQuery: () => ({
           data: {

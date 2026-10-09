@@ -6,7 +6,7 @@
 import type { SecretsChain } from "./chain.ts";
 import type { SecretHandle } from "./secret.ts";
 import {
-  AbsentSecretError,
+  SecretNotSetError,
   SealedSecretsError,
   SecretsPreflightError,
   UndeclaredSecretError,
@@ -35,7 +35,7 @@ export class SecretsResolver {
 
       const raw = await this.chain.fetch(handle.id);
 
-      if (raw === undefined && !handle.optional) throw new AbsentSecretError(handle.id);
+      if (raw === undefined && !handle.optional) throw new SecretNotSetError(handle.id);
 
       const value = raw === undefined ? undefined : (handle.schema?.parse(raw) ?? raw);
 

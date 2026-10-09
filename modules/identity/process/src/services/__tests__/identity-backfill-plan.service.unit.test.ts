@@ -16,6 +16,7 @@ const sam: BackfillUserRow & { email: string } = {
   emailVerified: true,
   createdAtMs: Date.UTC(2023, 2, 14, 9, 30),
   userHashKey: "a-hash-key",
+  lastLoginAtMs: null,
 };
 
 const auth0Row: BackfillAccountRow = {

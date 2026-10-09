@@ -3,6 +3,7 @@ import {
   type JoinLookupDecision,
   extractJoinDomain,
 } from "@langwatch/identity-contract";
+import { z } from "zod";
 
 /** Join-before-create interstitial: determines whether to offer workspace join. */
 
@@ -101,3 +102,25 @@ function joinableOf(offer: {
     colleagueCount: offer.colleagueCount,
   };
 }
+
+/**
+ * Where a new account goes before it makes an organization. Held here because
+ * both doors create accounts: the log-in door converts an unheld address too.
+ */
+export const JOIN_BEFORE_CREATE_PATH = "/auth/join";
+
+const joinOfferSchema = z.object({
+  organizationId: z.string(),
+  name: z.string(),
+  colleagueCount: z.number(),
+});
+
+/** The join matcher's answer as the wire carries it (the contract types it `unknown`). */
+export const joinLookupDecisionSchema: z.ZodType<JoinLookupDecision> = z.discriminatedUnion(
+  "outcome",
+  [
+    z.object({ outcome: z.literal("none") }),
+    z.object({ outcome: z.literal("ask"), organizations: z.array(joinOfferSchema) }),
+    z.object({ outcome: z.literal("auto"), organization: joinOfferSchema }),
+  ],
+);

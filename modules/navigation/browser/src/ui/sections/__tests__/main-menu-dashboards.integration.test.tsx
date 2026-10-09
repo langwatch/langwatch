@@ -8,7 +8,7 @@ import {
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
-} from "@langwatch/analytics-contract";
+} from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -32,7 +32,8 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
-import type { NavigationProject } from "../../../model/navigation-host.ts";
+import type { NavigationProject } from "@langwatch/navigation-contract";
+
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
 

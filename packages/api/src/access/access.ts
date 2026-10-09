@@ -34,6 +34,7 @@ import {
   PlatformSurfaceHiddenError,
   ScopeInputMismatchError,
 } from "../errors.ts";
+import { permissionDecisionRecord, recordPermissionDecision } from "./decision-record.ts";
 import { resolveDeclaredScope } from "./declaration.ts";
 import {
   AUTHZ_DECLARATION,
@@ -740,6 +741,7 @@ async function decidePermission({
     permission: declaration.permission,
     scope,
   });
+  recordDecision({ actor, permission: declaration.permission, scope, decision });
 
   if (!decision.permitted) {
     throw denied({ permission: declaration.permission, scope, decision, denials });
@@ -777,6 +779,7 @@ async function decidePermissionAny({
     projectId: scope.id,
     permissions: [first, ...rest],
   });
+  recordDecision({ actor, permission: first, scope, decision });
 
   if (!decision.permitted) {
     throw denied({ permission: first, scope, decision, denials });
@@ -810,6 +813,7 @@ async function decidePermissionAll({
 
   for (const permission of declaration.permissions) {
     const decision = await decisions.getDecision({ userId: actor.id, permission, scope });
+    recordDecision({ actor, permission, scope, decision });
 
     if (!decision.permitted) throw denied({ permission, scope, decision, denials });
   }
@@ -843,6 +847,7 @@ async function decidePermissionByInput({
     });
 
   const decision = await decisions.getDecision({ userId: actor.id, permission, scope });
+  recordDecision({ actor, permission, scope, decision });
 
   if (!decision.permitted) throw denied({ permission, scope, decision, denials });
 
@@ -1108,6 +1113,29 @@ function denied({
     scope: { type: scope.tier, id: scope.id },
     denialReason: denialReasonOf(decision),
   });
+}
+
+/** Every scoped decision names the operator and the subject (record: decision-record.ts). */
+function recordDecision({
+  actor,
+  permission,
+  scope,
+  decision,
+}: {
+  actor: AccessActor;
+  permission: AuthzPermission;
+  scope: AuthzDeclaredScopeId;
+  decision: PermissionDecision;
+}): void {
+  recordPermissionDecision(
+    permissionDecisionRecord({
+      actor,
+      permission,
+      scope,
+      permitted: decision.permitted,
+      denialReason: decision.permitted ? null : denialReasonOf(decision),
+    }),
+  );
 }
 
 function denialReasonOf(decision: PermissionDecision): AuthzDenialReason {

@@ -75,7 +75,9 @@ export class WorkflowEngineAttachmentLimitService {
     const known = this.remembered.get(projectId);
     if (known && known.expiresAtMs > nowMs) return known.maxBytes;
 
-    const maxBytes = this.datasets.getLimits({ projectId }).then((limits) => limits.attachmentBytes);
+    const maxBytes = this.datasets
+      .getLimits({ projectId })
+      .then((limits) => limits.attachmentBytes);
     this.remembered.delete(projectId);
     this.remembered.set(projectId, { maxBytes, expiresAtMs: nowMs + LIMIT_TTL_MS });
     maxBytes.catch(() => this.remembered.delete(projectId));

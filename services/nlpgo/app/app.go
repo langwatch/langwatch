@@ -7,15 +7,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// App is the nlpgo application. It composes the engine, the gateway
-// client, and the secrets resolver. All fields are injected via Options
+// App is the nlpgo application. It composes the logger and the
+// workflow engine. All fields are injected via Options
 // so tests can swap any dependency.
 type App struct {
 	logger   *zap.Logger
-	gateway  GatewayClient
-	llm      LLMClient
-	code     CodeRunner
-	secrets  SecretsResolver
 	executor WorkflowExecutor
 }
 
@@ -160,22 +156,10 @@ func New(opts ...Option) *App {
 // WithLogger injects the logger.
 func WithLogger(l *zap.Logger) Option { return func(a *App) { a.logger = l } }
 
-// WithGateway injects the AI gateway client.
-func WithGateway(g GatewayClient) Option { return func(a *App) { a.gateway = g } }
-
-// WithLLM injects the LLM block executor (wraps GatewayClient + translator).
-func WithLLM(l LLMClient) Option { return func(a *App) { a.llm = l } }
-
-// WithCodeRunner injects the code-block sandbox runner.
-func WithCodeRunner(c CodeRunner) Option { return func(a *App) { a.code = c } }
-
-// WithSecrets injects the secrets resolver used by HTTP blocks.
-func WithSecrets(s SecretsResolver) Option { return func(a *App) { a.secrets = s } }
-
 // WithWorkflowExecutor injects the workflow engine.
 func WithWorkflowExecutor(e WorkflowExecutor) Option { return func(a *App) { a.executor = e } }
 
-// Executor returns the configured workflow executor (nil during scaffold).
+// Executor returns the configured workflow executor.
 func (a *App) Executor() WorkflowExecutor { return a.executor }
 
 // Logger returns the configured logger or a noop if unset.
@@ -185,16 +169,3 @@ func (a *App) Logger() *zap.Logger {
 	}
 	return a.logger
 }
-
-// Gateway returns the configured gateway client (may be nil during
-// scaffold).
-func (a *App) Gateway() GatewayClient { return a.gateway }
-
-// LLM returns the configured LLM executor (may be nil during scaffold).
-func (a *App) LLM() LLMClient { return a.llm }
-
-// Code returns the configured code-block runner (may be nil during scaffold).
-func (a *App) Code() CodeRunner { return a.code }
-
-// Secrets returns the configured secrets resolver (may be nil).
-func (a *App) Secrets() SecretsResolver { return a.secrets }

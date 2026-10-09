@@ -1,5 +1,5 @@
 import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,

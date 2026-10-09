@@ -3,8 +3,8 @@ import { Circle, HStack, Icon, Text } from "@langwatch/design-system/primitives"
 import { AlertTriangle, GitBranch, Zap } from "lucide-react";
 import type React from "react";
 
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
 import { formatWallClock } from "../../../../../../../model/display-formatters.ts";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 
 interface SummaryProps {
   group: ConversationGroup;

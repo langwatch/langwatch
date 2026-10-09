@@ -21,7 +21,7 @@ import {
   USAGE_ROWS,
   type SelfHostedInstance,
 } from "../../model/self-hosted-instance.ts";
-import { EmptyCell, formatDate, formatDateTime } from "../elements/backoffice-cells.tsx";
+import { EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
 import { Detail, Section } from "../elements/drawer-sections.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 

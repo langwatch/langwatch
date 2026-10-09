@@ -3,7 +3,12 @@
  * The signed-out front door: the procedures, the throttles, the refusals.
  * @see specs/auth/signup-does-not-strand-an-account.feature
  */
-import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import {
+  bindTrpcFact,
+  browserSessionFact,
+  callerAddressFact,
+  createTrpcRuntime,
+} from "@langwatch/api/trpc";
 import {
   type FrontDoorRateLimitedError,
   type AuthApi,
@@ -30,6 +35,12 @@ const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
 const getSignUpEnrollment = vi.fn<AuthApi["getSignUpEnrollment"]>();
 const getMyAddressConfirmation = vi.fn<AuthApi["getMyAddressConfirmation"]>();
 const getPriorSession = vi.fn<AuthApi["getPriorSession"]>();
+const listBrowserSessions = vi.fn<AuthApi["listBrowserSessions"]>();
+const endBrowserSession = vi.fn<AuthApi["endBrowserSession"]>();
+const deactivateAccount = vi.fn<AuthApi["deactivateAccount"]>();
+const setOwnFirstPassword = vi.fn<AuthApi["setOwnFirstPassword"]>();
+const changeOwnPassword = vi.fn<AuthApi["changeOwnPassword"]>();
+const registerCredentialAccount = vi.fn<AuthApi["registerCredentialAccount"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
@@ -69,8 +80,8 @@ const door: AuthApi = {
   refreshCliSession: () => unreached("refreshCliSession"),
   findCliTokenRecordsForUser: () => unreached("findCliTokenRecordsForUser"),
   revokeCliTokens: () => unreached("revokeCliTokens"),
-  listBrowserSessions: () => unreached("listBrowserSessions"),
-  endBrowserSession: () => unreached("endBrowserSession"),
+  listBrowserSessions,
+  endBrowserSession,
   endBrowserSessionsForIdentifier: () => unreached("endBrowserSessionsForIdentifier"),
   revokeAllBrowserSessions: () => unreached("revokeAllBrowserSessions"),
   revokeBrowserSession: () => unreached("revokeBrowserSession"),
@@ -84,6 +95,12 @@ const door: AuthApi = {
   saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),
   releaseHeldAccount: () => unreached("releaseHeldAccount"),
   changeFederatedPassword: () => unreached("changeFederatedPassword"),
+  deactivateUser: () => unreached("deactivateUser"),
+  deactivateAccount,
+  setOwnFirstPassword,
+  changeOwnPassword,
+  registerCredentialAccount,
+  changeUserEmail: () => unreached("changeUserEmail"),
 };
 
 /** The front door reaches no session operation: naming one here would be a bug. */
@@ -102,6 +119,7 @@ const router = createTrpcRuntime<AuthTrpcTestContext>({
     bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null),
     bindTrpcFact(callerEmailFact, (ctx) => ctx.email ?? null),
     bindTrpcFact(authRequestHeadersFact, (ctx) => ctx.headers ?? null),
+    bindTrpcFact(browserSessionFact, (ctx) => ctx.sessionId ?? null),
   ],
 });
 
@@ -116,13 +134,19 @@ describe("the signed-out front door", () => {
   describe("given the mounted router", () => {
     it("publishes exactly the procedure names the signed-out screens call", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "browserSessions",
+        "changePassword",
+        "deactivate",
+        "endBrowserSession",
         "inviteLanding",
         "myAddressConfirmation",
         "priorSession",
+        "register",
         "requestFreshInvite",
         "requestSignUpVerification",
         "route",
         "sendMyAddressConfirmation",
+        "setPassword",
         "signUpEnrollment",
       ]);
     });
@@ -144,7 +168,78 @@ describe("the signed-out front door", () => {
         myAddressConfirmation: "query",
         signUpEnrollment: "mutation",
         priorSession: "query",
+        deactivate: "mutation",
+        browserSessions: "query",
+        endBrowserSession: "mutation",
+        setPassword: "mutation",
+        changePassword: "mutation",
+        register: "mutation",
       });
+    });
+  });
+
+  describe("when a signed-in person reads or ends their own browsers", () => {
+    /** @scenario "The browser session procedures answer on auth's namespace" */
+    it("asks for the caller's own sessions, naming the reading browser as current", async () => {
+      listBrowserSessions.mockResolvedValue([]);
+      endBrowserSession.mockResolvedValue({ ended: 1 });
+      const person = router.createCaller({ actor: { id: "user-1" }, sessionId: "session-0" });
+
+      await expect(person.browserSessions({})).resolves.toEqual([]);
+      await expect(person.endBrowserSession({ sessionId: "session-2" })).resolves.toEqual({
+        ended: 1,
+      });
+      expect(listBrowserSessions).toHaveBeenCalledWith({
+        userId: "user-1",
+        currentSessionId: "session-0",
+      });
+      expect(endBrowserSession).toHaveBeenCalledWith({
+        userId: "user-1",
+        sessionId: "session-2",
+        currentSessionId: "session-0",
+      });
+    });
+  });
+
+  describe("when a signed-in person deactivates their own account", () => {
+    /** @scenario "The deactivate procedure answers on auth's namespace" */
+    it("hands auth the caller as themselves and answers success, as user.deactivate did", async () => {
+      deactivateAccount.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" } });
+
+      await expect(person.deactivate({ userId: "user-1" })).resolves.toEqual({ success: true });
+      expect(deactivateAccount).toHaveBeenCalledWith({
+        userId: "user-1",
+        caller: { id: "user-1", operatorId: "user-1", impersonated: false },
+      });
+    });
+  });
+
+  describe("when a signed-in person sets or changes their own password", () => {
+    /** @scenario "The password procedures answer on auth's namespace" */
+    it("hands auth the caller as themselves and answers success, as user.* did", async () => {
+      setOwnFirstPassword.mockResolvedValue(undefined);
+      changeOwnPassword.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" } });
+      const caller = { id: "user-1", operatorId: "user-1", impersonated: false };
+
+      await expect(person.setPassword({ password: "a-first-pw-1" })).resolves.toEqual({
+        success: true,
+      });
+      await expect(
+        person.changePassword({ currentPassword: "old-pw-123", newPassword: "new-pw-1234" }),
+      ).resolves.toEqual({ success: true });
+      expect(setOwnFirstPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user-1", password: "a-first-pw-1", caller }),
+      );
+      expect(changeOwnPassword).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          currentPassword: "old-pw-123",
+          newPassword: "new-pw-1234",
+          caller,
+        }),
+      );
     });
   });
 
@@ -246,6 +341,28 @@ describe("the signed-out front door", () => {
       await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
         sent: false,
         addressProof: "proof-1",
+      });
+    });
+  });
+
+  describe("when a signed-out visitor submits the sign-up form", () => {
+    /** @scenario "The register procedure answers on auth's namespace" */
+    it("hands auth the form, the caller's address and origin, and answers the new id", async () => {
+      registerCredentialAccount.mockResolvedValue({ id: "user-1" });
+
+      await expect(
+        router
+          .createCaller({ address: "203.0.113.7", headers: { origin: "http://localhost:5560" } })
+          .register({ email: "sam@acme.com", password: "supersecret", addressProof: "proof-1" }),
+      ).resolves.toEqual({ id: "user-1" });
+      expect(registerCredentialAccount).toHaveBeenCalledWith({
+        name: null,
+        email: "sam@acme.com",
+        password: "supersecret",
+        addressProof: "proof-1",
+        callerAddress: "203.0.113.7",
+        origin: "http://localhost:5560",
+        referer: null,
       });
     });
   });

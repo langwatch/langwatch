@@ -3,7 +3,7 @@ import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/pri
 import { MoreVertical } from "lucide-react";
 
 import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";
-import { EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
+import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 
 const COLUMN_COUNT = 9;

@@ -5,6 +5,9 @@
 #   [gone] src/server/app-layer/traces/repositories/session-groups.clickhouse.repository.ts (GROUP BY conversation id rollup)
 #   [gone] src/server/app-layer/traces/session-groups.service.ts                            (DTO mapping, cursor codec, coding-agent enrichment)
 #   [gone] src/server/api/routers/tracesV2.ts                                               (`sessions` procedure)
+#   modules/trace/process/src/services/trace-session-groups.service.ts                     (rollup page, cursor codec, teasing)
+#   modules/coding-agent/process/src/services/coding-agent-session-groups-read.service.ts (coding-agent enrichment, title gate)
+#   modules/coding-agent/contract/src/coding-agent.trpc.ts                               (`codingAgents.sessionGroups`, was `traces.sessions`)
 #   modules/trace/browser/src/ui/sections/explorer/hooks/use-session-groups.ts                                 (lens data hook)
 #   modules/trace/browser/src/ui/sections/explorer/trace-table/conversation-lens-body.tsx            (session rows rendering)
 #
@@ -148,14 +151,14 @@ Rule: Coding-agent session rows enrich the rollup
   @unit
   Scenario: Coding agent enrichment attaches model calls and compactions
     Given a session whose conversation id matches a coding-agent session row
-    When session groups are assembled by the service
+    When coding-agent enriches the session page trace read for the viewer
     Then the session carries model calls, compactions, peak context tokens and sub agents
     And sessions without a coding-agent row keep the enrichment empty
 
   @unit
   Scenario: Coding agent enrichment carries repository, branch, worktree and title
     Given a coding-agent session row with git context and a title
-    When session groups are assembled by the service
+    When coding-agent enriches the session page trace read for the viewer
     Then the session carries the repository, branch, worktree and title
     And sessions without git context keep those fields empty
 
@@ -176,7 +179,7 @@ Rule: The session title follows the viewer's content protections
   @unit
   Scenario: A session beyond the visibility window teases its title
     Given a session older than the plan's visibility window
-    When session groups are assembled by the service
+    When coding-agent enriches the session page trace read for the viewer
     Then the title is teased the same way the previews are
 
 Rule: Sessions link to their repository and pull request

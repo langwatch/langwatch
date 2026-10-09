@@ -95,7 +95,8 @@ import {
 } from "./metrics.ts";
 import { GroupQueueMetricsCollector } from "./metricsCollector.ts";
 import {
-  type ProjectStorageDestination,
+  type MintStorageUri,
+  type ObjectStore,
   redactStorageUrisInText,
   tenantIdFromGroupId,
 } from "./storage.ts";
@@ -129,7 +130,7 @@ import {
   type PreflightTargetsState,
   WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts.ts";
-import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
+import { TransientBlobStoreError } from "./tieredBlobStore.ts";
 
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {
@@ -336,7 +337,7 @@ type CoalescedBatch<Payload> =
  * dispatch() hands work to fastq, which runs it with concurrency-limited
  * backpressure, and completion triggers the next dispatch.
  */
-export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
+export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destination = unknown> {
   private readonly logger: Logger;
   private readonly queueName: string;
   private readonly jobName: string;
@@ -355,7 +356,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private readonly redisConnection: IORedis | Cluster;
   private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
-  private readonly blobLifecycle: EnvelopeBlobLifecycle;
+  private readonly blobLifecycle: EnvelopeBlobLifecycle<Destination>;
   private readonly activity?: GroupQueueActivity<Payload>;
   private readonly contextPort?: GroupQueueContext;
   private readonly failureClassifier?: GroupQueueFailureClassifier;
@@ -427,7 +428,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       dispatchGroupAllowListKey?: string;
       preflightDrainTimeoutMs?: number;
       objectStoreFor?: (projectId: string) => ObjectStore;
-      resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
+      resolveStorageDestination?: (projectId: string) => Promise<Destination>;
+      mintUri?: MintStorageUri<Destination>;
       activity?: GroupQueueActivity<Payload>;
       context?: GroupQueueContext;
       failures?: GroupQueueFailureClassifier;
@@ -516,11 +518,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
     // The GQ2 content-addressed blob lifecycle — tiered store and the
     // encode/decode/renew/release seams. Staging Lua acquires the leases.
-    this.blobLifecycle = new EnvelopeBlobLifecycle({
+    this.blobLifecycle = new EnvelopeBlobLifecycle<Destination>({
       redis: this.redisConnection,
       queueName: this.queueName,
       objectStoreFor: options?.objectStoreFor,
       resolveStorageDestination: options?.resolveStorageDestination,
+      mintUri: options?.mintUri,
       compression: options?.policy?.compression,
       payloadCodec: options?.policy?.payloadCodec,
     });
@@ -2689,6 +2692,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    */
   setConcurrency(n: number): void {
     this.processingQueue.concurrency = n;
+  }
+
+  /** Stops claiming jobs; claimed ones run to completion. Idempotent; a producer ignores it. */
+  pause(): void {
+    this.dispatcher?.pause();
+  }
+
+  /** Claims again after `pause`, starting with the backlog staged meanwhile. Idempotent. */
+  resume(): void {
+    this.dispatcher?.resume();
   }
 
   async waitUntilReady(): Promise<void> {

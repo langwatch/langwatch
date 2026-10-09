@@ -29,4 +29,13 @@ describe("the evaluator browser declaration", () => {
 
     expect(typeof (loaded as { default?: unknown }).default).toBe("function");
   });
+
+  it("claims the evaluation slice and projects what the shell's deployment reads", () => {
+    const claim = evaluatorWeb.installation.config;
+
+    expect(Object.keys(claim?.slices ?? {})).toEqual(["evaluation"]);
+    expect(claim?.project({ evaluation: { langevals: true } } as never)).toEqual({
+      hasLangevals: true,
+    });
+  });
 });

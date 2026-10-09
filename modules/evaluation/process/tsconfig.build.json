@@ -8,7 +8,12 @@
       "@langwatch/evaluation-process": ["./src/index.ts"]
     }
   },
-  "files": ["./src/index.ts", "src/services/workflow-evaluation.service.ts"],
+  "files": [
+    "./src/index.ts",
+    "./src/__tests__/testing.ts",
+    "./src/__tests__/support/instant-eval-guardrail-check.test-fakes.ts",
+    "src/features/evaluators/services/workflow-evaluation.service.ts"
+  ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -63,6 +68,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../instant-eval-judge/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -88,6 +96,9 @@
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"

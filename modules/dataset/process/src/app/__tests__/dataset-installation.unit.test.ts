@@ -16,7 +16,6 @@ import { datasetProcessModule } from "../../dataset.module.ts";
 import {
   createDatasetTestAuthz,
   createDatasetTestEntitlement,
-  createDatasetTestExperiments,
   createDatasetTestProjects,
 } from "./dataset.fixture.ts";
 
@@ -26,7 +25,6 @@ function process(role: "api" | "worker") {
     .withStores(memoryStores())
     .withConfig({ dataset: { publicBaseUrl: undefined } })
     .provide({
-      experiment: createDatasetTestExperiments(),
       authz: createDatasetTestAuthz(),
       project: createDatasetTestProjects(),
       entitlement: createDatasetTestEntitlement(),
@@ -101,11 +99,7 @@ describe("dataset transports installation", () => {
       const shared = runtime.service(DatasetApi);
       const mounted = [...runtime.transports.rest, ...Object.values(runtime.transports.trpc)];
 
-      expect(Object.keys(runtime.transports.trpc).toSorted()).toEqual([
-        "batchRecord",
-        "dataset",
-        "datasetRecord",
-      ]);
+      expect(Object.keys(runtime.transports.trpc).toSorted()).toEqual(["dataset", "datasetRecord"]);
       expect(runtime.transports.rest).toHaveLength(1);
       for (const transport of mounted) {
         const first = transport.app();

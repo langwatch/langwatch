@@ -12,6 +12,8 @@ export {
 export type { SystemMigration } from "./system-migration.ts";
 export type { TenantSource } from "./tenant-source.ts";
 export {
+  HELD_REASONS,
+  type HeldReason,
   isTerminalTenantStatus,
   type MigrationPassSummary,
   TENANT_MIGRATION_STATUSES,
@@ -22,9 +24,6 @@ export {
 } from "./types.ts";
 export {
   driveSystemMigrationsToConvergence,
-  runSystemMigrationsAtStartup,
   startSystemMigrations,
-  SystemMigrationStartupIncompleteError,
-  type SystemMigrationExecutionMode,
   type SystemMigrationPass,
 } from "./convergence.ts";

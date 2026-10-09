@@ -5,7 +5,11 @@ import { createHash, createHmac } from "node:crypto";
 import { ErasureSecretMissingError } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { erasureDigest, erasureDigestsFor, getErasureSecret } from "../erasure-digest.rules.ts";
+import {
+  erasureDigest,
+  erasureDigestsFor,
+  getErasureSecret,
+} from "../../features/identity/rules/erasure-digest.rules.ts";
 
 const SECRET = "a".repeat(32);
 

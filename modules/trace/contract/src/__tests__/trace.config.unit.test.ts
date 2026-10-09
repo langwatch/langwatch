@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { traceConfig } from "../trace.constants.ts";
+import { traceConfig } from "../trace.config.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "trace", config: traceConfig }], environment }).trace;
@@ -19,7 +19,23 @@ describe("trace server configuration", () => {
     it("reads TIKTOKENS_PATH and TIKTOKEN_FETCH_TIMEOUT_MS into the tokenizer slice", () => {
       expect(
         read({ TIKTOKENS_PATH: "/srv/bpe", TIKTOKEN_FETCH_TIMEOUT_MS: "2500" }).tokenizer,
-      ).toEqual({ bpeDirectory: "/srv/bpe", fetchTimeoutMs: "2500" });
+      ).toEqual({ bpeDirectory: "/srv/bpe", fetchTimeoutMs: "2500", disabled: false });
+    });
+  });
+
+  describe("given the two kill switches main read", () => {
+    /** @scenario "The two kill switches are read at main's spellings and default off" */
+    it("reads DISABLE_TOKENIZATION and LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER as true only for 'true'", () => {
+      const unset = read({});
+      expect(unset.tokenizer.disabled).toBe(false);
+      expect(unset.disableCodingAgentSpanFilter).toBe(false);
+      const set = read({
+        DISABLE_TOKENIZATION: "true",
+        LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER: "true",
+      });
+      expect(set.tokenizer.disabled).toBe(true);
+      expect(set.disableCodingAgentSpanFilter).toBe(true);
+      expect(read({ DISABLE_TOKENIZATION: "1" }).tokenizer.disabled).toBe(false);
     });
   });
 

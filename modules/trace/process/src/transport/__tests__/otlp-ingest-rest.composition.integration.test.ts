@@ -1,4 +1,3 @@
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
@@ -7,12 +6,9 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as Observability from "@langwatch/observability";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
@@ -21,16 +17,15 @@ import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
 import { otlpIngestRest } from "../otlp-ingest.rest.ts";
@@ -74,35 +69,25 @@ const API_KEY_ID = "api-key-1";
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   for (const token of [
-    AnnotationApi,
     AuthzApi,
-    CodingAgentApi,
     DataPrivacyApi,
     DataRetentionApi,
     EntitlementApi,
-    EvaluationApi,
-    LogApi,
     ModelProviderApi,
     ProjectApi,
     ShareApi,
-    TopicApi,
   ]) {
     apis.declare(token);
   }
 
   return {
-    annotations: apis.reference(AnnotationApi),
     authz: apis.reference(AuthzApi),
-    codingAgents: apis.reference(CodingAgentApi),
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),
-    evaluations: apis.reference(EvaluationApi),
-    logs: apis.reference(LogApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
   };
 }
 
@@ -174,7 +159,6 @@ function deployment(access: OtlpAccess = {}) {
         legacySpool: S3TraceLegacySpoolChannel.create({
           resolveS3Client: () => Promise.reject(new Error("no object store in this test")),
         }),
-        resolveClickHouseClient: () => Promise.reject(new Error("no ClickHouse in this test")),
       }),
       dedup: MemoryTraceSpanDedupRepository.create(),
       commands,
@@ -200,13 +184,8 @@ function deployment(access: OtlpAccess = {}) {
         fallbackVisibilityDays: 14,
       },
       projects: peers.projects,
-      topics: peers.topics,
       modelProviders: peers.modelProviders,
-      logs: peers.logs,
-      annotations: peers.annotations,
       dataRetention: peers.dataRetention,
-      evaluations: peers.evaluations,
-      codingAgents: peers.codingAgents,
       share: peers.share,
       requestBounds: peers.plans,
       exportBounds: null,
@@ -230,7 +209,7 @@ function deployment(access: OtlpAccess = {}) {
   // point of the file: the door is mounted here only if `trace.module.ts` still
   // mounts it, so dropping it there turns every request below into the 404 an
   // OTLP exporter was getting.
-  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports;
+  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports ?? [];
   const servesOtlp = declaredRest.includes(otlpIngestRest);
 
   const mounted = servesOtlp

@@ -8,7 +8,7 @@ import { trpcQueryKey } from "@langwatch/api/web";
 import { hashKey, QueryClient, QueryObserver, type QueryKey } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
-import type { UiCachePlan } from "../cache-tiers.ts";
+import type { UiCachePlan } from "../query/cache-tiers.ts";
 import {
   clearPersistedUiQueries,
   indexedDbQueryStore,
@@ -18,7 +18,7 @@ import {
   storedQueryKey,
   type UiStoredQuery,
   type UiQueryStore,
-} from "../query-persistence.ts";
+} from "../query/query-persistence.ts";
 
 // The session read is in the plan on purpose: it is excluded by key, whatever the plan says.
 const DECLARED = ["organization.getAll", "organization.getMemberById", "auth.session"];

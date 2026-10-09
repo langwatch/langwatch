@@ -4,7 +4,18 @@
  * calculation after that is Temporal.
  */
 
-import { Temporal, type Instant, type ZonedDateTime } from "./temporal.ts";
+import { Temporal as PolyfilledTemporal } from "temporal-polyfill";
+
+type TemporalNamespace = typeof PolyfilledTemporal;
+
+const scope = globalThis as { Temporal?: TemporalNamespace };
+
+/** The runtime's own Temporal when it has one, the polyfill otherwise. */
+export const Temporal: TemporalNamespace = scope.Temporal ?? PolyfilledTemporal;
+
+export type Instant = PolyfilledTemporal.Instant;
+export type ZonedDateTime = PolyfilledTemporal.ZonedDateTime;
+export type PlainDateTime = PolyfilledTemporal.PlainDateTime;
 
 /** What every operation in this package accepts where a moment is wanted. */
 export type TimeInput = Date | number | string | ZonedDateTime;
@@ -53,4 +64,9 @@ export function fromDate(value: Date): Instant {
 /** Back to a `Date`, for the boundaries that only accept one. */
 export function toDate(value: Instant | ZonedDateTime): Date {
   return new Date(value.epochMilliseconds);
+}
+
+/** The moment a screen prints, as the `Date` the Intl formatters take. */
+export function readableDate(value: TimeInput): Date {
+  return new Date(toEpochMs(value));
 }

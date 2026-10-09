@@ -1,19 +1,21 @@
+import { EventNotFoundError } from "@langwatch/eventing";
 import { createLogger, type Logger as PinoLogger } from "@langwatch/observability";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
-import type { ExtractedIO } from "#rules/trace-io-text.rules";
-import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
+import type { ExtractedIO } from "#features/conversation/rules/trace-io-text.rules";
+import type { TraceIOExtractionService } from "#features/derivation/services/trace-io-extraction.service";
 
 /**
  * Read-time recompute of offloaded trace event refs (ADR-022). Ingestion writes the full event to
  * event_log and leans projections, so the fold holds preview IO; the read path resolves the
  * pointers and re-runs IO extraction. A missing row logs at warn and keeps the preview.
  */
-import type { ResolveTraceSpansFn } from "../repositories/trace-legacy-read.repository.ts";
+import type { ResolveTraceSpansFn } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
+import { TraceEventPayloadFieldNotFoundError } from "../repositories/trace-payload-reader.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
-import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
-import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
-import type { BlobResolutionDeps } from "./trace-legacy-read.service.ts";
+import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "../features/media/services/trace-blob-store.service.ts";
+import type { BlobResolutionDeps } from "../features/legacy/services/trace-legacy-read.service.ts";
 
 const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
 
@@ -74,14 +76,12 @@ export class TraceOffloadResolutionService {
     blobStore,
     ioExtractionService,
     logger,
-    aggregateType = "trace",
   }: {
     projectId: string;
     normalizedSpans: NormalizedSpan[];
     blobStore: TraceBlobStoreService;
     ioExtractionService: TraceIOExtractionService;
     logger: WarnLogger;
-    aggregateType?: string;
   }): Promise<ResolvedTraceSpans> {
     // Fast path: no span in this trace has any event ref, so there is nothing to resolve.
     const anyHasRefs = normalizedSpans.some((span) => hasEventRefs(span.spanAttributes));
@@ -103,7 +103,6 @@ export class TraceOffloadResolutionService {
           projectId,
           blobStore,
           logger,
-          aggregateType,
         }),
       ),
     );
@@ -161,13 +160,11 @@ export class TraceOffloadResolutionService {
     projectId,
     blobStore,
     logger,
-    aggregateType,
   }: {
     span: NormalizedSpan;
     projectId: string;
     blobStore: TraceBlobStoreService;
     logger: WarnLogger;
-    aggregateType: string;
   }): Promise<{ span: NormalizedSpan; resolvedCount: number }> {
     const attrs = span.spanAttributes;
     if (!hasEventRefs(attrs)) {
@@ -196,7 +193,6 @@ export class TraceOffloadResolutionService {
           eventId,
           field,
           tenantId: projectId,
-          aggregateType,
           aggregateId: span.traceId,
         }),
       })),
@@ -236,7 +232,11 @@ export class TraceOffloadResolutionService {
     attrKey: string;
     logger: WarnLogger;
   }): void {
-    const missing = error instanceof BlobNotFoundError || error instanceof BlobFieldNotFoundError;
+    const missing =
+      error instanceof EventNotFoundError ||
+      error instanceof TraceEventPayloadFieldNotFoundError ||
+      error instanceof BlobNotFoundError ||
+      error instanceof BlobFieldNotFoundError;
     logger.warn(
       {
         projectId,

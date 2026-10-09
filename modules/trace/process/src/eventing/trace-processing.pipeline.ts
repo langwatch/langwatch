@@ -1,35 +1,25 @@
 import {
   defineEventingModule,
   throttledWindow,
-  type EventSubscriberDefinition,
   type EventingSetup,
+  type LaneAlias,
   type TriggerContext,
 } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { TraceModule } from "../app/trace.app.ts";
-import {
-  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-  CUSTOM_EVAL_SYNC_DELAY_MS,
-  customEvaluationSyncDedupId,
-  hasSyncableEvaluations,
-} from "./custom-evaluation-sync.subscriber.ts";
 import {
   DEFERRED_ORIGIN_DEDUP,
   DEFERRED_ORIGIN_DELAY_MS,
   DEFERRED_ORIGIN_SUBSCRIBER_NAME,
   needsOriginResolution,
 } from "./deferred-origin.subscriber.ts";
-import {
-  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
-  EXPERIMENT_METRICS_SYNC_DELAY_MS,
-  hasExperimentCostMetrics,
-} from "./experiment-metrics-sync.subscriber.ts";
-import type { TraceSummarySubscriber } from "./origin-guarded.subscriber.ts";
 import {
   PROJECT_METADATA_WINDOW_MS,
   isRealFirstIngest,
@@ -56,19 +46,44 @@ type SummaryHandler = (
 /** Every reaction main's worker hung on trace_processing, keyed by its queued name. */
 interface TraceProcessingReactions {
   resolveDeferredOrigin: (payload: { tenantId: string; traceId: string }) => Promise<void>;
-  evaluationTrigger: TraceSummarySubscriber;
-  customEvaluationSync: SummaryHandler;
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
-  experimentMetricsSync: SummaryHandler;
-  codingAgentSpanFactsDispatch: EventSubscriberDefinition<TraceProcessingEvent>;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
   ) => Promise<void>;
   broadcastDisabled: boolean;
 }
+
+const deferredOriginJobSchema = z.object({ tenantId: z.string(), traceId: z.string() });
+
+/**
+ * Main's origin gate was a reactor of another name, and its delayed job a job lane. The job only
+ * ever sent `resolveOrigin`, so a job still queued sends it with the fallback main's handler used.
+ */
+const MAIN_ORIGIN_LANE_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "trace_processing:reactor:originGate",
+    to: { jobType: "reactor", lane: DEFERRED_ORIGIN_SUBSCRIBER_NAME },
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "trace_processing:job:deferredOriginResolution",
+    to: { jobType: "command", lane: "resolveOrigin" },
+    data: (stored) => {
+      const { tenantId, traceId } = deferredOriginJobSchema.parse(stored);
+      return {
+        tenantId,
+        traceId,
+        origin: "application",
+        reason: "deferred_fallback",
+        occurredAt: nowInstant().epochMilliseconds,
+      };
+    },
+    removeAfter: "3.21.0",
+  },
+];
 
 /** The consuming definition: projections and main's subscribers, deferred origin included. */
 export function buildTraceProcessingConsumer(
@@ -87,16 +102,6 @@ export function buildTraceProcessingConsumer(
           tenantId: context.tenantId,
           traceId: context.aggregateId,
         }),
-    })
-    .withProjectionSubscriber(reactions.evaluationTrigger.name, reactions.evaluationTrigger.spec)
-    .withProjectionSubscriber("customEvaluationSync", {
-      fold: "traceSummary",
-      events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: (event) => hasSyncableEvaluations(event),
-      delay: CUSTOM_EVAL_SYNC_DELAY_MS,
-      ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-      dedupId: (event) => customEvaluationSyncDedupId(event),
-      handler: (event, context) => reactions.customEvaluationSync(event, context),
     })
     .withProjectionSubscriber("trackedEventSync", {
       fold: "traceSummary",
@@ -128,17 +133,6 @@ export function buildTraceProcessingConsumer(
       }),
       handler: (event, context) => reactions.projectMetadata(event, context),
     })
-    .withProjectionSubscriber("experimentMetricsSync", {
-      fold: "traceSummary",
-      when: (_event, context) => hasExperimentCostMetrics(context.state),
-      delay: EXPERIMENT_METRICS_SYNC_DELAY_MS,
-      ttl: EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
-      handler: (event, context) => reactions.experimentMetricsSync(event, context),
-    })
-    .withEventSubscriber(
-      reactions.codingAgentSpanFactsDispatch.name,
-      reactions.codingAgentSpanFactsDispatch,
-    )
     .withProjectionSubscriber("spanStorageBroadcast", {
       map: "spanStorage",
       runIn: ["worker"],
@@ -146,6 +140,7 @@ export function buildTraceProcessingConsumer(
       ttl: SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
       handler: (event, context) => reactions.spanStorageBroadcast(event, context),
     })
+    .withLaneAliases(MAIN_ORIGIN_LANE_ALIASES)
     .build();
 }
 

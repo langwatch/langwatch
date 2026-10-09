@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scannedGroup, scannedQueue } from "../../services/__tests__/support/queue-scan.ts";
+import { scannedGroup, scannedQueue } from "../../__tests__/support/queue-scan.ts";
 import { countWaitingJobsByTenant } from "../ops-tenant-backlog.rules.ts";
 
 describe("countWaitingJobsByTenant", () => {

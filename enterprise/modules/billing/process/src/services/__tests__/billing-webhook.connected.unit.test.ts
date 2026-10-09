@@ -3,11 +3,13 @@ import { ConnectedBillingNotOnboardedError } from "@langwatch/enterprise-billing
  * The `invoice.finalized` branch for a connected self-hosted customer (ADR-156,
  * section 7): whose invoices it acts on, and whose it leaves.
  */
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BillingWebhookHost } from "../../channels/billing-webhook-host.channel.ts";
+import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../../repositories/billing-webhook-subscription.repository.ts";
 import {
@@ -31,10 +33,10 @@ function buildService(events: ConnectedBillingInvoiceEvents): EEWebhookService {
   return EEWebhookService.create({
     subscriptionRepository: createApiFixture<BillingWebhookSubscriptionRepository>(),
     organizationRepository: createApiFixture<BillingWebhookOrganizationRepository>(),
-    stripe: createApiFixture<Stripe>(),
+    licenses: createApiFixture<LicensingApi>(),
+    stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
     itemCalculator: createApiFixture<WebhookOptions["itemCalculator"]>(),
     host: createApiFixture<BillingWebhookHost>(),
-    retention: createApiFixture<WebhookOptions["retention"]>(),
     connectedBilling: events,
   });
 }

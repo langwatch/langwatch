@@ -4,7 +4,7 @@ Feature: GitHub service boundary
   Scenario: one process composes one GitHub capability
     Given the application supplies GitHub persistence and provider ports
     When the runtime creates the GitHub adapter
-    Then every GitHub caller receives the same GithubService contract instance
+    Then every GitHub caller receives the same GithubApi contract instance
     And no request constructs a repository or provider client
 
   @unit
@@ -32,5 +32,5 @@ Feature: GitHub service boundary
   Scenario: compatibility transports keep their public paths
     Given an existing GitHub REST or tRPC route is called
     When the feature is composed through the application
-    Then the route delegates to GithubService
+    Then the route delegates to GithubApi
     And its path and response contract remain unchanged

@@ -6,9 +6,7 @@
 
 import type { WireOf } from "@langwatch/api/web";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
-import { type Instant, toDate } from "@langwatch/time";
-
-import { readableDate } from "./display-formatters.ts";
+import { type Instant, toDate, readableDate } from "@langwatch/time";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;

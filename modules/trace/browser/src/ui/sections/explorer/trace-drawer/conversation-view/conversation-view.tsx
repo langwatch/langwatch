@@ -30,6 +30,12 @@ import {
   useState,
 } from "react";
 
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
+import { useConversationAnnotations } from "../../../../../features/conversation/behavior/use-conversation-annotations.ts";
+import { useConversationTurnEvents } from "../../../../../features/conversation/behavior/use-conversation-turn-events.ts";
+import { useConversationTurns } from "../../../../../features/conversation/behavior/use-conversation-turns.ts";
+import { useTraceDrawerNavigation } from "../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts";
 import {
   isTurnRailDraft,
   RenderedMarkdown,
@@ -43,21 +49,18 @@ import {
   useFocusedTurnBlink,
   useScrollFocusedTurnIntoView,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import { useConversationAnnotations } from "../../hooks/use-conversation-annotations.ts";
-import { useConversationTurnEvents } from "../../hooks/use-conversation-turn-events.ts";
-import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
-import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
-import type { TraceListItem } from "../../types/trace.ts";
-import { AnnotatedTurnRow } from "./annotated-turn-row.tsx";
+import { AnnotatedTurnRow, type ParsedTurn } from "./annotated-turn-row.tsx";
+import type { TurnLayout } from "./chat-turn-row.tsx";
 import { SystemPromptBanner } from "./system-prompt-banner.tsx";
-import { EMPTY_TURNS, type Mode, type ParsedTurn, type TurnLayout } from "./types.ts";
 import {
   type RailLayout,
   isRailActive as resolveIsRailActive,
   threadColumnMaxWidth,
   useRailLayout,
+  type Mode,
 } from "./use-rail-layout.ts";
+
+const EMPTY_TURNS: TraceListItem[] = [];
 
 type AnnotationsByTrace = Map<string, AnnotationByTrace[]>;
 const EMPTY_ANNOTATION_ITEMS: AnnotationByTrace[] = [];

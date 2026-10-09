@@ -4,7 +4,7 @@
  * an ordinary, editable widget.
  */
 
-import type { DashboardWidgetDefinition } from "../../../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDefinition } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
 /** One widget a template places, as the chart grid in `model/chart-grid.ts` measures it. */
 export interface BoardTemplateWidget {

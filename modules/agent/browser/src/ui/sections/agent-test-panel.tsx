@@ -13,11 +13,11 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { scenarioClient } from "@langwatch/scenario-client";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Play } from "lucide-react";
 import { useState } from "react";
 
-import { agentApi } from "../../behavior/agent-api.ts";
 import { ParameterLineField } from "../../behavior/lent-parameter-line-field.tsx";
 import { toLineRunParameters } from "../../model/parameter-line.ts";
 import { OFFLINE_AGENT_TEST_COPY } from "../blocks/connected-agents-section.tsx";
@@ -47,7 +47,7 @@ export function AgentTestPanel({
 }: AgentTestPanelProps) {
   const [message, setMessage] = useState(AGENT_TEST_DEFAULT_MESSAGE);
   const [parameterLine, setParameterLine] = useState("");
-  const test = agentApi.agents.testTurn.useMutation();
+  const test = scenarioClient.scenarios.testAgentTurn.useMutation();
   const plainParameters = plainParametersOf(parameters);
 
   return (

@@ -112,6 +112,11 @@ type ProbeOptions struct {
 	// the main pass saw the Enterprise gate refuse. Only `apidiff run` can
 	// supply one — it alone owns the databases; see entitlement.go.
 	ActivateEntitlement EntitlementActivator
+
+	// WorkerLogA and WorkerLogB are each side's worker log, named in the
+	// message when a fixture trace never reads back; empty outside `run`.
+	WorkerLogA string
+	WorkerLogB string
 }
 
 // SuppressedCounts tallies comparisons the default semantics filtered out,
@@ -137,6 +142,9 @@ type ProbeResult struct {
 	CredentialChecks []CredentialCheck
 	// Effects is each round trip's per-step outcome (roundtrip.go).
 	Effects []Effect
+	// Fatal is why the run stopped before probing: the fixture trace never
+	// read back on a side. The caller exits 2 with it.
+	Fatal string
 }
 
 // ProbeAll probes every selected operation in lockstep: each case runs on A
@@ -162,9 +170,11 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	canaries := engine.credentialCanaries(operations)
 	credentialsBefore := engine.readCanaries(canaries)
 	started := time.Now()
-	engine.seedFixtures()
+	fatal := engine.seedFixtures()
 	engine.phaseDone("seed fixtures", started)
-	defer engine.fixtureTraceSettled()
+	if fatal != "" {
+		return ProbeResult{Fatal: fatal}
+	}
 
 	mainStart := time.Now()
 	stopTicker := diffkit.Ticker{Out: options.Progress, Label: "probe", Total: len(selected), Snapshot: engine.probeSnapshot}.Start()
@@ -358,8 +368,6 @@ type probeEngine struct {
 	// progressMu keeps lines whole when the two sides, the module lanes, the
 	// collection and permission pools, and the fixture-trace wait report at once.
 	progressMu sync.Mutex
-	// fixtureTrace closes when the background fixture-trace wait is over.
-	fixtureTrace chan struct{}
 	// mu guards what module lanes probing at once share; lanes is, during a
 	// stage of several, each operation's lane's own tables (probe-waves.go).
 	mu    sync.Mutex

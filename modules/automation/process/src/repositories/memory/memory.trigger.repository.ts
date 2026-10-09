@@ -139,6 +139,27 @@ export class MemoryTriggerRepository extends TriggerRepository {
     );
   }
 
+  findActiveSlackTriggerPage({
+    after,
+    limit,
+  }: {
+    after?: string;
+    limit: number;
+  }): Promise<Trigger[]> {
+    return Promise.resolve(
+      this.rows()
+        .filter(
+          (row) =>
+            row.action === "SEND_SLACK_MESSAGE" &&
+            row.active &&
+            !row.deleted &&
+            (after === undefined || row.id > after),
+        )
+        .toSorted((left, right) => Number(left.id > right.id) - Number(left.id < right.id))
+        .slice(0, limit),
+    );
+  }
+
   replaceActionParamsIfUnchanged(input: {
     triggerId: string;
     projectId: string;

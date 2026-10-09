@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzApi, AuthzGrantsService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 
+import { assertRemovalKeepsAnAdministrator } from "../rules/scim-last-administrator.rules.ts";
 import type { ScimRemovalOperation, ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 
 const logger = createLogger("langwatch:scim:deprovision");
@@ -15,14 +15,8 @@ type ScimRemovalManifest = {
   personalTeams: { id: string; name: string }[];
 };
 
-/**
- * The one refusal a directory removal has to ask for: the organization's
- * own, stated where memberships are counted rather than restated here.
- */
-export type ScimOrganizationAdministration = Pick<
-  OrganizationApi,
-  "assertRemovalKeepsAnAdministrator"
->;
+/** Who can still administer the organisation, asked of authz before any removal. */
+export type ScimOrganizationAdministration = Pick<AuthzApi, "findActiveOrganizationAdministrators">;
 
 /** Removes all authority through authz's transactional offboarding proof. */
 export class ScimDeprovisionService {
@@ -50,10 +44,10 @@ export class ScimDeprovisionService {
       // The organization's own way in is not the directory's to close: a push
       // that would leave nobody able to administer it is refused before any
       // authority is taken away. enterprise/modules/scim/specs/scim-connection-sync.feature.
-      await this.organization.assertRemovalKeepsAnAdministrator({
+      const administrators = await this.organization.findActiveOrganizationAdministrators({
         organizationId: input.organizationId,
-        userId: input.userId,
       });
+      assertRemovalKeepsAnAdministrator({ administrators, userId: input.userId });
       const result = await this.grants.offboard({
         actor: SCIM_ACTOR,
         userId: input.userId,

@@ -12,16 +12,17 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useExplorerStore } from "../../../../../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { formatISOTimestamp } from "../../../../../../../../model/display-formatters.ts";
 import { useDensityTokens } from "../../../../../hooks/use-density-tokens.ts";
-import type { TraceListItem } from "../../../../../types/trace.ts";
 import { buildTracePlaceholderRows } from "../../../../skeleton-placeholders.ts";
 import type { CellDef } from "../../../types.ts";
 import { PromptCell } from "../prompt-cell.tsx";
 import { TimeCell } from "../time-cell.tsx";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 vi.mock("../../../../../../../../behavior/use-organization-team-project.ts", () => ({

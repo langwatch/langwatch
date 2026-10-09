@@ -17,7 +17,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   type TraceProcessingPipelineInput,
   TraceProcessingRuntimeAdapter,
@@ -141,7 +141,6 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
           organizationCreatedAt: null,
         }),
       }),
-      topics: createApiFixture<Peers["topics"]>({ bootstrapClustering: async () => undefined }),
     }),
     repositories: MemoryTraceRepositories.create(),
     canonicalisation: TraceCanonicalisationService.create(),

@@ -7,7 +7,7 @@
 import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { LWQL_APP_FUNCTION_CATALOG } from "../../rules/langwatch-ql-app-function-catalog.rules.ts";
+import { LWQL_APP_FUNCTION_CATALOG } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 

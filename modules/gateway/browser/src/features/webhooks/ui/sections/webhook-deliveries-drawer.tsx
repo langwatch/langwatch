@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { type TimeInput } from "@langwatch/time";
+import { type TimeInput, readableDate } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -18,7 +18,6 @@ import {
   type WebhookDeliveryCursor,
 } from "../../../../behavior/gateway-api.ts";
 import { keepPreviousData } from "../../../../model/keep-previous-data.ts";
-import { readableDate } from "../../../../model/readable-date.ts";
 
 const DELIVERIES_PAGE_SIZE = 25;
 

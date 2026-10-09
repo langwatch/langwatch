@@ -2,7 +2,7 @@
 
 import type { Instant } from "@langwatch/time";
 
-import type { AgentMetadata } from "../../rules/discovered-agent-metadata.rules.ts";
+import type { AgentMetadata } from "../../features/agents/rules/discovered-agent-metadata.rules.ts";
 import type { DiscoveredPersonRow } from "../discovered-person.repository.ts";
 import type { ErasedIdentifierSuppressionRow } from "../erased-identifier-suppression.repository.ts";
 import type { IdentityMatchSuggestionRow } from "../identity-match-suggestion.repository.ts";

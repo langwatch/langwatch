@@ -10,9 +10,11 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { CanonicalLogStorageMapProjection } from "../../eventing/canonical-log-storage.projection.ts";
-import type { LogRedaction } from "../canonical-log.service.ts";
-import { CanonicalLogService } from "../canonical-log.service.ts";
-import type { LogPreparationInput } from "../log.service.ts";
+import {
+  CanonicalLogService,
+  type LogPreparationInput,
+  type LogRedaction,
+} from "../canonical-log.service.ts";
 
 const noRedaction: LogRedaction = {
   redactLog: async () => undefined,
@@ -22,7 +24,7 @@ function prepareCanonicalLogRecords(
   input: LogPreparationInput,
   redaction: LogRedaction = noRedaction,
 ) {
-  return CanonicalLogService.create({ redaction }).prepare(input);
+  return CanonicalLogService.create({ redaction }).prepareCanonicalLogRecords(input);
 }
 
 function request(logRecords: unknown[], scopeName = "test.scope") {

@@ -1,0 +1,46 @@
+# @lw/enterprise-beta-process
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## Installation
+
+`defineProcessModule("beta").withApi(BetaModule).withTransports(betaRest)`, `src/beta.module.ts:4`.
+
+## Module API
+
+None: this module exports no `*Api` token of its own.
+
+## REST transport
+
+### `betaRest`
+
+|             |                                        |
+| ----------- | -------------------------------------- |
+| Declared at | `src/transport/beta.rest.ts:10`        |
+| Base URL    | none: each route's path is its address |
+| Addressing  | literal                                |
+| Credential  | organization                           |
+
+#### `POST /api/beta/run` · `runBeta`
+
+Permission `beta:manage`. Entitlement `enterprise` (feature `beta_runs`). Declared at `src/transport/beta.rest.ts:12`.
+
+Answers at `/api/beta/run`, `/api/v1/beta/run`.
+
+## tRPC transport
+
+None: this module declares no tRPC router.
+
+## Sockets
+
+None: this module declares no websocket, rawsocket or rawhttp door.
+
+## Workers
+
+None: beta declares no pipeline, process manager, subscriber or task.
+
+## Configuration
+
+None: no `static secrets` or `static config` leaf.
+
+<!-- readme:generated:end -->

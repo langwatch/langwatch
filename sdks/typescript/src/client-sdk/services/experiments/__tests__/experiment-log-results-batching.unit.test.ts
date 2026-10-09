@@ -38,10 +38,7 @@ function serve({ limitBytes }: { limitBytes?: number } = {}): FakeServer {
     const size = new TextEncoder().encode(text).length;
     if (limitBytes !== undefined && size > limitBytes) {
       server.refusedSizes.push(size);
-      return Response.json(
-        { code: "payload_too_large", message: "Too large" },
-        { status: 413 },
-      );
+      return Response.json({ code: "payload_too_large", message: "Too large" }, { status: 413 });
     }
     server.sizes.push(size);
     server.bodies.push(JSON.parse(text) as LogResultsRequest);
@@ -186,6 +183,23 @@ describe("Experiment log_results batching", () => {
         expect(logger.errors[0]).toContain("413");
         expect(rowIndexes(server)).toEqual([0, 2]);
         expect(finishedFlags(server).at(-1)).toBe(true);
+      });
+    });
+  });
+
+  describe("given three small rows with one evaluation each", () => {
+    describe("when the experiment finishes", () => {
+      /** @scenario "The request that ends the run carries the counts the run reported" */
+      it("reports the rows and evaluations of the whole run as expected", async () => {
+        const server = serve();
+
+        await runExperiment([0, 0, 0]);
+
+        const finishing = server.bodies.filter(
+          (body) => (body.timestamps.finished_at ?? null) !== null,
+        );
+        expect(finishing).toHaveLength(1);
+        expect(finishing[0]!.expected).toEqual({ dataset: 3, evaluations: 3 });
       });
     });
   });

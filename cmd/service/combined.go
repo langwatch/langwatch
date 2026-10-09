@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -111,6 +113,10 @@ func combinedRoot(ctx context.Context, args []string) error {
 	}
 
 	base := contexts.MustGetServiceInfo(ctx)
+	// A service's lifecycle group claiming SIGINT stops the default exit, so a
+	// service without one (the simulators) would outlive it: cancel them all.
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	group, groupCtx := errgroup.WithContext(ctx)
 	for _, svc := range selected {
 		info := *base

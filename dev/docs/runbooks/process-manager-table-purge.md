@@ -210,7 +210,7 @@ exactly the reap set, instead of adding write amplification for every pending
 row on the hot insert path.
 
 One outbox index does ship in a Prisma migration: the per-process lease index
-from `20261006150000_process_outbox_lease_by_process_index`, as a plain
+from `20261006120000_process_outbox_lease_by_process_index`, as a plain
 `CREATE INDEX IF NOT EXISTS`. On an install with real traffic, prebuild it
 before deploying that release, so the migration finds it and does nothing:
 

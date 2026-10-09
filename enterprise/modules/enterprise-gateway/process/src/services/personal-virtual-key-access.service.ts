@@ -12,7 +12,10 @@ import {
   RoutingPolicyEmptyError,
   RoutingPolicyHasNoProvidersError,
 } from "@langwatch/enterprise-gateway-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  PersonalWorkspacePendingError,
+} from "@langwatch/organization-contract";
 
 import type { PersonalVirtualKeyService } from "./personal-virtual-key.service.ts";
 
@@ -59,12 +62,14 @@ export class PersonalVirtualKeyAccessService {
       { organizationId: input.organizationId, userId: input.actorUserId },
       { id: input.actorUserId },
     );
-    const workspace = await this.members.ensurePersonalWorkspace({
+    const ensured = await this.members.ensurePersonalWorkspace({
       userId: input.actorUserId,
       organizationId: input.organizationId,
       displayName: member?.user.name ?? null,
       displayEmail: member?.user.email ?? null,
     });
+    if (ensured.kind === "pending") throw new PersonalWorkspacePendingError();
+    const { workspace } = ensured;
     const duplicate = await this.keys.hasLiveKeyLabelled({
       organizationId: input.organizationId,
       userId: input.actorUserId,

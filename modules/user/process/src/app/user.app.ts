@@ -1,24 +1,9 @@
 /** The User application: one object behind every user door this product opens. */
-import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import {
-  type CliBootstrapResult,
-  type GovernanceBudgetOverviewForUser,
-  GovernanceRestApi,
-  type PersonalUsageRollup,
-} from "@langwatch/enterprise-governance-contract";
-import { GatewayApi, type GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
-import { ValidationError } from "@langwatch/handled-error";
-import {
-  IdentityVerificationExpiredError,
-  describePasswordProblem,
-  routesToOrganizationConnection,
-} from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   EnsuredPersonalWorkspace,
   FindPersonalWorkspaceInput,
@@ -26,26 +11,22 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { PROJECT_KIND, ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
-  ChangeOwnPasswordInput,
-  CreateCredentialUserInput,
+  AdoptUnconfirmedAccountOutcome,
   CreatePasskeyUserInput,
   CreateUserInput,
   CreatedUser,
   UserEmailInput,
   MeProject,
-  MePersonalCredential,
-  MeUsage,
-  RegisterCredentialAccountInput,
+  CredentialAccountInput,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
   SetOwnAvatarInput,
-  SetOwnFirstPasswordInput,
   SetUserAvatarInput,
   SetUserHomePathInput,
   UnlinkUserAccountInput,
@@ -53,8 +34,6 @@ import type {
   UserAccountInfo,
   UserApiRequestBudgetIncreaseInput,
   UserAvatarResult,
-  UserBrowserSession,
-  UserBrowserSessionEnded,
   UserBudgetIncreaseRequested,
   UserCaller,
   UserFullProfile,
@@ -62,11 +41,8 @@ import type {
   UserIdInput,
   UserLifecycleChangeInput,
   UserLinkedAccount,
-  UserPasskeyNudgeStatus,
   UserSecureAccountOffer,
   UserPasswordRotationOutcome,
-  UserPersonalBudget,
-  UserPersonalContext,
   UserProfile,
   UserProfilesInput,
   UserSsoStatus,
@@ -75,9 +51,8 @@ import type {
   UserNotificationPreference,
   UserNotificationTopicInput,
   SetUserNotificationPreferenceInput,
+  UpdateUserEmailInput,
   UpdateUserProfileInput,
-  UserApiBudgetOverviewInput,
-  UserApiPersonalUsageInput,
   UserUsageCount,
   UserAvatarRestParams,
   UserAvatarUrl,
@@ -85,35 +60,30 @@ import type {
 } from "@langwatch/user-contract";
 import {
   EmailAlreadyRegisteredError,
-  ImpersonationCannotChangeCredentialsError,
   UserAccountAccessDeniedError,
   UserAvatarNotFoundError,
   UserAvatarRateLimitedError,
   UserBudgetRequestNotDeliveredError,
-  UserFederatedPasswordAccountMissingError,
-  UserFederatedPasswordChangeUnavailableError,
   UserLastAuthenticationMethodError,
   UserLinkedAccountNotFoundError,
-  UserNotOrganizationMemberError,
-  UserPasswordAlreadySetError,
-  UserPasswordAttemptsThrottledError,
-  UserPasswordAuthUnavailableError,
-  UserPasswordIncorrectError,
-  UserPasswordNotSetError,
-  UserRegistrationNotAvailableError,
-  UserSignupThrottledError,
   UserApi,
   userConfig,
 } from "@langwatch/user-contract";
 
 import { userBudgetRequestMailChannels } from "../channels/user-budget-request-mail-channels.registry.ts";
 import type { UserBudgetRequestMailChannel } from "../channels/user-budget-request-mail.channel.ts";
+import type { UserChannels } from "../channels/user.channels.ts";
 import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
-import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
+import type { UserFactIntent } from "../rules/user-lifecycle-outbox.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
 import { UserAvatarObjectService } from "../services/user-avatar-object.service.ts";
+import {
+  UserCreatedFactBackfillService,
+  type UserCreatedFactBackfillReport,
+  type UserCreatedFactBackfillRun,
+} from "../services/user-created-fact-backfill.service.ts";
 import {
   UserLifecycleNoticeService,
   type UserLifecycleSenders,
@@ -132,12 +102,6 @@ const logger = createLogger("langwatch:user-app");
  */
 const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
 
-/** Mirrors the hosted sign-up budget so this path is no spam side-channel. */
-const SIGNUP_BUDGET = { windowSeconds: 60 * 60, max: 20 } as const;
-
-/** A credential outlives the session that set it, so every attempt is metered. */
-const PASSWORD_BUDGET = { windowSeconds: 60 * 15, max: 5 } as const;
-
 /** Each upload writes bytes to object storage and updates the row. */
 const AVATAR_UPLOAD_BUDGET = { windowSeconds: 60, max: 10 } as const;
 
@@ -149,39 +113,30 @@ const CREDENTIAL_ISSUER = "local:credential";
 
 /** The peer capabilities this module calls, resolved by the kernel at boot. */
 interface UserAppDependencies {
-  auth: AuthApiContract;
   authz: AuthzApi;
-  /** The default routing policy and personal keys behind /me. */
-  enterpriseGateway: Pick<
-    EnterpriseGatewayApi,
-    "findDefaultRoutingPolicies" | "personalVirtualKeyList"
-  >;
-  /** The budget pre-check the /me banner runs at a projected cost of zero. */
-  gateway: Pick<GatewayApi, "checkBudget">;
-  governance: Pick<
-    GovernanceRestApi,
-    "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap" | "personalUsage"
-  >;
   organizations: OrganizationApi;
-  projects: ProjectApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
   storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }
 
-/** `PASSKEYS_ENABLED` is auth's, asked of that peer; the base URL is user's config leaf. */
-export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
+/** The sign-in capability switches, read from the deployment facts auth reads (round 48, A1-a). */
+export type UserFacts = Pick<
+  UserServerConfig,
+  "passkeysEnabled" | "mfaEnrollmentOpen" | "localPasswords"
+>;
 
 type UserSetup = FeatureSetup<
   typeof UserModule.dependencies,
-  never,
   UserServerConfig,
-  UserRepositories
+  UserRepositories,
+  UserChannels
 >;
 
 /** What `createForTesting` builds the module from; clock and hasher default to the real ones. */
 type UserTestSetup = Readonly<{
   repositories: UserRepositories;
   dependencies: UserAppDependencies;
+  channels: UserChannels;
   facts: UserFacts;
   budgetRequests: UserBudgetRequestMailChannel;
   passwords?: UserPasswordHasher;
@@ -192,24 +147,14 @@ export class UserModule implements UserApi {
   static readonly contract = UserApi;
   static readonly config = userConfig;
   static readonly dependencies: {
-    auth: typeof AuthApi;
     authz: typeof AuthzApi;
-    enterpriseGateway: typeof EnterpriseGatewayApi;
-    gateway: typeof GatewayApi;
-    governance: typeof GovernanceRestApi;
     notifications: typeof NotificationService;
     organizations: typeof OrganizationApi;
-    projects: typeof ProjectApi;
     storedObjects: typeof StoredObjectApi;
   } = {
-    auth: AuthApi,
     authz: AuthzApi,
-    enterpriseGateway: EnterpriseGatewayApi,
-    gateway: GatewayApi,
-    governance: GovernanceRestApi,
     notifications: NotificationService,
     organizations: OrganizationApi,
-    projects: ProjectApi,
     storedObjects: StoredObjectApi,
   };
 
@@ -220,17 +165,16 @@ export class UserModule implements UserApi {
 
     return UserModule.#build({
       dependencies: setup.dependencies,
+      channels: setup.channels,
       repositories: setup.repositories,
       budgetRequests: userBudgetRequestMailChannels.ses.create({
         mailer,
         baseUrl: setup.config.publicBaseUrl,
       }),
       facts: {
-        // Stored now, asked on first read: a peer API refuses during construction.
-        get passkeysEnabled() {
-          return setup.dependencies.auth.offersPasskeys();
-        },
-        baseUrl: setup.config.publicBaseUrl ?? null,
+        passkeysEnabled: setup.config.passkeysEnabled,
+        mfaEnrollmentOpen: setup.config.mfaEnrollmentOpen,
+        localPasswords: setup.config.localPasswords,
       },
     });
   }
@@ -245,6 +189,7 @@ export class UserModule implements UserApi {
 
   static #build({
     dependencies,
+    channels,
     repositories,
     facts,
     budgetRequests,
@@ -260,7 +205,7 @@ export class UserModule implements UserApi {
       users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
-        auth: dependencies.auth,
+        auth: { getSsoSetupStatus: (input) => channels.authReads.getSsoSetupStatus(input) },
         avatarStorage: avatarObjects,
         credentialIssuer: CREDENTIAL_ISSUER,
         now,
@@ -268,13 +213,16 @@ export class UserModule implements UserApi {
         lifecycle,
       }),
       lifecycle,
+      createdFactBackfill: UserCreatedFactBackfillService.create({
+        users: repositories.users,
+        lifecycle,
+      }),
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords,
       }),
       directory: UserOrganizationDirectoryService.create({
         directory: repositories.organizationDirectory,
-        organizations: dependencies.organizations,
       }),
       avatarObjects,
       rateLimits: repositories.rateLimits,
@@ -282,15 +230,18 @@ export class UserModule implements UserApi {
       passwords,
       now,
       dependencies,
+      channels,
       facts,
     });
   }
 
   readonly #users: UserService;
   readonly #lifecycle: UserLifecycleNoticeService;
+  readonly #createdFactBackfill: UserCreatedFactBackfillService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
+  readonly #authReads: UserChannels["authReads"];
   readonly #directory: UserOrganizationDirectoryService;
   readonly #avatarObjects: UserAvatarObjectService;
   readonly #rateLimits: UserRateLimitRepository;
@@ -302,6 +253,7 @@ export class UserModule implements UserApi {
   private constructor(input: {
     users: UserService;
     lifecycle: UserLifecycleNoticeService;
+    createdFactBackfill: UserCreatedFactBackfillService;
     credentials: UserCredentialService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
@@ -310,13 +262,16 @@ export class UserModule implements UserApi {
     passwords: UserPasswordHasher;
     now: () => Instant;
     dependencies: UserAppDependencies;
+    channels: UserChannels;
     facts: UserFacts;
   }) {
     this.#users = input.users;
     this.#lifecycle = input.lifecycle;
+    this.#createdFactBackfill = input.createdFactBackfill;
     this.#credentials = input.credentials;
     this.#account = UserAccountService.create(input.dependencies);
     this.#peers = input.dependencies;
+    this.#authReads = input.channels.authReads;
     this.#directory = input.directory;
     this.#avatarObjects = input.avatarObjects;
     this.#rateLimits = input.rateLimits;
@@ -342,6 +297,10 @@ export class UserModule implements UserApi {
 
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     return this.#users.updateProfile(input);
+  }
+
+  updateEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
+    return this.#users.updateEmail(input);
   }
 
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
@@ -425,10 +384,9 @@ export class UserModule implements UserApi {
 
   // -- credentials -----------------------------------------------------------
 
-  /** Mints an account that signs in with a password. */
-  async createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
-    const { id } = await this.#users.createCredentialUser(input);
-    return { id };
+  /** Confirms an unfinished account and drops its pre-proof sign-in methods, as one step. */
+  adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome> {
+    return this.#users.adoptUnconfirmedAccount(input);
   }
 
   /** Mints the account a passkey ceremony is about to register its key against. */
@@ -436,54 +394,11 @@ export class UserModule implements UserApi {
     return this.#users.createPasskeyUser(input);
   }
 
-  /**
-   * The signup form's whole path. Keyed off the RESOLVED provider, not the raw
-   * environment: the platform gate coerces to email mode with no license (ADR-027
-   * Decision 4), and blocking this path would kill fresh-signup recovery (5c).
-   */
-  async registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
-    // Before anything is claimed or written: the sign-in that follows is refused on a foreign
-    // origin, and an account created first would be left with nobody signed in to it.
-    await this.#peers.auth.assertSignUpOrigin({ origin: input.origin, referer: input.referer });
-
-    // The same rules the form ran, from the same module, so the two cannot
-    // drift into accepting different passwords. Carried as `fieldErrors` so the
-    // refusal lands on the password box rather than in a banner over it.
-    const problem = describePasswordProblem(input.password);
-
-    if (problem) {
-      throw new ValidationError(problem, { meta: { fieldErrors: { password: [problem] } } });
-    }
-
+  /** Mints the account auth's register door cleared, its address proof already spent (D-A1U-2). */
+  async registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser> {
     // Sign-in lowercases the address on every lookup, so an account stored as
     // typed is one sign-in can never find, no matter the password.
     const email = input.email.toLowerCase();
-
-    // D09: a deployment issuing its own passwords beside its provider passes
-    // too, except for an address an organization routes to its own connection.
-    const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
-
-    if (!emailMode && !this.#peers.auth.issuesOwnPasswords()) {
-      throw new UserRegistrationNotAvailableError();
-    }
-    if (!emailMode && (await this.#addressRoutesToConnection(email))) {
-      throw new UserRegistrationNotAvailableError();
-    }
-
-    await this.#meter({
-      key: `user.register:${input.callerAddress}`,
-      budget: SIGNUP_BUDGET,
-      refuse: () => new UserSignupThrottledError(),
-    });
-
-    // Before the proof is spent: a refused address keeps its link for the day
-    // an administrator invites it.
-    const verdict = await this.#peers.organizations.checkSignUp({ email });
-    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
-
-    // The mailbox proof is the authority to enrol a credential, spent before
-    // anything is hashed or written and bound to this exact address.
-    const addressConfirmed = await this.#claimSignUpProof({ token: input.addressProof, email });
 
     // Case-insensitive on purpose: rows written before the lowercasing above
     // may carry capitals, and minting a case-twin beside one would leave two
@@ -495,27 +410,13 @@ export class UserModule implements UserApi {
       email,
       passwordHash: await this.#passwords.hash({ password: input.password }),
     };
-    const created = addressConfirmed
-      ? await this.#users.createConfirmedCredentialUser(account)
-      : await this.#users.createCredentialUser(account);
-
-    await this.#lifecycle.registered({
-      userId: created.id,
-      at: this.#now(),
-      account: { accountId: created.accountId, createdAtMs: created.accountCreatedAtMs, email },
+    // The created and registered facts commit with the account, so a down bus never fails it.
+    const created = await this.#users.registerCredentialUser({
+      account,
+      addressConfirmed: input.addressConfirmed,
     });
 
     return { id: created.id };
-  }
-
-  /**
-   * Spends the sign-up proof and answers whether it confirmed the address. An unconfirmed
-   * proof counts only while the installation cannot send email (ADR-117, revision 2026-09-25).
-   */
-  async #claimSignUpProof(proof: { token: string; email: string }): Promise<boolean> {
-    if (await this.#peers.auth.claimSignUpAddressProof(proof)) return true;
-    if (await this.#peers.auth.claimUnconfirmedSignUpAddressProof(proof)) return false;
-    throw new IdentityVerificationExpiredError();
   }
 
   /** Whether this account can sign in with a password at all. */
@@ -529,120 +430,6 @@ export class UserModule implements UserApi {
   }
 
   /**
-   * Fills an EMPTY credential slot and never replaces a full one. A stolen session can
-   * already read everything; what's worth denying it is a credential that outlives the
-   * session being revoked — the refusal below is the whole endpoint's safety argument.
-   */
-  async setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void> {
-    // Refused before anything else: while impersonating, the account written is the
-    // subject's with no proof of the current password, so without this an operator
-    // could mint a durable credential on exactly the SSO-only/passkey-only accounts
-    // this method exists for. `keepSessionId` being null is the defensive half of
-    // the same rule.
-    if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
-
-    const problem = describePasswordProblem(input.password);
-
-    if (problem) {
-      throw new ValidationError(problem, { meta: { fieldErrors: { password: [problem] } } });
-    }
-
-    // Under a broker the password lives in the broker's tenant - unless the
-    // deployment issues its own (D09). Either way an address an organization
-    // routes through its own provider may not take a local password.
-    const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
-
-    if (!emailMode && !this.#peers.auth.issuesOwnPasswords()) {
-      throw new UserPasswordAuthUnavailableError();
-    }
-    const address = (await this.#users.findById({ id: input.userId }))?.email;
-    if (address && (await this.#addressRoutesToConnection(address))) {
-      throw new UserPasswordAuthUnavailableError();
-    }
-
-    await this.#meter({
-      key: `user.setPassword:${input.userId}`,
-      budget: PASSWORD_BUDGET,
-      refuse: () => new UserPasswordAttemptsThrottledError(),
-    });
-
-    const result = await this.#users.setFirstPassword({
-      id: input.userId,
-      passwordHash: await this.#passwords.hash({ password: input.password }),
-    });
-
-    if (result === "already_set") throw new UserPasswordAlreadySetError();
-
-    await this.#endOtherSessions(input);
-  }
-
-  /**
-   * Verifies the current password and replaces it. Throttled for both modes: this path
-   * has no recent-reauthentication gate like the hosted change-password endpoint, so
-   * without a budget a stolen session could brute-force `currentPassword`.
-   */
-  async changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    // Same rule as `setOwnFirstPassword`: how an account signs in belongs to
-    // its owner. Knowing the current password does not make it the operator's
-    // to replace, and a replacement outlives the impersonation session.
-    if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
-
-    const provider = await this.#peers.auth.resolveAuthProvider();
-
-    // A denied SSO deployment is coerced to email mode (ADR-027), and a person
-    // who recovered through the password-reset path owns a credential account
-    // they must be able to change. `changeOwnPassword` demands the current
-    // password, so this is no takeover vector.
-    if (provider !== "email" && provider !== "auth0" && !this.#peers.auth.issuesOwnPasswords()) {
-      throw new UserPasswordAuthUnavailableError();
-    }
-
-    await this.#meter({
-      key: `user.changePassword:${input.userId}`,
-      budget: PASSWORD_BUDGET,
-      refuse: () => new UserPasswordAttemptsThrottledError(),
-    });
-
-    const holdsOwnPassword = await this.#users.hasPassword({ id: input.userId });
-
-    if (changeTargetsBrokeredPassword({ provider, holdsOwnPassword })) {
-      await this.#changeFederatedPassword(input);
-      await this.#endOtherSessions(input);
-
-      return;
-    }
-
-    // Verify-and-replace as ONE call: split into a read of the stored hash and
-    // a write of its replacement, this method would be holding the hash.
-    const rotation = await this.#credentials.rotatePassword({
-      userId: input.userId,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
-    });
-
-    if (rotation === "no_password") throw new UserPasswordNotSetError();
-    if (rotation === "wrong_password") throw new UserPasswordIncorrectError();
-
-    await this.#endOtherSessions(input);
-  }
-
-  /**
-   * Whether an organization's own connection governs this address (D04). Left
-   * to throw: for an address a company signs in, "could not tell" must not
-   * become "here is a password".
-   */
-  async #addressRoutesToConnection(email: string): Promise<boolean> {
-    return routesToOrganizationConnection(
-      await this.#peers.auth.route({ identifier: email, breakGlass: false }),
-    );
-  }
-
-  /** Whether this deployment still owes the user a passkey offer, and when. */
-  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
-    return this.#users.getPasskeyNudgeStatus(input);
-  }
-
-  /**
    * The account-security offer (ADR-120, D06): one question covering a passkey and
    * two-step verification, each gated on its own deployment switch and never for a
    * person who holds it. One dismissal covers both. specs/identity/passkeys.feature
@@ -650,13 +437,12 @@ export class UserModule implements UserApi {
   async getPasskeyOffer(
     input: UserIdInput & { sessionId: string | null },
   ): Promise<UserSecureAccountOffer> {
-    const auth = this.#peers.auth;
     const signedInWith = input.sessionId
-      ? await auth.getSignedInWith({ userId: input.id, sessionId: input.sessionId })
+      ? await this.#authReads.getSignedInWith({ userId: input.id, sessionId: input.sessionId })
       : "unknown";
     const nudge = await this.#users.getPasskeyNudgeStatus({ id: input.id });
     const passkey = this.#facts.passkeysEnabled && !nudge.hasPasskey;
-    const twoStep = auth.offersTwoStepVerification() && !nudge.twoStepEnabled;
+    const twoStep = this.#facts.mfaEnrollmentOpen && !nudge.twoStepEnabled;
     if (!passkey && !twoStep) return { offer: false, passkey, twoStep, signedInWith };
 
     const askAgainAfter = nudge.dismissedAt
@@ -677,40 +463,6 @@ export class UserModule implements UserApi {
 
   dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void> {
     return this.#users.dismissJoinOffer(input);
-  }
-
-  /**
-   * What this person is signed in on. The reading half of ending a session:
-   * a person who lost a laptop needs the list before the action.
-   */
-  listBrowserSessions(input: {
-    userId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSession[]> {
-    return this.#account.listBrowserSessions(input);
-  }
-
-  /** Ends ONE of this person's own browser sessions, never the current one. */
-  endBrowserSession(input: {
-    userId: string;
-    sessionId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSessionEnded> {
-    return this.#account.endBrowserSession(input);
-  }
-
-  /**
-   * Ends every browser session of one user except the one named. A password
-   * outlives session revocation, so the sessions a credential write must end
-   * are a property of the write rather than of the door it arrived over.
-   */
-  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void> {
-    return this.#account.revokeOtherBrowserSessions(input);
-  }
-
-  /** Ends every browser session of one user, keeping none. */
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
-    return this.#account.revokeAllBrowserSessions(input);
   }
 
   /** Verifies the current password and replaces it, as ONE operation. */
@@ -754,34 +506,30 @@ export class UserModule implements UserApi {
     this.#lifecycle.connect(senders);
   }
 
-  /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
+  /** The `user:record-created-facts` step's body: every stored account recorded as created. */
+  recordExistingCreatedFacts(
+    input: UserCreatedFactBackfillRun,
+  ): Promise<UserCreatedFactBackfillReport> {
+    return this.#createdFactBackfill.recordExisting(input);
+  }
+
+  /** The fact outbox's delivery, on the worker: one committed fact recorded on user_lifecycle. */
+  recordLifecycleFact(intent: UserFactIntent): Promise<void> {
+    return this.#lifecycle.record(intent);
+  }
+
+  /** Retires an account in one write that refuses the last active operator; records no fact. */
   deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.deactivate(input);
+  }
+
+  recordDeactivated(input: UserLifecycleChangeInput): Promise<void> {
+    return this.#users.recordDeactivated(input);
   }
 
   /** Restores a retired account. */
   reactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.reactivate(input);
-  }
-
-  /** Self-service or an operator's call; `deactivate` ends every credential family. */
-  async deactivateAccount({
-    userId,
-    caller,
-  }: {
-    userId: string;
-    caller: UserCaller;
-  }): Promise<void> {
-    // Retiring someone else may revoke an operator, so it is never done while impersonating.
-    const isOthers = userId !== caller.id;
-    if (
-      isOthers &&
-      (caller.impersonated || !(await this.isOperator({ userId: caller.operatorId })))
-    ) {
-      throw new UserAccountAccessDeniedError();
-    }
-
-    await this.#users.deactivate({ id: userId, actor: { type: "user", id: caller.operatorId } });
   }
 
   /** An operator's call alone, never while impersonating: it can restore an operator's grant. */
@@ -858,85 +606,6 @@ export class UserModule implements UserApi {
   }
 
   /**
-   * Personal context inside one organization. The workspace is provisioned
-   * lazily on first read, so somebody who joined before the feature shipped
-   * gets one without re-accepting an invite.
-   */
-  async getPersonalContext({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<UserPersonalContext> {
-    await this.#assertMember({ userId, organizationId });
-
-    const profile = await this.#users.findById({ id: userId });
-    const workspace = await this.#account.ensurePersonalWorkspace({
-      userId,
-      organizationId,
-      displayName: profile?.name ?? null,
-      displayEmail: profile?.email ?? null,
-    });
-    const [policy] = await this.#peers.enterpriseGateway.findDefaultRoutingPolicies({
-      organizationId,
-      personalTeamId: workspace.team.id,
-    });
-
-    return {
-      workspace: { ...workspace, project: { ...workspace.project, apiKey: "" } },
-      routingPolicy: policy ? { id: policy.id, name: policy.name } : null,
-    };
-  }
-
-  /**
-   * The /me budget banner, delegated to the gateway's own check at a projected
-   * cost of zero — the same code path a request runs — so the banner and the
-   * command line's pre-check can never disagree.
-   */
-  async getPersonalBudget({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<UserPersonalBudget> {
-    const workspace = await this.#account.findPersonalWorkspace({ userId, organizationId });
-
-    if (!workspace) return { status: "ok" };
-
-    const keys = await this.#peers.enterpriseGateway.personalVirtualKeyList({
-      userId,
-      organizationId,
-    });
-    // OTLP-only people intentionally hold no personal gateway key. A sentinel
-    // that matches no key-scoped budget keeps them on the principal scope,
-    // which is what `principalUserId` resolves regardless.
-    const virtualKeyId = keys[0]?.id ?? `_ingestion_:user:${userId}`;
-    const decision = await this.#peers.gateway.checkBudget({
-      organizationId,
-      teamId: workspace.team.id,
-      projectId: workspace.project.id,
-      virtualKeyId,
-      principalUserId: userId,
-      projectedCostUsd: 0,
-    });
-    const topScope = findTopBudgetScope(decision);
-
-    if (!topScope) return { status: "ok" };
-
-    return {
-      status: budgetStatusOf({ decision: decision.decision, pctUsed: topScope.pctUsed }),
-      scope: normalizeScope(topScope.scope),
-      spentUsd: topScope.spentUsd,
-      limitUsd: topScope.limitUsd,
-      period: topScope.window.toLowerCase(),
-      ...this.#requestIncreaseUrl(topScope),
-      adminEmail: await this.#directory.findSupportContact({ organizationId }),
-    };
-  }
-
-  /**
    * Mails the organization's administrator the scope, the limit, the spend and
    * an optional message. Triggered from the budget-request page the gateway's
    * 402 and the command line both link to.
@@ -998,90 +667,11 @@ export class UserModule implements UserApi {
     return { lastHomePath, firstProjectSlug };
   }
 
-  /**
-   * Main checked membership before reading; the window applies only when both
-   * ends are given, otherwise governance defaults to this month.
-   */
-  async getPersonalUsageRollup({
-    userId,
-    organizationId,
-    windowStartMs,
-    windowEndMs,
-  }: UserApiPersonalUsageInput & { userId: string }): Promise<PersonalUsageRollup> {
-    await this.#assertMember({ userId, organizationId });
-
-    return this.#peers.governance.personalUsageDashboard(
-      windowStartMs && windowEndMs
-        ? { organizationId, window: { startMs: windowStartMs, endMs: windowEndMs } }
-        : { organizationId },
-      { id: userId },
-    );
-  }
-
-  /** Membership is re-checked by the gateway itself, answering `no_membership`. */
-  getBudgetOverview({
-    userId,
-    ...input
-  }: UserApiBudgetOverviewInput & { userId: string }): Promise<GovernanceBudgetOverviewForUser> {
-    return this.#peers.governance.personalBudgetOverview(input, { id: userId });
-  }
-
-  getCliBootstrap({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<CliBootstrapResult> {
-    return this.#peers.governance.cliBootstrap({ organizationId }, { id: userId });
-  }
-
-  // -- the two REST doors ----------------------------------------------------
-
-  /**
-   * The personal rollup one API key may read, scoped to THIS organization's hidden
-   * governance tenant — not the personal project — both to prune partitions and to
-   * stop a person in several organizations from summing usage across them.
-   */
-  async getPersonalUsage({
-    projectId,
-    credential,
-    window,
-  }: {
-    projectId: string;
-    credential: MePersonalCredential;
-    window?: { startMs: number; endMs: number };
-  }): Promise<MeUsage> {
-    const project = await this.#requireProject({ projectId });
-    const ownerUserId = this.#account.personalUsageCallerFor({ project, credential });
-    const organizationId =
-      (credential.kind === "legacyProjectKey" ? null : credential.organizationId) ??
-      (await this.#account.findOrganizationIdByTeamId({ teamId: project.teamId }));
-    const tenant = organizationId
-      ? await this.#peers.projects.findInternal({
-          organizationId,
-          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-        })
-      : null;
-
-    return this.#peers.governance.personalUsage({
-      personalProjectId: project.id,
-      userId: ownerUserId,
-      ...(tenant ? { ingestionTenantId: tenant.id } : {}),
-      ...(window ? { window } : {}),
-    });
-  }
+  // -- the /api/me/project door ---------------------------------------------
 
   /** The identity of the project the calling API key belongs to. */
-  async getKeyProject({ projectId }: { projectId: string }): Promise<MeProject> {
-    const project = await this.#requireProject({ projectId });
-
-    return {
-      id: project.id,
-      name: project.name,
-      slug: project.slug,
-      isPersonal: project.isPersonal,
-    };
+  getKeyProject(input: { projectId: string }): Promise<MeProject> {
+    return this.#directory.getKeyProject(input);
   }
 
   countUsage(): Promise<UserUsageCount> {
@@ -1124,158 +714,4 @@ export class UserModule implements UserApi {
   #nowMs(): number {
     return this.#now().epochMilliseconds;
   }
-
-  async #meter({
-    key,
-    budget,
-    refuse,
-  }: {
-    key: string;
-    budget: { windowSeconds: number; max: number };
-    refuse: () => Error;
-  }): Promise<void> {
-    const allowance = await this.#rateLimits.check({ key, ...budget });
-
-    if (!allowance.allowed) throw refuse();
-  }
-
-  /** A credential write ends every session but the one that made it. */
-  async #endOtherSessions(input: { userId: string; keepSessionId: string | null }): Promise<void> {
-    if (!input.keepSessionId) return;
-
-    await this.#account.revokeOtherBrowserSessions({
-      userId: input.userId,
-      keepSessionId: input.keepSessionId,
-    });
-  }
-
-  async #changeFederatedPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    const profile = await this.#users.findById({ id: input.userId });
-    const result = await this.#peers.auth.changeFederatedPassword({
-      userId: input.userId,
-      email: profile?.email ?? null,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
-    });
-
-    if (result.outcome === "changed") return;
-    if (result.outcome === "no_federated_account") {
-      throw new UserFederatedPasswordAccountMissingError(input.userId);
-    }
-    // Nothing the caller sent causes an account with no address, and nothing
-    // they can send avoids it, so it degrades to the generic failure.
-    if (result.outcome === "no_address_on_record") {
-      throw new Error("the authenticated account carries no email address");
-    }
-    if (result.outcome === "wrong_password") throw new UserPasswordIncorrectError();
-    // The provider's policy rejected the NEW password, and its wording is the
-    // only thing that says what to fix.
-    if (result.outcome === "weak_password") throw new ValidationError(result.message);
-
-    throw new UserFederatedPasswordChangeUnavailableError(result.outcome);
-  }
-
-  /**
-   * Membership, checked again after `organization:view`. The permission answers
-   * "may this caller act on an organization at all"; this answers "is this one
-   * theirs", which is what keeps a personal rollup inside their own tenant.
-   */
-  async #assertMember(input: { userId: string; organizationId: string }): Promise<void> {
-    const member = await this.#peers.organizations.isMember(input);
-
-    if (member) return;
-
-    throw new UserNotOrganizationMemberError(input.organizationId);
-  }
-
-  async #requireProject({ projectId }: { projectId: string }): Promise<ProjectIdentity> {
-    const project = await this.#peers.projects.findIdentity(projectId);
-
-    if (!project) throw new Error(`no project row for the credential's project "${projectId}"`);
-
-    return project;
-  }
-
-  #requestIncreaseUrl(scope: {
-    scope: string;
-    scopeId: string;
-    limitUsd: string;
-    spentUsd: string;
-  }): { requestIncreaseUrl?: string } {
-    const baseUrl = this.#facts.baseUrl;
-
-    if (!baseUrl) return {};
-
-    const params = new URLSearchParams({
-      scope: normalizeScope(scope.scope),
-      scope_id: scope.scopeId,
-      limit_usd: scope.limitUsd,
-      spent_usd: scope.spentUsd,
-    });
-
-    return {
-      requestIncreaseUrl: `${baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`,
-    };
-  }
-}
-
-/** One budget the gateway weighed, as the banner and the chip read it. */
-type BudgetScope =
-  | GatewayBudgetCheckResult["scopes"][number]
-  | GatewayBudgetCheckResult["blockedBy"][number];
-
-/** One weighed budget, with the percentage the chip renders. */
-type WeighedBudgetScope = BudgetScope & { pctUsed: number };
-
-/**
- * The budget the banner and the chip speak about: the blocking one where the gateway
- * named one, else the fullest. `blockedBy` carries the same scopes without the derived
- * percentage, so it's weighed the same way rather than tested for the field.
- */
-function findTopBudgetScope(decision: GatewayBudgetCheckResult): WeighedBudgetScope | undefined {
-  const blocking = decision.blockedBy[0];
-
-  if (blocking) return weigh(blocking);
-
-  return decision.scopes.map(weigh).toSorted((a, b) => b.pctUsed - a.pctUsed)[0];
-}
-
-function weigh(scope: BudgetScope): WeighedBudgetScope {
-  return { ...scope, pctUsed: percentUsed(scope.spentUsd, scope.limitUsd) };
-}
-
-/**
- * `hard_block` reddens the banner and `soft_warn` yellows it; `allow` still
- * carries the snapshot the chip renders, which is why "ok" is an answer with
- * numbers rather than an early return without them.
- */
-function budgetStatusOf({
-  decision,
-  pctUsed,
-}: {
-  decision: string;
-  pctUsed: number;
-}): "ok" | "warning" | "exceeded" {
-  if (decision === "hard_block") return "exceeded";
-  if (decision === "soft_warn" || pctUsed >= 80) return "warning";
-
-  return "ok";
-}
-
-function percentUsed(spentUsd: string, limitUsd: string): number {
-  const limit = Number.parseFloat(limitUsd);
-
-  if (!Number.isFinite(limit) || limit <= 0) return 0;
-
-  return (Number.parseFloat(spentUsd) / limit) * 100;
-}
-
-/**
- * The scope codes the banner and the command line's budget box accept.
- * Virtual-key blocks read as "personal" in both.
- */
-function normalizeScope(scope: string): string {
-  const normalized = scope.toLowerCase();
-
-  return normalized === "virtual_key" ? "personal" : normalized;
 }

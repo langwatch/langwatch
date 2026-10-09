@@ -14,24 +14,41 @@ import {
 } from "@langwatch/annotation-contract";
 
 import type { AnnotationScoreRepository } from "../repositories/annotation-score.repository.ts";
+import type { AnnotationFactsService } from "./annotation-facts.service.ts";
 
 export class AnnotationScoreService {
   #repository: AnnotationScoreRepository;
+  #facts: AnnotationFactsService;
 
-  private constructor(repository: AnnotationScoreRepository) {
+  private constructor(repository: AnnotationScoreRepository, facts: AnnotationFactsService) {
     this.#repository = repository;
+    this.#facts = facts;
   }
 
-  static create(options: { repository: AnnotationScoreRepository }): AnnotationScoreService {
-    return new AnnotationScoreService(options.repository);
+  static create(options: {
+    repository: AnnotationScoreRepository;
+    facts: AnnotationFactsService;
+  }): AnnotationScoreService {
+    return new AnnotationScoreService(options.repository, options.facts);
   }
 
   listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
     return this.#repository.findScoreNames(listAnnotationScoreNamesInputSchema.parse(input));
   }
 
-  upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore> {
-    return this.#repository.upsertScore(upsertAnnotationScoreInputSchema.parse(input));
+  /** A first name is recorded as defined, a changed one as renamed; soft-deleted names count. */
+  async upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore> {
+    const parsed = upsertAnnotationScoreInputSchema.parse(input);
+    const names = await this.#repository.findScoreNames({ projectId: parsed.projectId });
+    const previous = names.find((score) => score.id === parsed.id);
+    const score = await this.#repository.upsertScore(parsed);
+    const fact = { scoreId: score.id, projectId: score.projectId, name: score.name };
+    if (!previous) {
+      await this.#facts.scoreDefined(fact);
+    } else if (previous.name !== score.name) {
+      await this.#facts.scoreRenamed({ ...fact, previousName: previous.name });
+    }
+    return score;
   }
 
   listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {

@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
+import { useFacetHoverStore } from "../../../../features/facet/behavior/facet-hover.store.ts";
 
 /**
  * Escape characters that would break a CSS attribute-value string. Backslashes must be

@@ -4,19 +4,19 @@ import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useRef } from "react";
 
 import { useTraceSwitchOverlay } from "../../../../behavior/explorer/trace-drawer/use-trace-switch-overlay.ts";
+import { useTraceQueryArgs } from "../../../../behavior/explorer/use-trace-query-args.ts";
 import {
   traceChipDisplayName,
   traceContextChip,
 } from "../../../../behavior/langy/langy-context-chips.ts";
 import { useLangyContextTarget } from "../../../../behavior/langy/use-langy-context-target.ts";
-import { ScenarioRoleProvider } from "../../../../behavior/scenario-role.store.tsx";
+import { ScenarioRoleProvider } from "../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import { type DrawerViewMode, useShikiAdapter, useTraceDrawer } from "../../../../index.ts";
 import { BlurredContentGate } from "../../../blocks/explorer/blurred-content-gate.tsx";
 import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton.tsx";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay.tsx";
 import { useTraceEditSession } from "../hooks/use-trace-edit-session.ts";
-import { useTraceQueryArgs } from "../hooks/use-trace-query-args.ts";
 import { ConversationContext } from "./conversation-context.tsx";
 import { ConversationView } from "./conversation-view/index.ts";
 import { DrawerHeader } from "./drawer-header/index.ts";

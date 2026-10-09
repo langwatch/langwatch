@@ -18,6 +18,7 @@ import { GATEWAY_DEBITS_PROCESS_NAME } from "../../eventing/gateway-debit.proces
 import { gatewayRealtimeSessionEventing } from "../../eventing/gateway-realtime-session.pipeline.ts";
 import { SPEND_SETTLEMENT_PROCESS_NAME } from "../../eventing/gateway-spend-settlement.process.ts";
 import { gatewaySpendEventing } from "../../eventing/gateway-spend.pipeline.ts";
+import type { GatewaySpendApp } from "../../features/spend/services/gateway-spend-reconciliation.service.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
 import type { GatewayGuardrailCheckRow } from "../../repositories/gateway-guardrail.repository.ts";
 import type { OpenAdmission } from "../../repositories/gateway-open-admissions.repository.ts";
@@ -28,7 +29,6 @@ import {
   computeGatewaySignature,
 } from "../../rules/gateway-internal-identity.rules.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
-import type { GatewaySpendApp } from "../../services/gateway-spend-reconciliation.service.ts";
 import { signedGatewayRequest } from "../../transport/__tests__/support/gateway-internal-rest.harness.ts";
 import { gatewayInternalRest } from "../../transport/gateway-internal.rest.ts";
 import { GatewayModule } from "../gateway.app.ts";
@@ -197,7 +197,6 @@ async function installGateway({
     const state = await gatewayProcessModule.install({
       resources,
       config: { spendSettlementGraceMs: undefined },
-      members: {},
       repositorySelection: {
         tier: "live",
         members: { prisma, clickhouse, encryption: createApiFixture<Encryption>(), redis },

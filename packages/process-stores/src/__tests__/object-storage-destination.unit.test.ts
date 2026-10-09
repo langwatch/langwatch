@@ -171,6 +171,15 @@ describe("given writes moved to S3 while the Azure settings stay for legacy read
     await storage.close?.();
   });
 
+  /** @scenario "A historical Azure object resolves without the write-only container" */
+  it("reaches an object recorded on Azure when the retained block names no container", async () => {
+    const storage = storageWith(azureBlock({ accountKey, container: undefined }));
+
+    const url = await storage.value.signDownload(recorded, { expiresAt });
+    expect(url).toContain("/historic/project-1/object-1");
+    await storage.close?.();
+  });
+
   /** @scenario "Choosing S3 for writes does not unregister the Azure driver" */
   it("declines quietly when the retained block is unusable, leaving S3 traffic unaffected", async () => {
     const storage = storageWith(azureBlock());

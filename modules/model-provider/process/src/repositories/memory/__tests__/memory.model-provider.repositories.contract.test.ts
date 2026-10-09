@@ -140,19 +140,6 @@ describe("given the memory model-provider repositories", () => {
     });
   });
 
-  describe("when the setup checklist asks whether a provider is attached", () => {
-    it("counts only enabled rows on the project's own scopes", async () => {
-      const repositories = MemoryModelProviderRepositories.create();
-      await repositories.providers.create(provider({ id: "mp_1", enabled: false }));
-      expect(await repositories.evidence.hasEnabledForScopes([PROJECT_SCOPE])).toBe(false);
-
-      await repositories.providers.update(provider({ id: "mp_1", enabled: true }));
-
-      expect(await repositories.evidence.hasEnabledForScopes([PROJECT_SCOPE])).toBe(true);
-      expect(await repositories.evidence.hasEnabledForScopes([])).toBe(false);
-    });
-  });
-
   describe("when cost rules are listed for a project", () => {
     it("puts the project's own rate ahead of the organization's", async () => {
       const repositories = MemoryModelProviderRepositories.create();

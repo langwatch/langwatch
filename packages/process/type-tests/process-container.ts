@@ -6,7 +6,7 @@ import type {
   TasksProcessContainer,
   WorkerProcessContainer,
 } from "../src/process-container.ts";
-import { LicenseSource, ProjectApi } from "../tests/process-supply.fixtures.ts";
+import { ProjectApi } from "../tests/process-supply.fixtures.ts";
 
 type Booted<Container extends { boot(): Promise<unknown> }> = Awaited<
   ReturnType<Container["boot"]>
@@ -20,10 +20,6 @@ declare const tasks: Booted<TasksProcessContainer>;
 expectTypeOf(api.service(ProjectApi)).toEqualTypeOf<ProjectApi>();
 expectTypeOf(worker.service(ProjectApi)).toEqualTypeOf<ProjectApi>();
 expectTypeOf(tasks.service(ProjectApi)).toEqualTypeOf<ProjectApi>();
-
-// The accessor reaches module Apis only: a supply token stays inside the process.
-// @ts-expect-error a supply token is not a module Api
-void worker.service(LicenseSource);
 
 // Only the tasks role answers `tasks`; nothing else of the runtime leaks out.
 expectTypeOf(tasks).toEqualTypeOf<BootedApplication>();

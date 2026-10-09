@@ -15,8 +15,8 @@ export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;
  * nothing like a working one.
  */
 export const SCIM_SYNC_STATES = ["TOKEN_ISSUED", "SYNCING", "ERROR", "REVOKED"] as const;
-export const scimSyncStateSchema = z.enum(SCIM_SYNC_STATES);
-export type ScimSyncLifecycleState = z.infer<typeof scimSyncStateSchema>;
+export const scimSyncLifecycleStateSchema = z.enum(SCIM_SYNC_STATES);
+export type ScimSyncLifecycleState = z.infer<typeof scimSyncLifecycleStateSchema>;
 
 /** What a push did to one person, as the directory asked for it. */
 export const SCIM_USER_OPS = ["create", "update", "deactivate"] as const;
@@ -402,3 +402,25 @@ function sameFailure(
     standing.userId === next.userId
   );
 }
+
+/** Directory-sync pipeline identity: one aggregate per sync keyed by scimSyncId, tenanted by
+ * organizationId. Separate pipeline because sync and connection lifecycles differ. See D08.
+ */
+export const SCIM_SYNC_PIPELINE_NAME = "scim-sync" as const;
+export const SCIM_SYNC_AGGREGATE_TYPE = "scim_sync" as const;
+
+/** SCIM's cost-center fact: governance assigns the department from its own side (§9). */
+export const SCIM_COST_CENTER_PIPELINE_NAME = "scim_cost_center" as const;
+export const SCIM_MEMBER_AGGREGATE_TYPE = "scim_member" as const;
+export const SCIM_COST_CENTER_CHANGED_EVENT_TYPE = "lw.scim.cost_center_changed" as const;
+export const SCIM_COST_CENTER_CHANGED_EVENT_VERSION = "2026-10-07" as const;
+
+/** `costCenter` is trimmed; null clears the member's department. */
+export const scimCostCenterChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  costCenter: z.string().min(1).nullable(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type ScimCostCenterChangedEventData = z.infer<typeof scimCostCenterChangedEventDataSchema>;

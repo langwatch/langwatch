@@ -1,7 +1,8 @@
 name: migration-order
 
 # Fails a PR that adds a migration numbered below one already on the base branch,
-# and comments with the rename that fixes it.
+# takes a goose number main already used, or changes the file of a code step a
+# release manifest names, and comments with the command that fixes it.
 #
 # Migrations run in key order — Prisma by timestamp, ClickHouse by goose sequence
 # number. Goose only runs migrations above the version a database is already on,
@@ -30,13 +31,17 @@ on:
     # aggregator pattern the gated workflows use exists for exactly that
     # reason, and none of them lose it.
     #
-    # The two directories are the ones tools/migrationorder actually scans
-    # (tools/migrationorder/set.go). A PR that touches neither adds no
-    # migration, so there is no ordering to judge.
+    # These are the paths tools/migrationorder actually reads (set.go and
+    # steps.go). A PR that touches none of them adds no migration and changes
+    # no released step, so there is nothing to judge.
     paths:
       - "packages/prisma-client/prisma/migrations/**"
-      - "packages/prisma-client/prisma/migrations/**"
       - "packages/clickhouse-migrations/migrations/**"
+      # Released code steps are frozen: the manifests that name them, and the
+      # module folders that declare them (tools/migrationorder/steps.go).
+      - "packages/upgrade/releases/**"
+      - "modules/*/process/src/**/migrations/**"
+      - "enterprise/modules/*/process/src/**/migrations/**"
       # The checker and its own gate: a change to either has to run against
       # the real migration sets, not just its unit tests.
       - "tools/migrationorder/**"
@@ -160,7 +165,8 @@ jobs:
               ]),
               "Migrations run in the order their names sort. A migration numbered below one that " +
                 "already merged is skipped outright on any database that has run the newer one, so it " +
-                "passes locally and never runs in production.",
+                "passes locally and never runs in production. A code step a release manifest names has " +
+                "run on real installs, so its file cannot change either: declare a new step.",
             ].join("\n");
 
             // Edited in place when nothing changed, so a push does not re-notify

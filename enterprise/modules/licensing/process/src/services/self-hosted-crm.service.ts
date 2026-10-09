@@ -25,7 +25,7 @@ type SelfHostedCrmCollaborators = Readonly<{
   notifications: SelfHostedLeadNotifications;
   /** Absent where no CRM is configured. */
   nurturing?: SelfHostedLeadNurturing;
-  /** Where the backoffice lives, for the link in the Slack message. */
+  /** Where the admin console lives, for the link in the Slack message. */
   baseUrl: string;
   logger?: LicenseLogger;
 }>;
@@ -140,7 +140,7 @@ export class SelfHostedCrmService {
     leadingDomain: string | undefined;
     organizationName: string | null;
   }): Promise<void> {
-    const instanceUrl = `${this.collaborators.baseUrl}/ops/backoffice/self-hosted-instances`;
+    const instanceUrl = `${this.collaborators.baseUrl}/ops/cloud/self-hosted-instances`;
     const counts = reportedCounts(instance, { users: "users", traces28d: "traces_28d" });
     for (const signal of signals) {
       try {

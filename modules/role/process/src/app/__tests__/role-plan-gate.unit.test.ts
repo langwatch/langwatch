@@ -44,7 +44,6 @@ function harness(planType: "FREE" | "ENTERPRISE") {
     roles,
     entitlement: { getActivePlan },
     permissions,
-    organizations: { getOrganizationIdByTeamId: async () => ORGANIZATION_ID },
   });
 
   return { app, permissions, getActivePlan };

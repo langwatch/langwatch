@@ -49,6 +49,7 @@ describe("given object storage on the local filesystem", () => {
     /** @scenario "A write counts and hashes a body larger than any buffer while it streams" */
     /** @scenario "Datasets work on a minimal self-hosted install" */
     /** @scenario "A large file uploads on a self-hosted install with no object storage" */
+    /** @scenario "Local filesystem driver writes under the configured root using atomic rename" */
     it("answers its length and SHA-256, and reads the same bytes back", async () => {
       const backend = filesystemBackend({ root });
       const size = 24 * 1024 * 1024 + 7;
@@ -74,6 +75,7 @@ describe("given object storage on the local filesystem", () => {
       expect(await filesUnder(root)).toEqual([]);
     });
 
+    /** @scenario "Local filesystem driver write is atomic under interruption" */
     it("refuses a body that ends early", async () => {
       const backend = filesystemBackend({ root });
 
@@ -81,6 +83,9 @@ describe("given object storage on the local filesystem", () => {
         backend.write(at, bytes(10), { byteLength: 11, contentType: "text/plain" }),
       ).rejects.toBeInstanceOf(ObjectBodyShortError);
       expect(await filesUnder(root)).toEqual([]);
+
+      await backend.write(at, bytes(11), { byteLength: 11, contentType: "text/plain" });
+      expect(await hashOf(await backend.read(at))).toBe(await hashOf(bytes(11)));
     });
   });
 
@@ -99,6 +104,7 @@ describe("given object storage on the local filesystem", () => {
   });
 
   describe("when the object is removed", () => {
+    /** @scenario "StorageDriver interface exposes get, put, delete, exists" */
     it("reads as absent afterwards, and removing again is not an error", async () => {
       const backend = filesystemBackend({ root });
       await backend.write(at, bytes(10), { byteLength: 10, contentType: "text/plain" });

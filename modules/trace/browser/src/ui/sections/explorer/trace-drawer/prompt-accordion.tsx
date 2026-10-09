@@ -1,5 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import {
   Badge,
   Box,
@@ -9,13 +9,14 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
+import { usePromptByHandle } from "../../../../features/trace-drawer/behavior/use-prompt-by-handle.ts";
 import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes.ts";
-import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
 
 export { hasPromptMetadata };
 
@@ -164,7 +165,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
             size="xs"
             variant="ghost"
             gap={1}
-            onClick={() => openDrawer("promptEditor", { promptId: rawHandle })}
+            onClick={() => openDrawer(PromptEditorDrawerToken, { promptId: rawHandle })}
           >
             <Icon as={LuPencil} boxSize={3} />
             Open prompt

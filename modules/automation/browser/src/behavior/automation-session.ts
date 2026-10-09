@@ -1,7 +1,4 @@
-/**
- * Scope/permission reads from platform hooks (without landing policy); feature
- * flags keep two-field answer for prefill cases that depend on flag state.
- */
+/** Scope/permission reads from platform hooks (without landing policy). */
 
 import { useMemo } from "react";
 
@@ -30,18 +27,6 @@ export function useOrganizationTeamProject(): AutomationScopeReading {
     }),
     [host],
   );
-}
-
-export type AutomationFeatureFlagReading = {
-  enabled: boolean;
-  isLoading: boolean;
-};
-
-/** Fails closed while the answer is in flight, and says that it is. */
-export function useFeatureFlag(flag: string): AutomationFeatureFlagReading {
-  const host = useAutomationHost();
-  const answer = host.featureFlag(flag);
-  return { enabled: answer === true, isLoading: answer === void 0 };
 }
 
 /** Closes the drawer the address names by clearing its `drawer.*` keys. */

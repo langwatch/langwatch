@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAllowedLangWatchQLFunction,
   LWQL_ALLOWED_FUNCTION_NAMES,
-} from "../../rules/langwatch-ql-functions.rules.ts";
+} from "../../features/app-functions/rules/langwatch-ql-functions.rules.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 
 const POLICY = {

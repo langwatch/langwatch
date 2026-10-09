@@ -62,15 +62,62 @@ type TrpcParity struct {
 var acceptedNamespaceMoves = map[string]string{"tracesV2": "traces"}
 
 // acceptedProcedureMoves are single procedures ruled onto a new path: record
-// §3 (5bcdf4ee97) moved the coding-agent reads to their owner's namespace.
+// §3 (5bcdf4ee97) moved the coding-agent reads to their owner's namespace;
+// 26fe096afb (Alex) renamed role bindings to grants and moved them to authz;
+// rulings-2026-10-05 T1 D1 (5c57a04c5f) moved the Sessions lens to coding-agent.
 var acceptedProcedureMoves = map[string]string{
 	"tracesV2.codingAgentSession":    "codingAgents.session",
 	"tracesV2.codingAgentTranscript": "codingAgents.transcript",
+	"tracesV2.sessions":              "codingAgents.sessionGroups",
+
+	"roleBinding.listForOrg":          "authz.listManagedGrants",
+	"roleBinding.listForUser":         "authz.listMemberGrants",
+	"roleBinding.create":              "authz.createGrant",
+	"roleBinding.update":              "authz.changeGrantRole",
+	"roleBinding.delete":              "authz.revokeGrant",
+	"roleBinding.applyMemberBindings": "authz.applyMemberGrants",
+	"group.addBinding":                "group.addGrant",
+	"group.removeBinding":             "group.removeGrant",
+	"team.getTeamsWithRoleBindings":   "team.getTeamsWithGrants",
+
+	// Q-U9 (rulings-2026-10-06-rounds.md:73, d421aa2649): migrations under ops.upgrade;
+	// CD-2 (rulings-2026-10-07.md:198): monitor performance moved with its owner.
+	"ops.listSystemMigrations":              "ops.upgrade.listSystemMigrations",
+	"ops.listMigrationEnrollments":          "ops.upgrade.listMigrationEnrollments",
+	"ops.searchMigrationOrganizations":      "ops.upgrade.searchMigrationOrganizations",
+	"ops.enrollMigrationTenant":             "ops.upgrade.enrollMigrationTenant",
+	"ops.enrollMigrationCohort":             "ops.upgrade.enrollMigrationCohort",
+	"ops.withdrawMigrationTenant":           "ops.upgrade.withdrawMigrationTenant",
+	"ops.runSystemMigrationForOrganization": "ops.upgrade.runSystemMigrationForOrganization",
+	"ops.runSystemMigrationPass":            "ops.upgrade.runSystemMigrationPass",
+	"ops.rollBackSystemMigrationTenant":     "ops.upgrade.rollBackSystemMigrationTenant",
+	"monitors.getPerformanceForProject":     "evaluations.getMonitorPerformanceForProject",
+	// AD-1 / CD-11 and agent ADR-001:67: scenario and workflow serve these.
+	"agents.copy":       "workflow.copyAgent",
+	"agents.testTurn":   "scenarios.testAgentTurn",
+	"agents.testRun":    "scenarios.testAgentRun",
+	"httpProxy.execute": "scenarios.testHttpAgent",
+	// D4 (rulings-2026-10-07.md:255): instant evaluation is its own module.
+	"tracesV2.instantEval.estimate": "instantEval.estimate",
+	"tracesV2.instantEval.start":    "instantEval.start",
+	"tracesV2.instantEval.cancel":   "instantEval.cancel",
+	"tracesV2.instantEval.get":      "instantEval.get",
 }
 
-// retiredProcedures are main procedures ruled out of the branch (Alex,
-// 2026-09-25: the browser's public config is injected into the HTML).
-var retiredProcedures = map[string]bool{"publicEnv": true}
+// retiredProcedures are main procedures ruled out of the branch: publicEnv
+// (Alex, 2026-09-25: the browser's public config is injected into the HTML),
+// the project key reads (api-key ADR-002:58) and getMyAccessBreakdown (no
+// tRPC successor; main's browser never called it, only a REST handler did).
+var retiredProcedures = map[string]bool{
+	"publicEnv":                        true,
+	"project.getProjectAPIKey":         true,
+	"project.regenerateApiKey":         true,
+	"roleBinding.getMyAccessBreakdown": true,
+	// EF-3 (rulings-2026-10-07.md:164): the browser composes member provenance.
+	"organization.getMemberProvenance": true,
+	// linked-workflow-and-history.feature:34: the browser composes related entities.
+	"agents.getRelatedEntities": true,
+}
 
 // movedPath is where an accepted namespace move put a main procedure path.
 func movedPath(path string) (string, bool) {

@@ -1,6 +1,5 @@
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useEffect, useRef, useState } from "react";
-
-import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 
 /**
  * Click-to-edit state for a query handle name: the draft,

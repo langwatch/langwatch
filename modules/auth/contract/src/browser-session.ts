@@ -101,3 +101,11 @@ export const browserSessionInventoryEntrySchema = z
   })
   .strict();
 export type BrowserSessionInventoryEntry = z.infer<typeof browserSessionInventoryEntrySchema>;
+
+/** Which of the caller's own browser sessions to end. */
+export const endBrowserSessionInputSchema = z.object({ sessionId: z.string().min(1) }).strict();
+
+/** How many sessions an end request actually ended; zero is an ordinary answer. */
+export const browserSessionsEndedSchema = z
+  .object({ ended: z.number().int().nonnegative() })
+  .strict();

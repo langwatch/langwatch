@@ -1,6 +1,6 @@
 // Package fileregistry implements app.Store on the filesystem: the cross-worktree
 // registry + daemon record under the thuishaven home dir, plus the two
-// worktree-local files (the slug cache, the sticky selection and the HMR gate).
+// worktree-local files (the slug cache and the sticky selection).
 package fileregistry
 
 import (
@@ -298,34 +298,6 @@ func (s *Store) WritePrereqSkips(skips map[string]bool) error {
 	}
 	return s.writePrereqFile(f)
 }
-
-// hmrGatePath is the marker the Vite HMR-gate plugin reads. The plugin resolves
-// it against its own working directory, which is the Vite lane's — apps/ui —
-// so the marker is written there, not at the workspace root.
-func (s *Store) hmrGatePath(uiDir string) string {
-	return filepath.Join(uiDir, ".haven-hmr-gate")
-}
-
-// WriteHMRGate writes the gate expiry (unix-ms) so Vite defers HMR until then.
-func (s *Store) WriteHMRGate(uiDir string, expiryUnixMs int64) error {
-	return os.WriteFile(s.hmrGatePath(uiDir), []byte(strconv.FormatInt(expiryUnixMs, 10)+"\n"), 0o644)
-}
-
-// ReadHMRGate reads the gate expiry (unix-ms); ok is false when no gate is set.
-func (s *Store) ReadHMRGate(uiDir string) (int64, bool) {
-	b, err := os.ReadFile(s.hmrGatePath(uiDir))
-	if err != nil {
-		return 0, false
-	}
-	n, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
-	if err != nil {
-		return 0, false
-	}
-	return n, true
-}
-
-// ClearHMRGate removes the marker so HMR resumes immediately.
-func (s *Store) ClearHMRGate(uiDir string) { _ = os.Remove(s.hmrGatePath(uiDir)) }
 
 // dbActivityPath is the machine-wide last-seen clock for per-slug databases.
 func (s *Store) dbActivityPath() string { return filepath.Join(s.home, "db-activity.json") }

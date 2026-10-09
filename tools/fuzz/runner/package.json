@@ -5,7 +5,7 @@
   "description": "Playwright half of the fuzzer: a seeded monkey over every route the UI registers, many pages at once, with oracles and a replayable action trail per finding.",
   "type": "module",
   "scripts": {
-    "start": "node --experimental-transform-types src/main.ts",
+    "start": "node --experimental-transform-types src/fuzz.entrypoint.ts",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },

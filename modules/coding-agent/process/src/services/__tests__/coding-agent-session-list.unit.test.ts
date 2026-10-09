@@ -17,7 +17,7 @@ import {
 import {
   SESSIONS_LIST_LIMIT,
   SESSIONS_LIST_WINDOW_MS,
-} from "../coding-agent-pull-request-read.service.ts";
+} from "../../features/pull-requests/services/coding-agent-pull-request-read.service.ts";
 import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 
 const PROJECT = "project-1";

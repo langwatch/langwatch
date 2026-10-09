@@ -13,12 +13,12 @@ import type {
   SendEmailCommand,
 } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
-import { resolvedSecrets } from "@langwatch/process-stores";
+import { createApp } from "@langwatch/process";
+import { memoryStores, resolvedSecrets } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -40,11 +40,10 @@ async function bootAuth({
 }) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(authProcessModule)])
-    .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
+    .withModules([authProcessModule])
+    .withStores(memoryStores())
+    .withEncryption({ encrypt: (value: string) => value, decrypt: (value: string) => value })
     .withSecrets(resolvedSecrets({}))
-    .withRelational(prismaDouble({}))
-    .withKeyvalue(redisDouble({}))
     .withConfig({
       auth: {
         sessionUrl: undefined,
@@ -55,6 +54,7 @@ async function bootAuth({
         idpSimulatorUrl: undefined,
         localPasswords: false,
         auth0ManagementClientId: undefined,
+        cliRefreshTokenTtlSeconds: undefined,
         isSaas: false,
         signInProviders: NO_SIGN_IN_PROVIDERS,
         signUpMode: "open",
@@ -62,11 +62,13 @@ async function bootAuth({
         nodeEnvironment: "test",
       },
     })
+    .withObservability((observability) => observability.withLogging(createTestLogger().logger))
     .provide({
       user: createApiFixture<UserApi>({ findByEmail: async () => null }),
       "api-key": createApiFixture<ApiKeyApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       identity: createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         routeSignIn: async () => ({
           outcome: "route_to_signup",
           methodSet: [],
@@ -87,6 +89,7 @@ async function bootAuth({
       }),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>(),
+      project: createApiFixture<ProjectApi>(),
     })
     .boot();
 }

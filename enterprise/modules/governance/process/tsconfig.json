@@ -117,7 +117,13 @@
       "path": "../../../../modules/trace/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/upgrade/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/webhook/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/clickhouse-client/tsconfig.build.json"

@@ -25,8 +25,8 @@ import {
   COPILOT_CONVERSATION_ACTION,
   COPILOT_ROUTING_PROFILE,
   COPILOT_TURN_SPAN_NAME,
-} from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
-import * as CopilotStudioTraceMapperService from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
+} from "../../features/microsoft/rules/copilot-studio-trace-mapper-service.rules.ts";
+import * as CopilotStudioTraceMapperService from "../../features/microsoft/rules/copilot-studio-trace-mapper-service.rules.ts";
 
 const ORIGIN = {
   ingestionSourceId: "source-1",

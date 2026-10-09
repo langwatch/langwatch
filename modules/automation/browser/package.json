@@ -32,6 +32,7 @@
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/slack-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",

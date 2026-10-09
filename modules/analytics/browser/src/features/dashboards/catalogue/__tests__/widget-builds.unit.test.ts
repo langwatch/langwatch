@@ -5,10 +5,10 @@
  */
 
 import { NAVIGABLE_TARGETS } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { describe, expect, it } from "vitest";
 
 import { chartGridPlacementSchema } from "../../../../model/chart-grid.ts";
-import { dashboardWidgetDefinitionSchema } from "../../../../model/dashboard-widget-definition.ts";
 import { BOARD_MIN_ROW_SPAN } from "../../model/board-grid.ts";
 import { BOARD_TEMPLATES } from "../../templates/index.ts";
 import {

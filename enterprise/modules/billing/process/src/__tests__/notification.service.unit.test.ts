@@ -527,7 +527,7 @@ describe("NotificationService", () => {
       version: "3.1.0",
       users: 120,
       traces28d: 5000,
-      instanceUrl: "https://app.langwatch.ai/ops/backoffice/self-hosted-instances",
+      instanceUrl: "https://app.langwatch.ai/ops/admin/self-hosted-instances",
     };
 
     describe("when only the signups channel is configured", () => {

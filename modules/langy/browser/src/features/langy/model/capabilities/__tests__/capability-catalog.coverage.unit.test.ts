@@ -12,7 +12,7 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { SURFACE_LABEL, SURFACE_PATH } from "../capability-registry.ts";
+import { SURFACE_LABEL, SURFACE_PATH } from "../../../../../model/langy-capability-registry.ts";
 
 const CLI_PROGRAM_PATH = join(
   import.meta.dirname,

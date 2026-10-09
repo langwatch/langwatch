@@ -22,7 +22,6 @@ export const oversightFailureSchema = z
     occurredAtMs: z.number().int(),
   })
   .strict();
-export type OversightFailure = z.infer<typeof oversightFailureSchema>;
 
 /** One connection's sync, on the cross-customer list. */
 export const oversightSyncSchema = z

@@ -29,14 +29,15 @@ family whose routes run the statement as the credential's own cut of the project
 
 ## Dependencies
 
-Peers are named on `InstantEvalModule.dependencies` (feature flags, project, analytics, entitlement, gateway, trace, licensing and organization). The one channel is `InstantEvalJudgeChannel`
-(HTTP to the judge, with a memory twin); `JEV_API_KEY` resolves through the module's secret
-handle, never a config leaf.
+Peers are named on `InstantEvalModule.dependencies` (feature flags, project, analytics, entitlement, gateway, trace, licensing, organization and the Instant Evals judge). The one channel is `InstantEvalJudgeChannel`,
+with a memory twin. LangWatch's cloud classifier, its `JEV_API_KEY` and its rate limits belong to
+the `instant-eval-judge` leaf, reached only through its Api; Instant Evals asks it whether the key
+is set on its first call and otherwise uses Connect.
 
 ## Persistence
 
-ClickHouse repositories hold runs and judgments; Redis repositories hold budget reservations,
-cancellation and the rate limit. Each has a memory twin. Run progress is an event-sourced
+ClickHouse repositories hold runs and judgments; Redis repositories hold budget reservations
+and cancellation. Each has a memory twin. Run progress is an event-sourced
 projection built by the module's pipeline.
 
 ## Runtime and registration

@@ -25,11 +25,11 @@ If it prints `no merge in progress`, there is nothing to carry. Stop.
 
 ## 2. Read what binds you
 
-| File                                      | What it gives you                        |
-| ----------------------------------------- | ---------------------------------------- |
-| `.claude/skills/core/repository-rules.md` | what binds every agent here              |
-| `.claude/skills/core/handoff-rules.md`    | the seven statuses, the 150-line cap     |
-| `.claude/handoffs/merge-*.md`             | what earlier merge lanes already settled |
+| File                                       | What it gives you                        |
+| ------------------------------------------ | ---------------------------------------- |
+| `.claude/skills/core/repository-rules.md`  | what binds every agent here              |
+| `.claude/skills/core/handoff-rules.md`     | the seven statuses, the 150-line cap     |
+| the local merge handoff files (gitignored) | what earlier merge lanes already settled |
 
 Read the branch's own purpose before resolving anything. A restructuring branch
 deletes things **on purpose**, and main kept developing them; without knowing
@@ -228,7 +228,7 @@ repeated. Write the manifest with the cause in it, not just the file list.
 
 ## 10. Before you stop
 
-Rewrite `.claude/handoffs/merge-<area>.md` as a snapshot, under 150 lines, and
+Rewrite the area's local merge handoff file (gitignored) as a snapshot, under 150 lines, and
 put the live numbers in it by running step 1 rather than recalling them. The
 handoff carries what the next session cannot recompute: which decisions the
 human has already made, which `DU` files were ported and where, and which

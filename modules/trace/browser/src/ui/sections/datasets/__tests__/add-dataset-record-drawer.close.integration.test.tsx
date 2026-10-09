@@ -1,4 +1,4 @@
-import type * as HostDrawer from "@langwatch/browser-host/use-drawer";
+import type * as HostDrawer from "@langwatch/browser-host/drawer";
 /**
  * Leaving the "Add to Dataset" drawer hands the reader back to the drawer it was opened
  * from.
@@ -63,7 +63,7 @@ vi.mock("../../../../behavior/use-local-storage-selected-dataset-id.ts", () => (
 }));
 
 // The real navigator, with the hop to dataset's editor recorded rather than taken.
-vi.mock("@langwatch/browser-host/use-drawer", async (importOriginal) => {
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => {
   const actual = await importOriginal<typeof HostDrawer>();
   return {
     ...actual,
@@ -72,7 +72,9 @@ vi.mock("@langwatch/browser-host/use-drawer", async (importOriginal) => {
       return {
         ...drawer,
         openDrawer: (...args: Parameters<typeof drawer.openDrawer>) => {
-          if (args[0] === "addOrEditDataset") harness.openHostDrawer(args[0], args[1]);
+          const target = args[0] as string | { key: string };
+          const name = typeof target === "string" ? target : target.key;
+          if (name === "addOrEditDataset") harness.openHostDrawer(args[0], args[1]);
           else drawer.openDrawer(...args);
         },
       };
@@ -94,6 +96,7 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   },
 }));
 vi.mock("@langwatch/dataset-client", () => ({
+  AddOrEditDatasetRoutedDrawerToken: { key: "addOrEditDataset" },
   datasetClient: {
     useUtils: () => ({
       dataset: { getAll: { invalidate: vi.fn() } },
@@ -145,9 +148,9 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 
-import { useAnnotationQueueSessionStore } from "../../../../behavior/annotation-queue-session.store.ts";
+import { useAnnotationQueueSessionStore } from "../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer.tsx";
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */
@@ -311,7 +314,7 @@ describe("given the reader wants a new dataset from the drawer", () => {
       fireEvent.click(await screen.findByRole("button", { name: "New dataset" }));
 
       expect(harness.openHostDrawer).toHaveBeenCalledWith(
-        "addOrEditDataset",
+        expect.objectContaining({ key: "addOrEditDataset" }),
         expect.objectContaining({ onClose: expect.any(Function) }),
       );
     });

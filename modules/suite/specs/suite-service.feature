@@ -74,6 +74,15 @@ Feature: Suite service
     Then the answer counts one queued run
     And lists only the run that was queued
 
+  # Main answered a suite run with the slug of the plan it ran since #7867, so
+  # a caller can build the plan's address without a second read.
+  @unit @regression
+  Scenario: A suite run answers with the slug of the plan it ran
+    Given a stored suite whose slug is critical-path
+    When the suite is run through the service and through POST /api/suites/:id/run
+    Then the service result carries planSlug critical-path
+    And the REST response body carries the same planSlug
+
   # The suite starts its run on suite_run_processing and hands each scenario run
   # to the scenario owner, which records the run's metadata (main's startRun).
   @unit @regression

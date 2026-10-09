@@ -31,7 +31,12 @@ In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go
 every selected simulator runs in the `sims` lane: a second `service combined`
 process beside the `go` lane, which keeps only the gateway and the NLP engine. A
 simulator under load can therefore not starve the gateway. `haven restart sims`
-bounces them together and `haven logs <name>` still reads each one. Load drivers
+bounces them together and `haven logs <name>` still reads each one.
+`LANGWATCH_GO_ONE_PROCESS=1` is a trial of one Go process instead: the `go` lane
+hosts the gateway, the NLP engine and every simulator, each on its own address
+and hostname, and no `sims` lane runs. A gateway edit then restarts the
+simulators too; keep the split for protocol load or reload-sensitive work.
+Langy always keeps its own lane. Load drivers
 hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start with
 a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,
 set to 1 by haven); each simulator's delete endpoint empties it.
@@ -76,8 +81,13 @@ portless if missing, trusts its CA, starts the proxy — every step idempotent.
 `make haven install` (optional) go-installs the binary so plain `haven ...`
 works everywhere, and then runs `haven install`, which checks the machine for
 everything else haven drives — node, pnpm, go, the brew formulae behind the
-shared Postgres and Redis, a container runtime — and offers to install what is
-missing. Nothing is installed without being ticked, and anything declined with
+shared Postgres and Redis, on macOS the native tier (Grafana, Prometheus and
+Loki from Homebrew, the pinned ClickHouse, Tempo and Alloy downloads), and an
+optional container runtime (colima only backs the container fallback, `haven
+play` and sandboxed langy) — and offers to install what is missing. With no
+terminal (`make haven install` from an agent) it runs `--yes`: no prompts, one
+line per step, already-installed rows left alone, and only a missing required
+prerequisite fails. In a terminal nothing is installed without being ticked, and anything declined with
 "never" is remembered for the machine (`haven install --reset-skips` undoes
 that). Hostname routing is opt-in — `pnpm dev` uses the plain `PORT` scheme:
 
@@ -153,7 +163,7 @@ haven git        embedded git TUI (moron) for any worktree — `haven git <slug>
 haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
                  it becomes a real cd, tab-completed
 haven shell-init emit that shell function + completion
-haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven hmr        retired no-op (reloads are debounced, ADR-168)
 haven slot       run any command under the machine-wide check slot:
                  `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
                  runs with stdio passed through, releases; `slot explain`
@@ -384,11 +394,24 @@ machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
 shipped preset's list is empty until they do.
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
-container and the observability stack are memory-capped (and their colima VM is
-sized at creation), and the managed Redis gets a `maxmemory` ceiling
+container and the observability stack are memory-capped (the container tier by
+cgroup, the native tier by `GOMEMLIMIT`; the colima VM is sized at creation), and the managed Redis gets a `maxmemory` ceiling
 (`HAVEN_REDIS_MAXMEMORY_MB`, default 512, `0` disables) so a leaky stack fails
 loudly instead of paging the machine. `haven status` shows each service's
 current memory use, and the hub + dashboard show each stack's RAM footprint.
+
+**Observability tier.** The observability stack is on by default. On macOS it
+runs as host processes, no VM: `brew install grafana prometheus loki`; haven
+fetches Tempo 3.1.0, Alloy 1.20.1 and Pyroscope 2.3.2 itself (the official darwin release assets,
+pinned and sha256-checked like the native ClickHouse binary, into
+`<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN`, `HAVEN_OBS_ALLOY_BIN` and
+`HAVEN_OBS_PYROSCOPE_BIN` override them). A failed recommended or optional `haven install` row is logged
+and the run carries on; only a failed required row fails it. Same ports (OTLP 4317/4318, Grafana 3000) and
+datasource uids as the container; files under `<haven home>/observability`;
+`haven logs obs` tails its per-process logs. A missing binary prints its
+install line and never fails `up`. `LANGWATCH_HAVEN_OBS_TIER=container` runs
+the `grafana/otel-lgtm` container on colima instead (the default off macOS).
+Both tiers serve profiles on Pyroscope's port 4040. See ADR-042.
 
 **Machine limits.** `haven limits` prints the ClickHouse, observability and
 Redis memory caps, the colima VM's CPUs and memory, and the unit test worker
@@ -598,8 +621,12 @@ The daemon's JSON, which the console reads:
 
 ## More of what haven does
 
-- **Managed ClickHouse.** haven runs one shared `clickhouse-server` in Docker (colima) with its data on the
-  named volume `langwatch-clickhouse-data` (off virtiofs), and
+- **Managed ClickHouse.** On macOS haven runs one shared native `clickhouse-server`: the pinned
+  upstream 25.8 LTS binary, downloaded once into `<haven home>/clickhouse-native/` and checked
+  against its sha256, with its data beside it and no VM. Elsewhere, or with
+  `HAVEN_CH_RUNTIME=container`, it runs in Docker (colima) with its data on the named volume
+  `langwatch-clickhouse-data` (off virtiofs). The two never share data: switching starts an empty
+  server and each stack re-runs its migrations. Either way haven
   gives every worktree its own database (`lw_<slug>`) on it — so migration counts
   are always this worktree's own. Light local config (memory cap, no S3 tiering,
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`
@@ -787,9 +814,9 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   shared `~/.nx` cache is what trusted worktrees replay (ADR-150). `destroy`
   removes that directory. `down` and `destroy` stop the worktree's Nx daemon, and
   the daemon stops any Nx daemon whose worktree has been deleted.
-- **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
-  agent edits, then fires one catch-up reload — a human's browser isn't thrashed
-  through broken intermediate states. Opt-in and always time-bounded.
+- **Debounced HMR.** The Vite plugin coalesces a burst of agent edits into one
+  catch-up reload, so a human's browser isn't thrashed through broken
+  intermediate states. `haven hmr` is a retired no-op (ADR-168, 2026-10-09).
 
 ## Optional agent hooks
 

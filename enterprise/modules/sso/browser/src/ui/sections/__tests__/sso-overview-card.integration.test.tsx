@@ -122,6 +122,19 @@ describe("given a live OpenID Connect connection to okta", () => {
     expect(screen.getByText("Test sign-in")).toBeInTheDocument();
     expect(screen.queryByText("Metadata")).toBeNull();
   });
+
+  /** @scenario "Managing a live connection stays on the same page" */
+  it("only reads, and sends managing it to the provider page in the same section", () => {
+    renderCard();
+
+    // The journey is its own route; it never swaps places with the overview cards.
+    expect(screen.queryByText(/prove a domain is yours/i)).toBeNull();
+    const card = within(screen.getByTestId("single-sign-on-card"));
+    expect(card.getByText(/^Edit$/).closest("a")).toHaveAttribute(
+      "href",
+      "/settings/authentication/provider",
+    );
+  });
 });
 
 describe("given no connection yet", () => {

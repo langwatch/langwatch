@@ -4,7 +4,10 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ProviderScopeChips, scopeChipTooltip } from "../src/components/provider-scope-chips.tsx";
+import {
+  ProviderScopeChips,
+  scopeChipTooltip,
+} from "../src/components/scope/provider-scope-chips.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

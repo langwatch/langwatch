@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 import { S3TraceLegacySpoolChannel } from "../../../channels/s3/s3.trace-legacy-spool.channel.ts";
-import { BlobNotFoundError, TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobNotFoundError, TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
 
 type EventLogRead = Parameters<TraceBlobStoreService["getFromEventLog"]>[0];
 
@@ -31,7 +31,7 @@ export function blobStoreResolving(values: Record<string, string>): TraceBlobSto
   });
 }
 
-/** A real blob store with no ClickHouse client, as such a deployment runs; its read is spied. */
+/** A real blob store with no payload reader, as such a deployment runs; its read is spied. */
 export function blobStoreWithoutClickHouse(): TraceBlobStoreService {
   const store = TraceBlobStoreService.create({
     legacySpool: S3TraceLegacySpoolChannel.create({

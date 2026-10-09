@@ -12,7 +12,7 @@ import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
   type ModelPickerOption,
-} from "../src/components/provider-model-selector.tsx";
+} from "../src/components/scope/provider-model-selector.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 // jsdom has no Element.scrollTo, which the select machine calls when an item is picked.

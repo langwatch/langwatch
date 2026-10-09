@@ -6,7 +6,7 @@ import {
   azureBillingOf,
   costCaveatsFrom,
   readStoredCostCursor,
-} from "../governance-cost-notices.rules.ts";
+} from "../../features/cost/rules/governance-cost-notices.rules.ts";
 
 type Source = Parameters<typeof costCaveatsFrom>[0]["sources"][number];
 

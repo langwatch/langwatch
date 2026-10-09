@@ -4,7 +4,7 @@
  * @see specs/traces/trace-extraction-modules.feature
  */
 
-import { isoTimestamp } from "../trace-time-format.ts";
+import { isoTimestamp } from "../features/list/trace-time-format.ts";
 
 export type ConversationStepKind = "model" | "tool" | "retrieval" | "span";
 

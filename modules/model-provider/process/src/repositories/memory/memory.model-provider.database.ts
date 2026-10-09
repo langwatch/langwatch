@@ -7,9 +7,8 @@ import type {
 import { compareMoments, type TimeInput } from "@langwatch/time";
 
 /**
- * The rows the four memory twins share. One store rather than four: the
- * provider rows the evidence read counts are the ones the provider
- * repository writes, so two arrays could let a test attach a provider the checklist can't see.
+ * The rows the memory twins share, so every twin reads the provider rows
+ * the provider repository writes.
  */
 export class MemoryModelProviderDatabase {
   static create(): MemoryModelProviderDatabase {

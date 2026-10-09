@@ -27,8 +27,8 @@ const { state, calls } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../behavior/two-step-verification-api.ts", () => ({
-  twoStepVerificationApi: {
+vi.mock("@langwatch/api/web", () => ({
+  createModuleApi: () => ({
     useUtils: () => ({ twoStepVerification: { account: { invalidate: calls.invalidate } } }),
     twoStepVerification: {
       account: { useQuery: () => ({ data: state.account, isPending: false }) },
@@ -46,7 +46,7 @@ vi.mock("../behavior/two-step-verification-api.ts", () => ({
         }),
       },
     },
-  },
+  }),
 }));
 
 vi.mock("../../../behavior/personal-workspace-api.ts", () => ({

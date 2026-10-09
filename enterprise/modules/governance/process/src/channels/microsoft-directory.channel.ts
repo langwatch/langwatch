@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { DirectoryUser } from "../rules/microsoft-graph-directory.rules.ts";
-import type { PeopleListing } from "../rules/people-listing.rules.ts";
-import type { ListingRefusal } from "../rules/provider-listing.rules.ts";
+import type { ListingRefusal } from "../features/agents/rules/provider-listing.rules.ts";
+import type { PeopleListing } from "../features/identity/rules/people-listing.rules.ts";
+import type { DirectoryUser } from "../features/microsoft/rules/microsoft-graph-directory.rules.ts";
 
 /**
  * Why a directory walk stopped short. A cause as well as a refusal: the

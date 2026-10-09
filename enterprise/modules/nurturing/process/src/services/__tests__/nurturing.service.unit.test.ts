@@ -1,6 +1,7 @@
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { NurturingService } from "../nurturing.service.ts";
 
 // Suppress logger output and captureException in tests
@@ -33,9 +34,11 @@ function createService({
   const errorReporter = FakeErrorReporter.create();
   return {
     service: NurturingService.create({
-      config: { customerIoApiKey: apiKey, customerIoRegion: region },
-      fetchFn,
-      errorReporter,
+      channel: HttpCustomerIoChannel.create({
+        config: { customerIoApiKey: apiKey, customerIoRegion: region },
+        fetchFn,
+        errorReporter,
+      }),
     }),
     fetchFn,
     errorReporter,
@@ -233,9 +236,11 @@ describe("NurturingService", () => {
       });
 
       const service = NurturingService.create({
-        config: { customerIoApiKey: "key", customerIoRegion: "us" },
-        fetchFn: slowFetch,
-        errorReporter,
+        channel: HttpCustomerIoChannel.create({
+          config: { customerIoApiKey: "key", customerIoRegion: "us" },
+          fetchFn: slowFetch,
+          errorReporter,
+        }),
       });
 
       // Use fake timers to trigger the timeout immediately
@@ -286,8 +291,10 @@ describe("NurturingService", () => {
     it("defaults to the EU regional endpoint", async () => {
       const fetchFn = createMockFetch();
       const service = NurturingService.create({
-        config: { customerIoApiKey: "key", customerIoRegion: undefined },
-        fetchFn,
+        channel: HttpCustomerIoChannel.create({
+          config: { customerIoApiKey: "key", customerIoRegion: undefined },
+          fetchFn,
+        }),
       });
 
       await service.identifyUser({ userId: "user-1", traits: { email: "a@b.com" } });
@@ -300,8 +307,10 @@ describe("NurturingService", () => {
     it("behaves as a no-op without making HTTP requests", async () => {
       const fetchFn = createMockFetch();
       const service = NurturingService.create({
-        config: { customerIoApiKey: undefined, customerIoRegion: "us" },
-        fetchFn,
+        channel: HttpCustomerIoChannel.create({
+          config: { customerIoApiKey: undefined, customerIoRegion: "us" },
+          fetchFn,
+        }),
       });
 
       await service.identifyUser({

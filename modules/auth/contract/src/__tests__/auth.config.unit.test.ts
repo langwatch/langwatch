@@ -65,6 +65,26 @@ describe("auth server configuration", () => {
     });
   });
 
+  describe("given the CLI refresh-token lifetime", () => {
+    const lifetime = (raw?: string) =>
+      read({ LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS: raw }).cliRefreshTokenTtlSeconds;
+
+    /** @scenario "A CLI refresh token lives 90 days unless the deployment says otherwise" */
+    it("leaves the lifetime to the service's default when the deployment names none", () => {
+      expect(lifetime()).toBeUndefined();
+    });
+
+    /** @scenario "An operator shortens the CLI refresh-token lifetime" */
+    it("reads the operator's lifetime in seconds", () => {
+      expect(lifetime("3600")).toBe(3600);
+    });
+
+    /** @scenario "An unreadable CLI refresh-token lifetime keeps the default" */
+    it.each(["0", "-5", "1.5", "soon", ""])("boots and ignores %j", (raw) => {
+      expect(lifetime(raw)).toBeUndefined();
+    });
+  });
+
   describe("given the browser asks whether passwords are on here", () => {
     it("projects the same rule the credential routes mount by", async () => {
       const passwords = async (environment: Record<string, string>) =>
@@ -113,6 +133,7 @@ describe("auth server configuration", () => {
             signUpMode: "open",
             publicBaseUrl: undefined,
             nodeEnvironment: undefined,
+            cliRefreshTokenTtlSeconds: undefined,
             signInProviders: {
               authProvider: undefined,
               legacyProvider: undefined,

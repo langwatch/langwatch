@@ -1,111 +1,81 @@
 /**
- * What a judge is asked and what it answers, portable because the run, the
- * wire and the judge all name them.
+ * One synchronous query's judged columns. What a judge is asked and answers
+ * lives in the judge's own contract, `@langwatch/instant-eval-judge-contract`.
  *
  * @see modules/instant-eval/specs/classifier.feature
  */
 
-import { z } from "zod";
+import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";
+import {
+  instantEvalTextBudget,
+  instantEvalTranscriptRenderTokens,
+  type InstantEvalClassifierLimits,
+  type InstantEvalQuestion,
+  type InstantEvalSkipReason,
+} from "@langwatch/instant-eval-judge-contract";
 
-/** What a question asks for, which decides how its answer is read. */
-export const INSTANT_EVAL_QUESTION_KINDS = ["boolean", "score", "category"] as const;
-
-export type InstantEvalQuestionKind = (typeof INSTANT_EVAL_QUESTION_KINDS)[number];
-
-/** A yes-or-no question, answered with a calibrated probability. */
-const instantEvalBooleanQuestionSchema = z
-  .object({
-    id: z.string(),
-    kind: z.literal("boolean"),
-    instructions: z.string(),
-    /** What counts as yes, then what counts as no. A boundary has two sides. */
-    criteria: z.tuple([z.string(), z.string()]).readonly().optional(),
-  })
-  .readonly();
-
-export type InstantEvalBooleanQuestion = z.infer<typeof instantEvalBooleanQuestionSchema>;
-
-/** A rating on a whole-numbered scale, answered with a weighted mean. */
-const instantEvalScoreQuestionSchema = z
-  .object({
-    id: z.string(),
-    kind: z.literal("score"),
-    instructions: z.string(),
-    /** Inclusive bounds. Every whole number between them is a level. */
-    range: z.object({ min: z.number(), max: z.number() }).readonly(),
-  })
-  .readonly();
-
-export type InstantEvalScoreQuestion = z.infer<typeof instantEvalScoreQuestionSchema>;
-
-/** One named option out of a closed set. */
-const instantEvalCategoryQuestionSchema = z
-  .object({
-    id: z.string(),
-    kind: z.literal("category"),
-    instructions: z.string(),
-    options: z.array(z.object({ name: z.string(), description: z.string() }).readonly()).readonly(),
-  })
-  .readonly();
-
-export type InstantEvalCategoryQuestion = z.infer<typeof instantEvalCategoryQuestionSchema>;
-
-export type InstantEvalQuestion =
-  | InstantEvalBooleanQuestion
-  | InstantEvalScoreQuestion
-  | InstantEvalCategoryQuestion;
+/** One synchronous query's judged columns, their texts in place, and its caller's request. */
+export interface InstantEvalQueryJudgingInput {
+  readonly projectId: string;
+  readonly judgements: readonly LangWatchQLJudgementCall[];
+  readonly rows: readonly Record<string, unknown>[];
+  /** The caller's request: a cancel stops judging, keeping and billing what was answered. */
+  readonly signal?: AbortSignal;
+}
 
 /**
- * Why one text went unjudged. A skip is not an error: the query ran, and the
- * honest answer for that cell is null plus a diagnostic.
+ * One synchronous query's rows, judged: each judged column holds its verdict where its text
+ * was. A text the judge skipped is a null cell counted here by reason, not a missing key.
  */
-export const INSTANT_EVAL_SKIP_REASONS = [
-  "classifier_not_configured",
-  "classifier_rate_limited",
-  "classifier_input_too_large",
-  "classifier_failed",
-] as const;
-
-export type InstantEvalSkipReason = (typeof INSTANT_EVAL_SKIP_REASONS)[number];
-
-/** One question's answer. */
-export interface InstantEvalVerdict {
-  readonly questionId: string;
-  /** Probability of yes, for a boolean question. */
-  readonly probability?: number;
-  /** The probability-weighted mean inside the declared range, for a score. */
-  readonly score?: number;
-  /** The most likely option name, for a category. */
-  readonly label?: string;
-  /** Every option's probability, for a category. Sums to one. */
-  readonly probabilities?: Readonly<Record<string, number>>;
+export interface InstantEvalQueryJudging {
+  readonly rows: readonly Record<string, unknown>[];
+  readonly skipped: Readonly<Partial<Record<InstantEvalSkipReason, number>>>;
+  /** Present when the caller's signal stopped the judging, naming the rows left unjudged. */
+  readonly cancellation?: { readonly unjudgedRows: readonly number[] };
 }
 
-/** Everything one classification answered, whether or not it answered. */
-export interface InstantEvalJudgement {
-  /** One per question asked, in the order asked. Empty when skipped. */
-  readonly verdicts: readonly InstantEvalVerdict[];
-  readonly skippedReason?: InstantEvalSkipReason;
-  /** Input tokens the classifier billed for. Zero for a skip. */
-  readonly inputTokens: number;
-  readonly isTextTruncated: boolean;
-  /**
-   * Time this classification waited for rate-limit capacity. A run whose wall
-   * clock is limiter wait and one whose wall clock is provider latency need
-   * opposite fixes, and elapsed time alone cannot tell them apart.
-   */
-  readonly limiterWaitMs?: number;
+/** One judged column's question, addressed to the judge by the column it comes back in. */
+export function toInstantEvalQuestion(call: LangWatchQLJudgementCall): InstantEvalQuestion {
+  const { column: id, instructions } = call;
+  if (call.kind === "score") return { id, kind: "score", instructions, range: call.range };
+  if (call.kind === "category") {
+    return { id, kind: "category", instructions, options: call.options };
+  }
+
+  return {
+    id,
+    kind: "boolean",
+    instructions,
+    ...(call.criteria ? { criteria: call.criteria } : {}),
+  };
 }
 
-/** What the classifier charges, and what the customer is charged. */
-export interface InstantEvalPricing {
-  /** Output tokens are free on the shipped classifier, so only input is priced. */
-  readonly usdPerMillionInputTokens: number;
-  /** Multiplier from our cost to the customer's price. */
-  readonly markup: number;
+/** How large a conversation the judge takes whole, and the budget it is re-rendered under. */
+export interface InstantEvalTranscriptFit {
+  /** UTF-8 bytes the judge takes uncut, at its own transcript ratio. */
+  readonly maxBytes: number;
+  /** The same budget in the transcript renderer's four-bytes ruler. */
+  readonly renderTokens: number;
 }
 
-/** A judgement that judged nothing, for the reason given. */
-export function instantEvalSkipped(reason: InstantEvalSkipReason): InstantEvalJudgement {
-  return { verdicts: [], skippedReason: reason, inputTokens: 0, isTextTruncated: false };
+/**
+ * What one conversation judged by these columns may hold under the judge's own limits (Alex,
+ * 2026-10-08, round 26 CD-4); undefined when the questions leave no text, which `judgeQuery`
+ * refuses.
+ */
+export function computeInstantEvalTranscriptFit({
+  judgements,
+  limits,
+}: {
+  judgements: readonly LangWatchQLJudgementCall[];
+  limits: InstantEvalClassifierLimits;
+}): InstantEvalTranscriptFit | undefined {
+  const questions = judgements.map(toInstantEvalQuestion);
+  const textBudgetTokens = instantEvalTextBudget({ questions, limits });
+  if (textBudgetTokens <= 0) return undefined;
+
+  return {
+    maxBytes: Math.floor(textBudgetTokens * limits.transcriptFitBytesPerInputToken),
+    renderTokens: Math.max(1, instantEvalTranscriptRenderTokens({ textBudgetTokens, limits })),
+  };
 }

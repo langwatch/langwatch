@@ -49,7 +49,7 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
 
   const root = namespace("");
   root.useUtils = () => root;
-  return { api: root };
+  return { api: root, organizationApi: root };
 });
 
 vi.mock("../../../../behavior/use-join-requests.ts", () => ({
@@ -61,6 +61,16 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
     setJoining: vi.fn(),
     decide: vi.fn(),
     automaticJoins: [],
+  }),
+}));
+
+vi.mock("../../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
   }),
 }));
 

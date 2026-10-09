@@ -70,4 +70,19 @@ describe("the cross-check a process boots behind", () => {
       );
     });
   });
+
+  describe("given a dated mount over a shared family's route", () => {
+    /** @scenario "The dated middleware scopes of a shared family are not undeclared endpoints" */
+    it("reports a dated any-method mount only when no registered path stands behind it", () => {
+      const app = mounted();
+      const dated = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+
+      app.all(`/api/secrets${dated}/:id`, (context) => context.json({}));
+      app.all(`/api/secrets${dated}/smuggled`, (context) => context.json({}));
+
+      expect(undeclaredRoutes({ app, registry: allRegisteredRoutes() })).toEqual([
+        `ALL /api/secrets${dated}/smuggled`,
+      ]);
+    });
+  });
 });

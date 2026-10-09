@@ -5,12 +5,14 @@
 import { EventEmitter } from "node:events";
 
 import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
+import { RawSocketProtocol } from "@langwatch/api";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -22,7 +24,6 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -66,7 +67,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       "data-retention": createApiFixture<DataRetentionApi>({
         getResolvedForProject: async () => RETAINED,
       }),
-      suite: createApiFixture<SuiteApi>(),
+      evaluator: createApiFixture<EvaluatorApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
       prompt: createApiFixture<PromptApi>(),
       secret: createApiFixture<SecretApi>(),
@@ -127,7 +128,6 @@ const SIMULATION_KEYS = [
   "subscriber:pm:scenario_evaluations",
   "subscriber:pm:simulation_run_execution",
   "subscriber:snapshotUpdateBroadcast",
-  "subscriber:suiteRunSync",
   "subscriber:traceMetricsSync",
 ].map((key) => `simulation_processing:${key}`);
 
@@ -159,18 +159,45 @@ describe("given the scenario module installed on the worker role", () => {
     expect(keys).toContain("simulation_processing:subscriber:snapshotUpdateBroadcast");
   });
 
-  /** @scenario "The worker hosts the subscriber that reports a run into its suite run" */
-  it("hosts the suite run sync subscriber", async () => {
-    const { keys } = await installedOn("worker");
-
-    expect(keys).toContain("simulation_processing:subscriber:suiteRunSync");
-  });
-
   /** @scenario "The worker runs the run-execution process manager itself" */
   it("leaves no simulation process manager unrun", async () => {
     const { unrun } = await installedOn("worker");
 
     expect(unrun).toEqual([]);
+  });
+});
+
+describe("given the scenario module installed with a raw-socket host open", () => {
+  /** @scenario "A worker's boot plan always includes the voice media listener" */
+  it("mounts the voice media listener on the worker, whatever else its environment holds", async () => {
+    const doors: object[] = [];
+
+    const runtime = await process("worker", new EventEmitter())
+      .withEventing(eventingFor("worker"))
+      .expose(() => ({
+        hosts: { rawsocket: { mount: (declaration) => doors.push(declaration) } },
+        serve: () => undefined,
+      }))
+      .boot();
+    await runtime.stop();
+
+    expect(doors).toHaveLength(1);
+    expect(doors[0]).toBeInstanceOf(RawSocketProtocol);
+  });
+
+  it("leaves the voice media listener off the api role", async () => {
+    const doors: object[] = [];
+
+    const runtime = await process("api", new EventEmitter())
+      .withEventing(eventingFor("api"))
+      .expose(() => ({
+        hosts: { rawsocket: { mount: (declaration) => doors.push(declaration) } },
+        serve: () => undefined,
+      }))
+      .boot();
+    await runtime.stop();
+
+    expect(doors).toEqual([]);
   });
 });
 

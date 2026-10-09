@@ -16,7 +16,7 @@ import {
   shortenIdentifier,
   waitedFor,
 } from "../../model/identity-lookup-copy.ts";
-import { formatDateTime } from "../elements/backoffice-cells.tsx";
+import { formatDateTime } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 
 /** One person beside the list: how they sign in, what waits on a human, what happened. */

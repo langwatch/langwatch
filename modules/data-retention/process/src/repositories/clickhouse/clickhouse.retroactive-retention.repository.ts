@@ -1,23 +1,17 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
-  retentionCategories,
   RetroactiveMutationInProgressError,
+  retentionCategorySchema,
   retroactiveMutationProgressSchema,
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import {
-  INDEFINITE_EVENT_TYPE_PREFIXES,
-  INDEFINITE_EVENT_TYPES,
-  RETENTION_CLASS_BY_AGGREGATE_TYPE,
-  type EventLogRetentionClass,
-} from "@langwatch/data-retention-contract/event-log-retention-policy";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
+import { EventLogRetention } from "@langwatch/eventing/server";
 import { z } from "zod";
 
+import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
 import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
-
-const EVENT_LOG_TABLE = "event_log";
 
 const mutationRowSchema = z
   .object({
@@ -26,10 +20,8 @@ const mutationRowSchema = z
     isDone: z.number(),
     partsToDo: z.number(),
     createTime: z.string(),
-    // Selected only so `event_log` rows can recover the category marker
-    // stamped by `eventLogRetentionCategoryMutationMarkerSql`; other rows
-    // never carry one worth reading. Dropped again before a row leaves this
-    // repository (`retroactiveMutationProgressSchema` has no such field).
+    // Selected only so eventing's rewrite can be read back for its category
+    // marker; dropped before a row leaves this repository.
     command: z.string().optional(),
   })
   .strict();
@@ -52,10 +44,21 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   static create(options: {
     clickhouse: ClickHouseQueryClient;
   }): ClickHouseRetroactiveRetentionRepository {
-    return new ClickHouseRetroactiveRetentionRepository(options.clickhouse);
+    const eventLogRetention = EventLogRetention.create({
+      client: options.clickhouse,
+      classification: EVENT_LOG_RETENTION_CLASSIFICATION,
+    });
+    return new ClickHouseRetroactiveRetentionRepository(options.clickhouse, eventLogRetention);
   }
 
-  private constructor(private readonly clickhouse: ClickHouseQueryClient) {}
+  private constructor(
+    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly eventLogRetention: EventLogRetention,
+  ) {}
+
+  private isEventingTable(table: string): boolean {
+    return this.eventLogRetention.tables.includes(table);
+  }
 
   async triggerUpdate(input: {
     projectId: string;
@@ -65,10 +68,8 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
-    // event_log is never table-classified: it is stamped per row instead
-    // (`classifyEventLogRowRetention`), so every category's retroactive
-    // update must also visit it, not only the category flatly mapping to it.
-    const tables = [...new Set([...categoryTables, EVENT_LOG_TABLE])];
+    // Eventing's tables are classified per row, so every category visits them.
+    const tables = [...new Set([...categoryTables, ...this.eventLogRetention.tables])];
 
     const activeMutations = await this.getActiveMutations({
       projectId: input.projectId,
@@ -81,16 +82,14 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     }
 
     for (const table of tables) {
-      // event_log carries rows from every category plus a durable,
-      // never-expiring security slice. The extra predicate keeps this mutation
-      // to the rows this category owns; the marker records which category ran
-      // it so a concurrent mutation for another category is not mistaken for a
-      // conflict.
-      const eventLogCategoryFilter =
-        table === EVENT_LOG_TABLE
-          ? ` AND (${eventLogRetentionCategorySqlPredicate(input.category)})` +
-            ` AND ${eventLogRetentionCategoryMutationMarkerSql(input.category)}`
-          : "";
+      if (this.isEventingTable(table)) {
+        await this.eventLogRetention.retainCategory({
+          tenantId: input.projectId,
+          category: input.category,
+          retentionDays: input.newRetentionDays,
+        });
+        continue;
+      }
 
       await this.clickhouse.command({
         tenantId: input.projectId,
@@ -100,8 +99,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           `ALTER TABLE ${table} ` +
           "UPDATE _retention_days = {retentionDays:UInt16} " +
           "WHERE TenantId = {tenantId:String} " +
-          "AND _retention_days != {retentionDays:UInt16}" +
-          eventLogCategoryFilter,
+          "AND _retention_days != {retentionDays:UInt16}",
         params: {
           tenantId: input.projectId,
           retentionDays: input.newRetentionDays,
@@ -189,10 +187,8 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     });
 
     return this.parseRows(rows, {
-      // An event_log mutation marked for a different category touches a
-      // disjoint set of rows (the SQL predicate guarantees it), so it is not
-      // a real conflict and must not block this one. An unmarked legacy
-      // mutation carries no such guarantee and still blocks every category.
+      // Another category's event-log rewrite touches disjoint rows; an
+      // unmarked legacy rewrite reads as the table's flat category.
       keepEventLogRow: (category) => category === null || category === input.category,
     });
   }
@@ -209,7 +205,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
       })
       .filter(
         ({ row, category }) =>
-          row.table !== EVENT_LOG_TABLE || !options || options.keepEventLogRow(category),
+          !this.isEventingTable(row.table) || !options || options.keepEventLogRow(category),
       )
       .map(({ row, category }) =>
         retroactiveMutationProgressSchema.parse({
@@ -220,18 +216,11 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
       );
   }
 
-  /**
-   * event_log's category is read off the marker its own mutation stamped,
-   * since the table maps to "traces" flatly while its rows do not. A mutation
-   * predating the marker falls back to "traces", blocking every category.
-   */
+  /** An eventing rewrite's category is its marker's; an unmarked one falls back to the table's. */
   private categoryForRow(table: string, command: string | undefined): RetentionCategory | null {
-    if (table === EVENT_LOG_TABLE) {
-      return (
-        extractEventLogRetentionCategoryFromMutationCommand(command) ?? this.categoryForTable(table)
-      );
-    }
-    return this.categoryForTable(table);
+    const marked = this.eventLogRetention.categoryOfMutation({ table, command });
+    const category = retentionCategorySchema.safeParse(marked);
+    return category.success ? category.data : this.categoryForTable(table);
   }
 
   private categoryForTable(table: string): RetentionCategory | null {
@@ -239,85 +228,4 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
       Object.entries(RETENTION_TABLE_CATEGORY_MAP).find(([name]) => name === table)?.[1] ?? null
     );
   }
-}
-
-/** `event_log` retention classification SQL, from the map ingestion stamps rows with. */
-function sqlStringLiteral(value: string): string {
-  const escaped = value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  return `'${escaped}'`;
-}
-
-function aggregateTypesFor(retentionClass: EventLogRetentionClass): string[] {
-  return Object.entries(RETENTION_CLASS_BY_AGGREGATE_TYPE)
-    .filter(([, candidate]) => candidate === retentionClass)
-    .map(([aggregateType]) => aggregateType);
-}
-
-function aggregateTypeListSql(aggregateTypes: string[]): string {
-  return aggregateTypes.map(sqlStringLiteral).join(", ");
-}
-
-const eventTypePrefixSql = INDEFINITE_EVENT_TYPE_PREFIXES.map(
-  (prefix) => `startsWith(EventType, ${sqlStringLiteral(prefix)})`,
-).join(" OR ");
-
-const indefiniteEventTypesSql = aggregateTypeListSql([...INDEFINITE_EVENT_TYPES]);
-
-const indefiniteAggregateTypesSql = aggregateTypeListSql(aggregateTypesFor("indefinite"));
-
-/** Exact ClickHouse predicate for rows that must never expire. */
-const EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE =
-  `(${eventTypePrefixSql} OR ` +
-  `EventType IN (${indefiniteEventTypesSql}) OR ` +
-  `AggregateType IN (${indefiniteAggregateTypesSql}))`;
-
-/**
- * Finite-policy predicate for one retention category, generated from the same
- * map as ingestion — traces excludes scenario/experiment aggregate types so
- * neither can silently inherit the traces retention window.
- */
-function eventLogRetentionCategorySqlPredicate(category: RetentionCategory): string {
-  const finiteGuard = `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`;
-
-  if (category === "traces") {
-    const otherFiniteAggregateTypes = [
-      ...aggregateTypesFor("scenarios"),
-      ...aggregateTypesFor("experiments"),
-    ].toSorted();
-    return (
-      `${finiteGuard} AND ` +
-      `AggregateType NOT IN (${aggregateTypeListSql(otherFiniteAggregateTypes)})`
-    );
-  }
-
-  return (
-    `${finiteGuard} AND ` +
-    `AggregateType IN (${aggregateTypeListSql(aggregateTypesFor(category))})`
-  );
-}
-
-const EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
-
-/**
- * No-op predicate fragment stamping which category triggered a mutation, so a
- * concurrent mutation for a different category is distinguishable from a real
- * conflict.
- */
-function eventLogRetentionCategoryMutationMarkerSql(category: RetentionCategory): string {
-  const marker = `${EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX}${category}`;
-  return `length(${sqlStringLiteral(marker)}) > 0`;
-}
-
-/** Recovers the marker {@link eventLogRetentionCategoryMutationMarkerSql} stamped, if any. */
-function extractEventLogRetentionCategoryFromMutationCommand(
-  command: string | null | undefined,
-): RetentionCategory | null {
-  if (!command) return null;
-
-  const matchingCategories = retentionCategories.filter((category) => {
-    const marker = `${EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX}${category}`;
-    return command.includes(sqlStringLiteral(marker));
-  });
-
-  return matchingCategories.length === 1 ? matchingCategories[0]! : null;
 }

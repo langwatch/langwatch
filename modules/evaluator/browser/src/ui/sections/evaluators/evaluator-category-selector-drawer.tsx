@@ -17,8 +17,6 @@ import {
 } from "./evaluator-editor-shared.tsx";
 import { categoryNames, EvaluatorTypeSelectorContent } from "./evaluator-type-selector-content.tsx";
 
-export type { EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
-
 /** What a caller hands evaluator's category selector drawer. */
 export type EvaluatorCategorySelectorDrawerProps = {
   open?: boolean;

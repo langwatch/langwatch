@@ -5,7 +5,6 @@ import type { ModelProviderCredentialCipher } from "../model-provider.repository
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./prisma.model-default.repository.ts";
 import { PrismaModelProviderCredentialMapper } from "./prisma.model-provider-credential.mapper.ts";
-import { PrismaModelProviderEvidenceRepository } from "./prisma.model-provider-evidence.repository.ts";
 import { PrismaModelProviderRepository } from "./prisma.model-provider.repository.ts";
 
 /** The Postgres stores; the provider store seals and opens credentials with the cipher. */
@@ -22,7 +21,6 @@ export class PostgresModelProviderRepositories {
       providers: PrismaModelProviderRepository.create(prisma, credentials),
       defaults: PrismaModelDefaultRepository.create(prisma),
       costs: PrismaModelCostRepository.create(prisma),
-      evidence: PrismaModelProviderEvidenceRepository.create(prisma),
     };
   }
 }

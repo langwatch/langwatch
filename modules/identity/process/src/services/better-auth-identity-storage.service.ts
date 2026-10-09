@@ -6,32 +6,30 @@ import type {
   AdapterFactoryCustomizeAdapterCreator,
   CustomAdapter,
   DBAdapter,
+  DBTransactionAdapter,
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
 import { APIError } from "better-auth/api";
 
 import { type AdapterNaming, httpStatusFor } from "../rules/better-auth-storage-rows.rules.ts";
 
-export interface IdentityStorageAdapterDeps {
+type LegacyEngine = (options: BetterAuthOptions) => DBAdapter;
+
+interface IdentityStorageAdapterDeps {
   /**
    * better-auth's own published storage engine, built (`prismaAdapter(...)`,
    * `memoryAdapter(...)`) but not yet bound to options. The legacy branch delegates to it
    * verbatim, so an unlatched user's behavior is byte-for-byte what the stock adapter did.
    */
-  legacyEngine: (options: BetterAuthOptions) => DBAdapter;
+  legacyEngine: LegacyEngine;
+  /**
+   * One real Postgres transaction with the legacy engine rebound to it. Required: better-auth's
+   * SSO plugin runs `resolveUser` only when `transaction` is a function, and its `SsoProvider`
+   * row lock holds only inside one. The identity branch's event store is not spanned.
+   */
+  postgresTransaction: <R>(work: (legacyEngine: LegacyEngine) => Promise<R>) => Promise<R>;
   /** The routed adapter, composed in app/ once per bound engine and naming (Q223 (a)). */
   routing: (args: { legacy: DBAdapter; naming: AdapterNaming }) => CustomAdapter;
-}
-
-type PasskeyRemovalOutcome = "deleted" | "not_found" | "would_strand_user";
-
-/**
- * The atomic persistence boundary behind better-auth's one-passkey delete.
- * Decision and deletion share one serializable transaction: two removals
- * reading the same stale set could both proceed and lock the user out.
- */
-export interface PasskeyRemoval {
-  deleteIfAnotherWayInRemains(args: { passkeyId: string }): Promise<PasskeyRemovalOutcome>;
 }
 
 /**
@@ -48,13 +46,23 @@ export class BetterAuthIdentityStorageService {
     return (naming) => surfacingHandledRefusals(this.deps.routing({ legacy, naming }));
   }
 
-  /** The better-auth adapter factory this branch installs. */
+  /** The better-auth adapter factory; a transaction rebuilds it over the rebound engine. */
   factory(): AdapterFactory<BetterAuthOptions> {
-    return (options) =>
-      createAdapterFactory({
-        config: identityAdapterConfig,
-        adapter: this.customAdapter(this.deps.legacyEngine(options)),
-      })(options);
+    return (options) => {
+      const over = (legacyEngine: LegacyEngine, config: AdapterFactoryConfig): DBAdapter =>
+        createAdapterFactory({ config, adapter: this.customAdapter(legacyEngine(options)) })(
+          options,
+        );
+      return over(this.deps.legacyEngine, {
+        ...identityAdapterConfig,
+        transaction: <R>(
+          callback: (trx: DBTransactionAdapter<BetterAuthOptions>) => Promise<R>,
+        ): Promise<R> =>
+          this.deps.postgresTransaction((legacyEngine) =>
+            callback(over(legacyEngine, identityAdapterConfig)),
+          ),
+      });
+    };
   }
 }
 

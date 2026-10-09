@@ -1,3 +1,4 @@
+import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import type {
   Protections,
   Evaluation,
@@ -5,17 +6,8 @@ import type {
   TraceHeader,
   TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
-import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
-
-/**
- * Whether this viewer may read text the model wrote from the conversation, rather than a fact
- * about it. Both sides are required: summaries, titles and evaluator prose paraphrase prompt
- * and reply together, so one-sided access would leak the other. Every surface asks here.
- */
-export const canReadCapturedContent = (protections: Protections): boolean =>
-  protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true;
 
 /**
  * Gates for v2 trace read DTOs: enforces same Protections on both transports
@@ -59,42 +51,6 @@ export function gateSessionCost<T extends { totalCost: number }>({
 }): T[] {
   if (protections.canSeeCosts === true) return sessions;
   return sessions.map((session) => ({ ...session, totalCost: 0 }));
-}
-
-/**
- * Strip session title for viewers who cannot read captured content. `titleRedacted`
- * set only when a title existed (mirrors redactV2Content).
- */
-export function gateSessionTitle<T extends { codingAgent: { title: string | null } | null }>({
-  sessions,
-  protections,
-}: {
-  sessions: T[];
-  protections: Protections;
-}): (T & {
-  codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
-})[] {
-  const contentVisible = canReadCapturedContent(protections);
-  return sessions.map((session) => {
-    const codingAgent = session.codingAgent as NonNullable<T["codingAgent"]> | null;
-    return {
-      ...session,
-      codingAgent:
-        codingAgent === null
-          ? null
-          : {
-              ...codingAgent,
-              title: contentVisible ? codingAgent.title : null,
-              titleRedacted: !contentVisible && codingAgent.title !== null,
-            },
-    };
-  });
-}
-
-/** What {@link gateSessionTitle} adds to a row's coding-agent enrichment. */
-interface SessionTitleRedactionFlag {
-  /** True only when a title existed and this viewer may not read it. */
-  titleRedacted: boolean;
 }
 
 /** Redact resource attributes with the viewer's restricted-attribute rules. */

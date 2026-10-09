@@ -14,13 +14,16 @@ import {
   type WebhookEndpointView,
   webhookRequestFailureResponseSchema,
   WEBHOOK_PREVIOUS_SECRET_TTL_MS,
+  type WebhookSignatureScheme,
 } from "@langwatch/webhook-contract";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import type { WebhookDeliveryDisposition } from "../../rules/webhook-delivery-contract.rules.ts";
 import {
+  httpDestinationConfig,
   describeDestination,
+  endpointMaxBatchSize,
   sqsCredentialMode,
   type WebhookDestinationConfig,
 } from "../../rules/webhook-destination.rules.ts";
@@ -183,13 +186,15 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    signatureScheme?: WebhookSignatureScheme;
+    sharedSecret?: string;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const destinationKind = params.destinationKind ?? "http";
     const destination = PrismaWebhookEndpointRepository.storedDestination(
       params,
       this.deps.secrets,
     );
-    const secret = PrismaWebhookEndpointRepository.newSecret();
+    const secret = params.sharedSecret ?? PrismaWebhookEndpointRepository.newSecret();
     const data: Prisma.WebhookEndpointUncheckedCreateInput = {
       id: this.deps.ids.newEndpointId(),
       organizationId: params.organizationId,
@@ -206,6 +211,10 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     }
     if (params.maxInFlight !== undefined) {
       data.maxInFlight = params.maxInFlight;
+    }
+    if (params.signatureScheme !== undefined) {
+      data.signatureScheme = params.signatureScheme;
+      data.maxBatchSize = 1;
     }
     const endpoint = await this.prisma.webhookEndpoint.create({
       data,
@@ -258,7 +267,10 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       data.enabledEvents = params.enabledEvents;
     }
     if (params.maxBatchSize !== undefined) {
-      data.maxBatchSize = params.maxBatchSize;
+      data.maxBatchSize = endpointMaxBatchSize({
+        signatureScheme: endpoint.signatureScheme,
+        maxBatchSize: params.maxBatchSize,
+      });
     }
     if (params.maxBatchDelayMs !== undefined) {
       data.maxBatchDelayMs = params.maxBatchDelayMs;
@@ -412,7 +424,10 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
           : null,
       };
     }
-    return { kind: "http", url: endpoint.url ?? "" };
+    return httpDestinationConfig({
+      url: endpoint.url ?? "",
+      signatureScheme: endpoint.signatureScheme,
+    });
   }
 
   /** Decrypted signing secret for the delivery path and test sends. */

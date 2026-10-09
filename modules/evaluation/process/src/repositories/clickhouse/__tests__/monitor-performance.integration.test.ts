@@ -16,7 +16,7 @@ import {
   seedMonitorPerformance,
   startMigratedClickHouse,
 } from "../../../__tests__/support/monitor-performance.fixtures.ts";
-import { MonitorPerformanceService } from "../../../services/monitor-performance.service.ts";
+import { MonitorPerformanceService } from "../../../features/monitors/services/monitor-performance.service.ts";
 import { ClickHouseEvaluationSession } from "../clickhouse.evaluation-session.store.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../monitor-performance.repository.ts";
 

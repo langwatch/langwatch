@@ -190,7 +190,11 @@ func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) err
 	// remediation the customer sees. The HTTP status is deliberately absent —
 	// it is on the response, and nothing renders it from here.
 	code := bfErrorCode(berr)
-	meta := herr.M{"message": bfCustomerMessage(code, berr)}
+	problem := bfConfigProblem(code, berr)
+	meta := herr.M{"message": bfCustomerMessage(code, problem, berr.ExtraFields.OriginalModelRequested)}
+	if problem != "" {
+		meta["problem"] = string(problem)
+	}
 	if provider := string(berr.ExtraFields.Provider); provider != "" {
 		meta["provider"] = provider
 	}
@@ -356,7 +360,7 @@ func bfCodeForMessage(msg string) (herr.Code, bool) {
 // which puts a cluster-internal address in front of a customer. The specific
 // sentence is not lost — faults.go#handledCause puts it on the log line, off
 // the wire.
-func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
+func bfCustomerMessage(code herr.Code, problem domain.ConfigProblem, model string) string {
 	switch code {
 	case domain.ErrProviderCredentialInvalid:
 		// The "retrying will not help" half belongs here rather than in a tip:
@@ -365,16 +369,64 @@ func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 		// away for the very provider this was written for.
 		return "The credentials configured for this model provider were not accepted, so the request never reached the provider and will fail the same way on every retry. Check the provider's credentials in your model provider settings."
 	case domain.ErrProviderConfigInvalid:
-		if model := berr.ExtraFields.OriginalModelRequested; model != "" {
-			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", model)
-		}
-		return "This model provider is not configured to serve the requested model. Check the models and deployments configured for it in your model provider settings."
+		return configProblemMessage(problem, model)
 	case domain.ErrInternal:
 		return "The gateway could not build the upstream request."
 	case domain.ErrRequestAbandoned:
 		return "The request was canceled before the provider answered."
 	}
 	return "The model provider did not return a usable response."
+}
+
+// bfConfigProblem names what the provider slot is missing, for the one code
+// whose remediation depends on it. Bifrost says which with the same prose the
+// code was matched on, so the needle that picked provider_config_invalid also
+// picks the problem.
+//
+// A missing API key is not read from here. Bifrost reports it as "no keys
+// found that support model", the same sentence it uses for a key that lists
+// other models, so the two cannot be told apart from its message. The gateway
+// holds the credential and checks it before dispatch instead (see
+// credentialGap), which leaves this message meaning only the remainder.
+func bfConfigProblem(code herr.Code, berr *bfschemas.BifrostError) domain.ConfigProblem {
+	if code != domain.ErrProviderConfigInvalid {
+		return ""
+	}
+	if bfErrorCodeField(berr) == "unsupported_operation" {
+		return domain.ConfigProblemOperationUnsupported
+	}
+	lowered := strings.ToLower(bfErrorMsg(berr))
+	switch {
+	case strings.Contains(lowered, "deployments not set"):
+		return domain.ConfigProblemDeploymentMissing
+	case strings.Contains(lowered, "endpoint not set"):
+		return domain.ConfigProblemEndpointMissing
+	}
+	return domain.ConfigProblemModelNotServed
+}
+
+// configProblemMessage is the sentence for one provider_config_invalid
+// problem. Written here rather than relayed: each names the setting to change
+// and none repeats anything a credential or an upstream said.
+func configProblemMessage(problem domain.ConfigProblem, model string) string {
+	switch problem {
+	case domain.ConfigProblemAPIKeyMissing:
+		return "This model provider has no API key saved, so the request never reached the provider. Add the API key in your model provider settings."
+	case domain.ConfigProblemEndpointMissing:
+		return "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in your model provider settings."
+	case domain.ConfigProblemDeploymentMissing:
+		if model != "" {
+			return fmt.Sprintf("This model provider has no deployment mapped for %q. Add the deployment mapping in your model provider settings.", model)
+		}
+		return "This model provider has no deployment mapped for the requested model. Add the deployment mapping in your model provider settings."
+	case domain.ConfigProblemOperationUnsupported:
+		return "This model provider does not support this kind of request. Send it to a provider that does, or pick another model."
+	case domain.ConfigProblemModelNotServed:
+	}
+	if model != "" {
+		return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", model)
+	}
+	return "This model provider is not configured to serve the requested model. Check the models and deployments configured for it in your model provider settings."
 }
 
 // bfCause returns Bifrost's wrapped error as a herr reason, prefixed with the

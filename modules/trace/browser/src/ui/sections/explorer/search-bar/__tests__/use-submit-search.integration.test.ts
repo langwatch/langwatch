@@ -1,3 +1,4 @@
+import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
 import { instantEvalRunKey, type RouteSearchResult } from "@langwatch/trace-contract";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,8 +21,27 @@ const mutation = {
   mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(),
   isPending: false,
 };
+type ClassifyOptions = {
+  onSuccess?: (answer: ExplorerSearchClassification) => void;
+  onError?: (error: unknown) => void;
+};
+
+/** What instantEval.classifySearch answers at once, or that it fails. */
+const classification: { answer: ExplorerSearchClassification | "fails" } = {
+  answer: { classified: null, isInstantEvalAvailable: true },
+};
+const classifyMutation = {
+  mutate: vi.fn<(input: unknown, options: ClassifyOptions) => void>((_input, options) => {
+    if (classification.answer === "fails") options.onError?.(new Error("classifier down"));
+    else options.onSuccess?.(classification.answer);
+  }),
+  isPending: false,
+};
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
-  api: { traces: { routeSearch: { useMutation: () => mutation } } },
+  api: {
+    traces: { routeSearch: { useMutation: () => mutation } },
+    instantEval: { classifySearch: { useMutation: () => classifyMutation } },
+  },
 }));
 
 const project = { current: { id: "project-1" } as { id: string } | undefined };
@@ -59,6 +79,8 @@ function lastCall(): { input: Record<string, unknown>; options: MutateOptions } 
 
 beforeEach(() => {
   mutation.mutate.mockClear();
+  classifyMutation.mutate.mockClear();
+  classification.answer = { classified: null, isInstantEvalAvailable: true };
   handlers.onLangy.mockClear();
   handlers.onInstantEval.mockClear();
   handlers.onSupersede.mockClear();
@@ -113,9 +135,53 @@ describe("given the text has bare words", () => {
         activeQuery: "model:gpt-5-mini",
         lensId: "conversations",
         isLangyAvailable: true,
+        isInstantEvalAvailable: true,
       });
       // Nothing lands on the store until the router answers.
       expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini");
+    });
+  });
+
+  describe("when Instant Eval classifies the sentence first", () => {
+    /** @scenario "The search bar asks Instant Eval to classify, then trace to route" */
+    it("asks classifySearch with the search context, then hands the router its route and availability", () => {
+      classification.answer = { classified: "instant_eval", isInstantEvalAvailable: true };
+      useFilterStore.getState().applyQueryText("model:gpt-5-mini");
+      useFilterStore.getState().setTimeRange({ from: 1000, to: 2000, label: "Custom" });
+      const { result } = renderSubmit({ isLangyAvailable: false });
+      act(() => result.current.submitSearch("frustrated users"));
+      const search = {
+        projectId: "project-1",
+        text: "frustrated users",
+        timeRange: { from: 1000, to: 2000 },
+        activeQuery: "model:gpt-5-mini",
+        lensId: "all-traces",
+        isLangyAvailable: false,
+      };
+      expect(classifyMutation.mutate.mock.calls.at(-1)?.[0]).toEqual(search);
+      expect(lastCall().input).toEqual({
+        ...search,
+        classified: "instant_eval",
+        isInstantEvalAvailable: true,
+      });
+    });
+
+    it("hands the router no classification when the label names no route", () => {
+      classification.answer = { classified: "weather", isInstantEvalAvailable: false };
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch("frustrated users"));
+      expect(lastCall().input).not.toHaveProperty("classified");
+      expect(lastCall().input.isInstantEvalAvailable).toBe(false);
+    });
+
+    /** @scenario "A classification the browser could not get still routes the sentence" */
+    it("routes with no classification and no availability when classifySearch fails", () => {
+      classification.answer = "fails";
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch("frustrated users"));
+      expect(lastCall().input).not.toHaveProperty("classified");
+      expect(lastCall().input).not.toHaveProperty("isInstantEvalAvailable");
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 

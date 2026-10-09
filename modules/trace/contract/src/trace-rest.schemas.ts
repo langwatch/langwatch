@@ -10,14 +10,17 @@ import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 import {
+  projectionRequestSchema,
+  type ProjectionRequest,
+} from "./features/ingest/trace-projection.types.ts";
+import { discoverResultSchema } from "./features/list/trace-list-view.ts";
+import {
   evaluationSchema,
   traceInputSchema,
   traceOutputSchema,
   traceSchema,
 } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import { discoverResultSchema } from "./trace-list-view.ts";
-import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
 
 /** Longest `filter` string the boundary accepts; a shape ceiling, not a cost one. */
 const MAX_TRACE_FILTER_LENGTH = 4_000;

@@ -4,7 +4,7 @@ import { Lent } from "@langwatch/browser-host/lent";
 import {
   EditModelProviderFormToken,
   type EditModelProviderFormProps,
-} from "@langwatch/model-provider-contract";
+} from "@langwatch/model-provider-client";
 
 /** Model-provider's credential form, rendered as model-provider lends it. */
 export function LentEditModelProviderForm(props: EditModelProviderFormProps) {

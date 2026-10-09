@@ -4,7 +4,6 @@ import {
   formatFileSize,
   formatLicenseDate,
   formatLimitOrUnlimited,
-  formatResourceUsage,
   hasLicenseMetadata,
   isCorruptedLicense,
   isLicenseExpired,
@@ -227,22 +226,6 @@ describe("formatLimitOrUnlimited", () => {
   it("returns 'Unlimited' for values >= 1M", () => {
     expect(formatLimitOrUnlimited(1_000_000)).toBe("Unlimited");
     expect(formatLimitOrUnlimited(Number.MAX_SAFE_INTEGER)).toBe("Unlimited");
-  });
-});
-
-describe("formatResourceUsage", () => {
-  it("formats current/max pair with normal limits", () => {
-    expect(formatResourceUsage(5, 10)).toBe("5 / 10");
-    expect(formatResourceUsage(1000, 5000)).toBe("1,000 / 5,000");
-  });
-
-  it("displays 'Unlimited' for Infinity max", () => {
-    expect(formatResourceUsage(5, Infinity)).toBe("5 / Unlimited");
-  });
-
-  it("displays 'Unlimited' for large max values (>= 1M)", () => {
-    expect(formatResourceUsage(5, 1_000_000)).toBe("5 / Unlimited");
-    expect(formatResourceUsage(5, Number.MAX_SAFE_INTEGER)).toBe("5 / Unlimited");
   });
 });
 

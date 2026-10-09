@@ -143,16 +143,14 @@ func (s Stack) OverlayEnv() []string {
 			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
 		}
 	}
-	// The design system's Storybook. The ui lane frames it at /design-system and
-	// starts one itself on the first visit unless something is already listening
-	// on the port it derives — so naming haven's port here is what makes the two
-	// agree: the lane haven supervises IS the listener the route finds, instead
-	// of a second Storybook building the same stories on a different port.
-	// Emitted only when there is a Storybook to point at (a local lane, or a
-	// baseline stack's), so a worktree that never selected it keeps today's
-	// start-on-first-visit behavior untouched.
+	// The ui lane holds each developer tool's port and starts the tool on the first
+	// visit (apps/ui/vite/dormant-dev-tool.ts). Naming haven's ports here puts that
+	// listener behind design-system.<slug> and mail-room.<slug>.
 	if sb := s.svc(DesignSystemService); sb.Port != 0 {
 		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
+	}
+	if mr := s.svc(MailRoomService); mr.Port != 0 {
+		env = append(env, fmt.Sprintf("LANGWATCH_MAIL_PREVIEW_PORT=%d", mr.Port))
 	}
 	// The evaluator service, when this stack runs one (or falls back to a
 	// baseline's). Without it the app keeps .env's value, where nothing listens.
@@ -265,8 +263,8 @@ func (s Stack) OverlayEnv() []string {
 			"LWQL_CLICKHOUSE_USER="+s.ClickHouseDatabase+"_lwql",
 			"LWQL_CLICKHOUSE_PASSWORD="+LWQLClickHousePassword,
 			"LWQL_POSTGRES_READER_PASSWORD="+LWQLPostgresReaderPassword,
-			// ClickHouse runs in the VM, where DATABASE_URL's 127.0.0.1 is the VM itself.
-			"LWQL_POSTGRES_HOST="+ColimaHostAddress,
+			// Loopback for a native server; in the VM, 127.0.0.1 is the VM itself.
+			"LWQL_POSTGRES_HOST="+s.LWQLPostgresHost(),
 			// No config store renders the access model here (ClickHouseUsersConfig grants
 			// the SQL rights instead), so the app writes it, named collection included.
 			"LWQL_ACCESS_MODEL_MODE=sql",

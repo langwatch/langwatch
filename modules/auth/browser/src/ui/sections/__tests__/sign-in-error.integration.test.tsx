@@ -162,6 +162,22 @@ describe("given a sign-in refused because an unconfirmed account holds the addre
   });
 });
 
+describe("given a sign-in method refused until an administrator approves the link", () => {
+  /** @scenario "A handled refusal crosses with its own code" */
+  it("crosses as a stable code, so the screen stays put and offers a sign-out, not a bounce", () => {
+    // Stable is what stops the five-second timer sending them back to the provider.
+    expect(signInErrorMayCross("LINK_NEEDS_APPROVAL")).toBe(true);
+
+    renderError("LINK_NEEDS_APPROVAL");
+
+    expect(screen.getByText("This sign-in method needs approval")).toBeTruthy();
+    expect(screen.getByText(/administrator in your organization can review/i)).toBeTruthy();
+    const recovery = screen.getByRole("link", { name: /sign out.*try again/i });
+    expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+});
+
 describe("given one of the assertion refusals the boundary admits", () => {
   /** @scenario "A handled refusal crosses with its own code" */
   it("renders the words the registry holds for it, not the generic line", () => {

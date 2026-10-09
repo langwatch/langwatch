@@ -3,7 +3,7 @@
  */
 import { generateKeyPairSync } from "crypto";
 
-import { type GithubPullRequestEvent, type GithubApi } from "@langwatch/github-contract";
+import { type GithubPullRequestEvent } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -19,12 +19,15 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GithubModule } from "../app/github.app.ts";
+import { HttpGithubApiAdapter } from "../channels/http/http.github-api.channel.ts";
 import { PostgresGithubRepositories } from "../repositories/prisma/prisma.github.repositories.ts";
+import { githubHostOf } from "../rules/github-host.rules.ts";
 import {
   TestOrganizationService,
   createTestProjects,
 } from "../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
+import type { GithubFeatureService } from "../services/github.service.ts";
 import { unansweredRedisRepositories } from "./support/github-unanswered-redis.support.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -180,12 +183,15 @@ function harness(input: { host?: string } = {}) {
         ...PostgresGithubRepositories.create({ prisma: database() }),
       },
       config: {
-        appId: "test-app",
-        privateKey: testGithubPrivateKey,
         appSlug: "test-app",
         webhookSecret: "test-webhook-secret",
         signingKey: "test-signing-key",
       },
+      api: HttpGithubApiAdapter.create(
+        "test-app",
+        testGithubPrivateKey,
+        githubHostOf({ host: input.host }),
+      ),
       organization: new TestOrganizationService().api,
       project: projects,
       ...(input.host ? { hostConfig: { host: input.host } } : {}),
@@ -203,7 +209,11 @@ function branchRequest(headBranch: string, repositoryHost = "github.com") {
   };
 }
 
-async function storedFor(github: GithubApi, headBranch: string, repositoryHost = "github.com") {
+async function storedFor(
+  github: GithubFeatureService,
+  headBranch: string,
+  repositoryHost = "github.com",
+) {
   return github.findAllByBranches({
     organizationId,
     repositoryHost,

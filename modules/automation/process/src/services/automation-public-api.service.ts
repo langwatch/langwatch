@@ -24,6 +24,8 @@ import type {
   AutomationProviderSecrets,
   AutomationTraceFilterCompiler,
 } from "../app/automation.app.ts";
+import type { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
+import type { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
 import type { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
 import {
   resolveCadenceForCreate,
@@ -36,9 +38,7 @@ import {
 import { AutomationRestColumnsService } from "./automation-rest-columns.service.ts";
 import { AutomationRestTestFireService } from "./automation-rest-test-fire.service.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
-import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationLogger, AutomationService } from "./automation.service.ts";
-import type { SlackDestinationService } from "./slack-destination.service.ts";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service.ts";
 
 const recordSchema = z.record(z.string(), z.unknown());

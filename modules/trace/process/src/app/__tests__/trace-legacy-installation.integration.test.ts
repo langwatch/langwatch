@@ -7,19 +7,17 @@ import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
@@ -75,7 +73,6 @@ function bootTraceApp(options: {
     getTracesByThreadId: unread,
     getTracesWithSpansByThreadIds: unread,
     getEvaluationsMultiple: unread,
-    findEvaluationInputs: unread,
     getTopicCounts: unread,
     getCustomersAndLabels: unread,
     getDistinctFieldNames: unread,
@@ -89,6 +86,7 @@ function bootTraceApp(options: {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
+        findTraceCosts: async () => [],
       },
       read,
       spans: {} as TracesSpanReader,
@@ -101,15 +99,13 @@ function bootTraceApp(options: {
       editOverlay: {} as TraceEditOverlayStore,
       changeTraceName: async () => void 0,
     },
-    topics: {} as TopicApi,
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no read in this suite subscribes");
       },
       cleanupTenantEmitter: () => void 0,
     },
-    evaluations: {} as EvaluationApi,
-    codingAgents: {} as CodingAgentApi,
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,

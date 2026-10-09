@@ -16,10 +16,14 @@ import type {
   BackfillAccountRow,
   BackfillUserRow,
 } from "../repositories/identity-backfill.repository.ts";
+import { MemoryIdentitySecretCarryRepository } from "../repositories/memory/memory.identity-secret-carry.repository.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
-import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
+import {
+  type IdentitySecretCarryRepository,
+  IdentitySecretCarryService,
+} from "../services/identity-secret-carry.service.ts";
 
 const identifierIdentity = CryptoIdentifierIdentityService.create();
 
@@ -34,6 +38,7 @@ function samUser(overrides?: Partial<BackfillUserRow>): BackfillUserRow {
     emailVerified: true,
     createdAtMs: USER_CREATED_AT,
     userHashKey: "a-hash-key",
+    lastLoginAtMs: null,
     ...overrides,
   };
 }
@@ -60,6 +65,7 @@ function harness(options?: {
   accounts?: BackfillAccountRow[];
   applyCeremonies?: boolean;
   presetRows?: BackfillIdentifierRow[];
+  secretCarry?: IdentitySecretCarryRepository;
 }) {
   const user = options?.user === undefined ? samUser() : options.user;
   const accounts = options?.accounts ?? [googleAccount()];
@@ -113,6 +119,7 @@ function harness(options?: {
   });
 
   const carried: string[] = [];
+  const droppedCredentials: string[][] = [];
   const service = IdentityBackfillService.create({
     reads: {
       getUser: async ({ userId }) => {
@@ -138,15 +145,21 @@ function harness(options?: {
     // The latch's secret carry (ADR-116 §4). Recorded rather than performed:
     // WHEN it runs is this pass's contract — only for a user the proof
     // finalized — and WHAT it copies is its own suite's.
-    secrets: IdentitySecretCarryService.create({
-      findDriftedUserIdsAfter: async () => [],
-      findAccountSecretPairs: async () => {
-        carried.push("looked");
-        return [];
+    secrets: IdentitySecretCarryService.create(
+      options?.secretCarry ?? {
+        findDriftedUserIdsAfter: async () => [],
+        findAccountSecretPairs: async () => {
+          carried.push("looked");
+          return [];
+        },
+        insertCredentialIfMissing: async () => true,
+        overwriteCredential: async () => undefined,
+        deleteCredentials: async ({ accountIds }) => {
+          droppedCredentials.push([...accountIds]);
+          return accountIds.length;
+        },
       },
-      insertCredentialIfMissing: async () => true,
-      overwriteCredential: async () => undefined,
-    }),
+    ),
     plan: IdentityBackfillPlanService.create(identifierIdentity),
     deps: { now: () => 1_800_000_000_000 },
   });
@@ -159,6 +172,7 @@ function harness(options?: {
     },
     minted,
     carried,
+    droppedCredentials,
     attachIdentifier,
     verifyIdentifier,
     detachIdentifier,
@@ -252,6 +266,80 @@ describe("the identifier backfill pass", () => {
       await third.service.migrateUser({ userId: USER });
 
       expect(third.detachIdentifier).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when nobody has proven the account (never confirmed, never signed into)", () => {
+    /** @scenario "The backfill never finalizes an account nobody has proven" */
+    it("holds the user at migrated and writes nothing", async () => {
+      const { service, attachIdentifier, verifyIdentifier, minted, carried } = harness({
+        user: samUser({ emailVerified: false, userHashKey: null }),
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome).toEqual({ status: "migrated", report: { kind: "unproven_account" } });
+      expect(attachIdentifier).not.toHaveBeenCalled();
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+      expect(minted).toEqual([]);
+      expect(carried).toEqual([]);
+    });
+
+    /** @scenario "The backfill never finalizes an account nobody has proven" */
+    it("finalizes as before on a later pass once the address is confirmed", async () => {
+      const user = samUser({ emailVerified: false });
+      const { service } = harness({ user });
+      expect((await service.migrateUser({ userId: USER })).status).toBe("migrated");
+
+      user.emailVerified = true;
+      const later = await service.migrateUser({ userId: USER });
+
+      expect(later.status).toBe("finalized");
+    });
+
+    it("still backfills an account that was signed into without confirming", async () => {
+      const { service } = harness({
+        user: samUser({ emailVerified: false, lastLoginAtMs: USER_CREATED_AT }),
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome.status).toBe("finalized");
+    });
+  });
+
+  describe("when a carried credential's Account row is gone on a later pass", () => {
+    /** @scenario "The backfill drops the stored credential of an account row that is gone" */
+    it("drops the carried credential row with the detached identifier, and only once", async () => {
+      const secretCarry = MemoryIdentitySecretCarryRepository.create();
+      await secretCarry.insertCredentialIfMissing({
+        accountId: "acc_google",
+        userId: USER,
+        providerId: "google",
+        secrets: { accessToken: "pre-proof-token" },
+        createdAtMs: ACCOUNT_CREATED_AT,
+        updatedAtMs: ACCOUNT_CREATED_AT,
+      });
+      const first = harness();
+      await first.service.migrateUser({ userId: USER });
+
+      const second = harness({ accounts: [], presetRows: [...first.rows.values()], secretCarry });
+      await second.service.migrateUser({ userId: USER });
+
+      expect(second.detachIdentifier).toHaveBeenCalledTimes(1);
+      expect(await secretCarry.findAccountSecretPairs({ userId: USER })).toEqual([]);
+      const third = harness({ accounts: [], presetRows: [...second.rows.values()], secretCarry });
+      const deleteCredentials = vi.spyOn(secretCarry, "deleteCredentials");
+      await third.service.migrateUser({ userId: USER });
+      expect(await deleteCredentials.mock.results[0]?.value).toBe(0);
+    });
+
+    it("never drops the credential of an Account row that is still there", async () => {
+      const { service, droppedCredentials } = harness();
+
+      await service.migrateUser({ userId: USER });
+
+      expect(droppedCredentials).toEqual([]);
     });
   });
 

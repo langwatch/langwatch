@@ -6,15 +6,16 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Temporal, type Instant } from "@langwatch/time";
 import {
-  ATTR_KEYS,
+  deriveSpanRollupContribution,
+  isSpanTokenAccumulationSkipped,
   type SpanReceivedEvent,
   spanReceivedEventSchema,
-  NormalizedStatusCode,
+  spanStorabilityOf,
+  UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
-import type { SpanCostService } from "../services/span-cost.service.ts";
-import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
+import type { SpanCostService } from "../features/span/services/span-cost.service.ts";
+import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
 
 /**
  * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent. Field
@@ -26,7 +27,7 @@ export interface TraceAnalyticsRollupRow {
   tenantId: string;
   /** Minute bucket of the span's startTimeUnixMs (toStartOfMinute). */
   bucketStart: Instant;
-  /** Response model > request model > '', via SpanCostService.extractModelsFromSpan.
+  /** Response model > request model > '', via trace-contract's extractSpanModels.
    *  This is a SORT key, not a group-by target — the rollup attributes each
    *  span's cost to that span's own model, whereas legacy and the slim table
    *  attribute a trace's whole cost to every model it used. See
@@ -125,50 +126,17 @@ export class TraceAnalyticsRollupMapProjection
     });
     this.spanNormalization.enrichRagContextIds(span);
 
-    const isRoot = span.parentSpanId === null;
-    const isError = isRoot && span.statusCode === NormalizedStatusCode.ERROR;
-
-    // Delegate every extraction to SpanCostService — the SAME calls
-    // `SpanCostService.accumulateTokens` and the two folds make. Re-deriving
-    // any of this from raw attribute reads silently drifts the rollup away
-    // from `trace_summaries`, and the rollup only exists to answer the same
-    // question faster.
-    const model = this.spanCostService.extractModelsFromSpan(span)[0] ?? "";
-    const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
-
-    // A redundant usage-copy span (e.g. codex's lower-level echo of the turn
-    // rollup) contributes nothing to TRACE totals — the rollup is a
-    // trace-level aggregate too, so it applies the same zeroing gate.
-    const skipTokenAccumulation = this.spanCostService.isTokenAccumulationSkipped(span);
-    const tokens = skipTokenAccumulation
-      ? { promptTokens: 0, completionTokens: 0, cost: 0 }
-      : this.spanCostService.extractTokenMetrics(span);
-    const cacheTokens = skipTokenAccumulation
-      ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-      : this.spanCostService.extractCacheTokens(span);
+    // Every extraction is trace-contract's, the SAME the trace-summary fold
+    // makes, so the rollup cannot drift from `trace_summaries`. Only the
+    // price lookup stays here; a skipped usage-copy span is never priced.
+    const spanCost = isSpanTokenAccumulationSkipped(span)
+      ? 0
+      : this.spanCostService.estimateSpanCost(span);
 
     return {
       tenantId: span.tenantId,
       bucketStart: toStartOfMinute(span.startTimeUnixMs),
-      model,
-      spanType: typeof spanType === "string" ? spanType : "",
-      spanCount: 1,
-      traceCount: isRoot ? 1 : 0,
-      errorCount: isError ? 1 : 0,
-      costSum: tokens.cost,
-      // Mirrors `accumulateTokens`: the bundled portion is this span's own cost
-      // when the span is non-billable, and 0 otherwise. Skipped spans carry
-      // cost 0, so they contribute nothing here either.
-      nonBilledCostSum: this.spanCostService.isSpanCostNonBillable(span) ? tokens.cost : 0,
-      // Root span carries trace wall-clock duration; children contribute 0 so the
-      // SimpleAggregateFunction(sum) over a trace's spans equals the trace's
-      // duration. (Same gate the prior MV applied via `ParentSpanId IS NULL`.)
-      durationSum: isRoot ? Math.round(span.durationMs) : 0,
-      promptTokensSum: tokens.promptTokens,
-      completionTokensSum: tokens.completionTokens,
-      cacheReadTokensSum: cacheTokens.cacheReadTokens,
-      cacheWriteTokensSum: cacheTokens.cacheCreationTokens,
-      reasoningTokensSum: cacheTokens.reasoningTokens,
+      ...deriveSpanRollupContribution({ span, spanCost }),
     };
   }
 }

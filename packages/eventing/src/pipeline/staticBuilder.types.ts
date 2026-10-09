@@ -16,6 +16,8 @@ import type { DeduplicationStrategy } from "../queues/queue.types.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import type { PipelineUpcasts } from "../upcast/eventUpcast.ts";
+import type { LaneAlias } from "../upcast/laneAlias.ts";
 import type { ProcessManagerDefinition } from "./processManagerDefinition.ts";
 import type { PipelineMetadata } from "./types.ts";
 
@@ -76,8 +78,19 @@ export type NoCommands = never;
 /** A cross-pipeline map projection, registered onto the runtime's global registry. */
 export interface GlobalProjection {
   readonly name: string;
-  readonly register: (registry: ProjectionRegistry<Event>) => void;
+  /** `host` carries the declaring pipeline's retention, which its peer lanes write under. */
+  readonly register: (
+    registry: ProjectionRegistry<Event>,
+    host?: { retentionPolicyResolver?: RetentionPolicyResolver },
+  ) => void;
+  /** Set on a peer fold or map: the lane as registered, which a projection replay rebuilds. */
+  readonly peer?: PeerLane;
 }
+
+/** A peer projection's lane, its owner events parsed by the contract (§9). */
+export type PeerLane =
+  | { readonly kind: "fold"; readonly projection: SealedFoldProjection<Event> }
+  | { readonly kind: "map"; readonly projection: SealedMapProjection<Event> };
 
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,
@@ -108,6 +121,12 @@ export interface StaticPipelineDefinition<
    * the owning module's data-retention dependency. Registration prefers it to the runtime's (§9).
    */
   retentionPolicyResolver?: RetentionPolicyResolver;
+
+  /** Stored event types read as current ones, declared with `.withUpcasts` (§9). */
+  upcasts?: PipelineUpcasts;
+
+  /** Former lane keys this pipeline's lanes also consume for one release (round 49 E4). */
+  laneAliases?: readonly LaneAlias[];
 
   /** Fold projections (stateful, reduce events into state) registered in this pipeline */
   foldProjections: Map<

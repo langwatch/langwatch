@@ -36,3 +36,10 @@ export const scimTokenCreateRestInputSchema = z.object({
     .refine(withoutNullByte, "connectionId must not contain a null byte")
     .optional(),
 });
+
+/** The two headers an Auth0 SCIM log-stream delivery is admitted by, as the process reads them. */
+
+export const scimWebhookDeliveryHeadersSchema = z.object({
+  signature: z.string().nullable(),
+  authorization: z.string().nullable(),
+});

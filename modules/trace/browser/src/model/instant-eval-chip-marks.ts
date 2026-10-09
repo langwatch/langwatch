@@ -3,10 +3,8 @@
  * "(partial…)" once its run ended short of its total, and a sweep while it runs.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import {
-  type ExplorerInstantEvalProgress,
-  isExplorerInstantEvalRunActive,
-} from "@langwatch/trace-contract";
+import type { ExplorerInstantEvalProgress } from "@langwatch/instant-eval-contract";
+import { isExplorerInstantEvalRunActive } from "@langwatch/trace-contract";
 
 type ChipRun = Pick<ExplorerInstantEvalProgress, "status" | "progress" | "total">;
 

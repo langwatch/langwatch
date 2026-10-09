@@ -9,7 +9,7 @@ import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import type { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
-import type { ParameterFieldError } from "./parameter-suggestions.ts";
+import type { ParameterFieldError } from "../run-parameters/parameter-suggestions.ts";
 import type { RunScope } from "./run-configuration.ts";
 import type { RunDialogSubject, RunStartedInfo, RunTarget } from "./run-dialog-types.ts";
 import { useBatchRun } from "./use-run-dialog-batch.ts";

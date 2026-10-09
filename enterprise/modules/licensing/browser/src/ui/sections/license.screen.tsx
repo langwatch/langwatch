@@ -1,5 +1,5 @@
 // Organization license page for self-hosted operators; licenses are issued in
-// the backoffice. No chrome — the settings frame is applied by the host.
+// the Admin. No chrome — the settings frame is applied by the host.
 
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Link, Text, VStack } from "@langwatch/design-system/primitives";

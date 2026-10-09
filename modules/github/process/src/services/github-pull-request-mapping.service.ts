@@ -16,8 +16,6 @@ import type {
 import type { GithubBranchMaintenanceService } from "./github-branch-maintenance.service.ts";
 import type { GithubBranchMappingService } from "./github-branch-mapping.service.ts";
 
-export type { BranchMappingRequest } from "./github-branch-demand.service.ts";
-
 /** One stored snapshot, as the contract carries it: instants become the wire's dates. */
 function toContractPullRequest(row: GithubPullRequestRow): GithubPullRequest {
   return {

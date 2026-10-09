@@ -5,7 +5,7 @@ import {
 } from "./connection.ts";
 import type { AbortSignalLike } from "./query.ts";
 import { ConcurrencyLimiter, type LimiterStats } from "./rateLimit.ts";
-import { createStatementWait, statementRefusal } from "./statementWait.ts";
+import { createStatementWait, statementRefusal, type StatementWait } from "./statementWait.ts";
 import {
   checkStatementTenantScope,
   describeTenantScopeViolation,
@@ -24,6 +24,17 @@ export const DEFAULT_CLICKHOUSE_IDLE_SOCKET_TTL_MS = 1_500;
 export const DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT = 8;
 export const DEFAULT_MIN_STATEMENT_QUEUE_DEPTH = 64;
 export const DEFAULT_STATEMENT_WAIT_TIMEOUT_MS = 20_000;
+/** Each kind's slots held back for the other (`CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE`). */
+export const DEFAULT_STATEMENT_LANE_RESERVE_SHARE = 0.25;
+
+/** Inserts and reads are bounded apart; "all" is the one bound of a pool too small to split. */
+export type ClickHouseStatementLane = "read" | "insert" | "all";
+
+export interface ClickHouseLaneStats {
+  lane: ClickHouseStatementLane;
+  inFlight: number;
+  queued: number;
+}
 
 export interface ClickHouseVendorClient extends ClickHouseCloseableClient {
   query(params: unknown): Promise<unknown>;
@@ -55,7 +66,12 @@ export abstract class ClickHouseManagedClientLogger {
 }
 
 export abstract class ClickHouseManagedClientTelemetry {
-  abstract registerLimiter(input: { instance: string; stats: () => LimiterStats }): void;
+  /** `lanes` reports each statement lane; a sink that omits it sees only the total. */
+  abstract registerLimiter(input: {
+    instance: string;
+    stats: () => LimiterStats;
+    lanes?: () => readonly ClickHouseLaneStats[];
+  }): void;
   abstract unregisterLimiter(instance: string): void;
   abstract observeStatementWait(input: {
     instance: string;
@@ -86,6 +102,7 @@ export interface ClickHouseManagedClientOptions<Client extends ClickHouseVendorC
   statementQueueDepthPerSlot?: number | undefined;
   minimumStatementQueueDepth?: number | undefined;
   statementWaitTimeoutMs?: number | undefined;
+  statementLaneReserveShare?: number | undefined;
   requestTimeoutMs?: number | undefined;
   idleSocketTtlMs?: number | undefined;
 }
@@ -135,6 +152,7 @@ export class ClickHouseManagedClientService<
       statementQueueDepthPerSlot: this.options.statementQueueDepthPerSlot,
       minimumStatementQueueDepth: this.options.minimumStatementQueueDepth,
       statementWaitTimeoutMs: this.options.statementWaitTimeoutMs,
+      statementLaneReserveShare: this.options.statementLaneReserveShare,
     });
     const defaulted = withClickHouseDefaultQuerySettings(
       limited,
@@ -207,6 +225,209 @@ export interface ClickHouseStatementLimitOptions<Client extends ClickHouseVendor
   statementQueueDepthPerSlot?: number | undefined;
   minimumStatementQueueDepth?: number | undefined;
   statementWaitTimeoutMs?: number | undefined;
+  statementLaneReserveShare?: number | undefined;
+}
+
+export interface ClickHouseStatementAdmissionOptions {
+  instance: string;
+  maxConcurrent: number;
+  telemetry: ClickHouseManagedClientTelemetry;
+  overloadErrorFactory: ClickHouseOverloadErrorFactory;
+  logger?: ClickHouseManagedClientLogger | undefined;
+  statementQueueDepthPerSlot?: number | undefined;
+  minimumStatementQueueDepth?: number | undefined;
+  statementWaitTimeoutMs?: number | undefined;
+  /** Fraction of `maxConcurrent` each kind keeps for the other; default 0.25. */
+  reserveShare?: number | undefined;
+}
+
+/**
+ * The statement bound: `maxConcurrent` slots, a queue of max(64, slots x 8), a 20s wait. Inserts
+ * and reads each reserve slots the other cannot take (ADR-114, #8480). A refusal throws the
+ * overload error; an admitted statement's own errors pass through untouched.
+ */
+export class ClickHouseStatementAdmission {
+  readonly maxQueued: number;
+  readonly reserve: number;
+  private readonly total: ConcurrencyLimiter;
+  private readonly lanes: readonly StatementLane[];
+  private readonly timeoutMs: number;
+
+  constructor(private readonly options: ClickHouseStatementAdmissionOptions) {
+    this.maxQueued = Math.max(
+      options.minimumStatementQueueDepth ?? DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
+      options.maxConcurrent *
+        (options.statementQueueDepthPerSlot ?? DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
+    );
+    this.timeoutMs = options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
+    this.total = new ConcurrencyLimiter({
+      maxConcurrent: options.maxConcurrent,
+      maxQueued: this.maxQueued,
+    });
+    const caps = statementLaneCaps({
+      maxConcurrent: options.maxConcurrent,
+      reserveShare: options.reserveShare ?? DEFAULT_STATEMENT_LANE_RESERVE_SHARE,
+    });
+    this.reserve = caps?.reserve ?? 0;
+    // Each lane queue holds half the single-queue bound, so together they equal it.
+    this.lanes =
+      caps === null
+        ? [statementLane({ lane: "all", capMax: options.maxConcurrent, maxQueued: null })]
+        : (["insert", "read"] as const).map((lane) =>
+            statementLane({
+              lane,
+              capMax: caps.laneCap,
+              maxQueued: Math.floor(this.maxQueued / 2),
+            }),
+          );
+    options.logger?.info(
+      {
+        instance: options.instance,
+        maxConcurrent: options.maxConcurrent,
+        maxQueued: this.maxQueued,
+        reserve: this.reserve,
+        lanes: this.lanes.map(({ lane, capMax }) => ({ lane, cap: capMax })),
+      },
+      "ClickHouse statement concurrency bounded",
+    );
+  }
+
+  stats(): LimiterStats {
+    return this.total.stats();
+  }
+
+  /** Per lane: what it runs on the driver, and all that waits behind its cap or the total. */
+  laneStats(): ClickHouseLaneStats[] {
+    return this.lanes.map(({ lane, cap, running }) => {
+      if (cap === null) return { lane, inFlight: running, queued: this.total.stats().queued };
+      const { inFlight, queued } = cap.stats();
+      return { lane, inFlight: running, queued: queued + inFlight - running };
+    });
+  }
+
+  /** Runs `task` once its lane and the total grant a slot, or refuses it as overloaded. */
+  async run<T>({
+    operation,
+    signal,
+    task,
+  }: {
+    operation: ClickHouseStatementOperation;
+    signal?: AbortSignalLike | undefined;
+    task: () => Promise<T>;
+  }): Promise<T> {
+    const { instance, telemetry } = this.options;
+    const lane = this.laneFor(operation);
+    const startedAt = performance.now();
+    let admitted = false;
+    const wait = createStatementWait({ signal, waitTimeoutMs: this.timeoutMs });
+    const onDriver = async (): Promise<T> => {
+      admitted = true;
+      lane.running += 1;
+      wait.dispose();
+      telemetry.observeStatementWait({
+        instance,
+        operation,
+        seconds: (performance.now() - startedAt) / 1_000,
+      });
+      try {
+        return await task();
+      } finally {
+        lane.running -= 1;
+      }
+    };
+    try {
+      return await this.acquire({ lane, wait, onDriver });
+    } catch (error) {
+      const refused = statementRefusal({
+        error,
+        isAdmitted: admitted,
+        hasTimedOut: wait.hasTimedOut(),
+        startedAt,
+        waitTimeoutMs: this.timeoutMs,
+        logger: this.options.logger,
+        subject: "a ClickHouse statement",
+        logFields: { instance, operation },
+        createOverloadError: (cause) => this.options.overloadErrorFactory.create({ cause }),
+        onShed: () => telemetry.incrementStatementsShed({ instance, operation }),
+      });
+      throw refused === undefined ? error : refused.refusal;
+    } finally {
+      wait.dispose();
+    }
+  }
+
+  private laneFor(operation: ClickHouseStatementOperation): StatementLane {
+    const wanted: ClickHouseStatementLane = operation === "insert" ? "insert" : "read";
+    return this.lanes.find(({ lane }) => lane === wanted) ?? this.lanes[0]!;
+  }
+
+  /**
+   * The lane cap, then the total. The wait is armed at whichever limiter is full at the moment
+   * it is entered: a same-tick batch reaches the total only from inside its cap's grant, so an
+   * up-front check would read a total no statement has entered yet and arm nothing.
+   */
+  private acquire<T>({
+    lane,
+    wait,
+    onDriver,
+  }: {
+    lane: StatementLane;
+    wait: StatementWait;
+    onDriver: () => Promise<T>;
+  }): Promise<T> {
+    const runInTotal = () => {
+      wait.armIfSaturated(this.total.stats().inFlight >= this.options.maxConcurrent);
+      return this.total.run({ task: onDriver, signal: wait.signal });
+    };
+    if (lane.cap === null) return runInTotal();
+    wait.armIfSaturated(lane.cap.stats().inFlight >= lane.capMax);
+    return lane.cap.run({ task: runInTotal, signal: wait.signal });
+  }
+}
+
+/**
+ * Work-conserving lane caps over one slot budget: `reserve` slots are held back for the other
+ * kind and a lane may hold the rest. The reserve is at least one slot and at most half the
+ * budget; under two slots nothing can be reserved, so the answer is null (one shared bound).
+ */
+export function statementLaneCaps({
+  maxConcurrent,
+  reserveShare,
+}: {
+  maxConcurrent: number;
+  reserveShare: number;
+}): { reserve: number; laneCap: number } | null {
+  if (maxConcurrent < 2) return null;
+  const reserve = Math.min(
+    Math.floor(maxConcurrent / 2),
+    Math.max(1, Math.round(maxConcurrent * reserveShare)),
+  );
+  return { reserve, laneCap: maxConcurrent - reserve };
+}
+
+/** One kind's lane: the cap it enters before the total (none for "all"), and what it runs now. */
+interface StatementLane {
+  lane: ClickHouseStatementLane;
+  cap: ConcurrencyLimiter | null;
+  capMax: number;
+  running: number;
+}
+
+function statementLane({
+  lane,
+  capMax,
+  maxQueued,
+}: {
+  lane: ClickHouseStatementLane;
+  capMax: number;
+  maxQueued: number | null;
+}): StatementLane {
+  return {
+    lane,
+    capMax,
+    running: 0,
+    cap: maxQueued === null ? null : new ConcurrencyLimiter({ maxConcurrent: capMax, maxQueued }),
+  };
 }
 
 const STATEMENT_METHODS: readonly ClickHouseStatementOperation[] = [
@@ -237,35 +458,29 @@ function boundStatementMethod({
   return [(params: unknown) => run({ operation, params, task: () => method.call(target, params) })];
 }
 
-/** How many statements may wait for a slot: a floor, or a depth per open connection. */
-function statementQueueDepth<Client extends ClickHouseVendorClient>(
-  options: ClickHouseStatementLimitOptions<Client>,
-): number {
-  return Math.max(
-    options.minimumStatementQueueDepth ?? DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
-    options.input.maxOpenConnections *
-      (options.statementQueueDepthPerSlot ?? DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
-  );
-}
-
 /** Bounds every vendor statement method while preserving the caller's cancellation signal. */
 export function withClickHouseStatementLimit<Client extends ClickHouseVendorClient>(
   options: ClickHouseStatementLimitOptions<Client>,
 ): Client {
-  const { client, input, telemetry, logger } = options;
-  const timeoutMs = options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
-  const maxQueued = statementQueueDepth(options);
-  const limiter = new ConcurrencyLimiter({
+  const { client, input, telemetry } = options;
+  const admission = new ClickHouseStatementAdmission({
+    instance: input.instance,
     maxConcurrent: input.maxOpenConnections,
-    maxQueued,
+    telemetry,
+    overloadErrorFactory: options.overloadErrorFactory,
+    logger: options.logger,
+    statementQueueDepthPerSlot: options.statementQueueDepthPerSlot,
+    minimumStatementQueueDepth: options.minimumStatementQueueDepth,
+    statementWaitTimeoutMs: options.statementWaitTimeoutMs,
+    reserveShare: options.statementLaneReserveShare,
   });
-  telemetry.registerLimiter({ instance: input.instance, stats: () => limiter.stats() });
-  logger?.info(
-    { instance: input.instance, maxConcurrent: input.maxOpenConnections, maxQueued },
-    "ClickHouse statement concurrency bounded",
-  );
+  telemetry.registerLimiter({
+    instance: input.instance,
+    stats: () => admission.stats(),
+    lanes: () => admission.laneStats(),
+  });
 
-  const run = async ({
+  const run = ({
     operation,
     params,
     task,
@@ -273,43 +488,7 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
     operation: ClickHouseStatementOperation;
     params: unknown;
     task: () => Promise<unknown>;
-  }): Promise<unknown> => {
-    const startedAt = performance.now();
-    let admitted = false;
-    const wait = createStatementWait({ signal: signalOf(params), waitTimeoutMs: timeoutMs });
-    wait.armIfSaturated(limiter.stats().inFlight >= input.maxOpenConnections);
-    try {
-      return await limiter.run({
-        signal: wait.signal,
-        task: () => {
-          admitted = true;
-          wait.dispose();
-          telemetry.observeStatementWait({
-            instance: input.instance,
-            operation,
-            seconds: (performance.now() - startedAt) / 1_000,
-          });
-          return task();
-        },
-      });
-    } catch (error) {
-      const refused = statementRefusal({
-        error,
-        isAdmitted: admitted,
-        hasTimedOut: wait.hasTimedOut(),
-        startedAt,
-        waitTimeoutMs: timeoutMs,
-        logger,
-        subject: "a ClickHouse statement",
-        logFields: { instance: input.instance, operation },
-        createOverloadError: (cause) => options.overloadErrorFactory.create({ cause }),
-        onShed: () => telemetry.incrementStatementsShed({ instance: input.instance, operation }),
-      });
-      throw refused === undefined ? error : refused.refusal;
-    } finally {
-      wait.dispose();
-    }
-  };
+  }): Promise<unknown> => admission.run({ operation, signal: signalOf(params), task });
 
   let closePromise: Promise<void> | undefined;
   return new Proxy(client, {

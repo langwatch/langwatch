@@ -5,16 +5,16 @@ import type {
   PendingSsoSetupRepository,
 } from "../pending-sso-setup.repository.ts";
 
-/** The client a cleanup run is handed: the flag, and the organization lookup beside it. */
-export type PrismaPendingSsoSetupDatabase = PrismaClient;
+/** The client a cleanup run is handed: the flag and the accounts on auth's own User rows. */
+type PrismaPendingSsoSetupDatabase = Pick<PrismaClient, "user">;
 
 /** The Prisma-backed {@link PendingSsoSetupRepository}. */
 export class PrismaPendingSsoSetupRepository implements PendingSsoSetupRepository {
-  static create(prisma: PrismaClient): PrismaPendingSsoSetupRepository {
+  static create(prisma: PrismaPendingSsoSetupDatabase): PrismaPendingSsoSetupRepository {
     return new PrismaPendingSsoSetupRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly prisma: PrismaPendingSsoSetupDatabase) {}
 
   async findPendingPage({
     afterId,

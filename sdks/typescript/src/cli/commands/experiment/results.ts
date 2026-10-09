@@ -2,6 +2,8 @@ import chalk from "chalk";
 
 import {
   ExperimentsApiService,
+  ExperimentsApiServiceError,
+  type ExperimentRunCompleteness,
   type ExperimentRunResultsResponse,
   type ExperimentRunDatasetEntry,
   type ExperimentRunEvaluation,
@@ -22,9 +24,127 @@ export interface ExperimentResultsOptions {
   evaluator?: string;
   limit?: string;
   runId?: string;
+  /** Exit with status 2 when the answer does not hold the whole run. */
+  requireComplete?: boolean;
+  /** Seconds to keep reading the run until it is whole; implies `requireComplete`. */
+  wait?: string;
+  /** Poll interval of `wait`, for tests. */
+  pollMs?: number;
 }
 
 const DEFAULT_LIMIT = 20;
+const DEFAULT_POLL_MS = 3000;
+/** The exit status of a read that was required to be whole and was not. */
+export const INCOMPLETE_RESULTS_EXIT_CODE = 2;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** The server's own count when it sends one; otherwise what the timestamps can tell. */
+export const completenessOf = (results: ExperimentRunResultsResponse): ExperimentRunCompleteness =>
+  results.completeness ?? {
+    complete: isTerminalStatus(deriveRunStatus(results.timestamps)),
+    dataset: { received: results.dataset.length, expected: null },
+    evaluations: { received: results.evaluations.length, expected: null },
+  };
+
+const countPhrase = ({
+  received,
+  expected,
+  noun,
+}: {
+  received: number;
+  expected: number | null;
+  noun: string;
+}): string => (expected === null ? `${received} ${noun}` : `${received} of ${expected} ${noun}`);
+
+/** One line saying what is stored so far, for a run that is not whole. */
+export const partialResultsNotice = (completeness: ExperimentRunCompleteness): string => {
+  const rows = countPhrase({ ...completeness.dataset, noun: "rows" });
+  const verdicts = countPhrase({ ...completeness.evaluations, noun: "evaluations" });
+  return `Partial results: ${rows} and ${verdicts} are stored so far. Pass --wait <seconds> to read the run once it is whole, or --require-complete to fail on a partial read.`;
+};
+
+/** A run the platform does not hold yet: a run reported moments ago is stored after the fact. */
+const isRunNotFound = (error: unknown): boolean => {
+  if (!(error instanceof ExperimentsApiServiceError)) return false;
+  const original = error.originalError as
+    | { code?: string; httpStatus?: number; response?: { status?: number } }
+    | undefined;
+  return (
+    original?.code === "run_not_found" ||
+    original?.httpStatus === 404 ||
+    original?.response?.status === 404
+  );
+};
+
+/** Reads the run until it is whole or the wait is over, keeping the last read. */
+const readUntilComplete = async ({
+  read,
+  waitSeconds,
+  pollMs,
+  onPoll,
+}: {
+  read: () => Promise<ExperimentRunResultsResponse>;
+  waitSeconds: number;
+  pollMs: number;
+  onPoll: PollListener;
+}): Promise<ExperimentRunResultsResponse> => {
+  const deadline = Date.now() + waitSeconds * 1000;
+  for (;;) {
+    const expired = Date.now() >= deadline;
+    let results: ExperimentRunResultsResponse | null = null;
+    try {
+      results = await read();
+    } catch (error) {
+      // Not stored yet is worth the wait; once the wait is over it is the answer.
+      if (expired || !isRunNotFound(error)) throw error;
+    }
+    if (results && (expired || completenessOf(results).complete)) return results;
+    onPoll(results ? completenessOf(results) : null);
+    await sleep(Math.min(pollMs, Math.max(deadline - Date.now(), 0)));
+  }
+};
+
+type PollListener = (completeness: ExperimentRunCompleteness | null) => void;
+
+const parseWaitSeconds = (wait: string | undefined): number | null => {
+  if (wait === undefined) return null;
+  const seconds = Number(wait);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    throw new Error(`--wait takes a number of seconds, got "${wait}"`);
+  }
+  return seconds;
+};
+
+const storedSoFar = (pending: ExperimentRunCompleteness | null): string =>
+  pending ? countPhrase({ ...pending.evaluations, noun: "evaluations" }) : "nothing yet";
+
+/** One read, or reads until the run is whole when the caller asked to wait. */
+const loadResults = ({
+  read,
+  waitSeconds,
+  pollMs,
+  onPoll,
+}: {
+  read: () => Promise<ExperimentRunResultsResponse>;
+  waitSeconds: number | null;
+  pollMs: number;
+  onPoll: PollListener;
+}): Promise<ExperimentRunResultsResponse> =>
+  waitSeconds === null ? read() : readUntilComplete({ read, waitSeconds, pollMs, onPoll });
+
+/** Warns on stderr, so a caller reading JSON from stdout still learns the answer is partial. */
+const flagPartialResults = ({
+  completeness,
+  mustBeWhole,
+}: {
+  completeness: ExperimentRunCompleteness;
+  mustBeWhole: boolean;
+}): void => {
+  if (completeness.complete) return;
+  console.error(chalk.yellow(partialResultsNotice(completeness)));
+  if (mustBeWhole) process.exitCode = INCOMPLETE_RESULTS_EXIT_CODE;
+};
 
 const rowKey = (index: number, targetId?: string | null): string => `${index}:${targetId ?? ""}`;
 
@@ -205,14 +325,24 @@ export const experimentResultsCommand = async ({
       experimentSlug,
       runId: options.runId,
     });
-    const results: ExperimentRunResultsResponse = await service.getRunResults({
-      runId,
-      experimentSlug,
+    const waitSeconds = parseWaitSeconds(options.wait);
+    const results = await loadResults({
+      read: () => service.getRunResults({ runId, experimentSlug }),
+      waitSeconds,
+      pollMs: options.pollMs ?? DEFAULT_POLL_MS,
+      onPoll: (pending) => {
+        spinner.text = `Waiting for "${runId}" to be stored: ${storedSoFar(pending)}...`;
+      },
     });
     const runStatus = deriveRunStatus(results.timestamps);
+    const completeness = completenessOf(results);
     spinner.succeed(
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,
     );
+    flagPartialResults({
+      completeness,
+      mustBeWhole: Boolean(options.requireComplete) || waitSeconds !== null,
+    });
 
     const evaluationsByRow = groupByRow({ evaluations: results.evaluations, evaluatorFilter });
 
@@ -275,7 +405,10 @@ export const experimentResultsCommand = async ({
         ...results,
         dataset: rows.map((row) => row.entry),
         evaluations: [...rows.flatMap((row) => row.evaluations), ...returnedRowIndependent],
+        completeness,
         meta: {
+          /** False while the platform is still storing the run, or the run has not ended. */
+          complete: completeness.complete,
           totalMatching,
           /** Rows in `dataset`. Equal to `totalMatching`: the answer is whole. */
           returned: rows.length,

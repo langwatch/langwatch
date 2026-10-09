@@ -1,14 +1,17 @@
 import { z } from "zod";
 
 import { cliToolResultSchema, type CliToolResult } from "./cards/tool-result.ts";
-import { langyMessagePartSchema } from "./json.ts";
-import { startCallBodySchema, startWaitBodySchema } from "./langy.local-control-http.ts";
+import {
+  startCallBodySchema,
+  startWaitBodySchema,
+} from "./features/local-control/langy.local-control-http.ts";
 import {
   cliFrameSchema,
   platformFrameSchema,
   refusedFrameSchema,
   registeredFrameSchema,
-} from "./langy.local-control-protocol.ts";
+} from "./features/local-control/langy.local-control-protocol.ts";
+import { langyMessagePartSchema } from "./json.ts";
 
 // ── internal control-plane (the Go agent's outbound calls) ─────────────────
 

@@ -13,8 +13,8 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryInstanceAdminRepository } from "../../repositories/memory/memory.instance-admin.repository.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
-import { AdminBackofficeService } from "../admin-backoffice.service.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
+import { InstanceAdminService } from "../instance-admin.service.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 const MiB = 1024 * 1024;
@@ -44,7 +44,15 @@ function organizationEdit(data: Record<string, unknown>): AdminOperationInput {
 async function instanceAdmin() {
   const repository = MemoryInstanceAdminRepository.create({ store: MemoryOpsStore.create() });
   const audit = new RecordingAudit();
-  const service = AdminBackofficeService.create({ repository, users: new TestUserApi(), audit });
+  const service = InstanceAdminService.create({
+    repository,
+    users: new TestUserApi(),
+    accounts: {
+      deactivateUser: () => Promise.reject(new Error("unreached")),
+      changeUserEmail: () => Promise.reject(new Error("unreached")),
+    },
+    audit,
+  });
   await repository.execute({
     resource: "organization",
     method: "create",

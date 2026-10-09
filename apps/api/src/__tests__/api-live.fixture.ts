@@ -16,6 +16,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { processConfig, Server } from "@langwatch/process";
 
 import { processModules } from "../process-modules.generated.ts";
+import { upgradedLiveDatabase } from "./live-upgrade.fixture.ts";
 import {
   deleteSeededTenantRows,
   startMigratedClickHouseEndpoint,
@@ -64,6 +65,7 @@ export async function bootLiveApi({
 }: { environment?: Readonly<Record<string, string>>; withWorker?: boolean } = {}) {
   if (!databaseUrl || !redisUrl) throw new Error("the live api needs the test Postgres and Redis");
   const [clickHouse, port] = await Promise.all([startMigratedClickHouseEndpoint(), freePort()]);
+  await upgradedLiveDatabase({ databaseUrl, redisUrl, clickHouseUrl: clickHouse.url });
   const baseUrl = `http://127.0.0.1:${port}`;
   const processEnvironment = {
     ...SYNTHETIC_ENVIRONMENT,
@@ -233,7 +235,7 @@ export async function signUpSession({
   if (!addressProof) throw new Error(`sign-up verification gave no proof: ${asked.body}`);
   const registered = await callTrpc({
     api,
-    path: "user.register",
+    path: "auth.register",
     kind: "mutation",
     input: { email, password: SIGN_UP_PASSWORD, addressProof },
     headers: browser,

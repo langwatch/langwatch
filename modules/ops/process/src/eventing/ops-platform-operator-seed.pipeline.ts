@@ -17,8 +17,6 @@ import {
   type PlatformOperatorSeedRecordedEvent,
   type platformOperatorSeedRecordedEventDataSchema,
   platformOperatorSeedRecordedEventSchema,
-} from "./ops-platform-operator-seed.events.ts";
-import {
   PLATFORM_OPERATOR_SEED_PROCESS_NAME,
   PLATFORM_OPERATOR_SEED_WAKE_INTERVAL_MS,
   platformOperatorSeedGrantIntentSchema,

@@ -2,12 +2,12 @@
 
 import { describe, expect, it } from "vitest";
 
+import { defineCatalogTable } from "../../features/lwql-catalogue/rules/lwql-dataset-derivation.rules.ts";
+import { defineCatalogModel } from "../../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
+import { LWQL_POSTGRES_ALL_OVERRIDES } from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
+import type { PrismaManifest } from "../../features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import type { ColumnsManifest } from "../lwql-columns-manifest.rules.ts";
-import { defineCatalogTable } from "../lwql-dataset-derivation.rules.ts";
-import { defineCatalogModel } from "../lwql-postgres-catalog-model.rules.ts";
-import { LWQL_POSTGRES_ALL_OVERRIDES } from "../lwql-postgres-view-catalog.rules.ts";
-import type { PrismaManifest } from "../lwql-prisma-schema.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const allowed = new Set(

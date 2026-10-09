@@ -18,7 +18,8 @@ tools:
   - Glob
   - Bash
   - Skill
-model: sonnet
+model: claude-sonnet-5-5
+effort: medium
 ---
 
 # Residue sweeper
@@ -74,7 +75,7 @@ counted.
 
 ## Escalate the model when the question is "which generation is live"
 
-You default to sonnet, which is right for a scoped sweep and for confirming
+You run on Sonnet 5.5 at medium effort, which is right for a scoped sweep and for confirming
 detector output. When the job turns on judgment - two live generations of one
 subsystem, and the question is which one the codebase means - say so in your
 report and recommend the sweep be re-run on opus for that subsystem. Do not

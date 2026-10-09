@@ -255,6 +255,7 @@ From the fifth wave (secret-archived, api-live, api-composition, auth-device, sm
 Format: file:line · today · wants · main?
 
 ### Identity (33 left; detail was in handoffs/bind2-identity.md)
+
 - org-access-cluster:35,47,54,70 · Access tab lists one row per grant, no gathering, no counts · gathered per holder · main gathered (RolesPanel); port >150 lines.
 - identifier-model:129 · guard dedupes provisional heads but nothing writes them · main had writeProvisionalHeads; port needs a repository method and ledger wiring.
 - organization-authentication-settings:36,129 · no "prove another" action or empty text; manage-and-back flow missing.
@@ -270,18 +271,21 @@ Format: file:line · today · wants · main?
 - identity-storage-adapter:287,575,582,622,631,637,646,656,665 · bindable now the test DB is migrated.
 
 ### Product (30 left; handoffs/bind2-product.md §12)
+
 - Rewordings to confirm: ci-cd-execution:24,30 (key door resolves the key); absent-score formatter (null "-", zero "0.00"); archive dialog title "Archive run plan?"; page-structure rule row; ui-feature-install now about the browser module list.
 - Not built: instant-eval-billing:210 (judged query not held); tracked-event-validation:78 (routes mounted unconditionally); platform-health:95; shared-scope-host:80 (walker handles loading only); github-branch-maintenance:90.
 - Likely delete: invitations:123; externalize-event-byte-content:713 (createS3Client gone).
 - Not investigated: authz package-boundary:125, partial-trace-id-resolution:66, pii-redaction:534, legacy-rest-remediation:67, evaluation-execution:230, fresh-clone-dev-setup:40, suite-bugfixes-1956:44, voice-phone:285,291, governance cost-screen:25,529 and leak-gate:43,56, guided-onboarding-offer:39,109, online-evaluation-drawer:46, user-avatar-upload:90,139, anchored-comments:469, scenario-input-mapping:197 (main test to port); lwql-judgments-view:36,42 and query-reference:125 need ClickHouse containers.
 
 ### Langy and agents (15 left; handoffs/bind2-langy.md)
+
 - lwql/langy-authoring:192,200,209,216,223 · CLI-to-REST rows have only unit halves · either a `langwatch` devDependency plus a testing export in dashboard-process (shared files), or retag as unit pairs.
 - langy-trace-explorer-actions:220 · thumbs-down e2e · main had a 240-line live-LLM scenario test · port in an e2e lane or tag unimplemented.
 - postgres-catalog:157 · needs docker or a native harness, and new topic seeding.
 - langy-guided-onboarding:350,405,412,428,1334,1341 (quiet option dropped; icons differ); langy-model-selection:95 (main port ~50 lines); langy-navigation-persistence:76; langy-stop-and-resume:65 (EmptyAnswer always drawn).
 
 ### Platform (9 left; handoffs/bind2-platform.md)
+
 - feature-package-boundaries:9 · duplicate of haven's admission scenario · retire or reword.
 - strict-feature-layout:92 · rule no longer exists · reword or retire.
 - system-migrations-runner:151 · main's groupQueue preflight not ported (>150 lines) · port or retire.
@@ -291,10 +295,12 @@ Format: file:line · today · wants · main?
 - api-process-executable:102 (Q154(2)), api-process-metrics:65 (Q103) · waiting.
 
 ### Access (4 left; handoffs/bind2-access.md)
+
 - api-keys-v2:122,129,135 · ADR-002 open question: does a new project get an internal-only key value, and does revoking the legacy key re-issue one so internal callers keep working?
 - plan-allowance-on-ingest-doors:37 · scenario needs an optional meter; EntitlementApi is a required peer · optional meter or retire.
 
 ### Worker (0 left; rewordings to confirm, handoffs/bind2-worker.md)
+
 - worker-capability-mount:22 (dropped "second connection reports an empty keyspace"), :29 (online evaluation "reports skipped", Q89), :36 (topic clustering names the provider).
 - worker-graceful-shutdown:77 · 25s drain everywhere, no 5s dev default.
 - back-office-http-door:26,32; shared-ops-snapshot:276; langy dispatch-series; capability-mount in-memory connection windows.

@@ -34,3 +34,16 @@ Feature: Upgrade modal when a call is refused by the licence
     Given a call fails for a reason unrelated to the licence
     When the licensing reader reads it
     Then it reports nothing, so the screen still can
+
+  @integration
+  Scenario: Another module opens the upgrade modal through what licensing lends
+    Given licensing is installed
+    When a screen in another module reads the lent upgrade modal actions
+    Then calling them opens the modal in limit, seats or restriction mode
+    And the screen imports no store from the application's host package
+
+  @integration
+  Scenario: A screen opens nothing while no module lends the upgrade modal
+    Given no module lends the upgrade modal actions
+    When a screen asks to open the upgrade modal
+    Then the call does nothing and the screen still renders

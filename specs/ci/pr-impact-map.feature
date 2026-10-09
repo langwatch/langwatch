@@ -66,6 +66,18 @@ Feature: PR impact map comment
     Then the file is attributed to "Deps"
     And the map does not report a change to the application
 
+  Scenario: Regenerated files are attributed to Generated, not to the module
+    Given a pull request changes "modules/prompt/README.md" and "apps/api/src/process-modules.generated.ts"
+    When the impact map is built
+    Then both files are attributed to "Generated"
+    And neither is counted under a module or framework category
+    But a lockfile is still attributed to "Deps"
+
+  Scenario: The Generated category reads the linguist-generated lines of .gitattributes
+    Given .gitattributes marks a path linguist-generated
+    When the impact map decides whether a changed file is generated
+    Then it agrees with git check-attr for every tracked file
+
   Scenario: Categories with no changed files are omitted
     Given a pull request changes only documentation
     When the impact map is built

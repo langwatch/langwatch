@@ -56,7 +56,13 @@ describe("given workflow published its host actions as the workflow:host slice",
       const user = userEvent.setup({ pointerEventsCheck: 0 });
 
       renderWithDesignSystem(
-        <CopyExperimentDialog open onClose={vi.fn()} isCopying={false} onCopy={vi.fn()} />,
+        <CopyExperimentDialog
+          open
+          onClose={vi.fn()}
+          experimentType="EVALUATIONS_V3"
+          isCopying={false}
+          onCopy={vi.fn()}
+        />,
       );
       await user.click(await screen.findByRole("combobox"));
 

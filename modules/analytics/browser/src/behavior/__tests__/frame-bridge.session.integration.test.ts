@@ -5,8 +5,11 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  createWidgetQueryLane,
+  type WidgetQueryLane,
+} from "../../features/dashboard-widget/behavior/widget-query-lane.ts";
 import { FrameBridgeSession, type ChartFrameExecuteQuery } from "../frame-bridge.ts";
-import { createWidgetQueryLane, type WidgetQueryLane } from "../widget-query-lane.ts";
 
 const CONTEXT = {
   timeWindow: { start: 0, end: 1 },

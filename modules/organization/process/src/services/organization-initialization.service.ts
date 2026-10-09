@@ -5,22 +5,19 @@ import type {
   OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
 import type { OrganizationCaller, OrganizationIntent } from "@langwatch/organization-contract";
-import { OnboardingProjectNotCreatedError } from "@langwatch/organization-contract";
 
-import type { OrganizationCeremony } from "./organization-ceremony.service.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 import type { OrganizationSignals } from "./organization-signals.service.ts";
 
 /**
  * The intent that ends on the personal portal rather than in a project.
- * ADR-038 v6: a coding-agent sign-up gets a personal workspace and no shared
- * project; the organization creates one when it later flips to LLMOps.
+ * ADR-038 v6: a coding-agent sign-up gets a personal workspace; onboarding
+ * creates the shared first project for every other intent.
  */
 const CODING_AGENT_INTENT = "AGENT_GOVERNANCE";
 
 /** What the ceremony creates the organization and everything after it through. */
 interface OrganizationInitializationDependencies {
-  readonly ceremony: OrganizationCeremony;
   readonly signals: OrganizationSignals;
   /** Where the sign-up is recorded as organization's event, for nurturing. */
   readonly lifecycle: Pick<
@@ -64,7 +61,7 @@ export class OrganizationInitializationService {
   async initialize(
     input: OnboardingInitializeOrganizationInput,
     by: OrganizationCaller,
-  ): Promise<OrganizationInitialized> {
+  ): Promise<Omit<OrganizationInitialized, "projectSlug">> {
     try {
       const created = await this.deps.createAndAssign(
         {
@@ -84,11 +81,6 @@ export class OrganizationInitializationService {
         await this.#provisionPersonalWorkspace({ organizationId: created.organization.id, by });
       }
 
-      const projectSlug =
-        input.primaryIntent === CODING_AGENT_INTENT
-          ? null
-          : await this.#createFirstProject({ input, created, by });
-
       await this.#announce({ input, organizationName: created.organization.name, by });
 
       this.deps.lifecycle.signedUp({
@@ -99,15 +91,12 @@ export class OrganizationInitializationService {
         primaryIntent: input.primaryIntent,
       });
 
-      // A null slug is how the client knows to land on the personal portal
-      // rather than in a project.
       return {
         success: true,
         teamSlug: created.team.slug,
         teamName: created.team.name,
         teamId: created.team.id,
         organizationId: created.organization.id,
-        projectSlug,
       };
     } catch (error) {
       this.deps.signals.reportError(error);
@@ -140,30 +129,6 @@ export class OrganizationInitializationService {
         },
       });
     }
-  }
-
-  async #createFirstProject(input: {
-    input: OnboardingInitializeOrganizationInput;
-    created: Readonly<{
-      organization: Readonly<{ id: string }>;
-      team: Readonly<{ id: string; name: string }>;
-    }>;
-    by: OrganizationCaller;
-  }): Promise<string> {
-    const result = await this.deps.ceremony.createProject({
-      organizationId: input.created.organization.id,
-      teamId: input.created.team.id,
-      // The organization's own team names the project when the customer did
-      // not: at this point in the ceremony it is the only name they have given.
-      name: input.input.projectName ?? input.created.team.name,
-      language: input.input.language,
-      framework: input.input.framework,
-      userId: input.by.id,
-    });
-
-    if (!result.success) throw new OnboardingProjectNotCreatedError();
-
-    return result.projectSlug;
   }
 
   /** Marketing traffic, never fatal: a sign-up that was not announced still happened. */

@@ -32,18 +32,19 @@ vi.mock("../../../behavior/organization-api.ts", () => {
         getMemberById: {
           useQuery: () => ({ data: state.member, isError: false, error: null }),
         },
-        getMemberProvenance: {
-          useQuery: () =>
-            state.provenanceFails
-              ? { data: undefined, isError: true, error: new Error("boom") }
-              : { data: state.provenance, isError: false, error: null },
-        },
         deleteMember: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         setMemberDisabled: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
     },
   };
 });
+
+vi.mock("../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: () =>
+    state.provenanceFails
+      ? { data: undefined, isError: true, error: new Error("boom") }
+      : { data: state.provenance, isError: false, error: null },
+}));
 
 vi.mock("../../../behavior/use-two-step-requirement.ts", () => ({
   useTwoStepRequirement: () => ({

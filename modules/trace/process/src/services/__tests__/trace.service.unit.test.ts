@@ -8,7 +8,7 @@ import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
-} from "../../repositories/query-field-values.repository.ts";
+} from "../../features/query/repositories/query-field-values.repository.ts";
 import { TraceFullRecordRepository } from "../../repositories/trace-full-record.repository.ts";
 import {
   TraceProjectedReadRepository,

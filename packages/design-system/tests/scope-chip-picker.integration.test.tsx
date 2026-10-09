@@ -5,7 +5,10 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { collapseRedundantScopes, ScopeChipPicker } from "../src/components/scope-chip-picker.tsx";
+import {
+  collapseRedundantScopes,
+  ScopeChipPicker,
+} from "../src/components/scope/scope-chip-picker.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 describe("ScopeChipPicker quick-picks", () => {

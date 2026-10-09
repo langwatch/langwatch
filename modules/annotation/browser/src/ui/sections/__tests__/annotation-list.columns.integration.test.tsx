@@ -56,7 +56,7 @@ vi.mock("../../../behavior/annotation-api.ts", () => ({
   annotationApi: {
     useUtils: () => mocks.utils,
     annotationScore: { getAll: { useQuery: () => ({ data: mocks.scoreTypes }) } },
-    project: {
+    traces: {
       getFieldRedactionStatus: {
         useQuery: () => ({ data: mocks.redaction, isLoading: false }),
       },

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
@@ -24,7 +24,7 @@ vi.mock("langwatch", () => ({
 
 const { TraceModule } = await import("../trace.app.ts");
 const { TraceLegacyReadClickHouseRepository } =
-  await import("../../repositories/clickhouse/trace-legacy-read.repository.ts");
+  await import("../../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts");
 const traceCanonicalisation = TraceCanonicalisationService.create();
 const retentionResolver = { resolve: async () => null };
 

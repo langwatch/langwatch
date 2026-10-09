@@ -30,7 +30,7 @@ import {
 } from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
 
-import { credentialsOf } from "../../rules/ingestion-credentials.rules.ts";
+import { credentialsOf } from "../../features/ingestion-pull/rules/ingestion-credentials.rules.ts";
 import { ProviderAccountChannel } from "../provider-account.channel.ts";
 
 const logger = createLogger("langwatch:governance:provider-account-lookup");

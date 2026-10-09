@@ -9,11 +9,11 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
 } from "../../services/langwatch-ql-access-model.service.ts";
-import { LangWatchQLSelfProvisioningService } from "../../services/langwatch-ql-self-provisioning.service.ts";
 
 const enabled = Boolean(process.env.LANGWATCH_TEST_CLICKHOUSE_URL);
 const accessModel = LangWatchQLAccessModelService.create();

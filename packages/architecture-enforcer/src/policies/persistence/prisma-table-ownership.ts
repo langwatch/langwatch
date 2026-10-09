@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import ts from "typescript";
@@ -9,6 +9,108 @@ import { getAnchor } from "../../workspace/anchors.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile as parsedSourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+
+/** A named reader's write a ruling admits on a share, by file, with its reason (R42). */
+export type SharedPrismaWrite = { reader: string; file: string; reason: string };
+
+/** A Prisma model its claiming module shares for reading with named modules (R40). */
+export type SharedPrismaTable = {
+  table: string;
+  owner: string;
+  readers: readonly string[];
+  reason: string;
+  writes?: readonly SharedPrismaWrite[];
+};
+
+/** The Postgres twin of clickhouse-table-ownership's `shared`; `table` is the model name. */
+export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
+  {
+    table: "Project",
+    owner: "project",
+    readers: [
+      "entitlement",
+      "billing",
+      "data-retention",
+      "data-privacy",
+      "instant-eval-judge",
+      "nurturing",
+      "presence",
+      "organization",
+      "user",
+      "authz",
+    ],
+    reason:
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40); authz's legacy-import tenant step reads an organisation's project ids to bound its share-link read, and each project's apiKey presence and createdAt, per tenant the upgrade runner hands it, never a peer (PO-2, R40)",
+  },
+  {
+    table: "Team",
+    owner: "organization",
+    readers: ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
+    reason:
+      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40)",
+  },
+  {
+    table: "OrganizationUser",
+    owner: "organization",
+    readers: ["authz", "data-privacy", "billing"],
+    reason:
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40)",
+    writes: [
+      {
+        reader: "authz",
+        file: "modules/authz/process/src/repositories/prisma/prisma.authz-admission.repository.ts",
+        reason:
+          "SSO admission completes or clears pendingSsoGrantId atomically with the grant (R42)",
+      },
+      {
+        reader: "authz",
+        file: "modules/authz/process/src/repositories/prisma/prisma.authz-ledger-read.repository.ts",
+        reason:
+          "offboarding deletes the membership first, its lock serialising the grant snapshot (R42)",
+      },
+    ],
+  },
+  {
+    table: "Organization",
+    owner: "organization",
+    readers: ["scim", "entitlement", "billing"],
+    reason:
+      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, its other writes being facts organization applies (R42, round 46 D-b)",
+    writes: [
+      {
+        reader: "billing",
+        file: "enterprise/modules/billing/process/src/repositories/prisma/prisma.billing-account-facts.repository.ts",
+        reason:
+          "the Stripe customer-id claim stays a synchronous compare-and-set, so two checkouts never make two customers (round 46 D-b)",
+      },
+    ],
+  },
+  {
+    table: "User",
+    owner: "user",
+    readers: ["billing"],
+    reason:
+      "billing reads its organisations' administrators' names and addresses, and which members are deactivated, never a copy (C2 B, R40)",
+  },
+  {
+    table: "Topic",
+    owner: "topic",
+    readers: ["trace"],
+    reason: "trace labels topic facets with topic's names, keeping no copy (R40)",
+  },
+  {
+    table: "Annotation",
+    owner: "annotation",
+    readers: ["trace"],
+    reason: "trace's legacy read attaches a page's annotations, keeping no copy (R40)",
+  },
+  {
+    table: "AnnotationScore",
+    owner: "annotation",
+    readers: ["trace"],
+    reason: "trace's legacy read names annotation scores, deleted definitions included (R40)",
+  },
+];
 
 const PRISMA_REPOSITORY_FILE = new RegExp(
   `/process/src/${FEATURE_PREFIX}repositories/prisma/prisma\\.[^/]+\\.repository\\.ts$`,
@@ -50,7 +152,7 @@ type Bindings = {
   repositoryNamespaces: Set<string>;
 };
 type ClaimCall = { call: ts.CallExpression; source: "tables" | "repository" };
-type Claim = { feature: string; file: string; model: string; line: number };
+export type Claim = { feature: string; file: string; model: string; line: number };
 
 function issue(file: string, message: string, line?: number): ArchitectureViolation {
   return {
@@ -357,7 +459,7 @@ function readClaim({
     .map((argument) => ({ feature, file, model: argument.text, line }));
 }
 
-function featureClaims(
+export function featureClaims(
   root: string,
   feature: FeatureCatalogueEntry,
   violations: ArchitectureViolation[],
@@ -380,10 +482,20 @@ function featureClaims(
   });
 }
 
-function checkOwners(
-  claims: readonly Claim[],
-  models: ReadonlyMap<string, string>,
-): ArchitectureViolation[] {
+/** A claim by a module the model's owner named as a reader: a read seat is never a claim. */
+function isReaderClaim(claim: Claim, shared: readonly SharedPrismaTable[]): boolean {
+  return shared.some((item) => item.table === claim.model && item.readers.includes(claim.feature));
+}
+
+function checkOwners({
+  claims,
+  models,
+  shared,
+}: {
+  claims: readonly Claim[];
+  models: ReadonlyMap<string, string>;
+  shared: readonly SharedPrismaTable[];
+}): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const owners = new Map<string, Claim>();
 
@@ -392,6 +504,17 @@ function checkOwners(
 
     if (!table) {
       violations.push(issue(claim.file, `Unknown Prisma model ${claim.model}.`, claim.line));
+      continue;
+    }
+
+    if (isReaderClaim(claim, shared)) {
+      violations.push(
+        issue(
+          claim.file,
+          `${claim.feature} reads ${table} but does not own it, and a claim is ownership: boot refuses it. Read it through a plain class over the Prisma client that no .for(...) or static tables claims (see prisma.billing-project-directory.repository.ts).`,
+          claim.line,
+        ),
+      );
       continue;
     }
 
@@ -414,15 +537,215 @@ function checkOwners(
 }
 
 /**
- * Checks explicit adoption across the catalogue, including features never
- * installed together. Migration access (who may reach a table) is its own
- * registered policy now, not nested here — see policies/index.ts.
+ * Checks adoption across the catalogue, features never installed together included. Declared
+ * shares apply where their owner is catalogued; migration access is its own policy (index.ts).
  */
-export function lintPrismaTableOwnership(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+export function lintPrismaTableOwnership(
+  snapshot: WorkspaceSnapshot,
+  declared?: readonly SharedPrismaTable[],
+): ArchitectureViolation[] {
   const { root, catalogue } = snapshot;
+  const shared =
+    declared ??
+    SHARED_PRISMA_TABLES.filter((item) => catalogue.some((entry) => entry.id === item.owner));
   const models = prismaModelNames({ root, policy: "prisma-table-ownership" });
   const violations: ArchitectureViolation[] = [];
   const claims = catalogue.flatMap((feature) => featureClaims(root, feature, violations));
 
-  return [...violations, ...checkOwners(claims, models)];
+  return [
+    ...violations,
+    ...checkOwners({ claims, models, shared }),
+    ...sharedFindings({ root, catalogue, claims, models, shared }),
+  ];
+}
+
+const READ_METHODS = new Set([
+  "aggregate",
+  "count",
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "findUnique",
+  "findUniqueOrThrow",
+  "groupBy",
+]);
+const WRITE_METHODS = new Set([
+  "create",
+  "createMany",
+  "createManyAndReturn",
+  "delete",
+  "deleteMany",
+  "update",
+  "updateMany",
+  "updateManyAndReturn",
+  "upsert",
+]);
+const SQL_VERB = "(FROM|JOIN|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM|TRUNCATE(?:\\s+TABLE)?)";
+const READING_VERBS = new Set(["from", "join"]);
+
+/** One read or write of a shared model by a named reader: a delegate call or quoted raw SQL. */
+type ShareAccess = { file: string; line: number; write: boolean };
+
+/** A delegate method call on the model, as eventing-table-access.ts reads delegates. */
+function delegateAccess(node: ts.Node, delegate: string): boolean | undefined {
+  if (!ts.isPropertyAccessExpression(node) || node.name.text !== delegate) return void 0;
+
+  const method = node.parent;
+  if (!ts.isPropertyAccessExpression(method) || method.expression !== node) return void 0;
+
+  if (!ts.isCallExpression(method.parent) || method.parent.expression !== method) return void 0;
+
+  if (WRITE_METHODS.has(method.name.text)) return true;
+
+  return READ_METHODS.has(method.name.text) ? false : void 0;
+}
+
+function fileAccess({
+  file,
+  table,
+  delegate,
+}: {
+  file: string;
+  table: string;
+  delegate: string;
+}): ShareAccess[] {
+  const text = sourceText({ file });
+  if (!text.includes(delegate) && !text.includes(`"${table}"`)) return [];
+
+  const source = parsedSourceFile({ file });
+  const sql = new RegExp(`\\b${SQL_VERB}\\s+"${table}"`, "gi");
+  const found: ShareAccess[] = [];
+  const add = (node: ts.Node, write: boolean): void => {
+    const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+    found.push({ file, line, write });
+  };
+  const visit = (node: ts.Node): void => {
+    const write = delegateAccess(node, delegate);
+    if (write !== void 0) add(node, write);
+
+    if (ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) {
+      for (const match of node.getText(source).matchAll(sql))
+        add(node, !READING_VERBS.has((match[1] ?? "").toLowerCase()));
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+
+  return found;
+}
+
+function readerAccess({
+  root,
+  feature,
+  table,
+}: {
+  root: string;
+  feature: FeatureCatalogueEntry;
+  table: string;
+}): ShareAccess[] {
+  const delegate = `${table.charAt(0).toLowerCase()}${table.slice(1)}`;
+  const files = listFiles({
+    directory: join(root, feature.root),
+    accept: (file) => /\.[cm]?tsx?$/.test(file) && !TEST_FILE.test(file),
+  });
+
+  return [...files].toSorted().flatMap((file) => fileAccess({ file, table, delegate }));
+}
+
+/** A wrong owner, an unadmitted write by a reader, a stale write exception or a stale reader. */
+function sharedFindings({
+  root,
+  catalogue,
+  claims,
+  models,
+  shared,
+}: {
+  root: string;
+  catalogue: readonly FeatureCatalogueEntry[];
+  claims: readonly Claim[];
+  models: ReadonlyMap<string, string>;
+  shared: readonly SharedPrismaTable[];
+}): ArchitectureViolation[] {
+  return shared.flatMap((item): ArchitectureViolation[] => {
+    const physical = models.get(item.table);
+    const owner = claims.find(
+      (claim) => models.get(claim.model) === physical && !isReaderClaim(claim, shared),
+    );
+
+    if (!physical || owner?.feature !== item.owner) {
+      return [
+        issue(
+          join(root, SCHEMA_PATH),
+          `Table ${item.table} is declared shared by ${item.owner}, which does not own it. Fix or delete the declaration.`,
+        ),
+      ];
+    }
+
+    const written: SharedPrismaWrite[] = [];
+    const readers = item.readers.flatMap((reader) => {
+      const feature = catalogue.find((entry) => entry.id === reader);
+      const access = feature ? readerAccess({ root, feature, table: item.table }) : [];
+      const writes = access
+        .filter((entry) => entry.write)
+        .filter((entry) => {
+          const excepted = admittedWrite({ item, reader, file: relative(root, entry.file) });
+          if (excepted) written.push(excepted);
+
+          return !excepted;
+        })
+        .map((entry) =>
+          issue(
+            entry.file,
+            `${reader} writes ${item.table}, which ${item.owner} shares with it for reading only.`,
+            entry.line,
+          ),
+        );
+
+      if (access.some((entry) => !entry.write)) return writes;
+
+      return [
+        ...writes,
+        issue(
+          owner.file,
+          `Table ${item.table} is shared with ${reader}, which no longer reads it. Delete the reader.`,
+          owner.line,
+        ),
+      ];
+    });
+
+    return [...readers, ...staleWrites({ root, item, written })];
+  });
+}
+
+function admittedWrite({
+  item,
+  reader,
+  file,
+}: {
+  item: SharedPrismaTable;
+  reader: string;
+  file: string;
+}): SharedPrismaWrite | undefined {
+  return item.writes?.find((write) => write.reader === reader && write.file === file);
+}
+
+/** A write exception the tree no longer needs is deleted, so the share cannot widen silently. */
+function staleWrites({
+  root,
+  item,
+  written,
+}: {
+  root: string;
+  item: SharedPrismaTable;
+  written: readonly SharedPrismaWrite[];
+}): ArchitectureViolation[] {
+  return (item.writes ?? [])
+    .filter((write) => !written.includes(write))
+    .map((write) =>
+      issue(
+        join(root, write.file),
+        `The write exception for ${write.reader} writing ${item.table} in ${write.file} matches no write. Delete it.`,
+      ),
+    );
 }

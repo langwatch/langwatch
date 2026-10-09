@@ -116,64 +116,6 @@ function handlerManagedCredentialClass({
 }
 
 /**
- * Require a specific RBAC permission at the app's scope. The secured app
- * resolves it against the caller's role bindings (project scope) or org role
- * bindings (org scope), exactly like the tRPC `checkProjectPermission` path.
- */
-export function requires<P extends AuthzPermission>(
-  permission: P,
-): { readonly kind: "permission"; readonly permission: P } {
-  return { kind: "permission", permission };
-}
-
-/** Requires permission through the API-key ceiling; legacy project keys bypass it. */
-export function apiKeyPermission<P extends AuthzPermission>(
-  permission: P,
-): { readonly kind: "apiKeyPermission"; readonly permission: P } {
-  return { kind: "apiKeyPermission", permission };
-}
-
-/**
- * Require an RBAC permission at the scope of the project the route addresses, for org apps
- * that operate on one project at a time. `requires(...)` would resolve at organization
- * scope there, so a single org-wide grant would reach every project in the org.
- */
-export function requiresOnProject<P extends AuthzPermission>(
-  permission: P,
-  options: { param?: string } = {},
-): {
-  readonly kind: "projectPermission";
-  readonly permission: P;
-  readonly param: string;
-} {
-  return {
-    kind: "projectPermission",
-    permission,
-    param: options.param ?? "id",
-  };
-}
-
-/**
- * Require an RBAC permission at team scope, for org apps operating on one team at a time.
- * `requires(...)` resolves at org scope, so a team-scoped binding could never pass and an
- * org-wide grant reached every team in the org.
- */
-export function requiresOnTeam<P extends AuthzPermission>(
-  permission: P,
-  options: { param?: string } = {},
-): {
-  readonly kind: "teamPermission";
-  readonly permission: P;
-  readonly param: string;
-} {
-  return {
-    kind: "teamPermission",
-    permission,
-    param: options.param ?? "id",
-  };
-}
-
-/**
  * Any valid credential for the app's scope is accepted; no specific permission
  * is checked. Reserve for routes whose handler performs no privileged action
  * beyond what authentication already proves (e.g. "whoami").
@@ -231,17 +173,6 @@ export function handlerManagedAuth({
 }
 
 /**
- * Can a caller holding an API key reach this route at all?
- */
-export function isApiKeyReachable(policy: AccessPolicy): boolean {
-  if (policy.kind === "handlerManaged") {
-    return policy.credential === "apiKey" || policy.credential === "both";
-  }
-
-  return policy.kind !== "public" && policy.kind !== "internal";
-}
-
-/**
  * Every RBAC permission a route requires, whichever way it declares it — middleware policy
  * or self-enforcing handler. The single place any audit should ask "what does this route
  * actually demand?", so a new policy kind cannot quietly drop out of the answer.
@@ -267,28 +198,6 @@ function assertReason(reason: string, fn: string): void {
     throw new Error(
       `${fn}() requires a non-empty reason describing why the route needs no RBAC credential`,
     );
-  }
-}
-
-/** Human-readable one-liner for registry listings + audit output. */
-export function describeAccessPolicy(policy: AccessPolicy): string {
-  switch (policy.kind) {
-    case "permission":
-      return `requires ${policy.permission}`;
-    case "apiKeyPermission":
-      return `requires ${policy.permission} (API-key ceiling; legacy project keys bypass)`;
-    case "projectPermission":
-      return `requires ${policy.permission} on the project in :${policy.param}`;
-    case "teamPermission":
-      return `requires ${policy.permission} on the team in :${policy.param}`;
-    case "anyAuthenticated":
-      return "any authenticated credential";
-    case "public":
-      return `public — ${policy.reason}`;
-    case "internal":
-      return `internal — ${policy.reason}`;
-    case "handlerManaged":
-      return `handler-managed — ${policy.reason}`;
   }
 }
 

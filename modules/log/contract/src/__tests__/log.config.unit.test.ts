@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { logConfig } from "../log.api.ts";
+import { logConfig } from "../log.config.ts";
 
 describe("log server configuration", () => {
   describe("given the log pipeline's lane count", () => {

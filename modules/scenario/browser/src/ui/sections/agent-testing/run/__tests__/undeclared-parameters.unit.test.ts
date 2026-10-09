@@ -12,7 +12,7 @@ import {
   undeclaredNamesOnLine,
   undeclaredNamesOnRows,
   undeclaredParameterMessage,
-} from "../undeclared-parameters.ts";
+} from "../../run-parameters/undeclared-parameters.ts";
 
 const declares = (...names: string[]): DeclaredParameter[] =>
   names.map((name) => ({ name, source: "agent" as const }));

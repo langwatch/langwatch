@@ -38,6 +38,14 @@ const workspace = createFixtureWorkspace({
       name: "@langwatch/enterprise-governance-contract",
       exports: { ".": "." },
     }),
+    "enterprise/modules/governance/browser/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-browser",
+      exports: { ".": "." },
+    }),
+    "enterprise/modules/governance/client/package.json": JSON.stringify({
+      name: "@langwatch/enterprise-governance-client",
+      exports: { ".": "." },
+    }),
   },
 });
 
@@ -180,6 +188,21 @@ describe("given package-boundaries", () => {
     });
   });
 
+  describe("when a contract package imports eventing", () => {
+    /** @scenario "A contract may read eventing's table list and no other eventing entry" */
+    it("accepts the tables subpath and reports every other eventing entry as contractRuntime", () => {
+      const contract = "modules/agent/contract/src/agent.commands.ts";
+      const runtimeIds = (specifier) =>
+        report(contract, `import { X } from "${specifier}";`)
+          .map((entry) => entry.messageId)
+          .filter((id) => id === "contractRuntime");
+
+      expect(runtimeIds("@langwatch/eventing/tables")).toEqual([]);
+      expect(runtimeIds("@langwatch/eventing")).toEqual(["contractRuntime"]);
+      expect(runtimeIds("@langwatch/eventing/server")).toEqual(["contractRuntime"]);
+    });
+  });
+
   describe("when a module library imports a runtime or an implementation package", () => {
     /** @scenario "A module library importing a runtime or implementation is reported as libraryRuntime" */
     it("reports libraryRuntime for node, react, framework and implementation packages", () => {
@@ -201,7 +224,7 @@ describe("given package-boundaries", () => {
       expect(ids(client, 'import { useMemo } from "react";')).toEqual([]);
       expect(ids(LIBRARY, 'import { useMemo } from "react";')).toEqual(["libraryRuntime"]);
       for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/browser"]) {
-        expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
+        expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["clientRuntime"]);
       }
     });
 
@@ -256,6 +279,54 @@ describe("given package-boundaries", () => {
       expect(
         ids(SERVICE, 'import { GovernanceApi } from "@langwatch/enterprise-governance-contract";'),
       ).not.toContain("coreImportsEnterprise");
+    });
+  });
+
+  describe("when a core browser reads an enterprise module's client", () => {
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          BROWSER,
+          'import { GovernanceLentToken } from "@langwatch/enterprise-governance-client";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("still reports coreImportsEnterprise for the enterprise browser and process packages", () => {
+      expect(
+        ids(
+          BROWSER,
+          'import { governanceBrowser } from "@langwatch/enterprise-governance-browser";',
+        ),
+      ).toContain("coreImportsEnterprise");
+      expect(
+        ids(
+          BROWSER,
+          'import { governanceProcessModule } from "@langwatch/enterprise-governance-process";',
+        ),
+      ).toContain("coreImportsEnterprise");
+    });
+
+    /** @scenario "A core browser may read an enterprise module's client, and no other enterprise package" */
+    it("still lets the enterprise contract through, as before", () => {
+      expect(
+        report(
+          BROWSER,
+          'import { GovernanceApi } from "@langwatch/enterprise-governance-contract";',
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "Core code other than a browser reading an enterprise client is still reported" */
+    it("reports a core service reading it", () => {
+      expect(
+        ids(
+          SERVICE,
+          'import { GovernanceLentToken } from "@langwatch/enterprise-governance-client";',
+        ),
+      ).toEqual(expect.arrayContaining(["clientConsumer", "coreImportsEnterprise"]));
     });
   });
 

@@ -1,7 +1,8 @@
 /** What onboarding lends this module by token (ARCHITECTURE.md §3.4, rule 7). */
 
 import { useLentHooks } from "@langwatch/browser-host/lent";
-import { GuidedTourToken, type GuidedTourHooks } from "@langwatch/onboarding-contract";
+import { GuidedTourToken } from "@langwatch/onboarding-client";
+import type { GuidedTourHooks } from "@langwatch/onboarding-contract";
 
 /** What a composition without onboarding reads: nothing is registered, nothing is recorded. */
 const NO_TOUR: GuidedTourHooks = {

@@ -14,7 +14,8 @@ Feature: AuthZ package boundary
   @unit @architecture @typecheck
   Scenario: AuthZ has one versioned feature root
     Given the AuthZ feature declares layoutVersion 0
-    Then @langwatch/authz-contract contains its portable vocabulary, schemas, errors and service capabilities
+    Then @langwatch/authz-contract contains its portable vocabulary, schemas, errors and the AuthzApi capability
+    And the contract declares no abstract AuthzService for a caller to type against
     And @langwatch/authz-process contains its concrete services, repositories, adapters, projections and migration
     And packages/authz and packages/authz-server do not exist
     And no compatibility package or forwarding export preserves the old package name
@@ -121,16 +122,12 @@ Feature: AuthZ package boundary
     Then the synchronous deny effect still removes the permission
     And the worker projection and audit subscriber catch up after Redis recovers
 
-  @integration @runtime
-  Scenario: Each process installs only its AuthZ responsibilities
-    Given the app and worker need AuthZ
-    When the application preset composes the AuthZ feature
-    Then only the AuthZ application composition root imports @langwatch/authz-process
-    And RequestApp exposes contract-typed AuthzService and AuthzGrantsService capabilities
-    And a web-only process installs command producers without running subscriber or projection consumers
-    And a worker-capable process installs the same Eventing pipeline with its projection and audit subscriber consumers
-    And the worker-capable process starts the automatic migration only after command senders connect
-    And tRPC, middleware, API key, group, role, team, SCIM and share code receives those capabilities without constructing AuthZ infrastructure
+  @unit @runtime
+  Scenario: Every process installs AuthZ whole rather than a per-role slice
+    Given the api and the worker each install the AuthZ module
+    When each process composes its graph on a producer-only Eventing runtime
+    Then both register the same grants ledger pipeline with the same commands
+    And neither needs an AuthZ capability to mount it
 
   @integration @trpc
   Scenario: Application tRPC remains a separate adapter

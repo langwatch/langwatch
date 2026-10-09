@@ -6,7 +6,6 @@
  * service's own. enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */
 import type { ScimSyncFailure, ScimSyncState } from "@langwatch/enterprise-scim-contract";
-import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
@@ -73,10 +72,8 @@ function build(initial: ScimSyncState | null): void {
       findForOperator: async () => (held ? [held] : []),
     },
     organizations: {
-      findProvisioningSummary: async (organizationId) =>
-        organizationId === ORG
-          ? { id: ORG, name: "Acme", slug: "acme", createdAt: fromDate(new Date(0)) }
-          : null,
+      findOrganizationNames: async ({ organizationIds }) =>
+        organizationIds.includes(ORG) ? [{ id: ORG, name: "Acme" }] : [],
     },
     identities,
     lifecycle: {

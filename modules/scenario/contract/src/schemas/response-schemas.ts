@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 
-import { ScenarioRunStatus } from "../scenario-run.ts";
+import { ScenarioRunStatus } from "../features/run/scenario-run.ts";
 import {
   batchRunIdSchema,
   langwatchMetadataSchema,

@@ -1,6 +1,6 @@
 import { isImageAttachmentRef } from "@langwatch/dataset-contract";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
+import { format, formatDistanceToNow, nowInstant, readableDate } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -10,7 +10,6 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 
-import { readableDate } from "../../../../model/experiment/display-formatters.ts";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 
 export type BatchCellFailure = {

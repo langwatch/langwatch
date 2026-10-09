@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { spendUsageSchema, type SpendUsage } from "../gateway-spend.schemas.ts";
+import { spendUsageSchema, type SpendUsage } from "../features/spend/gateway-spend.schemas.ts";
 import {
   findSpendRatingFaults,
   NO_RATE_RULE_CODE,
   rateSpendNanoUsd,
   UNPRICED_QUANTITIES_CODE,
-} from "../gateway.spend-rating.ts";
+} from "../features/spend/gateway.spend-rating.ts";
 
 const usage = (quantities: Partial<SpendUsage>): SpendUsage => spendUsageSchema.parse(quantities);
 

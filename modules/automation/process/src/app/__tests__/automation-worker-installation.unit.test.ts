@@ -38,7 +38,7 @@ import {
   settlementTrace,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
 import { automationProcessModule } from "../../automation.module.ts";
-import { AutomationPersistCapService } from "../../services/persist-cap.service.ts";
+import { AutomationPersistCapService } from "../../features/runaway/services/persist-cap.service.ts";
 
 const CONFIG: AutomationServerConfig = {
   emailHourlyCap: 100,
@@ -76,6 +76,7 @@ type Installed = Readonly<{
   authz?: AuthzApi;
   notification?: NotificationService;
   webhook?: WebhookApi;
+  slack?: SlackApi;
 }>;
 
 function composed(role: "api" | "worker", eventing: EventSourcing) {
@@ -117,7 +118,7 @@ function peers(installed: Installed = {}) {
     annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
     authz: installed.authz ?? createApiFixture<AuthzApi>(),
     notification: installed.notification ?? createApiFixture<NotificationService>(),
-    slack: createApiFixture<SlackApi>(),
+    slack: installed.slack ?? createApiFixture<SlackApi>(),
     webhook: installed.webhook ?? createApiFixture<WebhookApi>(),
   };
 }
@@ -132,7 +133,6 @@ function bootWithout(absent: keyof ReturnType<typeof peers>) {
     Object.entries(peers()).filter(([module]) => module !== absent),
   );
   return Promise.resolve().then(() =>
-    // @ts-expect-error MissingSupply: the compiler refuses a worker missing a peer it names
     composed("worker", eventingFor("worker")).provide(supplied).boot(),
   );
 }
@@ -696,5 +696,25 @@ describe("given a memory-tier worker hosting report schedules", () => {
 
     await vi.waitFor(async () => expect(await worker.schedule()).toEqual([]));
     await worker.runtime.stop();
+  });
+});
+
+describe("given a memory-tier api process composed with its Slack transport", () => {
+  describe("when the automation form asks a bot connection for its channels", () => {
+    /** @scenario "The Slack channel picker lists a bot connection's channels" */
+    it("lists through the composed Web API channel instead of refusing as unavailable", async () => {
+      const runtime = await process("api", eventingFor("api"), {
+        slack: createApiFixture<SlackApi>({
+          findUsableSlackSecret: async () => [{ kind: "BOT", token: "xoxb-memory" }],
+        }),
+      }).boot();
+      onTestFinished(() => runtime.stop());
+
+      await expect(
+        runtime
+          .service(AutomationApi)
+          .listSlackChannels({ projectId: "project-1", slackIntegrationId: "slack-1" }),
+      ).resolves.toEqual({ channels: [], error: null, gaps: [] });
+    });
   });
 });

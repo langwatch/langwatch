@@ -8,19 +8,19 @@ import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
-import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
-import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
-import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
-import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
+import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
-} from "../services/langwatch-ql-production-provisioning.service.ts";
+} from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlSelfProvisionRequest,
-} from "../services/langwatch-ql-self-provisioning.service.ts";
+} from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
+import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
+import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();

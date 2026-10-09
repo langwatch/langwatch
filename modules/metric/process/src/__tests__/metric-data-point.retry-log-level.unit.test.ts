@@ -19,8 +19,8 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-const { MetricDataPointClickHouseRepository } =
-  await import("../repositories/clickhouse/clickhouse.metric-data-point.repository.ts");
+const { ClickHouseMetricDataPointAppendRepository } =
+  await import("../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts");
 
 const REFUSED = new Error("Too many queries in flight");
 
@@ -93,9 +93,8 @@ function refusingClient(): MetricClickHouseClient {
 function refusingRepository() {
   const client = refusingClient();
 
-  return MetricDataPointClickHouseRepository.create({
+  return ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: async () => client,
-    resolveOrganizationClient: async () => client,
     defaultRetentionDays: 30,
   });
 }

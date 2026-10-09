@@ -149,7 +149,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     Then it filters out kind == "internal_governance" rows
     And any leak of the hidden project to a user surface is treated
       as a bug (regression test in
-      apps/api/src/app-static/__tests__/projectFilter.invariant.integration.test.ts
+      apps/api/src/__tests__/project-filter.invariant.integration.test.ts
       asserts every Project consumer applies the filter)
 
   # ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   @bdd @ui @ui-contract @regression
   Scenario: The Lane-B suite asserts every Project consumer filters out internal governance projects
     When the test suite runs
-      apps/api/src/app-static/__tests__/projectFilter.invariant.integration.test.ts
+      apps/api/src/__tests__/project-filter.invariant.integration.test.ts
     Then it enumerates every component / API / hook / repository
       method that loads or renders Projects
     And for each, asserts that a Project with kind="internal_governance"

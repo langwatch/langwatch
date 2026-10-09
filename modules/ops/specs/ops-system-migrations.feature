@@ -13,3 +13,10 @@ Feature: Ops runs the system migration passes and names their cohorts
     When it runs
     Then abandoned newborn streams are swept alongside the migrations
     And the pass is still reported when the sweep itself fails
+
+  @unit
+  Scenario: The system-migration procedures answer under ops.upgrade and nowhere else
+    Given the ten operator-only system-migration procedures
+    When the ops tRPC declarations are read
+    Then each of the ten sits under ops.upgrade with its original kind and platform permission
+    And none of them is declared under ops

@@ -10,6 +10,7 @@ export {
   handledErrorFromHerr,
   isZodLikeError,
   setTraceUrlProvider,
+  traceLinksFor,
 } from "./handled-error.ts";
 export {
   REMEDIATION_CODES,
@@ -23,9 +24,11 @@ export {
   serializedHandledErrorSchema,
   serializedReasonSchema,
 } from "./serialized-handled-error.ts";
+export { TRANSIENT_REFUSAL_CODES, isTransientRefusal } from "./handled-error.ts";
 export type {
   HandledErrorOptions,
   HerrEnvelope,
+  TraceLinks,
   TraceUrlProvider,
   ZodLikeError,
   ZodLikeIssue,

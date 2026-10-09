@@ -10,8 +10,8 @@ import {
   pulledUsageRetractedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 
+import type { GovernanceCostRollupState } from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
 import { MemoryGovernanceCostRollupRepository } from "../../repositories/memory/memory.governance-cost-rollup.repository.ts";
-import type { GovernanceCostRollupState } from "../../rules/governance-cost-rollup-cell.rules.ts";
 import { GovernanceCostRollupFoldProjection } from "../governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../governance-cost-rollup.store.ts";
 

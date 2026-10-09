@@ -5,7 +5,7 @@ import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
 
 import { api } from "../../../behavior/langy-api.ts";
-import { isLangyTranscriptMessage } from "../../../model/langy-transcript.ts";
+import { isLangyTranscriptMessage } from "../../transcript/model/langy-transcript.ts";
 import { toEngineMessage } from "../model/langy-engine-parts.ts";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
 

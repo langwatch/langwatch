@@ -5,8 +5,6 @@ import { useDatasetTable } from "../../../model/dataset/dataset-table-context.ts
 import { DatasetCellDisplay } from "./dataset-cell-display.tsx";
 import { FloatingCellEditor } from "./floating-cell-editor.tsx";
 
-export { JSON_LIKE_TYPES } from "../../../model/dataset/editable-cell-value.ts";
-
 type EditableCellProps = {
   value: string;
   row: number;

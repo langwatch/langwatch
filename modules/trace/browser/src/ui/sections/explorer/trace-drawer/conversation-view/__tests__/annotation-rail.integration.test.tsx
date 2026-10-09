@@ -51,7 +51,8 @@ vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
@@ -93,7 +94,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 }));
 
 /** Annotation's lent form, which its own tests cover, stood in by controls that read the state. */
-vi.mock("../../../../../../behavior/lent-annotation-form.tsx", () => {
+vi.mock("../../../../../../features/annotation/behavior/lent-annotation-form.tsx", () => {
   function CommentAndScores({ state }: { state: AnnotationFormState }) {
     const scores = state.scores.data ?? [];
     return (
@@ -181,15 +182,19 @@ vi.mock("../chat-turn-row.tsx", () => ({
   ),
 }));
 
-import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../behavior/explorer/types/trace.ts";
+import type { AnnotationByTrace } from "../../../../../../behavior/use-annotations-by-trace-ids.ts";
+import { useAnnotationDraftStore } from "../../../../../../features/annotation/behavior/annotation-draft.store.ts";
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
-} from "../../../../../../behavior/annotation-queue-session.store.ts";
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+} from "../../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import { AnnotatedTurnRow } from "../annotated-turn-row.tsx";
-import type { ParsedTurn, TurnLayout } from "../types.ts";
+import type { ParsedTurn } from "../annotated-turn-row.tsx";
+import type { TurnLayout } from "../chat-turn-row.tsx";
 import {
   RAIL_WIDTH_SLIM_PX,
   RAIL_WIDTH_WIDE_PX,

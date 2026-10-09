@@ -1,4 +1,3 @@
-import { uiTokens } from "@langwatch/module";
 /**
  * The inputs the `evaluators.*` tRPC surface publishes, kept in the
  * contract so the wire shape a client is typed against is stated once,
@@ -135,17 +134,18 @@ export const evaluatorWorkflowFieldsSchema = z.object({
   outputFields: z.array(evaluatorFieldSchema),
 });
 
-/** The workflow and monitors an archive would take with the evaluator. */
+/** The workflow an archive would take with the evaluator; monitor answers for its own rows. */
 export const evaluatorRelatedEntitiesSchema = z.object({
   workflow: z.object({ id: z.string(), name: z.string() }).nullable(),
-  monitors: z.array(z.object({ id: z.string(), name: z.string() })),
 });
+
+/** One evaluator a workflow backs, as a workflow's archive preview names it. */
+export const evaluatorByWorkflowSchema = z.object({ id: z.string(), name: z.string() });
 
 /** What a cascade archive took with it. */
 export const evaluatorCascadeArchiveSchema = z.object({
   evaluator: evaluatorSchema,
   archivedWorkflow: z.object({ id: z.string() }).nullable(),
-  deletedMonitorsCount: z.number(),
 });
 
 /** How far a push to the replicas reached. */
@@ -157,6 +157,22 @@ export const evaluatorPushToCopiesSchema = z.object({
 /** A copy pulled back into line with its source. */
 export const evaluatorSyncFromSourceSchema = z.object({ ok: z.literal(true) });
 
+/** One workflow inside one project: the Optimization Studio's evaluator switch is scoped by it. */
+export const evaluatorApiWorkflowInputSchema = z.object({
+  workflowId: z.string(),
+  projectId: z.string(),
+});
+
+/** The studio's save-as-evaluator switch; `isComponent` is sent and ignored, as it always was. */
+export const evaluatorApiWorkflowToggleInputSchema = z.object({
+  ...evaluatorApiWorkflowInputSchema.shape,
+  isEvaluator: z.boolean(),
+  isComponent: z.boolean(),
+});
+
+/** What a studio switch answers once the write is done. */
+export const evaluatorWorkflowSwitchedSchema = z.object({ success: z.boolean() }).strict();
+
 export type EvaluatorCopy = z.infer<typeof evaluatorCopySchema>;
 export type EvaluatorHistoryEntry = z.infer<typeof evaluatorHistoryEntrySchema>;
 export type EvaluatorWorkflowFields = z.infer<typeof evaluatorWorkflowFieldsSchema>;
@@ -164,20 +180,6 @@ export type EvaluatorRelatedEntities = z.infer<typeof evaluatorRelatedEntitiesSc
 export type EvaluatorCascadeArchive = z.infer<typeof evaluatorCascadeArchiveSchema>;
 export type EvaluatorPushToCopiesResult = z.infer<typeof evaluatorPushToCopiesSchema>;
 export type EvaluatorSyncFromSourceResult = z.infer<typeof evaluatorSyncFromSourceSchema>;
-
-/** The settings form evaluator lends the studio's inline evaluator node (§10, §10.1). */
-
-/** What the studio hands evaluator's settings form for an inline evaluator node. */
-export type EvaluatorSettingsFormProps = {
-  evaluatorType: string;
-  initialSettings: Record<string, unknown>;
-  /** Fill in the evaluator's default settings on first render. */
-  applyDefaults: boolean;
-  onChange: (settings: Record<string, unknown>) => void;
-};
-
-export const EvaluatorSettingsFormToken =
-  uiTokens("evaluator").component<EvaluatorSettingsFormProps>("evaluatorSettingsForm");
 
 type SettingsSchema = z.ZodType<Record<string, unknown>, Record<string, unknown>>;
 

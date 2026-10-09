@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { GroupQueueDependenciesAdapter, type GroupQueueStorage } from "../dependencies-adapter.ts";
 
-function storage(): GroupQueueStorage {
+function storage(): GroupQueueStorage<{ kind: string; root: string }> {
   return {
     objectStoreFor: () => ({
       put: async () => undefined,
@@ -13,6 +13,7 @@ function storage(): GroupQueueStorage {
       delete: async () => undefined,
     }),
     resolveDestination: async () => ({ kind: "file", root: "/tmp/langwatch" }),
+    mintUri: ({ destination, key }) => `file://${destination.root}/${key}`,
   };
 }
 
@@ -35,6 +36,13 @@ describe("GroupQueueDependenciesAdapter", () => {
       kind: "file",
       root: "/tmp/langwatch",
     });
+    expect(
+      dependencies.mintUri?.({
+        destination: { kind: "file", root: "/tmp/langwatch" },
+        tenantId: "project-1",
+        key: "k",
+      }),
+    ).toBe("file:///tmp/langwatch/k");
 
     // A borrowed connection is not closed by this projection adapter.
     expect(redis.status).toBe("wait");

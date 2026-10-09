@@ -4,7 +4,7 @@ import {
   parseOnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import {
-  type JoinRequestJoining,
+  type OrganizationJoinSetting,
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
@@ -13,16 +13,22 @@ import {
   type OrganizationWithAdministrators,
   type PersonalFeatures,
   type PersonalWorkspace,
+  type OrganizationIdPage,
+  type OrganizationIdPageInput,
   type OrganizationUsageCount,
   type PricingModel,
+  type SignInSecurityPolicy,
+  type OrganizationCurrency,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
+  type EnsuredPersonalTeam,
   type StoredOrganizationSettings,
+  type OrganizationTeamProject,
 } from "../organization.repository.ts";
 import type {
   MemoryOrganizationDatabase,
@@ -33,6 +39,14 @@ import type {
 /** In-memory `OrganizationRepository`, for tests and a memory-backed boot. */
 const BYTES_PER_MEBIBYTE = 1024 * 1024;
 
+/** An absent column reads as no rule, so a row seeded without one asks nothing of anybody. */
+const signInSecurityPolicyOf = (organization: MemoryOrganizationRow): SignInSecurityPolicy => ({
+  lockoutAfterFailedAttempts: organization.lockoutAfterFailedAttempts ?? 0,
+  lockoutMinutes: organization.lockoutMinutes ?? 30,
+  sessionIdleTimeoutMinutes: organization.sessionIdleTimeoutMinutes ?? 0,
+  sessionMaxLifetimeMinutes: organization.sessionMaxLifetimeMinutes ?? 0,
+});
+
 export class MemoryOrganizationRepository extends OrganizationRepository {
   private constructor(private readonly memory: MemoryOrganizationDatabase) {
     super();
@@ -42,8 +56,13 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return new MemoryOrganizationRepository(options.memory);
   }
 
-  async findAllIds(): Promise<string[]> {
-    return [...this.memory.organizations.keys()];
+  async listAllIds({ after, limit }: OrganizationIdPageInput = {}): Promise<OrganizationIdPage> {
+    const ids = [...this.memory.organizations.keys()]
+      .filter((id) => after === undefined || id > after)
+      .toSorted();
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
   }
 
   /** The memory rows carry no legacy single sign-on column, so no provider is named here. */
@@ -96,13 +115,29 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<JoinRequestJoining> {
+  }): Promise<OrganizationJoinSetting> {
     const organization = this.requireOrganization(organizationId);
 
     return {
       domainJoin: organization.domainJoin ?? "request",
       joinDomains: [...(organization.joinDomains ?? [])],
       joinerRole: organization.joinerRole ?? "MEMBER",
+    };
+  }
+
+  async findBySsoDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    const organization = [...this.memory.organizations.values()].find(
+      (candidate) => candidate.ssoDomain === domain,
+    );
+    if (!organization) return null;
+    return {
+      id: organization.id,
+      name: organization.name,
+      ssoProvider: organization.ssoProvider ?? null,
     };
   }
 
@@ -123,6 +158,48 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     maxSessionDurationDays: number;
   }): Promise<void> {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
+  }
+
+  async getSignInSecurityPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SignInSecurityPolicy> {
+    return signInSecurityPolicyOf(this.requireOrganization(organizationId));
+  }
+
+  async updateSignInSecurityPolicy({
+    organizationId,
+    policy,
+  }: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void> {
+    Object.assign(this.requireOrganization(organizationId), policy);
+  }
+
+  async findSignInSecurityPoliciesForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<SignInSecurityPolicy[]> {
+    return this.memory.organizationUsers
+      .filter((member) => member.userId === userId && member.disabledAt === null)
+      .flatMap((member) => {
+        const organization = this.memory.organizations.get(member.organizationId);
+        return organization ? [signInSecurityPolicyOf(organization)] : [];
+      });
+  }
+
+  async findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]> {
+    return [...this.memory.organizations.values()]
+      .map(signInSecurityPolicyOf)
+      .filter(
+        (policy) =>
+          policy.lockoutAfterFailedAttempts > 0 ||
+          policy.sessionIdleTimeoutMinutes > 0 ||
+          policy.sessionMaxLifetimeMinutes > 0,
+      );
   }
 
   async getPricing({ organizationId }: { organizationId: string }): Promise<{
@@ -163,7 +240,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     setting,
   }: {
     organizationId: string;
-    setting: JoinRequestJoining;
+    setting: OrganizationJoinSetting;
   }): Promise<void> {
     const organization = this.requireOrganization(organizationId);
     organization.domainJoin = setting.domainJoin;
@@ -274,6 +351,57 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organization.sentPlanLimitAlert = input.sentAt;
   }
 
+  async updateCurrency(input: {
+    organizationId: string;
+    currency: OrganizationCurrency;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.currency = input.currency;
+  }
+
+  async updatePricingModel(input: {
+    organizationId: string;
+    pricingModel: PricingModel;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.pricingModel = input.pricingModel;
+  }
+
+  async setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+    validatedAt: Instant | null;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.license = input.licenseKey;
+    organization.licenseExpiresAt = input.expiresAt;
+    organization.licenseLastValidatedAt = input.validatedAt;
+  }
+
+  async clearLicense(input: { organizationId: string }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.license = null;
+    organization.licenseExpiresAt = null;
+    organization.licenseLastValidatedAt = null;
+  }
+
+  async findFirstAdministratorEmail(organizationId: string): Promise<string | null> {
+    const [first] = this.memory.organizationUsers
+      .filter(
+        (member) =>
+          member.organizationId === organizationId &&
+          member.role === "ADMIN" &&
+          member.disabledAt === null,
+      )
+      .toSorted((a, b) => Temporal.Instant.compare(a.createdAt, b.createdAt));
+    return (first && this.memory.users.get(first.userId)?.email) ?? null;
+  }
+
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {
     const organization = this.memory.organizations.get(organizationId);
     if (!organization) throw new OrganizationNotFoundError();
@@ -282,16 +410,6 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       name: organization.name,
       billingCustomerId: organization.stripeCustomerId,
     };
-  }
-
-  async claimBillingCustomerId(input: {
-    organizationId: string;
-    billingCustomerId: string;
-  }): Promise<boolean> {
-    const organization = this.memory.organizations.get(input.organizationId);
-    if (!organization || organization.stripeCustomerId) return false;
-    organization.stripeCustomerId = input.billingCustomerId;
-    return true;
   }
 
   async getPersonalWorkspace(input: {
@@ -311,9 +429,9 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       displayEmail?: string | null;
     };
     resources: PersonalWorkspaceResourceIds;
-  }): Promise<{ workspace: PersonalWorkspace; created: boolean }> {
-    const existing = this.findWorkspace(input.workspace);
-    if (existing) return { workspace: existing, created: false };
+  }): Promise<EnsuredPersonalTeam> {
+    const existing = this.findPersonalTeam(input.workspace);
+    if (existing) return existing;
 
     const displayLabel =
       input.workspace.displayName?.trim() || input.workspace.displayEmail?.split("@")[0] || "user";
@@ -330,19 +448,6 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       updatedAt: now,
     };
     this.memory.teams.set(team.id, team);
-    this.memory.projects.set(input.resources.projectId, {
-      id: input.resources.projectId,
-      name: "Personal Workspace",
-      slug: input.resources.projectSlug,
-      apiKey: input.resources.projectApiKey,
-      teamId: team.id,
-      isPersonal: true,
-      ownerUserId: input.workspace.userId,
-      organizationId: input.workspace.organizationId,
-      archivedAt: null,
-      createdAt: now,
-      personalFeatures: null,
-    });
     const alreadyMember = this.memory.organizationUsers.some(
       (row) =>
         row.userId === input.workspace.userId &&
@@ -359,9 +464,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       });
     }
 
-    const created = this.findWorkspace(input.workspace);
-    if (!created) throw new Error("personal workspace vanished after being written");
-    return { workspace: created, created: true };
+    return {
+      kind: "pending",
+      team: { id: team.id, name: team.name, slug: team.slug, createdAtMs: now.epochMilliseconds },
+    };
   }
 
   async getPersonalWorkspaceFeatureProject(
@@ -378,7 +484,45 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     };
   }
 
-  async setPersonalWorkspaceFeaturesWithAudit(input: {
+  async findProjectIds(organizationId: string): Promise<string[]> {
+    return [...this.memory.projects.values()]
+      .filter((project) => project.organizationId === organizationId)
+      .map((project) => project.id);
+  }
+
+  async findProjectNames(projectIds: readonly string[]): Promise<{ id: string; name: string }[]> {
+    return projectIds.flatMap((id) => {
+      const project = this.memory.projects.get(id);
+      return project ? [{ id: project.id, name: project.name }] : [];
+    });
+  }
+
+  // shortcut: memory rows carry no project kind, so no governance project is excluded here.
+  async findProjects(input: {
+    organizationId: string;
+    teamId?: string;
+    limit?: number;
+  }): Promise<OrganizationTeamProject[]> {
+    return [...this.memory.projects.values()]
+      .filter(
+        (project) =>
+          project.organizationId === input.organizationId &&
+          project.archivedAt === null &&
+          (input.teamId === undefined || project.teamId === input.teamId),
+      )
+      .toSorted((a, b) => Temporal.Instant.compare(b.createdAt, a.createdAt))
+      .slice(0, input.limit)
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        teamId: project.teamId,
+        createdAt: toDate(project.createdAt),
+        updatedAt: toDate(project.updatedAt),
+      }));
+  }
+
+  async appendPersonalWorkspaceFeaturesAudit(input: {
     projectId: string;
     callerUserId: string;
     organizationId: string | null;
@@ -386,13 +530,39 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     before: PersonalFeatures;
     after: PersonalFeatures;
   }): Promise<void> {
-    const project = this.memory.projects.get(input.projectId);
-    if (!project) throw new PersonalProjectNotFoundError(input.projectId);
-    project.personalFeatures = input.after;
+    // No audit store in memory; the switches are project's, set on organization's fact.
+    if (!this.memory.projects.has(input.projectId)) {
+      throw new PersonalProjectNotFoundError(input.projectId);
+    }
   }
 
   private teamsOf(organizationId: string): MemoryTeamRow[] {
     return [...this.memory.teams.values()].filter((team) => team.organizationId === organizationId);
+  }
+
+  /** Pending while the personal team has no project: project creates it on organization's fact. */
+  private findPersonalTeam(input: {
+    userId: string;
+    organizationId: string;
+  }): EnsuredPersonalTeam | null {
+    const workspace = this.findWorkspace(input);
+    if (workspace) return { kind: "ready", workspace };
+    const team = this.teamsOf(input.organizationId).find(
+      (candidate) =>
+        candidate.isPersonal &&
+        candidate.ownerUserId === input.userId &&
+        candidate.archivedAt === null,
+    );
+    if (!team) return null;
+    return {
+      kind: "pending",
+      team: {
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        createdAtMs: team.createdAt.epochMilliseconds,
+      },
+    };
   }
 
   private findWorkspace(input: {

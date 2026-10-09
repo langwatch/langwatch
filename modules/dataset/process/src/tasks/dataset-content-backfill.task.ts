@@ -42,8 +42,6 @@ type DatasetContentMigration = Pick<DatasetMigrationService, "run">;
 
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task dataset-content-backfill`.
- * Registered in `apps/tasks`' catalogue via `dataset-content-backfill.composition.ts`, which
- * supplies the object storage from `TasksHost.objectStorage`.
  */
 export class DatasetContentBackfillTask extends Task {
   readonly name = "dataset-content-backfill";

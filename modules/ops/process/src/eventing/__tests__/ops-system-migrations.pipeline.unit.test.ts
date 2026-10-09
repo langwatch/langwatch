@@ -11,10 +11,10 @@ import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { SystemMigrationPassRequestsService } from "../../features/system-migrations/services/system-migration-pass-requests.service.ts";
+import { SystemMigrationsService } from "../../features/system-migrations/services/system-migrations.service.ts";
 import { opsProcessModule } from "../../ops.module.ts";
 import type { SystemMigrationsServiceDependencies } from "../../rules/system-migration-support.rules.ts";
-import { SystemMigrationPassRequestsService } from "../../services/system-migration-pass-requests.service.ts";
-import { SystemMigrationsService } from "../../services/system-migrations.service.ts";
 import { SYSTEM_MIGRATION_PASS_PROCESS_NAME } from "../ops-system-migrations.intent.ts";
 import {
   SYSTEM_MIGRATIONS_PIPELINE_NAME,
@@ -152,7 +152,7 @@ describe("given ops's system-migrations declaration", () => {
   describe("when the re-drive comes round with a held tenant under recurring reconciliation", () => {
     /** @scenario "A recurring reconciliation keeps running on a long-lived worker" */
     it("re-proves it, because a held tenant is still one a pass can move", async () => {
-      const runPass = vi.fn(async () => ({ ...PASS, parked: 0, held: 1, finiteHeld: 0 }));
+      const runPass = vi.fn(async () => ({ ...PASS, parked: 0, held: 1 }));
       const service = passes({ hasTenantAwaitingRedrive: async () => true, runPass });
 
       await deliver(built((input) => service.executePass(input)).process, true);

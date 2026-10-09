@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { PlanInfo } from "./license-plan.ts";
+import type { PlanInfo } from "./license-constants.ts";
 
 /**
  * The entitlements a plan tier carries, applied wherever a plan is resolved.
@@ -32,7 +32,7 @@ import type { PlanInfo } from "./license-plan.ts";
  */
 type TierEntitlements = Partial<Pick<PlanInfo, "webhookEndpointsEnabled">>;
 
-export const ENTITLEMENTS_BY_PLAN_TYPE: Partial<Record<string, TierEntitlements>> = {
+const ENTITLEMENTS_BY_PLAN_TYPE: Partial<Record<string, TierEntitlements>> = {
   ENTERPRISE: { webhookEndpointsEnabled: true },
 };
 

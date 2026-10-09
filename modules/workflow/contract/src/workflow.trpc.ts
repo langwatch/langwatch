@@ -3,6 +3,7 @@
  * cache keys, so they are the wire names the Optimization Studio has always
  * called.
  */
+import { agentApiCopyRequestSchema, agentCopyCreatedSchema } from "@langwatch/agent-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
@@ -119,4 +120,9 @@ export const workflowTrpc = defineTrpcContract("workflow")
   .mutation("generateCommitMessage")
   .withInput(workflowApiGenerateCommitMessageInputSchema)
   .withOutput(z.string())
+
+  /** Copies an agent into this project; a workflow agent brings a copy of its graph. */
+  .mutation("copyAgent")
+  .withInput(agentApiCopyRequestSchema)
+  .withOutput(agentCopyCreatedSchema)
   .build();

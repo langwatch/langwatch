@@ -19,14 +19,10 @@ import {
   type UnpinTraceInput,
   unpinTraceInputSchema,
 } from "@langwatch/data-retention-contract";
-import {
-  TeamNotFoundError,
-  type OrganizationApi,
-  type OrganizationTeam,
-} from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
+import type { DataRetentionProjectScopeRepository } from "../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
@@ -35,8 +31,8 @@ import type { StorageMeterService } from "./storage-meter.service.ts";
 type DataRetentionServiceOptions = Readonly<{
   policies: DataRetentionRepository;
   pins: PinnedTraceRepository;
-  projects: ProjectApi;
-  organizations: OrganizationApi;
+  /** Where each project sits, read through project's and organization's shares (R40). */
+  projectScopes: DataRetentionProjectScopeRepository;
   defaultRetentionDays: number;
   /**
    * The rewrite path. Not nullable: a deployment with no ClickHouse refuses at
@@ -69,24 +65,18 @@ export class DataRetentionService {
       return cached.value;
     }
 
-    const project = await this.options.projects.findWithTeam(input.projectId);
-    const context = project
-      ? {
-          organizationId: project.team.organizationId,
-          teamId: project.teamId,
-          projectId: project.id,
-        }
-      : null;
-    const resolved = context
-      ? resolveRetention({
-          rows: await this.options.policies.findForProjectChain({
-            organizationId: context.organizationId,
-            scopes: resolveScopeChain(context),
-          }),
-          chain: resolveScopeChain(context),
-          defaultRetentionDays: this.options.defaultRetentionDays,
-        })
-      : this.defaultRetention();
+    // A project with no row is refused, never cached: the job retries until the row exists.
+    const context = await this.findProjectContext(input.projectId);
+    if (!context) throw new ProjectNotFoundError();
+    const chain = resolveScopeChain(context);
+    const resolved = resolveRetention({
+      rows: await this.options.policies.findForProjectChain({
+        organizationId: context.organizationId,
+        scopes: chain,
+      }),
+      chain,
+      defaultRetentionDays: this.options.defaultRetentionDays,
+    });
     await this.options.cache.set(input.projectId, resolved);
 
     return resolved;
@@ -101,14 +91,43 @@ export class DataRetentionService {
     return retention[input.category];
   }
 
-  async previewScopeRemoval(input: { scope: ScopeAssignment }): Promise<ResolvedRetention> {
-    const resolvedScope = await this.findScopeChain(input.scope);
-    if (!resolvedScope) {
+  /** Refuses a target that does not sit in `organizationId`, as its row places it. */
+  async assertScopeInOrganization(input: {
+    organizationId: string;
+    scope: ScopeAssignment;
+  }): Promise<void> {
+    if (!(await this.findScopeChain(input))) {
+      throw new ScopeTargetNotFoundError("Scope target not found.");
+    }
+  }
+
+  /** The organisation the target's own row places it in; refuses a target no row places. */
+  async getScopeOrganizationId({ scope }: { scope: ScopeAssignment }): Promise<string> {
+    if (scope.scopeType === "ORGANIZATION") {
+      return scope.scopeId;
+    }
+    const organizationId =
+      scope.scopeType === "TEAM"
+        ? await this.options.projectScopes.findTeamOrganizationId({ teamId: scope.scopeId })
+        : (await this.findProjectContext(scope.scopeId))?.organizationId;
+    if (!organizationId) {
+      throw new ScopeTargetNotFoundError("Scope target not found.");
+    }
+
+    return organizationId;
+  }
+
+  async previewScopeRemoval(input: {
+    organizationId: string;
+    scope: ScopeAssignment;
+  }): Promise<ResolvedRetention> {
+    const chain = await this.findScopeChain(input);
+    if (!chain) {
       return this.defaultRetention();
     }
 
     const rows = await this.options.policies.findAllInOrganization({
-      organizationId: resolvedScope.organizationId,
+      organizationId: input.organizationId,
     });
     const remaining = rows.filter(
       (row) => !(row.scopeType === input.scope.scopeType && row.scopeId === input.scope.scopeId),
@@ -116,7 +135,7 @@ export class DataRetentionService {
 
     return resolveRetention({
       rows: remaining,
-      chain: resolvedScope.chain,
+      chain,
       defaultRetentionDays: this.options.defaultRetentionDays,
     });
   }
@@ -126,32 +145,33 @@ export class DataRetentionService {
   }
 
   async setForScope(input: {
+    organizationId: string;
     scope: ScopeAssignment;
     category: RetentionCategory;
     retentionDays: number;
   }): Promise<RetentionPolicy> {
     const retentionDays = retentionDaysInputSchema.parse(input.retentionDays);
-    const resolvedScope = await this.findScopeChain(input.scope);
-    if (!resolvedScope) {
-      throw new ScopeTargetNotFoundError("Scope target not found.");
-    }
+    await this.assertScopeInOrganization(input);
 
     const row = await this.options.policies.upsertForScope({
-      ...input,
+      organizationId: input.organizationId,
+      scope: input.scope,
+      category: input.category,
       retentionDays,
-      organizationId: resolvedScope.organizationId,
     });
-    await this.invalidateForScope(input.scope);
+    await this.invalidateForScope(input);
 
     return row;
   }
 
   async removeForScope(input: {
+    organizationId: string;
     scope: ScopeAssignment;
     category: RetentionCategory;
   }): Promise<void> {
-    await this.options.policies.deleteForScope(input);
-    await this.invalidateForScope(input.scope);
+    await this.assertScopeInOrganization(input);
+    await this.options.policies.deleteForScope({ scope: input.scope, category: input.category });
+    await this.invalidateForScope(input);
   }
 
   async pin(input: PinTraceInput): Promise<PinnedTrace> {
@@ -232,85 +252,66 @@ export class DataRetentionService {
     };
   }
 
-  private async invalidateForScope(scope: ScopeAssignment): Promise<void> {
-    const projectIds = await this.findAffectedProjectIds(scope);
+  private async invalidateForScope(input: {
+    organizationId: string;
+    scope: ScopeAssignment;
+  }): Promise<void> {
+    const projectIds = await this.findAffectedProjectIds(input);
     await Promise.all(projectIds.map((projectId) => this.options.cache.delete(projectId)));
   }
 
-  private async findScopeChain(scope: ScopeAssignment): Promise<{
+  /** The target's chain inside `organizationId`, or null when its row puts it elsewhere. */
+  private async findScopeChain({
+    organizationId,
+    scope,
+  }: {
     organizationId: string;
-    chain: ScopeAssignment[];
-  } | null> {
+    scope: ScopeAssignment;
+  }): Promise<ScopeAssignment[] | null> {
+    const organization: ScopeAssignment = { scopeType: "ORGANIZATION", scopeId: organizationId };
     if (scope.scopeType === "ORGANIZATION") {
-      return { organizationId: scope.scopeId, chain: [scope] };
+      return scope.scopeId === organizationId ? [scope] : null;
     }
 
     if (scope.scopeType === "TEAM") {
-      const team = await this.findTeam(scope.scopeId);
-      if (!team) {
-        return null;
-      }
+      const teamOrganizationId = await this.options.projectScopes.findTeamOrganizationId({
+        teamId: scope.scopeId,
+      });
 
-      return {
-        organizationId: team.organizationId,
-        chain: [scope, { scopeType: "ORGANIZATION", scopeId: team.organizationId }],
-      };
+      return teamOrganizationId === organizationId ? [scope, organization] : null;
     }
 
-    const project = await this.options.projects.findWithTeam(scope.scopeId);
-    if (!project) {
+    const context = await this.findProjectContext(scope.scopeId);
+    if (!context || context.organizationId !== organizationId) {
       return null;
     }
 
-    return {
-      organizationId: project.team.organizationId,
-      chain: resolveScopeChain({
-        projectId: project.id,
-        teamId: project.teamId,
-        organizationId: project.team.organizationId,
-      }),
-    };
+    return resolveScopeChain(context);
   }
 
-  private async findAffectedProjectIds(scope: ScopeAssignment): Promise<string[]> {
+  /** The project's chain as its row places it, archived included; null when it has no row. */
+  private findProjectContext(projectId: string): Promise<{
+    organizationId: string;
+    teamId: string;
+    projectId: string;
+  } | null> {
+    return this.options.projectScopes.findProjectPlacement({ projectId });
+  }
+
+  private async findAffectedProjectIds({
+    organizationId,
+    scope,
+  }: {
+    organizationId: string;
+    scope: ScopeAssignment;
+  }): Promise<string[]> {
     if (scope.scopeType === "PROJECT") {
       return [scope.scopeId];
     }
 
-    if (scope.scopeType === "TEAM") {
-      const team = await this.findTeam(scope.scopeId);
-      if (!team) {
-        return [];
-      }
-
-      const projects = await this.options.projects.listByTeam({
-        organizationId: team.organizationId,
-        teamId: scope.scopeId,
-        includeGovernance: true,
-      });
-
-      return projects.map((project) => project.id);
-    }
-
-    const projects = await this.options.projects.listByOrganization({
-      organizationId: scope.scopeId,
-      page: 1,
-      limit: 10_000,
-      includeGovernance: true,
+    return this.options.projectScopes.findProjectIds({
+      organizationId,
+      ...(scope.scopeType === "TEAM" ? { teamId: scope.scopeId } : {}),
     });
-
-    return projects.data.map((project) => project.id);
-  }
-
-  private async findTeam(teamId: string): Promise<OrganizationTeam | null> {
-    try {
-      return await this.options.organizations.getTeamById({ teamId });
-    } catch (error) {
-      if (error instanceof TeamNotFoundError) {
-        return null;
-      }
-
-      throw error;
-    }
   }
 }

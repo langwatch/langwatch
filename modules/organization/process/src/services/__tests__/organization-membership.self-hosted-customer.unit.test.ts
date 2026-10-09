@@ -7,10 +7,10 @@ import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.org
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const refuse = (what: string) => () => Promise.reject(new Error(`${what} is not asked here`));
@@ -18,25 +18,26 @@ const refuse = (what: string) => () => Promise.reject(new Error(`${what} is not 
 function installed() {
   const memory = MemoryOrganizationDatabase.create();
   const seeded: string[] = [];
-  const prompts: OrganizationPromptSeed = {
-    seedTagsForOrganization: async ({ organizationId }) => {
+  const creations: OrganizationCreationNotice = {
+    created: async ({ organizationId }) => {
       seeded.push(organizationId);
     },
-    reportCompensationFailure: () => undefined,
+    reportError: () => undefined,
   };
   const seats: OrganizationSeatLicense = {
     checkLimit: refuse("a seat limit"),
     assertRoleChangeAllowed: refuse("a role change"),
   };
-  const sessions: OrganizationSessionRevocation = {
-    revokeAllBrowserSessions: refuse("a session revocation"),
+  const seatNotices: OrganizationSeatRevocationNotice = {
+    memberDisabled: refuse("a seat revocation record"),
   };
   const grantCache: OrganizationGrantCache = { invalidateOrganization: refuse("a grant cache") };
   const service = OrganizationMembershipService.create({
+    workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
-    prompts,
+    creations,
     seats,
-    sessions,
+    seatNotices,
     grantCache,
     testArrivals: { standingFor: async () => ({ testing: false }) },
     ceiling: { assertWithinCaller: async () => {} },
@@ -55,6 +56,7 @@ function installed() {
 
 describe("OrganizationMembershipService.createSelfHostedCustomer", () => {
   describe("when a licence is issued to a customer with no organization yet", () => {
+    /** @scenario "Every way an organization is created records lw.organization.created" */
     it("creates the organization with its first team, exactly as provisioning does", async () => {
       const { service, organizations, seeded } = installed();
 

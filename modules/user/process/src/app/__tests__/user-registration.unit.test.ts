@@ -1,58 +1,46 @@
 /**
  * @vitest-environment node
- * The signup form's own choke point: it writes the account row itself, so it records
+ * The account write behind auth's register door (D-A1U-2): it writes the row itself, so it records
  * user's registered fact, from which nurturing derives `signed_up`; a refusal records nothing.
  * @see specs/licensing/sso-license-gating.feature
  */
-import { InvalidAuthOriginError } from "@langwatch/auth-contract";
-import {
-  EmailAlreadyRegisteredError,
-  UserRegistrationNotAvailableError,
-} from "@langwatch/user-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  REFUSED_ADDRESS_PROOF,
-  UNCONFIRMED_ADDRESS_PROOF,
-  createUserTestApp,
-  createUserTestAuth,
-  createUserTestLifecycle,
-  createUserTestOrganizations,
-} from "./user.fixture.ts";
+import { MemoryUserDatabase } from "../../repositories/memory/memory.user.database.ts";
+import { memoryUserRepositoriesOver } from "../../repositories/memory/memory.user.repositories.ts";
+import { createUserTestApp, createUserTestLifecycle } from "./user.fixture.ts";
 
 function register(
   app: ReturnType<typeof createUserTestApp>,
   email = "a@x.com",
-  { addressProof = "address-proof", password = "supersecret" } = {},
+  { addressConfirmed = true } = {},
 ) {
   return app.registerCredentialAccount({
     name: "Alice",
     email,
-    password,
-    addressProof,
-    callerAddress: "127.0.0.1",
-    origin: "http://localhost:5560",
-    referer: null,
+    password: "supersecret",
+    addressConfirmed,
   });
 }
 
 describe("registering a credential account", () => {
   describe("when registration succeeds", () => {
     /** @scenario "A self-service registration is recorded as user's fact" */
-    it("records one registered fact for the new account", async () => {
-      const lifecycle = createUserTestLifecycle();
-      const app = createUserTestApp({ lifecycle: lifecycle.senders });
+    it("commits the created fact, then one registered fact, with the new account", async () => {
+      const database = MemoryUserDatabase.create();
+      const app = createUserTestApp({ repositories: memoryUserRepositoriesOver({ database }) });
 
       const created = await register(app);
 
       expect(created).toEqual({ id: expect.any(String) });
-      expect(lifecycle.recorded).toEqual([
+      const fact = { tenantId: created.id, userId: created.id, occurredAt: expect.any(Number) };
+      expect(database.factOutbox()).toEqual([
+        { type: "recordCreated", data: fact },
         {
-          type: "registered",
+          type: "recordRegistered",
           data: {
-            tenantId: created.id,
-            userId: created.id,
-            occurredAt: expect.any(Number),
+            ...fact,
             accountId: expect.any(String),
             createdAtMs: expect.any(Number),
             email: "a@x.com",
@@ -62,19 +50,18 @@ describe("registering a credential account", () => {
     });
   });
 
-  describe("when user's registered fact cannot be sent", () => {
-    /** @scenario "A registration stands even when user's registered fact cannot be sent" */
+  describe("when the event bus is down", () => {
+    /** @scenario "A registration stands even when the event bus is down" */
     it("still creates the account and answers it", async () => {
       const { senders } = createUserTestLifecycle();
-      const failing = {
-        ...senders,
-        recordUserRegistered: {
-          send: async () => {
-            throw new Error("event store unavailable");
-          },
+      const down = {
+        send: async () => {
+          throw new Error("event bus unavailable");
         },
       };
-      const app = createUserTestApp({ lifecycle: failing });
+      const app = createUserTestApp({
+        lifecycle: { ...senders, recordUserCreated: down, recordUserRegistered: down },
+      });
 
       const created = await register(app);
 
@@ -85,57 +72,19 @@ describe("registering a credential account", () => {
   describe("when the email is already registered", () => {
     /** @scenario "A refused registration records no registered fact" */
     it("refuses and records no second registered fact", async () => {
-      const lifecycle = createUserTestLifecycle();
-      const app = createUserTestApp({ lifecycle: lifecycle.senders });
+      const database = MemoryUserDatabase.create();
+      const app = createUserTestApp({ repositories: memoryUserRepositoriesOver({ database }) });
 
       await register(app);
-      lifecycle.recorded.length = 0;
+      const committed = database.factOutbox().length;
 
       await expect(register(app)).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
-      expect(lifecycle.recorded).toEqual([]);
+      expect(database.factOutbox()).toHaveLength(committed);
     });
   });
 
-  describe("when the browser is on a web address the installation is not set up for", () => {
-    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
-    it("refuses with the invalid origin code before the proof is spent or the account written", async () => {
-      const auth = createUserTestAuth();
-      auth.assertSignUpOrigin.mockRejectedValueOnce(new InvalidAuthOriginError());
-      const app = createUserTestApp({ dependencies: { auth } });
-
-      await expect(register(app, "sam@acme.com")).rejects.toMatchObject({
-        code: "auth_invalid_origin",
-      });
-      expect(auth.assertSignUpOrigin).toHaveBeenCalledWith({
-        origin: "http://localhost:5560",
-        referer: null,
-      });
-      expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
-      expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
-      await expect(app.findByEmail({ email: "sam@acme.com" })).resolves.toBeNull();
-    });
-  });
-
-  describe("when the installation's sign-up policy refuses the address", () => {
-    /** @scenario "A refused registration spends no address proof and writes no account" */
-    it("refuses with the restricted code before the proof is spent or the account written", async () => {
-      const auth = createUserTestAuth();
-      const organizations = createUserTestOrganizations();
-      organizations.checkSignUp.mockResolvedValueOnce({ allowed: false, reason: "invite_only" });
-      const app = createUserTestApp({ dependencies: { auth, organizations } });
-
-      await expect(register(app, "Stranger@Example.com")).rejects.toMatchObject({
-        code: "auth_sign_up_restricted",
-      });
-      expect(organizations.checkSignUp).toHaveBeenCalledWith({ email: "stranger@example.com" });
-      expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
-      expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
-      await expect(app.findByEmail({ email: "stranger@example.com" })).resolves.toBeNull();
-    });
-  });
-
-  describe("when the address proof was spent", () => {
-    it("creates the account already confirmed, since the proof confirmed the address", async () => {
+  describe("when auth's door spent a confirming proof", () => {
+    it("creates the account already confirmed", async () => {
       const app = createUserTestApp();
 
       const created = await register(app);
@@ -146,32 +95,16 @@ describe("registering a credential account", () => {
     });
   });
 
-  describe("when an unconfirmed proof is spent, where the installation cannot send email", () => {
+  describe("when auth's door spent an unconfirmed proof, where the installation cannot send email", () => {
     /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
     it("creates the account with its address unconfirmed", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
+      const app = createUserTestApp();
 
-      const created = await register(app, "Sam@Acme.com", {
-        addressProof: UNCONFIRMED_ADDRESS_PROOF,
-      });
+      const created = await register(app, "sam@acme.com", { addressConfirmed: false });
 
-      expect(auth.claimUnconfirmedSignUpAddressProof).toHaveBeenCalledWith({
-        token: UNCONFIRMED_ADDRESS_PROOF,
-        email: "sam@acme.com",
-      });
       await expect(app.findById({ id: created.id })).resolves.toMatchObject({
         emailVerified: false,
       });
-    });
-
-    it("never asks for an unconfirmed proof when a confirmed one was spent", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
-
-      await register(app);
-
-      expect(auth.claimUnconfirmedSignUpAddressProof).not.toHaveBeenCalled();
     });
   });
 
@@ -200,100 +133,6 @@ describe("registering a credential account", () => {
 
       await expect(register(app, "Joel.During@example.com")).rejects.toBeInstanceOf(
         EmailAlreadyRegisteredError,
-      );
-    });
-  });
-
-  describe("when the address proof is refused", () => {
-    /** @scenario "No credential is collected until the confirmation link is opened" */
-    it("refuses as an expired verification and creates no account", async () => {
-      const lifecycle = createUserTestLifecycle();
-      const app = createUserTestApp({ lifecycle: lifecycle.senders });
-
-      await expect(
-        register(app, "sam@acme.com", { addressProof: REFUSED_ADDRESS_PROOF }),
-      ).rejects.toMatchObject({ code: "identity_verification_expired" });
-      await expect(app.findByEmail({ email: "sam@acme.com" })).resolves.toBeNull();
-      expect(lifecycle.recorded).toEqual([]);
-    });
-  });
-
-  describe("when the address proof is offered", () => {
-    /** @scenario "No credential is collected until the confirmation link is opened" */
-    it("claims it for the lowercased address being registered", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
-
-      await register(app, "Sam@Acme.com", { addressProof: "proof-1" });
-
-      expect(auth.claimSignUpAddressProof).toHaveBeenCalledWith({
-        token: "proof-1",
-        email: "sam@acme.com",
-      });
-    });
-
-    it("leaves it unspent when the password is refused", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
-
-      await expect(register(app, "sam@acme.com", { password: "short" })).rejects.toMatchObject({
-        code: "validation_error",
-      });
-      expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given an SSO-capable deployment where the gate denies (coerced email mode)", () => {
-    /** @scenario "A fresh unlicensed deployment bootstraps via email signup" */
-    it("registers the account through the signup form's own path", async () => {
-      const app = createUserTestApp({
-        dependencies: { auth: createUserTestAuth("email") },
-      });
-
-      await expect(register(app, "operator@example.com")).resolves.toMatchObject({
-        id: expect.any(String),
-      });
-    });
-  });
-
-  describe("given an SSO-capable deployment where the gate allows", () => {
-    /** @scenario "A licensed deployment cannot mint password accounts" */
-    it("refuses direct registration", async () => {
-      const app = createUserTestApp({
-        dependencies: { auth: createUserTestAuth("auth0") },
-      });
-
-      await expect(register(app, "operator@example.com")).rejects.toBeInstanceOf(
-        UserRegistrationNotAvailableError,
-      );
-    });
-  });
-
-  describe("given a deployment that federates and issues its own passwords (D09)", () => {
-    /** @scenario "Sign-up offers a password where the deployment issues its own" */
-    it("registers an ordinary address with a password", async () => {
-      const app = createUserTestApp({
-        dependencies: { auth: createUserTestAuth("auth0", { issuesOwnPasswords: true }) },
-      });
-
-      await expect(register(app, "sam@home.net")).resolves.toMatchObject({
-        id: expect.any(String),
-      });
-    });
-
-    /** @scenario "Sign-up offers a password where the deployment issues its own" */
-    it("still hands an address whose domain routes to a connection to that provider", async () => {
-      const app = createUserTestApp({
-        dependencies: {
-          auth: createUserTestAuth("auth0", {
-            issuesOwnPasswords: true,
-            governedDomain: "acme.com",
-          }),
-        },
-      });
-
-      await expect(register(app, "jo@acme.com")).rejects.toBeInstanceOf(
-        UserRegistrationNotAvailableError,
       );
     });
   });

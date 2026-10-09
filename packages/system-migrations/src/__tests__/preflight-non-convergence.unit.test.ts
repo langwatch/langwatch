@@ -4,10 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  driveSystemMigrationsToConvergence,
-  SystemMigrationStartupIncompleteError,
-} from "../convergence.ts";
+import { driveSystemMigrationsToConvergence } from "../convergence.ts";
 import type { MigrationPassSummary } from "../types.ts";
 
 const progress: MigrationPassSummary = {
@@ -32,21 +29,17 @@ describe("driveSystemMigrationsToConvergence", () => {
   });
 
   describe("given passes that report progress every time", () => {
-    /** @scenario "A loop that never converges prevents startup" */
-    it("rejects at the cap, naming the passes it gave up after", async () => {
+    /** @scenario "A loop that never settles stops at the cap without claiming success" */
+    it("stops at the cap without rejecting, so nothing it precedes is refused", async () => {
       const runPass = vi.fn().mockResolvedValue(progress);
 
       const outcome = driveSystemMigrationsToConvergence({
         signal: new AbortController().signal,
         runPass,
-      }).catch((error: unknown) => error);
+      });
       await vi.runAllTimersAsync();
 
-      await expect(outcome).resolves.toEqual(
-        new SystemMigrationStartupIncompleteError(
-          "System migration preflight did not converge after 25 passes",
-        ),
-      );
+      await expect(outcome).resolves.toBeUndefined();
       expect(runPass).toHaveBeenCalledTimes(25);
     });
   });

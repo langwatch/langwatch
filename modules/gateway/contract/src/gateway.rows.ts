@@ -4,8 +4,13 @@
  * `packages/prisma-client/prisma/schema.prisma` and moves with it.
  */
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
 
-import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budget.ts";
+import type {
+  GatewayBudgetScopeType,
+  GatewayBudgetWindow,
+} from "./features/budget/gateway.budget.ts";
+import type { SpendUsage } from "./features/spend/gateway-spend.schemas.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type GatewayJsonObject = { [Key in string]?: GatewayJsonValue };
@@ -145,8 +150,31 @@ export type GatewayRealtimeSession = {
   closeReason: string | null;
   traceId: string | null;
   vendorCostRaw: GatewayJsonValue | null;
+  /** What the session is, and so how it is priced. Null on a row an older gateway booked. */
+  kind: string | null;
+  /** Who measures the usage: `client` or `gateway`. */
+  metering: string | null;
+  credentialExpiresAt: Instant | null;
+  transcriptionModel: string | null;
+  /** The end user the mint was attributed to. Null when the mint named none. */
+  endUserId: string | null;
+  lastReportAt: Instant | null;
+  /** Everything recorded for the session: its reports plus what its own record confirmed. */
+  reportedCostNanoUsd: number;
+  reportCount: number;
   createdAt: Instant;
   updatedAt: Instant;
+};
+
+/** One usage report of a realtime session, priced as its own spend record. */
+export type GatewayRealtimeSessionReport = {
+  sessionId: string;
+  reportKey: string;
+  projectId: string;
+  model: string;
+  usage: SpendUsage;
+  costNanoUsd: number;
+  createdAt: Instant;
 };
 
 /** One place a virtual key is reachable from: an organization, a team or a project. */
@@ -204,3 +232,16 @@ export type GatewayVirtualKeyRecord = {
 
 /** The same record, named for the join a caller cares about. */
 export type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
+
+/* BigInt-safe audit serialiser: plain `JSON.stringify(row)` throws on a BigInt column
+ * (VK.revision, GatewayChangeEvent.revision) and silently lost every VK-mutation audit write. */
+const gatewayAuditJsonSchema = z.json();
+
+export type GatewayAuditJson = z.infer<typeof gatewayAuditJsonSchema>;
+
+export function serializeRowForAudit(row: object): GatewayAuditJson {
+  const serialised = JSON.stringify(row, (_key, value) =>
+    typeof value === "bigint" ? value.toString() : value,
+  );
+  return gatewayAuditJsonSchema.parse(JSON.parse(serialised));
+}

@@ -8,7 +8,6 @@ import {
   LangWatchQLParameterMissingError,
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
-  LWQL_PERIOD_GRANULARITY_PARAMETER,
   langWatchQLPassSchema,
   type LangWatchQLCaller,
   type LangWatchQLEvalGate,
@@ -20,17 +19,23 @@ import {
   type LangWatchQLSchema,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import type { LangWatchQLHydrationService } from "../features/hydration/services/langwatch-ql-hydration.service.ts";
 import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
-import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
+import {
+  langWatchQLExecutionParameters,
+  langWatchQLMissingParameters,
+  langWatchQLRowLimitedSql,
+  type ValidatedLangWatchQL,
+} from "../rules/langwatch-ql-validation-shape.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
@@ -40,6 +45,7 @@ import {
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
+import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import {
   type LangWatchQLGranularityResolution,
@@ -59,22 +65,6 @@ const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
-/**
- * A statement that passed the gate, plus what the surface's time window means
- * for it.
- */
-interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
-  /** Whether the statement declares the reserved time-window parameters. */
-  readonly followsTimeWindow: boolean;
-  /**
-   * The values to execute with — the caller's, plus the window this surface
-   * injected for the reserved names the statement declares.
-   */
-  readonly boundParameters?: Readonly<Record<string, unknown>>;
-  /** Reserved names the statement declares that no window filled. */
-  readonly awaitingTimeWindow: readonly string[];
-}
-
 export interface LangWatchQLServiceDependencies {
   /**
    * How queries reach the database, or `null` on a deployment with no LangWatchQL
@@ -90,6 +80,18 @@ export interface LangWatchQLServiceDependencies {
   readonly limits?: LangWatchQLResultLimits;
   /** The clock the diagnostics ask "has this period finished yet" against. */
   readonly now?: () => Instant;
+  /**
+   * Turns the keys an app function answered with into values. Absent only in a suite measuring
+   * the database's own answer, which then comes back as the database gave it.
+   */
+  readonly hydration?: Pick<LangWatchQLHydrationService, "hydrate">;
+  /**
+   * Judges the eval columns once hydration left their text in place (Alex, 2026-10-06, "Judge
+   * cycle"). Absent only in a suite that judges nothing; an eval column then keeps its text.
+   */
+  readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
+  /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
+  readonly stopwatch?: () => number;
 }
 
 export class LangWatchQLService {
@@ -97,7 +99,9 @@ export class LangWatchQLService {
   private readonly catalog: LwqlCatalogue;
   private readonly limits: LangWatchQLResultLimits;
   private readonly now: () => Instant;
+  private readonly stopwatch: () => number;
   private readonly validation = LangWatchQLValidationService.create();
+  private readonly extraction: LangWatchQLExtractionService;
 
   /** Releases the transport the executor holds, where it holds one. */
   async close(): Promise<void> {
@@ -109,6 +113,11 @@ export class LangWatchQLService {
     this.catalog = deps.catalog ?? LWQL_CATALOG;
     this.limits = deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS;
     this.now = deps.now ?? nowInstant;
+    this.stopwatch = deps.stopwatch ?? (() => performance.now());
+    this.extraction = LangWatchQLExtractionService.create({
+      hydration: deps.hydration,
+      judging: deps.judging,
+    });
   }
 
   static create(deps: LangWatchQLServiceDependencies): LangWatchQLService {
@@ -220,19 +229,7 @@ export class LangWatchQLService {
       ...(timeWindow ? { timeWindow } : {}),
     });
 
-    const missing = validation.parameters
-      .map((parameter) => parameter.name)
-      .filter((name) => window.parameters?.[name] === undefined)
-      // A reserved name with no window yet is not missing — it is deferred to
-      // the surface, and `execute` is where that becomes a refusal.
-      .filter((name) => !window.awaitingTimeWindow.includes(name))
-      // The granularity is surface-owned exactly like the window bounds, so a
-      // declaration with no step yet is deferred rather than missing: a save
-      // request can never legitimately carry one (the reserved-supplied sweep
-      // above refuses it), and demanding it here would leave every chart that
-      // declares the parameter unsavable.
-      .filter((name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER)
-      .toSorted();
+    const missing = langWatchQLMissingParameters({ declared: validation.parameters, window });
     if (missing.length > 0) {
       throw new LangWatchQLParameterMissingError(missing);
     }
@@ -321,6 +318,7 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     isInstantEvalsEnabled,
+    signal,
   }: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
     const validation = this.validate({
@@ -357,10 +355,12 @@ export class LangWatchQLService {
     return this.executeValidated({
       executor,
       projects,
+      protections,
       sql,
       validation,
       granularity,
       ...(timeWindow ? { timeWindow } : {}),
+      ...(signal ? { signal } : {}),
     });
   }
 
@@ -379,43 +379,29 @@ export class LangWatchQLService {
     }
   }
 
-  private rowLimitedSql({
-    sql,
-    validation,
-  }: {
-    readonly sql: string;
-    readonly validation: ValidatedLangWatchQL;
-  }): string {
-    return validation.appendRowLimit
-      ? appendDefaultRowLimit({
-          sql,
-          maxRows: this.limits.maxRows,
-          ...(validation.appendRowLimitBeforeOffset
-            ? { beforeOffset: validation.appendRowLimitBeforeOffset }
-            : {}),
-        })
-      : sql;
-  }
-
   private async executeValidated({
     executor,
     projects,
+    protections,
     sql,
     validation,
     granularity,
     timeWindow,
+    signal,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
     readonly projects: readonly LangWatchQLCaller[];
+    readonly protections: LangWatchQLProtections;
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
     readonly timeWindow?: LangWatchQLTimeWindow;
+    readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
     // empty, so an unparameterised query keeps the request shape it had.
-    const executionParameters = executionParametersOf({ validation, granularity });
+    const executionParameters = langWatchQLExecutionParameters({ validation, granularity });
     const tenantCapability = lwqlCapability.tenantCapabilitySet({
       secrets: projects.map((project) => project.lwqlKey),
     });
@@ -423,7 +409,7 @@ export class LangWatchQLService {
     const execution = await executor.execute({
       // The submitted statement with one edit and no other: a default `LIMIT` when the caller
       // named none, so an unbounded query is capped rather than streamed.
-      sql: this.rowLimitedSql({ sql, validation }),
+      sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: this.limits.maxRows }),
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half — it predates the
@@ -435,6 +421,18 @@ export class LangWatchQLService {
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
     this.assertResultWithinByteCeiling(execution.rows);
+    const hydrationStartedMs = this.stopwatch();
+    const answer = await this.extraction.hydrate({
+      projects,
+      protections,
+      validation,
+      execution,
+      ...(signal ? { signal } : {}),
+    });
+    // The database's own time plus what hydration spent reading and judging: a judged query
+    // that took three seconds must not report the sixty milliseconds ClickHouse saw of it.
+    const elapsedMs =
+      execution.statistics.elapsedMs + Math.round(this.stopwatch() - hydrationStartedMs);
 
     // The facts the walk recorded, plus what actually came back. Both halves
     // are needed and neither is re-derived: a rule about the query's shape
@@ -443,9 +441,10 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
-      columns: execution.columns,
-      rows: execution.rows,
+      columns: answer.columns,
+      rows: answer.rows,
       now: this.now(),
+      ...(answer.appFunctions ? { appFunctions: answer.appFunctions } : {}),
     });
 
     // After the main query, never beside it: a refused or failed query costs no second read.
@@ -466,9 +465,9 @@ export class LangWatchQLService {
       {
         projectIds: projects.map((project) => project.id),
         tables: validation.tables,
-        rowsReturned: execution.statistics.rowsReturned,
+        rowsReturned: answer.rows.length,
         rowsRead: execution.statistics.rowsRead,
-        elapsedMs: execution.statistics.elapsedMs,
+        elapsedMs,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
@@ -479,9 +478,10 @@ export class LangWatchQLService {
     );
 
     return {
-      columns: execution.columns,
-      rows: execution.rows,
-      statistics: execution.statistics,
+      columns: answer.columns,
+      rows: answer.rows,
+      // Hydration can drop trailing rows at its own ceiling: the count is what the caller received.
+      statistics: { ...execution.statistics, elapsedMs, rowsReturned: answer.rows.length },
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,
@@ -494,23 +494,6 @@ export class LangWatchQLService {
       ...(completeness.kind === "reported" ? { completeness: completeness.completeness } : {}),
     };
   }
-}
-
-function executionParametersOf({
-  validation,
-  granularity,
-}: {
-  readonly validation: ValidatedLangWatchQL;
-  readonly granularity: LangWatchQLGranularityResolution;
-}): Record<string, unknown> {
-  return {
-    ...validation.boundParameters,
-    ...(granularity.granularitySeconds === undefined
-      ? {}
-      : {
-          [LWQL_PERIOD_GRANULARITY_PARAMETER]: granularity.granularitySeconds,
-        }),
-  };
 }
 
 /**

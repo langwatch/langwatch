@@ -341,7 +341,7 @@ describe("ScenarioService", () => {
   });
 
   describe("given a deployment with no stored-secret encryption key", () => {
-    class RefusingScenarioSecretCipher implements ScenarioSecretCipher {
+    class FailingScenarioSecretCipher implements ScenarioSecretCipher {
       encrypt(): string {
         throw Object.assign(
           new Error(
@@ -364,7 +364,7 @@ describe("ScenarioService", () => {
         serviceOptions(
           PrismaScenarioRepository.create(
             createApiFixture<PrismaClient>(),
-            new RefusingScenarioSecretCipher(),
+            new FailingScenarioSecretCipher(),
           ),
           "scenario_1",
         ),

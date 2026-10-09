@@ -1,6 +1,8 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
+import { experimentRunExpectedCountsSchema } from "./experiment-run.ts";
+
 /**
  * Target configuration for experiment run commands and events.
  */
@@ -122,6 +124,7 @@ export const completeExperimentRunCommandDataSchema = z.object({
   experimentId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
+  expected: experimentRunExpectedCountsSchema.optional(),
   occurredAt: z.number(),
 });
 

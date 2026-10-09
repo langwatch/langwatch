@@ -21,12 +21,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/observability": "workspace:*"
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

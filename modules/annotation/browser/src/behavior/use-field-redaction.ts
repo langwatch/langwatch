@@ -19,7 +19,7 @@ export function useFieldRedaction({
   /** `project:view`, which is what the procedure's own policy asks for. */
   canRead: boolean;
 }): { input: FieldRedactionReading; output: FieldRedactionReading } {
-  const reading = annotationApi.project.getFieldRedactionStatus.useQuery(
+  const reading = annotationApi.traces.getFieldRedactionStatus.useQuery(
     { projectId: projectId ?? "" },
     {
       enabled: !!projectId && canRead,

@@ -5,16 +5,16 @@
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
-import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import type {
+  DashboardWidgetDefinition,
+  DashboardWidgetSource,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { startTransition, useRef, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
-import type {
-  DashboardWidgetDefinition,
-  DashboardWidgetDraft,
-} from "../../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDraft } from "../../../model/dashboard-widget-draft.ts";
 import { pickerWidgets } from "../catalogue/index.ts";
 import { blankWidgetSlot } from "../model/blank-widget.ts";
 import { atLeastBoardMinRows } from "../model/board-grid.ts";

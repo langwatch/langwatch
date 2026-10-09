@@ -15,14 +15,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type {
   SsoConnectionRegistrationRepository,
   SsoConnectionRegistrationSlot,
-} from "../../repositories/sso-connection-registration.repository.ts";
+} from "../../features/sso-connection/repositories/sso-connection-registration.repository.ts";
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-} from "../../repositories/sso-connection.repository.ts";
-import { findBlockingRegistrationSlots } from "../../rules/sso-connection-registration.rules.ts";
-import { ownedVerifiedDomains } from "../../rules/sso-domain-ownership.rules.ts";
+} from "../../features/sso-connection/repositories/sso-connection.repository.ts";
+import { findBlockingRegistrationSlots } from "../../features/sso-connection/rules/sso-connection-registration.rules.ts";
+import { ownedVerifiedDomains } from "../../features/sso-domain/rules/sso-domain-ownership.rules.ts";
 
 /**
  * The connection guards' three reads, in memory — using the SAME reducer the

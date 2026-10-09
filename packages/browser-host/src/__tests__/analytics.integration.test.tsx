@@ -5,17 +5,17 @@ import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import {
-  INERT_UI_ANALYTICS,
-  UiAnalytics,
-  useUiAnalytics,
-  type UiAnalyticsEvent,
-} from "../analytics.ts";
-import {
   resolveUiCapabilities,
   UiCapabilityContextProvider,
   UNAVAILABLE_UI_SESSION,
   type UiCapabilities,
 } from "../capabilities.ts";
+import {
+  INERT_UI_ANALYTICS,
+  UiAnalytics,
+  useUiAnalytics,
+  type UiAnalyticsEvent,
+} from "../telemetry/analytics.ts";
 import { createUiCapabilitiesFromHost } from "../testing.ts";
 
 class RecordingUiAnalytics extends UiAnalytics {

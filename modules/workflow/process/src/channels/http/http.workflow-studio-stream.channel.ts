@@ -2,7 +2,9 @@
  * Engine's streaming studio route; HTTP POST with SSE stream, no per-project Lambda routing.
  */
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+import { nowInstant } from "@langwatch/time";
 
+import { s3CacheKeyHeaders } from "../../rules/s3-cache-key.rules.ts";
 import {
   type WorkflowStudioStream,
   type WorkflowStudioStreamInput,
@@ -17,6 +19,8 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
     fetch?: typeof fetch;
     /** The engine hop's shared credential, as the process resolved it. */
     internalSecret?: string | undefined;
+    /** Main's `S3_KEY_SALT`; unset sends no per-project cache key. */
+    cacheKeySalt?: string | undefined;
   }): HttpWorkflowStudioStreamAdapter {
     return new HttpWorkflowStudioStreamAdapter(options);
   }
@@ -26,6 +30,7 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
       serviceUrl: string;
       fetch?: typeof fetch;
       internalSecret?: string | undefined;
+      cacheKeySalt?: string | undefined;
     },
   ) {}
 
@@ -37,6 +42,11 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
         "Content-Type": "application/json",
         "X-LangWatch-Origin": input.origin,
         ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
+        ...s3CacheKeyHeaders({
+          projectId: input.projectId,
+          salt: this.options.cacheKeySalt,
+          now: nowInstant(),
+        }),
       },
       body: JSON.stringify(input.body),
     });

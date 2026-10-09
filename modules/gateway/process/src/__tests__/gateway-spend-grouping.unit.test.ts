@@ -4,8 +4,8 @@ import { isIanaTimeZone } from "@langwatch/gateway-contract";
  */
 import { describe, expect, it } from "vitest";
 
+import { FixedGatewaySettlementPolicyService } from "../features/spend/services/fixed-gateway-settlement-policy.service.ts";
 import * as spendGrouping from "../rules/gateway-spend-grouping.rules.ts";
-import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 
 const NOW = 1_800_000_000_000;
 /**

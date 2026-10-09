@@ -4,7 +4,12 @@
  * specs/errors/legacy-rest-remediation-channel.feature.
  */
 import { PermissionDeniedError } from "@langwatch/authorization";
-import { HandledError, remediation, ValidationError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  remediation,
+  setTraceUrlProvider,
+  ValidationError,
+} from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -195,9 +200,28 @@ describe("a traced request answering a refusal that carries a reason of its own"
 
     expect(body.trace_id).toBe(TRACE.traceId);
     expect(body.span_id).toBe(TRACE.spanId);
+    expect(body.trace).toEqual(TRACE);
+    // The flat pair and main's nested `trace` block: the envelope only, never a reason.
     const wire = JSON.stringify(body);
-    expect(wire.split(TRACE.traceId)).toHaveLength(2);
-    expect(wire.split(TRACE.spanId)).toHaveLength(2);
+    expect(wire.split(TRACE.traceId)).toHaveLength(3);
+    expect(wire.split(TRACE.spanId)).toHaveLength(3);
+  });
+
+  it("links the trace and its logs in main's trace block when a provider is installed", () => {
+    setTraceUrlProvider((traceId) =>
+      traceId ? { traceUrl: `https://g/t/${traceId}`, logsUrl: `https://g/l/${traceId}` } : void 0,
+    );
+    try {
+      const { body } = canonicalErrorFor(new RejectedFieldError({ field: "name" }), TRACE);
+
+      expect(body.trace).toEqual({
+        ...TRACE,
+        traceUrl: `https://g/t/${TRACE.traceId}`,
+        logsUrl: `https://g/l/${TRACE.traceId}`,
+      });
+    } finally {
+      setTraceUrlProvider(() => void 0);
+    }
   });
 
   /** @scenario "A response carries one trace-id pair" */

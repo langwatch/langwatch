@@ -21,8 +21,6 @@ import {
 
 import { type EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 
-export type { EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
-
 const evaluationAnalyticsEvents = [
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,

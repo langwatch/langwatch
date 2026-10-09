@@ -85,6 +85,27 @@ function service({ allowed }: { allowed: boolean }) {
   return { copies, experiments };
 }
 
+/** A V3 source whose saved state still holds its own identity and results. */
+const V3_SOURCE: Experiment = {
+  ...SOURCE,
+  type: "EVALUATIONS_V3",
+  workflowId: null,
+  workbenchState: {
+    experimentId: SOURCE.id,
+    experimentSlug: SOURCE.slug,
+    name: SOURCE.name,
+    datasets: [],
+    results: { runId: "run-1" },
+  },
+};
+
+class V3Experiments extends Experiments {
+  override getById(): Promise<Experiment> {
+    this.reads += 1;
+    return Promise.resolve(V3_SOURCE);
+  }
+}
+
 const COPY = {
   experimentId: "experiment-1",
   projectId: "target-project",
@@ -102,6 +123,27 @@ describe("ExperimentCopyService", () => {
         httpStatus: 401,
       });
       expect(experiments.reads).toBe(0);
+    });
+  });
+
+  describe("given an experiment whose saved state holds its own id, slug and results", () => {
+    /** @scenario "A replicated experiment does not carry the original's identity" */
+    it("saves a copy without them, named as the copy", async () => {
+      const experiments = new V3Experiments();
+      const copies = ExperimentCopyService.create({
+        experiments,
+        links: new GoneWorkflows(),
+        workflowAuthoring: new Authoring(),
+        dataset: new Datasets(),
+        permissions: new Probe(true),
+        slugify: (value) => value,
+      });
+
+      await copies.copyToProject(COPY, { id: "user-1" });
+
+      const [saved] = experiments.saved;
+      expect(saved?.name).toBe("Support classifier (copy)");
+      expect(saved?.workbenchState).toEqual({ name: "Support classifier (copy)", datasets: [] });
     });
   });
 

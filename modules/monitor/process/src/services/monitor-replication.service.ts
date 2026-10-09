@@ -31,6 +31,7 @@ export class MonitorReplicationService {
       sourceProjectId: input.sourceProjectId,
       newEvaluatorId: newEvaluatorId(),
       actorId: input.actor.id,
+      shouldCheckEvaluatorCap: false,
     });
 
     return { id: copied.id, workflowId: copied.workflowId };

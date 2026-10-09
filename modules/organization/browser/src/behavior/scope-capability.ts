@@ -3,7 +3,7 @@
  * project a page is about. One subpath for the four files it is made of.
  */
 
-export { useUiOrgQueryParamSelection } from "./ui-scope-org-param";
+export { useUiOrgQueryParamSelection } from "../features/ui-scope/behavior/ui-scope-org-param";
 export {
   BrowserUiScope,
   createBrowserUiScope,
@@ -11,7 +11,7 @@ export {
   useUiScopeReading,
   type BrowserUiScopeState,
   type UiScopeReading,
-} from "./ui-scope-capability";
+} from "../features/ui-scope/behavior/ui-scope-capability";
 export {
   UI_ORGANIZATIONS_PROCEDURE,
   UI_SHARED_TRACE_PROCEDURE,
@@ -20,7 +20,7 @@ export {
   type UiFeatureApiTransport,
   type UiSharedProject,
   type UiSharedTraceRead,
-} from "./ui-scope-queries";
+} from "../features/ui-scope/behavior/ui-scope-queries";
 export {
   organizationRoleOf,
   projectSlugAddressedBy,
@@ -32,14 +32,14 @@ export {
   userCanOpenTeam,
   type UiScopeResolutionInput,
   type UiScopeSelectionWrite,
-} from "./ui-scope-resolution";
+} from "../features/ui-scope/behavior/ui-scope-resolution";
 export {
   isUiPublicRoute,
   UI_ORG_QUERY_PARAM,
   UI_PUBLIC_ROUTES,
   useUiRouteReading,
   type UiRouteReading,
-} from "./ui-scope-route";
+} from "../features/ui-scope/behavior/ui-scope-route";
 export {
   broadcastUiScopeWrite,
   readUiScopeMemory,
@@ -50,4 +50,4 @@ export {
   useUiScopeMemory,
   writeUiScopeSelection,
   type UiScopeMemory,
-} from "./ui-scope-storage";
+} from "../features/ui-scope/behavior/ui-scope-storage";

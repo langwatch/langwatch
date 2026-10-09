@@ -5,8 +5,18 @@
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
-import { evaluationRunDataSchema } from "./trace-evaluation.schemas.ts";
+import { traceEditOverlayPatchSchema } from "./features/edit-overlay/trace-edit-overlay.contract.ts";
+import { evaluationRunDataSchema } from "./features/evaluation/trace-evaluation.schemas.ts";
+import { traceListPageSchema, traceListViewItemSchema } from "./features/list/trace-list-view.ts";
+import {
+  sessionGroupCodingAgentDtoSchema,
+  sessionGroupDtoSchema,
+  sessionGroupsResultSchema,
+} from "./features/list/trace-session-group.ts";
+import {
+  traceEventRollupSchema,
+  traceLogRecordDtoSchema,
+} from "./features/span/trace-span-read-model.ts";
 import {
   chatMessageSchema,
   errorCaptureSchema,
@@ -14,13 +24,6 @@ import {
   spanMetricsSchema,
   spanTimestampsSchema,
 } from "./trace-format.schemas.ts";
-import { traceListPageSchema, traceListViewItemSchema } from "./trace-list-view.ts";
-import {
-  sessionGroupCodingAgentDtoSchema,
-  sessionGroupDtoSchema,
-  sessionGroupsResultSchema,
-} from "./trace-session-group.ts";
-import { traceEventRollupSchema, traceLogRecordDtoSchema } from "./trace-span-read-model.ts";
 import { spanDetailSchema, spanLangwatchSignalsSchema } from "./trace-view.contract.ts";
 import { spanTreeNodeSchema } from "./trace.ts";
 
@@ -120,6 +123,7 @@ export const tracesSessionsPageSchema = z.object({
     }),
   ),
 });
+export type TracesSessionsPage = z.infer<typeof tracesSessionsPageSchema>;
 
 /** `listEvents`: the events column's rollups, keyed by trace id. */
 export const tracesListEventsSchema = z.record(z.string(), traceEventRollupSchema);
@@ -194,3 +198,12 @@ export const tracesTraceEventsSchema = z.array(derivedTraceEventSchema);
 
 /** `traceLogs`: the trace's correlated log records, visibility-gated. */
 export const tracesTraceLogsSchema = z.array(traceLogRecordDtoSchema);
+
+/** `getFieldRedactionStatus`: whether this reader may see captured input and output, and who. */
+export const tracesFieldRedactionStatusSchema = z
+  .object({
+    isRedacted: z.object({ input: z.boolean(), output: z.boolean() }).strict(),
+    visibleTo: z.object({ input: z.string().nullable(), output: z.string().nullable() }).strict(),
+  })
+  .strict();
+export type TracesFieldRedactionStatus = z.infer<typeof tracesFieldRedactionStatusSchema>;

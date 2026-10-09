@@ -30,8 +30,21 @@ function presetOf(type: PlanType): PlanInfo {
   };
 }
 
+/**
+ * Creation caps on the cloud Free plan. Paid plans leave them unset, which
+ * means uncapped. Organizations already above a cap keep what they have;
+ * only creating one more is refused.
+ */
+export const FREE_PLAN_CREATION_CAPS = {
+  maxScenarios: 3,
+  maxScenarioSets: 3,
+  maxEvaluators: 3,
+} as const satisfies Pick<PlanInfo, "maxScenarios" | "maxScenarioSets" | "maxEvaluators">;
+
 export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
-  [PlanTypes.FREE]: presetOf(PlanTypes.FREE),
+  // Cloud Free only. Self-hosted resolves its plan from the license
+  // provider and never reads this table, so it stays uncapped.
+  [PlanTypes.FREE]: { ...presetOf(PlanTypes.FREE), ...FREE_PLAN_CREATION_CAPS },
   [PlanTypes.PRO]: presetOf(PlanTypes.PRO),
   [PlanTypes.LAUNCH]: presetOf(PlanTypes.LAUNCH),
   [PlanTypes.LAUNCH_ANNUAL]: presetOf(PlanTypes.LAUNCH_ANNUAL),

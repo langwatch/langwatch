@@ -16,11 +16,11 @@ vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
-vi.mock("../../hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
-vi.mock("../../hooks/use-instant-eval-access.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-access.ts", () => ({
   useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: "enable" }),
 }));
 
@@ -36,7 +36,7 @@ vi.mock("../use-submit-search.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-facet-search.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 

@@ -8,10 +8,9 @@ import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
+import { refuseUndeclaredDrawer } from "../model/drawer-declarations.ts";
 import type {
   DrawerCallbacksIn,
-  UiDrawerMap,
-  UiDrawerPropsOf,
   UiFlowCallbacksStore,
   UndeclaredDrawerCallbacks,
 } from "../model/drawer-map.ts";
@@ -207,6 +206,7 @@ function ancestorsForOpen({
  * mounted.
  */
 export const navigateToDrawer = (drawer: DrawerType, options: { resetStack?: boolean } = {}) => {
+  refuseUndeclaredDrawer(drawer);
   // Clear complex props since we're navigating fresh
   complexProps = {};
 
@@ -438,7 +438,7 @@ type UpdateDrawerUrl = (
 ) => void;
 
 /** `openDrawer`'s two spellings: by the owner's token, or by name. */
-type OpenDrawer<Map extends object> = {
+type OpenDrawer = {
   <Props>(
     drawer: UiDrawerToken<Props>,
     props?: Partial<Props> & { urlParams?: Record<string, string> },
@@ -446,7 +446,7 @@ type OpenDrawer<Map extends object> = {
   ): void;
   <Name extends string>(
     drawer: Name,
-    props?: Partial<UiDrawerPropsOf<Map, Name>> & { urlParams?: Record<string, string> },
+    props?: Record<string, unknown> & { urlParams?: Record<string, string> },
     options?: OpenOptions,
   ): void;
 };
@@ -464,6 +464,7 @@ function openOn({
 }): void {
   const { replace, resetStack, replaceCurrentInStack } = options;
   const effectiveDrawer = drawerKey(drawer);
+  refuseUndeclaredDrawer(effectiveDrawer);
   const effectiveProps = props === undefined ? undefined : toRecord(props);
 
   // Extract urlParams and merge with props
@@ -496,10 +497,10 @@ function openOn({
 
 /**
  * Manages drawer state via the address, with the stack in `history.state` for
- * the back button. Generic over the registry so a caller naming the
- * application's registry gets per-drawer prop checking; others just get strings.
+ * the back button. A drawer another module owns opens by its token, which
+ * carries the props; a name opens an undeclared drawer with open props.
  */
-export const useDrawer = <Map extends object = UiDrawerMap>() => {
+export const useDrawer = () => {
   const router = useDrawerRouter();
 
   const currentDrawer = router.query["drawer.open"];
@@ -566,7 +567,7 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
    * while the string path stays. Opening the drawer that is already open
    * updates its params in place, unless `replace: false` asks to go forward.
    */
-  const openDrawer: OpenDrawer<Map> = useCallback(
+  const openDrawer: OpenDrawer = useCallback(
     (drawer: string | UiTokenIdentity, props?: object, options?: OpenOptions) =>
       openOn({ updateDrawerUrl, drawer, props, options }),
     [updateDrawerUrl],

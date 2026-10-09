@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import {
+  type BootedApplication,
   loadTaskModules,
   parseTaskModuleSpecifiers,
   processConfig,
@@ -24,6 +25,31 @@ export interface TaskModulePlugins {
 const refuseImport = (specifier: string): Promise<unknown> =>
   Promise.reject(new Error(`No task module loader was given for "${specifier}"`));
 
+/** Boots the modules in the tasks role, hands the running App to `use`, and closes it after. */
+export async function withTasksApp<Result>({
+  use,
+}: {
+  use: (app: BootedApplication) => Promise<Result>;
+}): Promise<Result> {
+  const server = await Server.create("langwatch-tasks")
+    .withEnvironment(processEnvironment)
+    .withConfig(processConfig(processModules))
+    // Ephemeral health door: API_PORT is the api's. specs/tasks/task-launcher.feature
+    .withHealthPort(0)
+    .withSecrets((config, secrets) =>
+      secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
+    )
+    .withProcessOwnership(false)
+    .start();
+  try {
+    const app = await server.container("tasks").boot();
+    await server.run(app);
+    return await use(app);
+  } finally {
+    await server.close();
+  }
+}
+
 /**
  * Boots the modules in the tasks role and runs one declared task: main's `<name> <args…>`.
  * `LANGWATCH_TASK_MODULES` adds plugin tasks; a `createTasks(app)` gets the booted App (Alex,
@@ -41,30 +67,22 @@ export async function runModuleTask({
   /** Absent loads no plugin module, as a run that names only an installed module's task. */
   plugins?: TaskModulePlugins;
 }): Promise<void> {
-  const server = await Server.create("langwatch-tasks")
-    .withEnvironment(processEnvironment)
-    .withConfig(processConfig(processModules))
-    .withSecrets((config, secrets) =>
-      secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
-    )
-    .withProcessOwnership(false)
-    .start();
-  try {
-    const app = await server.container("tasks").boot();
-    await server.run(app);
-    const loaded = await loadTaskModules({
-      specifiers: parseTaskModuleSpecifiers(plugins?.taskModules),
-      host: app,
-      isTask,
-      importModule: plugins?.importModule ?? refuseImport,
-    });
-    const catalogue = TaskCatalogue.create({ tasks: [...app.tasks(isTask), ...loaded] });
-    const logger = createLogger("langwatch:tasks");
-    signal.throwIfAborted();
-    logger.info({ task: name }, "task starting");
-    await catalogue.get({ name }).run({ args, signal });
-    logger.info({ task: name }, "task finished");
-  } finally {
-    await server.close();
-  }
+  await withTasksApp({
+    use: async (app) => {
+      const loaded = await loadTaskModules({
+        specifiers: parseTaskModuleSpecifiers(plugins?.taskModules),
+        host: app,
+        isTask,
+        importModule: plugins?.importModule ?? refuseImport,
+      });
+      const catalogue = TaskCatalogue.create({ tasks: [...app.tasks(isTask), ...loaded] });
+      const logger = createLogger("langwatch:tasks");
+      signal.throwIfAborted();
+      const startedAt = performance.now();
+      logger.info({ task: name }, "task starting");
+      await catalogue.get({ name }).run({ args, signal });
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      logger.info({ task: name, elapsedMs }, "task finished");
+    },
+  });
 }

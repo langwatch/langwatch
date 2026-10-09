@@ -11,6 +11,7 @@ import type {
   EvaluatorRelatedEntities as EvaluatorRelatedEntitiesContract,
   evaluatorTrpc,
 } from "@langwatch/evaluator-contract";
+import type { instantEvalTrpc } from "@langwatch/instant-eval-contract";
 import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import type { monitorTrpc } from "@langwatch/monitor-contract";
 import type { projectTrpc } from "@langwatch/project-contract";
@@ -80,6 +81,7 @@ export type EvaluatorApiMap = ContractApiMap<typeof evaluatorTrpc> &
   ContractApiMap<typeof projectTrpc> &
   ContractApiMap<typeof secretTrpc> &
   ContractApiMap<typeof tracesTrpc> &
+  ContractApiMap<typeof instantEvalTrpc> &
   ContractApiMap<typeof workflowTrpc> &
   BorrowedProcedures;
 

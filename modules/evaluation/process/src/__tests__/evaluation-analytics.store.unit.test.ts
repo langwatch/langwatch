@@ -1,4 +1,4 @@
-import { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { evaluationCompletedEventSchema } from "@langwatch/evaluation-contract";
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
@@ -175,10 +175,18 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
     tenantId: createTenantId(TENANT),
   } as ProjectionStoreContext;
 
-  class ReadBackAnalytics extends AnalyticsService {
-    constructor(private readonly row: EvaluationAnalyticsRow) {
-      super();
-    }
+  class ReadBackAnalytics implements Pick<
+    AnalyticsApi,
+    | "getTimeseries"
+    | "getFeedbacks"
+    | "getTopUsedDocuments"
+    | "upsertEvaluationAnalytics"
+    | "upsertEvaluationAnalyticsBatch"
+    | "findEvaluationAnalytics"
+    | "appendEvaluationAnalyticsRollup"
+    | "appendEvaluationAnalyticsRollupBatch"
+  > {
+    constructor(private readonly row: EvaluationAnalyticsRow) {}
 
     async getTimeseries(): Promise<never> {
       throw new Error("not used");

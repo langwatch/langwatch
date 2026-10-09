@@ -37,6 +37,7 @@ type uiPlan struct {
 	ReloadEvery     int             `json:"reloadEvery"`
 	Only            string          `json:"only"`
 	MaxErrors       int             `json:"maxConsecutiveErrors"`
+	Vision          bool            `json:"vision"`
 	Org             diffkit.ToolOrg `json:"org"`
 	Credential      uiCredential    `json:"credential"`
 }
@@ -76,7 +77,7 @@ func runUI(ctx context.Context, streams Streams, options Options) error {
 	}
 	plan := uiPlan{
 		RunID: runID, URL: appURL, Seed: options.Seed, Workers: options.Workers,
-		DurationMs: options.Duration.Milliseconds(), ActionsPerRoute: options.ActionsPerRoute, ReloadEvery: options.ReloadEvery, Only: options.Only, MaxErrors: options.errorLimit(DefaultUIMaxErrors), Org: org,
+		DurationMs: options.Duration.Milliseconds(), ActionsPerRoute: options.ActionsPerRoute, ReloadEvery: options.ReloadEvery, Only: options.Only, MaxErrors: options.errorLimit(DefaultUIMaxErrors), Vision: options.Vision, Org: org,
 		Credential: uiCredential{Email: fuzzUIEmail, Password: diffkit.CeremonyPassword, FallbackEmails: []string{diffkit.CeremonyEmail("fuzzer")}},
 	}
 	planPath := filepath.Join(runDir, "plan.json")

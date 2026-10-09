@@ -2,16 +2,14 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import { WorkflowModule } from "../workflow.app.ts";
 
@@ -19,28 +17,28 @@ import { WorkflowModule } from "../workflow.app.ts";
 async function appWith({
   authz = createApiFixture<AuthzApi>({}, "AuthzApi"),
 }: { authz?: AuthzApi } = {}): Promise<WorkflowModule> {
+  const config = {
+    nlpServiceUrl: void 0,
+    stagingThresholdBytes: void 0,
+    stagingTtlSeconds: 600,
+    relayTurnCeilingMs: void 0,
+    publicBaseUrl: void 0,
+    nlpCodeBlockTimeoutSeconds: void 0,
+  };
+  const secrets = new ScopedSecrets(async (_handle, build) => build(undefined));
   return WorkflowModule.create({
     dependencies: {
-      evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz,
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
-      experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
-      monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
     },
-    config: {
-      nlpServiceUrl: void 0,
-      stagingThresholdBytes: void 0,
-      stagingTtlSeconds: 600,
-      relayTurnCeilingMs: void 0,
-      publicBaseUrl: void 0,
-      nlpCodeBlockTimeoutSeconds: void 0,
-    },
+    config,
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    secrets,
+    channels: await HttpWorkflowChannels.create({ config, secrets }),
     repositories: MemoryWorkflowRepositories.create(),
   });
 }

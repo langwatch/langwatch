@@ -21,14 +21,14 @@ const logger = createLogger("langwatch:identity:verification-ceremony");
 
 export const IDENTITY_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 
-export interface MintedEmailVerification {
+interface MintedEmailVerification {
   verificationId: string;
   /** The raw single-use token — rides only in the magic link, never at rest. */
   token: string;
   expiresAtMs: number;
 }
 
-export interface VerificationCeremonyDeps {
+interface VerificationCeremonyDeps {
   /** The per-user write gate. Completion emits a verify command, and
    *  ADR-101 §2 holds that no user's live events precede their history —
    *  so an unlatched user's completion is refused here, the same way the

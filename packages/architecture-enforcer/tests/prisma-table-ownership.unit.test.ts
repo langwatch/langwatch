@@ -4,7 +4,11 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { lintPrismaTableOwnership } from "../src/policies/persistence/prisma-table-ownership.ts";
+import {
+  lintPrismaTableOwnership,
+  SHARED_PRISMA_TABLES,
+  type SharedPrismaTable,
+} from "../src/policies/persistence/prisma-table-ownership.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -31,6 +35,9 @@ model Profile {
 model AuditLog {
   id String @id
 }
+model Project {
+  id String @id
+}
 `,
   );
   function repository(
@@ -53,7 +60,12 @@ model AuditLog {
 ${options.declaration ?? `export class Repository { static readonly tables = ${expression}; }`}`,
     );
   }
-  return { repository, lint: () => lintPrismaTableOwnership(snapshotOf({ root, catalogue })) };
+  return {
+    repository,
+    write,
+    lint: (shared: readonly SharedPrismaTable[] = []) =>
+      lintPrismaTableOwnership(snapshotOf({ root, catalogue }), shared),
+  };
 }
 
 afterEach(() => {
@@ -220,4 +232,190 @@ describe("Prisma table ownership lint", () => {
       ]);
     },
   );
+
+  describe("given project shares Project for reading with entitlement", () => {
+    const SHARED: SharedPrismaTable[] = [
+      { table: "Project", owner: "project", readers: ["entitlement"], reason: "x" },
+    ];
+    const NATIVE = 'import { PrismaRepository } from "@langwatch/prisma-client";';
+    const READER = "modules/entitlement/process/src/repositories/prisma/prisma.usage.repository.ts";
+    const WRITER = READER.replace("usage", "entitlement");
+
+    function world(reads: string, claimed = false) {
+      const built = fixture();
+      built.repository("project", "unused", {
+        imports: NATIVE,
+        declaration: 'export class Repository extends PrismaRepository.for("Project") {}',
+      });
+      built.repository("entitlement", "unused", {
+        imports: NATIVE,
+        declaration: `export class Repository ${claimed ? 'extends PrismaRepository.for("Project") ' : ""}{
+  list(db: any) { ${reads} }
+}`,
+      });
+      return built;
+    }
+    const messages = (built: ReturnType<typeof fixture>, shared = SHARED) =>
+      built.lint(shared).map((violation) => violation.message);
+
+    /** @scenario "A module reading a Prisma table its owner shares with it passes" */
+    it("reports nothing for the named reader's unclaimed delegate read and SQL read", () => {
+      const built = world('return db.project.findMany({ where: { id: "p" } });');
+      built.write(
+        READER.replace("usage", "usage-sql"),
+        'export const query = `SELECT id FROM "Project" WHERE id = $1`;',
+      );
+
+      expect(messages(built)).toEqual([]);
+    });
+
+    /** @scenario "A declared reader that claims the shared Prisma table is reported" */
+    it("reports a reader's claim and names the unclaimed class", () => {
+      const built = world("return db.project.findMany({});", true);
+
+      expect(messages(built)).toEqual([
+        expect.stringMatching(
+          /entitlement reads Project but does not own it.*prisma\.billing-project-directory/,
+        ),
+      ]);
+    });
+
+    /** @scenario "A module the owner did not name still may not claim a shared Prisma table" */
+    it("reports a claim by a module the declaration does not name", () => {
+      const built = world("return db.project.findMany({});");
+      built.repository("experiment", 'prismaTables("Project")');
+
+      expect(messages(built)).toEqual([
+        expect.stringContaining("Table Project is claimed by experiment and project"),
+      ]);
+    });
+
+    /** @scenario "A named reader writing a shared Prisma table is reported" */
+    it("reports the named reader's delegate and SQL writes", () => {
+      const built = world(
+        'db.project.findMany({}); return db.project.update({ where: { id: "p" } });',
+      );
+      built.write(
+        READER.replace("usage", "usage-sql"),
+        'export const query = `UPDATE "Project" SET name = $1`;',
+      );
+
+      expect(messages(built)).toEqual([
+        "entitlement writes Project, which project shares with it for reading only.",
+        "entitlement writes Project, which project shares with it for reading only.",
+      ]);
+    });
+
+    /** @scenario "A shared Prisma table declared by a module that does not own it is reported" */
+    it("reports a declaration naming the wrong owner", () => {
+      const built = world("return db.project.findMany({});");
+      const wrong = [{ ...SHARED[0]!, owner: "organization" }];
+
+      expect(messages(built, wrong)).toEqual([
+        "Table Project is declared shared by organization, which does not own it. Fix or delete the declaration.",
+      ]);
+    });
+
+    /** @scenario "A named reader's write a share admits by file passes" */
+    it("reports nothing for a write in the file the share's write exception names", () => {
+      const built = world(
+        'db.project.findMany({}); return db.project.update({ where: { id: "p" } });',
+      );
+      const admitted = [
+        { ...SHARED[0]!, writes: [{ reader: "entitlement", file: WRITER, reason: "x" }] },
+      ];
+
+      expect(messages(built, admitted)).toEqual([]);
+    });
+
+    /** @scenario "A named reader's write a share admits by file passes" */
+    it("still reports the reader's write in a file the exception does not name", () => {
+      const built = world(
+        'db.project.findMany({}); return db.project.update({ where: { id: "p" } });',
+      );
+      built.write(
+        READER.replace("usage", "usage-sql"),
+        'export const query = `DELETE FROM "Project" WHERE id = $1`;',
+      );
+      const admitted = [
+        { ...SHARED[0]!, writes: [{ reader: "entitlement", file: WRITER, reason: "x" }] },
+      ];
+
+      expect(messages(built, admitted)).toEqual([
+        "entitlement writes Project, which project shares with it for reading only.",
+      ]);
+    });
+
+    /** @scenario "A share's write exception that matches no write is reported" */
+    it("reports a write exception whose file no longer writes the table", () => {
+      const built = world("return db.project.findMany({});");
+      const admitted = [
+        { ...SHARED[0]!, writes: [{ reader: "entitlement", file: WRITER, reason: "x" }] },
+      ];
+
+      expect(messages(built, admitted)).toEqual([
+        `The write exception for entitlement writing Project in ${WRITER} matches no write. Delete it.`,
+      ]);
+    });
+
+    /** @scenario "A share's write exception that matches no write is reported" */
+    it("reports a write exception naming a module the share does not name as a reader", () => {
+      const built = world("return db.project.findMany({});");
+      const admitted = [
+        { ...SHARED[0]!, writes: [{ reader: "experiment", file: WRITER, reason: "x" }] },
+      ];
+
+      expect(messages(built, admitted)).toEqual([
+        `The write exception for experiment writing Project in ${WRITER} matches no write. Delete it.`,
+      ]);
+    });
+
+    /** @scenario "A shared Prisma reader that no longer reads the table is reported" */
+    it("reports a named reader the tree no longer has", () => {
+      const built = world('return "Project";');
+
+      expect(messages(built)).toEqual([
+        "Table Project is shared with entitlement, which no longer reads it. Delete the reader.",
+      ]);
+    });
+  });
+
+  /** @scenario "Every shared Prisma table carries a reason" */
+  it("gives each declared Prisma share and write exception a reason and a known shape", () => {
+    const writes = SHARED_PRISMA_TABLES.flatMap((item) => item.writes ?? []);
+
+    expect(SHARED_PRISMA_TABLES.filter((item) => item.reason.trim() === "")).toEqual([]);
+    expect(writes.filter((item) => item.reason.trim() === "")).toEqual([]);
+    expect(SHARED_PRISMA_TABLES.map((item) => [item.table, item.owner, item.readers])).toEqual([
+      [
+        "Project",
+        "project",
+        [
+          "entitlement",
+          "billing",
+          "data-retention",
+          "data-privacy",
+          "instant-eval-judge",
+          "nurturing",
+          "presence",
+        ],
+      ],
+      [
+        "Team",
+        "organization",
+        ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
+      ],
+      ["OrganizationUser", "organization", ["authz", "data-privacy", "billing"]],
+      ["Organization", "organization", ["scim", "entitlement", "billing"]],
+      ["User", "user", ["billing"]],
+      ["Topic", "topic", ["trace"]],
+      ["Annotation", "annotation", ["trace"]],
+      ["AnnotationScore", "annotation", ["trace"]],
+    ]);
+    expect(writes.map((item) => [item.reader, item.file.split("/").at(-1)])).toEqual([
+      ["authz", "prisma.authz-admission.repository.ts"],
+      ["authz", "prisma.authz-ledger-read.repository.ts"],
+      ["billing", "prisma.billing-account-facts.repository.ts"],
+    ]);
+  });
 });

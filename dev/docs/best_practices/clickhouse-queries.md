@@ -233,7 +233,7 @@ Anything else that wants to skip the filter should be a repository method taking
 
 A table whose whole purpose is to total usage _across_ an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. Two tables qualify today:
 
-- `metric_usage_estimates` (`queryMetricUsageEstimates`, `metric-data-point.usage.ts`) — ORDER BY `(OrganizationId, TenantId, PointId)`.
+- `metric_usage_estimates` (written by `clickhouse.metric-data-point-append.repository.ts`; it has no reader today, so the first one must meet every condition below) — ORDER BY `(OrganizationId, TenantId, PointId)`.
 - `billable_events` (`enterprise/modules/billing/process/src/repositories/clickhouse/clickhouse.billable-events.repository.ts`, every organization read declaring `unscoped` with its reason) — ORDER BY `(OrganizationId, TenantId, DeduplicationKeyHash)`; the columns are identifiers, an event type and timestamps only. Open items against the conditions below, checked 2026-09-23 — see the note after them.
 
 It is allowed to lead with `OrganizationId` **only** because all of these hold:
@@ -242,8 +242,8 @@ It is allowed to lead with `OrganizationId` **only** because all of these hold:
 2. `OrganizationId` leads the table's sort key, so the predicate order matches the index. A `TenantId`-first predicate would be both wrong for the aggregate and worse for the scan.
 3. `TenantId` is still ANDed in whenever the caller supplies one, and remains a selected grouping dimension.
 4. The table holds identifiers and byte counts only — never attributes, values, buckets or payloads — so a scoping mistake cannot leak customer data.
-5. A test pins that the organization-wide path uses the organization-resolved client and filters on `OrganizationId`.
-6. The caller has already proven the requesting user belongs to `organizationId`. The repository asserts only that the string is non-empty — it authenticates nothing. `queryMetricUsageEstimates` has no callers yet, so this costs nothing today; whoever wires the first route owns the membership check, because with condition 1 the predicate is the boundary and an unchecked `organizationId` from a request hands the caller someone else's ledger.
+5. A test pins that the organization-wide path uses the organization-resolved client and filters on `OrganizationId` (for `metric_usage_estimates`, the first reader writes it).
+6. The caller has already proven the requesting user belongs to `organizationId`. The repository asserts only that the string is non-empty — it authenticates nothing. `metric_usage_estimates` has no reader yet, so this costs nothing today; whoever wires the first route owns the membership check, because with condition 1 the predicate is the boundary and an unchecked `organizationId` from a request hands the caller someone else's ledger.
 
 **`billable_events` open items (2026-09-23).** Conditions 1, 2 and 4 hold: the organization id is both the predicate and the client route (`organizationId` travels on every query request). Three do not yet:
 

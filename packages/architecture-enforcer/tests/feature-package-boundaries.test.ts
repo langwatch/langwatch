@@ -359,6 +359,28 @@ describe("feature package boundary lint", () => {
     );
   });
 
+  /** @scenario A contract may declare eventing when it imports only the tables subpath */
+  it("accepts eventing in a contract that imports only its tables subpath", () => {
+    const declared = "A contract package cannot declare the server runtime @langwatch/eventing.";
+    const messages = (source: string): string[] => {
+      featurePackage({
+        feature: "agent",
+        role: "contract",
+        dependencies: { "@langwatch/eventing": "workspace:*" },
+        source,
+      });
+
+      return lintWorkspace({ root, declarations: false }).map((item) => item.message);
+    };
+    const tables = 'import { EVENT_TABLES } from "@langwatch/eventing/tables";';
+
+    expect(messages(tables)).not.toContain(declared);
+    expect(messages(`${tables} import { x } from "@langwatch/eventing/server";`)).toContain(
+      declared,
+    );
+    expect(messages(`${tables} import { x } from "@langwatch/eventing";`)).toContain(declared);
+  });
+
   it("accepts canonical dotted artifact roles with kebab-case subjects", () => {
     featurePackage({ feature: "agent", role: "contract" });
     featurePackage({ feature: "agent", role: "process" });
@@ -833,6 +855,34 @@ describe("strict feature source layout", () => {
     expect(policies()).not.toContain("feature-layout");
   });
 
+  /** @scenario A contract that records callable false declares no feature API */
+  it("accepts a contract with no feature API only when it records callable false", () => {
+    featurePackage({ feature: "widget", role: "contract" });
+    rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
+    expect(policies()).toContain("feature-layout");
+
+    const manifestPath = join(root, "modules/widget/contract/package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+    write("modules/widget/contract/package.json", JSON.stringify({ ...manifest, callable: false }));
+    expect(policies()).not.toContain("feature-layout");
+  });
+
+  /** @scenario A process package that records the plan it is staged on holds no service yet */
+  it("accepts a process package with no service only when it records an existing staged plan", () => {
+    featurePackage({ feature: "widget", role: "process" });
+    rmSync(join(root, "modules/widget/process/src/services/widget.service.ts"));
+    expect(policies()).toContain("feature-layout");
+
+    const manifestPath = join(root, "modules/widget/process/package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+    const staged = { ...manifest, staged: "dev/docs/plans/widget.md" };
+    write("modules/widget/process/package.json", JSON.stringify(staged));
+    expect(policies()).toContain("feature-layout");
+
+    write("dev/docs/plans/widget.md", "# Widget\n");
+    expect(policies()).not.toContain("feature-layout");
+  });
+
   it("rejects process wiring bound from the composition root by a portable API contract", () => {
     featurePackage({
       feature: "widget",
@@ -1156,7 +1206,33 @@ describe("Prisma client containment", () => {
 
     const messages = lintWorkspace({ root, declarations: false }).map((item) => item.message);
     expect(messages).toContain(
-      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/raw-client -> @langwatch/agent-contract",
+      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/raw-client -> @langwatch/agent-contract; strongly connected with 2 packages: @langwatch/agent-contract, @langwatch/raw-client",
     );
+  });
+
+  /** @scenario A strongly connected component is one package cycle naming every member */
+  it("reports each strongly connected component once, with all its members", () => {
+    const contract = (feature: string, targets: string[]) =>
+      featurePackage({
+        feature,
+        role: "contract",
+        dependencies: Object.fromEntries(
+          targets.map((target) => [`@langwatch/${target}-contract`, "workspace:*"]),
+        ),
+      });
+    contract("agent", ["dataset"]);
+    contract("dataset", ["agent", "workflow"]);
+    contract("workflow", ["agent"]);
+    contract("trace", ["user"]);
+    contract("user", ["trace"]);
+
+    const cycles = lintWorkspace({ root, declarations: false })
+      .filter((violation) => violation.policy === "package-cycle")
+      .map((violation) => violation.message);
+
+    expect(cycles).toEqual([
+      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/dataset-contract -> @langwatch/agent-contract; strongly connected with 3 packages: @langwatch/agent-contract, @langwatch/dataset-contract, @langwatch/workflow-contract",
+      "Package dependency cycle: @langwatch/trace-contract -> @langwatch/user-contract -> @langwatch/trace-contract; strongly connected with 2 packages: @langwatch/trace-contract, @langwatch/user-contract",
+    ]);
   });
 });

@@ -177,3 +177,9 @@ Feature: Date and time arithmetic runs on Temporal
       Given a moment read in the viewer's time zone
       When it is converted for a boundary that only accepts a Date
       Then the Date names the same epoch millisecond count
+
+    @unit
+    Scenario: A moment in any held shape becomes a Date a screen can print
+      Given a moment held as epoch milliseconds, a Date, an ISO string or a zoned value
+      When a screen asks for a printable Date
+      Then the Date names the same epoch millisecond count

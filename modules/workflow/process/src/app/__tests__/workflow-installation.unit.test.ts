@@ -29,12 +29,9 @@ function process_(role: "api" | "worker") {
     .withStores(memoryStores())
     .provide({
       authz: createApiFixture({}, "AuthzApi"),
-      evaluator: createApiFixture({}, "EvaluatorApi"),
       dataset: createApiFixture({}, "DatasetApi"),
       agent: createApiFixture({}, "AgentApi"),
       "model-provider": createApiFixture({}, "ModelProviderApi"),
-      experiment: createApiFixture({}, "ExperimentApi"),
-      monitor: createApiFixture({}, "MonitorApi"),
       secret: createApiFixture({}, "SecretApi"),
       organization: createApiFixture({}, "OrganizationApi"),
       "api-key": createApiFixture({}, "ApiKeyApi"),

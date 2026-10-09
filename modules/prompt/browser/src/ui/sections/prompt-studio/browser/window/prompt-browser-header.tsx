@@ -4,7 +4,7 @@ import { useFormContext } from "react-hook-form";
 
 import { useHandleSavePrompt } from "../../../../../behavior/use-handle-save-prompt.ts";
 import { useHasUnsavedChanges } from "../../../../../behavior/use-has-unsaved-changes.ts";
-import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useDraggableTabsBrowserStore } from "../../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import type { WireVersionedPrompt } from "../../../../../model/wire-versioned-prompt.ts";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../../prompt-form.ts";
 import { PromptEditorHeader } from "../../prompt-editor-header.tsx";

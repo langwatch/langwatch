@@ -11,7 +11,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../services/child-process-spawn.service.ts", () => ({
+vi.mock("../features/child/services/child-process-spawn.service.ts", () => ({
   ChildProcessSpawnService: {
     create: () => ({
       resolve: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
@@ -40,14 +40,14 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { type ScenarioExecutionRunner } from "../app/scenario.app.ts";
-import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
 import {
   NodeScenarioChildService,
   type ScenarioChildProcessConfig,
-} from "../services/node-scenario-child.service.ts";
+} from "../features/child/services/node-scenario-child.service.ts";
+import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
+import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
 import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
-import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 
 /** A runner that never actually executes — the pool only needs the job
  * marked active so `registerChild` below finds it. */

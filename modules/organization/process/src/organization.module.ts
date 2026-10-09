@@ -1,7 +1,9 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import type { OrganizationApi, OrganizationServerConfig } from "@langwatch/organization-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { OrganizationModule } from "./app/organization.app.ts";
+import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
@@ -9,7 +11,6 @@ import { OrganizationPresenceSettingBackfillTask } from "./tasks/organization-pr
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
-import { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 import { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
 import {
   organizationKeyFacts,
@@ -21,7 +22,11 @@ import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-wor
 import { teamsRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
 
-export const organizationProcessModule = defineProcessModule("organization")
+export const organizationProcessModule: PublishedProcessModule<
+  "organization",
+  OrganizationApi,
+  OrganizationServerConfig
+> = defineProcessModule("organization")
   .withRepositories(organizationRepositories)
   .withApi(OrganizationModule)
   .withTransports(
@@ -29,7 +34,6 @@ export const organizationProcessModule = defineProcessModule("organization")
     inviteTrpcTransport,
     teamTrpcTransport,
     groupTrpcTransport,
-    joinRequestTrpcTransport,
     licenseEnforcementTrpcTransport,
     personalWorkspaceFeaturesTrpcTransport,
     organizationManagementRest,
@@ -45,4 +49,5 @@ export const organizationProcessModule = defineProcessModule("organization")
   ])
   .withEventing(seatLimitEventing)
   .withEventing(organizationLifecycleEventing)
+  .withEventing(organizationAuditEventing)
   .withTasks(({ app }) => [OrganizationPresenceSettingBackfillTask.create({ organizations: app })]);

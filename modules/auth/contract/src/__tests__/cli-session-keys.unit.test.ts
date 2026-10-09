@@ -4,7 +4,7 @@ import {
   cliAccessTokenKey,
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
-} from "../cli-session-keys.ts";
+} from "../auth-cli-device-flow.schemas.ts";
 
 describe("CLI session keys", () => {
   it("keeps the existing Redis key protocol stable", () => {

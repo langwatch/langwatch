@@ -1,6 +1,7 @@
 import "@langwatch/time/polyfill";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process";
+import { servingUpgradeGate } from "@langwatch/upgrade/gate";
 
 import { processEnvironment } from "./config.ts";
 import { processModules } from "./process-modules.generated.ts";
@@ -22,7 +23,8 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
     )
-    .withProcessOwnership(options.ownsProcess ?? true);
+    .withProcessOwnership(options.ownsProcess ?? true)
+    .withUpgradeGate({ role: "worker", gate: servingUpgradeGate });
   const server = await (
     (options.ownsTelemetry ?? true)
       ? preamble

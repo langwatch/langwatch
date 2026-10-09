@@ -119,10 +119,11 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Then only that organization's invoicing currency changes
 
   @unit
-  Scenario: A paid subscription retires the trial licence and both dates derived from it
+  Scenario: A paid subscription asks organization to retire the trial licence
     Given an organization holding a trial licence
     When a paid subscription activates
-    Then the licence key and both dates derived from it are cleared together
+    Then billing asks organization to clear that organization's licence and nothing else
+    And organization clears the key and both dates derived from it together
 
   @unit
   Scenario: An activation carries the organization's trial licence to the webhook
@@ -153,3 +154,9 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Given a hosted deployment with Stripe and its webhook signing secret
     When a delivery signed with that secret arrives
     Then the delivery is acknowledged
+
+  @unit
+  Scenario: A Stripe delivery verifies alike over the provider and its memory twin
+    Given the Stripe delivery channel over the provider and over its memory twin, each holding a signing secret
+    When a delivery signed with that secret, one signed with another secret and one where no secret is held arrive
+    Then each tier answers the first with its event and refuses the other two

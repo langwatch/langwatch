@@ -1,9 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
-import type {
-  CliBootstrapResult,
-  GovernanceBudgetOverviewForUser,
-  PersonalUsageRollup,
-} from "@langwatch/enterprise-governance-contract";
 import { moduleApi } from "@langwatch/module";
 import type {
   EnsuredPersonalWorkspace,
@@ -12,37 +6,21 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 
-import type {
-  MeProject,
-  MePersonalCredential,
-  MeUsage,
-  UserAvatarRestParams,
-} from "./user-rest.schemas.ts";
-import type {
-  UserBrowserSession,
-  UserBrowserSessionEnded,
-  UserBudgetIncreaseRequested,
-  UserHomePagePickerState,
-  UserPersonalBudget,
-  UserPersonalContext,
-} from "./user.responses.ts";
+import type { MeProject, UserAvatarRestParams } from "./user-rest.schemas.ts";
+import type { UserBudgetIncreaseRequested, UserHomePagePickerState } from "./user.responses.ts";
 import type {
   UserCodeAccessPreference,
-  UserApiBudgetOverviewInput,
-  UserApiPersonalUsageInput,
   UserApiRequestBudgetIncreaseInput,
 } from "./user.schemas.ts";
 import type {
-  ChangeOwnPasswordInput,
-  CreateCredentialUserInput,
+  AdoptUnconfirmedAccountOutcome,
   CreatePasskeyUserInput,
   CreateUserInput,
   CreatedUser,
-  RegisterCredentialAccountInput,
+  CredentialAccountInput,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
   SetOwnAvatarInput,
-  SetOwnFirstPasswordInput,
   UnlinkUserAccountInput,
   UnlinkUserAccountOutcome,
   UserCaller,
@@ -53,6 +31,7 @@ import type {
   SetFirstUserPasswordResult,
   SetUserAvatarInput,
   SetUserHomePathInput,
+  UpdateUserEmailInput,
   UpdateUserProfileInput,
   UserAccountInfo,
   UserAvatarResult,
@@ -61,7 +40,6 @@ import type {
   UserLifecycleChangeInput,
   UserFullProfile,
   UserProfilesInput,
-  UserPasskeyNudgeStatus,
   UserSecureAccountOffer,
   UserProfile,
   UserSsoStatus,
@@ -83,7 +61,10 @@ export interface UserUsageCount {
 /** Portable User use cases exposed to process peers and transports. */
 export interface UserApi {
   findById(input: { id: string }): Promise<UserProfile | null>;
+  /** Changes the name only; an address change is `updateEmail`, behind auth's door. */
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
+  /** Writes a normalized address and nothing else; auth's door ends the sessions after it. */
+  updateEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
   personalCallerFor(input: {
     project: { isPersonal: boolean; ownerUserId: string | null };
     callerUserId: string | undefined;
@@ -109,18 +90,17 @@ export interface UserApi {
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;
-  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
   /** Mints an account whose only sign-in method is the passkey about to be registered. */
   createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
-  /** The signup form's whole path: the mode gate, the throttle and the mint. */
-  registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
+  /**
+   * An address proof adopts the unfinished account on it: one transaction confirms the address
+   * and drops every sign-in method set before the proof; memberships stay (rulings 2026-10-06).
+   */
+  adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome>;
+  /** Mints the account auth's register door cleared, its address proof already spent (D-A1U-2). */
+  registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser>;
   hasPassword(input: UserIdInput): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
-  /** Fills an empty credential slot, then ends every other session. */
-  setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
-  /** Verifies the current password, replaces it, then ends every other session. */
-  changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
-  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;
   /** Whether to offer this person a passkey or two-step verification now, on this session. */
   getPasskeyOffer(
     input: UserIdInput & { sessionId: string | null },
@@ -140,24 +120,11 @@ export interface UserApi {
   unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome>;
   /** Removes one of the caller's own sign-in methods, refusing the last one. */
   unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void>;
-  /** What this person is signed in on, and how each session signed in. */
-  listBrowserSessions(input: {
-    userId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSession[]>;
-  /** Ends ONE of this person's own sessions; the current one is refused. */
-  endBrowserSession(input: {
-    userId: string;
-    sessionId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSessionEnded>;
-  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
-  /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
+  /** Retires an account, never the last active operator, in one write; records no fact. */
   deactivate(input: UserLifecycleChangeInput): Promise<UserProfile>;
+  /** Records a written retirement as user's fact, at the instant the database stamped. */
+  recordDeactivated(input: UserLifecycleChangeInput): Promise<void>;
   reactivate(input: UserLifecycleChangeInput): Promise<UserProfile>;
-  /** Retires an account and ends every credential family that outlives it. */
-  deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
   /** Restores a retired account. Operators only. */
   reactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
   setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult>;
@@ -173,11 +140,6 @@ export interface UserApi {
 
   // -- the /me dashboard -----------------------------------------------------
 
-  getPersonalContext(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<UserPersonalContext>;
-  getPersonalBudget(input: { userId: string; organizationId: string }): Promise<UserPersonalBudget>;
   requestBudgetIncrease(
     input: UserApiRequestBudgetIncreaseInput & { userId: string },
   ): Promise<UserBudgetIncreaseRequested>;
@@ -185,25 +147,9 @@ export interface UserApi {
     userId: string;
     organizationId: string;
   }): Promise<UserHomePagePickerState>;
-  /** The caller's own usage rollup; refuses a caller outside the organization. */
-  getPersonalUsageRollup(
-    input: UserApiPersonalUsageInput & { userId: string },
-  ): Promise<PersonalUsageRollup>;
-  /** Every budget binding the caller's own keys, most binding first. */
-  getBudgetOverview(
-    input: UserApiBudgetOverviewInput & { userId: string },
-  ): Promise<GovernanceBudgetOverviewForUser>;
-  /** What the CLI's login ceremony renders: the caller's providers and monthly budget. */
-  getCliBootstrap(input: { userId: string; organizationId: string }): Promise<CliBootstrapResult>;
 
-  // -- the two REST doors ----------------------------------------------------
+  // -- the /api/me/project door ---------------------------------------------
 
-  /** One person's own AI usage, rolled up over a window, for `/api/me/usage`. */
-  getPersonalUsage(input: {
-    projectId: string;
-    credential: MePersonalCredential;
-    window?: { startMs: number; endMs: number };
-  }): Promise<MeUsage>;
   /** The identity of the project a calling key belongs to, for `/api/me/project`. */
   getKeyProject(input: { projectId: string }): Promise<MeProject>;
   /** The usage report's figures (ADR-156, section 10). */
@@ -217,11 +163,3 @@ export interface UserApi {
 }
 
 export const UserApi = moduleApi<UserApi>()("user");
-
-/** The deployment facts user reads: the shared origin a budget-increase mail links back to. */
-export const userConfig = Config.define(() => ({
-  /** The shared deployment origin; absent, a budget-increase request is refused by name. */
-  publicBaseUrl,
-}));
-
-export type UserServerConfig = ConfigOf<typeof userConfig>;

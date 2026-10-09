@@ -2,17 +2,15 @@
 
 import type { AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
-  CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
+  FullyLoadedOrganization,
   Organization,
   OrganizationFounding,
   OrganizationIntent,
   OrganizationUser,
   OrganizationUserRole,
+  OrganizationWithMembersAndTheirTeams,
   PricingModel,
-  ProjectRow as Project,
-  Team,
-  TeamUser,
   TeamUserRole,
   User,
 } from "@langwatch/organization-contract";
@@ -20,37 +18,7 @@ import type {
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
-type TeamWithProjects = Team & {
-  projects: Project[];
-};
-
-type TeamWithProjectsAndMembers = TeamWithProjects & {
-  members: (TeamUser & {
-    assignedRole?: CustomRole | null;
-  })[];
-};
-
-export type FullyLoadedOrganization = Organization & {
-  members: OrganizationUser[];
-  teams: TeamWithProjectsAndMembers[];
-};
-
-type TeamMemberWithTeam = TeamUser & {
-  team: Team;
-  assignedRole?: CustomRole | null;
-};
-
-type UserWithTeams = User & {
-  teamMemberships: TeamMemberWithTeam[];
-};
-
-export type OrganizationMemberWithUser = OrganizationUser & {
-  user: UserWithTeams;
-};
-
-export type OrganizationWithMembersAndTheirTeams = Organization & {
-  members: OrganizationMemberWithUser[];
-};
+export type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"][number];
 
 /**
  * Input for creating an organization and assigning the user as admin.
@@ -429,7 +397,17 @@ export abstract class OrganizationMembershipRepository {
     origin?: "web" | "cli";
   }) => Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
 
-  abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
+  /** The plain MEMBER row an SSO domain auto-join writes; an existing row is "already-present". */
+  abstract createSsoDomainMembership: (input: {
+    organizationId: string;
+    userId: string;
+  }) => Promise<"created" | "already-present">;
+
+  /** Every membership row the person holds, disabled ones included. */
+  abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;
+
+  /** Answers the personal team ids it archived; project archives their projects on the fact. */
+  abstract deleteMember: (input: DeleteMemberInput) => Promise<string[]>;
 
   abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;
 

@@ -18,6 +18,8 @@ vi.mock("@clickhouse/client", () => ({
 
 import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttl.reconciler.ts";
 
+const MANAGED_TABLES = ["stored_spans"] as const;
+
 describe("reconcileTTL()", () => {
   let coldStorageEnabled: boolean;
 
@@ -44,7 +46,11 @@ describe("reconcileTTL()", () => {
   describe("when a tiered table has current cold-storage TTL but no retention TTL", () => {
     /** @scenario Existing tiered tables receive missing retention TTL */
     it("adds the retention TTL without removing cold-storage TTL", async () => {
-      await reconcileTTL({ connectionUrl: "http://localhost:8123/default", coldStorageEnabled });
+      await reconcileTTL({
+        connectionUrl: "http://localhost:8123/default",
+        coldStorageEnabled,
+        managedTables: MANAGED_TABLES,
+      });
 
       expect(clickhouseMocks.client.command).toHaveBeenCalledWith({
         query: expect.stringContaining("toDateTime(EndTime) + INTERVAL 49 DAY TO VOLUME 'cold'"),
@@ -52,6 +58,54 @@ describe("reconcileTTL()", () => {
       expect(clickhouseMocks.client.command).toHaveBeenCalledWith({
         query: expect.stringContaining("_retention_days"),
       });
+    });
+  });
+
+  describe("when the reconciler is handed a table as managed", () => {
+    /** @scenario "The reconciler adds the retention TTL to a table it was handed" */
+    it("adds the retention DELETE clause to that table", async () => {
+      clickhouseMocks.client.query.mockResolvedValue({
+        json: async () => [
+          {
+            name: "stored_spans",
+            storage_policy: "default",
+            engine_full: "MergeTree ORDER BY (TenantId)",
+          },
+        ],
+      });
+
+      await reconcileTTL({
+        connectionUrl: "http://localhost:8123/default",
+        coldStorageEnabled: false,
+        managedTables: ["stored_spans"],
+      });
+
+      expect(clickhouseMocks.client.command).toHaveBeenCalledWith({
+        query: expect.stringContaining("_retention_days"),
+      });
+    });
+  });
+
+  describe("when the reconciler is handed no managed tables", () => {
+    /** @scenario "The reconciler leaves a table it was not handed alone" */
+    it("issues no retention clause for a table that carries none", async () => {
+      clickhouseMocks.client.query.mockResolvedValue({
+        json: async () => [
+          {
+            name: "stored_spans",
+            storage_policy: "default",
+            engine_full: "MergeTree ORDER BY (TenantId)",
+          },
+        ],
+      });
+
+      await reconcileTTL({
+        connectionUrl: "http://localhost:8123/default",
+        coldStorageEnabled: false,
+        managedTables: [],
+      });
+
+      expect(clickhouseMocks.client.command).not.toHaveBeenCalled();
     });
   });
 
@@ -82,6 +136,7 @@ describe("reconcileTTL()", () => {
       await reconcileTTL({
         connectionUrl: "http://localhost:8123/default",
         coldStorageEnabled,
+        managedTables: MANAGED_TABLES,
         hotDayOverrides: { CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS: "30" },
       });
 
@@ -121,7 +176,11 @@ describe("reconcileTTL()", () => {
         ],
       });
 
-      await reconcileTTL({ connectionUrl: "http://localhost:8123/default", coldStorageEnabled });
+      await reconcileTTL({
+        connectionUrl: "http://localhost:8123/default",
+        coldStorageEnabled,
+        managedTables: MANAGED_TABLES,
+      });
 
       const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
         /MODIFY TTL/.test((c[0] as { query: string }).query),
@@ -161,7 +220,11 @@ describe("reconcileTTL()", () => {
         ],
       });
 
-      await reconcileTTL({ connectionUrl: "http://localhost:8123/default", coldStorageEnabled });
+      await reconcileTTL({
+        connectionUrl: "http://localhost:8123/default",
+        coldStorageEnabled,
+        managedTables: MANAGED_TABLES,
+      });
 
       const modifyCalls = clickhouseMocks.client.command.mock.calls.filter((c) =>
         /MODIFY TTL/.test((c[0] as { query: string }).query),
@@ -180,6 +243,7 @@ describe("reconcileTTL()", () => {
       await reconcileTTL({
         connectionUrl: "http://localhost:8123/default",
         coldStorageEnabled,
+        managedTables: MANAGED_TABLES,
         clusterName: "main",
       });
 

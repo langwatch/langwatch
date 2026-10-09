@@ -6,6 +6,8 @@ import { createAuthEndpoint } from "better-auth/api";
 import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { z } from "zod";
 
+import type { IdentityConnectionIssuersRepository } from "../../repositories/identity-connection-issuers.repository.ts";
+import type { IdentityPasskeyRemovalRepository } from "../../repositories/identity-passkey-removal.repository.ts";
 import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
 import { newIdentityCommandId } from "../../rules/identity-command-id.rules.ts";
 import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
@@ -13,10 +15,7 @@ import { BetterAuthAccountBranchService } from "../../services/better-auth-accou
 import { BetterAuthCeremonyBridgeService } from "../../services/better-auth-ceremony-bridge.service.ts";
 import { IdentityCeremoniesService } from "../../services/better-auth-identity-ceremonies.service.ts";
 import { BetterAuthIdentityRoutingService } from "../../services/better-auth-identity-routing.service.ts";
-import {
-  BetterAuthIdentityStorageService,
-  type PasskeyRemoval,
-} from "../../services/better-auth-identity-storage.service.ts";
+import { BetterAuthIdentityStorageService } from "../../services/better-auth-identity-storage.service.ts";
 import { BetterAuthUserBranchService } from "../../services/better-auth-user-branch.service.ts";
 import { CryptoIdentifierIdentityService } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
@@ -153,6 +152,10 @@ export interface IdentityStack {
    *  restates facts the store already holds and they are absorbed, so
    *  this is also the count of what a retry did NOT duplicate. */
   events: InMemoryIdentityEventStore;
+  /** `SsoProvider(providerId, issuer)` as the connection-issuer reads see it. */
+  connections: { providerId: string; issuer: string }[];
+  /** How many Postgres transactions the adapter opened. */
+  transactions: { opened: number };
 }
 
 /**
@@ -174,7 +177,7 @@ export function identityStack({
   withDatabaseHooks?: boolean;
   /** Use the named fixture that represents the current Prisma account shape. */
   schemaBoundLegacy?: boolean;
-  passkeyRemoval?: PasskeyRemoval;
+  passkeyRemoval?: IdentityPasskeyRemovalRepository;
 } = {}): IdentityStack {
   const db = emptyDb();
   const heads = new InMemoryHeads();
@@ -227,6 +230,16 @@ export function identityStack({
   };
 
   const reservations = new InMemoryReservations();
+  const connections: { providerId: string; issuer: string }[] = [];
+  const connectionIssuers: IdentityConnectionIssuersRepository = {
+    async findProviderIdsForIssuer({ issuer }) {
+      return connections.filter((row) => row.issuer === issuer).map((row) => row.providerId);
+    },
+    async findRegisteredIssuers({ providerId }) {
+      return connections.filter((row) => row.providerId === providerId).map((row) => row.issuer);
+    },
+  };
+  const transactions = { opened: 0 };
 
   const storage = new InMemoryIdentityStorage(
     heads,
@@ -266,9 +279,15 @@ export function identityStack({
     ceremonies,
     routesToIdentity: isUserOnIdentityWrites,
   });
+  const legacyEngine = schemaBoundLegacy ? schemaBoundLegacyEngine(db) : memoryAdapter(db);
   const auth = authOver(
     BetterAuthIdentityStorageService.create({
-      legacyEngine: schemaBoundLegacy ? schemaBoundLegacyEngine(db) : memoryAdapter(db),
+      legacyEngine,
+      // The memory engine has no transaction of its own; the rebinding is what is under test.
+      postgresTransaction: (work) => {
+        transactions.opened += 1;
+        return work(legacyEngine);
+      },
       // The composition app/ owns (Q223 (a)): routing and both branches, once per bound engine.
       routing: ({ legacy, naming }) =>
         BetterAuthIdentityRoutingService.create({
@@ -281,6 +300,7 @@ export function identityStack({
           passkeyRemoval: passkeyRemoval ?? {
             deleteIfAnotherWayInRemains: async () => "not_found",
           },
+          connectionIssuers,
           accountBranch: BetterAuthAccountBranchService.create({
             legacy,
             accounts,
@@ -325,6 +345,8 @@ export function identityStack({
     migrationState,
     engine,
     events,
+    connections,
+    transactions,
   };
 }
 

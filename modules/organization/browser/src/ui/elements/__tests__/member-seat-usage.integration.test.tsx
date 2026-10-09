@@ -1,4 +1,4 @@
-import { uiDeclarations, type UiResourceLimitRowProps } from "@langwatch/browser-host/declarations";
+import { uiDeclarations } from "@langwatch/browser-host/declarations";
 /**
  * @vitest-environment jsdom
  *
@@ -6,11 +6,15 @@ import { uiDeclarations, type UiResourceLimitRowProps } from "@langwatch/browser
  * @see specs/licensing/seat-reconciliation.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  ResourceLimitRowToken,
+  type ResourceLimitRowProps,
+} from "@langwatch/enterprise-licensing-client";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The row is licensing's to draw; this suite checks what organization asks of it.
-const LentRow = ({ limitType, label, current, max }: UiResourceLimitRowProps) => (
+const LentRow = ({ limitType, label, current, max }: ResourceLimitRowProps) => (
   <p>{`${limitType ?? label}: ${current} / ${max ?? "none"}`}</p>
 );
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
@@ -20,7 +24,8 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
       {
         name: "licensing",
         installation: {
-          capabilities: { resourceLimitRow: { load: async () => ({ default: LentRow }) } },
+          capabilities: {},
+          lends: [{ token: ResourceLimitRowToken, load: async () => ({ default: LentRow }) }],
         },
       },
     ]),

@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SectionNavigationFrame } from "../src/components/section-navigation-frame.tsx";
+import { SectionNavigationFrame } from "../src/components/layout/section-navigation-frame.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

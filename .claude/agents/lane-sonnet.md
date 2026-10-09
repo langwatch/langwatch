@@ -1,7 +1,7 @@
 ---
 name: lane-sonnet
 description: |
-  The lane agent pinned to Sonnet 5.5 (Alex, 2026-09-29): big implementation lanes, scoped fixes, flow and test-id work.
+  The lane agent pinned to Sonnet 5.5 (Alex, 2026-09-29): high effort: big scoped implementation lanes with a clear acceptance test. At high effort Sonnet costs about what Opus does, so judgement-heavy work goes to lane-opus instead.
   A bounded implementation lane in the LangWatch coordinator/lane workflow. Use
   when spawning work that has a manifest under .claude/manifests/ - the lane
   edits only its owned paths, runs only scoped checks, and stops with a handoff

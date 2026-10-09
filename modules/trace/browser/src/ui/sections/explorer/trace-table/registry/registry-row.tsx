@@ -1,13 +1,13 @@
 import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
 
-import { useDensityStore } from "../../../../../behavior/density.store.ts";
+import type { TraceStatus } from "../../../../../behavior/explorer/types/trace.ts";
 import { type LangyContextTargetDescriptor } from "../../../../../behavior/langy/langy-context-target.store.ts";
 import { useLangyContextTarget } from "../../../../../behavior/langy/use-langy-context-target.ts";
-import { useRowPulseStore } from "../../../../../behavior/row-pulse.store.ts";
+import { useDensityStore } from "../../../../../features/explorer/behavior/density.store.ts";
+import { useRowPulseStore } from "../../../../../features/explorer/behavior/row-pulse.store.ts";
 import { Tbody, Td, Tr } from "../../../../elements/explorer/trace-table/table-primitives.tsx";
 import { useDensityTokens } from "../../hooks/use-density-tokens.ts";
-import type { TraceStatus } from "../../types/trace.ts";
 import {
   SkeletonAddonRow,
   SkeletonCellContent,

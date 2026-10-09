@@ -1,19 +1,14 @@
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FoldProjectionStore, FoldStateRead } from "@langwatch/eventing";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { LocalFeatureApis } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import { traceSummaryDataSchema, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -21,8 +16,8 @@ import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spo
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import type { TraceRepositories } from "../../repositories/trace.repositories.ts";
-import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModule } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
@@ -73,35 +68,25 @@ const FOLDED: TraceSummaryData = traceSummaryDataSchema.parse({
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   for (const token of [
-    AnnotationApi,
     AuthzApi,
-    CodingAgentApi,
     DataPrivacyApi,
     DataRetentionApi,
     EntitlementApi,
-    EvaluationApi,
-    LogApi,
     ModelProviderApi,
     ProjectApi,
     ShareApi,
-    TopicApi,
   ]) {
     apis.declare(token);
   }
 
   return {
-    annotations: apis.reference(AnnotationApi),
     authz: apis.reference(AuthzApi),
-    codingAgents: apis.reference(CodingAgentApi),
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),
-    evaluations: apis.reference(EvaluationApi),
-    logs: apis.reference(LogApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
   };
 }
 
@@ -127,7 +112,6 @@ function compose({
     canonicalisation: TraceCanonicalisationService.create(),
     blobStore: TraceBlobStoreService.create({
       legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-      resolveClickHouseClient: refuse,
     }),
     dedup: MemoryTraceSpanDedupRepository.create(),
     commands: {

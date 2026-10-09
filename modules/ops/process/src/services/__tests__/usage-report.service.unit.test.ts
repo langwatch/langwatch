@@ -104,7 +104,9 @@ function service({ disabled = false, isSaas = false } = {}) {
         authMethod: "email",
       }),
     }),
-    organizations: { findAllIds: async () => [...state.projectsByOrganization.keys()] },
+    organizations: {
+      listAllIds: async () => ({ ids: [...state.projectsByOrganization.keys()], next: null }),
+    },
     channel,
     install,
     disabled,

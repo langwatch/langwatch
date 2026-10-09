@@ -71,6 +71,8 @@ cycles are refused, and no peer-cycle edge is cut or listed without asking Alex 
   tests for the old edge: when gateway -> webhook was cut, the worker's governance-delivery test
   still read gateway's deleted subscriber (fixed in 8a48fdbe40; five more stale tests in d752cad06a).
 - The `module-dependencies` skill teaches the shape of a cut.
+- Compare the diff's touched paths with the "What <id> owns" tables on the module pages
+  (`modules/<id>/README.md`): a write to a table another module owns is a finding (`ownership`).
 
 ### C. Authorization or audit beside the door (§8; CLAUDE.md rule 6)
 

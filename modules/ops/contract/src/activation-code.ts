@@ -1,11 +1,11 @@
-/** Activation codes (ADR-156, section 5), as the license registry's backoffice
+/** Activation codes (ADR-156, section 5), as the license registry's admin console
  * reads and writes them. `licensing` is enterprise, so every shape here is
  * declared locally rather than imported from it (as `license-registry.ts`). */
 import { z } from "zod";
 
 const activationCodeStatusSchema = z.enum(["active", "redeemed", "expired", "revoked"]);
 
-/** A code as the backoffice reads it — never the code itself, only its hint. */
+/** A code as the admin console reads it — never the code itself, only its hint. */
 export const activationCodeViewSchema = z.object({
   id: z.string(),
   codeHint: z.string(),
@@ -41,7 +41,7 @@ export const listActivationCodesInputSchema = z.object({
   organizationId: z.string().min(1).optional(),
 });
 
-/** What an operator supplies when minting a code from the backoffice. */
+/** What an operator supplies when minting a code from the admin console. */
 export const issueActivationCodeInputSchema = z.object({
   organizationId: z.string().min(1),
   organizationName: z.string().min(1),

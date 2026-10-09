@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { findInboxProvider, type InboxProviderId } from "../../model/inbox-providers.ts";
 import { AuthCard } from "./auth-card.tsx";
 import { Google } from "./google-icon.tsx";
-import { Microsoft } from "./microsoft-icon.tsx";
+import { Microsoft } from "./sign-in-method-icon.tsx";
 
 /** The mark on the inbox door; a provider we hold no mark for wears a plain envelope. */
 const INBOX_MARKS: Record<InboxProviderId, ReactNode> = {
@@ -32,7 +32,7 @@ export function CheckYourEmail({
   const [inbox] = findInboxProvider({ email });
 
   return (
-    <AuthCard title="Check your email">
+    <AuthCard title="Check your email" solid>
       <VStack width="full" align="stretch" gap="14px">
         {/* Centred under a centred title, because there is nothing to do on
             this card. Every other screen left-aligns its words against a form

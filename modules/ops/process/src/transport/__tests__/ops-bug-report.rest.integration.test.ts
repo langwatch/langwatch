@@ -21,26 +21,12 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
-import type { BugReportNotifier, BugReportRateLimiter } from "../../app/ops.app.ts";
+import type { BugReportNotifier } from "../../app/ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import { PrismaBugReportRepository } from "../../repositories/prisma/prisma.bug-report.repository.ts";
 import { bugReportCredential, opsBugReportRest } from "../ops-bug-report.rest.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
-
-/** In-process fixed-window limiter, one bucket per callerKey, per test run. */
-function inMemoryRateLimiter(): BugReportRateLimiter {
-  const counts = new Map<string, number>();
-
-  return {
-    consume: async ({ key, max }) => {
-      const next = (counts.get(key) ?? 0) + 1;
-      counts.set(key, next);
-
-      return { allowed: next <= max };
-    },
-  };
-}
 
 function silentNotifier(): BugReportNotifier {
   return { notify: async () => void 0 };
@@ -86,19 +72,17 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   function opsApp(
     options: {
       apiKeys?: ApiKeyApi;
-      rateLimiter?: BugReportRateLimiter;
       notifier?: BugReportNotifier;
     } = {},
   ) {
     const { app } = createOpsTestApp({
       repositories: {
-        ...MemoryOpsRepositories.create(),
+        ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
         bugReports: repository,
         processStore: InMemoryProcessStore.createForTesting(),
       },
       ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
       members: {
-        bugReportRateLimiter: options.rateLimiter ?? inMemoryRateLimiter(),
         bugReportNotifier: options.notifier ?? silentNotifier(),
       },
     });
@@ -377,8 +361,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   describe("when the caller exceeds the rate limit", () => {
     /** @scenario "Submissions are rate limited per client" */
     it("rejects further reports for that caller only", async () => {
-      const rateLimiter = inMemoryRateLimiter();
-      const app = opsApp({ rateLimiter });
+      const app = opsApp();
       const callerKey = `ratelimit-${testNamespace}`;
       const submitOnce = () =>
         app.submitBugReport({

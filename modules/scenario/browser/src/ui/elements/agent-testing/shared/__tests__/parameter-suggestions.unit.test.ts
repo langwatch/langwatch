@@ -22,7 +22,7 @@ import {
   parameterSuggestionState,
   parameterSuggestions,
   valueSuggestions,
-} from "../../../../sections/agent-testing/run/parameter-suggestions.ts";
+} from "../../../../sections/agent-testing/run-parameters/parameter-suggestions.ts";
 
 const MODEL: DeclaredParameter = {
   name: "model",

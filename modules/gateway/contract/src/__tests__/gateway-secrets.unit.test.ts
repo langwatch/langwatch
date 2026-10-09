@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -18,6 +22,27 @@ const refusalFor = (source: Record<string, string>): GatewaySecretsConfiguration
   }
   throw new Error("the configuration was accepted");
 };
+
+/** The KEY=value lines of the repository's .env.example, quotes stripped. */
+const envExampleValues = (): Record<string, string> => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const text = readFileSync(path.join(here, "../../../../../.env.example"), "utf-8");
+  const entries = text.split("\n").flatMap((line) => {
+    const match = /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(line.trim());
+    if (!match?.[1]) return [];
+    return [[match[1], (match[2] ?? "").trim().replace(/^(["'])(.*)\1$/, "$2")] as const];
+  });
+  return Object.fromEntries(entries);
+};
+
+describe("given a fresh .env copied from .env.example", () => {
+  describe("when the gateway secrets are validated", () => {
+    /** @scenario "A fresh clone with no gateway secrets set boots clean" */
+    it("accepts the configuration without any gateway secret", () => {
+      expect(() => assertGatewaySecretsAllOrNone(envExampleValues())).not.toThrow();
+    });
+  });
+});
 
 describe("given the AI Gateway secrets", () => {
   describe("when none of them is set", () => {

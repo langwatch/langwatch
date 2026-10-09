@@ -6,9 +6,9 @@ import {
 } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
-  ATTR_KEYS,
   type DerivedTraceEvent,
   type NormalizedAttributes,
   type NormalizedSpan,
@@ -20,8 +20,8 @@ import {
   type TraceEventRollup,
 } from "@langwatch/trace-contract";
 
-import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
+import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
+import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as

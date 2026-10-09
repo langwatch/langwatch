@@ -1,27 +1,27 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
 import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../../behavior/annotation-queue-session.store.ts";
+  openTraceEditorFromConversation,
+  tracePartitionHint,
+} from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useTraceAnnotations } from "../../../../../behavior/reads/use-annotation-reads.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
 import { PersonAvatar } from "../../../person-avatar.tsx";
-import {
-  openTraceEditorFromConversation,
-  tracePartitionHint,
-} from "../../utils/trace-edit-mode.ts";
 import { AnnotationPopover } from "./annotation-popover.tsx";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];

@@ -1,13 +1,21 @@
-import { getFacetValueState, describeAstProblem } from "../../../trace-query-analysis.ts";
-import type { FacetState } from "../../../trace-query-metadata.ts";
+import {
+  getFacetValueState,
+  describeAstProblem,
+} from "../../../features/query/trace-query-analysis.ts";
+import type { FacetState } from "../../../features/query/trace-query-metadata.ts";
 import {
   addSameFieldOrValue,
   addToOrGroupAtLocation,
   combineQueries,
   removeFacetValueFromQuery,
   toggleFacetInQuery,
-} from "../../../trace-query-mutations.ts";
-import { isEmptyAST, type LiqeQuery, parse, serialize } from "../../../trace-query-parser.ts";
+} from "../../../features/query/trace-query-mutations.ts";
+import {
+  isEmptyAST,
+  type LiqeQuery,
+  parse,
+  serialize,
+} from "../../../features/query/trace-query-parser.ts";
 import {
   type SetFilterPayload,
   setFilterPayloadSchema,

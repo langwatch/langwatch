@@ -45,10 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: the changed paths come
+          # from git trees (.github/actions/detect-changes),
+          # and every file this job needs on disk lives under .github/.
+          # Checking out the rest of the tree is pure runner time.
           sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
@@ -282,12 +282,11 @@ jobs:
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
 
-      - name: Setup database
-        run: pnpm prisma:migrate
-
-      - name: Setup ClickHouse
-        working-directory: apps/tasks
-        run: pnpm task clickhouse-migrate
+      # The api and the worker never migrate and refuse to serve until the
+      # upgrade has run: the preparation script, `upgrade` then the
+      # system-migrations pass (specs/upgrade/entry-points.feature).
+      - name: Upgrade the databases
+        run: pnpm start:prepare:db
 
       # The browser bundle only. apps/api and apps/worker run from source
       # through node and have no build of their own.
@@ -300,9 +299,6 @@ jobs:
 
       - name: Run E2E tests
         env:
-          # Migrations already ran in earlier steps; skip them during pnpm start
-          SKIP_PRISMA_MIGRATE: "true"
-          SKIP_CLICKHOUSE_MIGRATE: "true"
           # Launch the runner's preinstalled Google Chrome (no browser download)
           E2E_BROWSER_CHANNEL: chrome
           # The api started below serves the suite; the e2e stack borrows it instead of booting its own.

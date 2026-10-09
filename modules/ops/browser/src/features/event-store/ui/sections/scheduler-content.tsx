@@ -8,11 +8,11 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { CalendarClock } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { formatTimeAgo, readableDate } from "../../../../model/ops-formatters.ts";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 import type { SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
 import {

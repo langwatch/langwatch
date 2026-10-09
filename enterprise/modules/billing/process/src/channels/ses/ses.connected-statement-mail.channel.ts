@@ -2,8 +2,8 @@
 
 import { sendConnectedStatementEmail, type MailSender } from "@langwatch/mail";
 
+import type { ConnectedStatement } from "../../features/connected-billing/services/connected-monthly-statement.service.ts";
 import { statementMonthLabel } from "../../rules/connected-statement.rules.ts";
-import type { ConnectedStatement } from "../../services/connected-monthly-statement.service.ts";
 import { ConnectedStatementMailChannel } from "../connected-statement-mail.channel.ts";
 
 /** Main's `EmailMonthlyStatementMailer` over notification's sender. */

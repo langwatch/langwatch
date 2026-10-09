@@ -1,9 +1,7 @@
-import type { AuthApi } from "@langwatch/auth-contract";
 import {
   type EnsuredPersonalWorkspace,
   type FindPersonalWorkspaceInput,
   type OrganizationApi,
-  OrganizationNotFoundForTeamError,
   type PersonalWorkspace,
   TeamNotFoundError,
   type PersonalWorkspaceInput,
@@ -11,23 +9,13 @@ import {
 import {
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
-  PersonalUsageServiceKeyUnsupportedError,
-  type MePersonalCredential,
-  type UserBrowserSession,
-  type UserBrowserSessionEnded,
 } from "@langwatch/user-contract";
 
 export class UserAccountService {
-  private constructor(
-    private readonly auth: AuthApi,
-    private readonly organizations: OrganizationApi,
-  ) {}
+  private constructor(private readonly organizations: OrganizationApi) {}
 
-  static create(dependencies: {
-    auth: AuthApi;
-    organizations: OrganizationApi;
-  }): UserAccountService {
-    return new UserAccountService(dependencies.auth, dependencies.organizations);
+  static create(dependencies: { organizations: OrganizationApi }): UserAccountService {
+    return new UserAccountService(dependencies.organizations);
   }
 
   personalCallerFor(input: {
@@ -43,77 +31,6 @@ export class UserAccountService {
     }
 
     return input.project.ownerUserId;
-  }
-
-  /**
-   * The same resolution for a request that presents a CREDENTIAL rather than a
-   * session. The key's class is half the decision: a service key belongs to
-   * nobody and must not be read as this workspace's own legacy key.
-   */
-  personalUsageCallerFor(input: {
-    project: { isPersonal: boolean; ownerUserId: string | null };
-    credential: MePersonalCredential;
-  }): string {
-    if (!input.project.isPersonal || !input.project.ownerUserId) {
-      throw new PersonalProjectKeyRequiredError();
-    }
-
-    if (input.credential.kind === "legacyProjectKey") return input.project.ownerUserId;
-    if (input.credential.userId === null) throw new PersonalUsageServiceKeyUnsupportedError();
-
-    return this.personalCallerFor({
-      project: input.project,
-      callerUserId: input.credential.userId,
-    });
-  }
-
-  /** The organization a personal workspace's team belongs to. */
-  findOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null> {
-    return this.organizations.getOrganizationIdByTeamId(input).catch((error: unknown) => {
-      if (OrganizationNotFoundForTeamError.is(error)) return null;
-      throw error;
-    });
-  }
-
-  /**
-   * Auth owns the session rows; this surface owns the words a `/me` reader
-   * sees. The field-by-field copy is what makes that a typechecked agreement
-   * rather than an assumption that the two shapes stay identical.
-   */
-  async listBrowserSessions(input: {
-    userId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSession[]> {
-    const sessions = await this.auth.listBrowserSessions(input);
-
-    return sessions.map((session) => ({
-      sessionId: session.sessionId,
-      identifierId: session.identifierId,
-      method: session.method,
-      secondFactorProven: session.secondFactorProven,
-      ipAddress: session.ipAddress,
-      userAgent: session.userAgent,
-      signedInAt: session.signedInAt,
-      lastActiveAt: session.lastActiveAt,
-      expiresAt: session.expiresAt,
-      current: session.current,
-    }));
-  }
-
-  endBrowserSession(input: {
-    userId: string;
-    sessionId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSessionEnded> {
-    return this.auth.endBrowserSession(input);
-  }
-
-  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void> {
-    return this.auth.revokeOtherBrowserSessions(input);
-  }
-
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
-    return this.auth.revokeAllBrowserSessions(input);
   }
 
   ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {

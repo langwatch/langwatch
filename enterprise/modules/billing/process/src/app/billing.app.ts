@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
-import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { AuthzApi, PLATFORM_TENANT_ID } from "@langwatch/authz-contract";
 import {
   BillingApi,
   billingBrowserConfig,
@@ -10,13 +8,13 @@ import {
   BillingPriceCatalogue,
   billingSecrets,
   type BillingServerConfig,
+  type BillingAuditRecordedEventData,
   type BillingStaff,
   type BillingDisplayInvoice,
   type ConnectedAddCommitRequest,
   type Currency,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
-  type SubscriptionInvite,
   type CurrencyRequest,
   type DetectedCurrency,
   type ConnectedBillingAccountView,
@@ -31,7 +29,6 @@ import {
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
-  type USAGE_UNKNOWN,
   type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
@@ -40,34 +37,40 @@ import type {
   EventingCommandSender,
   EventingParticipation,
 } from "@langwatch/eventing";
-import { GatewayApi } from "@langwatch/gateway-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import { AdminSurfaceHiddenError, type OpsOperatorPermission } from "@langwatch/ops-contract";
-import { OrganizationApi, type OrganizationCaller } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
-import Stripe from "stripe";
 
+import type { BillingStripeChannels } from "../channels/billing-stripe.channels.ts";
 import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
-import { connectedInvoicingChannels } from "../channels/connected-invoicing-channels.registry.ts";
 import { connectedStatementMailChannels } from "../channels/connected-statement-mail-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import { composeHttpBillingStripe } from "../channels/http/http.billing-stripe.channels.ts";
 import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
+import { stripeWebhooksChannels } from "../channels/stripe-webhooks-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   type BillingReportingDefinition,
   BillingReportingPipeline,
 } from "../eventing/billing-reporting.pipeline.ts";
+import { ConnectedBillingOverviewService } from "../features/connected-billing/services/connected-billing-overview.service.ts";
+import { ConnectedBillingTickService } from "../features/connected-billing/services/connected-billing-tick.service.ts";
+import { ConnectedBillingService } from "../features/connected-billing/services/connected-billing.service.ts";
+import { ConnectedCustomerFactsService } from "../features/connected-billing/services/connected-customer-facts.service.ts";
+import { ConnectedMonthlyStatementService } from "../features/connected-billing/services/connected-monthly-statement.service.ts";
+import { ConnectedSeatChangeService } from "../features/connected-billing/services/connected-seat-change.service.ts";
+import { ConnectedUsageCeilingService } from "../features/connected-billing/services/connected-usage-ceiling.service.ts";
+import { LicensePurchaseDeliveryService } from "../features/license-purchase/services/license-purchase-delivery.service.ts";
+import { LicensePurchaseService } from "../features/license-purchase/services/license-purchase.service.ts";
+import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
-import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import {
   planLimitCooldown,
   planLimitInFlight,
@@ -80,24 +83,10 @@ import {
   EEWebhookService,
   type LicensePurchaseHandler,
 } from "../services/billing-stripe-webhook.service.ts";
-import type { SeatRetentionRules } from "../services/billing-subscription-lifecycle.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
-import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
-import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
-import { ConnectedBillingService } from "../services/connected-billing.service.ts";
-import {
-  type ConnectedCustomerPeers,
-  ConnectedCustomerFactsService,
-} from "../services/connected-customer-facts.service.ts";
-import { ConnectedMonthlyStatementService } from "../services/connected-monthly-statement.service.ts";
-import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
-import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
-import { LicensePurchaseDeliveryService } from "../services/license-purchase-delivery.service.ts";
-import { LicensePurchaseService } from "../services/license-purchase.service.ts";
-import { LicensingLicenseGeneratorService } from "../services/licensing-license-generator.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
@@ -105,7 +94,6 @@ import { ResourceLimitAlertService } from "../services/resource-limit-alert.serv
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
-import { StripeWebhookSignatureService } from "../services/stripe-webhook-signature.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import { BillingSubscriptionService } from "../services/subscription.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
@@ -123,7 +111,6 @@ const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
   typeof BillingModule.dependencies,
-  never,
   BillingServerConfig,
   BillingRepositories
 >;
@@ -144,35 +131,28 @@ type ConnectedLicensing = Pick<
 export type ConnectedBillingPeers = Readonly<{
   licensing: ConnectedLicensing;
   authorization: Pick<AuthzApi, "can">;
-  auditLog: Pick<AuditLogApi, "record">;
-  organizations: ConnectedCustomerPeers["organizations"];
-  gateway: ConnectedCustomerPeers["gateway"];
 }>;
 
-/** Stripe API version this callback's client speaks, as the rest of billing pins it. */
-const STRIPE_API_VERSION = "2024-04-10";
+/** Where the plan-limit stamp goes: billing's fact, which organization applies (R42). */
+type PlanLimitStamps = Pick<BillingLifecycleAnnouncerService, "planLimitAlertSent">;
+
+/** Billing's Stripe, built once per deployment that holds the key. */
+type BillingStripe = Readonly<{
+  channels: BillingStripeChannels;
+}>;
 
 type StripeWebhookComposition = Readonly<{
-  signing: StripeWebhookSignatureService;
   host: BillingWebhookHost;
-  /** Data-retention's rules, which a first seat activation stamps at the platform default. */
-  retention: SeatRetentionRules;
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
-  /** Opens the invitations a seat checkout paid for; organization owns them. */
-  invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
+  /** Clears a trial's licence once its subscription activates; licensing owns it. */
+  licenses: Pick<LicensingApi, "removeLicense">;
 }>;
 
 type SubscriptionComposition = Readonly<{
   notifier: BillingSubscriptionNotifier;
-  organizations: Pick<
-    OrganizationApi,
-    | "getBillingProfile"
-    | "claimBillingCustomerId"
-    | "checkInvitesWithinCaller"
-    | "createPaymentPendingInvites"
-    | "cancelPaymentPendingInvites"
-  >;
+  /** Abandoned checkouts' held invitations close from billing's fact (R42). */
+  facts: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
 }>;
 
 type SubscriptionDoor = Readonly<{
@@ -193,20 +173,10 @@ export class BillingModule
   static readonly dependencies = {
     /** The commit and the contract budget live on the license, not here. */
     licensing: LicensingApi,
-    /** The platform-operator grant the backoffice commands are checked against. */
+    /** The platform-operator grant the admin console commands are checked against. */
     authorization: AuthzApi,
-    /** Which organizations are connected customers, and their projects. */
-    organizations: OrganizationApi,
-    /** The spend ledger a statement sums. */
-    gateway: GatewayApi,
-    /** Where every backoffice billing command is recorded, as main recorded it. */
-    auditLog: AuditLogApi,
     /** Where the usage-limit warning is written down, and read back so it goes once a month. */
     notifications: NotificationApi,
-    /** The named projects a usage-limit warning lists. */
-    projects: ProjectApi,
-    /** The retention window a plan change resets, as main's webhook did. */
-    dataRetention: DataRetentionApi,
   };
   static readonly config = billingConfig;
   static readonly publicConfig = billingBrowserConfig.project;
@@ -223,8 +193,9 @@ export class BillingModule
     const mailer: MailSender = {
       send: (content) => setup.dependencies.notifications.sendEmail(content),
     };
-    const signing = await setup.secrets.into(BillingModule.secrets.stripeWebhookSecret, (secret) =>
-      StripeWebhookSignatureService.create(secret),
+    const webhooks = await setup.secrets.into(
+      BillingModule.secrets.stripeWebhookSecret,
+      (signingSecret) => stripeWebhooksChannels.http.create({ signingSecret }),
     );
     const notices = await BillingModule.#composeNotices(setup);
     // Licensing holds the signing key and refuses a purchase it cannot sign.
@@ -238,35 +209,61 @@ export class BillingModule
         notices,
       }),
     });
-    const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices);
-    return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (stripeSecretKey) =>
-      BillingModule.assemble({
+    // The announcer subscribes the plan-limit alert, whose stamp is the announcer's own fact.
+    const stamps: PlanLimitStamps = {
+      planLimitAlertSent: (input) => lifecycle.planLimitAlertSent(input),
+    };
+    const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices, stamps);
+    const lifecycle = BillingLifecycleAnnouncerService.create({
+      subscriptions: setup.repositories.webhookSubscriptions,
+      organizations: setup.repositories.organizations,
+      resourceLimitAlerts,
+      planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices, stamps),
+      billingOrganizations: setup.repositories.reportOrganizations,
+    });
+    const { nodeEnvironment } = setup.config;
+    return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) => {
+      const stripe = secretKey
+        ? BillingModule.#composeStripe({ secretKey, webhooks, nodeEnvironment })
+        : void 0;
+      return BillingModule.assemble({
         repositories: setup.repositories,
         config: setup.config,
         peers: setup.dependencies,
-        stripeSecretKey,
+        stripe,
+        usageReporting: () =>
+          StripeUsageReportingBuilder.create({
+            meters: stripe?.channels.meters,
+            nodeEnvironment,
+          }).build(),
         statementMail: connectedStatementMailChannels.ses.create(mailer),
-        usageWarnings: BillingModule.#composeUsageWarnings(setup, notices),
+        usageWarnings: BillingModule.#composeUsageWarnings(setup, notices, stamps),
         resourceLimitAlerts,
-        lifecycle: BillingLifecycleAnnouncerService.create({
-          subscriptions: setup.repositories.webhookSubscriptions,
-          organizations: setup.dependencies.organizations,
-          resourceLimitAlerts,
-          planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices),
-        }),
+        lifecycle,
         webhook: {
-          signing,
           host: billingWebhookHostChannels.slack.create({ notices }),
-          retention: setup.dependencies.dataRetention,
-          invites: setup.dependencies.organizations,
+          licenses: setup.dependencies.licensing,
           licensePurchase,
         },
         subscription: {
           notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
-          organizations: setup.dependencies.organizations,
+          facts: lifecycle,
         },
-      }),
-    );
+      });
+    });
+  }
+
+  /** Every Stripe subject channel billing has, over the one client the http bundle builds. */
+  static #composeStripe({
+    secretKey,
+    webhooks,
+    nodeEnvironment,
+  }: {
+    secretKey: string;
+    webhooks: BillingStripeChannels["webhooks"];
+    nodeEnvironment: string | undefined;
+  }): BillingStripe {
+    return { channels: { webhooks, ...composeHttpBillingStripe({ secretKey, nodeEnvironment }) } };
   }
 
   /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
@@ -305,11 +302,13 @@ export class BillingModule
   static #composeUsageWarnings(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
+    stamps: PlanLimitStamps,
   ): UsageWarningService {
-    const { notifications, organizations, projects } = setup.dependencies;
+    const { notifications } = setup.dependencies;
+    const { projects, organizations } = setup.repositories;
     return UsageWarningService.create({
       records: notifications,
-      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
       emails: notices,
       baseHost: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
     });
@@ -319,13 +318,14 @@ export class BillingModule
   static #composeResourceLimitAlerts(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
+    stamps: PlanLimitStamps,
   ): ResourceLimitAlertService {
-    const { organizations, projects } = setup.dependencies;
+    const { projects, organizations } = setup.repositories;
     const { isSaas } = setup.config;
     return ResourceLimitAlertService.create({
       isSaas,
       cooldown: resourceLimitCooldown,
-      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
       plans: SaaSPlanProviderService.create({
         subscriptions: setup.repositories.subscriptions,
         isSaas,
@@ -339,13 +339,14 @@ export class BillingModule
   static #composePlanLimitAlerts(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
+    stamps: PlanLimitStamps,
   ): PlanLimitAlertService {
-    const { organizations, projects } = setup.dependencies;
+    const { projects, organizations } = setup.repositories;
     return PlanLimitAlertService.create({
       isSaas: setup.config.isSaas,
       inFlight: planLimitInFlight,
       cooldown: planLimitCooldown,
-      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
       notices,
       errors: BillingErrorReporterService.create(),
     });
@@ -356,7 +357,8 @@ export class BillingModule
     repositories,
     config,
     peers,
-    stripeSecretKey,
+    stripe,
+    usageReporting,
     statementMail,
     usageWarnings,
     resourceLimitAlerts,
@@ -369,7 +371,6 @@ export class BillingModule
       | "connectedBilling"
       | "checkpoints"
       | "reportOrganizations"
-      | "billableEvents"
       | "organizationCache"
       | "subscriptions"
       | "organizationPricing"
@@ -377,18 +378,23 @@ export class BillingModule
       | "webhookOrganizations"
       | "seatEventSubscriptions"
       | "organizations"
+      | "gatewaySpend"
+      | "projects"
     >;
     config: Pick<
       BillingServerConfig,
       "bankDetails" | "licensePaymentLinkId" | "isSaas" | "nodeEnvironment"
     >;
     peers: ConnectedBillingPeers;
-    stripeSecretKey: string | undefined;
+    /** Billing's Stripe; absent where the deployment holds no key, and nothing bills. */
+    stripe?: BillingStripe;
+    /** The meter LangWatch Cloud reports usage to, built on first use; it refuses without a key. */
+    usageReporting: () => UsageReportingService;
     /** The monthly statement mail; absent, statements wait and nothing is recorded. */
     statementMail?: ConnectedStatementMailChannel;
     usageWarnings: UsageWarningService;
     resourceLimitAlerts: ResourceLimitAlertService;
-    /** The Stripe callback's signing secret and outside reach; absent, the callback answers 404. */
+    /** The Stripe callback's outside reach; absent, the callback answers 404. */
     webhook?: StripeWebhookComposition;
     /** Main's subscription door; absent, every `subscription.*` procedure answers not found. */
     subscription?: SubscriptionComposition;
@@ -397,7 +403,12 @@ export class BillingModule
   }): BillingModule {
     const { isSaas, nodeEnvironment } = config;
     const repository = repositories.connectedBilling;
-    const facts = ConnectedCustomerFactsService.create(peers);
+    const facts = ConnectedCustomerFactsService.create({
+      licensing: peers.licensing,
+      organizations: repositories.organizations,
+      gateway: repositories.gatewaySpend,
+      projects: repositories.projects,
+    });
     const overview = ConnectedBillingOverviewService.create({
       repository,
       facts,
@@ -405,7 +416,6 @@ export class BillingModule
     });
     const gate = {
       authorization: peers.authorization,
-      auditLog: peers.auditLog,
       overview,
       subscriptionPlans: SaaSPlanProviderService.create({
         subscriptions: repositories.subscriptions,
@@ -414,23 +424,16 @@ export class BillingModule
       isSaas,
       usageWarnings,
       resourceLimitAlerts,
-      billableEvents: BillableEventsQueryService.create(repositories.billableEvents),
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
       reporting: BillingModule.#composeReporting({
         repositories,
         peers,
         facts,
         nodeEnvironment,
-        usageReporting: isSaas
-          ? () =>
-              StripeUsageReportingBuilder.create({
-                secretKey: stripeSecretKey,
-                nodeEnvironment,
-              }).build()
-          : void 0,
+        usageReporting: isSaas ? usageReporting : void 0,
       }),
     };
-    if (!stripeSecretKey) {
+    if (!stripe) {
       return new BillingModule({
         ...gate,
         lifecycle,
@@ -440,12 +443,7 @@ export class BillingModule
       });
     }
 
-    const invoicing = connectedInvoicingChannels.http.create({
-      secretKey: stripeSecretKey,
-      usagePriceId: () =>
-        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).prices
-          .CONNECTED_HOSTED_USAGE_QUARTERLY,
-    });
+    const invoicing = stripe.channels.connectedInvoicing;
     const { licensing } = peers;
     const billing = ConnectedBillingService.create({
       repository,
@@ -470,7 +468,7 @@ export class BillingModule
         ? BillingModule.#composeStripeWebhook({
             webhook,
             isSaas,
-            stripeSecretKey,
+            stripe,
             nodeEnvironment,
             repositories,
             licensePaymentLinkId: config.licensePaymentLinkId,
@@ -482,7 +480,7 @@ export class BillingModule
         subscription && isSaas
           ? BillingModule.#composeSubscriptions({
               subscription,
-              stripeSecretKey,
+              stripe,
               nodeEnvironment,
               repositories,
             })
@@ -521,36 +519,37 @@ export class BillingModule
   /** Main's `createSubscriptionRouter` services: customers, subscriptions and seat checkouts. */
   static #composeSubscriptions({
     subscription,
-    stripeSecretKey,
+    stripe,
     nodeEnvironment,
     repositories,
   }: {
     subscription: SubscriptionComposition;
-    stripeSecretKey: string;
+    stripe: Pick<BillingStripe, "channels">;
     nodeEnvironment: string | undefined;
     repositories: Pick<
       BillingRepositories,
       "subscriptions" | "organizations" | "seatEventSubscriptions"
     >;
   }): SubscriptionDoor {
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
     const prices = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
     ).prices;
     const stripeErrors = StripeErrorTranslatorService.create();
+    const { customers, subscriptions: stripeSubscriptions } = stripe.channels;
     return {
-      customers: CustomerService.create({ stripe, organizations: subscription.organizations }),
+      customers: CustomerService.create({ customers, organizations: repositories.organizations }),
       subscriptions: BillingSubscriptionService.create({
         repository: repositories.subscriptions,
         organizationRepository: repositories.organizations,
-        stripe,
+        stripeSubscriptions,
+        stripeInvoices: stripe.channels.invoices,
         itemCalculator: SubscriptionItemCalculatorService.create(prices),
         seatEventService: SeatEventSubscriptionService.create({
-          stripe,
+          stripeSubscriptions,
           subscriptions: repositories.seatEventSubscriptions,
-          invites: subscription.organizations,
+          abandoned: subscription.facts,
           prices,
-          customerCurrency: StripeCustomerCurrencyService.create(stripeErrors),
+          customerCurrency: StripeCustomerCurrencyService.create({ customers, stripeErrors }),
         }),
         notifier: subscription.notifier,
         stripeErrors,
@@ -634,17 +633,20 @@ export class BillingModule
     return this.#subscriptionDoor.subscriptions.notifyProspective(input);
   }
 
-  async createSubscriptionWithInvites(input: {
+  async createSeatCheckout(input: {
     organizationId: string;
     baseUrl: string;
     membersToAdd: number;
-    customerId: string;
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
-    invites: readonly SubscriptionInvite[];
-    invitedBy: OrganizationCaller;
-  }): Promise<{ url: string | null }> {
-    return this.#subscriptionDoor.subscriptions.createSubscriptionWithInvites(input);
+    customerEmail: string | null;
+  }): Promise<{ url: string | null; subscriptionId: string }> {
+    const { customerEmail, ...checkout } = input;
+    const customerId = await this.getOrCreateCustomerId({
+      user: { email: customerEmail },
+      organizationId: input.organizationId,
+    });
+    return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
@@ -655,7 +657,7 @@ export class BillingModule
   static #composeStripeWebhook({
     webhook,
     isSaas,
-    stripeSecretKey,
+    stripe,
     nodeEnvironment,
     repositories,
     licensePaymentLinkId,
@@ -665,7 +667,7 @@ export class BillingModule
     announcer: BillingLifecycleAnnouncerService | undefined;
     webhook: StripeWebhookComposition;
     isSaas: boolean;
-    stripeSecretKey: string;
+    stripe: BillingStripe;
     nodeEnvironment: string | undefined;
     repositories: Pick<BillingRepositories, "webhookSubscriptions" | "webhookOrganizations">;
     licensePaymentLinkId: string | undefined;
@@ -677,20 +679,19 @@ export class BillingModule
     const events = EEWebhookService.create({
       subscriptionRepository: repositories.webhookSubscriptions,
       organizationRepository: repositories.webhookOrganizations,
-      stripe: new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION }),
+      stripeSubscriptions: stripe.channels.subscriptions,
       itemCalculator: SubscriptionItemCalculatorService.create(prices),
       licensePaymentLinkId,
-      inviteApprover: webhook.invites,
+      licenses: webhook.licenses,
       licensePurchaseHandler: webhook.licensePurchase,
       host: webhook.host,
-      retention: webhook.retention,
       connectedBilling,
       ...(announcer ? { announcer } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
-      hasSigningSecret: () => webhook.signing.isConfigured(),
-      constructEvent: (input) => webhook.signing.constructEvent(input),
+      hasSigningSecret: () => stripe.channels.webhooks.isConfigured(),
+      constructEvent: (input) => stripe.channels.webhooks.constructEvent(input),
       handleEvent: (event) => events.handleEvent(event),
     });
   }
@@ -717,11 +718,9 @@ export class BillingModule
   readonly #subscriptions: SubscriptionDoor | undefined;
   readonly #connected: ConnectedBilling | undefined;
   readonly #authorization: Pick<AuthzApi, "can">;
-  readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #overview: ConnectedBillingOverviewService;
   readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
-  readonly #billableEvents: BillableEventsQueryService;
   readonly #pricing: OrganizationPricingService;
   readonly #reporting: BillingReportingPipeline;
   readonly #usageWarnings: UsageWarningService;
@@ -733,11 +732,9 @@ export class BillingModule
     subscriptions,
     connected,
     authorization,
-    auditLog,
     overview,
     subscriptionPlans,
     isSaas,
-    billableEvents,
     pricing,
     reporting,
     usageWarnings,
@@ -749,11 +746,9 @@ export class BillingModule
     subscriptions: SubscriptionDoor | undefined;
     connected: ConnectedBilling | undefined;
     authorization: Pick<AuthzApi, "can">;
-    auditLog: Pick<AuditLogApi, "record">;
     overview: ConnectedBillingOverviewService;
     subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
-    billableEvents: BillableEventsQueryService;
     pricing: OrganizationPricingService;
     reporting: BillingReportingPipeline;
     usageWarnings: UsageWarningService;
@@ -763,11 +758,9 @@ export class BillingModule
     this.#subscriptions = subscriptions;
     this.#connected = connected;
     this.#authorization = authorization;
-    this.#auditLog = auditLog;
     this.#overview = overview;
     this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
-    this.#billableEvents = billableEvents;
     this.#pricing = pricing;
     this.#reporting = reporting;
     this.#usageWarnings = usageWarnings;
@@ -791,13 +784,6 @@ export class BillingModule
     };
   }
 
-  countBillableEventsByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN> {
-    return this.#billableEvents.countBillableEventsByProjects(input);
-  }
-
   getPricingModel(input: {
     organizationId: string;
   }): Promise<{ pricingModel: BillingPricingModel | null }> {
@@ -811,6 +797,20 @@ export class BillingModule
     }
 
     return this.#lifecycle.pipeline;
+  }
+
+  /** The usage-billing catch-up for one organization, for its hand-run task (ADR-174 decision 17). */
+  async catchUpUsageBilling({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ usageBilled: boolean }> {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    return this.#lifecycle.usageBillingCaughtUp({ organizationId, isDryRun });
   }
 
   /** Binds the lifecycle pipeline's own senders. */
@@ -848,9 +848,9 @@ export class BillingModule
   }: {
     repositories: Pick<
       BillingRepositories,
-      "checkpoints" | "reportOrganizations" | "organizationCache"
+      "checkpoints" | "reportOrganizations" | "organizationCache" | "gatewaySpend"
     >;
-    peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
+    peers: Pick<ConnectedBillingPeers, "licensing">;
     facts: ConnectedCustomerFactsService;
     usageReporting: (() => UsageReportingService) | undefined;
     nodeEnvironment: string | undefined;
@@ -859,13 +859,14 @@ export class BillingModule
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
     };
     const instantEvalSpend = InstantEvalSpendQueryService.create({
-      isSpendSourceAvailable: () => peers.gateway.isSpendSourceAvailable(),
+      isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
       listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
-      sumSpendNanoUsdByRequestType: (input) => peers.gateway.sumSpendNanoUsdByRequestType(input),
+      sumSpendNanoUsdByRequestType: (input) =>
+        repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
     const ceiling = ConnectedUsageCeilingService.create({
       licensing: peers.licensing,
-      gateway: peers.gateway,
+      gateway: repositories.gatewaySpend,
       projects,
     });
     let reporter: UsageReportingService | undefined;
@@ -899,15 +900,18 @@ export class BillingModule
       ...plan,
       overrideAddingLimitations:
         !!impersonatorId &&
-        (await this.#isOperator({ userId: impersonatorId, permission: "ops:view" })),
+        (await this.#authorization.can({
+          principal: { type: "user", id: impersonatorId },
+          permission: "ops:view",
+          scope: { type: "platform" },
+        })),
     };
   }
 
   async getConnectedBillingOverview(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingOverview> {
-    const staff = await this.#admitStaff({ by, permission: "ops:view" });
     await this.#record({
       staff,
       action: "connectedBilling.get",
@@ -919,15 +923,16 @@ export class BillingModule
 
   async onboardConnectedCustomer(
     input: ConnectedOnboardRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const account = await this.#connectedBilling().billing.onboard({
       ...input,
       termStartsAt: Temporal.Instant.from(input.termStartsAt),
       termEndsAt: Temporal.Instant.from(input.termEndsAt),
       operatorId: staff.id,
     });
+    // Onboarding opens the account and its usage subscription, which the meter's rule reads.
+    await this.#lifecycle?.usageBillingChanged({ organizationId: input.organizationId });
     await this.#record({
       staff,
       action: "connectedBilling.onboard",
@@ -944,9 +949,8 @@ export class BillingModule
 
   async addConnectedCommit(
     input: ConnectedAddCommitRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedCreditGrantView> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const grant = await this.#connectedBilling().billing.addCommit({
       ...input,
       operatorId: staff.id,
@@ -962,9 +966,8 @@ export class BillingModule
 
   async renewConnectedTerm(
     input: ConnectedRenewRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const account = await this.#connectedBilling().billing.renew({
       ...input,
       termStartsAt: Temporal.Instant.from(input.termStartsAt),
@@ -986,9 +989,8 @@ export class BillingModule
 
   async completeConnectedRenewalIfDue(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<RenewalCompletion> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const outcome = await this.#connectedBilling().billing.completeRenewalIfDue(input);
     await this.#record({
       staff,
@@ -1001,11 +1003,11 @@ export class BillingModule
 
   async markConnectedInvoicePaidOutOfBand(
     input: { stripeInvoiceId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<void> {
-    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     await this.#connectedBilling().billing.markPaidOutOfBand(input);
-    await this.#auditLog.record({
+    await this.#audited().audited({
+      tenantId: PLATFORM_TENANT_ID,
       userId: staff.id,
       action: "connectedBilling.markPaidOutOfBand",
       args: { stripeInvoiceId: input.stripeInvoiceId },
@@ -1022,16 +1024,25 @@ export class BillingModule
   }: {
     staff: BillingStaff;
     action: string;
-    args: RecordAuditLogCommand["args"];
+    args: BillingAuditRecordedEventData["args"];
     organizationId: string;
   }): Promise<void> {
-    await this.#auditLog.record({
+    await this.#audited().audited({
+      tenantId: organizationId,
       userId: staff.id,
       action,
       args,
       targetKind: "organization",
       targetId: organizationId,
     });
+  }
+
+  /** Audit-log writes each admin console command's row from billing's fact (round 37 D3). */
+  #audited(): BillingLifecycleAnnouncerService {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    return this.#lifecycle;
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */
@@ -1044,34 +1055,6 @@ export class BillingModule
   async runConnectedBillingTick(): Promise<void> {
     if (!this.#isSaas) return;
     await this.#connectedBilling().tick.run();
-  }
-
-  /** The staff member, or a 404 that says nothing about why. */
-  async #admitStaff({
-    by,
-    permission,
-  }: {
-    by: BillingStaff | null;
-    permission: OpsOperatorPermission;
-  }): Promise<BillingStaff> {
-    if (!by || !(await this.#isOperator({ userId: by.id, permission }))) {
-      throw new AdminSurfaceHiddenError();
-    }
-    return by;
-  }
-
-  #isOperator({
-    userId,
-    permission,
-  }: {
-    userId: string;
-    permission: OpsOperatorPermission;
-  }): Promise<boolean> {
-    return this.#authorization.can({
-      principal: { type: "user", id: userId },
-      permission,
-      scope: { type: "platform" },
-    });
   }
 
   /** Off Cloud nothing is invoiced; on Cloud a missing payment key is a deployment fault. */

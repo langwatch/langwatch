@@ -16,7 +16,7 @@ import {
   sessionLastUpdateAtMs,
   sessionTotalTokens,
   sortSessionRows,
-} from "../session-sort.ts";
+} from "../behavior/session-sort.ts";
 
 /**
  * One sortable row, filled in around whatever a case pins. Every fixture names

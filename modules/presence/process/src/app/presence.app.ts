@@ -20,10 +20,6 @@ import {
 } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
 
-import {
-  buildPresenceSettingsPipeline,
-  type PresenceSettingsPipeline,
-} from "../eventing/presence-settings.pipeline.ts";
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
 import { PresenceSettingsService } from "../services/presence-settings.service.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
@@ -52,7 +48,6 @@ export interface PresenceEmitter {
 
 type PresenceSetup = FeatureSetup<
   typeof PresenceModule.dependencies,
-  never,
   undefined,
   PresenceRepositories
 >;
@@ -62,7 +57,6 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
   static readonly dependencies = {};
 
   readonly #presence: PresenceService;
-  readonly #settings: PresenceSettingsService;
   readonly #stream: PresenceStreamService;
   readonly #readHints: ReadHintStreamService;
   /** The same fabric {@link PresenceBroadcastFabric} exposes to a peer. */
@@ -71,21 +65,18 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
 
   private constructor({
     presence,
-    settings,
     stream,
     readHints,
     emitters,
     broadcast,
   }: {
     presence: PresenceService;
-    settings: PresenceSettingsService;
     stream: PresenceStreamService;
     readHints: ReadHintStreamService;
     emitters: PresenceEmitter;
     broadcast: PresenceBroadcast;
   }) {
     this.#presence = presence;
-    this.#settings = settings;
     this.#stream = stream;
     this.#readHints = readHints;
     this.#emitters = emitters;
@@ -114,17 +105,11 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
 
     return new PresenceModule({
       presence,
-      settings,
       stream: PresenceStreamService.create({ presence, emitters }),
       readHints: ReadHintStreamService.create({ emitters }),
       emitters,
       broadcast,
     });
-  }
-
-  /** The pipeline whose peer subscribers fold the presence-setting facts. */
-  settingsPipeline(): PresenceSettingsPipeline {
-    return buildPresenceSettingsPipeline({ settings: this.#settings });
   }
 
   /** {@link PresenceBroadcastFabric}: the tenant's live-update signals. */
@@ -187,5 +172,9 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
   }: ReadHintsWatchInput & { signal?: AbortSignal }): AsyncIterable<ReadHint> {
     const tenantIds = [userId, organizationId, ...(projectId === undefined ? [] : [projectId])];
     return this.#readHints.watch({ tenantIds, ...(signal === undefined ? {} : { signal }) });
+  }
+
+  upgradeReadHints({ signal }: { signal?: AbortSignal }): AsyncIterable<ReadHint> {
+    return this.#readHints.watchUpgrades(signal === undefined ? {} : { signal });
   }
 }

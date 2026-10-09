@@ -27,6 +27,25 @@ export interface TurnHealth {
   terminal: LangyStreamEntry | null;
 }
 
+/** The health of a turn from one fold read and one heartbeat read. */
+export function turnHealthOf({
+  conversation,
+  liveness,
+}: {
+  conversation: { status: string; lastError: string | null };
+  liveness: { stale: boolean };
+}): TurnHealth {
+  return {
+    isStale: liveness.stale,
+    terminal:
+      deriveSyntheticTerminal({
+        status: conversation.status,
+        lastError: conversation.lastError,
+        heartbeatStale: liveness.stale,
+      }) ?? null,
+  };
+}
+
 export type SettlementOutcome =
   | { kind: "terminal"; entry: LangyStreamEntry }
   | { kind: "abandoned" };
@@ -78,7 +97,7 @@ export function advanceSettlement({
 }
 
 /** The terminal a settled fold implies once the heartbeat went stale; never over a live beat. */
-export function deriveSyntheticTerminal({
+function deriveSyntheticTerminal({
   status,
   lastError,
   heartbeatStale,

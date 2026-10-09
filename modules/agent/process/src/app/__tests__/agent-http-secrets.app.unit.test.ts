@@ -1,7 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { createAgentAppFixture, secretStoreFixture } from "./agent.fixture.ts";
@@ -123,137 +121,6 @@ describe("AgentModule HTTP agent credentials", () => {
     });
   });
 
-  describe("given a test call that would use stored credentials", () => {
-    const blank = {
-      projectId,
-      actorId: "user_1",
-      method: "POST" as const,
-      headers: [{ key: "X-Tenant-Key", value: "" }],
-      auth: { type: "bearer" as const, token: "" },
-      bodyTemplate: "{}",
-    };
-
-    async function testingSavedAgent() {
-      const sent: string[] = [];
-      const spans: string[] = [];
-      const saved = await savedHttpAgent({
-        workflows: createApiFixture<WorkflowApi>({
-          executeComponent: async (input) => {
-            sent.push(JSON.stringify(input.workflow));
-            return { status: "success", outputs: { output: "pong" } };
-          },
-        }),
-        traces: createApiFixture<TraceApi>({
-          recordCapturedSpan: async (input) => {
-            spans.push(JSON.stringify(input));
-          },
-        }),
-      });
-
-      return { ...saved, sent, spans };
-    }
-
-    /** @scenario "Testing a saved HTTP agent uses its stored credentials for blank ones" */
-    it("fills the stored references and sends the project's secrets to resolve them", async () => {
-      const { app, agent, sent } = await testingSavedAgent();
-
-      await app.executeHttpTest({ ...blank, agentId: agent.id, url: config.url });
-
-      expect(sent[0]).toContain("{{ secrets.HTTP_");
-      expect(sent[0]).toContain("token-secret");
-      expect(sent[0]).toContain("tenant-secret");
-    });
-
-    /** @scenario A test call resolves only the secrets the saved agent references */
-    it("sends only the secrets the saved config references, never the rest of the project", async () => {
-      const { app, agent, sent, values } = await testingSavedAgent();
-      values.UNSAVED = "unsaved-secret";
-
-      await app.executeHttpTest({
-        ...blank,
-        agentId: agent.id,
-        url: config.url,
-        headers: [{ key: "X-Extra", value: "{{ secrets.UNSAVED }}" }],
-      });
-
-      expect(sent[0]).toContain("token-secret");
-      expect(sent[0]).not.toContain("unsaved-secret");
-    });
-
-    /** @scenario A test call never traces a stored credential */
-    it("traces the headers as typed, never the stored values", async () => {
-      const { app, agent, spans } = await testingSavedAgent();
-
-      await app.executeHttpTest({ ...blank, agentId: agent.id, url: config.url });
-
-      expect(spans).toHaveLength(1);
-      expect(spans[0]).not.toContain("token-secret");
-      expect(spans[0]).not.toContain("tenant-secret");
-      expect(spans[0]).not.toContain("{{ secrets.");
-    });
-
-    /** @scenario "A test call to a different address than the saved agent's is refused when it would use stored credentials" */
-    it("refuses a different address and sends nothing", async () => {
-      const { app, agent, sent } = await testingSavedAgent();
-
-      await expect(
-        app.executeHttpTest({ ...blank, agentId: agent.id, url: "https://elsewhere.test/chat" }),
-      ).rejects.toMatchObject({
-        code: "agent_stored_credentials_destination_mismatch",
-        httpStatus: 422,
-      });
-      expect(sent).toEqual([]);
-    });
-
-    /** @scenario "A test call whose address resolves to another host through a secret is refused" */
-    it("checks the address after its references are resolved", async () => {
-      const { app, agent, sent, values } = await testingSavedAgent();
-      values.HOST = "elsewhere.test/x#";
-
-      await expect(
-        app.executeHttpTest({
-          ...blank,
-          agentId: agent.id,
-          url: "https://{{ secrets.HOST }}@agent.test/chat",
-        }),
-      ).rejects.toMatchObject({ code: "agent_stored_credentials_destination_mismatch" });
-      expect(sent).toEqual([]);
-    });
-
-    /** @scenario "A test call to the saved address uses the stored credentials" */
-    it("fills the stored credentials at the saved address, however it is spelled", async () => {
-      const { app, agent, sent } = await testingSavedAgent();
-
-      await app.executeHttpTest({
-        ...blank,
-        agentId: agent.id,
-        url: "https://AGENT.test:443/other-path",
-      });
-
-      expect(sent[0]).toContain("token-secret");
-      expect(sent[0]).toContain("tenant-secret");
-    });
-
-    /** @scenario "A test call with no saved agent fills nothing, and typed credentials are used as typed" */
-    it("sends the typed credentials as typed to any address, and fills none without an agent", async () => {
-      const { app, agent, sent } = await testingSavedAgent();
-
-      await app.executeHttpTest({
-        ...blank,
-        agentId: agent.id,
-        url: "https://elsewhere.test/chat",
-        headers: [{ key: "X-Tenant-Key", value: "typed-tenant" }],
-        auth: { type: "bearer", token: "typed-token" },
-      });
-      await app.executeHttpTest({ ...blank, url: config.url });
-
-      expect(sent[0]).toContain("typed-token");
-      expect(sent[0]).not.toContain("token-secret");
-      expect(sent[1]).not.toContain("token-secret");
-      expect(sent[1]).not.toContain("tenant-secret");
-    });
-  });
-
   describe("given a copy into another project", () => {
     /** @scenario A copy into another project arrives with blank credentials */
     it("arrives with every credential blank, references too, and the rest as it was", async () => {
@@ -261,12 +128,10 @@ describe("AgentModule HTTP agent credentials", () => {
         permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       });
 
-      await app.copyForActor({
+      await app.createCopy({
         sourceAgentId: agent.id,
         sourceProjectId: projectId,
         targetProjectId: "project_2",
-        actorId: "user_1",
-        actorUserId: "user_1",
       });
 
       const [copy] = await repositories.agents.findAll({ projectId: "project_2" });

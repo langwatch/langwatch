@@ -54,17 +54,21 @@ function alertsFor({
   const slack: PlanLimitNotificationContext[] = [];
   const hubspot: PlanLimitNotificationContext[] = [];
   const stamped: Instant[] = [];
+  const reads = { count: 0 };
   const alerts = PlanLimitAlertService.create({
     isSaas,
     inFlight: new Set(),
     cooldown: BillingAlertCooldownService.create({ ttlMs: 30 * DAY_MS }),
     organizations: createApiFixture<BillingUsageLimitOrganization>({
-      findWithAdmins: async () => ({
-        id: "org_acme",
-        name: "Acme",
-        sentPlanLimitAlert,
-        members: [{ user: { id: "user_ana", name: "Ana", email: "ana@acme.com" } }],
-      }),
+      findWithAdmins: async () => {
+        reads.count += 1;
+        return {
+          id: "org_acme",
+          name: "Acme",
+          sentPlanLimitAlert,
+          members: [{ user: { id: "user_ana", name: "Ana", email: "ana@acme.com" } }],
+        };
+      },
       updateSentPlanLimitAlert: async (_organizationId, timestamp) => void stamped.push(timestamp),
     }),
     notices: createApiFixture<NotificationService>({
@@ -73,7 +77,7 @@ function alertsFor({
     }),
     errors: RecordingErrorReporter.create(),
   });
-  return { alerts, slack, hubspot, stamped };
+  return { alerts, slack, hubspot, stamped, reads };
 }
 
 describe("the plan-limit alert", () => {
@@ -145,6 +149,20 @@ describe("the plan-limit alert", () => {
       await alerts.notifyPlanLimitReached(REACHED);
 
       expect([...slack, ...hubspot]).toEqual([]);
+    });
+  });
+
+  describe("given billing's stamp fact that organization has not applied yet", () => {
+    /** @scenario "A plan-limit alert inside the apply window is not sent twice" */
+    it("refuses the second alert at the damper, before the stale stamp is read", async () => {
+      const { alerts, slack, stamped, reads } = alertsFor({ sentPlanLimitAlert: null });
+
+      await alerts.notifyPlanLimitReached(REACHED);
+      await alerts.notifyPlanLimitReached(REACHED);
+
+      expect(slack).toHaveLength(1);
+      expect(stamped).toHaveLength(1);
+      expect(reads.count).toBe(1);
     });
   });
 });

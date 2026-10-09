@@ -1,12 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * What the identity provider asked us, and what we answered (ADR-126).
- *
- * The question this answers is "my provider says it is syncing and your page
- * says nothing arrived". A push refused before it reached a handler decided
- * nothing and appears nowhere else, and that refusal is the whole of what
- * somebody who has just pasted a token needs to read.
- */
 import {
   Alert,
   Badge,
@@ -17,11 +8,21 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * What the identity provider asked us, and what we answered (ADR-126).
+ *
+ * The question this answers is "my provider says it is syncing and your page
+ * says nothing arrived". A push refused before it reached a handler decided
+ * nothing and appears nowhere else, and that refusal is the whole of what
+ * somebody who has just pasted a token needs to read.
+ */
+import { readableDate } from "@langwatch/time";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import { scimApi, type ScimRequestRow } from "../../behavior/scim-api.ts";
-import { connectionLabel, readableDate } from "../../model/display-formatters.ts";
+import { connectionLabel } from "../../model/display-formatters.ts";
 import { isRefusal, reasonInWords, resourceInWords } from "../../model/request-log-words.ts";
 
 /** A connection as the settings page already holds it. */

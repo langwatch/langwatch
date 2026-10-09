@@ -54,6 +54,22 @@ async function application({ failKeys = 0 }: { failKeys?: number } = {}) {
 
   const setup = organizationModuleSetup({ permissions, apiKeys });
   const app = await OrganizationModule.create(setup);
+  const accepts = { send: async () => undefined };
+  app.connectLifecycle({
+    recordCreated: accepts,
+    recordSignedUp: accepts,
+    recordMembersInvited: accepts,
+    recordInviteAccepted: accepts,
+    recordIntegrationMethodChosen: accepts,
+    recordPersonalWorkspaceProvisioned: accepts,
+    recordPersonalTeamCreated: accepts,
+    recordPersonalWorkspaceArchived: accepts,
+    recordPersonalWorkspaceRevived: accepts,
+    recordPersonalWorkspaceFeaturesChanged: accepts,
+    recordPresenceSettingChanged: accepts,
+    recordTraceSharingDisabled: accepts,
+    recordMemberDisabled: accepts,
+  });
 
   return { app, repositories: setup.repositories, permissions, keyRequests };
 }

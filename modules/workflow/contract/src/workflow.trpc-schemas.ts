@@ -205,19 +205,15 @@ export const workflowPushToCopiesSchema = z.object({
   ),
 });
 
-/** What archiving a workflow would take with it. */
+/** What archiving a workflow takes with it; its evaluators and monitors are their owners'. */
 export const workflowRelatedEntitiesSchema = z.object({
-  evaluators: z.array(z.object({ id: z.string(), name: z.string() })),
   agents: z.array(z.object({ id: z.string(), name: z.string() })),
-  monitors: z.array(z.object({ id: z.string(), name: z.string(), evaluatorId: z.string() })),
 });
 
-/** What `cascadeArchive` did, in one transaction. */
+/** What `cascadeArchive` archived at once; evaluators and their monitors follow after a lag. */
 export const workflowCascadeArchiveSchema = z.object({
   workflow: workflowSchema,
-  archivedEvaluatorsCount: z.number(),
   archivedAgentsCount: z.number(),
-  deletedMonitorsCount: z.number(),
 });
 
 export type WorkflowProjectPath = z.infer<typeof workflowProjectPathSchema>;

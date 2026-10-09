@@ -1,3 +1,4 @@
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type ListWebhookEventsQuery,
@@ -5,12 +6,13 @@ import {
   type WebhookEnvelope,
 } from "@langwatch/webhook-contract";
 
-import type { WebhookEventsRepository } from "../repositories/webhook-events.repository.ts";
+import { parseSpendEventId, spendStatusesForTypes } from "../rules/webhook-spend-event-id.rules.ts";
 import type { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 
-export type WebhookEventsServiceOptions = {
+type WebhookEventsServiceOptions = {
   projects: Pick<ProjectApi, "listIdsByOrganization">;
-  events: WebhookEventsRepository;
+  /** Gateway owns gateway_spend; webhook reads its emitted events through gateway's Api. */
+  spend: Pick<GatewayApi, "listSpendEventsAcrossTenants" | "findSpendEventAcrossTenants">;
   envelopes: WebhookEnvelopeService;
 };
 
@@ -29,26 +31,32 @@ export class WebhookEventsService {
     organizationId: string;
     id: string;
   }): Promise<WebhookEnvelope | null> {
-    const row = await this.options.events.findEmittedEventById({
+    const parsed = parseSpendEventId(input.id);
+    if (!parsed) return null;
+    const row = await this.options.spend.findSpendEventAcrossTenants({
       tenantIds: await this.options.projects.listIdsByOrganization({
         organizationId: input.organizationId,
       }),
-      id: input.id,
+      gatewayRequestId: parsed.gatewayRequestId,
+      statuses: parsed.statuses,
     });
 
     return row ? this.options.envelopes.fromSpendRow(row) : null;
   }
 
   async getEmittedEvents(query: ListWebhookEventsQuery): Promise<ListWebhookEventsResult> {
-    const page = await this.options.events.readEmittedEventsPage({
-      tenantIds: await this.options.projects.listIdsByOrganization({
-        organizationId: query.organizationId,
-      }),
+    const statuses = spendStatusesForTypes(query.types);
+    const tenantIds = await this.options.projects.listIdsByOrganization({
+      organizationId: query.organizationId,
+    });
+    if (tenantIds.length === 0 || statuses.length === 0) return { events: [], nextCursor: null };
+    const page = await this.options.spend.listSpendEventsAcrossTenants({
+      tenantIds,
+      statuses,
       fromMs: query.fromMs,
       toMs: query.toMs,
       cursor: query.cursor ?? null,
       limit: query.limit,
-      types: query.types,
     });
 
     return {

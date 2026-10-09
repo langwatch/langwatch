@@ -11,23 +11,32 @@ import type {
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const featureNameSchema = z.string().regex(NAME);
-const featureSubjectsSchema = z
-  .array(featureNameSchema)
-  .min(1)
-  .refine((subjects) => new Set(subjects).size === subjects.length)
-  .refine((subjects) =>
-    subjects.every((subject, index) => {
-      const previous = subjects[index - 1];
-      const comparison = previous?.localeCompare(subject);
-      const ordered = comparison !== void 0 && comparison < 0;
+/** A REST path segment: lower-case words joined by `-`, or `_` where a legacy path has one. */
+const REST_NAMESPACE = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
-      return index === 0 || ordered;
-    }),
-  );
+/** A non-empty, sorted, duplicate-free list of names the pattern accepts. */
+function sortedNamesSchema(pattern: RegExp) {
+  return z
+    .array(z.string().regex(pattern))
+    .min(1)
+    .refine((names) => new Set(names).size === names.length)
+    .refine((names) =>
+      names.every((name, index) => {
+        const previous = names[index - 1];
+        const comparison = previous?.localeCompare(name);
+        const ordered = comparison !== void 0 && comparison < 0;
+
+        return index === 0 || ordered;
+      }),
+    );
+}
+
+const featureSubjectsSchema = sortedNamesSchema(NAME);
 const featureCatalogueEntryKeysSchema = z
   .object({
     classification: z.unknown(),
     id: z.unknown(),
+    restNamespaces: z.unknown().optional(),
     root: z.unknown(),
     subjects: z.unknown(),
   })
@@ -36,6 +45,8 @@ const featureCatalogueEntrySchema = z
   .object({
     classification: z.enum(["core", "enterprise"]),
     id: featureNameSchema,
+    /** The first segments after `/api/` (or `/api/v1/`) this feature owns (§8). */
+    restNamespaces: sortedNamesSchema(REST_NAMESPACE).optional(),
     root: z.string(),
     subjects: featureSubjectsSchema,
   })
@@ -60,7 +71,13 @@ interface SeenCatalogue {
   ids: Set<string>;
   roots: Set<string>;
   subjectOwners: Map<string, string>;
+  restNamespaceOwners: Map<string, string>;
 }
+
+type ParsedCatalogueEntry = {
+  entry: FeatureCatalogueEntry;
+  restNamespaces: readonly string[];
+};
 
 function parseCatalogueEntry({
   path,
@@ -72,7 +89,7 @@ function parseCatalogueEntry({
   index: number;
   raw: unknown;
   violations: ArchitectureViolation[];
-}): FeatureCatalogueEntry | undefined {
+}): ParsedCatalogueEntry | undefined {
   if (!jsonObjectSchema.validate(raw)) {
     violations.push(issue(path, `Feature catalogue entry ${index} must be an object.`));
     return undefined;
@@ -82,7 +99,7 @@ function parseCatalogueEntry({
     violations.push(
       issue(
         path,
-        `Feature catalogue entry ${index} must contain only id, root, classification, and subjects.`,
+        `Feature catalogue entry ${index} must contain only id, root, classification, subjects, and restNamespaces.`,
       ),
     );
 
@@ -96,15 +113,45 @@ function parseCatalogueEntry({
       issue(
         path,
         `Feature catalogue entry ${index} is malformed.`,
-        "Use a singular lower-case kebab-case id, its derived root, a core or enterprise classification, and a sorted duplicate-free subjects array.",
+        "Use a singular lower-case kebab-case id, its derived root, a core or enterprise classification, a sorted duplicate-free subjects array, and an optional sorted duplicate-free restNamespaces array.",
       ),
     );
 
     return undefined;
   }
 
-  const { classification, id, root, subjects } = entryResult.data;
-  return { id, root, classification, subjects };
+  const { classification, id, root, subjects, restNamespaces = [] } = entryResult.data;
+  return { entry: { id, root, classification, subjects }, restNamespaces };
+}
+
+function checkRestNamespaces({
+  path,
+  parsed,
+  seen,
+  violations,
+}: {
+  path: string;
+  parsed: ParsedCatalogueEntry;
+  seen: SeenCatalogue;
+  violations: ArchitectureViolation[];
+}): void {
+  const { id } = parsed.entry;
+
+  for (const namespace of parsed.restNamespaces) {
+    const owner = seen.restNamespaceOwners.get(namespace);
+
+    if (owner && owner !== id) {
+      violations.push(
+        issue(
+          path,
+          `REST namespace ${JSON.stringify(namespace)} is owned by both ${JSON.stringify(owner)} and ${JSON.stringify(id)}.`,
+          "Give each REST namespace one owner; the other module serves its paths with .withSharedPath({ owner }). See dev/docs/ARCHITECTURE.md §8.",
+        ),
+      );
+    } else {
+      seen.restNamespaceOwners.set(namespace, id);
+    }
+  }
 }
 
 function checkCatalogueEntry({
@@ -159,10 +206,38 @@ function checkCatalogueEntry({
   }
 }
 
+type ReadCatalogue = {
+  entries: FeatureCatalogueEntry[];
+  restNamespaceOwners: ReadonlyMap<string, string>;
+};
+
+const NOTHING_READ: ReadCatalogue = { entries: [], restNamespaceOwners: new Map() };
+
 export function readFeatureCatalogue(
   workspaceRoot: string,
   violations: ArchitectureViolation[],
 ): FeatureCatalogueEntry[] {
+  return readCatalogue({ workspaceRoot, violations }).entries;
+}
+
+/** Which feature owns each REST namespace, from the same catalogue (§8). */
+export function readRestNamespaceOwners({
+  workspaceRoot,
+  violations = [],
+}: {
+  workspaceRoot: string;
+  violations?: ArchitectureViolation[];
+}): ReadonlyMap<string, string> {
+  return readCatalogue({ workspaceRoot, violations }).restNamespaceOwners;
+}
+
+function readCatalogue({
+  workspaceRoot,
+  violations,
+}: {
+  workspaceRoot: string;
+  violations: ArchitectureViolation[];
+}): ReadCatalogue {
   const path = join(workspaceRoot, "modules", "catalogue.json");
 
   if (!existsSync(path)) {
@@ -174,7 +249,7 @@ export function readFeatureCatalogue(
       ),
     );
 
-    return [];
+    return NOTHING_READ;
   }
 
   let rawCatalogue: unknown;
@@ -189,7 +264,7 @@ export function readFeatureCatalogue(
       ),
     );
 
-    return [];
+    return NOTHING_READ;
   }
 
   const catalogueResult = featureCatalogueSchema.safeParse(rawCatalogue);
@@ -197,7 +272,7 @@ export function readFeatureCatalogue(
   if (!catalogueResult.success) {
     violations.push(issue(path, "Feature catalogue must contain version 0 and a features array."));
 
-    return [];
+    return NOTHING_READ;
   }
 
   const entries: FeatureCatalogueEntry[] = [];
@@ -206,13 +281,15 @@ export function readFeatureCatalogue(
     ids: new Set<string>(),
     roots: new Set<string>(),
     subjectOwners: new Map<string, string>(),
+    restNamespaceOwners: new Map<string, string>(),
   };
 
   for (const [index, raw] of catalogueResult.data.features.entries()) {
-    const entry = parseCatalogueEntry({ path, index, raw, violations });
-    if (!entry) continue;
-    checkCatalogueEntry({ path, entry, seen, violations });
-    entries.push(entry);
+    const parsed = parseCatalogueEntry({ path, index, raw, violations });
+    if (!parsed) continue;
+    checkCatalogueEntry({ path, entry: parsed.entry, seen, violations });
+    checkRestNamespaces({ path, parsed, seen, violations });
+    entries.push(parsed.entry);
   }
 
   const sorted = [...entries].toSorted((left, right) => {
@@ -231,5 +308,5 @@ export function readFeatureCatalogue(
     );
   }
 
-  return entries;
+  return { entries, restNamespaceOwners: seen.restNamespaceOwners };
 }

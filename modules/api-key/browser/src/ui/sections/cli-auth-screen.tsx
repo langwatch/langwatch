@@ -17,6 +17,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
+import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { nowInstant } from "@langwatch/time";
 import { CheckCircle2, CircleAlert, Clock3, Info, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -673,10 +674,10 @@ function ProjectPicker({
           variant="ghost"
           color="fg.muted"
           onClick={() =>
-            host.openPlatformDrawer({
-              drawer: "createProject",
-              params: { organizationId: organizationId ?? void 0 },
-            })
+            host.openDrawerByToken(
+              CreateProjectDrawerToken,
+              organizationId ? { organizationId } : undefined,
+            )
           }
         >
           <Icon as={Plus} boxSize={3.5} />

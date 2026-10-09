@@ -82,7 +82,7 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
         orderBy: { name: "asc" },
       }),
       this.database.project.findMany({
-        where: { team: { organizationId } },
+        where: { team: { organizationId }, kind: { not: "internal_governance" } },
         // `archivedAt` is SELECTED rather than filtered so a rule targeting a
         // since-archived project still resolves its name; the picker is where
         // the archived ones are dropped.
@@ -99,28 +99,6 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
         archived: project.archivedAt !== null,
       })),
     };
-  }
-
-  async findScopeOrganizationId({ scope }: { scope: ScopeAssignment }): Promise<string | null> {
-    if (scope.scopeType === "ORGANIZATION") {
-      const organization = await this.database.organization.findUnique({
-        where: { id: scope.scopeId },
-        select: { id: true },
-      });
-      return organization?.id ?? null;
-    }
-    if (scope.scopeType === "TEAM") {
-      const team = await this.database.team.findUnique({
-        where: { id: scope.scopeId },
-        select: { organizationId: true },
-      });
-      return team?.organizationId ?? null;
-    }
-    const project = await this.database.project.findUnique({
-      where: { id: scope.scopeId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    return project?.team?.organizationId ?? null;
   }
 
   async findScopeProjects({

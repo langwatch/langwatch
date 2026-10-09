@@ -14,17 +14,17 @@ import {
   SilentLogger,
   TestDispatchErrors,
 } from "../../__tests__/fixtures/graph-activity.fixture.ts";
+import { AutomationGraphActivityService } from "../../features/graph-alert/services/automation-graph-activity.service.ts";
+import { AutomationGraphDeliveryService } from "../../features/graph-alert/services/automation-graph-delivery.service.ts";
+import { AutomationEmailCapService } from "../../features/runaway/services/email-cap.service.ts";
+import { SlackDestinationService } from "../../features/slack/services/slack-destination.service.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
 import type { TriggerSecretCipher } from "../../repositories/trigger.repository.ts";
-import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
-import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
-import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
 import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
-import { SlackDestinationService } from "../slack-destination.service.ts";
 
 /**
  * Spec: modules/automation/specs/graph-alert-worker-composition.feature
@@ -33,6 +33,7 @@ import { SlackDestinationService } from "../slack-destination.service.ts";
 const storesConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
+  clickhouseStatementLaneReserveShare: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,

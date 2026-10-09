@@ -1,11 +1,14 @@
-import { visitContentPart } from "../trace-content-part.dispatcher.ts";
-import type { ContentPartVisitor } from "../trace-content-part.types.ts";
+import { visitContentPart } from "../features/content/trace-content-part.dispatcher.ts";
+import type { ContentPartVisitor } from "../features/content/trace-content-part.types.ts";
 /**
  * Decoding one message's `content` into display parts. Split from the
  * message-level walk so each file answers one question: this is "what is
  * inside a message", `flattenMessages` is "what is in the conversation".
  */
-import { convertMediaPartToMediaData, type MediaPartData } from "../trace-media-part.collector.ts";
+import {
+  convertMediaPartToMediaData,
+  type MediaPartData,
+} from "../features/content/trace-media-part.collector.ts";
 import type { DisplayPart } from "./display-part.ts";
 
 /** Identity a decoded part inherits from the message it came from. */

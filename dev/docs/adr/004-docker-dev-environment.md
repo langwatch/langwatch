@@ -468,3 +468,6 @@ process boots, migrate, then report healthy.**
 
 Spec: `specs/setup/boot-sequence.feature`. See also
 `specs/setup/schema-migrations-on-start.feature` for the deployed start path.
+
+
+**Amendment 2026-10-09:** on macOS haven now runs ClickHouse natively by default; the container tier (colima) is the fallback.

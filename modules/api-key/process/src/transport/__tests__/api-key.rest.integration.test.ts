@@ -1022,6 +1022,28 @@ describe("the api-keys REST family", () => {
       expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ callerIsAdmin: false }));
     });
 
+    /** @scenario "A missing API key names the two ways to find the right id" */
+    it("carries the tips for checking and listing the key ids and the API keys documentation link", async () => {
+      const { send } = mountApiKeyRest({
+        apiKeys: {
+          revoke: vi.fn(async (): Promise<ApiKey> => {
+            throw new ApiKeyNotFoundError("api-key-missing");
+          }),
+          isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
+      });
+
+      const response = await send("/api/api-keys/api-key-missing", { method: "DELETE" });
+      const body = (await response.json()) as { code: string; tips?: string[]; docs_url?: string };
+
+      expect(response.status).toBe(404);
+      expect(body.code).toBe("api_key_not_found");
+      expect(body.tips?.some((tip) => tip.includes("Check the API key id"))).toBe(true);
+      expect(body.tips?.some((tip) => tip.includes("List the keys"))).toBe(true);
+      expect(body.docs_url).toContain("/api-reference/api-keys/overview");
+    });
+
     /** @scenario Revoking a key that is already revoked names the code */
     it("names the code rather than the HTTP reason phrase", async () => {
       const { send } = mountApiKeyRest({

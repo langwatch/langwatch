@@ -113,6 +113,38 @@ export async function discoverAffectedAggregates({
 }
 
 /**
+ * The tenants holding any of the event types since a timestamp, one row each, so a replay lists
+ * them before it discovers any aggregate. Read on the shared server: a private dataplane's tenants
+ * are not listed here (plan pr-7536 F-5, MIG-REPLAY-SCALE risk R1).
+ */
+export async function discoverTenants({
+  client,
+  eventTypes,
+  sinceMs,
+}: {
+  client: EventingClickHouseReplayClient;
+  eventTypes: readonly string[];
+  sinceMs: number;
+}): Promise<string[]> {
+  const { rows } = await client.query<{ tenantId: string }>({
+    tenantId: REPLAY_ALL_TENANTS,
+    sql: `
+      SELECT DISTINCT TenantId AS tenantId
+      FROM event_log
+      WHERE EventType IN ({eventTypes:Array(String)})
+        AND EventTimestamp >= {sinceMs:UInt64}
+      ORDER BY TenantId
+    `,
+    params: { eventTypes: [...eventTypes], sinceMs },
+    unscoped: {
+      reason:
+        "Replay tenant listing: a replay lists the tenants holding a lane's events before it discovers each tenant's aggregates under that tenant.",
+    },
+  });
+  return rows.map((row) => row.tenantId);
+}
+
+/**
  * Count total events for discovered aggregates (ALL history, not just since window).
  */
 export async function countEventsForAggregates({
@@ -478,6 +510,10 @@ export class EventingClickHouseReplayEventSource implements ReplayEventSource {
   constructor(deps: { clickhouse: EventingClickHouseReplayClient; lean: ReplayEventLean }) {
     this.clickhouse = deps.clickhouse;
     this.lean = deps.lean;
+  }
+
+  discoverTenants(input: { eventTypes: readonly string[]; sinceMs: number }): Promise<string[]> {
+    return discoverTenants({ client: this.clickhouse, ...input });
   }
 
   discoverAffectedAggregates(input: {

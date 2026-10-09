@@ -10,18 +10,15 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/compat/next-dynamic.ts",
     "./src/capabilities.ts",
     "./src/use-router.ts",
     "./src/toaster.ts",
     "./src/storage.ts",
     "./src/errors.ts",
-    "./src/query-retry.ts",
+    "./src/query/query-retry.ts",
     "./src/testing.ts",
     "./src/link.tsx",
-    "./src/use-drawer.ts",
     "./src/global-store.ts",
-    "./src/upgrade-modal-store.ts",
     "./src/use-organization-team-project.ts",
     "./src/format-time-ago.ts",
     "./src/feature-flag.ts",
@@ -47,37 +44,13 @@
   ],
   "references": [
     {
-      "path": "../../modules/agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/annotation/contract/tsconfig.build.json"
-    },
-    {
       "path": "../api/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
       "path": "../config/tsconfig.build.json"
     },
     {
-      "path": "../../modules/dashboard/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/dataset/contract/tsconfig.build.json"
-    },
-    {
       "path": "../design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/evaluator/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/experiment/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/feature-flag/contract/tsconfig.build.json"
@@ -86,31 +59,16 @@
       "path": "../handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../modules/langy/contract/tsconfig.build.json"
-    },
-    {
       "path": "../module/tsconfig.build.json"
     },
     {
       "path": "../observability/tsconfig.build.json"
     },
     {
-      "path": "../../modules/prompt/contract/tsconfig.build.json"
-    },
-    {
       "path": "../react-rum/tsconfig.build.json"
     },
     {
-      "path": "../../modules/scenario/contract/tsconfig.build.json"
-    },
-    {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/workflow/contract/tsconfig.build.json"
     }
   ]
 }

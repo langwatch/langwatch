@@ -33,7 +33,9 @@ type Options struct {
 	URL             string // app origin; empty resolves the shared stack via haven
 	// MaxConsecutiveErrors stops the run after this many harness errors in a row; 0 never, negative the mode's default.
 	MaxConsecutiveErrors int
-	Root                 string // repository root, for .fuzz output and the UI runner
+	// Vision asks a vision model to judge each UI route's settled screen (needs ANTHROPIC_API_KEY).
+	Vision bool
+	Root   string // repository root, for .fuzz output and the UI runner
 }
 
 // Invocation is what a command line hands Main: the arguments after the
@@ -48,7 +50,7 @@ type Invocation struct {
 func Main(ctx context.Context, invocation Invocation) int {
 	args, streams, root := invocation.Args, invocation.Streams, invocation.Root
 	if len(args) == 0 {
-		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-reload-every N] [-actions N] [-max-consecutive-errors N] [-url URL]")
+		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-reload-every N] [-actions N] [-max-consecutive-errors N] [-vision] [-url URL]")
 		return 2
 	}
 	options := Options{Mode: args[0], Root: root}
@@ -61,6 +63,7 @@ func Main(ctx context.Context, invocation Invocation) int {
 	flags.IntVar(&options.ReloadEvery, "reload-every", DefaultReloadEvery, "ui: full page load every Nth visit, in-app navigation between (1 = always load)")
 	flags.IntVar(&options.ActionsPerRoute, "actions", DefaultActionsPerRoute, "ui: random actions per visited route")
 	flags.IntVar(&options.MaxConsecutiveErrors, "max-consecutive-errors", -1, "stop after this many harness errors in a row: api transport errors (default 200), ui visits that errored or stayed loading (default 10); 0 never stops")
+	flags.BoolVar(&options.Vision, "vision", false, "ui: a vision model judges each route's settled screen for looks-wrong defects (needs ANTHROPIC_API_KEY)")
 	flags.StringVar(&options.URL, "url", "", "app origin; default is diffsuite's branch stack, else the shared stack")
 	if err := flags.Parse(args[1:]); err != nil {
 		return 2

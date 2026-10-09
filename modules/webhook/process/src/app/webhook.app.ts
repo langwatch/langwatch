@@ -1,11 +1,10 @@
-import { AwsClientConfiguration } from "@langwatch/aws-client";
-import { parseOutboundProxyConfig } from "@langwatch/egress";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   EventingCommandSender,
   EventingParticipation,
   ProcessStore,
 } from "@langwatch/eventing";
+import { GatewayApi } from "@langwatch/gateway-contract";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
@@ -25,12 +24,7 @@ import {
   WebhookEventNotFoundError,
 } from "@langwatch/webhook-contract";
 
-import { HttpDestinationChannel } from "../channels/http/http.destination.channel.ts";
-import { MemorySqsWebhookDestinationChannel } from "../channels/memory/memory.sqs-webhook-destination.channel.ts";
-import {
-  SqsWebhookDestinationChannel,
-  sqsProxyResolver,
-} from "../channels/sqs/sqs.webhook-destination.channel.ts";
+import type { WebhookChannels } from "../channels/webhook.channels.ts";
 import {
   buildWebhookDeliveryPipeline,
   type WebhookDeliveryDefinition,
@@ -41,6 +35,7 @@ import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/w
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import { webhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
+import { WebhookDeliveryMaintenanceService } from "../services/webhook-delivery-maintenance.service.ts";
 import { WebhookDeliveryRequestService } from "../services/webhook-delivery-request.service.ts";
 import {
   WebhookDeliveryService,
@@ -114,9 +109,7 @@ type WebhookTestDispatchInput = {
   isTestFire: boolean;
 };
 
-export type WebhookTestDispatch = (
-  input: WebhookTestDispatchInput,
-) => Promise<DeliveryDispatchResult>;
+type WebhookTestDispatch = (input: WebhookTestDispatchInput) => Promise<DeliveryDispatchResult>;
 
 /** What the process composes this feature's application from. */
 export interface WebhookAppDependencies {
@@ -151,9 +144,9 @@ export interface WebhookAppDependencies {
 
 type WebhookSetup = FeatureSetup<
   typeof WebhookModule.dependencies,
-  never,
   WebhookServerConfig,
-  WebhookRepositories
+  WebhookRepositories,
+  WebhookChannels
 >;
 
 /** What the worker's delivery process manager is composed from; built only when consuming. */
@@ -166,9 +159,13 @@ type WebhookDeliveryParts = Readonly<{
 
 export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoorApi {
   static readonly contract = WebhookApi;
-  /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`),
-   *  and the project peer naming an organization's tenants for the events listing. */
-  static readonly dependencies = { entitlement: EntitlementApi, projects: ProjectApi };
+  /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`), the
+   *  project peer naming an organization's tenants, and gateway answering their spend events. */
+  static readonly dependencies = {
+    entitlement: EntitlementApi,
+    gateway: GatewayApi,
+    projects: ProjectApi,
+  };
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookModule {
@@ -177,23 +174,13 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
     const caps = WebhookDispatchCapService.create({ caps: input.repositories.dispatchCaps });
     const egress = WebhookEgressService.create({
       caps,
-      http: HttpDestinationChannel.create({
-        tls: { rejectUnauthorized: input.config.isSaas },
-      }),
-    });
-    const aws = AwsClientConfiguration.create({
-      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.config.outboundProxy)),
+      http: input.channels.http,
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({
         egress,
         allowInsecureLocal: input.config.allowInsecureLocalUrls,
-        sqs:
-          input.tier === "memory"
-            ? MemorySqsWebhookDestinationChannel.create()
-            : SqsWebhookDestinationChannel.create({
-                awsClientConfig: (config) => aws.build(config),
-              }),
+        sqs: input.channels.sqs,
         caps,
       }),
     });
@@ -202,7 +189,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
         projects: input.dependencies.projects,
-        events: input.repositories.events,
+        spend: input.dependencies.gateway,
         envelopes: WebhookEnvelopeService.create(),
       }),
       assertEndpointsEntitled: (organizationId) => access.assertEndpointsAvailable(organizationId),
@@ -258,6 +245,10 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       deliveryProcess: WebhookDeliveryService.create(deps).processManager(),
       governanceProcess: WebhookGovernanceDeliveryService.create(deps).processManager(),
       gatewayEvents: (request) => this.requestGatewayEventDelivery(request),
+      prune: {
+        prune: () => WebhookDeliveryMaintenanceService.create(deps).runIfDue(),
+        deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+      },
     });
   }
 
@@ -503,7 +494,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
  * What one delivery attempt amounted to. - `success`: the receiver has it. Clears the
  * endpoint's failure streak. - `retryable`: try again along the ladder.
  */
-export type WebhookDispatchVerdict = "success" | "retryable" | "terminal";
+type WebhookDispatchVerdict = "success" | "retryable" | "terminal";
 
 export interface WebhookDispatchResult {
   verdict: WebhookDispatchVerdict;

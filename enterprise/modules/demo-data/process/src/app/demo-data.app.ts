@@ -18,11 +18,7 @@ import { DemoDataService } from "../services/demo-data.service.ts";
 
 const logger = createLogger("langwatch:demo-data");
 
-type DemoDataSetup = FeatureSetup<
-  typeof DemoDataModule.dependencies,
-  never,
-  DemoDataConfig | undefined
->;
+type DemoDataSetup = FeatureSetup<typeof DemoDataModule.dependencies, DemoDataConfig | undefined>;
 
 export class DemoDataModule implements DemoDataApiContract {
   static readonly contract = DemoDataApi;

@@ -19,6 +19,9 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../agent/client/tsconfig.build.json"
+    },
+    {
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
@@ -58,7 +61,13 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../model-provider/client/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../monitor/client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
@@ -67,7 +76,13 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../prompt/client/tsconfig.build.json"
+    },
+    {
       "path": "../../prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../scenario/client/tsconfig.build.json"
     },
     {
       "path": "../../secret/contract/tsconfig.build.json"
@@ -76,10 +91,16 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../trace/client/tsconfig.build.json"
+    },
+    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

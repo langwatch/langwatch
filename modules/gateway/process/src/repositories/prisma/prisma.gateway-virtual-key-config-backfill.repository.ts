@@ -19,7 +19,6 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
 >;
 
 type VirtualKeyConfigBackfillDatabase = {
-  organization: Delegate<"organization", "findMany">;
   virtualKey: Delegate<"virtualKey", "findMany" | "update">;
   routingPolicy: Delegate<"routingPolicy", "create">;
   gatewayGuardrail: Delegate<"gatewayGuardrail", "create">;
@@ -43,11 +42,6 @@ export class PrismaGatewayVirtualKeyConfigBackfillRepository extends GatewayVirt
     database: VirtualKeyConfigBackfillDatabase;
   }): PrismaGatewayVirtualKeyConfigBackfillRepository {
     return new PrismaGatewayVirtualKeyConfigBackfillRepository(options.database);
-  }
-
-  async findOrganizationIds(): Promise<string[]> {
-    const organizations = await this.database.organization.findMany({ select: { id: true } });
-    return organizations.map((organization) => organization.id);
   }
 
   async findVirtualKeys({ organizationId }: { organizationId: string }): Promise<VirtualKeyRow[]> {

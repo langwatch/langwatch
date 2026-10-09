@@ -1,14 +1,13 @@
 /** Test harness for auth screens; encapsulates host composition. Not published. */
 
+import type {
+  AuthFailureNotice,
+  AuthPublicEnvironment,
+  AuthRouteReading,
+} from "@langwatch/auth-contract";
 import type { ReactElement, ReactNode } from "react";
 
-import {
-  AuthHostApi,
-  AuthHostProvider,
-  type AuthFailureNotice,
-  type AuthPublicEnvironment,
-  type AuthRouteReading,
-} from "./model/auth-host.ts";
+import { AuthHostApi, AuthHostProvider } from "./model/auth-host.ts";
 
 /** The deployment a test runs against unless it says otherwise. */
 export const TEST_PUBLIC_ENVIRONMENT: AuthPublicEnvironment = {

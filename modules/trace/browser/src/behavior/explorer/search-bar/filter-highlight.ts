@@ -23,11 +23,23 @@ const GRAMMAR_OPERATOR_WORDS: ReadonlySet<string> = new Set(["AND", "OR", "NOT",
  */
 const OPERATOR_SHAPED_WORD_REGEX = /\b([A-Z]{2,5})\b/g;
 
+/**
+ * A quoted value, closed or still being typed. An open quote runs to the end
+ * of the text, as it will read once closed: stopping at the first space would
+ * drop every later word of the value out of its chip until the quote closes.
+ */
+const QUOTED_VALUE_SOURCE = [
+  String.raw`"(?:\\.|[^"\\])*(?:"|\\?$)`,
+  String.raw`'(?:\\.|[^'\\])*(?:'|\\?$)`,
+].join("|");
+
 // Tolerant fallback for queries that don't yet parse (mid-typing, unmatched quotes,
 // trailing operator). Decorates anything shaped like `field:value` so users still get
 // visual feedback while editing.
-const FILTER_TOKEN_REGEX =
-  /(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:"[^"]*"|\[[^\]]*\]|(?:>=|<=|>|<)[^\s()]+|[^\s()]+)/g;
+const FILTER_TOKEN_REGEX = new RegExp(
+  String.raw`(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:${QUOTED_VALUE_SOURCE}|\[[^\]]*\]|(?:>=|<=|>|<)[^\s()]+|[^\s()]+)`,
+  "g",
+);
 
 interface DecorationSlot {
   from: number;

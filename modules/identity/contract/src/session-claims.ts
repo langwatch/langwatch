@@ -6,7 +6,7 @@ import {
   PASSWORD_AMR,
   PHISHING_RESISTANT_AMR,
   TOTP_AMR,
-} from "./mfa-condition.ts";
+} from "./features/mfa/mfa-condition.ts";
 
 /**
  * What a sign-in proved, and which way in minted the session (D06). Pure over

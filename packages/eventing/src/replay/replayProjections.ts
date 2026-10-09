@@ -1,7 +1,9 @@
 import { createTenantId } from "../domain/tenantId.ts";
 import type { Event, Projection } from "../domain/types.ts";
+import { peerOwnerOf } from "../pipeline/peerOwner.ts";
 import type { SealedPipelineDefinition } from "../pipeline/sealedPipeline.ts";
 import type {
+  PeerLane,
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "../pipeline/staticBuilder.types.ts";
@@ -19,6 +21,7 @@ import {
   sealStateProjection,
 } from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { ReplayEvent } from "./replayEventSource.ts";
 import type {
   RegisteredFoldProjection,
@@ -51,8 +54,86 @@ export function replayProjectionsOf(
     replayable.projections.push(...own.projections);
     replayable.mapProjections.push(...own.mapProjections);
     replayable.stateProjections.push(...own.stateProjections);
+    // A peer lane writes under its declaring pipeline's retention, as its live registration does.
+    const host = sealed.open((definition) => retentionOf(definition));
+    for (const peer of sealed.open((definition) => peerLanesOf(definition))) {
+      if (peer.kind === "fold") {
+        replayable.projections.push({ ...replayPeerFold({ definitions, peer }), ...host });
+      } else replayable.mapProjections.push({ ...replayPeerMap({ definitions, peer }), ...host });
+    }
   }
   return replayable;
+}
+
+/**
+ * A peer lane (§9) rebuilt from its owner's events: it runs on the global registry, so its pause
+ * entry names the `global` pipeline, and it reads under the aggregate type of the one owner.
+ */
+function peerIdentity({
+  definitions,
+  lane,
+  eventTypes,
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  lane: string;
+  eventTypes: readonly string[];
+}) {
+  const owner = peerOwnerOf({ definitions, lane, eventTypes });
+  return {
+    pipelineName: "global",
+    aggregateType: owner.metadata.aggregateType,
+    source: "global" as const,
+    projectionName: lane,
+  };
+}
+
+function replayPeerFold({
+  definitions,
+  peer: { projection },
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  peer: Extract<PeerLane, { kind: "fold" }>;
+}): RegisteredFoldProjection {
+  const { name, eventTypes } = projection.definition;
+  return {
+    ...peerIdentity({ definitions, lane: name, eventTypes }),
+    ...replayFold(projection),
+    pauseKey: `global/projection/${name}`,
+    kind: "fold",
+  };
+}
+
+function replayPeerMap({
+  definitions,
+  peer: { projection },
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  peer: Extract<PeerLane, { kind: "map" }>;
+}): RegisteredMapProjection {
+  const { name, eventTypes, targetTable } = projection.definition;
+  return {
+    ...peerIdentity({ definitions, lane: name, eventTypes }),
+    ...projection.open((own) => sealMapProjection(own)),
+    pauseKey: `global/handler/${name}`,
+    kind: "map",
+    ...(targetTable === undefined ? {} : { targetTable }),
+  };
+}
+
+/** A pipeline's declared retention, spread onto each projection a replay rebuilds for it. */
+function retentionOf(definition: Pick<StaticPipelineDefinition, "retentionPolicyResolver">): {
+  retentionPolicyResolver?: RetentionPolicyResolver;
+} {
+  const { retentionPolicyResolver } = definition;
+  return retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver };
+}
+
+function peerLanesOf<
+  EventType extends Event,
+  ProjectionTypes extends Record<string, Projection>,
+  Commands extends RegisteredCommand,
+>(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): PeerLane[] {
+  return (definition.globalProjections ?? []).flatMap(({ peer }) => (peer ? [peer] : []));
 }
 
 /**
@@ -100,7 +181,12 @@ function replayProjectionsOfPipeline<
   Commands extends RegisteredCommand,
 >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): ReplayProjections {
   const { name: pipelineName, aggregateType } = definition.metadata;
-  const identity = { pipelineName, aggregateType, source: "pipeline" as const };
+  const identity = {
+    pipelineName,
+    aggregateType,
+    source: "pipeline" as const,
+    ...retentionOf(definition),
+  };
 
   const projections = Array.from(definition.foldProjections.values()).map(
     (fold): RegisteredFoldProjection => ({

@@ -18,8 +18,8 @@ import { expandRoute, registeredRoutes, type Expanded } from "./routes.ts";
 import { loadingScale, ReloadSchedule, takeOnceMore } from "./schedule.ts";
 import { FindingSink, HeldFindings } from "./sink.ts";
 import { ErrorStreak } from "./streak.ts";
+import { haikuJudge, VisionCheck } from "./vision.ts";
 
-const out = process.stdout;
 const PROGRESS_MILLIS = 5000;
 /** UNBOUNDED_PASSES lets a timed run keep walking until its deadline. */
 const UNBOUNDED_PASSES = 1_000_000;
@@ -199,6 +199,7 @@ class Run {
   readonly sink: FindingSink;
   readonly avoid: readonly RegExp[];
   readonly deadline: number;
+  readonly vision: VisionCheck | undefined;
 
   constructor(input: {
     plan: FuzzPlan;
@@ -206,7 +207,9 @@ class Run {
     sink: FindingSink;
     avoid: readonly RegExp[];
     deadline: number;
+    vision: VisionCheck | undefined;
   }) {
+    this.vision = input.vision;
     this.plan = input.plan;
     this.order = input.order;
     this.sink = input.sink;
@@ -309,6 +312,7 @@ class Run {
         // A stopped run ends its in-flight visits at their next action.
         now: () => (this.streak.stopped === undefined ? Date.now() : Number.POSITIVE_INFINITY),
         deadline: this.deadline,
+        vision: this.vision,
       });
       return { result };
     } catch (thrown) {
@@ -379,15 +383,38 @@ const coverageOf = ({
   perRoute: run.perRoute,
 });
 
+/** VisionKey is the Anthropic key the entrypoint read from the environment; never printed. */
+export interface VisionKey {
+  apiKey: string;
+  baseUrl?: string;
+}
+
+const visionCheck = ({
+  plan,
+  key,
+}: {
+  plan: FuzzPlan;
+  key: VisionKey;
+}): VisionCheck | undefined => {
+  if (!plan.vision) return undefined;
+  if (key.apiKey === "") {
+    throw new SetupFailed("stopping: setup failed: -vision needs ANTHROPIC_API_KEY");
+  }
+  return new VisionCheck(haikuJudge(key));
+};
+
 const walk = async ({
   plan,
   runDir,
   browser,
+  key,
 }: {
   plan: FuzzPlan;
   runDir: string;
   browser: SideBrowser;
+  key: VisionKey;
 }): Promise<string | undefined> => {
+  const vision = visionCheck({ plan, key });
   const outDir = join(runDir, "ui");
   const sink = new FindingSink(runDir);
   const signInStartedAt = Date.now();
@@ -413,6 +440,7 @@ const walk = async ({
     sink,
     avoid: (plan.avoid ?? []).map((source) => new RegExp(source, "i")),
     deadline,
+    vision,
   });
   const progress = setInterval(() => {
     stamp(
@@ -437,6 +465,13 @@ const walk = async ({
   const coverage = coverageOf({ run, expanded, timing });
   await sink.flush();
   await writeFile(join(outDir, "coverage.json"), JSON.stringify(coverage, null, 2));
+  if (vision !== undefined) {
+    const ledger = vision.ledger();
+    await writeFile(join(outDir, "vision.json"), JSON.stringify(ledger, null, 2));
+    stamp(
+      `fuzz: vision ${ledger.pages.length} pages, ${ledger.calls} calls, $${ledger.usd.toFixed(4)} ($${ledger.perPageUsd.toFixed(5)}/page), ${ledger.failures} failed${ledger.firstFailure ? `: ${ledger.firstFailure}` : ""}`,
+    );
+  }
   sink.complete({ routesExercised: coverage.routesVisited, routesTotal: coverage.routesTotal });
   await sink.flush();
   stamp(
@@ -446,8 +481,8 @@ const walk = async ({
   return run.streak.stopped;
 };
 
-const main = async (): Promise<number> => {
-  const { plan, runDir } = readPlan(process.argv.slice(2));
+const main = async ({ argv, key }: { argv: string[]; key: VisionKey }): Promise<number> => {
+  const { plan, runDir } = readPlan(argv);
   const browser = await setup(async () =>
     openSideBrowser({
       side: { name: "fuzz", baseUrl: plan.url },
@@ -458,7 +493,7 @@ const main = async (): Promise<number> => {
     }),
   );
   try {
-    const stopped = await walk({ plan, runDir, browser });
+    const stopped = await walk({ plan, runDir, browser, key });
     if (stopped === undefined) return 0;
     note({ text: `fuzz ui: ${stopped}`, err: process.stderr });
     return STOPPED_EXIT;
@@ -467,10 +502,11 @@ const main = async (): Promise<number> => {
   }
 };
 
-const code = await main().catch((thrown: unknown) => {
-  if (thrown instanceof SetupFailed)
-    note({ text: `fuzz ui: ${thrown.message}`, err: process.stderr });
-  else stamp(`fuzz: ${thrown instanceof Error ? thrown.message : String(thrown)}`);
-  return 1;
-});
-out.write("", () => process.exit(code));
+/** run is one fuzz run's exit code; fuzz.entrypoint.ts is the process that calls it. */
+export const run = async (input: { argv: string[]; key: VisionKey }): Promise<number> =>
+  main(input).catch((thrown: unknown) => {
+    if (thrown instanceof SetupFailed)
+      note({ text: `fuzz ui: ${thrown.message}`, err: process.stderr });
+    else stamp(`fuzz: ${thrown instanceof Error ? thrown.message : String(thrown)}`);
+    return 1;
+  });

@@ -23,7 +23,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 // "finance-prod-99" proves the search reached past the top-N), plus the
 // namespaced "openai/gpt-4o-mini" — the server's ANCHORED prefix "gpt-4o"
 // misses it, so it exercises the supplement (preloaded ∪ server) regression.
-vi.mock("../../hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({
     data: [
       {

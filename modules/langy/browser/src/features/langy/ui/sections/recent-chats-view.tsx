@@ -15,7 +15,7 @@ import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
 /**
  * Langy's conversation history, as a FULL VIEW inside the panel.
  */
-import { nowInstant, startOfDay } from "@langwatch/time";
+import { nowInstant, startOfDay, readableDate } from "@langwatch/time";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowLeft, Check, MoreHorizontal, Pencil, Search, Trash2, X } from "lucide-react";
 import type React from "react";
@@ -30,8 +30,7 @@ import {
   useState,
 } from "react";
 
-import { formatLangyConversationDate } from "../../../../model/langy-conversation-date.ts";
-import { readableDate } from "../../../../model/langy-row-format.ts";
+import { formatLangyConversationDate } from "../../../transcript/model/langy-conversation-date.ts";
 import { useLangyConversationListQuery } from "../../behavior/data/use-langy-conversation-list-query.ts";
 
 /** A conversation whose title subscriber hasn't landed yet still needs a name. */

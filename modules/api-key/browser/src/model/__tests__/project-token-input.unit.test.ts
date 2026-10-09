@@ -27,7 +27,12 @@ describe("given a team viewer on project alpha", () => {
     it("holds only the device-flow defaults the person holds, restricted to the project", () => {
       const held = heldOnProject("VIEWER");
       const permissions = cappedDeviceFlowPermissions({ held });
-      const input = projectTokenInput({ organizationId: ORG, projectId: "alpha", permissions });
+      const input = projectTokenInput({
+        organizationId: ORG,
+        projectId: "alpha",
+        permissions,
+        expiresAt: undefined,
+      });
 
       expect(permissions.length).toBeGreaterThan(0);
       expect(permissions.every((permission) => held.includes(permission))).toBe(true);
@@ -35,6 +40,7 @@ describe("given a team viewer on project alpha", () => {
       expect(input.permissionMode).toBe("restricted");
       expect(input.permissions).toEqual(permissions);
       expect(input.bindings).toEqual([{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "alpha" }]);
+      expect(input.expiresAt).toBeUndefined();
     });
   });
 });

@@ -39,9 +39,15 @@
 
 import { z } from "zod";
 
-import type { DiscoveredPersonRecord, PeopleListing } from "../../rules/people-listing.rules.ts";
-import { peopleListed, peopleRefused } from "../../rules/people-listing.rules.ts";
-import { refusalFromStatus, refusalFromThrown } from "../../rules/provider-listing.rules.ts";
+import {
+  refusalFromStatus,
+  refusalFromThrown,
+} from "../../features/agents/rules/provider-listing.rules.ts";
+import type {
+  DiscoveredPersonRecord,
+  PeopleListing,
+} from "../../features/identity/rules/people-listing.rules.ts";
+import { peopleListed, peopleRefused } from "../../features/identity/rules/people-listing.rules.ts";
 import type { DatabricksScimUsersChannel } from "../databricks-scim-users.channel.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import { GenieHttpError, genieGet } from "./http.genie-spaces.channel.ts";

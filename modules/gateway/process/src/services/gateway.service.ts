@@ -34,6 +34,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
+import { GatewayBudgetScopeReadService } from "../features/budget/services/gateway-budget-scope-read.service.ts";
 import {
   type GatewayBudgetRepository,
   type ArchiveBudgetInput,
@@ -47,7 +48,6 @@ import {
   type GatewayBudgetScope,
 } from "../repositories/gateway-budget.repository.ts";
 import { isGroupNotFound, isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
-import { GatewayBudgetScopeReadService } from "./gateway-budget-scope-read.service.ts";
 import type { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
 import type { GatewayGuardrailService } from "./gateway-guardrail.service.ts";
 

@@ -8,7 +8,7 @@ import {
   GROUP_ICONS,
   NORMAL_CASE_FIELDS,
   SECTION_ORDER,
-} from "../../../../behavior/facet-constants.ts";
+} from "../../../../features/facet/behavior/facet-constants.ts";
 import { formatBytes } from "../../../../model/display-formatters.ts";
 
 const TOKEN_K = 1_000;

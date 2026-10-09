@@ -1,15 +1,15 @@
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
+import type { DataRetentionProjectPlacement } from "../../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
+import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import {
   DataRetentionModule,
@@ -89,94 +89,27 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
 
 const epoch = new Date(0);
 
-function testTeam(graph: RetentionTestDirectoryGraph): Team {
-  return {
-    id: graph.teamId,
-    name: "Payments",
-    slug: "payments",
-    organizationId: graph.organizationId ?? "",
-    createdAt: epoch,
-    updatedAt: epoch,
-    archivedAt: null,
-    isPersonal: graph.organizationId === null,
-    ownerUserId: null,
-    departmentId: null,
-  };
-}
-
-function testProject(graph: RetentionTestDirectoryGraph): ProjectWithTeam {
-  return {
-    id: graph.projectId,
-    name: graph.projectName,
-    slug: "checkout",
-    apiKey: "key",
-    lwqlKey: "lwql",
-    teamId: graph.teamId,
-    language: "typescript",
-    framework: "other",
-    kind: "default",
-    firstMessage: false,
-    integrated: false,
-    createdAt: epoch,
-    updatedAt: epoch,
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
-    isPersonal: graph.organizationId === null,
-    ownerUserId: null,
-    personalFeatures: null,
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-    team: testTeam(graph),
-  };
-}
-
 /**
- * `siblingProjectIds` are the other projects the organization holds, which is
- * what a cache invalidation on a wider scope has to reach.
+ * Project and team rows retention reads through its shares. `siblingProjectIds` are the other
+ * projects the organization's team holds, which a cache invalidation on a wider scope has to reach.
  */
-export function createDataRetentionTestProjects(
+export function createDataRetentionTestProjectScopes(
   graph: RetentionTestDirectoryGraph = retentionTestGraph,
   siblingProjectIds: readonly string[] = [],
-): ProjectApi {
-  const project = testProject(graph);
-  const projects = [project, ...siblingProjectIds.map((id) => ({ ...project, id }))];
-
-  return createApiFixture<ProjectApi>({
-    findWithTeam: vi.fn(async (id: string) => (id === graph.projectId ? project : null)),
-    listByTeam: vi.fn(async () => projects),
-    listByOrganization: vi.fn(async () => ({
-      data: projects,
-      pagination: { page: 1, limit: projects.length, total: projects.length },
-    })),
+): MemoryDataRetentionProjectScopeRepository {
+  return MemoryDataRetentionProjectScopeRepository.create({
+    projects: [graph.projectId, ...siblingProjectIds].map((projectId) =>
+      retentionTestScopeRow(projectId, graph),
+    ),
   });
 }
 
-export function createDataRetentionTestOrganizations(
+/** One project's placement, as its row sits under the graph's team. */
+export function retentionTestScopeRow(
+  projectId: string,
   graph: RetentionTestDirectoryGraph = retentionTestGraph,
-): OrganizationApi {
-  const team: OrganizationTeam = {
-    id: graph.teamId,
-    name: "Payments",
-    slug: "payments",
-    organizationId: graph.organizationId ?? "",
-    isPersonal: graph.organizationId === null,
-    ownerUserId: null,
-    archivedAt: null,
-    createdAt: epoch,
-    updatedAt: epoch,
-  };
-
-  return createApiFixture<OrganizationApi>({
-    getTeamById: vi.fn(async () => team),
-  });
+): DataRetentionProjectPlacement {
+  return { projectId, organizationId: graph.organizationId ?? "", teamId: graph.teamId };
 }
 
 /** Every permission answers `permitted`, so a gate test states one thing. */
@@ -244,8 +177,6 @@ export function createDataRetentionTestApp(
     repositories?: DataRetentionRepositories;
     directory?: DataRetentionDirectoryReader;
     dependencies?: Partial<{
-      projects: ProjectApi;
-      organizations: OrganizationApi;
       permissions: AuthzApi;
       users: UserApi;
       entitlement: EntitlementApi;
@@ -257,10 +188,9 @@ export function createDataRetentionTestApp(
     repositories: input.repositories ?? {
       ...MemoryDataRetentionRepositories.create(),
       directory: input.directory ?? MemoryRetentionDirectory.create(),
+      projectScopes: createDataRetentionTestProjectScopes(),
     },
     dependencies: {
-      projects: input.dependencies?.projects ?? createDataRetentionTestProjects(),
-      organizations: input.dependencies?.organizations ?? createDataRetentionTestOrganizations(),
       permissions: input.dependencies?.permissions ?? createDataRetentionTestAuthz(),
       users: input.dependencies?.users ?? createDataRetentionTestUsers(),
       entitlement: input.dependencies?.entitlement ?? createDataRetentionTestEntitlement(),

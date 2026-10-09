@@ -31,10 +31,22 @@
       "path": "../../governance/contract/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/error-views/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/identity/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/organization/client/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"

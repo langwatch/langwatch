@@ -14,7 +14,13 @@ import {
   secretLogRedactPaths,
 } from "@langwatch/secrets";
 
+import {
+  assertGatedRole,
+  type UpgradeGatedRole,
+  type UpgradeGate,
+} from "./migration/upgrade-gate.ts";
 import { isProcessModule } from "./process-container.ts";
+import { setProcessGlobals } from "./process-globals.ts";
 import { ProcessServer } from "./process-server.ts";
 import {
   Server as ServerBoundary,
@@ -44,8 +50,17 @@ type FactoryContext<Owners extends readonly PreambleOwner[]> = Readonly<{
   redactPaths: readonly string[];
 }>;
 
+/** Metrics also get the process logger, so boot names a scrape door it left unmounted. */
+type MetricsContext<Owners extends readonly PreambleOwner[]> = FactoryContext<Owners> &
+  Readonly<{ logger: ServerLogger }>;
+
 /** The environment the process was started with, as its main hands it in. */
 export type PreambleEnvironment = Readonly<Record<string, string | undefined>>;
+
+/** The serving gate's factory: resolves what it needs before boot seals secrets, opens nothing. */
+type UpgradeGateFactory<Owners extends readonly PreambleOwner[]> = (
+  context: FactoryContext<Owners> & Readonly<{ role: UpgradeGatedRole }>,
+) => UpgradeGate | Promise<UpgradeGate>;
 
 type ChainBuilder<Owners extends readonly PreambleOwner[]> = (
   config: ProcessConfigOf<Owners>,
@@ -63,10 +78,11 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       owners: Owners;
       chain?: ChainBuilder<Owners>;
       telemetry?: (context: FactoryContext<Owners>) => Telemetry | Promise<Telemetry>;
-      metrics?: (context: FactoryContext<Owners>) => Metrics | Promise<Metrics>;
+      metrics?: (context: MetricsContext<Owners>) => Metrics | Promise<Metrics>;
       healthPort?: number;
       ownsProcess?: boolean;
       environment?: PreambleEnvironment;
+      upgradeGate?: Readonly<{ role: UpgradeGatedRole; gate: UpgradeGateFactory<Owners> }>;
     }>,
   ) {}
 
@@ -80,6 +96,21 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     return new ServerPreamble(this.name, { ...this.state, chain: build });
   }
 
+  /**
+   * The serving gate (D5): api and worker refuse to start, by name, when the installation is
+   * behind their image, and write a roster entry once admitted. Tasks is never gated.
+   */
+  withUpgradeGate({
+    role,
+    gate,
+  }: Readonly<{
+    role: UpgradeGatedRole;
+    gate: UpgradeGateFactory<Owners>;
+  }>): ServerPreamble<Owners> {
+    assertGatedRole(role);
+    return new ServerPreamble(this.name, { ...this.state, upgradeGate: { role, gate } });
+  }
+
   withTelemetry(
     factory: (context: FactoryContext<Owners>) => Telemetry | Promise<Telemetry>,
   ): ServerPreamble<Owners> {
@@ -87,7 +118,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
   }
 
   withMetrics(
-    factory: (context: FactoryContext<Owners>) => Metrics | Promise<Metrics>,
+    factory: (context: MetricsContext<Owners>) => Metrics | Promise<Metrics>,
   ): ServerPreamble<Owners> {
     return new ServerPreamble(this.name, { ...this.state, metrics: factory });
   }
@@ -116,6 +147,8 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       throw new Error(`${this.name}: the preamble starts only after withEnvironment(...)`);
     }
     const config = parseProcessConfig({ owners, environment });
+    // Before any module is built, so no id is minted without the install's prefix.
+    if (this.state.ownsProcess !== false) setProcessGlobals({ environment });
 
     const chain = (this.state.chain ?? ((_, secrets) => secrets.withEnv()))(
       config,
@@ -158,9 +191,18 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
         config,
         secrets: frameworkSecrets,
         redactPaths,
+        logger: boundary.logger,
       })) {
         server.with(contribution);
       }
+    }
+
+    // Hosted before boot's components: asked before the application starts, stopped after it.
+    const upgradeGate = this.state.upgradeGate;
+    if (upgradeGate) {
+      const { role } = upgradeGate;
+      const gate = await upgradeGate.gate({ config, secrets: frameworkSecrets, redactPaths, role });
+      server.hostUpgradeGate({ role, gate, logger: boundary.logger });
     }
 
     return server;

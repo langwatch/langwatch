@@ -19,7 +19,10 @@ import {
 } from "@langwatch/enterprise-gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  PersonalWorkspacePendingError,
+} from "@langwatch/organization-contract";
 
 import {
   DEFAULT_PERSONAL_KEY_LABEL,
@@ -59,7 +62,7 @@ export class PersonalVirtualKeyService {
   private readonly keys: PersonalKeyReads;
   private readonly providers: ProviderCounts;
   private readonly issuer: PersonalVirtualKeyIssuer;
-  private readonly organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
+  private readonly organizations: Pick<OrganizationApi, "ensurePersonalWorkspace">;
   private readonly policies: RoutingPolicyReader;
   private readonly gatewayBaseUrl: string;
 
@@ -74,7 +77,7 @@ export class PersonalVirtualKeyService {
     keys: PersonalKeyReads;
     providers: ProviderCounts;
     issuer: PersonalVirtualKeyIssuer;
-    organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
+    organizations: Pick<OrganizationApi, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }) {
@@ -90,7 +93,7 @@ export class PersonalVirtualKeyService {
     keys: PersonalKeyReads;
     providers: ProviderCounts;
     issuer: PersonalVirtualKeyIssuer;
-    organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
+    organizations: Pick<OrganizationApi, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }): PersonalVirtualKeyService {
@@ -126,7 +129,9 @@ export class PersonalVirtualKeyService {
     input: EnsureDefaultPersonalVirtualKeyInput,
   ): Promise<IssuedPersonalVirtualKey> {
     const parsed = ensureDefaultPersonalVirtualKeyInputSchema.parse(input);
-    const workspace = await this.organizations.ensurePersonalWorkspace(parsed);
+    const ensured = await this.organizations.ensurePersonalWorkspace(parsed);
+    if (ensured.kind === "pending") throw new PersonalWorkspacePendingError();
+    const { workspace } = ensured;
     const held = await this.keys.findPersonalVirtualKeys({
       organizationId: parsed.organizationId,
       principalUserId: parsed.userId,

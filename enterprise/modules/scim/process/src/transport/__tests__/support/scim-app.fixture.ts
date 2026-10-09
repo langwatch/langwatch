@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * One SCIM application over a fake directory service, for the transport tests:
- * the same object the four doors are mounted on, so what a test drives is the
+ * the same object the six doors are mounted on, so what a test drives is the
  * declaration and the application, never a stand-in for either.
  *
  * Built through {@link ScimModule.createWithService}, not {@link ScimModule.create}:
@@ -11,31 +11,29 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import {
-  ScimService,
-  type ScimDirectoryOwnership,
-  type ScimRequestLogEntry,
-  type ScimRequestLogQuery,
-  type ScimRequestRecord,
-  type ScimTokenEntitlement,
-  type ScimSyncActivityEntry,
+import type {
+  ScimDirectoryOwnership,
+  ScimRequestLogEntry,
+  ScimRequestLogQuery,
+  ScimRequestRecord,
+  ScimTokenEntitlement,
+  ScimSyncActivityEntry,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
+import { foldedConnectionReads } from "../../../__tests__/support/folded-connections.ts";
 import { ScimModule } from "../../../app/scim.app.ts";
-import {
-  ScimConnectionsService,
-  type ScimConnectionReads,
-} from "../../../services/scim-connections.service.ts";
+import { ScimConnectionsService } from "../../../services/scim-connections.service.ts";
 import { ScimDirectoryExternalIdsService } from "../../../services/scim-directory-external-ids.service.ts";
 import type { ScimOversightService } from "../../../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
 import { ScimTokenMintService } from "../../../services/scim-token-mint.service.ts";
+import type { ScimService } from "../../../services/scim.service.ts";
 
-export class ScimServiceFake extends ScimService {
+export class ScimServiceFake implements Pick<ScimService, keyof ScimService> {
   readonly verifyToken = vi.fn(
     async (_input: { token: string }): Promise<ScimTokenEntitlement> => ({
       status: "invalid_token",
@@ -67,6 +65,7 @@ export class ScimServiceFake extends ScimService {
   readonly replaceGroup = vi.fn();
   readonly updateGroup = vi.fn();
   readonly deleteGroup = vi.fn();
+  readonly toScimUser = vi.fn();
 }
 
 /** A minimal but complete plan, at the type the doors only ever read `.type` off. */
@@ -87,7 +86,7 @@ function fakePlan(type: string): Plan {
 /** One application, and the audit entries it recorded. */
 export function scimTestApp(
   options: {
-    scim?: ScimService;
+    scim?: Pick<ScimService, keyof ScimService>;
     connections?: OrganizationSsoConnection[];
     webhookSecret?: string | undefined;
     planType?: string;
@@ -105,13 +104,7 @@ export function scimTestApp(
   );
   const scim = options.scim ?? new ScimServiceFake();
   const offered = options.connections ?? [];
-  const identity: ScimConnectionReads = {
-    ssoConnectionReads: () => ({
-      findForOrganization: () => Promise.resolve(offered),
-      getProvider: ({ connectionId }) => Promise.resolve({ connectionId, providerId: "oidc" }),
-      getOrganization: () => Promise.reject(new Error("the doors never ask")),
-    }),
-  };
+  const folded = foldedConnectionReads(offered);
   const audited: unknown[] = [];
   const entitlements: Pick<EntitlementApi, "getActivePlan"> = {
     getActivePlan: () => Promise.resolve(fakePlan(options.planType ?? "ENTERPRISE")),
@@ -122,7 +115,7 @@ export function scimTestApp(
       return Promise.resolve({ id: "audit", occurredAt: 0 });
     },
   };
-  const connections = ScimConnectionsService.create(identity);
+  const connections = ScimConnectionsService.create(folded);
   const app = ScimModule.createWithService({
     scim,
     connections,
@@ -135,7 +128,7 @@ export function scimTestApp(
       },
     }),
     reconciliation: ScimReconciliationService.create({
-      identity,
+      connections,
       syncs: {
         findForOrganization: () => Promise.resolve([]),
         findByConnection: () => Promise.resolve(null),

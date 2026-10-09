@@ -133,7 +133,6 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 	isOneProcess := !st.Layout.IsMonolith() && opts.ShouldRunOneProcess
 	out := []Child{p.frontChild(mono, isOneProcess)}
 	out = append(out, p.goLanes(mono)...)
-	out = append(out, p.devToolChildren()...)
 	if opts.Selection.Langevals {
 		out = append(out, p.langevalsChild())
 	}
@@ -231,6 +230,9 @@ func (p *childPlan) nodeEnv(lane string) []string {
 		p.o.compileCacheEnv(p.st.Slug))
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
+		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {
+			env = append(env, "LANGWATCH_DEV_TOOLS_IDLE="+v)
+		}
 	}
 	return env
 }
@@ -265,6 +267,12 @@ func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
 func (p *childPlan) goLanes(mono monolithPlan) []Child {
 	var out []Child
 	goServices, goEnv := p.goServices()
+	sims := p.planSimulators()
+	if p.opts.ShouldRunGoAsOneProcess && len(sims.services) > 0 {
+		goServices = append(goServices, sims.services...)
+		goEnv = append(goEnv, sims.env...)
+		sims.services = nil
+	}
 	if p.st.Layout.IsMonolith() {
 		out = append(out, mono.goChildren()...)
 	} else if len(goServices) > 0 {
@@ -274,12 +282,11 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 			Env:   goEnv,
 		})
 	}
-	sims := p.planSimulators()
 	if len(sims.services) > 0 {
 		out = append(out, Child{
 			Name: SimsLane, Dir: p.opts.RepoRoot, Color: palette[8], LogPath: p.logPath(SimsLane),
 			Shell: goCombinedShell(p.opts.RepoRoot, sims.services, p.opts.ShouldGoWatch),
-			Env:   sims.env,
+			Env:   append(append(append([]string{}, p.base...), domain.LaneEnv(SimsLane)), sims.env...),
 		})
 	}
 	return append(out, sims.children...)
@@ -301,7 +308,8 @@ func (p *childPlan) goServices() ([]string, []string) {
 }
 
 // simulatorPlan is where the selected simulators run: inside the sims lane
-// (services, with env) or each as a lane of its own (children).
+// (services, with their own env, no base) or each as a lane of its own
+// (children).
 type simulatorPlan struct {
 	inGo     bool
 	services []string
@@ -321,12 +329,12 @@ func (sp *simulatorPlan) host(binary string, env func() []string, child func() C
 
 // planSimulators places every selected simulator. The linked simulators get a
 // lane of their own, so a simulator under load cannot starve the gateway: a
-// second `service combined` process.
+// second `service combined` process. LANGWATCH_GO_ONE_PROCESS=1 folds them
+// into the go lane instead (a trial; Langy always keeps its own lane).
 func (p *childPlan) planSimulators() simulatorPlan {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	sp := simulatorPlan{
 		inGo: !st.Layout.IsMonolith() && goLaneHostsSimulators(repoRoot),
-		env:  append(append([]string{}, base...), domain.LaneEnv(SimsLane)),
 	}
 	if sel.IDP {
 		idpEnv := o.idpEnv(st)
@@ -371,37 +379,6 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 			sp.host(sim.binary, sim.env, sim.child)
 		}
 	}
-}
-
-// devToolChildren is the two developer tools. Neither is a Node LANE — nothing
-// in the product degrades without them — so they are planned like the Go
-// services: only when the worktree has selected them, and never counted among
-// the three. Each is handed the port haven allocated for its hostname, on the
-// command line, because both tools otherwise bind a fixed default that a
-// second worktree would find busy.
-func (p *childPlan) devToolChildren() []Child {
-	var out []Child
-	if p.opts.Selection.DesignSystem {
-		out = append(out, Child{
-			Name: domain.DesignSystemService, Dir: p.repoDir, Color: palette[8], LogPath: p.logPath(domain.DesignSystemService),
-			Shell: fmt.Sprintf("pnpm --silent --filter %s storybook --port %d --ci",
-				DesignSystemPackage, p.port(domain.DesignSystemService)),
-			Env: p.nodeEnv(domain.DesignSystemService),
-		})
-	}
-	if p.opts.Selection.MailRoom {
-		out = append(out, Child{
-			Name: domain.MailRoomService, Dir: p.repoDir, Color: palette[9], LogPath: p.logPath(domain.MailRoomService),
-			// --strictPort: vite silently moves to the next free port otherwise,
-			// which would leave mail-room.<slug> routed to nothing at all.
-			// --host 127.0.0.1: vite's default "localhost" binds only ::1 on
-			// this machine, and the proxy and the port probe both dial IPv4.
-			Shell: fmt.Sprintf("pnpm --silent --filter %s dev --host 127.0.0.1 --port %d --strictPort",
-				MailPackage, p.port(domain.MailRoomService)),
-			Env: p.nodeEnv(domain.MailRoomService),
-		})
-	}
-	return out
 }
 
 // backendChild is the api lane.
@@ -475,7 +452,8 @@ const (
 	// AppLane is the ui and api lanes run as one process (LANGWATCH_DEV_ONE_PROCESS=1).
 	// Same name as a monolith checkout's one lane, for the same reason.
 	AppLane = domain.MonolithAppLane
-	// GoLane is the process hosting the Go data-plane services.
+	// GoLane is the process hosting the Go data-plane services, and the
+	// simulators too when LANGWATCH_GO_ONE_PROCESS=1.
 	GoLane = "go"
 	// SimsLane is the second Go process, hosting the simulators a stack
 	// selected, so load on one cannot starve the gateway.
@@ -491,23 +469,8 @@ const (
 	IDPAddrEnv     = "LANGWATCH_GO_IDPSIM_ADDR"
 )
 
-// The two developer tools a stack can optionally supervise, by workspace
-// package name. They are tools rather than parts of the product — nothing the
-// application does depends on either — so they stay in their own packages and
-// haven only runs them for a worktree that asked (`haven up +design-system
-// +mail-room`).
-const (
-	// DesignSystemPackage owns the component workshop (Storybook), routed at
-	// design-system.<slug>.
-	DesignSystemPackage = "@langwatch/design-system"
-	// MailPackage owns the studio that previews every transactional message,
-	// routed at mail-room.<slug>. Its `dev` script is the studio's Vite server.
-	MailPackage = "@langwatch/mail"
-)
-
 // UIDirRel is where the browser application lives inside the workspace. Only
-// the Vite lane's own working directory needs it — the HMR-gate marker is
-// resolved by the plugin against that directory, not the workspace root.
+// the Vite lane's own working directory needs it.
 const UIDirRel = "apps/ui"
 
 // UIDir is the Vite lane's working directory inside a checkout.

@@ -16,8 +16,8 @@ import {
 import type { SpanReceivedEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { IO_PREVIEW_BYTES, leanForProjection } from "../../rules/trace-projection-lean.rules.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { IO_PREVIEW_BYTES, leanForProjection } from "../../features/projection/rules/trace-projection-lean.rules.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 

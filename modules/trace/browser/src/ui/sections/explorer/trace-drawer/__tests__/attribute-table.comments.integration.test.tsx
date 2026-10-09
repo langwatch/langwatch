@@ -9,7 +9,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock(
-  "../../../../../behavior/lent-annotation-form.tsx",
+  "../../../../../features/annotation/behavior/lent-annotation-form.tsx",
   () => import("../../../__tests__/lent-annotation-form.stand-in.tsx"),
 );
 

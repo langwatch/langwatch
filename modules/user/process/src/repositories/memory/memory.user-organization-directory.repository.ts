@@ -1,3 +1,5 @@
+import type { MeProject } from "@langwatch/user-contract";
+
 import type { UserOrganizationDirectoryRepository } from "../user-organization-directory.repository.ts";
 
 /** One organization as the memory directory holds it. */
@@ -6,6 +8,8 @@ type MemoryUserDirectoryOrganization = Readonly<{
   firstAdminEmail?: string;
   /** The first project slug each member sees, by user id. */
   firstProjectSlugs?: Readonly<Record<string, string>>;
+  /** The projects API keys belong to, as `/api/me/project` names them. */
+  projects?: readonly MeProject[];
 }>;
 
 /** The directory's memory twin: the organizations it was seeded with, keyed by id. */
@@ -33,5 +37,13 @@ export class MemoryUserOrganizationDirectoryRepository implements UserOrganizati
 
   async findFirstAdminEmail(organizationId: string): Promise<string | null> {
     return this.organizations[organizationId]?.firstAdminEmail ?? null;
+  }
+
+  async findKeyProject({ projectId }: { projectId: string }): Promise<MeProject | null> {
+    const projects = Object.values(this.organizations).flatMap(
+      (organization) => organization.projects ?? [],
+    );
+
+    return projects.find((project) => project.id === projectId) ?? null;
   }
 }

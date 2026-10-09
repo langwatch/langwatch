@@ -4,17 +4,19 @@
  * memory repositories, reading no process member and naming no repository class here.
  */
 import { AnalyticsApi, type AnalyticsEvaluationRow } from "@langwatch/analytics-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/process";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import type { TraceApi } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { analyticsProcessModule } from "../../analytics.module.ts";
@@ -50,10 +52,12 @@ const evaluationRow: AnalyticsEvaluationRow = {
   completedAtMs: null,
 };
 
-function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([analyticsProcessModule])
-    .withConfig({
+/** Every peer, and the judge analytics' channel binds, stand in for their uninstalled owners. */
+function boot(role: "api" | "worker") {
+  return bootInstalledProcess({
+    role,
+    modules: [analyticsProcessModule],
+    config: {
       analytics: {
         langwatchQl: {
           url: undefined,
@@ -67,23 +71,25 @@ function process(role: "api" | "worker") {
         tenantAnalyticsConcurrency: 4,
         publicBaseUrl: PUBLIC_BASE_URL,
       },
-    })
-    .withStores(memoryStores())
-    .provide({
-      "feature-flag": createApiFixture<FeatureFlagApi>(),
-      authz: createApiFixture<AuthzApi>(),
-      "data-privacy": createApiFixture<DataPrivacyApi>(),
-      project: createApiFixture<ProjectApi>(),
-      entitlement: createApiFixture<EntitlementApi>(),
-      trace: createApiFixture<TraceApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>(),
-    });
+    },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
+      testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
+      testPeer({ token: DataPrivacyApi, instance: createApiFixture<DataPrivacyApi>() }),
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
+      testPeer({ token: EntitlementApi, instance: createApiFixture<EntitlementApi>() }),
+      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>() }),
+      testPeer({ token: InstantEvalApi, instance: createApiFixture<InstantEvalApi>() }),
+    ],
+  });
 }
 
 describe("analytics app installation", () => {
   describe("given a process that boots the feature over memory stores", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-      const runtime = await process(role).boot();
+      const runtime = await boot(role);
 
       try {
         const app = runtime.service(AnalyticsApi);
@@ -108,7 +114,7 @@ describe("analytics app installation", () => {
     });
 
     it("reads back the evaluation analytics it was given", async () => {
-      const runtime = await process("worker").boot();
+      const runtime = await boot("worker");
 
       try {
         const app = runtime.service(AnalyticsApi);

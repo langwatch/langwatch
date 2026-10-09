@@ -20,16 +20,15 @@ import {
   type TracePinInput,
 } from "@langwatch/share-contract";
 
+import {
+  buildShareTraceSharingRevocationPipeline,
+  type ShareTraceSharingRevocationPipeline,
+} from "../eventing/share-trace-sharing-revocation.pipeline.ts";
 import { LedgerShareRepository } from "../repositories/ledger/ledger.share.repository.ts";
 import type { ShareRepositories } from "../repositories/share.repositories.ts";
 import { ShareService } from "../services/share.service.ts";
 
-type ShareSetup = FeatureSetup<
-  typeof ShareModule.dependencies,
-  never,
-  undefined,
-  ShareRepositories
->;
+type ShareSetup = FeatureSetup<typeof ShareModule.dependencies, undefined, ShareRepositories>;
 
 export class ShareModule implements ShareApiContract {
   static readonly contract = ShareApi;
@@ -66,6 +65,11 @@ export class ShareModule implements ShareApiContract {
       }),
       dataRetention,
     );
+  }
+
+  /** Revokes a project's trace links once project records trace sharing disabled. */
+  revocationPipeline(): ShareTraceSharingRevocationPipeline {
+    return buildShareTraceSharingRevocationPipeline({ shares: this.#shares });
   }
 
   listForResource(input: ShareResourceInput): Promise<ShareLink[]> {

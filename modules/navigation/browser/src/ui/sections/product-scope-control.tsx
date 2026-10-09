@@ -6,6 +6,7 @@
 
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, Box, Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
+import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
@@ -64,8 +65,8 @@ function ProjectScopeMenu() {
   if (!organization || !project) return null;
 
   const onCreateProjectForTeam = ({ teamId, orgId }: { teamId: string; orgId: string }) =>
-    host.openDrawer("createProject", {
-      navigateOnCreate: "true",
+    host.openDrawerByToken(CreateProjectDrawerToken, {
+      navigateOnCreate: true,
       defaultTeamId: teamId,
       organizationId: orgId,
     });

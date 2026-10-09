@@ -18,8 +18,8 @@ const COLORS: Record<string, (s: string) => string> = {
   "prepare:app": chalk.blue,
   "prepare:langwatch": chalk.green,
   "prepare:langevals": chalk.magenta,
-  "migrate:prisma": chalk.dim,
-  "migrate:clickhouse": chalk.dim,
+  "migrate:upgrade": chalk.dim,
+  "migrate:system-migrations": chalk.dim,
 };
 
 // Wide enough to fit `prepare:langevals` without breaking alignment when

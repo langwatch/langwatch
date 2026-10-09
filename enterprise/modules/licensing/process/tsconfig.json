@@ -22,6 +22,9 @@
       "path": "../../../../packages/authorization/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {
@@ -47,6 +50,9 @@
     },
     {
       "path": "../../../../modules/instant-eval/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/instant-eval-judge/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/internal-slack/tsconfig.build.json"
@@ -79,13 +85,16 @@
       "path": "../../../../packages/process-stores/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/project/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/secrets/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/task/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"

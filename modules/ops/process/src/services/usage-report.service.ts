@@ -49,7 +49,7 @@ type UsageReportSendOutcome =
 
 interface UsageReportServiceDependencies {
   readonly collection: UsageReportCollectionService;
-  readonly organizations: Pick<OrganizationApi, "findAllIds">;
+  readonly organizations: Pick<OrganizationApi, "listAllIds">;
   readonly channel: UsageReportChannel;
   readonly install: UsageReportInstall;
   /** DISABLE_USAGE_STATS. */
@@ -81,7 +81,7 @@ export class UsageReportService {
     const connect = await install.getConnectDeployment();
     // LANGWATCH_CONNECT_DISABLED proves the install calls LangWatch for nothing, this report too.
     if (!connect.permitted) return "connect_disabled";
-    const organizationIds = await this.deps.organizations.findAllIds();
+    const { ids: organizationIds } = await this.deps.organizations.listAllIds();
     if (organizationIds.length === 0) return "no_organization";
 
     const instanceId = await install.getInstanceId();
@@ -125,8 +125,8 @@ export class UsageReportService {
    */
   async preview(): Promise<UsageReportPreview> {
     const now = this.deps.now();
-    const [organizationIds, [identity], connect] = await Promise.all([
-      this.deps.organizations.findAllIds(),
+    const [{ ids: organizationIds }, [identity], connect] = await Promise.all([
+      this.deps.organizations.listAllIds(),
       this.deps.install.findInstanceIdentity(),
       this.deps.install.getConnectDeployment(),
     ]);

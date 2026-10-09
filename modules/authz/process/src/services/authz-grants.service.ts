@@ -78,7 +78,7 @@ import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
  * composition root): the audit writer, the KSUID minter for binding ids, the redis-backed
  * epoch bump, and the collector factory the offboarding proof re-binds to its transaction
  */
-export type AuthzGrantsServiceOptions = {
+type AuthzGrantsServiceOptions = {
   repository: AuthzGrantRepository;
   /** Private compatibility writer; its operations surface only through this service. */
   ledger: AuthzCompatibilityLedger;

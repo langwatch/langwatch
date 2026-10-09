@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 const CONTRACT_SRC = fileURLToPath(new URL("../", import.meta.url));
 
-const SCHEMA_NAMES = readFileSync(join(CONTRACT_SRC, "scenario-execution-data.ts"), "utf8")
+const SCHEMA_NAMES = readFileSync(join(CONTRACT_SRC, "features/execution/scenario-execution-data.ts"), "utf8")
   .split("\n")
   .map((line) => /^export const (\w+Schema)\b/.exec(line)?.[1])
   .filter((name): name is string => name !== undefined);
@@ -81,7 +81,7 @@ describe("the child execution contract's schemas", () => {
     describe("when its imports are inspected", () => {
       /** @scenario "The shared field mapping schema carries no framework dependency" */
       it("imports zod and nothing else", () => {
-        const source = readFileSync(join(CONTRACT_SRC, "field-mapping.ts"), "utf8");
+        const source = readFileSync(join(CONTRACT_SRC, "resolve-field-mappings.ts"), "utf8");
         const specifiers = [
           ...source.matchAll(/^import\s+(?:type\s+)?[\s\S]*?\sfrom\s+["']([^"']+)["']/gm),
         ].map((match) => match[1]);

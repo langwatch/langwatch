@@ -10,4 +10,6 @@ export interface ProductAnalyticsEvent {
 export interface ProductAnalyticsChannel {
   /** Fire and forget: whatever produced the event must not fail on it. */
   capture(event: ProductAnalyticsEvent): void;
+  /** Flushes what is queued; the module hands it to its resources at install. */
+  close(): Promise<void>;
 }

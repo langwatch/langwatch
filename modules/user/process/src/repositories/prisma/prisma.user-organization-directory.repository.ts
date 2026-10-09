@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { MeProject } from "@langwatch/user-contract";
 
 import type { UserOrganizationDirectoryRepository } from "../user-organization-directory.repository.ts";
 
@@ -56,5 +57,12 @@ export class PrismaUserOrganizationDirectoryRepository implements UserOrganizati
     });
 
     return admin?.user.email ?? null;
+  }
+
+  findKeyProject({ projectId }: { projectId: string }): Promise<MeProject | null> {
+    return this.database.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, name: true, slug: true, isPersonal: true },
+    });
   }
 }

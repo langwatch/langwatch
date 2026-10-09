@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SEARCH_FIELDS } from "../../trace-query-metadata.ts";
+import { SEARCH_FIELDS } from "../../features/query/trace-query-metadata.ts";
 import { getFieldSuggestions, getValueSuggestions } from "../suggestion-items.ts";
 
 describe("getFieldSuggestions", () => {

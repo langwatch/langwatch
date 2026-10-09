@@ -2,8 +2,6 @@ import type { SpanDetail } from "@langwatch/trace-contract";
 
 import { pickString } from "./telemetry/coding-agent-span.ts";
 
-export { pickString } from "./telemetry/coding-agent-span.ts";
-
 export function readUnknown(
   attrs: Record<string, unknown> | null | undefined,
   key: string,

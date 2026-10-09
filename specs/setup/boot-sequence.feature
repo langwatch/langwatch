@@ -155,11 +155,11 @@ Feature: The stack migrates once, quietly, under a lock
   # --- Readiness ---
 
   @unit
-  Scenario: The API listens only after preparation succeeded
+  Scenario: The API listens only after its upgrade gate admitted it
     Given the production start path
     When the API process starts
-    Then preparation runs to completion first
-    And a failed preparation means the entry point never runs
+    Then the gate reads the ledger first
+    And a refusal means the entry point never listens
 
   # Locally the api lane hosts the worker beside the API, so a restart is a
   # handover: the successor boots while the predecessor is still draining

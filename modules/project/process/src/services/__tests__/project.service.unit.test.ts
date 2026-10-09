@@ -1,6 +1,5 @@
 import {
   OrganizationHasNoTeamError,
-  OrganizationService as OrganizationServiceContract,
   type OrganizationApi,
   type AddOrganizationTeamMemberInput,
   type CreateOrganizationTeamInput,
@@ -98,6 +97,22 @@ const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
 });
 
 class StubRepository implements ProjectRepository {
+  archivePersonalInTeams(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  revivePersonalInTeam(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  createPersonal(): Promise<string> {
+    return Promise.resolve("project-personal");
+  }
+
+  updatePersonalFeatures(): Promise<void> {
+    return Promise.resolve();
+  }
+
   findPaths = vi.fn(async () => []);
   findProjectsWithDepartments = vi.fn(async () => []);
   assignProjectDepartment = vi.fn(async () => false);
@@ -112,12 +127,16 @@ class StubRepository implements ProjectRepository {
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
   findIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
-  findLiveNonGovernanceIds = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
+  findLiveNonGovernanceIds = vi.fn<
+    (input: { organizationId: string; includeArchived: boolean }) => Promise<string[]>
+  >(async () => []);
   findLiveByIdInOrganization = vi.fn(async (): Promise<Project[]> => []);
   findLiveBySlugInOrganization = vi.fn(async (): Promise<Project[]> => []);
   countUsage = vi.fn(async () => ({ projects: 0, updatedProjects: 0 }));
   countWithTraces = vi.fn(async () => 0);
   findSharedProjectSlugs = vi.fn(async () => []);
+  listAllIds = vi.fn(async () => ({ ids: [], next: null }));
+  listAllWithOrganization = vi.fn(async () => ({ projects: [], next: null }));
   create = vi.fn(async () => applicationProject);
   findById = vi.fn(async () => applicationProject);
   findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(async () => "org");
@@ -154,7 +173,7 @@ class StubRepository implements ProjectRepository {
   );
 }
 
-class StubOrganizationService extends OrganizationServiceContract {
+class StubOrganizationService {
   teamId: string | null = "oldest-team";
   findActiveTeam = vi.fn<
     (input: { teamId: string; organizationId: string }) => Promise<{
@@ -215,10 +234,6 @@ class StubOrganizationService extends OrganizationServiceContract {
   }
 
   getBillingProfile(): Promise<OrganizationBillingProfile> {
-    throw new Error("not used by this test");
-  }
-
-  claimBillingCustomerId(): Promise<boolean> {
     throw new Error("not used by this test");
   }
 
@@ -648,6 +663,8 @@ describe("ProjectService", () => {
         recordPresenceSettingChanged: { send: async () => undefined },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectTraceSharingDisabled: { send: async () => undefined },
       });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -659,6 +676,40 @@ describe("ProjectService", () => {
           tenantId: applicationProject.id,
           projectId: applicationProject.id,
           organizationId: "org",
+        }),
+      );
+    });
+
+    /** @scenario "A new project's created fact carries its team and whether it is personal" */
+    it("records the new project's team and personal flag on its created fact", async () => {
+      const send = vi.fn(async (_payload: unknown) => undefined);
+      const created = ProjectCreatedNoticeService.create({
+        logger: { error: () => void 0 },
+        projects: {
+          findWithOrgAdmin: async () => null,
+          findIdsByOrganization: async () => [],
+          findWithTeam: async () => null,
+        },
+      });
+      created.connect({
+        recordProjectCreated: { send },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
+        recordPresenceSettingChanged: { send: async () => undefined },
+        recordProjectMoved: { send: async () => undefined },
+        recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectTraceSharingDisabled: { send: async () => undefined },
+      });
+
+      await createService(new StubRepository(), new StubOrganizationService(), created).create(
+        input,
+      );
+
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: applicationProject.id,
+          teamId: applicationProject.teamId,
+          isPersonal: applicationProject.isPersonal,
         }),
       );
     });
@@ -680,6 +731,8 @@ describe("ProjectService", () => {
         recordPresenceSettingChanged: { send: async () => undefined },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectTraceSharingDisabled: { send: async () => undefined },
       });
 
       await expect(
@@ -793,6 +846,27 @@ describe("ProjectService", () => {
       createService(repository).listIdsByOrganization({ organizationId: "org" }),
     ).resolves.toEqual(["project_1", "project_2"]);
     expect(repository.findIdsByOrganization).toHaveBeenCalledWith("org");
+  });
+
+  /** @scenario "The model-defaults scope picker offers an archived project" */
+  it("passes includeArchived to the live read, defaulting to false", async () => {
+    const repository = new StubRepository();
+    const service = createService(repository);
+
+    await service.findLiveNonGovernanceIdsByOrganization({ organizationId: "org" });
+    await service.findLiveNonGovernanceIdsByOrganization({
+      organizationId: "org",
+      includeArchived: true,
+    });
+
+    expect(repository.findLiveNonGovernanceIds).toHaveBeenNthCalledWith(1, {
+      organizationId: "org",
+      includeArchived: false,
+    });
+    expect(repository.findLiveNonGovernanceIds).toHaveBeenNthCalledWith(2, {
+      organizationId: "org",
+      includeArchived: true,
+    });
   });
 
   it("bounds active project scope queries and reports another page", async () => {
@@ -1126,7 +1200,7 @@ describe("ProjectService", () => {
     expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(expected);
   });
 
-  describe("isTeamMember", () => {
+  describe("when asked isTeamMember", () => {
     describe("given an unknown project", () => {
       it("reports false without asking the organisation roster", async () => {
         const repository = new StubRepository();
@@ -1203,6 +1277,8 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
       recordPresenceSettingChanged: { send: async () => undefined },
       recordProjectMoved: { send: moved },
       recordProjectArchived: { send: archived },
+      recordProjectDepartmentAssigned: { send: async () => undefined },
+      recordProjectTraceSharingDisabled: { send: async () => undefined },
     });
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_alpha" }));
@@ -1304,6 +1380,86 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
         expect.objectContaining({ projectId: applicationProject.id }),
         expect.any(String),
       );
+    });
+  });
+});
+
+describe("ProjectService department facts for data privacy's fold", () => {
+  function recording({ assigned }: { assigned: boolean }) {
+    const departments = vi.fn(async (_payload: unknown) => undefined);
+    const created = ProjectCreatedNoticeService.create({
+      logger: { error: vi.fn() },
+      projects: {
+        findWithOrgAdmin: async () => null,
+        findIdsByOrganization: async () => [],
+        findWithTeam: async () => projectWithTeam({ teamId: "team_alpha", departmentId: "risk" }),
+      },
+    });
+    created.connect({
+      recordProjectCreated: { send: async () => undefined },
+      recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      recordPresenceSettingChanged: { send: async () => undefined },
+      recordProjectMoved: { send: async () => undefined },
+      recordProjectArchived: { send: async () => undefined },
+      recordProjectDepartmentAssigned: { send: departments },
+      recordProjectTraceSharingDisabled: { send: async () => undefined },
+    });
+    const repository = new StubRepository();
+    repository.assignProjectDepartment.mockResolvedValue(assigned);
+
+    return {
+      service: createService(repository, new StubOrganizationService(), created),
+      departments,
+    };
+  }
+
+  const assignment = {
+    organizationId: "org",
+    projectId: applicationProject.id,
+    departmentId: "risk",
+  };
+
+  /** @scenario "A project's department assignment is recorded as project's fact" */
+  it("records the department with the project's team and personal flag", async () => {
+    const { service, departments } = recording({ assigned: true });
+
+    await expect(service.assignProjectDepartment(assignment)).resolves.toBe(true);
+
+    expect(departments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: applicationProject.id,
+        projectId: applicationProject.id,
+        organizationId: "org",
+        departmentId: "risk",
+        teamId: "team_alpha",
+        isPersonal: false,
+      }),
+    );
+    expect(departments.mock.calls[0]?.[0]).not.toHaveProperty("backfilled");
+  });
+
+  /** @scenario "Assigning a department to a project outside the organization records no fact" */
+  it("records nothing when no project in the organization was assigned", async () => {
+    const { service, departments } = recording({ assigned: false });
+
+    await expect(service.assignProjectDepartment(assignment)).resolves.toBe(false);
+
+    expect(departments).not.toHaveBeenCalled();
+  });
+});
+
+describe("ProjectService legacy key lookup", () => {
+  describe("when a caller presents a revoked legacy key", () => {
+    /** @scenario "Revoking the legacy key stops nothing the platform runs" */
+    it("resolves no project and never asks the store", async () => {
+      const repository = new StubRepository();
+      repository.findIdByLegacyApiKey.mockResolvedValue("project_alpha");
+      const service = createService(repository);
+
+      await expect(
+        service.findIdByLegacyApiKey({ token: "lw-revoked-project_alpha" }),
+      ).resolves.toBeNull();
+      expect(repository.findIdByLegacyApiKey).not.toHaveBeenCalled();
     });
   });
 });

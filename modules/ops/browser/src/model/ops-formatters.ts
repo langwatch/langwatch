@@ -1,9 +1,4 @@
-import { nowInstant, Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
-
-/** The moment a screen prints, as the `Date` the Intl formatters take. */
-export function readableDate(value: TimeInput) {
-  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
-}
+import { nowInstant, toEpochMs } from "@langwatch/time";
 
 export function formatTimeAgo(ms: number | null, now = nowInstant().epochMilliseconds): string {
   if (ms === null) return "—";

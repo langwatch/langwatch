@@ -236,11 +236,11 @@ describe("the dataset REST declaration", () => {
 
       expect(route?.rateLimit).toEqual({ requests: 600, seconds: 60 });
       await expect(
-        answer(
-          "postApiDatasetAttachmentsUploads",
-          completeDatasetApi({ createAttachmentUpload }),
-          { filename: "scan.png", mediaType: "image/png", byteLength: 1024 },
-        ),
+        answer("postApiDatasetAttachmentsUploads", completeDatasetApi({ createAttachmentUpload }), {
+          filename: "scan.png",
+          mediaType: "image/png",
+          byteLength: 1024,
+        }),
       ).resolves.toEqual(upload);
       expect(createAttachmentUpload).toHaveBeenCalledWith({
         projectId: "project-1",

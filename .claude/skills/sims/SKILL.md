@@ -57,3 +57,16 @@ Chakra, no product design system.
 `dev/docs/LOCAL_STACK.md` (simulators and the sims lane), `tools/thuishaven/README.md`
 (hostname scheme), and `services/<name>/README.md` where one exists (llmsim, mailsim,
 storagesim, idpsim).
+
+## CLI parity
+
+Every console action has a verb (`--json` on reads, non-zero exit on failure, `--stack <slug>`):
+
+| Sim | Verbs |
+|---|---|
+| mail | `haven mail address\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear` |
+| llm | `haven llm info\|calls\|call <id>\|clear\|set --error --seed` |
+| analytics | `haven analytics status\|records\|clear\|wait --event` |
+| storage | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|requests` |
+| voice | `haven voice status\|calls\|call <id>` |
+| idp | `haven idp` (summary only; more verbs planned) |

@@ -115,7 +115,7 @@ export const uiCallCommand = async (
   let response: Response;
   let text: string;
   try {
-    response = await langwatchFetch(`${endpoint}/api/v1/langy/ui/actions`, {
+    response = await langwatchFetch(`${endpoint}/api/langy/ui/actions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

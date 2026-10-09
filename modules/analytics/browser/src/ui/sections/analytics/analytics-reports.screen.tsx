@@ -25,12 +25,12 @@ import {
   useFirstDashboard,
 } from "../../../behavior/use-dashboards.ts";
 import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
-import { useWidgetGranularity } from "../../../behavior/use-widget-granularity.ts";
+import { useWidgetGranularity } from "../../../features/dashboard-widget/behavior/use-widget-granularity.ts";
+import { CreateDashboardWidgetDrawer } from "../../../features/dashboard-widget/ui/sections/create-dashboard-widget-drawer.tsx";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import { Link } from "../../elements/analytics-link.tsx";
 import AnalyticsLayout from "../analytics-layout.tsx";
-import { CreateDashboardWidgetDrawer } from "../create-dashboard-widget-drawer.tsx";
 import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
 import { FilterSidebar } from "../filter-sidebar.tsx";
 import { ReportGrid } from "../report-grid.tsx";

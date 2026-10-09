@@ -52,7 +52,6 @@ async function offerFor({
   if (holdsPasskey) database.writePasskey({ id: "passkey-1", userId: id });
 
   const auth = Object.assign(createUserTestAuth(), {
-    offersTwoStepVerification: vi.fn(() => twoStep),
     getSignedInWith: vi.fn(async () => signedInWith),
   });
   const app = createUserTestApp({
@@ -62,7 +61,7 @@ async function offerFor({
       credentials: MemoryUserCredentialRepository.create({ database }),
     },
     dependencies: { auth },
-    facts: { passkeysEnabled: passkeys, baseUrl: null },
+    facts: { passkeysEnabled: passkeys, mfaEnrollmentOpen: twoStep },
     now: () => fromDate(NOW),
   });
 

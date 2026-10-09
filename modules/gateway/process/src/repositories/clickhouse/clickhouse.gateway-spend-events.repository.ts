@@ -23,6 +23,9 @@ import { z } from "zod";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import {
   GatewaySpendEventsRepository,
+  type GatewaySpendModelTotal,
+  type GatewaySpendVirtualKeyTotal,
+  type GatewaySpendWindow,
   type SpendEventsPageCursor,
   type SpendSummaryRow,
 } from "../../repositories/gateway-spend-events.repository.ts";
@@ -74,6 +77,14 @@ const CHARGED_STATUSES = "('confirmed', 'failed')";
 const METERED_READ_MAX_EXECUTION_SECONDS = 20;
 const DAY_MS = 86_400_000;
 
+/** The order the per-tenant statements page in, applied again once their pages merge. */
+function newestFirst(left: SpendEventRow, right: SpendEventRow): number {
+  const byTime = right.occurredAt.epochMilliseconds - left.occurredAt.epochMilliseconds;
+  if (byTime !== 0) return byTime;
+  if (left.gatewayRequestId === right.gatewayRequestId) return 0;
+  return left.gatewayRequestId < right.gatewayRequestId ? 1 : -1;
+}
+
 /** The `TenantId IN (...)` list and its params: the guard wants one bound String per tenant. */
 function tenantSet({ tenantIds }: { tenantIds: readonly string[] }) {
   return {
@@ -82,10 +93,23 @@ function tenantSet({ tenantIds }: { tenantIds: readonly string[] }) {
   };
 }
 
-/** Main's governance metered-lane read: each request at its latest version, summed per day. */
-const spendDaysQuery = ({ placeholders }: { placeholders: string }) => `
+/**
+ * Main's governance metered-lane read: each request at its latest version, summed per one
+ * dimension (`governanceGatewaySpend.clickhouse.repository.ts`). Never grouped by person.
+ */
+const meteredSpendQuery = ({
+  placeholders,
+  dimension,
+  grouping,
+  ordering,
+}: {
+  placeholders: string;
+  dimension: string;
+  grouping: string;
+  ordering: string;
+}) => `
   SELECT
-    toDate(RequestOccurredAt, 'UTC') AS Day,
+    ${dimension},
     toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
     countIf(RequestStatus IN ${CHARGED_STATUSES}) AS RequestCount,
     countIf(RequestStatus IN ${CHARGED_STATUSES} AND RequestCostNanoUSD > 0) AS PricedRequestCount,
@@ -103,6 +127,8 @@ const spendDaysQuery = ({ placeholders }: { placeholders: string }) => `
       argMax(Status, EventTimestamp)           AS RequestStatus,
       argMax(CostNanoUSD, EventTimestamp)      AS RequestCostNanoUSD,
       argMax(OccurredAt, EventTimestamp)       AS RequestOccurredAt,
+      argMax(Model, EventTimestamp)            AS RequestModel,
+      argMax(VirtualKeyId, EventTimestamp)     AS RequestVirtualKeyId,
       argMax(TokensInput, EventTimestamp)      AS RequestTokensInput,
       argMax(TokensOutput, EventTimestamp)     AS RequestTokensOutput,
       argMax(TokensCacheRead, EventTimestamp)  AS RequestTokensCacheRead,
@@ -114,19 +140,34 @@ const spendDaysQuery = ({ placeholders }: { placeholders: string }) => `
     HAVING RequestOccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
       AND RequestOccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
   )
-  GROUP BY Day
-  ORDER BY Day
+  GROUP BY ${grouping}
+  ORDER BY ${ordering}
 `;
 
-const spendDayRowSchema = z.object({
-  Day: z.string(),
+/** `AmountNanoUsd` is a string alias and would sort as text; rank on the number. */
+const AMOUNT_DESC = "toInt64(AmountNanoUsd) DESC";
+
+const meteredFiguresSchema = z.object({
   AmountNanoUsd: z.union([z.string(), z.number()]),
   RequestCount: z.coerce.number(),
   PricedRequestCount: z.coerce.number(),
   RequestsWithoutAmount: z.coerce.number(),
 });
 
-const spendDayRowsSchema = z.array(spendDayRowSchema);
+const meteredFigures = (row: z.infer<typeof meteredFiguresSchema>) => ({
+  amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
+  requestCount: row.RequestCount,
+  pricedRequestCount: row.PricedRequestCount,
+  requestsWithoutAmount: row.RequestsWithoutAmount,
+});
+
+const spendDayRowsSchema = z.array(z.object({ ...meteredFiguresSchema.shape, Day: z.string() }));
+const spendModelRowsSchema = z.array(
+  z.object({ ...meteredFiguresSchema.shape, Model: z.string() }),
+);
+const spendVirtualKeyRowsSchema = z.array(
+  z.object({ ...meteredFiguresSchema.shape, VirtualKeyId: z.string() }),
+);
 
 const utcDayStartMs = (day: string): number =>
   Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds;
@@ -374,6 +415,102 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
    * (EventTimestamp, GatewayRequestId) so late-restated rows sort after the
    * cursor, never skipped; from/to stay OccurredAt (request-time) bounds.
    */
+  async readSpendEventsAcrossTenants(input: {
+    tenantIds: string[];
+    statuses: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    if (input.tenantIds.length === 0 || input.statuses.length === 0) {
+      return { rows: [], nextCursor: null };
+    }
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = { statuses: input.statuses, limit: input.limit };
+    if (input.fromMs !== undefined) {
+      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+      params.fromMs = input.fromMs;
+    }
+    if (input.toMs !== undefined) {
+      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+      params.toMs = input.toMs;
+    }
+    const cursor = input.cursor ? spendCursors.decodeSpendEventsCursor(input.cursor) : null;
+    if (cursor) {
+      clauses.push(
+        "AND (OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})",
+      );
+      params.cursorOccurredAtMs = cursor.eventTimestampMs;
+      params.cursorRequestId = cursor.gatewayRequestId;
+    }
+    const query = `SELECT ${SPEND_ROW_COLUMNS}
+        FROM ${TABLE} FINAL
+        WHERE TenantId = {tenantId:String}
+          AND Status IN {statuses:Array(String)}
+          ${clauses.join("\n          ")}
+        ORDER BY OccurredAt DESC, GatewayRequestId DESC
+        LIMIT {limit:UInt32}`;
+    const perTenant = await Promise.all(
+      input.tenantIds.map((tenantId) => this.readTenantSpendRows({ tenantId, query, params })),
+    );
+    const rows = perTenant.flat().toSorted(newestFirst).slice(0, input.limit);
+    const last = rows.at(-1);
+    return {
+      rows,
+      nextCursor:
+        rows.length === input.limit && last
+          ? spendCursors.encodeSpendEventsCursor({
+              eventTimestampMs: last.occurredAt.epochMilliseconds,
+              gatewayRequestId: last.gatewayRequestId,
+            })
+          : null,
+    };
+  }
+
+  async findSpendEventAcrossTenants(input: {
+    tenantIds: string[];
+    gatewayRequestId: string;
+    statuses: string[];
+  }): Promise<SpendEventRow | null> {
+    if (input.statuses.length === 0) return null;
+    const perTenant = await Promise.all(
+      input.tenantIds.map((tenantId) =>
+        this.readTenantSpendRows({
+          tenantId,
+          query: `SELECT ${SPEND_ROW_COLUMNS}
+        FROM ${TABLE} FINAL
+        WHERE TenantId = {tenantId:String}
+          AND GatewayRequestId = {gatewayRequestId:String}
+          AND Status IN {statuses:Array(String)}
+        LIMIT 1`,
+          params: { gatewayRequestId: input.gatewayRequestId, statuses: input.statuses },
+        }),
+      ),
+    );
+    return perTenant.flat()[0] ?? null;
+  }
+
+  /** One statement per project tenant: the tenant guard admits exactly one tenant per read. */
+  private async readTenantSpendRows({
+    tenantId,
+    query,
+    params,
+  }: {
+    tenantId: string;
+    query: string;
+    params: Record<string, unknown>;
+  }): Promise<SpendEventRow[]> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query,
+      query_params: { ...params, tenantId },
+      format: "JSONEachRow",
+    });
+    const raw = await result.json<Record<string, unknown>>();
+    return raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
+  }
+
   async walkSpendEvents({
     tenantIds,
     fromMs,
@@ -599,21 +736,64 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
   }
 
-  async sumDaysForOrganizationProjects({
-    tenantIds,
-    fromDay,
-    toDay,
+  async sumDaysForOrganizationProjects(input: GatewaySpendWindow): Promise<GatewaySpendDay[]> {
+    const rows = await this.#readMetered({
+      window: input,
+      dimension: "toDate(RequestOccurredAt, 'UTC') AS Day",
+      grouping: "Day",
+      ordering: "Day",
+    });
+    return spendDayRowsSchema.parse(rows).map((row) => ({ day: row.Day, ...meteredFigures(row) }));
+  }
+
+  async sumWindowByModel(input: GatewaySpendWindow): Promise<GatewaySpendModelTotal[]> {
+    const rows = await this.#readMetered({
+      window: input,
+      dimension: "RequestModel AS Model",
+      grouping: "RequestModel",
+      ordering: `${AMOUNT_DESC}, Model`,
+    });
+    return spendModelRowsSchema
+      .parse(rows)
+      .map((row) => ({ model: row.Model, ...meteredFigures(row) }));
+  }
+
+  async sumWindowByVirtualKey(input: GatewaySpendWindow): Promise<GatewaySpendVirtualKeyTotal[]> {
+    const rows = await this.#readMetered({
+      window: input,
+      dimension: "RequestVirtualKeyId AS VirtualKeyId",
+      grouping: "RequestVirtualKeyId",
+      ordering: `${AMOUNT_DESC}, VirtualKeyId`,
+    });
+    return spendVirtualKeyRowsSchema
+      .parse(rows)
+      .map((row) => ({ virtualKeyId: row.VirtualKeyId, ...meteredFigures(row) }));
+  }
+
+  /** One grouped read over the deduped requests; the client is resolved by the first tenant. */
+  async #readMetered({
+    window,
+    dimension,
+    grouping,
+    ordering,
   }: {
-    tenantIds: readonly string[];
-    fromDay: string;
-    toDay: string;
-  }): Promise<GatewaySpendDay[]> {
+    window: GatewaySpendWindow;
+    dimension: string;
+    grouping: string;
+    ordering: string;
+  }): Promise<unknown[]> {
+    const { tenantIds, fromDay, toDay } = window;
     const [firstTenantId] = tenantIds;
     if (firstTenantId === undefined) return [];
     const client = await this.resolveClient(firstTenantId);
     const tenant = tenantSet({ tenantIds });
     const result = await client.query({
-      query: spendDaysQuery({ placeholders: tenant.placeholders }),
+      query: meteredSpendQuery({
+        placeholders: tenant.placeholders,
+        dimension,
+        grouping,
+        ordering,
+      }),
       tenantIds,
       query_params: {
         ...tenant.params,
@@ -623,13 +803,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       format: "JSONEachRow",
       clickhouse_settings: { max_execution_time: METERED_READ_MAX_EXECUTION_SECONDS },
     });
-    return spendDayRowsSchema.parse(await result.json()).map((row) => ({
-      day: row.Day,
-      amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
-      requestCount: row.RequestCount,
-      pricedRequestCount: row.PricedRequestCount,
-      requestsWithoutAmount: row.RequestsWithoutAmount,
-    }));
+    return result.json();
   }
 
   async readEndUserSpend({

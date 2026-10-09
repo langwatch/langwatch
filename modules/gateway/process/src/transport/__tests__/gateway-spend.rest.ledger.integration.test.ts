@@ -14,6 +14,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GatewayEndUserCapsAdapter } from "../../__tests__/support/postgres.gateway-service.ts";
 import { createTraceDestinationProjects } from "../../__tests__/support/trace-destination-project-service.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
+import { FixedGatewaySettlementPolicyService } from "../../features/spend/services/fixed-gateway-settlement-policy.service.ts";
+import { GatewaySpendEventsService } from "../../features/spend/services/gateway-spend-events.service.ts";
+import {
+  type GatewaySpendApp,
+  GatewaySpendReconciliationService,
+} from "../../features/spend/services/gateway-spend-reconciliation.service.ts";
+import { GatewaySpendScopeService } from "../../features/spend/services/gateway-spend-scope.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -21,13 +28,6 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import { FixedGatewaySettlementPolicyService } from "../../services/fixed-gateway-settlement-policy.service.ts";
-import { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
-import {
-  type GatewaySpendApp,
-  GatewaySpendReconciliationService,
-} from "../../services/gateway-spend-reconciliation.service.ts";
-import { GatewaySpendScopeService } from "../../services/gateway-spend-scope.service.ts";
 import { type GatewaySpendDoorApi, gatewaySpendRest } from "../gateway-spend.rest.ts";
 
 const databaseUrl = process.env.DATABASE_URL;

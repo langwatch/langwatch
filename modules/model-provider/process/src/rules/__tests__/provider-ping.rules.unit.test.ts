@@ -6,6 +6,7 @@ import { getModelsForProvider, type Model } from "@langwatch/model-provider-cont
 import { describe, expect, it } from "vitest";
 
 import {
+  ensureGatewayV1BaseUrl,
   classifyPingRefusal,
   findPingModels,
   UNPINGABLE_CREDENTIALS,
@@ -71,5 +72,14 @@ describe("given a credential the probe could not read", () => {
   /** @scenario "A row whose credential could not be read is not pinged" */
   it("names both outcomes the caller must stop at", () => {
     expect(UNPINGABLE_CREDENTIALS).toEqual(["no_credential", "credential_masked"]);
+  });
+});
+
+describe("ensureGatewayV1BaseUrl", () => {
+  describe("given a gateway address", () => {
+    it("ends it in /v1 exactly once", () => {
+      expect(ensureGatewayV1BaseUrl("http://gw-internal:5563/")).toBe("http://gw-internal:5563/v1");
+      expect(ensureGatewayV1BaseUrl("https://gw.example/v1")).toBe("https://gw.example/v1");
+    });
   });
 });

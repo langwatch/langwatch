@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 import { EventingTraceTopicAssignment } from "../../eventing/trace-topic-assignment.commands.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { ScenarioRoleMetricsDerivationService } from "../../services/scenario-role-metrics-derivation.service.ts";
-import { SpanCostService } from "../../services/span-cost.service.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { TraceModelCostService } from "../../services/trace-model-cost.service.ts";
-import { TraceTopicClusteringReadService } from "../../services/trace-topic-clustering-read.service.ts";
+import { SpanCostService } from "../../features/span/services/span-cost.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceModelCostService } from "../../features/derivation/services/trace-model-cost.service.ts";
+import { TraceTopicClusteringReadService } from "../../features/topic/services/trace-topic-clustering-read.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
 

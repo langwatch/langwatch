@@ -7,7 +7,7 @@ import {
   MATCH_EVIDENCE_KIND,
   MATCH_SUSPENSION_REASON,
   normalizeEmail,
-} from "../identity-evidence.rules.ts";
+} from "../../features/identity/rules/identity-evidence.rules.ts";
 
 const accounts = ({
   emails = {},

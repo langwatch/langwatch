@@ -1,5 +1,5 @@
-import type { TraceListItem } from "../../types/trace.ts";
-import type { ConversationGroup } from "../conversation-groups.ts";
+import type { ConversationGroup } from "../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
 import { conversationAddons } from "./addons/conversation/index.ts";
 import { groupAddons } from "./addons/group/index.ts";
 import { traceAddons } from "./addons/trace/index.ts";

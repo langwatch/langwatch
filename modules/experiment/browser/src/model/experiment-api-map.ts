@@ -5,10 +5,10 @@
 
 import type { agentTrpc } from "@langwatch/agent-contract";
 import type { ContractApiMap, OutputsFromMap, RouterFromMap } from "@langwatch/api/web";
-import type { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
+import type { datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 import type { evaluationTrpc } from "@langwatch/evaluation-contract";
 import type { evaluatorTrpc } from "@langwatch/evaluator-contract";
-import type { experimentsTrpc } from "@langwatch/experiment-contract";
+import type { batchRecordTrpc, experimentsTrpc } from "@langwatch/experiment-contract";
 import type { opsDashboardTrpc } from "@langwatch/ops-contract";
 import type { promptTrpc } from "@langwatch/prompt-contract";
 

@@ -14,7 +14,7 @@ import {
   type PullRequestSortState,
   type SortablePullRequestRow,
   sortPullRequestRows,
-} from "../pull-request-sort.ts";
+} from "../behavior/pull-request-sort.ts";
 
 /**
  * One sortable row, filled in around whatever a case pins. Every fixture names

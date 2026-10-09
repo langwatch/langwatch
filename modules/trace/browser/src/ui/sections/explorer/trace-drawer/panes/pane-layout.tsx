@@ -13,8 +13,8 @@ import {
   getTraceDrawer,
   type TraceDrawerState,
 } from "../../../../../behavior/trace-drawer.ts";
+import { useConversationContext } from "../../../../../features/conversation/behavior/use-conversation-context.ts";
 import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
-import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 import { ConversationContext } from "../conversation-context.tsx";
 import { VizPlaceholder } from "../viz-placeholder.tsx";
 import { SpanDetailPane } from "./span-detail-pane.tsx";

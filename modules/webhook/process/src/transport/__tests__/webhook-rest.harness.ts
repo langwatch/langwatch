@@ -3,13 +3,9 @@
  * one organization door, the canonical error envelope this family has always
  * published, and a pass-through idempotency ledger.
  */
-import {
-  apiErrorBody,
-  createRestRuntime,
-  type IdempotentRunner,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { apiErrorBody, createRestRuntime, type IdempotentRunner } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { WebhookModule, type WebhookAppDependencies } from "../../app/webhook.app.ts";
@@ -38,7 +34,7 @@ function unreachableDependencies(): WebhookAppDependencies {
 }
 
 /** The canonical `{ error: { code, message, ... } }` envelope this family publishes. */
-const onError: RestErrorHandler = (error, c) => {
+const onError: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     const status =
       error.code === "validation_error" ? 400 : ((error.httpStatus ?? 500) as ContentfulStatusCode);

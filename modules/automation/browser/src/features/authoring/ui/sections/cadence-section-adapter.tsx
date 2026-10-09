@@ -5,8 +5,7 @@ import {
   type AutomationCadenceDraft,
 } from "../blocks/cadence-section.tsx";
 import { type FacetAccordionProps } from "../elements/facet-section.tsx";
-import { useDraft } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
+import { useDraft, useAutomationStore } from "./automation-selectors.ts";
 import { CLIENT_PROVIDERS } from "./client-providers.ts";
 import { isNotifyAction } from "./draft-model.ts";
 

@@ -6,6 +6,7 @@ import type {
   TraceHeader,
   TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
+import { gateSessionTitle } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { applyDerivedTraceEventProtections } from "../trace-read-redaction.rules.ts";
@@ -14,7 +15,6 @@ import {
   gateHeaderCost,
   gateResources,
   gateSessionCost,
-  gateSessionTitle,
   gateTreeCost,
 } from "../trace-view-gates.rules.ts";
 

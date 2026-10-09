@@ -4,7 +4,7 @@ import {
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
-} from "@langwatch/analytics-contract";
+} from "@langwatch/analytics-client";
 import { Lent } from "@langwatch/browser-host/lent";
 
 export function SavedDashboards(props: SavedDashboardsProps) {

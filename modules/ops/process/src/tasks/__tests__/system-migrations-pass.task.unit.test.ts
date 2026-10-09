@@ -33,7 +33,10 @@ describe("SystemMigrationsPassTask", () => {
   });
 
   describe("when a pass fails outright", () => {
-    /** @scenario "The boot chain drives the migrations to convergence before the process starts" */
+    /**
+     * @scenario "The boot chain drives the migrations to convergence before the process starts"
+     * @scenario "A failed pass ends the run without preventing startup"
+     */
     it("ends the task without failing the boot chain", async () => {
       const pass = vi.fn().mockRejectedValue(new Error("the state table is down"));
       const task = SystemMigrationsPassTask.create({ pass: () => pass });
@@ -42,6 +45,26 @@ describe("SystemMigrationsPassTask", () => {
         task.run({ args: [], signal: new AbortController().signal }),
       ).resolves.toBeUndefined();
       expect(pass).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the passes never settle", () => {
+    /** @scenario "The boot chain drives the migrations to convergence before the process starts" */
+    it("stops at the cap and ends the task without failing the boot chain", async () => {
+      vi.useFakeTimers();
+      try {
+        const pass = vi.fn().mockResolvedValue(summary({ tenantsSeen: 1, advanced: 1 }));
+        const run = SystemMigrationsPassTask.create({ pass: () => pass }).run({
+          args: [],
+          signal: new AbortController().signal,
+        });
+        await vi.runAllTimersAsync();
+
+        await expect(run).resolves.toBeUndefined();
+        expect(pass).toHaveBeenCalledTimes(25);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

@@ -14,14 +14,19 @@ function browserDocument() {
 }
 
 describe("given a browser that installs notification", () => {
-  describe("when the kernel renders with only a transport supplied", () => {
-    it("installs the module", async () => {
+  describe("when the kernel renders with a transport and the page's config supplied", () => {
+    it("installs the module and projects the slice it claims", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
         .withModules([notificationWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
+        .withInjectedConfig(() => ({
+          process: { mode: "test", deployment: "self-hosted", nlp: true },
+          notification: { email: true },
+        }))
         .render();
 
       expect(installed.modules).toContain(notificationWeb);
+      expect(installed.config).toEqual({ notification: { hasEmailProvider: true } });
     });
   });
 

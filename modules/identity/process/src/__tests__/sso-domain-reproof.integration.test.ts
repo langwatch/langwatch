@@ -15,19 +15,19 @@ import type {
   SsoDomainProofChannel,
   SsoDomainTxtLookup,
 } from "../channels/sso-domain-proof.channel.ts";
-import { PrismaSsoDomainReproofTargetRepository } from "../repositories/prisma/prisma.sso-domain-reproof.repository.ts";
+import type { SsoConnectionLedger } from "../features/sso-connection/rules/sso-connection-ledger.rules.ts";
+import { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
+import { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
+import { PrismaSsoDomainReproofTargetRepository } from "../features/sso-domain/repositories/prisma/prisma.sso-domain-reproof.repository.ts";
 import type {
   SsoDomainReproofTarget,
   SsoDomainReproofTargetRepository,
-} from "../repositories/sso-domain-reproof.repository.ts";
-import { sha256Hex } from "../rules/pkce.rules.ts";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
-import { SsoConnectionService } from "../services/sso-connection.service.ts";
+} from "../features/sso-domain/repositories/sso-domain-reproof.repository.ts";
 import {
   SSO_DOMAIN_REPROOF_BATCH,
   SsoDomainReproofService,
-} from "../services/sso-domain-reproof.service.ts";
+} from "../features/sso-domain/services/sso-domain-reproof.service.ts";
+import { sha256Hex } from "../rules/pkce.rules.ts";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,

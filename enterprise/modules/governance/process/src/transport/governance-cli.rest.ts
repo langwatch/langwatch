@@ -31,7 +31,7 @@ import {
 const JSON_MEDIA_TYPE = "application/json";
 const CLI_DOOR = anyAuthenticated({
   reason:
-    "main asked no permission here: the CLI token door admits the device-session bearer, and the key-minting routes check the active seat",
+    "the CLI bearer is one user's device session; every route answers for that user's own seat and the minting routes refuse an inactive seat",
 });
 
 export const governanceCliRest = defineRestRouter(GovernanceRestApi)

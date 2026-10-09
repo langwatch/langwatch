@@ -18,9 +18,9 @@ import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-
 import { RunsSidebarEntry } from "../../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
 import { passRateColor } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
 import { TARGET_COLORS } from "../../../../elements/agent-testing/shared/target-colors.ts";
+import { RUN_AGAIN_LABEL } from "../../run-plan-results/run-plan-detail-header.tsx";
+import { RunPlanDetail } from "../../run-plan-results/run-plan-detail.tsx";
 import { NOT_IN_RUN_LABEL } from "../comparison-results-row.tsx";
-import { RUN_AGAIN_LABEL } from "../run-plan-detail-header.tsx";
-import { RunPlanDetail } from "../run-plan-detail.tsx";
 import { PROJECT_DEFAULT_MODEL } from "../run-settings-block.tsx";
 
 const mockGetSuiteRunData = vi.hoisted(() => vi.fn());

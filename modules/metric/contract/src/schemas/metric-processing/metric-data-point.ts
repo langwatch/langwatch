@@ -1,4 +1,3 @@
-import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 export const metricKindSchema = z.enum([
@@ -117,25 +116,4 @@ export interface MetricRollupRow {
   gapCount: number;
   sourcePointCount: number;
   updatedAt: number;
-}
-
-export interface MetricUsageEstimateQuery {
-  organizationId: string;
-  tenantId?: string;
-  metricName?: string;
-  from: Instant;
-  to: Instant;
-  groupBy: "organization" | "project" | "metric" | "hour";
-}
-
-export interface MetricUsageEstimate {
-  organizationId: string;
-  tenantId: string | null;
-  metricName: string | null;
-  acceptedHour: string | null;
-  uniqueActiveSeries: number;
-  activeSeriesHours: number;
-  acceptedPoints: number;
-  canonicalRetainedBytes: number;
-  projectedEventEquivalentUsage: number;
 }

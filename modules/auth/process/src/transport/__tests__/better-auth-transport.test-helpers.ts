@@ -15,12 +15,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
-import { createSecondaryStorage } from "../../app/auth-composition.build.ts";
+import type { LinkProposals } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import {
   createBetterAuthTransport,
   type BetterAuthDeploymentConfiguration,
 } from "../../channels/http/http.better-auth.channel.ts";
 import { CredentialSessionGuard } from "../../channels/http/http.credential-session-guard.channel.ts";
+import { MemoryBetterAuthSecondaryStorageRepository } from "../../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
 import { CredentialSignInPolicyService } from "../../services/credential-sign-in-policy.service.ts";
 
@@ -51,10 +52,13 @@ export function betterAuthTransportFor(
   return createBetterAuthTransport({
     auth: {} as never,
     database: {} as never,
-    storage: {
-      adapter: () =>
-        memoryAdapter({ user: [], session: [], account: [], verification: [], ssoProvider: [] }),
-    } as never,
+    storage: memoryAdapter({
+      user: [],
+      session: [],
+      account: [],
+      verification: [],
+      ssoProvider: [],
+    }),
     deployment: deployment(overrides),
     federation: {
       federationCapable: () => false,
@@ -68,6 +72,12 @@ export function betterAuthTransportFor(
     } as never,
     invites: {
       applyPendingInvite: async () => ({ applied: false }),
+    },
+    /** No organization claims any domain, and nobody belongs to one. */
+    organizations: {
+      findBySsoDomain: async () => null,
+      createSsoDomainMembership: async () => "created",
+      countMembershipsForUser: async () => 0,
     },
     announcements: {
       signUpNurturing: () => undefined,
@@ -84,6 +94,7 @@ export function betterAuthTransportFor(
     authzGrants: {} as never,
     arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
+    linkProposals: createApiFixture<LinkProposals>(),
     ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
       decideAccountLink: async () => ({ kind: "not_migrating" }),
     }),
@@ -100,6 +111,7 @@ export function betterAuthTransportFor(
     findGoverningConnections: async () => [],
     /** Sign-up is open, as on an installation that sets neither variable. */
     signUpPolicy: { checkSignUp: async () => ({ allowed: true, via: "open" }) },
+    passkeySignUpEligibility: { enrolsLocally: async () => true },
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: null,
@@ -108,8 +120,8 @@ export function betterAuthTransportFor(
       }),
     ),
     sendResetPassword: async () => undefined,
-    redis: null,
-    secondaryStorage: createSecondaryStorage(null),
+    sharedStorage: false,
+    secondaryStorage: MemoryBetterAuthSecondaryStorageRepository.create(),
     signUpVerification: {
       completeVerification: async () => {
         throw new IdentityVerificationExpiredError();

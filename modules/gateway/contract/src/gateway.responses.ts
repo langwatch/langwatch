@@ -317,3 +317,36 @@ export const gatewayVirtualKeyUsageSummarySchema = z
   })
   .strict();
 export type GatewayVirtualKeyUsageSummary = z.infer<typeof gatewayVirtualKeyUsageSummarySchema>;
+
+/**
+ * The /me budget banner's state: two shapes, and the bare one is not a degenerate case of
+ * the other. It is what a caller with no personal workspace, no virtual key, or no
+ * analytics store gets: no budget to describe.
+ */
+export const gatewayPersonalBudgetSchema = z.union([
+  z.object({ status: z.literal("ok") }).strict(),
+  z
+    .object({
+      status: z.enum(["ok", "warning", "exceeded"]),
+      scope: z.string(),
+      spentUsd: z.string(),
+      limitUsd: z.string(),
+      period: z.string(),
+      /** Absent when the deployment publishes no base URL to link to. */
+      requestIncreaseUrl: z.string().optional(),
+      adminEmail: z.string().nullable(),
+    })
+    .strict(),
+]);
+export type GatewayPersonalBudget = z.infer<typeof gatewayPersonalBudgetSchema>;
+
+/* Casing at the REST wire seam: lower_snake_case (wire) and SCREAMING_SNAKE (stored). */
+/** The wire spelling of a stored enum value: `"BLOCK"` becomes `"block"`. */
+export function toWireEnum<T extends string>(value: T): Lowercase<T> {
+  return value.toLowerCase() as Lowercase<T>;
+}
+
+/** The stored spelling of a wire enum value: `"block"` becomes `"BLOCK"`. */
+export function toStoredEnum<T extends string>(value: T): Uppercase<T> {
+  return value.toUpperCase() as Uppercase<T>;
+}

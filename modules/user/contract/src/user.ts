@@ -130,6 +130,19 @@ export const userPasswordRotationOutcomeSchema = z.enum([
 ]);
 export type UserPasswordRotationOutcome = z.infer<typeof userPasswordRotationOutcomeSchema>;
 
+/**
+ * What adopting an unfinished account did. Each refusal leaves the account as
+ * it was: `no_account`, an address that is `already_confirmed`, or one somebody
+ * has `signed_in` to.
+ */
+export const adoptUnconfirmedAccountOutcomeSchema = z.enum([
+  "adopted",
+  "no_account",
+  "already_confirmed",
+  "signed_in",
+]);
+export type AdoptUnconfirmedAccountOutcome = z.infer<typeof adoptUnconfirmedAccountOutcomeSchema>;
+
 /** What an unlink did. `last_account` is a refusal, not a failure. */
 export const unlinkUserAccountOutcomeSchema = z.enum(["unlinked", "last_account", "not_found"]);
 export type UnlinkUserAccountOutcome = z.infer<typeof unlinkUserAccountOutcomeSchema>;
@@ -152,10 +165,14 @@ export const updateUserProfileInputSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().optional(),
-    email: userEmailSchema.optional(),
   })
   .strict();
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileInputSchema>;
+
+export const updateUserEmailInputSchema = z
+  .object({ id: z.string().min(1), email: userEmailSchema })
+  .strict();
+export type UpdateUserEmailInput = z.infer<typeof updateUserEmailInputSchema>;
 
 export const userAccountInfoSchema = z.object({ createdAt: z.date() }).strict();
 export type UserAccountInfo = z.infer<typeof userAccountInfoSchema>;
@@ -270,6 +287,17 @@ export const registerCredentialAccountInputSchema = z
   })
   .strict();
 export type RegisterCredentialAccountInput = z.infer<typeof registerCredentialAccountInputSchema>;
+
+/** An account auth's register door cleared; `addressConfirmed` is what its spent proof proved. */
+export const credentialAccountInputSchema = z
+  .object({
+    name: z.string().nullable(),
+    email: z.string().min(1),
+    password: z.string().min(1),
+    addressConfirmed: z.boolean(),
+  })
+  .strict();
+export type CredentialAccountInput = z.infer<typeof credentialAccountInputSchema>;
 
 /**
  * The session row a credential write keeps. Null while impersonating: the

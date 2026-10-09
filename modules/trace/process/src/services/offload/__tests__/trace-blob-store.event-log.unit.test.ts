@@ -1,10 +1,16 @@
 /**
- * @see ADR-022: Unit tests for getFromEventLog (event_log) and putSpool/deleteSpool
- * (S3). Tests FAIL at runtime but pass typecheck: TDD contract.
+ * @see ADR-022: the blob store's offloaded-field read through trace's payload reader over a
+ * recording event read seat, and the spool's best-effort delete and empty-body refusal.
  */
 
-import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
-import { generate, Ksuid } from "@langwatch/ksuid";
+import {
+  createTenantId,
+  type Event,
+  EventNotFoundError,
+  type EventReadSeat,
+  EventUtils,
+  eventToRecord,
+} from "@langwatch/eventing";
 import {
   EVENTREF_ATTR_PREFIX,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -14,354 +20,257 @@ import {
   NormalizedStatusCode,
   type SpanReceivedEvent,
 } from "@langwatch/trace-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 import {
   type S3ClientResolver,
   S3TraceLegacySpoolChannel,
 } from "../../../channels/s3/s3.trace-legacy-spool.channel.ts";
-import { IO_PREVIEW_BYTES } from "../../../rules/trace-projection-lean.rules.ts";
-import {
-  BlobFieldNotFoundError,
-  BlobNotFoundError,
-  TraceBlobStoreService,
-} from "../../trace-blob-store.service.ts";
-import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
+import { EventingTraceEventPayloadRepository } from "../../../repositories/eventing/eventing.trace-event-payload.repository.ts";
+import { TraceEventPayloadFieldNotFoundError } from "../../../repositories/trace-payload-reader.repository.ts";
+import { IO_PREVIEW_BYTES } from "../../../features/projection/rules/trace-projection-lean.rules.ts";
+import { TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
+import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
 import {
   TraceOffloadResolutionService,
   type WarnLogger,
 } from "../../trace-offload-resolution.service.ts";
 
-// ---------------------------------------------------------------------------
-// Helpers — ClickHouse mock
-// ---------------------------------------------------------------------------
-
 const TENANT_A = "tenant-aaa";
 const TENANT_B = "tenant-bbb";
-const AGGREGATE_TYPE = "trace";
 const AGGREGATE_ID = "trace-001";
 const EVENT_ID = "evt-001";
 const FIELD = "langwatch.output";
 const FULL_VALUE = "x".repeat(100 * 1024);
 
-interface MockRow {
-  EventPayload: string;
-}
+type SeatRead = Parameters<EventReadSeat["getEvent"]>[0];
 
-/**
- * Builds a mock ClickHouseClient whose `query` method records the SQL issued
- * and returns the configured rows.
- */
-function makeMockChClient({
-  rows = [] as MockRow[],
-}: {
-  rows?: MockRow[];
-} = {}) {
-  const sqlCaptures: string[] = [];
-  const paramCaptures: Record<string, unknown>[] = [];
-  const client = {
-    query: vi
-      .fn()
-      .mockImplementation(
-        async ({
-          query,
-          query_params,
-        }: {
-          query: string;
-          query_params?: Record<string, unknown>;
-        }) => {
-          sqlCaptures.push(query);
-          paramCaptures.push(query_params ?? {});
-          // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
-          // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
-          // production code's `response.data` access works.
-          return {
-            json: async () => ({ data: rows, meta: [], rows: rows.length }),
-          };
-        },
-      ),
-  };
-  return { client, sqlCaptures, paramCaptures };
+/** A seat holding events per tenant and keeping every read it was asked; others are not found. */
+class RecordingSeat implements EventReadSeat {
+  readonly reads: SeatRead[] = [];
+  private readonly events = new Map<string, unknown>();
+
+  store({ tenantId, eventId, data }: { tenantId: string; eventId: string; data: unknown }): this {
+    this.events.set(`${tenantId}/${eventId}`, data);
+    return this;
+  }
+
+  async getEvent(input: SeatRead): Promise<Event> {
+    this.reads.push(input);
+    const key = `${input.tenantId}/${input.eventId}`;
+    if (!this.events.has(key)) throw new EventNotFoundError(input);
+
+    return { id: input.eventId, data: this.events.get(key) } as Event;
+  }
 }
 
 function makeS3Resolver(s3Client: { send: ReturnType<typeof vi.fn> }): S3ClientResolver {
-  return async () => ({
-    s3Client: s3Client as never,
-    s3Bucket: "test-spool-bucket",
+  return async () => ({ s3Client: s3Client as never, s3Bucket: "test-spool-bucket" });
+}
+
+function blobStoreOver(
+  seat: RecordingSeat,
+  resolveS3Client: S3ClientResolver = makeS3Resolver({ send: vi.fn() }),
+): TraceBlobStoreService {
+  return TraceBlobStoreService.create({
+    legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client }),
+    payloads: EventingTraceEventPayloadRepository.create({ eventReadSeat: seat }),
   });
 }
 
-function makeChResolver(
-  client: ReturnType<typeof makeMockChClient>["client"],
-): (tenantId: string) => Promise<typeof client> {
-  return async (_tenantId) => client;
+/** The payload exactly as the write path stores it, read back through JSON as the seat answers. */
+function storedPayloadOf(event: SpanReceivedEvent): unknown {
+  return JSON.parse(JSON.stringify(eventToRecord(event).EventPayload));
 }
 
-// ---------------------------------------------------------------------------
-// getFromEventLog — happy path
-// ---------------------------------------------------------------------------
+function spanPayload(attributes: unknown[]): unknown {
+  return { span: { attributes } };
+}
 
-describe("given an event_log row stored under tenantA with a known EventPayload", () => {
-  describe("when getFromEventLog is called with matching (TenantId, AggregateType, AggregateId, EventId) and field", () => {
-    let sqlCaptures: string[];
-    let blobStore: TraceBlobStoreService;
+function spanReceivedEvent(attributes: unknown[]): SpanReceivedEvent {
+  return EventUtils.createEvent<SpanReceivedEvent>({
+    aggregateType: "trace",
+    aggregateId: AGGREGATE_ID,
+    tenantId: createTenantId(TENANT_A),
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+    data: {
+      span: {
+        traceId: "abcd1234abcd1234abcd1234abcd1234",
+        spanId: "abcd1234abcd1234",
+        name: "test-span",
+        kind: 1,
+        startTimeUnixNano: "0",
+        endTimeUnixNano: "1000000",
+        attributes: attributes as never,
+        events: [],
+        links: [],
+        status: { message: null, code: null },
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+      },
+      resource: null,
+      instrumentationScope: null,
+      piiRedactionLevel: "DISABLED",
+    },
+  });
+}
 
-    beforeEach(() => {
-      const eventPayload = JSON.stringify({
-        span: {
-          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
-        },
-      });
-      const mock = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-      sqlCaptures = mock.sqlCaptures;
+const MIXED_SIBLINGS = [
+  { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
+  { key: "gen_ai.request.temperature", value: { doubleValue: 0.7 } },
+  { key: "langwatch.streaming", value: { boolValue: true } },
+  { key: "gen_ai.request.tools", value: { arrayValue: { values: [{ stringValue: "a" }] } } },
+];
 
-      blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(mock.client) as never,
-      });
+describe("given a trace event stored under tenantA carrying an offloaded field", () => {
+  const seat = () =>
+    new RecordingSeat().store({
+      tenantId: TENANT_A,
+      eventId: EVENT_ID,
+      data: spanPayload([{ key: FIELD, value: { stringValue: FULL_VALUE } }]),
     });
 
+  describe("when getFromEventLog is called with tenantA's context", () => {
     /** @scenario Cross-tenant event_log read is structurally denied */
-    it("issues a CH SELECT with TenantId as the FIRST predicate and returns the correct field value", async () => {
-      const result = await blobStore.getFromEventLog({
+    it("asks the seat for tenantA's trace event and returns the full value", async () => {
+      const recording = seat();
+
+      const value = await blobStoreOver(recording).getFromEventLog({
         eventId: EVENT_ID,
         field: FIELD,
         tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
         aggregateId: AGGREGATE_ID,
       });
 
-      // SQL must have TenantId as the first WHERE predicate
-      const sql = sqlCaptures[0] ?? "";
-      const tenantIdPos = sql.indexOf("TenantId");
-      const aggregateIdPos = sql.indexOf("AggregateId");
-      const eventIdPos = sql.indexOf("EventId");
-
-      expect(tenantIdPos).toBeGreaterThanOrEqual(0);
-      expect(tenantIdPos).toBeLessThan(aggregateIdPos);
-      expect(tenantIdPos).toBeLessThan(eventIdPos);
-
-      // Returned value is the field value from EventPayload
-      expect(result).toBe(FULL_VALUE);
+      expect(value).toBe(FULL_VALUE);
+      expect(recording.reads).toEqual([
+        {
+          tenantId: TENANT_A,
+          aggregateType: "trace",
+          aggregateId: AGGREGATE_ID,
+          eventId: EVENT_ID,
+        },
+      ]);
     });
+  });
 
-    it("SQL contains 'TenantId' as the first predicate (substring assertion)", async () => {
-      await blobStore.getFromEventLog({
+  describe("when tenantB attempts to read it with the same EventId", () => {
+    /** @scenario Cross-tenant event_log read is structurally denied */
+    it("asks the seat under tenantB, which answers not found", async () => {
+      const recording = seat();
+
+      await expect(
+        blobStoreOver(recording).getFromEventLog({
+          eventId: EVENT_ID,
+          field: FIELD,
+          tenantId: TENANT_B,
+          aggregateId: AGGREGATE_ID,
+        }),
+      ).rejects.toBeInstanceOf(EventNotFoundError);
+      expect(recording.reads.map((read) => read.tenantId)).toEqual([TENANT_B]);
+    });
+  });
+
+  describe("when the requested field is not in the payload", () => {
+    it("raises field-not-found", async () => {
+      await expect(
+        blobStoreOver(seat()).getFromEventLog({
+          eventId: EVENT_ID,
+          field: "langwatch.input",
+          tenantId: TENANT_A,
+          aggregateId: AGGREGATE_ID,
+        }),
+      ).rejects.toBeInstanceOf(TraceEventPayloadFieldNotFoundError);
+    });
+  });
+
+  describe("when the deployment has no object storage (resolveS3Client throws)", () => {
+    it("reads the field without touching S3", async () => {
+      const noStorage: S3ClientResolver = () => {
+        throw new Error("no object storage configured");
+      };
+
+      const value = await blobStoreOver(seat(), noStorage).getFromEventLog({
         eventId: EVENT_ID,
         field: FIELD,
         tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
         aggregateId: AGGREGATE_ID,
       });
 
-      expect(sqlCaptures[0]).toContain("TenantId");
+      expect(value).toBe(FULL_VALUE);
     });
   });
 });
 
-// ---------------------------------------------------------------------------
-// getFromEventLog — EventOccurredAt partition-prune window
-// ---------------------------------------------------------------------------
+describe("given a blob store composed with no payload reader", () => {
+  it("refuses the read by name", async () => {
+    const store = TraceBlobStoreService.create({
+      legacySpool: S3TraceLegacySpoolChannel.create({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+      }),
+    });
 
-describe("given a KSUID EventId (the time is embedded in the id)", () => {
-  const eventPayload = JSON.stringify({
-    span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] },
-  });
-  const windowMs = 2 * 24 * 60 * 60 * 1000;
-
-  describe("when getFromEventLog is called", () => {
-    it("derives a bounded EventOccurredAt window from the EventId's KSUID timestamp (keeping EventOccurredAt = 0)", async () => {
-      const ksuidEventId = generate("event").toString();
-      const createdAtMs = Ksuid.parse(ksuidEventId).date.getTime();
-
-      const { client, sqlCaptures, paramCaptures } = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      const result = await blobStore.getFromEventLog({
-        eventId: ksuidEventId,
+    await expect(
+      store.getFromEventLog({
+        eventId: EVENT_ID,
         field: FIELD,
         tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
         aggregateId: AGGREGATE_ID,
-      });
-
-      const sql = sqlCaptures[0] ?? "";
-      expect(sql).toContain("EventOccurredAt >= {occurredAtFromMs:UInt64}");
-      expect(sql).toContain("EventOccurredAt <= {occurredAtToMs:UInt64}");
-      expect(sql).toContain("EventOccurredAt = 0");
-      expect(paramCaptures[0]).toMatchObject({
-        occurredAtFromMs: createdAtMs - windowMs,
-        occurredAtToMs: createdAtMs + windowMs,
-      });
-      // The window never changes which row is returned (still keyed by EventId).
-      expect(result).toBe(FULL_VALUE);
-    });
+      }),
+    ).rejects.toThrow(/No trace payload reader configured/);
   });
 });
 
-describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
-  describe("when getFromEventLog is called", () => {
-    it("omits the EventOccurredAt predicate and falls back to an unpruned read", async () => {
-      const eventPayload = JSON.stringify({
-        span: {
-          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
-        },
-      });
-      const { client, sqlCaptures, paramCaptures } = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
+describe("given a log record event whose body was offloaded", () => {
+  it("resolves the body from the payload root, not span.attributes", async () => {
+    const logBody = "y".repeat(80 * 1024);
+    const recording = new RecordingSeat().store({
+      tenantId: TENANT_A,
+      eventId: EVENT_ID,
+      data: { body: logBody },
+    });
 
-      await blobStore.getFromEventLog({
-        eventId: "not-a-ksuid",
-        field: FIELD,
+    await expect(
+      blobStoreOver(recording).getFromEventLog({
+        eventId: EVENT_ID,
+        field: "body",
         tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
         aggregateId: AGGREGATE_ID,
-      });
+      }),
+    ).resolves.toBe(logBody);
+  });
 
-      expect(sqlCaptures[0]).not.toContain("EventOccurredAt");
-      expect(paramCaptures[0]).not.toHaveProperty("occurredAtFromMs");
-      expect(paramCaptures[0]).not.toHaveProperty("occurredAtToMs");
+  it("raises field-not-found when the payload has no body", async () => {
+    const recording = new RecordingSeat().store({
+      tenantId: TENANT_A,
+      eventId: EVENT_ID,
+      data: spanPayload([]),
     });
+
+    await expect(
+      blobStoreOver(recording).getFromEventLog({
+        eventId: EVENT_ID,
+        field: "body",
+        tenantId: TENANT_A,
+        aggregateId: AGGREGATE_ID,
+      }),
+    ).rejects.toBeInstanceOf(TraceEventPayloadFieldNotFoundError);
   });
 });
-
-// ---------------------------------------------------------------------------
-// getFromEventLog — cross-tenant denial
-// ---------------------------------------------------------------------------
-
-describe("given an event_log row under tenantA when tenantB attempts to read it", () => {
-  describe("when getFromEventLog is called with tenantB's context and the same EventId", () => {
-    /** @scenario Cross-tenant event_log read is structurally denied */
-    it("returns no rows (because TenantId predicate mismatches) and throws BlobNotFoundError", async () => {
-      // No rows returned — cross-tenant query returns empty set
-      const { client } = makeMockChClient({ rows: [] });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      await expect(
-        blobStore.getFromEventLog({
-          eventId: EVENT_ID,
-          field: FIELD,
-          tenantId: TENANT_B, // wrong tenant
-          aggregateType: AGGREGATE_TYPE,
-          aggregateId: AGGREGATE_ID,
-        }),
-      ).rejects.toBeInstanceOf(BlobNotFoundError);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getFromEventLog — corrupt EventPayload
-// ---------------------------------------------------------------------------
-
-describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => {
-  describe("when getFromEventLog is called", () => {
-    it("throws a descriptive error about the parse failure", async () => {
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: "not-valid-json{{{{" }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      await expect(
-        blobStore.getFromEventLog({
-          eventId: EVENT_ID,
-          field: FIELD,
-          tenantId: TENANT_A,
-          aggregateType: AGGREGATE_TYPE,
-          aggregateId: AGGREGATE_ID,
-        }),
-      ).rejects.toThrow(/parse EventPayload/i);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getFromEventLog — field missing in EventPayload
-// ---------------------------------------------------------------------------
-
-describe("given a valid event_log row whose EventPayload does not contain the requested field", () => {
-  describe("when getFromEventLog is called for the missing field", () => {
-    it("throws BlobFieldNotFoundError", async () => {
-      const eventPayload = JSON.stringify({
-        span: { attributes: [] },
-      });
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      await expect(
-        blobStore.getFromEventLog({
-          eventId: EVENT_ID,
-          field: "langwatch.input", // not present in EventPayload
-          tenantId: TENANT_A,
-          aggregateType: AGGREGATE_TYPE,
-          aggregateId: AGGREGATE_ID,
-        }),
-      ).rejects.toBeInstanceOf(BlobFieldNotFoundError);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// deleteSpool — best-effort (errors swallowed)
-// ---------------------------------------------------------------------------
 
 describe("given a transient spool ref", () => {
   describe("when deleteSpool is called", () => {
     it("issues an S3 DELETE and returns void (no error thrown even if S3 DELETE fails)", async () => {
       const sendMock = vi.fn().mockRejectedValue(new Error("S3 DELETE failed"));
+      const blobStore = blobStoreOver(new RecordingSeat(), makeS3Resolver({ send: sendMock }));
 
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: sendMock }),
-        }),
-      });
-
-      const spoolRef = `trace-blobs/spool/proj/trace-001/span-001`;
-
-      // Must not throw — errors are swallowed
       await expect(
         blobStore.deleteSpool({
-          spoolRef,
+          spoolRef: "trace-blobs/spool/proj/trace-001/span-001",
           projectId: "proj",
           traceId: "trace-001",
           spanId: "span-001",
@@ -371,76 +280,11 @@ describe("given a transient spool ref", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getFromEventLog — log-record body resolution (eventref field "body")  [GtVrA]
-// ---------------------------------------------------------------------------
-
-describe("given an event_log row whose EventPayload is a log record (full body at top level, no span)", () => {
-  describe("when getFromEventLog is called with field 'body'", () => {
-    it("resolves the log body from EventPayload.body, not span.attributes", async () => {
-      const logBody = "y".repeat(80 * 1024);
-      const eventPayload = JSON.stringify({ body: logBody });
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      const result = await blobStore.getFromEventLog({
-        eventId: EVENT_ID,
-        field: "body",
-        tenantId: TENANT_A,
-        aggregateType: "log",
-        aggregateId: AGGREGATE_ID,
-      });
-
-      expect(result).toBe(logBody);
-    });
-
-    it("throws BlobFieldNotFoundError when field is 'body' but the EventPayload has no body", async () => {
-      const eventPayload = JSON.stringify({ span: { attributes: [] } });
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      await expect(
-        blobStore.getFromEventLog({
-          eventId: EVENT_ID,
-          field: "body",
-          tenantId: TENANT_A,
-          aggregateType: "log",
-          aggregateId: AGGREGATE_ID,
-        }),
-      ).rejects.toBeInstanceOf(BlobFieldNotFoundError);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getSpool — explicit error on empty S3 body  [GtVrH]
-// ---------------------------------------------------------------------------
-
 describe("given an S3 GetObject that returns a response with no Body", () => {
   describe("when getSpool is called", () => {
     it("throws an explicit 'no body' error rather than returning an empty buffer", async () => {
       const sendMock = vi.fn().mockResolvedValue({ Body: undefined });
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: sendMock }),
-        }),
-      });
+      const blobStore = blobStoreOver(new RecordingSeat(), makeS3Resolver({ send: sendMock }));
 
       await expect(
         blobStore.getSpool({
@@ -454,377 +298,157 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getFromEventLog — read-vs-write contract regression (issue #4215)
-// ---------------------------------------------------------------------------
-
-/**
- * CONTRACT REGRESSION: read path must match write path. Derives CH-mock EventPayload
- * from ACTUAL eventToRecord call; any drift in write or read shape fails immediately.
- */
+/** CONTRACT REGRESSION (#4215): the read path finds the field where the write path stores it. */
 describe("given a SpanReceivedEvent written through eventToRecord (real write path)", () => {
   describe("when getFromEventLog is called with matching ids and the oversize field name", () => {
-    it("returns the field value — proving the read path matches the write path", async () => {
-      // Build a minimal but realistic SpanReceivedEvent whose data matches the
-      // real write shape used in recordSpanCommand.ts:281-290.
-      const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
-        aggregateType: "trace",
-        aggregateId: AGGREGATE_ID,
-        tenantId: createTenantId(TENANT_A),
-        type: SPAN_RECEIVED_EVENT_TYPE,
-        version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
-        data: {
-          span: {
-            traceId: "abcd1234abcd1234abcd1234abcd1234",
-            spanId: "abcd1234abcd1234",
-            name: "test-span",
-            kind: 1, // SPAN_KIND_INTERNAL
-            startTimeUnixNano: "0",
-            endTimeUnixNano: "1000000",
-            attributes: [
-              // The oversize field under test — exact OTLP key-value shape
-              {
-                key: FIELD,
-                value: { stringValue: FULL_VALUE },
-              },
-            ],
-            events: [],
-            links: [],
-            status: { message: null, code: null },
-            droppedAttributesCount: 0,
-            droppedEventsCount: 0,
-            droppedLinksCount: 0,
-          },
-          resource: null,
-          instrumentationScope: null,
-          piiRedactionLevel: "DISABLED",
-        },
+    it("returns the field value, proving the read path matches the write path", async () => {
+      const event = spanReceivedEvent([{ key: FIELD, value: { stringValue: FULL_VALUE } }]);
+      const recording = new RecordingSeat().store({
+        tenantId: TENANT_A,
+        eventId: event.id,
+        data: storedPayloadOf(event),
       });
 
-      // Derive the EventPayload exactly as the write path does.
-      // eventToRecord sets `EventPayload = event.data ?? {}`, so
-      // record.EventPayload IS spanReceivedEvent.data — no extra wrapper.
-      const record = eventToRecord(spanReceivedEvent);
-
-      const { client, sqlCaptures } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      // read path must find the attribute at span.attributes, NOT data.span.attributes
-      const result = await blobStore.getFromEventLog({
-        eventId: spanReceivedEvent.id,
+      const value = await blobStoreOver(recording).getFromEventLog({
+        eventId: event.id,
         field: FIELD,
         tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
         aggregateId: AGGREGATE_ID,
       });
 
-      expect(result).toBe(FULL_VALUE);
-      // Verify a CH query was actually issued (not short-circuited)
-      expect(sqlCaptures.length).toBeGreaterThan(0);
+      expect(value).toBe(FULL_VALUE);
+      expect(recording.reads).toHaveLength(1);
     });
   });
 });
 
-// ---------------------------------------------------------------------------
-// getFromEventLog — S3-independence invariant (ADR-022 on-prem guarantee)
-// ---------------------------------------------------------------------------
-
-/**
- * Read path is object-storage-independent (ADR-022 on-prem / no-object-storage).
- * Proves that TraceBlobStoreService.getFromEventLog never calls resolveS3Client, so deployments
- * with no object storage can still serve "show full" and online-eval reads.
- */
-describe("given a deployment with no object storage (resolveS3Client throws)", () => {
-  describe("when getFromEventLog is called with a valid event_log row", () => {
-    it("reads the field from event_log without touching S3", async () => {
-      const eventPayload = JSON.stringify({
-        span: {
-          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
-        },
-      });
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-
-      // resolveS3Client throws unconditionally — simulates a deployment with no
-      // object storage configured. getFromEventLog must never call this resolver.
-      const noStorageResolver: S3ClientResolver = () => {
-        throw new Error("no object storage configured");
-      };
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: noStorageResolver }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      const result = await blobStore.getFromEventLog({
-        eventId: EVENT_ID,
-        field: FIELD,
-        tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
-        aggregateId: AGGREGATE_ID,
-      });
-
-      expect(result).toBe(FULL_VALUE);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getFromEventLog — mixed-type sibling attributes do not mask the offloaded
-// IO field (#4888 falsifiability proof)
-// ---------------------------------------------------------------------------
-
-/**
- * FALSIFIABILITY (#4888): non-string sibling attributes used to mask >64KB offloaded
- * IO fields; proves pre-fix strict schema fails, post-fix returns full value.
- */
-describe("given a real OTLP EventPayload whose span carries mixed-type sibling attributes alongside a >64KB offloaded IO field", () => {
-  // >64 KB and includes a multibyte char so byte-identity is meaningfully asserted.
+/** FALSIFIABILITY (#4888): non-string sibling attributes must not mask a >64KB offloaded field. */
+describe("given a real OTLP payload whose span carries mixed-type siblings beside >64KB offloaded IO fields", () => {
   const BIG = "x".repeat(100 * 1024) + "🧪tail";
   const BIG_OUTPUT = "y".repeat(100 * 1024) + "🧪out";
 
-  /**
-   * Builds SpanReceivedEvent with mixed-type siblings (real OTLP shape, not clean).
-   */
-  function makeMixedTypeSpanEvent() {
-    return EventUtils.createEvent<SpanReceivedEvent>({
-      aggregateType: "trace",
-      aggregateId: AGGREGATE_ID,
-      tenantId: createTenantId(TENANT_A),
-      type: SPAN_RECEIVED_EVENT_TYPE,
-      version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
-      data: {
-        span: {
-          traceId: "abcd1234abcd1234abcd1234abcd1234",
-          spanId: "abcd1234abcd1234",
-          name: "test-span",
-          kind: 1, // SPAN_KIND_INTERNAL
-          startTimeUnixNano: "0",
-          endTimeUnixNano: "1000000",
-          attributes: [
-            // Offloaded IO fields (the ONLY fields the read path needs).
-            { key: "langwatch.input", value: { stringValue: BIG } },
-            { key: "langwatch.output", value: { stringValue: BIG_OUTPUT } },
-            // Mixed-type siblings the OLD strict schema rejected.
-            { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
-            { key: "gen_ai.request.temperature", value: { doubleValue: 0.7 } },
-            { key: "langwatch.streaming", value: { boolValue: true } },
-            {
-              key: "gen_ai.request.tools",
-              value: { arrayValue: { values: [{ stringValue: "a" }] } },
-            },
-          ] as never,
-          events: [],
-          links: [],
-          status: { message: null, code: null },
-          droppedAttributesCount: 0,
-          droppedEventsCount: 0,
-          droppedLinksCount: 0,
-        },
-        resource: null,
-        instrumentationScope: null,
-        piiRedactionLevel: "DISABLED",
-      },
+  for (const [field, expected] of [
+    ["langwatch.input", BIG],
+    ["langwatch.output", BIG_OUTPUT],
+  ] as const) {
+    describe(`when getFromEventLog is called for ${field}`, () => {
+      it("returns the FULL >64KB value despite non-string sibling attributes", async () => {
+        const event = spanReceivedEvent([
+          { key: "langwatch.input", value: { stringValue: BIG } },
+          { key: "langwatch.output", value: { stringValue: BIG_OUTPUT } },
+          ...MIXED_SIBLINGS,
+        ]);
+        const recording = new RecordingSeat().store({
+          tenantId: TENANT_A,
+          eventId: event.id,
+          data: storedPayloadOf(event),
+        });
+
+        const value = await blobStoreOver(recording).getFromEventLog({
+          eventId: event.id,
+          field,
+          tenantId: TENANT_A,
+          aggregateId: AGGREGATE_ID,
+        });
+
+        expect(value).toBe(expected);
+        expect(Buffer.byteLength(value, "utf8")).toBe(Buffer.byteLength(expected, "utf8"));
+        expect(value.length).toBeGreaterThan(65536);
+      });
     });
   }
-
-  describe("when getFromEventLog is called for the offloaded input field", () => {
-    it("returns the FULL >64KB value despite non-string sibling attributes", async () => {
-      const spanReceivedEvent = makeMixedTypeSpanEvent();
-      // EventPayload IS event.data — derive it exactly as the write path does.
-      const record = eventToRecord(spanReceivedEvent);
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      const result = await blobStore.getFromEventLog({
-        eventId: spanReceivedEvent.id,
-        field: "langwatch.input",
-        tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
-        aggregateId: AGGREGATE_ID,
-      });
-
-      expect(result).toBe(BIG);
-      expect(Buffer.byteLength(result, "utf8")).toBe(Buffer.byteLength(BIG, "utf8"));
-      expect(result.length).toBeGreaterThan(65536);
-    });
-  });
-
-  describe("when getFromEventLog is called for the offloaded output field", () => {
-    it("returns the FULL >64KB value for langwatch.output despite non-string sibling attributes", async () => {
-      const spanReceivedEvent = makeMixedTypeSpanEvent();
-      const record = eventToRecord(spanReceivedEvent);
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      const result = await blobStore.getFromEventLog({
-        eventId: spanReceivedEvent.id,
-        field: "langwatch.output",
-        tenantId: TENANT_A,
-        aggregateType: AGGREGATE_TYPE,
-        aggregateId: AGGREGATE_ID,
-      });
-
-      expect(result).toBe(BIG_OUTPUT);
-      expect(Buffer.byteLength(result, "utf8")).toBe(Buffer.byteLength(BIG_OUTPUT, "utf8"));
-      expect(result.length).toBeGreaterThan(65536);
-    });
-  });
 });
 
-// ---------------------------------------------------------------------------
-// END-TO-END resolveOffloadedTraces with real TraceBlobStoreService and mixed-type
-// EventPayload (#4888)
-// ---------------------------------------------------------------------------
+function leanedSpanPointingAt({ eventId, preview }: { eventId: string; preview: string }) {
+  const span: NormalizedSpan = {
+    id: "abcd1234abcd1234",
+    traceId: AGGREGATE_ID,
+    spanId: "abcd1234abcd1234",
+    tenantId: TENANT_A,
+    parentSpanId: null,
+    parentTraceId: null,
+    parentIsRemote: null,
+    sampled: true,
+    startTimeUnixMs: 0,
+    endTimeUnixMs: 1000,
+    durationMs: 1000,
+    name: "test-span",
+    kind: NormalizedSpanKind.INTERNAL,
+    resourceAttributes: {},
+    spanAttributes: {
+      "langwatch.input": preview,
+      [`${EVENTREF_ATTR_PREFIX}langwatch.input`]: JSON.stringify({
+        field: "langwatch.input",
+        eventId,
+      }),
+    },
+    events: [],
+    links: [],
+    statusMessage: null,
+    statusCode: NormalizedStatusCode.OK,
+    instrumentationScope: { name: "test", version: null },
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
+  };
+  return span;
+}
 
-/**
- * END-TO-END (#4888): resolveOffloadedTraces with real TraceBlobStoreService and
- * mixed-type EventPayload; pre-fix degrades to preview, post-fix restores full value.
- */
-describe("given a leaned span pointing at a real mixed-type EventPayload offloaded to event_log", () => {
+describe("given a leaned span pointing at a real mixed-type trace event", () => {
   const BIG = "z".repeat(120 * 1024) + "🧪e2e";
+  const preview = "z".repeat(IO_PREVIEW_BYTES) + "…";
+  const resolve = ({ seat, eventId }: { seat: RecordingSeat; eventId: string }) => {
+    const logger: WarnLogger = { warn: vi.fn(), error: vi.fn() };
+    const result = TraceOffloadResolutionService.create().resolveOffloadedTraces({
+      projectId: TENANT_A,
+      normalizedSpans: [leanedSpanPointingAt({ eventId, preview })],
+      blobStore: blobStoreOver(seat),
+      ioExtractionService: TraceIOExtractionService.create(TraceCanonicalisationService.create()),
+      logger,
+    });
+    return { result, logger };
+  };
 
-  describe("when TraceOffloadResolutionService.resolveOffloadedTraces runs with a real TraceBlobStoreService over event_log", () => {
-    it("restores the FULL langwatch.input into spanAttributes and strips the reserved eventref key", async () => {
-      // The FULL event the command worker writes to event_log, with mixed-type
-      // siblings present alongside the offloaded IO field.
-      const fullEvent = EventUtils.createEvent<SpanReceivedEvent>({
-        aggregateType: "trace",
-        aggregateId: AGGREGATE_ID,
-        tenantId: createTenantId(TENANT_A),
-        type: SPAN_RECEIVED_EVENT_TYPE,
-        version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
-        data: {
-          span: {
-            traceId: "abcd1234abcd1234abcd1234abcd1234",
-            spanId: "abcd1234abcd1234",
-            name: "test-span",
-            kind: 1,
-            startTimeUnixNano: "0",
-            endTimeUnixNano: "1000000",
-            attributes: [
-              { key: "langwatch.input", value: { stringValue: BIG } },
-              { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
-              {
-                key: "gen_ai.request.temperature",
-                value: { doubleValue: 0.7 },
-              },
-              { key: "langwatch.streaming", value: { boolValue: true } },
-              {
-                key: "gen_ai.request.tools",
-                value: { arrayValue: { values: [{ stringValue: "a" }] } },
-              },
-            ] as never,
-            events: [],
-            links: [],
-            status: { message: null, code: null },
-            droppedAttributesCount: 0,
-            droppedEventsCount: 0,
-            droppedLinksCount: 0,
-          },
-          resource: null,
-          instrumentationScope: null,
-          piiRedactionLevel: "DISABLED",
-        },
-      });
-
-      const record = eventToRecord(fullEvent);
-      const { client } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        legacySpool: S3TraceLegacySpoolChannel.create({
-          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
-      // The LEANED span as projected: preview value + the eventref pointer that
-      // leanForProjection embeds with the event's id (the read path JOINs on it).
-      const preview = "z".repeat(IO_PREVIEW_BYTES) + "…";
-      const stagedSpan: NormalizedSpan = {
-        id: "abcd1234abcd1234",
-        traceId: AGGREGATE_ID,
-        spanId: "abcd1234abcd1234",
+  describe("when resolveOffloadedTraces runs with a real TraceBlobStoreService over the seat", () => {
+    it("restores the FULL langwatch.input and strips the reserved eventref key", async () => {
+      const event = spanReceivedEvent([
+        { key: "langwatch.input", value: { stringValue: BIG } },
+        ...MIXED_SIBLINGS,
+      ]);
+      const seat = new RecordingSeat().store({
         tenantId: TENANT_A,
-        parentSpanId: null,
-        parentTraceId: null,
-        parentIsRemote: null,
-        sampled: true,
-        startTimeUnixMs: 0,
-        endTimeUnixMs: 1000,
-        durationMs: 1000,
-        name: "test-span",
-        kind: NormalizedSpanKind.INTERNAL,
-        resourceAttributes: {},
-        spanAttributes: {
-          "langwatch.input": preview,
-          [`${EVENTREF_ATTR_PREFIX}langwatch.input`]: JSON.stringify({
-            field: "langwatch.input",
-            eventId: fullEvent.id,
-          }),
-        },
-        events: [],
-        links: [],
-        statusMessage: null,
-        statusCode: NormalizedStatusCode.OK,
-        instrumentationScope: { name: "test", version: null },
-        droppedAttributesCount: 0,
-        droppedEventsCount: 0,
-        droppedLinksCount: 0,
-        cost: null,
-        nonBilledCost: null,
-      };
-
-      const logger: WarnLogger = {
-        warn: vi.fn(),
-        error: vi.fn(),
-      };
-
-      const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
-        projectId: TENANT_A,
-        normalizedSpans: [stagedSpan],
-        blobStore,
-        ioExtractionService: TraceIOExtractionService.create(TraceCanonicalisationService.create()),
-        logger,
+        eventId: event.id,
+        data: storedPayloadOf(event),
       });
 
-      const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<string, string>;
-      // FULL value restored from the mixed-type EventPayload — not the preview.
-      expect(resolvedAttrs["langwatch.input"]).toBe(BIG);
-      expect(resolvedAttrs["langwatch.input"]!.length).toBeGreaterThan(65536);
-      // Reserved eventref namespace never leaks to the UI.
-      const hasReserved = Object.keys(resolvedAttrs).some((k) =>
-        k.startsWith("langwatch.reserved."),
+      const { result } = resolve({ seat, eventId: event.id });
+      const resolved = await result;
+
+      const attrs = resolved.resolvedSpans[0]!.spanAttributes as Record<string, string>;
+      expect(attrs["langwatch.input"]).toBe(BIG);
+      expect(Object.keys(attrs).some((k) => k.startsWith("langwatch.reserved."))).toBe(false);
+      expect(resolved.anyResolved).toBe(true);
+    });
+  });
+
+  describe("when the seat answers not found or the event lacks the field", () => {
+    it.each([
+      ["the event is not found", new RecordingSeat()],
+      [
+        "the field is absent",
+        new RecordingSeat().store({ tenantId: TENANT_A, eventId: EVENT_ID, data: spanPayload([]) }),
+      ],
+    ])("keeps the preview and warns it as missing when %s", async (_case, seat) => {
+      const { result, logger } = resolve({ seat, eventId: EVENT_ID });
+      const resolved = await result;
+
+      expect(resolved.resolvedSpans[0]!.spanAttributes["langwatch.input"]).toBe(preview);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ attrKey: "langwatch.input" }),
+        "event_log row not found for eventref — keeping preview value",
       );
-      expect(hasReserved).toBe(false);
-      expect(result.anyResolved).toBe(true);
     });
   });
 });

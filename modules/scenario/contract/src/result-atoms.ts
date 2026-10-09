@@ -2,7 +2,7 @@
  * browser and read side (types only).
  */
 
-import type { ScenarioRunStatus } from "./scenario-run.ts";
+import type { ScenarioRunStatus } from "./features/run/scenario-run.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { ResultsOverviewResponse } from "./scenario.responses.ts";
 import type { ScenarioEvaluationStatus } from "./schemas/event-schemas.ts";

@@ -5,8 +5,16 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { opsWebConfigSchema } from "@langwatch/ops-contract";
+import { rumWebConfigSchema } from "@langwatch/rum-contract";
 
 export const opsWeb = defineBrowserModule("ops")
+  // Ops answers for the rum slice too: the shell's telemetry reads both (R3).
+  .withConfig({ ops: opsWebConfigSchema, rum: rumWebConfigSchema }, ({ ops, rum }) => ({
+    browserTracing: rum.enabled,
+    sampleRatio: rum.sampleRatio,
+    ...ops,
+  }))
   .withHosts({
     requires: ["OpsHostApi", "CheckupHostApi"],
     mounts: {
@@ -71,6 +79,18 @@ export const opsWeb = defineBrowserModule("ops")
     "pages/ops/migrations": {
       requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-migrations.screen.tsx"),
+    },
+    "pages/ops/upgrades": {
+      requires: "ops:view",
+      load: () => import("./features/upgrades/ui/sections/upgrades.screen.tsx"),
+    },
+    "pages/ops/upgrades/releases/[release]": {
+      requires: "ops:view",
+      load: () => import("./features/upgrades/ui/sections/upgrade-release.screen.tsx"),
+    },
+    "pages/ops/upgrades/runs/[runId]": {
+      requires: "ops:view",
+      load: () => import("./features/upgrades/ui/sections/upgrade-run.screen.tsx"),
     },
     "pages/ops/projections/[runId]": {
       requires: "ops:view",

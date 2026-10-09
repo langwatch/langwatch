@@ -24,6 +24,8 @@ from typing import (
     Literal,
     Optional,
     Sequence,
+    Set,
+    Tuple,
     TypeVar,
     TypedDict,
     Sized,
@@ -332,6 +334,10 @@ class Experiment:
         self.last_sent = 0
         self.debounce_interval = 1  # 1 second
         self.threads: List[threading.Thread] = []
+        # Every row and verdict sent so far, by the identity the platform stores
+        # it under. Their counts go with the finishing batch.
+        self._sent_rows: Set[Tuple[int, str]] = set()
+        self._sent_evaluations: Set[Tuple[Optional[int], str, str]] = set()
         self.initialized = False
 
         # Target registry - tracks registered targets and their metadata
@@ -1111,10 +1117,23 @@ class Experiment:
             if len(targets) > 0:
                 body["targets"] = targets
 
+            for entry in self.batch["dataset"]:
+                self._sent_rows.add((entry.index, entry.target_id or ""))
+            for eval in self.batch["evaluations"]:
+                self._sent_evaluations.add(
+                    (eval.index, eval.target_id or "", eval.evaluator)
+                )
+
             if finished:
                 if not isinstance(body["timestamps"], dict):
                     body["timestamps"] = {}
                 body["timestamps"]["finished_at"] = int(time.time() * 1000)
+                # What the run reported in total, so a reader can tell results
+                # that are still being stored from a run that is whole.
+                body["expected"] = {
+                    "dataset": len(self._sent_rows),
+                    "evaluations": len(self._sent_evaluations),
+                }
 
             # Start a new thread to send the batch
             thread = threading.Thread(
@@ -1756,8 +1775,7 @@ class Experiment:
         duration: Optional[int] = None
 
         start_time = time.time()
-        result = langwatch.evaluations.evaluate(
-            span=langwatch.get_current_span(),
+        result = langwatch.evaluation.evaluate(
             slug=evaluator_id,
             name=name or evaluator_id,
             settings=settings,

@@ -14,8 +14,6 @@ import {
   WorkflowApi,
   workflowRestArchivedSchema,
   workflowRestDetailSchema,
-  workflowRestEvaluateSchema,
-  workflowRestEvaluationStartedSchema,
   workflowRestParamsSchema,
   workflowRestUpdateSchema,
   type Workflow,
@@ -54,7 +52,7 @@ function wireOf(params: {
   };
 }
 
-export type WorkflowRestDeclaration = Readonly<{
+type WorkflowRestDeclaration = Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<WorkflowApi>;
@@ -136,58 +134,6 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
         return { id: input.id, archived: true };
       })
 
-      // Running a workflow is not administering it: the committed version, its
-      // nodes and its dataset are untouched - the call produces a RUN. So it
-      // asks for `workflows:create`, the same grain as the suite run, and
-      // `evaluations:view` after it: the caller must also be able to READ the
-      // run it starts.
-      .post("/:id/evaluate", "postApiWorkflowsByIdEvaluate")
-      .withParams(workflowRestParamsSchema)
-      .withInput(workflowRestEvaluateSchema)
-      .withPermission(["workflows:create", "evaluations:view"])
-      .withOutput(workflowRestEvaluationStartedSchema)
-      .withDocs({
-        description:
-          "Trigger an evaluation run of a workflow's committed version through " +
-          "the evaluations pipeline. Evaluate the workflow's attached dataset, " +
-          "inline data, or a platform dataset id; parameters bind as constant " +
-          "entry inputs on every row. Returns a run id and a results URL to poll " +
-          "or open in the browser.",
-        errors: [
-          {
-            status: 400,
-            description: "The workflow has no committed version, or the run could not start",
-          },
-          { status: 403, description: "The API key cannot read the evaluation run it would start" },
-          { status: 404, description: "The project holds no such workflow or dataset" },
-          { status: 422, description: "The body failed validation" },
-        ],
-      })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ app, input, scope }, project) => {
-        logger.info(
-          { projectId: scope.id, workflowId: input.id },
-          "Triggering workflow evaluation via API",
-        );
-
-        const started = await app.triggerEvaluation({
-          projectId: scope.id,
-          projectSlug: project.projectSlug,
-          workflowId: input.id,
-          versionId: input.version_id,
-          data: input.data,
-          datasetId: input.dataset_id,
-          parameters: input.parameters,
-          rowIndices: input.row_indices,
-        });
-
-        return {
-          run_id: started.runId,
-          run_url: started.runUrl,
-          workflow_version_id: started.workflowVersionId,
-          version: started.version,
-        };
-      })
       .build()
   );
 }

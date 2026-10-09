@@ -71,8 +71,9 @@ An app is `src/main.ts` plus `src/config.ts`, and holds no product code (§1, §
    No `get()`, no `Secret.define`, no nested `into`. The resolver seals after boot (§6).
 10. **Connection strings are the stores' secrets**, and store clients appear in exactly one place:
     the chain. A module never names a URL or opens a client (§6, §7).
-11. **Migrations are tasks, run before serve**, never by the api (§7). A module's in-place system
-    migration is its own, answered through its `*Api`; ops runs them (§7).
+11. **Migrations run before serve, through `pnpm task upgrade`**, never by the api or worker (§7,
+    ADR-173). api and worker compose `withUpgradeGate`, which refuses by name while a blocking step of
+    the image is outstanding. A module declares its steps with `.withMigrations` (`migration` skill).
 12. **Composition is proven by booting it.** The installation test boots the installed list in a
     role over memory stores with no server (§4 last paragraph, §13). A unit test with fakes proves
     a module's behaviour, never that the process composes.

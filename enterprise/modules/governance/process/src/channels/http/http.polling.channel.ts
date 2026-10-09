@@ -27,7 +27,7 @@ import { nowInstant } from "@langwatch/time";
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 
-import type { IngestionPullDiagnosticsSink } from "../../services/ingestion-pull-log.service.ts";
+import type { IngestionPullDiagnosticsSink } from "../../features/ingestion-pull/services/ingestion-pull-log.service.ts";
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../governance-http.channel.ts";
 
 const TEMPLATE_PATTERN = /\$\{\{([\w.]+)\}\}/g;

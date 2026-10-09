@@ -13,6 +13,7 @@ import {
   InMemoryJobBlobStore,
   InMemoryObjectStore,
   incompressible,
+  mintTestUri,
 } from "./blob-test-doubles.ts";
 
 type TestPayload = {
@@ -49,7 +50,6 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
   });
 
   beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
     queues = [];
   });
 
@@ -91,6 +91,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
     const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
       consumerEnabled,
       objectStoreFor: () => objectStore,
+      mintUri: mintTestUri,
       resolveStorageDestination: STORAGE_DESTINATION,
     });
     queues.push(queue);
@@ -621,6 +622,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         const encodeTiered = new TieredBlobStore({
           redisBlobs: new InMemoryJobBlobStore(),
           objectStoreFor: () => flaky,
+          mintUri: mintTestUri,
           resolveDestination: STORAGE_DESTINATION,
         });
         const envelope = withJobAttempt({

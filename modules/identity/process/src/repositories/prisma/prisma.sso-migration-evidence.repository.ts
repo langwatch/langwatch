@@ -5,7 +5,7 @@ import type {
   MigrationIdentifierHolding,
   SsoAuthenticationRecord,
   SsoMigrationEvidenceRepository,
-} from "../sso-migration-evidence.repository.ts";
+} from "../../features/sso-arrival/repositories/sso-migration-evidence.repository.ts";
 
 /** The two models the pair's evidence is read through. */
 type PrismaSsoMigrationEvidenceDatabase = Pick<

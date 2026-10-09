@@ -84,3 +84,72 @@ describe("given the project's only model provider is connected at the organizati
     });
   });
 });
+
+describe("given Langy rides beside a drawer", () => {
+  describe("when the composer's model picker opens", () => {
+    /** @scenario "The model list opens above the panel when Langy rides beside a drawer" */
+    it("puts the model list on the overlay layer, above the panel", async () => {
+      const user = userEvent.setup();
+      renderPill();
+
+      await user.click(screen.getByTestId("langy-model-picker"));
+
+      const [option] = await screen.findAllByRole("option");
+      const positioner = option?.closest<HTMLElement>('[data-part="positioner"]');
+      // The panel sits at z 1600 beside a drawer and the drawer at 1500.
+      expect(Number(positioner?.style.getPropertyValue("z-index"))).toBe(2010);
+      expect(positioner?.style.getPropertyPriority("z-index")).toBe("important");
+    });
+  });
+});
+
+function renderLockedPill({ reason }: { reason?: "turn-active" }) {
+  return render(
+    <DesignSystemProvider forcedTheme="light">
+      <LangyModelPill
+        model="anthropic/claude-sonnet-4-5"
+        options={OPTIONS}
+        onChange={() => undefined}
+        disabled
+        {...(reason ? { disabledReason: reason } : {})}
+      />
+    </DesignSystemProvider>,
+  );
+}
+
+describe("given a turn is running and the model picker is locked", () => {
+  describe("when the user hovers the model pill", () => {
+    /** @scenario "The model in use stays visible while Langy is working" */
+    it("names the provider and model, says the lock ends with the turn, and stays shut", async () => {
+      const user = userEvent.setup();
+      renderLockedPill({ reason: "turn-active" });
+
+      const picker = screen.getByTestId("langy-model-picker");
+      expect(picker.getAttribute("aria-disabled")).toBe("true");
+      expect(picker.hasAttribute("disabled")).toBe(false);
+
+      await user.hover(picker);
+      const tooltip = await screen.findByRole("tooltip");
+      expect(tooltip.textContent).toContain("Anthropic · claude-sonnet-4-5");
+      expect(tooltip.textContent).toContain(
+        "Langy is working. You can switch models when it stops.",
+      );
+
+      await user.click(picker);
+      expect(picker.getAttribute("data-state")).toBe("closed");
+    });
+  });
+
+  describe("when the picker is locked for another reason", () => {
+    it("promises no switch, because no turn is about to stop", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderLockedPill({});
+
+      const picker = screen.getByTestId("langy-model-picker");
+      expect(picker.hasAttribute("disabled")).toBe(true);
+      await user.hover(picker);
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+  });
+});

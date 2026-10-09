@@ -110,6 +110,32 @@ describe("buildFinalAssistantParts", () => {
       });
     });
 
+    /** @scenario "The step is still accounted for in the turn" */
+    it("keeps a create that named nothing as a completed step, marked unconfirmed", () => {
+      const parts = buildFinalAssistantParts({
+        text: "done",
+        toolCalls: [
+          {
+            id: "c1",
+            name: "bash",
+            input: { command: "langwatch scenario create --name x --format json" },
+            output: "[]",
+          },
+        ],
+      });
+
+      expect(parts[0]).toMatchObject({
+        toolCallId: "c1",
+        state: "output-available",
+        output: JSON.stringify({
+          kind: "card",
+          card: "resourceCreated",
+          payload: [],
+          outcome: "unconfirmed",
+        }),
+      });
+    });
+
     it("preserves tool-call order", () => {
       const parts = buildFinalAssistantParts({
         text: "t",

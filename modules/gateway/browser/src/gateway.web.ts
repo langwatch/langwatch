@@ -5,8 +5,10 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { gatewayWebConfigSchema } from "@langwatch/gateway-contract";
 
 export const gatewayWeb = defineBrowserModule("gateway")
+  .withConfig({ gateway: gatewayWebConfigSchema }, ({ gateway }) => gateway)
   .withHosts({
     requires: ["GatewayHostApi"],
     mounts: { GatewayHostApi: { load: () => import("./behavior/gateway-host-mount.tsx") } },

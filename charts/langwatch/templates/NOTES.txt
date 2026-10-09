@@ -242,9 +242,19 @@ backend for you:
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032
         boundary (see the migration Job template header).
-      • GitOps: the pre-roll migration Job (app.migrations.preRoll) is a
+      • GitOps: the pre-roll upgrade Job (app.migrations.preRoll) is a
         pre-upgrade hook, which ArgoCD/Flux map to PreSync and run on the
-        first sync too; both runners are idempotent, so it is a no-op there.
+        first sync too; `upgrade` is idempotent, so it is a no-op there.
+
+  • Upgrades: the app and workers never migrate. They refuse to start, naming
+    the outstanding steps, until `pnpm task upgrade` has run on the new image.
+    The pre-roll Job runs it on every helm upgrade; with
+    app.migrations.preRoll=false you run it yourself first:
+      kubectl run langwatch-upgrade --rm -it --restart=Never \
+        --image={{ .Values.images.app.repository }}:{{ .Values.images.app.tag }} \
+        -- sh -c 'cd /app/apps/api && pnpm --silent run start:prepare:db'
+    (with the app's environment). A first install needs nothing: the app's
+    first boot runs it once on the empty database.
 
   • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
     Then configure these on the bucket and deployment, or uploads and

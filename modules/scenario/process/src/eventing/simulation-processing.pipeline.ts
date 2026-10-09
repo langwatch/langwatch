@@ -5,6 +5,7 @@ import {
   type AppendStore,
   type EventingSetup,
   type FoldProjectionStore,
+  type LaneAlias,
   type ProcessManagerApplier,
   type Projection,
   type RegisteredCommand,
@@ -49,10 +50,6 @@ import {
   type SnapshotUpdateBroadcastSubscriberDeps,
 } from "./snapshot-update-broadcast.subscriber.ts";
 import {
-  createSuiteRunSyncSubscriber,
-  type SuiteRunSyncSubscriberDeps,
-} from "./suite-run-sync.subscriber.ts";
-import {
   createTraceMetricsSyncSubscriber,
   createTraceSpanMetricsSyncHandler,
   TRACE_SPAN_METRICS_SETTLE_MS,
@@ -76,11 +73,42 @@ export interface SimulationProcessingPipelineDeps {
   scenarioEvaluations: { name: string; process: ProcessManagerApplier<SimulationProcessingEvent> };
   simulations: SimulationService;
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
-  suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
   traceSpanMetricsSync: TraceSpanMetricsSyncDeps;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
+}
+
+/** Main's simulation lanes that moved here or into the process manager that replaced them. */
+function mainSimulationLaneAliases({
+  evaluationsProcess,
+}: {
+  evaluationsProcess: string;
+}): readonly LaneAlias[] {
+  return [
+    {
+      from: "simulation_processing:subscriber:scenarioEvaluations",
+      to: { jobType: "subscriber", lane: `pm:${evaluationsProcess}` },
+      removeAfter: "3.21.0",
+    },
+    {
+      from: "simulation_processing:job:scenarioEvaluations",
+      tombstone:
+        "grading is an intent of the scenario_evaluations process; a job has no finished event to open it",
+      removeAfter: "3.21.0",
+    },
+    {
+      from: "simulation_processing:job:deferredComputeRunMetrics",
+      to: { jobType: "command", lane: "computeRunMetrics" },
+      removeAfter: "3.21.0",
+    },
+    {
+      from: "trace_processing:reactor:simulationMetricsSync",
+      to: { jobType: "subscriber", lane: "traceSpanMetricsSync" },
+      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+      removeAfter: "3.21.0",
+    },
+  ];
 }
 
 function buildSimulationProcessingPipelineDefinition(
@@ -120,7 +148,6 @@ function buildSimulationProcessingPipelineDefinition(
       "snapshotUpdateBroadcast",
       createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
     )
-    .withEventSubscriber("suiteRunSync", createSuiteRunSyncSubscriber(deps.suiteRunSync))
     .withEventSubscriber(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
@@ -182,7 +209,10 @@ function buildSimulationProcessingPipelineDefinition(
           ttlMs: 60_000,
         },
       },
-    });
+    })
+    .withLaneAliases(
+      mainSimulationLaneAliases({ evaluationsProcess: deps.scenarioEvaluations.name }),
+    );
   return (deps.retention ? pipeline.withRetention(deps.retention) : pipeline).build();
 }
 

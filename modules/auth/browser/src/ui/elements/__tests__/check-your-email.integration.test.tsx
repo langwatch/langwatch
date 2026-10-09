@@ -14,6 +14,19 @@ const renderCard = (email: string) =>
 
 afterEach(() => cleanup());
 
+describe("given I asked for a confirmation link", () => {
+  describe("when the check-your-email card is shown", () => {
+    /** @scenario "The email-sent card stands on a solid floor" */
+    it("draws the card on the solid surface, not the glass", () => {
+      const { container } = renderCard("sam@acme-widgets.example");
+
+      const card = container.querySelector("[data-auth-card]");
+      expect(card).not.toBeNull();
+      expect(card).toHaveAttribute("data-auth-card-surface", "solid");
+    });
+  });
+});
+
 describe("given I asked for a confirmation link at a gmail.com address", () => {
   describe("when the check-your-email card is shown", () => {
     /** @scenario "A common mailbox gets a door straight to it" */

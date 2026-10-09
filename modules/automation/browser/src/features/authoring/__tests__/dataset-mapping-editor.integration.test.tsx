@@ -4,7 +4,7 @@
  * editor, stood in here: it starts from the slice's mapping and writes only the user's edits back.
  */
 import "@testing-library/jest-dom/vitest";
-import type { UiEvaluatorTracesMappingProps } from "@langwatch/browser-host/declarations";
+import type { EvaluatorTracesMappingProps } from "@langwatch/trace-client";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,12 +12,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 const editor = vi.hoisted(() => {
-  const state: { props?: UiEvaluatorTracesMappingProps } = {};
+  const state: { props?: EvaluatorTracesMappingProps } = {};
   return state;
 });
 
 vi.mock("../../../behavior/lent-peers.tsx", () => ({
-  TracesMapping: (props: UiEvaluatorTracesMappingProps) => {
+  TracesMapping: (props: EvaluatorTracesMappingProps) => {
     editor.props = props;
     // Like the real editor, report the derived mapping on opening, in a different key order.
     const reported = useRef(false);

@@ -43,40 +43,6 @@ const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 const logger = createLogger("langwatch:governance:clickhouse-ocsf-events-repository");
 
-/**
- * OCSF v1.1 SeverityId values.
- *   1 = Informational
- *   3 = Low (warning)
- *   4 = Medium
- *   5 = High
- *   6 = Critical
- * Per the spec: default 1 (info); elevated when
- * langwatch.governance.anomaly_alert_id is set.
- */
-export const OCSF_SEVERITY = {
-  INFO: 1,
-  LOW: 3,
-  MEDIUM: 4,
-  HIGH: 5,
-  CRITICAL: 6,
-} as const;
-
-/**
- * OCSF v1.1 ActivityId values for ClassUid 6003 (API Activity).
- *   1 = Create
- *   2 = Read
- *   3 = Update
- *   4 = Delete
- *   6 = Invoke (LLM call / agent action)
- */
-export const OCSF_ACTIVITY = {
-  CREATE: 1,
-  READ: 2,
-  UPDATE: 3,
-  DELETE: 4,
-  INVOKE: 6,
-} as const;
-
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 

@@ -6,6 +6,23 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    evaluators: {
+      getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      listByWorkflow: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/monitor-client", () => ({
+  monitorClient: {
+    monitors: {
+      getAllForProject: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
 vi.mock("../../../behavior/workflow-api.ts", () => {
   const mutation = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
   return {

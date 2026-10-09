@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-import { CONNECT_SERVICES } from "./connect-services.ts";
+import { CONNECT_SERVICES } from "./issued-license.ts";
 import type { LicenseError } from "./license-constants.ts";
 
 /** What an install presents on every call to LangWatch. */
@@ -214,6 +214,14 @@ export interface InstanceIdentityView {
   readonly lastReportError?: string;
   readonly optionalMetricsOptOut: boolean;
   readonly hostnameOptOut: boolean;
+}
+
+/** One hosted service's answer in its two halves, since each refusal has its own remedy. */
+export interface ConnectServiceState {
+  /** The license names the service. */
+  readonly isEntitled: boolean;
+  /** Named, and no organization admin switched it off. */
+  readonly isSwitchedOn: boolean;
 }
 
 /** What the deployment decided about Connect, and whether any license here names a hosted service. */

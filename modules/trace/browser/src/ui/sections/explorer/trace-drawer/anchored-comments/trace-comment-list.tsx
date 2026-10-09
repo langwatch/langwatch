@@ -1,14 +1,14 @@
 import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Crosshair, Lightbulb } from "lucide-react";
 
-import { readableDate } from "../../../../../model/display-formatters.ts";
-import { PersonAvatar } from "../../../person-avatar.tsx";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 import {
   canJumpToAnnotationAnchor,
   useJumpToAnnotationAnchor,
-} from "../../hooks/use-jump-to-annotation-anchor.ts";
+} from "../../../../../features/annotation/behavior/use-jump-to-annotation-anchor.ts";
+import { PersonAvatar } from "../../../person-avatar.tsx";
 
 /** What a comment reads as when the part it was left on is gone. */
 const ORPHANED_ANCHOR = "On a part of the trace that is no longer there";

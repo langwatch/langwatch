@@ -9,12 +9,12 @@ import { useEffect } from "react";
 import {
   type AnnotationDraft,
   useAnnotationDraftStore,
-} from "../../../../../behavior/annotation-draft.store.ts";
+} from "../../../../../features/annotation/behavior/annotation-draft.store.ts";
 import {
   AnnotateBody,
   FormFooter,
   SuggestBody,
-} from "../../../../../behavior/lent-annotation-form.tsx";
+} from "../../../../../features/annotation/behavior/lent-annotation-form.tsx";
 import { useAnnotationMutations } from "./use-annotation-form.ts";
 
 interface AnnotationEditorCardProps {

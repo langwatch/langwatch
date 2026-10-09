@@ -38,3 +38,11 @@ Feature: A module reacts to a peer pipeline's events from its own side
     When the owner's pipeline appends one fact twice under one idempotency key
     Then the subscriber is handed both appends, each with its own event id and the shared key
     And an event without an idempotency key reaches the handler with none
+
+  @unit
+  Scenario: A peer subscriber's enqueue filter declines events before a job is minted
+    Given a module declares a peer subscriber with an enqueue filter over the event's data
+    When the owner's pipeline appends one event the filter takes and one it declines
+    Then the lane's filter is handed each event's data parsed with the contract's schema
+    And only the event the filter takes would mint a job
+    And data the schema refuses is staged, so the handler's parse fails as it would unfiltered

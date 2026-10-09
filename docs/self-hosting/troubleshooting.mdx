@@ -52,7 +52,7 @@ Common causes:
 First startup is slower because:
 
 - Docker pulls all images
-- PostgreSQL runs initial migrations
+- The `migrate` service runs the upgrade (PostgreSQL and ClickHouse migrations) before the app starts
 - OpenSearch initializes its cluster
 
 Subsequent starts are faster. If it remains slow, check Docker resource allocation.
@@ -204,26 +204,32 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ## PostgreSQL Issues
 
-### Migration failures on startup
+### The app refuses to start: the installation is behind
 
-If Prisma migrations fail, the app pod crashes. Check logs:
+The app and the workers never migrate. They log `refuses to serve: the installation is behind this image` with the outstanding steps when the upgrade has not run for their version. Run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)), or check why the pre-upgrade Job (Helm) or the `migrate` service (Docker Compose) did not.
+
+The refusal names the cause: outstanding steps, a release below the installation's floor, or no ClickHouse configured (set `CLICKHOUSE_URL`, run the upgrade, start again). **Ops > Upgrades** and `pnpm task upgrade status` show the state.
+
+On Helm, read the pre-upgrade Job:
 
 ```bash
-kubectl -n langwatch logs deploy/langwatch-app --tail=100 | grep -i prisma
+kubectl -n langwatch get jobs | grep migrate-pre-roll
+kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 ```
 
-To skip migrations temporarily (for debugging):
+On Docker Compose, read the `migrate` service:
 
-```yaml
-app:
-  extraEnvs:
-    - name: SKIP_PRISMA_MIGRATE
-      value: "true"
+```bash
+docker compose -f infra/compose.yml --project-directory . logs migrate
 ```
 
-<Warning>
-  Only skip migrations for debugging. Running with pending migrations can cause application errors.
-</Warning>
+### The upgrade failed
+
+A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. On Docker Compose, the `migrate` service exits non-zero and the app and workers do not start.
+
+The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
+
+`SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the app refuses to start until the upgrade has applied every migration its version needs.
 
 ### Connection refused
 

@@ -1,41 +1,30 @@
 /**
- * What kind of deployment the chrome is drawn on. Only the composing
- * application can read this, which is why the port asks for it rather than
- * a browser package decoding the shell's meta tag a fourth time.
+ * What kind of deployment the chrome is drawn on: the shell's published
+ * deployment, read off the installed modules' config, plus the process's
+ * two development-badge facts.
  */
 
-import { readPublicAppConfig } from "@langwatch/browser/public-config";
-import type { NavigationDeployment } from "@langwatch/navigation-browser/navigation";
+import type { UiDeployment } from "@langwatch/browser-host/capabilities";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
+import type { NavigationDeployment } from "@langwatch/navigation-contract";
 
-import { parseUiFeatureConfig } from "../ui-feature-config";
+type DevIndicator = Pick<ProcessWebConfig, "hideDevIndicator" | "devIndicatorLabel">;
 
-/**
- * A document with no config makes no claim about the analysis services, and
- * warning that two settings are unset on the strength of a missing config
- * block would be a false alarm on every test mount.
- */
-const UNCONFIGURED: NavigationDeployment = {
-  isSaaS: false,
-  hasCloudOps: false,
-  isDevelopment: false,
-  hasNlpService: true,
-  hasLangevals: true,
-};
-
-export function readNavigationDeployment(): NavigationDeployment {
-  try {
-    const { process, authz, evaluation, ops } = parseUiFeatureConfig(readPublicAppConfig());
-    return {
-      isSaaS: process.deployment === "saas",
-      hasCloudOps: ops.cloudOps,
-      isDevelopment: process.mode === "development",
-      ...(process.hideDevIndicator ? { hideDevIndicator: true } : {}),
-      ...(process.devIndicatorLabel ? { devIndicatorLabel: process.devIndicatorLabel } : {}),
-      ...authz,
-      hasNlpService: process.nlp,
-      hasLangevals: evaluation.langevals,
-    };
-  } catch {
-    return UNCONFIGURED;
-  }
+export function navigationDeploymentOf({
+  deployment,
+  process: { hideDevIndicator, devIndicatorLabel },
+}: {
+  deployment: UiDeployment;
+  process: DevIndicator;
+}): NavigationDeployment {
+  return {
+    isSaaS: deployment.isSaaS,
+    hasCloudOps: deployment.hasCloudOps,
+    isDevelopment: deployment.isDevelopment,
+    ...(hideDevIndicator ? { hideDevIndicator: true } : {}),
+    ...(devIndicatorLabel ? { devIndicatorLabel } : {}),
+    ...(deployment.demoProjectSlug ? { demoProjectSlug: deployment.demoProjectSlug } : {}),
+    hasNlpService: deployment.hasNlpService,
+    hasLangevals: deployment.hasLangevals,
+  };
 }

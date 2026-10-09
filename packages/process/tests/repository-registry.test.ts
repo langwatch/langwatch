@@ -1,4 +1,5 @@
 import { Config } from "@langwatch/config";
+import type { StoresMemberSource } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -6,18 +7,16 @@ import { ApplicationBuilder } from "../src/application.ts";
 import {
   defineProcessModule,
   defineRepositories,
-  withMemoryRepositories,
   type FeatureSetup,
   type Tier,
 } from "../src/index.ts";
 import { MissingMemberError } from "../src/module-members.ts";
-import type { MemberSource } from "../src/module-members.ts";
 import { RepositoryOwnershipConflictError } from "../src/repository-ownership.ts";
 import {
   instantiateRepositories,
   selectedRepositoryOwnership,
 } from "../src/repository-registry.ts";
-import { liveMemberSourceOf, memberSourceOf } from "./member-source.ts";
+import { liveMemberSourceOf, memoryMemberSourceOf } from "./member-source.ts";
 
 type Repositories = Readonly<{ value: { read(): string } }>;
 let liveCreates = 0;
@@ -47,7 +46,7 @@ class App {
   static create({
     repositories,
     tier,
-  }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): App {
+  }: FeatureSetup<Record<never, never>, undefined, Repositories>): App {
     return new App(repositories.value.read(), tier);
   }
   constructor(
@@ -59,19 +58,12 @@ class App {
 class ConfiguredApp {
   static readonly contract = ConfiguredApp;
   static readonly dependencies = {};
-  static readonly reads = ["suffix"] as const;
   static readonly config = Config.define((c) => ({ prefix: c.env("AGENT_PREFIX", z.string()) }));
   static create({
     repositories,
-    members,
     config,
-  }: FeatureSetup<
-    Record<never, never>,
-    { suffix: string },
-    { prefix: string },
-    Repositories
-  >): ConfiguredApp {
-    return new ConfiguredApp(`${config.prefix}:${repositories.value.read()}:${members.suffix}`);
+  }: FeatureSetup<Record<never, never>, { prefix: string }, Repositories>): ConfiguredApp {
+    return new ConfiguredApp(`${config.prefix}:${repositories.value.read()}`);
   }
   constructor(readonly value: string) {}
 }
@@ -103,7 +95,7 @@ class DuplicateApp {
   static readonly dependencies = {};
   static create({
     repositories,
-  }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): DuplicateApp {
+  }: FeatureSetup<Record<never, never>, undefined, Repositories>): DuplicateApp {
     return new DuplicateApp(repositories.value.read());
   }
   constructor(readonly value: string) {}
@@ -172,7 +164,7 @@ describe("given a module that declares both repository tiers", () => {
       memoryCreates = 0;
       const runtime = await new ApplicationBuilder({
         role: "api",
-        members: liveMemberSourceOf({ prisma: { prefix: "postgres" } }),
+        stores: liveMemberSourceOf({ prisma: { prefix: "postgres" } }),
       })
         .withModules([feature])
         .boot();
@@ -184,16 +176,16 @@ describe("given a module that declares both repository tiers", () => {
       await runtime.stop();
     });
 
-    it("hands the app its config, the members it reads and the live repositories", async () => {
+    it("hands the app its config and the live repositories", async () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
         config: { agent: { prefix: "config" } },
-        members: liveMemberSourceOf({ suffix: "infra", prisma: { prefix: "database" } }),
+        stores: liveMemberSourceOf({ prisma: { prefix: "database" } }),
       })
         .withModules([configuredFeature])
         .boot();
 
-      expect(runtime.module(configuredFeature).provided.value).toBe("config:database:infra");
+      expect(runtime.module(configuredFeature).provided.value).toBe("config:database");
       await runtime.stop();
     });
   });
@@ -203,8 +195,11 @@ describe("given a module that declares both repository tiers", () => {
     it("builds the memory tier and asks for no client at all", async () => {
       liveCreates = 0;
       memoryCreates = 0;
-      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
-        .withModules([withMemoryRepositories(feature)])
+      const runtime = await new ApplicationBuilder({
+        role: "api",
+        stores: memoryMemberSourceOf({}),
+      })
+        .withModules([feature])
         .boot();
 
       expect(runtime.module(feature).provided.value).toBe("memory");
@@ -213,26 +208,13 @@ describe("given a module that declares both repository tiers", () => {
       expect(memoryCreates).toBe(1);
       await runtime.stop();
     });
-
-    it("refuses on a module that declares no repositories at all", () => {
-      class StorelessApp {
-        static readonly contract = StorelessApp;
-        static readonly dependencies = {};
-        static create(): StorelessApp {
-          return new StorelessApp();
-        }
-      }
-      const plain = defineProcessModule("share").withApi(StorelessApp).build();
-
-      expect(() => withMemoryRepositories(plain)).toThrow("has no memory tier");
-    });
   });
 
   describe("when the store the live tier needs has no address", () => {
     /** @scenario "A store with no address refuses at boot" */
     it("refuses naming the module and the member, before any factory runs", async () => {
       liveCreates = 0;
-      const booting = new ApplicationBuilder({ role: "api", members: liveMemberSourceOf({}) })
+      const booting = new ApplicationBuilder({ role: "api", stores: liveMemberSourceOf({}) })
         .withModules([feature])
         .boot();
 
@@ -244,7 +226,7 @@ describe("given a module that declares both repository tiers", () => {
     it("refuses rather than falling back to the memory tier", async () => {
       memoryCreates = 0;
       await expect(
-        new ApplicationBuilder({ role: "api", members: liveMemberSourceOf({}) })
+        new ApplicationBuilder({ role: "api", stores: liveMemberSourceOf({}) })
           .withModules([feature])
           .boot(),
       ).rejects.toBeInstanceOf(MissingMemberError);
@@ -253,15 +235,14 @@ describe("given a module that declares both repository tiers", () => {
     });
 
     it("refuses a member the source names but cannot build", async () => {
-      const unbuildable: MemberSource<{ prisma: { prefix: string } }> = {
+      const unbuildable: StoresMemberSource = {
         tier: "live",
         order: ["prisma"],
         read: () => {
           throw new Error('This process has no "prisma" member.');
         },
-        close: () => Promise.resolve(),
       };
-      const booting = new ApplicationBuilder({ role: "api", members: unbuildable })
+      const booting = new ApplicationBuilder({ role: "api", stores: unbuildable })
         .withModules([feature])
         .boot();
 
@@ -278,7 +259,7 @@ describe("given a module that declares both repository tiers", () => {
         .build();
 
       await expect(
-        new ApplicationBuilder({ role: "api", members: liveMemberSourceOf({}) })
+        new ApplicationBuilder({ role: "api", stores: liveMemberSourceOf({}) })
           .withModules([duplicateFeature, conflictingFeature])
           .boot(),
       ).rejects.toThrow(RepositoryOwnershipConflictError);
@@ -289,7 +270,7 @@ describe("given a module that declares both repository tiers", () => {
       duplicateCreates = 0;
 
       await expect(
-        new ApplicationBuilder({ role: "api", members: liveMemberSourceOf({}) })
+        new ApplicationBuilder({ role: "api", stores: liveMemberSourceOf({}) })
           .withModules([duplicateFeature, canonicalPrismaFeature])
           .boot(),
       ).rejects.toBeInstanceOf(RepositoryOwnershipConflictError);
@@ -304,7 +285,7 @@ describe("given a module that declares both repository tiers", () => {
         static readonly dependencies = {};
         static create({
           repositories,
-        }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): MethodApp {
+        }: FeatureSetup<Record<never, never>, undefined, Repositories>): MethodApp {
           return new MethodApp(repositories.value.read());
         }
         constructor(readonly value: string) {}
@@ -314,8 +295,11 @@ describe("given a module that declares both repository tiers", () => {
         .withApi(MethodApp)
         .build();
 
-      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
-        .withModules([withMemoryRepositories(methodFeature)])
+      const runtime = await new ApplicationBuilder({
+        role: "api",
+        stores: memoryMemberSourceOf({}),
+      })
+        .withModules([methodFeature])
         .boot();
 
       expect(runtime.module(methodFeature).provided.value).toBe("memory");

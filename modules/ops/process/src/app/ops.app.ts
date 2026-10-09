@@ -47,7 +47,8 @@ import { LangyApi } from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
+import { grafanaLinkConfigOf } from "@langwatch/observability/grafana-links";
 import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
@@ -62,6 +63,7 @@ import {
   type UsageReportAnswer,
   opsBrowserConfig,
   opsConfig,
+  opsSecrets,
   type AdminIdentity,
   type AggregateDiscovery,
   type AggregateEventView,
@@ -207,6 +209,8 @@ import {
   type StartReplayResult,
   type StopImpersonationInput,
   type ReconcileQueuePendingInput,
+  type OpsQueueReapedStrandedGroups,
+  type ReapStrandedQueueGroupsInput,
   type UnblockAllQueueGroupsInput,
   type UnblockAllQueueGroupsResult,
   type UnblockQueueGroupInput,
@@ -225,10 +229,18 @@ import {
   type OpsSignUpHealthInput,
   type SignUpHealth,
   type OpsDoorAnswer,
+  type OpsUpgradeIdInput,
+  type OpsUpgradeListRunsInput,
+  type OpsUpgradeListStepsInput,
+  type OpsUpgradeReleasePage,
+  type OpsUpgradeRun,
+  type OpsUpgradeRunPage,
+  type OpsUpgradeStatus,
+  type OpsUpgradeStepDetail,
+  type OpsUpgradeStepPage,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import type { FeatureSetup, ServerRole } from "@langwatch/process";
-import { storesOwner } from "@langwatch/process-stores/config";
+import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
@@ -236,14 +248,19 @@ import {
 } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
-import { Secret } from "@langwatch/secrets/secret";
+import {
+  credentialsSecret,
+  credentialsSecretPrevious,
+  sessionSecret,
+} from "@langwatch/secrets/shared-secrets";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { UpgradeAlertsService } from "#features/upgrades/services/upgrade-alerts.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
@@ -253,39 +270,70 @@ import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
-import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
-import { HttpSlackAlertChannel } from "../channels/http/http.slack-alert.channel.ts";
-import { HttpUsageReportChannel } from "../channels/http/http.usage-report.channel.ts";
-import { SlackBugReportNotifierChannel } from "../channels/slack/slack.bug-report-notifier.channel.ts";
+import type { OpsChannels } from "../channels/ops.channels.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
+import { GROUP_QUEUE_REAPER_PIPELINE_NAME } from "../eventing/ops-group-queue-reaper.pipeline.ts";
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
-import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
-import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
+import { OpsCheckupService } from "../features/checkup/services/ops-checkup.service.ts";
+import { OpsMetricsCollectorService } from "../features/metrics/services/ops-metrics-collector.service.ts";
+import { DefaultOpsSnapshotService } from "../features/metrics/services/ops-snapshot-reader.service.ts";
+import { ReplayRetentionService } from "../features/replay/services/replay-retention.service.ts";
+import {
+  type ProjectionReplayRequestSender,
+  ReplayService,
+} from "../features/replay/services/replay.service.ts";
+import {
+  type SystemMigrationPassRequestSender,
+  SystemMigrationPassRequestsService,
+} from "../features/system-migrations/services/system-migration-pass-requests.service.ts";
+import { SystemMigrationPassService } from "../features/system-migrations/services/system-migration-pass.service.ts";
+import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
+import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
+import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import {
+  type AdminAccess,
+  AdminAccessService,
+  type AdminAccessServiceOptions,
+} from "../services/admin-access.service.ts";
+import { AdminAuditService } from "../services/admin-audit.service.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
-import { OpsCheckupService } from "../services/ops-checkup.service.ts";
+import { BlobStoreService } from "../services/blob-store.service.ts";
+import { EventExplorerService } from "../services/event-explorer.service.ts";
+import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
+import { GroupQueueReaperService } from "../services/group-queue-reaper.service.ts";
+import {
+  type AdminAuditSink,
+  ImpersonationService,
+  type ImpersonationSessions,
+} from "../services/impersonation.service.ts";
+import {
+  type InstanceAdminAccounts,
+  InstanceAdminService,
+  type OrganizationSsoRouting,
+} from "../services/instance-admin.service.ts";
+import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
-import type { OpsService } from "../services/ops.service.ts";
+import { OpsUpgradeService } from "../services/ops-upgrade.service.ts";
+import { OpsService } from "../services/ops.service.ts";
 import {
   PlatformOperatorsService,
   type PlatformOperatorSeedOutcome,
   type PlatformOperatorSeedSettings,
 } from "../services/platform-operators.service.ts";
-import type { ProjectionReplayRequestSender } from "../services/replay.service.ts";
+import { ProcessAuditService } from "../services/process-audit.service.ts";
+import { QueueAuditService } from "../services/queue-audit.service.ts";
+import { QueueService } from "../services/queue.service.ts";
+import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
+import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
-import { StorageStatsCollectionService } from "../services/storage-stats-collection.service.ts";
+import {
+  StorageStatsCollectionService,
+  type StorageStatsInstance,
+} from "../services/storage-stats-collection.service.ts";
 import { StorageStatsGaugesService } from "../services/storage-stats-gauges.service.ts";
-import {
-  type SystemMigrationPassRequestSender,
-  SystemMigrationPassRequestsService,
-} from "../services/system-migration-pass-requests.service.ts";
-import {
-  buildOpsInfrastructure,
-  type OpsProcessMembers,
-  sharedStorageStatsInstance,
-} from "./ops-composition.build.ts";
 /** The instance admin methods that only read; every other one needs `ops:manage`. */
 const ADMIN_READ_METHODS: ReadonlySet<string> = new Set([
   "getList",
@@ -554,7 +602,8 @@ export type QueueControlAction =
   | "queue_move_group_to_dlq"
   | "queue_move_all_blocked_to_dlq"
   | "queue_unblock_group"
-  | "queue_unblock_all";
+  | "queue_unblock_all"
+  | "queue_reap_stranded";
 
 export interface QueueAuditSink {
   append(entry: {
@@ -567,19 +616,6 @@ export interface QueueAuditSink {
 
 export interface BugReportNotifier {
   notify(input: { report: BugReport }): Promise<void>;
-}
-
-/**
- * Fixed-window counter for the PUBLIC report endpoint, keyed on the
- * caller-asserted nearest-hop IP — a flood bound, not authorization; its
- * absence would let one client fill a cross-tenant inbox.
- */
-export interface BugReportRateLimiter {
-  consume(input: {
-    key: string;
-    windowSeconds: number;
-    max: number;
-  }): Promise<{ allowed: boolean }>;
 }
 
 /** The registered projections and event subscribers, as the process knows them. */
@@ -608,7 +644,6 @@ export interface OpsAppInfrastructure {
     dependencies: OpsAppDependencies;
     passRequests: SystemMigrationPassRequestsService;
   }): OpsSystemMigrationRunner;
-  bugReportRateLimiter: BugReportRateLimiter;
   bugReportNotifier: BugReportNotifier;
   /** The ClickHouse account an operator EXPLAIN runs as. */
   explainClients: OpsExplainClients;
@@ -653,10 +688,16 @@ type OpsRuntimeDependencies = Readonly<{
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
+  groupQueueReaper: GroupQueueReaperService;
   /** The orphaned-organization rate; absent where a composition built none. */
   signUpHealth: SignUpHealthService | undefined;
   /** The Operators page, the recovery task and the seed; absent where a composition built none. */
   platformOperators: PlatformOperatorsService | undefined;
+  /** The Upgrades pages' reads over the upgrade ledger. */
+  upgrades: OpsUpgradeService;
+  /** The check `ops_upgrade_alerts` runs hourly; absent where a composition built none. */
+  upgradeAlerts: UpgradeAlertsService | undefined;
   operatorSeed: PlatformOperatorSeedSettings | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
@@ -670,9 +711,9 @@ type OpsAppRuntimeDependencies = OpsAppDependencies &
 
 type OpsSetup = FeatureSetup<
   typeof OpsModule.dependencies,
-  OpsProcessMembers,
   OpsServerConfig,
-  OpsRepositories
+  OpsRepositories,
+  OpsChannels
 >;
 
 /** The badge's two integers, and when they were computed. */
@@ -729,18 +770,17 @@ export class OpsModule implements OpsApi {
   static readonly config = opsConfig;
   static readonly secrets = {
     licensePrivateKey: licensingSecrets.licensePrivateKey,
-    /** The stores' own handle: goose reads migration status from the same ClickHouse. */
-    clickhouseUrl: storesOwner.secrets.clickhouse,
-    /** Posts the new-bug-report alert; absent, intake stays silent. */
-    slackBugReportsBotToken: Secret.load("SLACK_BUG_REPORTS_BOT_TOKEN", { optional: true }),
+    slackBugReportsBotToken: opsSecrets.slackBugReportsBotToken,
+    /** The stores' own keys: credentials-reseal moves values from the previous to the current. */
+    credentials: credentialsSecret,
+    credentialsFallback: sessionSecret,
+    credentialsPrevious: credentialsSecretPrevious,
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
-  static readonly reads = ["prisma", "redis", "clickhouse", "eventing"] as const;
 
   /**
-   * Builds this process's own {@link OpsAppInfrastructure} from the members it
-   * reads, then composes over it exactly as {@link OpsModule.fromInfrastructure}
-   * does — what a hand composition (or a test) still supplies directly.
+   * Builds this process's own {@link OpsAppInfrastructure} from ops' repositories, then composes
+   * over it exactly as {@link OpsModule.fromInfrastructure} does: what a test still supplies.
    */
   static async create(setup: OpsSetup): Promise<OpsModule> {
     const cloudOps = await setup.secrets.into(OpsModule.secrets.licensePrivateKey, (privateKey) =>
@@ -751,36 +791,19 @@ export class OpsModule implements OpsApi {
       }),
     );
     // One tracker: the queue-metrics writer records into it, the detector reads it.
-    const rateTracker = RedisAnomalyRateTrackerRepository.create({
-      redis: setup.members.redis,
-      featureFlags: setup.dependencies.featureFlags,
-    });
+    const { rateTracker } = setup.repositories;
     const logger = createLogger("langwatch:ops");
-    const bugReportNotifier = await setup.secrets.into(
-      OpsModule.secrets.slackBugReportsBotToken,
-      (botToken) =>
-        SlackBugReportNotifierChannel.create({
-          transport: HttpSlackAlertChannel.create(),
-          config: {
-            botToken,
-            channel: setup.config.bugReportSlackChannel,
-            baseHost: setup.config.publicBaseUrl,
-          },
-        }),
-    );
     const infrastructure = buildOpsInfrastructure({
-      bugReportNotifier,
-      members: setup.members,
+      bugReportNotifier: setup.channels.bugReportNotifier,
       logger,
       config: setup.config,
       resources: setup.resources,
       repositories: setup.repositories,
-      rateTracker,
+      featureFlags: setup.dependencies.featureFlags,
       cloudOps,
     });
 
     const { dependencies, config, repositories } = setup;
-    const { members } = setup;
     const checkup = OpsCheckupService.create({
       facts: {
         isSaas: config.isSaas,
@@ -804,23 +827,17 @@ export class OpsModule implements OpsApi {
       },
       repositories: {
         postgres: repositories.postgresHealth,
-        clickhouse: await setup.secrets.into(OpsModule.secrets.clickhouseUrl, (connectionUrl) =>
-          ClickHouseClickHouseHealthRepository.create({
-            clickhouse: members.clickhouse,
-            connectionUrl,
-          }),
-        ),
+        clickhouse: repositories.clickhouseHealth,
         redis: repositories.redisHealth,
+        upgradeLedger: repositories.upgradeLedger,
       },
-      channels: {
-        usageReport: HttpUsageReportChannel.create(),
-        probes: HttpCheckupProbeChannel.create(),
-      },
+      channels: setup.channels,
       // Read only when a report is taken, by which time `app` below exists.
       opsHealth: OpsHealthService.create({
         findDashboardData: () => app.findDashboardData(),
         getFleetSummary: () => app.getFleetSummary(),
         listSystemMigrations: () => app.listSystemMigrations(),
+        getUpgradeStatus: () => app.getUpgradeStatus(),
       }),
     });
 
@@ -845,6 +862,11 @@ export class OpsModule implements OpsApi {
       logger.warn(warning);
     }
 
+    const platformOperators = PlatformOperatorsService.create({
+      authz: dependencies.authz,
+      users: dependencies.users,
+      organizations: dependencies.organizations,
+    });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
       dependencies,
@@ -856,19 +878,20 @@ export class OpsModule implements OpsApi {
         organizations: dependencies.organizations,
         identity: dependencies.identity,
       }),
-      platformOperators: PlatformOperatorsService.create({
-        authz: dependencies.authz,
-        users: dependencies.users,
-        organizations: dependencies.organizations,
+      platformOperators,
+      upgradeAlerts: UpgradeAlertsService.create({
+        ledger: repositories.upgradeLedger,
+        operators: platformOperators,
+        mail: dependencies.notifications,
+        upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
       }),
     });
     return app;
   }
 
   /**
-   * Composes over an already-built {@link OpsAppInfrastructure}. Kept
-   * because a hand composition (and every unit test's fixture) still builds
-   * one directly rather than reading process members.
+   * Composes over an already-built {@link OpsAppInfrastructure}. Kept because every unit
+   * test's fixture still builds one directly rather than booting a process.
    */
   static fromInfrastructure(setup: {
     infrastructure: OpsAppInfrastructure;
@@ -879,6 +902,7 @@ export class OpsModule implements OpsApi {
     storageStats?: StorageStatsCollectionService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
+    upgradeAlerts?: UpgradeAlertsService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -891,7 +915,7 @@ export class OpsModule implements OpsApi {
       inbox,
       intake: BugReportIntakeService.create({
         reports: repositories.bugReports,
-        rateLimiter: members.bugReportRateLimiter,
+        rateLimiter: repositories.bugReportRateLimit,
         notifier: members.bugReportNotifier,
       }),
       apiKeys: dependencies.apiKeys,
@@ -913,10 +937,16 @@ export class OpsModule implements OpsApi {
         }),
       }),
       checkup: setup.checkup,
+      upgrades: OpsUpgradeService.create({ ledger: repositories.upgradeLedger }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      groupQueueReaper: GroupQueueReaperService.create({
+        repository: repositories.groupQueueReaper,
+        audit: QueueAuditService.create({ auditLog: dependencies.auditLog }),
+      }),
       signUpHealth: setup.signUpHealth,
       platformOperators: setup.platformOperators,
+      upgradeAlerts: setup.upgradeAlerts,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1893,6 +1923,30 @@ export class OpsModule implements OpsApi {
   }
 
   /** A project key has no person behind it, so it reads its organization's verdicts only. */
+  getUpgradeStatus(): Promise<OpsUpgradeStatus> {
+    return this.#dependencies.upgrades.getStatus();
+  }
+
+  listUpgradeReleases(): Promise<OpsUpgradeReleasePage> {
+    return this.#dependencies.upgrades.listReleases();
+  }
+
+  listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage> {
+    return this.#dependencies.upgrades.listSteps(input);
+  }
+
+  getUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
+    return this.#dependencies.upgrades.getStep(input);
+  }
+
+  listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage> {
+    return this.#dependencies.upgrades.listRuns(input);
+  }
+
+  getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
+    return this.#dependencies.upgrades.getRun(input);
+  }
+
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
     const checkup = this.#checkup;
     if (checkup.isSaas) throw new CheckupNotSelfHostedError();
@@ -2001,11 +2055,26 @@ export class OpsModule implements OpsApi {
     return anomalies.tick();
   }
 
+  /** Emails this installation's platform operators what went wrong with an upgrade. */
+  async checkUpgradeAlerts(input: { since: number; until: number }): Promise<void> {
+    const { upgradeAlerts } = this.#dependencies;
+    if (!upgradeAlerts) throw new OpsCapabilityUnavailableError("upgrade alerts");
+    await upgradeAlerts.check(input);
+  }
+
   /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
   measureStorage(): Promise<void> {
     const { storageStats } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
     return storageStats.collect();
+  }
+
+  /** Deletes the queue groups stranded long enough that no dispatch still holds them. */
+  reapStrandedQueueGroups(
+    input: ReapStrandedQueueGroupsInput,
+  ): Promise<OpsQueueReapedStrandedGroups> {
+    const audited = input.requestedBy !== GROUP_QUEUE_REAPER_PIPELINE_NAME;
+    return this.#dependencies.groupQueueReaper.reap({ ...input, audited });
   }
 
   get #signUpHealth(): SignUpHealthService {
@@ -2147,4 +2216,261 @@ export interface OpsReplayRuntime {
  */
 export interface OpsReplayRuntimeFactory {
   create(): OpsReplayRuntime;
+}
+
+/** The writer's queue reads over the queue service alone, for a process with no Postgres. */
+class QueueOpsMetricsSource extends OpsQueueMetricsSourceRepository {
+  constructor(private readonly queues: QueueService) {
+    super();
+  }
+
+  discoverQueueNames(): Promise<string[]> {
+    return this.queues.discoverQueueNames();
+  }
+
+  scanQueues(input: { queueNames: string[] }): Promise<QueueInfo[]> {
+    return this.queues.scanQueues(input);
+  }
+
+  reconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileOutcome> {
+    return this.queues.reconcilePending(input);
+  }
+
+  readQueuePendingDrift(input: { queueNames: string[] }): Promise<number> {
+    return this.queues.readPublishedPendingDrift(input);
+  }
+
+  getBlockedQueueSummary(): Promise<OpsBlockedSummary> {
+    return this.queues.getBlockedSummary();
+  }
+
+  listParkedQueueTenants(input: {
+    queueNames: string[];
+    maxTenants: number;
+  }): Promise<OpsParkedTenantsPage> {
+    return this.queues.listParkedTenants(input);
+  }
+}
+
+/** The one endpoint storage stats measure: the shared ClickHouse, as main's worker did. */
+function sharedStorageStatsInstance(storage: StorageFootprintRepository): StorageStatsInstance {
+  return { target: "shared", storage };
+}
+
+/** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
+function buildOpsInfrastructure(input: {
+  bugReportNotifier: BugReportNotifier;
+  logger: Logger;
+  config: OpsServerConfig;
+  resources: ResourceOwnership;
+  repositories: OpsRepositories;
+  featureFlags: Pick<FeatureFlagApi, "isEnabled"> | undefined;
+  cloudOps: boolean;
+}): OpsAppInfrastructure {
+  const { logger, config, resources, repositories } = input;
+  const introspection = EventingIntrospectionService.create(() =>
+    repositories.pipelineDefinitions.findAll(),
+  );
+
+  const snapshots = DefaultOpsSnapshotService.create(repositories.snapshots);
+  // Polling starts here rather than on first read: the dashboard, the badge and
+  // the live stream all read the last artifact this process pulled.
+  snapshots.start().catch((error: unknown) => {
+    logger.error({ error }, "failed to start the ops snapshot reader");
+  });
+  resources.own("api ops snapshot reader", () => snapshots.stop());
+
+  // Every serving role, lease-elected across the fleet (ADR-090); stopped before the
+  // stores close, so the lease is handed back rather than left to lapse.
+  const queueMetricsWriter = OpsMetricsCollectorService.create({
+    metrics: repositories.metrics,
+    ops: new QueueOpsMetricsSource(QueueService.create({ repo: repositories.queues })),
+    rateTracker: repositories.rateTracker,
+    featureFlags: input.featureFlags,
+    snapshots: DefaultOpsSnapshotService.create(repositories.snapshots),
+  });
+  resources.ownService({
+    name: "ops queue-metrics writer",
+    start: () => {
+      queueMetricsWriter.start().catch((error: unknown) => {
+        logger.error({ error }, "failed to start the ops queue-metrics writer");
+      });
+    },
+    stop: () => queueMetricsWriter.stop(),
+  });
+
+  const explainRuntime = OpsClickHouseRuntime.create({
+    url: config.clickhouseOpsUrl,
+    buildTime: false,
+  });
+  resources.own("api ops explain client", () => explainRuntime.close());
+
+  return {
+    createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
+      return OpsOperations.create({
+        authz: dependencies.authz,
+        repositories,
+        // Where an organization's connection decides its sign-in, editing
+        // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
+        // person experiences, so the admin console refuses rather than accepting
+        // a no-op. Asked of identity per organization (ADR-117 §5).
+        ssoRouting: organizationSsoRouting(dependencies.identity),
+        audit: AdminAuditService.create({ auditLog: dependencies.auditLog }),
+        sessions: dependencies.auth,
+        auditLog: dependencies.auditLog,
+        users: dependencies.users,
+        accounts: dependencies.auth,
+        scheduler: {
+          schedules: dependencies.automations,
+          projects: dependencies.projects,
+        },
+        explorers: {
+          eventExplorer: EventExplorerService.create({
+            repo: repositories.events,
+            introspection,
+          }) satisfies OpsEventExplorer,
+          managerExplorer: ManagerExplorerService.create({
+            store: repositories.processStore,
+            fleet: repositories.processFleet,
+            audit: ProcessAuditService.create({ auditLog: dependencies.auditLog }),
+            introspection,
+          }) satisfies OpsProcessExplorer,
+          // Every role reads, cancels and starts; only the worker hosting
+          // `ops_projection_replay` builds a runtime and executes.
+          replay: ReplayService.create({
+            repo: repositories.replay,
+            runtimeFactory: {
+              create: () =>
+                repositories.replayRuntimes.create({
+                  retention: ReplayRetentionService.create(dependencies.retention),
+                }),
+            },
+          }),
+          // Read-only here: the worker holds the lease and writes the
+          // artifact; a second writer would publish a second answer.
+          snapshots,
+        },
+      }).build();
+    },
+    eventingIntrospection: introspection,
+    pipelines: introspection,
+    // The window the event-log search really uses; the hot-tier TTL is not
+    // configured on this process, so the cold-tier note stays off.
+    eventLogWindow: {
+      read: () => ({
+        searchLookbackDays: EVENT_LOG_SEARCH_LOOKBACK_MS / (24 * 60 * 60 * 1000),
+        hotTierDays: null,
+        hotTierEnvVar: null,
+      }),
+    },
+    grafana: { findLinkConfig: () => grafanaLinkConfigOf(config.grafana) },
+    createSystemMigrations: ({ dependencies, passRequests }) =>
+      SystemMigrationPassService.runner({
+        repositories,
+        isSaaS: () => config.isSaas,
+        routes: () => repositories.clickhouseRoutes.findPrivateRoutes(),
+        dependencies,
+        passRequests,
+      }),
+    bugReportNotifier: input.bugReportNotifier,
+    explainClients: explainRuntime,
+    findOpsApiKey: () => config.apiKey ?? null,
+    findProductAnalyticsTargets: () => {
+      const { key, host } = config.productAnalytics;
+      return key ? [{ key, ...(host ? { host } : {}) }] : [];
+    },
+    isProduction: config.nodeEnvironment === "production",
+    cloudOps: input.cloudOps,
+    // Cloud never bootstraps: staff are seeded at cutover with the recovery task.
+    operatorSeed: { adminEmails: config.adminEmails, cloud: config.isSaas || input.cloudOps },
+  };
+}
+
+/** Which route decides one organization's sign-in, asked of identity: one
+ *  holding a connection is routed by it, one holding none is still routed by
+ *  its legacy strings, and no installation-wide switch changes both. */
+function organizationSsoRouting(identity: OpsAppDependencies["identity"]): OrganizationSsoRouting {
+  return {
+    connectionDecides: async ({ organizationId }) =>
+      (await identity.ssoConnectionReads().findForOrganization({ organizationId })).length > 0,
+  };
+}
+
+export interface OpsOperationsOptions {
+  authz: AdminAccessServiceOptions["authz"];
+  /** The stores the operations read and edit, as the registry built them. */
+  repositories: Pick<
+    OpsRepositories,
+    "instanceAdmin" | "impersonation" | "queues" | "blobStore" | "anomalyState"
+  >;
+  audit: AdminAuditSink;
+  /** Auth's session claims, which an impersonation starts, reads and stops. */
+  sessions: ImpersonationSessions;
+  /** The shared audit log every operator act is recorded on. */
+  auditLog: AuditLogApi;
+  access?: AdminAccess | undefined;
+  now?: (() => Instant) | undefined;
+  users: UserApi;
+  accounts: InstanceAdminAccounts;
+  /** Whether one organization's own connection decides its sign-in. */
+  ssoRouting?: OrganizationSsoRouting | undefined;
+  scheduler: {
+    schedules: OpsAppDependencies["automations"];
+    projects: ProjectApi;
+  };
+  /** The explorers, the replay runner and the snapshot reader the capability carries. */
+  explorers: OpsExplorers;
+}
+
+/**
+ * The operations half of the application, built from the repositories and the
+ * connections the process hands it. Not a persistence adapter: the backend
+ * choice is the registry's, and this is where the services are composed.
+ */
+export class OpsOperations {
+  private constructor(private readonly options: OpsOperationsOptions) {}
+
+  static create(options: OpsOperationsOptions): OpsOperations {
+    return new OpsOperations(options);
+  }
+
+  build(): OpsCapability {
+    const access =
+      this.options.access ??
+      AdminAccessService.create({ authz: this.options.authz, users: this.options.users });
+    const { repositories } = this.options;
+    const queues = QueueService.create({
+      repo: repositories.queues,
+      audit: QueueAuditService.create({ auditLog: this.options.auditLog }),
+    });
+
+    return OpsService.create({
+      access,
+      instanceAdmin: InstanceAdminService.create({
+        repository: repositories.instanceAdmin,
+        users: this.options.users,
+        accounts: this.options.accounts,
+        audit: this.options.audit,
+        ssoRouting: this.options.ssoRouting,
+      }),
+      blobStore: BlobStoreService.create(repositories.blobStore),
+      impersonation: ImpersonationService.create({
+        repository: repositories.impersonation,
+        sessions: this.options.sessions,
+        access,
+        audit: this.options.audit,
+        now: this.options.now,
+      }),
+      scheduler: SchedulerOpsService.create({
+        ...this.options.scheduler,
+        audit: SchedulerAuditService.create({
+          auditLog: this.options.auditLog,
+          users: this.options.users,
+        }),
+      }),
+      anomalyState: repositories.anomalyState,
+      queues,
+      explorers: this.options.explorers,
+    });
+  }
 }

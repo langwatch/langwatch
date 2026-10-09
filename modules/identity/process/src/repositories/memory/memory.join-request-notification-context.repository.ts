@@ -1,4 +1,4 @@
-import { JoinRequestNotificationContextRepository } from "../join-request-notification-context.repository.ts";
+import { JoinRequestNotificationContextRepository } from "../../features/join-request/repositories/join-request-notification-context.repository.ts";
 import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The notification context off the memory store: no intents, no personal teams recorded. */

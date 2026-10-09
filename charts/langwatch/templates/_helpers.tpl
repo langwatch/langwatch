@@ -189,25 +189,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate evaluators secrets */}}
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-  {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.endpoint.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.endpoint.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but endpoint is not configured" }}
-  {{- end }}
-  
-  {{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
-    {{- if empty .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
-      {{- $errors = append $errors "app.evaluators.azureOpenAI.apiKey.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.evaluators.azureOpenAI.apiKey.value }}
-    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but apiKey is not configured" }}
-  {{- end }}
+{{/* The previous credentials key is optional. Only a half-written secret
+     reference is an error: it names a Secret but no key inside it. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- if and (($credsPrevious.secretKeyRef).name) (empty ($credsPrevious.secretKeyRef).key) }}
+  {{- $errors = append $errors "app.credentialsEncryptionKey.previous.secretKeyRef.name is set but key is empty" }}
 {{- end }}
 
+{{/* Validate evaluators secrets */}}
 {{- if .Values.app.evaluators.google.enabled }}
   {{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
     {{- if empty .Values.app.evaluators.google.credentials.secretKeyRef.key }}
@@ -1040,10 +1029,31 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       key: credentialsEncryptionKey
 {{- end }}
 
-# Evaluators - Azure OpenAI Integration
-{{- if .Values.app.evaluators.azureOpenAI.enabled }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_ENDPOINT" "fieldValues" .Values.app.evaluators.azureOpenAI.endpoint) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_KEY" "fieldValues" .Values.app.evaluators.azureOpenAI.apiKey) }}
+{{/* Previous credentials key, set only during a rotation. Every process that
+     gets CREDENTIALS_SECRET gets this too, so data written under the old key
+     stays readable while it is re-encrypted. Never generated: an install that
+     names no previous key renders no variable.
+
+     Precedence: an explicit secretKeyRef, then an inline value, then the key
+     secrets.secretKeys.credentialsEncryptionKeyPrevious names inside
+     secrets.existingSecret. */}}
+{{- $credsPrevious := (.Values.app.credentialsEncryptionKey).previous | default dict }}
+{{- $credsPreviousKey := (.Values.secrets.secretKeys).credentialsEncryptionKeyPrevious | default "" }}
+{{- if ($credsPrevious.secretKeyRef).name }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ $credsPrevious.secretKeyRef.name }}
+      key: {{ $credsPrevious.secretKeyRef.key }}
+{{- else if $credsPrevious.value }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  value: {{ $credsPrevious.value | quote }}
+{{- else if and .Values.secrets.existingSecret $credsPreviousKey }}
+- name: CREDENTIALS_SECRET_PREVIOUS
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.existingSecret }}
+      key: {{ $credsPreviousKey }}
 {{- end }}
 
 # Evaluators - Google AI Integration
@@ -1075,23 +1085,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
-{{- if .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
-# The ADR-022 trace spool stays off on Azure until the operator states that the
-# container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3
-# days. That policy is management-plane; the app holds a data-plane key and
-# cannot read it back, so this is an assertion, not a check. Left unset, an
-# oversized span keeps its payload inline instead of leaving an object behind
-# that nothing reaps. Emitted here, beside the write toggle rather than with
-# the connection settings below, because it gates only the spool WRITE path —
-# a legacyAzureRead migration reads existing spool objects without it.
-- name: AZURE_BLOB_SPOOL_RETENTION_CONFIRMED
+{{- if or .Values.app.dataplane.objectRetentionConfirmed .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
+# Azure refuses oversized writes (trace spool, staging, group-queue, evaluation
+# inputs) until the operator states that the container has a lifecycle rule for
+# every prefix in the values.yaml table. That policy is management-plane; the
+# app holds a data-plane key and cannot read it back, so this is an assertion,
+# not a check. The earlier spool-only value still sets it (expand; retired at
+# the LTS floor). It gates only the WRITE path, so a legacyAzureRead migration
+# reads existing objects without it.
+- name: OBJECT_RETENTION_CONFIRMED
   value: "true"
 {{- end }}
 {{- else }}
 - name: STORED_OBJECTS_BACKEND
   value: "s3"
-- name: USE_S3_STORAGE
-  value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
 # storage code paths (storage.ts, stored-objects.service.ts,
 # env-create.mjs). The legacy `S3_BUCKET` env was a no-op for every

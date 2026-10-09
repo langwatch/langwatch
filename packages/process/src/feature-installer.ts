@@ -1,6 +1,6 @@
 import type { TransportFactBinding } from "@langwatch/api";
 import type { ConfigOf, ConfigSlice } from "@langwatch/config";
-import { type FeatureEventing } from "@langwatch/eventing";
+import { type FeatureEventing, type ProjectionLaneReplayer } from "@langwatch/eventing";
 import {
   type DependencyIdentity,
   type DependencyToken,
@@ -17,7 +17,15 @@ import {
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 
 import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
+import {
+  instantiateChannels,
+  type AnyChannelRegistry,
+  type ChannelRegistry,
+  type ChannelsFor,
+} from "./channel-registry.ts";
 /** One feature installer. A feature declares its config, the contract services */
+import { buildsMigrationSteps } from "./migration/migration-steps.ts";
+import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
 import {
@@ -54,9 +62,9 @@ export type ModuleOperatorReadsScope = (input: {
 /** The complete context supplied to a server app's static factory. */
 export type FeatureSetup<
   Dependencies extends TokenMap,
-  Members,
   Config,
   Repositories = never,
+  Channels = never,
 > = Readonly<{
   readonly dependencies: ResolvedTokens<Dependencies>;
   readonly config: Config;
@@ -66,14 +74,15 @@ export type FeatureSetup<
   /** Which process this install is in; absent only where a test builds the App by hand. */
   readonly role?: ServerRole;
 }> &
-  ([Members] extends [never] ? object : Readonly<{ readonly members: Members }>) &
   ([Repositories] extends [never]
     ? object
     : Readonly<{
         readonly repositories: Repositories;
         /** The tier the repositories came from, so channels follow it; absent if built by hand. */
         readonly tier?: Tier;
-      }>);
+      }>) &
+  /** Built by the container from the registry named in `.withChannels(...)` (record §5). */
+  ([Channels] extends [never] ? object : Readonly<{ readonly channels: Channels }>);
 
 type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{
@@ -83,18 +92,18 @@ type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{ contract: abstract new (...args: never[]) => App; dependencies: Dependencies }>;
 
 /** Static construction metadata owned by a server app implementation. */
-export type AppDefinition<Dependencies extends TokenMap, Members, Config, App> = AppContract<
-  Dependencies,
-  App
-> &
+export type AppDefinition<
+  Dependencies extends TokenMap,
+  Config,
+  App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
   Readonly<{
     /** Present when the App declared its own slice instead (§6). */
     readonly config?: ConfigSlice;
     readonly repositories?: FeatureRepositories;
-    /** What this App reads off the process's members, declared with `reads(...)`. */
-    readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, NoInfer<Config>>,
+      setup: FeatureSetup<NoInfer<Dependencies>, NoInfer<Config>, never, Channels>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
@@ -105,56 +114,51 @@ export type AppDefinition<Dependencies extends TokenMap, Members, Config, App> =
  */
 export type DeclaredConfigAppDefinition<
   Dependencies extends TokenMap,
-  Members,
   Slice extends ConfigSlice,
   App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly config: Slice;
     readonly repositories?: FeatureRepositories;
-    readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, ConfigOf<Slice>>,
+      setup: FeatureSetup<NoInfer<Dependencies>, ConfigOf<Slice>, never, Channels>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
 /** Static construction metadata for an app with no semantic configuration. */
-export type AppDefinitionWithoutConfig<Dependencies extends TokenMap, Members, App> = AppContract<
-  Dependencies,
-  App
-> &
+export type AppDefinitionWithoutConfig<
+  Dependencies extends TokenMap,
+  App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
   Readonly<{
     readonly repositories?: FeatureRepositories;
-    /** What this App reads off the process's members, declared with `reads(...)`. */
-    readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, undefined>,
+      setup: FeatureSetup<NoInfer<Dependencies>, undefined, never, Channels>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
 /** Module supplies facts (org, link, media type) its routes declare. */
-export interface ModuleTransportFactSetup<Dependencies extends TokenMap, Members, App> {
+export interface ModuleTransportFactSetup<Dependencies extends TokenMap, App> {
   /** This module's own App, already constructed by the same boot. */
   readonly app: App;
   /** The peer Apps this module declared as dependencies, resolved. */
   readonly dependencies: ResolvedTokens<Dependencies>;
-  /** Exactly the members this module's App declared it reads. */
-  readonly members: Members;
 }
 
 /** The binder itself, run once at install in a role that serves doors. */
-export type ModuleTransportFacts<Dependencies extends TokenMap, Members, App> = (
-  setup: ModuleTransportFactSetup<Dependencies, Members, App>,
+export type ModuleTransportFacts<Dependencies extends TokenMap, App> = (
+  setup: ModuleTransportFactSetup<Dependencies, App>,
 ) => readonly TransportFactBinding[];
 
 /** What a task binder is handed: the transport-fact setup plus the module's own repositories. */
 export interface ModuleTaskSetup<
   Dependencies extends TokenMap,
-  Members,
   Repositories,
   App,
   Config = unknown,
-> extends ModuleTransportFactSetup<Dependencies, Members, App> {
+> extends ModuleTransportFactSetup<Dependencies, App> {
   readonly repositories: Repositories;
   /** This module's slice of the one process parse (§6), as its App's `create` received it. */
   readonly config: Config;
@@ -163,14 +167,29 @@ export interface ModuleTaskSetup<
 }
 
 /** Builds a module's one-shot tasks over its booted App, once at install in the tasks role. */
-export type ModuleTaskBinder<
+export type ModuleTaskBinder<Dependencies extends TokenMap, Repositories, App, Config = unknown> = (
+  setup: ModuleTaskSetup<Dependencies, Repositories, App, Config>,
+) => readonly unknown[] | Promise<readonly unknown[]>;
+
+/** What a migration binder is handed: the task setup plus the process's projection replayer. */
+export interface ModuleMigrationSetup<
   Dependencies extends TokenMap,
-  Members,
+  Repositories,
+  App,
+  Config = unknown,
+> extends ModuleTaskSetup<Dependencies, Repositories, App, Config> {
+  /** Replays one named lane from its owner's log, for `defineProjectionReplayStep` (round 12). */
+  readonly replayer: ProjectionLaneReplayer;
+}
+
+/** Builds a module's migration steps over its booted App, at install in tasks and worker. */
+export type ModuleMigrationBinder<
+  Dependencies extends TokenMap,
   Repositories,
   App,
   Config = unknown,
 > = (
-  setup: ModuleTaskSetup<Dependencies, Members, Repositories, App, Config>,
+  setup: ModuleMigrationSetup<Dependencies, Repositories, App, Config>,
 ) => readonly unknown[] | Promise<readonly unknown[]>;
 
 /** The parsed slice a declaration's phantom `configType` names; nothing where it declared none. */
@@ -187,12 +206,11 @@ export type FeatureTransportDescriptor = Readonly<{
 }>;
 
 /** What a setup is handed, once per process. */
-export interface FeatureSetupArguments<Config, Members, Dependencies> {
+export interface FeatureSetupArguments<Config, Dependencies> {
   readonly resources: ResourceOwnership;
   /** Which process this install is in. */
   readonly role: ServerRole;
   readonly config: Config;
-  readonly members: Members;
   readonly dependencies: Dependencies;
   /**
    * Exactly the handles this module declared, and the only way to resolve one
@@ -200,23 +218,24 @@ export interface FeatureSetupArguments<Config, Members, Dependencies> {
    * the constructed collaborator escape. Resolving seals when boot finishes.
    */
   readonly secrets: ScopedSecrets;
-  readonly repositorySelection?: FeatureInstallArguments<Members>["repositorySelection"];
+  readonly repositorySelection?: FeatureInstallArguments["repositorySelection"];
   /**
    * What the module's registry answered on the selected backend, instantiated
    * once per install so the app and its eventing declaration read the same
    * objects rather than two graphs over the same rows.
    */
   readonly repositories?: unknown;
+  /** The channels the module's registry built on the same tier, once per install. */
+  readonly channels?: unknown;
 }
 
 /** What the one transport assembly is handed, in a role that serves doors. */
 export interface FeatureTransportSetupArguments<
   Config,
-  Members,
   Dependencies,
   TransportDependencies,
   Provided,
-> extends FeatureSetupArguments<Config, Members, Dependencies> {
+> extends FeatureSetupArguments<Config, Dependencies> {
   /** The tokens this feature needs only where it serves a transport. */
   readonly transportDependencies: TransportDependencies;
   /** Whatever the setup returned. */
@@ -226,18 +245,11 @@ export interface FeatureTransportSetupArguments<
 /** What a door's contribution is handed, after the transport assembly ran. */
 export interface FeatureTransportArguments<
   Config,
-  Members,
   Dependencies,
   TransportDependencies,
   Provided,
   Transport,
-> extends FeatureTransportSetupArguments<
-  Config,
-  Members,
-  Dependencies,
-  TransportDependencies,
-  Provided
-> {
+> extends FeatureTransportSetupArguments<Config, Dependencies, TransportDependencies, Provided> {
   /** What the doors share: constructed once, by the transport assembly. */
   readonly transport: Transport;
 }
@@ -245,10 +257,9 @@ export interface FeatureTransportArguments<
 /** What a background contribution is handed, after the setup ran. */
 export interface FeatureWorkerArguments<
   Config,
-  Members,
   Dependencies,
   Provided,
-> extends FeatureSetupArguments<Config, Members, Dependencies> {
+> extends FeatureSetupArguments<Config, Dependencies> {
   readonly provided: Provided;
 }
 
@@ -271,6 +282,8 @@ export interface InstalledFeatureState {
   readonly facts?: readonly TransportFactBinding[];
   /** The tasks this module's binders built over its App, in the tasks role only. */
   readonly tasks?: readonly unknown[];
+  /** The migration steps this module's binders built over its App, in tasks and worker only. */
+  readonly migrationSteps?: readonly unknown[];
   /** Bound contribution readers; absent where the feature declared none. */
   readonly rest: (() => unknown) | undefined;
   readonly trpc: (() => unknown) | undefined;
@@ -278,21 +291,24 @@ export interface InstalledFeatureState {
 }
 
 /** What `install` is handed by the application root. */
-export interface FeatureInstallArguments<Members> {
+export interface FeatureInstallArguments {
   readonly resources: ResourceOwnership;
   readonly config: unknown;
-  readonly members: Members;
-  /** Which repository tier this process chose, and the members that tier may read. */
+  /** Which repository tier this process chose, and the store clients that tier may read. */
   readonly repositorySelection?: RepositorySelection;
   readonly role: ServerRole;
   /** Instantiated once by the repository-aware declaration that wraps this. */
   readonly repositories?: unknown;
+  /** Instantiated once by the channel-aware declaration that wraps this. */
+  readonly channels?: unknown;
   /**
    * Scoped to this module's own declared handles by the application root. A
    * process that composed no resolver supplies none, and a module that then
    * resolves one refuses by name rather than reading an undeclared secret.
    */
   readonly secrets?: ScopedSecrets;
+  /** The process's projection replayer; absent where none was composed, which then refuses. */
+  readonly replayer?: ProjectionLaneReplayer;
   /** The instance the graph resolved for one token. */
   resolve: (token: TokenIdentity) => unknown;
 }
@@ -301,7 +317,7 @@ export interface FeatureInstallArguments<Members> {
  * Application root's view of a module. Retains name + config schema for
  * compile-time checking.
  */
-export interface InstallableServerFeature<Members, Name extends string = string, Config = unknown> {
+export interface InstallableServerFeature<Name extends string = string, Config = unknown> {
   readonly name: Name;
   /**
    * Phantom: the slice type the one process parse (§6) produces for this
@@ -318,6 +334,8 @@ export interface InstallableServerFeature<Members, Name extends string = string,
   readonly transports?: readonly FeatureTransportDescriptor[];
   readonly repositories?: FeatureRepositories;
   readonly repositoryRegistry?: AnyRepositoryRegistry;
+  /** The registry named in `.withChannels(...)`; boot claims the stores its tier requires. */
+  readonly channelRegistry?: AnyChannelRegistry;
   readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
@@ -329,15 +347,27 @@ export interface InstallableServerFeature<Members, Name extends string = string,
   readonly tasks?: readonly unknown[];
   /** Event sourcing declared with withEventing. */
   readonly eventing?: FeatureEventing;
-  /**
-   * What this module's App declared it reads. Types erase, so this is what
-   * boot reads to build exactly that set and to refuse, naming the module and
-   * the member, when this process cannot supply one.
-   */
-  readonly members?: readonly string[];
-  /** Repository tier: live (default) or memory via withMemoryRepositories. */
+  /** Repository tier: live (default) or memory. */
   readonly tier?: Tier;
-  readonly install: (args: FeatureInstallArguments<Members>) => Promise<InstalledFeatureState>;
+  readonly install: (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
+}
+
+/**
+ * A module's installer as its package publishes it (ruling PD-1): name, Api and config
+ * only, so its class, repositories and Prisma never reach the public `.d.ts`. `types` keeps the
+ * annotation checked against what the builder built. Record §3.2.
+ */
+export interface PublishedProcessModule<
+  Name extends string,
+  Api,
+  Config = undefined,
+> extends InstallableServerFeature<Name, Config> {
+  readonly transports?: readonly FeatureTransportDescriptor[];
+  readonly types: Readonly<{
+    config: Config;
+    provided: Api;
+    dependencies: ResolvedTokens<TokenMap>;
+  }>;
 }
 
 /** One slice per module name, as a process states the config it hands them. */
@@ -345,7 +375,7 @@ export type ModuleConfigRecord = Readonly<Record<string, unknown>>;
 
 /** The module name a config slice is keyed by, or nothing where it declared none. */
 type ConfiguredModuleName<Module> =
-  Module extends InstallableServerFeature<never, infer Name, infer Config>
+  Module extends InstallableServerFeature<infer Name, infer Config>
     ? [Config] extends [undefined]
       ? never
       : Name
@@ -353,7 +383,7 @@ type ConfiguredModuleName<Module> =
 
 /** The slice one module's own schema parses. */
 type ConfiguredModuleConfig<Module> =
-  Module extends InstallableServerFeature<never, string, infer Config> ? Config : never;
+  Module extends InstallableServerFeature<string, infer Config> ? Config : never;
 
 /** Config each module's schema requires for the process to install it. */
 export type ModuleConfigFor<Modules extends readonly unknown[]> = {
@@ -403,26 +433,9 @@ export type ModuleConfigGuard<Modules extends readonly unknown[], Supplied> = [
   ? unknown
   : ModuleConfigMissing<ModulesMissingConfig<ModuleConfigFor<Modules>, Supplied> & string>;
 
-/**
- * Run module on memory repositories (no external store needed).
- * Always explicit; never chosen by missing DATABASE_URL.
- */
-export function withMemoryRepositories<Declaration extends Readonly<{ name: string }>>(
-  module: Declaration,
-): Declaration & Readonly<{ tier: "memory" }> {
-  const registry = (module as Readonly<{ repositoryRegistry?: unknown }>).repositoryRegistry;
-  if (registry === void 0) {
-    throw new Error(
-      `Module "${module.name}" declares no repositories, so it has no memory tier to install.`,
-    );
-  }
-  return Object.freeze({ ...module, tier: "memory" satisfies Tier });
-}
-
 /** A built declaration, with the types its own call sites read back. */
 export interface ServerFeatureDeclaration<
   Config,
-  Members,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
   Provided,
@@ -431,7 +444,7 @@ export interface ServerFeatureDeclaration<
   Trpc,
   Worker,
   Name extends string = string,
-> extends InstallableServerFeature<Members, Name, Config> {
+> extends InstallableServerFeature<Name, Config> {
   readonly dependencies: Dependencies;
   readonly transportDependencies: TransportDependencies;
   /** Present only so the declaration's types are reachable from a runtime read. */
@@ -456,8 +469,6 @@ interface FeatureShape<
   readonly name: Name;
   readonly dependencies: Dependencies;
   readonly transportDependencies: TransportDependencies;
-  /** What this feature reads off the process's members, for a feature with no App. */
-  readonly members: readonly string[];
 }
 
 /**
@@ -467,7 +478,6 @@ interface FeatureShape<
  */
 export class ServerFeatureBuilder<
   Config,
-  Members,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
   Name extends string = string,
@@ -480,7 +490,6 @@ export class ServerFeatureBuilder<
    */
   withConfigType<NextConfig>(): ServerFeatureBuilder<
     NextConfig,
-    Members,
     Dependencies,
     TransportDependencies,
     Name
@@ -491,32 +500,24 @@ export class ServerFeatureBuilder<
   /** The contract services this feature needs in EVERY role it is installed in. */
   withDependencies<NextDependencies extends TokenMap>(
     dependencies: NextDependencies,
-  ): ServerFeatureBuilder<Config, Members, NextDependencies, TransportDependencies, Name> {
+  ): ServerFeatureBuilder<Config, NextDependencies, TransportDependencies, Name> {
     return new ServerFeatureBuilder({ ...this.shape, dependencies });
   }
 
   /** The tokens this feature needs only where it serves a transport. They are */
   withTransportDependencies<NextTransportDependencies extends TokenMap>(
     transportDependencies: NextTransportDependencies,
-  ): ServerFeatureBuilder<Config, Members, Dependencies, NextTransportDependencies, Name> {
+  ): ServerFeatureBuilder<Config, Dependencies, NextTransportDependencies, Name> {
     return new ServerFeatureBuilder({ ...this.shape, transportDependencies });
-  }
-
-  /** Declare members this feature reads (or use App's reads()). */
-  withMembers(
-    ...members: readonly string[]
-  ): ServerFeatureBuilder<Config, Members, Dependencies, TransportDependencies, Name> {
-    return new ServerFeatureBuilder({ ...this.shape, members });
   }
 
   /** Ordinary code, run once per process, that constructs what this feature owns. */
   withSetup<Provided>(
     setup: (
-      args: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
+      args: FeatureSetupArguments<Config, ResolvedTokens<Dependencies>>,
     ) => Provided | Promise<Provided>,
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -543,7 +544,6 @@ export class ServerFeatureBuilder<
 /** What the assembly stage accumulates once a setup exists. */
 interface FeatureAssemblyState<
   Config,
-  Members,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
   Provided,
@@ -554,14 +554,13 @@ interface FeatureAssemblyState<
   Name extends string = string,
 > extends FeatureShape<Dependencies, TransportDependencies, Name> {
   readonly setup: (
-    args: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
+    args: FeatureSetupArguments<Config, ResolvedTokens<Dependencies>>,
   ) => Provided | Promise<Provided>;
   readonly providers: readonly FeatureProvider<Provided>[];
   readonly transport:
     | ((
         args: FeatureTransportSetupArguments<
           Config,
-          Members,
           ResolvedTokens<Dependencies>,
           ResolvedTokens<TransportDependencies>,
           Provided
@@ -570,7 +569,6 @@ interface FeatureAssemblyState<
     | undefined;
   readonly rest: DoorContribution<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -579,7 +577,6 @@ interface FeatureAssemblyState<
   >;
   readonly trpc: DoorContribution<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -587,16 +584,13 @@ interface FeatureAssemblyState<
     Trpc
   >;
   readonly worker:
-    | ((
-        args: FeatureWorkerArguments<Config, Members, ResolvedTokens<Dependencies>, Provided>,
-      ) => Worker)
+    | ((args: FeatureWorkerArguments<Config, ResolvedTokens<Dependencies>, Provided>) => Worker)
     | undefined;
   readonly close: ((provided: Provided) => void | Promise<void>) | undefined;
   readonly transportFacts:
     | ((
         args: FeatureTransportArguments<
           Config,
-          Members,
           ResolvedTokens<Dependencies>,
           ResolvedTokens<TransportDependencies>,
           Provided,
@@ -609,7 +603,6 @@ interface FeatureAssemblyState<
 /** One door's contribution, or nothing where the feature declared no such door. */
 type DoorContribution<
   Config,
-  Members,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
   Provided,
@@ -619,7 +612,6 @@ type DoorContribution<
   | ((
       args: FeatureTransportArguments<
         Config,
-        Members,
         ResolvedTokens<Dependencies>,
         ResolvedTokens<TransportDependencies>,
         Provided,
@@ -635,7 +627,6 @@ type DoorContribution<
  */
 export class ServerFeatureAssembly<
   Config,
-  Members,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
   Provided,
@@ -648,7 +639,6 @@ export class ServerFeatureAssembly<
   constructor(
     private readonly state: FeatureAssemblyState<
       Config,
-      Members,
       Dependencies,
       TransportDependencies,
       Provided,
@@ -665,7 +655,6 @@ export class ServerFeatureAssembly<
     token: DependencyToken<Instance> & ([Provided] extends [Instance] ? unknown : never),
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -693,7 +682,6 @@ export class ServerFeatureAssembly<
     create: (
       args: FeatureTransportSetupArguments<
         Config,
-        Members,
         ResolvedTokens<Dependencies>,
         ResolvedTokens<TransportDependencies>,
         Provided
@@ -701,7 +689,6 @@ export class ServerFeatureAssembly<
     ) => NextTransport,
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -725,7 +712,6 @@ export class ServerFeatureAssembly<
     create: (
       args: FeatureTransportArguments<
         Config,
-        Members,
         ResolvedTokens<Dependencies>,
         ResolvedTokens<TransportDependencies>,
         Provided,
@@ -734,7 +720,6 @@ export class ServerFeatureAssembly<
     ) => NextRest,
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -752,7 +737,6 @@ export class ServerFeatureAssembly<
     bind: (
       args: FeatureTransportArguments<
         Config,
-        Members,
         ResolvedTokens<Dependencies>,
         ResolvedTokens<TransportDependencies>,
         Provided,
@@ -761,7 +745,6 @@ export class ServerFeatureAssembly<
     ) => readonly TransportFactBinding[],
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -779,7 +762,6 @@ export class ServerFeatureAssembly<
     create: (
       args: FeatureTransportArguments<
         Config,
-        Members,
         ResolvedTokens<Dependencies>,
         ResolvedTokens<TransportDependencies>,
         Provided,
@@ -788,7 +770,6 @@ export class ServerFeatureAssembly<
     ) => NextTrpc,
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -804,11 +785,10 @@ export class ServerFeatureAssembly<
   /** The consumers and schedulers this feature contributes to a worker. */
   withWorker<NextWorker>(
     create: (
-      args: FeatureWorkerArguments<Config, Members, ResolvedTokens<Dependencies>, Provided>,
+      args: FeatureWorkerArguments<Config, ResolvedTokens<Dependencies>, Provided>,
     ) => NextWorker,
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -826,7 +806,6 @@ export class ServerFeatureAssembly<
     close: (provided: Provided) => void | Promise<void>,
   ): ServerFeatureAssembly<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -842,7 +821,6 @@ export class ServerFeatureAssembly<
   /** The immutable declaration. Building it constructs nothing. */
   build(): ServerFeatureDeclaration<
     Config,
-    Members,
     Dependencies,
     TransportDependencies,
     Provided,
@@ -858,10 +836,9 @@ export class ServerFeatureAssembly<
       transportDependencies: state.transportDependencies,
       providers: state.providers as readonly FeatureProvider<never>[],
       contributesWorkerWork: state.worker !== undefined,
-      members: Object.freeze([...state.members]),
       types: undefined as never,
 
-      install: async (args: FeatureInstallArguments<Members>): Promise<InstalledFeatureState> => {
+      install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
         const config = declaredConfig<Config>(args.config);
         const dependencies = resolveTokens(
           state.dependencies,
@@ -870,12 +847,12 @@ export class ServerFeatureAssembly<
         const setupArguments = {
           config,
           secrets: args.secrets ?? undeclaredSecrets(state.name),
-          members: args.members,
           dependencies,
           resources: args.resources,
           role: args.role,
           repositorySelection: args.repositorySelection,
           repositories: args.repositories,
+          channels: args.channels,
         };
         // A module resolving a secret does so in `create()`, so the whole
         // install awaits: only the constructed collaborator comes back.
@@ -904,9 +881,9 @@ export class ServerFeatureAssembly<
   }
 
   private bindTransports(
-    setupArguments: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
+    setupArguments: FeatureSetupArguments<Config, ResolvedTokens<Dependencies>>,
     provided: Provided,
-    args: FeatureInstallArguments<Members>,
+    args: FeatureInstallArguments,
   ): {
     rest: (() => unknown) | undefined;
     trpc: (() => unknown) | undefined;
@@ -938,21 +915,16 @@ export class ServerFeatureAssembly<
   }
 }
 
-/**
- * Names one feature installer. The members type is stated here because
- * it is what the application root must be able to supply, and stating it at the
- * end would let a feature declare a need no root could see.
- */
-export function serverFeature<Members>(
+/** Names one feature installer. */
+export function serverFeature(
   name: string,
-): ServerFeatureBuilder<undefined, Members, Record<never, never>, Record<never, never>, string> {
+): ServerFeatureBuilder<undefined, Record<never, never>, Record<never, never>, string> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("A feature installer needs a name.");
   return new ServerFeatureBuilder({
     name: trimmed,
     dependencies: {},
     transportDependencies: {},
-    members: [],
   });
 }
 
@@ -980,79 +952,66 @@ type ModuleRepositories<Live extends AnyProvider, Memory extends AnyProvider> = 
   Tier
 >;
 
-/** Extract member reads from the App's static readonly reads declaration. */
-function declaredReads<const Reads extends readonly string[]>(
-  app: Readonly<{ reads?: Reads }>,
-): readonly Reads[number][] {
-  return Object.freeze([...(app.reads ?? [])]);
-}
-
-class DefinedFeatureBuilder<Name extends ModuleName> {
-  constructor(private readonly name: Name) {}
+class DefinedFeatureBuilder<Name extends ModuleName, Channels = never, Registry = undefined> {
+  constructor(
+    private readonly name: Name,
+    private readonly channels?: AnyChannelRegistry,
+  ) {}
 
   withRepositories<const Live extends AnyProvider, const Memory extends AnyProvider>(
     repositories: RepositoryRegistry<Live, Memory>,
-  ): RepositoryDefinedFeatureBuilder<Name, Live, Memory> {
-    return new RepositoryDefinedFeatureBuilder(this.name, repositories);
+  ): RepositoryDefinedFeatureBuilder<Name, Live, Memory, Channels, Registry> {
+    return new RepositoryDefinedFeatureBuilder(this.name, repositories, this.channels);
   }
 
-  withApi<
-    Dependencies extends TokenMap,
-    Members,
-    Config,
-    App,
-    const Reads extends readonly string[],
-  >(
-    app: AppDefinition<Dependencies, Members, Config, App> & { readonly reads: Reads },
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>;
-  withApi<
-    Dependencies extends TokenMap,
-    Members,
-    Slice extends ConfigSlice,
-    App,
-    const Reads extends readonly string[],
-  >(
-    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App> & { readonly reads: Reads },
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, Reads>;
-  withApi<Dependencies extends TokenMap, Members, App, const Reads extends readonly string[]>(
-    app: AppDefinitionWithoutConfig<Dependencies, Members, App> & { readonly reads: Reads },
-  ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>;
-  withApi<Dependencies extends TokenMap, Members, Config, App>(
-    app: AppDefinition<Dependencies, Members, Config, App>,
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, readonly []>;
-  withApi<Dependencies extends TokenMap, Members, Slice extends ConfigSlice, App>(
-    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App>,
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, readonly []>;
-  withApi<Dependencies extends TokenMap, Members, App>(
-    app: AppDefinitionWithoutConfig<Dependencies, Members, App>,
-  ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, readonly []>;
+  /** This module's channels, built by the container on the tier the stores state (record §5). */
+  withChannels<const Live extends AnyProvider, const Memory extends AnyProvider>(
+    channels: ChannelRegistry<Live, Memory>,
+  ): DefinedFeatureBuilder<
+    Name,
+    ChannelsFor<ChannelRegistry<Live, Memory>>,
+    ChannelRegistry<Live, Memory>
+  > {
+    return new DefinedFeatureBuilder(this.name, channels);
+  }
+  withApi<Dependencies extends TokenMap, Config, App>(
+    app: AppDefinition<Dependencies, Config, App, Channels>,
+  ): ConfiguredAppBuilder<Name, Dependencies, Config, App, Registry>;
+  withApi<Dependencies extends TokenMap, Slice extends ConfigSlice, App>(
+    app: DeclaredConfigAppDefinition<Dependencies, Slice, App, Channels>,
+  ): ConfiguredAppBuilder<Name, Dependencies, ConfigOf<Slice>, App, Registry>;
+  withApi<Dependencies extends TokenMap, App>(
+    app: AppDefinitionWithoutConfig<Dependencies, App, Channels>,
+  ): UnconfiguredAppBuilder<Name, Dependencies, App, Registry>;
   withApi(
     app:
-      | AppDefinition<TokenMap, unknown, unknown, unknown>
-      | AppDefinitionWithoutConfig<TokenMap, unknown, unknown>,
+      | AppDefinition<TokenMap, unknown, unknown, Channels>
+      | AppDefinitionWithoutConfig<TokenMap, unknown, Channels>,
   ): object {
-    if ("config" in app) {
-      return new ConfiguredAppBuilder(this.name, app);
+    // The overloads typed `setup.channels`; the builders forward it at runtime.
+    const erased = app as
+      | AppDefinition<TokenMap, unknown, unknown>
+      | AppDefinitionWithoutConfig<TokenMap, unknown>;
+    if ("config" in erased) {
+      return new ConfiguredAppBuilder(this.name, erased, this.channels);
     }
-    return new UnconfiguredAppBuilder(this.name, app);
+    return new UnconfiguredAppBuilder(this.name, erased, this.channels);
   }
 }
 
 type RepositoryAppDefinition<
   Dependencies extends TokenMap,
-  Members,
   Config,
   Repositories,
   App,
   Created extends App = App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     /** Present when the App declared its own slice instead (§6). */
     readonly config?: ConfigSlice;
-    readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, NoInfer<Config>, Repositories> &
-        Readonly<{ members: Members }>,
+      setup: FeatureSetup<NoInfer<Dependencies>, NoInfer<Config>, Repositories, Channels>,
     ) => Created | Promise<Created>;
   }>;
 
@@ -1062,205 +1021,140 @@ type RepositoryAppDefinition<
  */
 type RepositoryDeclaredConfigAppDefinition<
   Dependencies extends TokenMap,
-  Members,
   Slice extends ConfigSlice,
   Repositories,
   App,
   Created extends App = App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly config: Slice;
-    readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, ConfigOf<Slice>, Repositories> &
-        Readonly<{ members: Members }>,
+      setup: FeatureSetup<NoInfer<Dependencies>, ConfigOf<Slice>, Repositories, Channels>,
     ) => Created | Promise<Created>;
   }>;
 
 type RepositoryAppDefinitionWithoutConfig<
   Dependencies extends TokenMap,
-  Members,
   Repositories,
   App,
   Created extends App = App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
-    readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, undefined, Repositories> &
-        Readonly<{ members: Members }>,
+      setup: FeatureSetup<NoInfer<Dependencies>, undefined, Repositories, Channels>,
     ) => Created | Promise<Created>;
   }>;
+
+/** The registry named in `.withChannels(...)`, typed, so the root reads what its tiers bind. */
+type ChannelsDeclared<Registry> = [Registry] extends [undefined]
+  ? unknown
+  : Readonly<{ readonly channelRegistry: Registry }>;
+
+/** The registries a module named on its installer, handed to the app builder together. */
+type ModuleRegistries<Live extends AnyProvider, Memory extends AnyProvider> = Readonly<{
+  repositories: RepositoryRegistry<Live, Memory>;
+  channels?: AnyChannelRegistry;
+}>;
 
 class RepositoryDefinedFeatureBuilder<
   Name extends ModuleName,
   Live extends AnyProvider,
   Memory extends AnyProvider,
+  Channels = never,
+  Registry = undefined,
 > {
   constructor(
     private readonly name: Name,
     private readonly repositories: RepositoryRegistry<Live, Memory>,
+    private readonly channels?: AnyChannelRegistry,
   ) {}
 
-  withApi<
-    Dependencies extends TokenMap,
-    Members extends object,
-    Config,
-    App,
-    Created extends App,
-    const Reads extends readonly string[],
-  >(
+  /** This module's channels, built by the container on the repositories' tier (record §5). */
+  #registries(): ModuleRegistries<Live, Memory> {
+    return this.channels === undefined
+      ? { repositories: this.repositories }
+      : { repositories: this.repositories, channels: this.channels };
+  }
+
+  withChannels<const ChannelLive extends AnyProvider, const ChannelMemory extends AnyProvider>(
+    channels: ChannelRegistry<ChannelLive, ChannelMemory>,
+  ): RepositoryDefinedFeatureBuilder<
+    Name,
+    Live,
+    Memory,
+    ChannelsFor<ChannelRegistry<ChannelLive, ChannelMemory>>,
+    ChannelRegistry<ChannelLive, ChannelMemory>
+  > {
+    return new RepositoryDefinedFeatureBuilder(this.name, this.repositories, channels);
+  }
+  withApi<Dependencies extends TokenMap, Config, App, Created extends App>(
     app: RepositoryAppDefinition<
       Dependencies,
-      Members,
       Config,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
-    > & { readonly reads: Reads },
-  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads, Created>;
-  withApi<
-    Dependencies extends TokenMap,
-    Members extends object,
-    App,
-    Created extends App,
-    const Reads extends readonly string[],
-  >(
+      Created,
+      Channels
+    >,
+  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Config, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, App = unknown, Created extends App = App>(
     app: RepositoryAppDefinitionWithoutConfig<
       Dependencies,
-      Members,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
-    > & { readonly reads: Reads },
-  ): RepositoryUnconfiguredAppBuilder<
-    Name,
-    Live,
-    Memory,
-    Dependencies,
-    Members,
-    App,
-    Reads,
-    Created
-  >;
-  withApi<Dependencies extends TokenMap, Members extends object, Config, App, Created extends App>(
-    app: RepositoryAppDefinition<
-      Dependencies,
-      Members,
-      Config,
-      ModuleRepositories<Live, Memory>,
-      App,
-      Created
+      Created,
+      Channels
     >,
-  ): RepositoryAppBuilder<
-    Name,
-    Live,
-    Memory,
-    Dependencies,
-    Members,
-    Config,
-    App,
-    readonly [],
-    Created
-  >;
-  withApi<
-    Dependencies extends TokenMap,
-    Members extends object = object,
-    App = unknown,
-    Created extends App = App,
-  >(
-    app: RepositoryAppDefinitionWithoutConfig<
-      Dependencies,
-      Members,
-      ModuleRepositories<Live, Memory>,
-      App,
-      Created
-    >,
-  ): RepositoryUnconfiguredAppBuilder<
-    Name,
-    Live,
-    Memory,
-    Dependencies,
-    Members,
-    App,
-    readonly [],
-    Created
-  >;
-  withApi<
-    Dependencies extends TokenMap,
-    Members extends object,
-    Slice extends ConfigSlice,
-    App,
-    Created extends App,
-    const Reads extends readonly string[],
-  >(
+  ): RepositoryUnconfiguredAppBuilder<Name, Live, Memory, Dependencies, App, Created, Registry>;
+  withApi<Dependencies extends TokenMap, Slice extends ConfigSlice, App, Created extends App>(
     app: RepositoryDeclaredConfigAppDefinition<
       Dependencies,
-      Members,
       Slice,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
-    > & { readonly reads: Reads },
-  ): RepositoryAppBuilder<
-    Name,
-    Live,
-    Memory,
-    Dependencies,
-    Members,
-    ConfigOf<Slice>,
-    App,
-    Reads,
-    Created
-  >;
-  withApi<
-    Dependencies extends TokenMap,
-    Members extends object,
-    Slice extends ConfigSlice,
-    App,
-    Created extends App,
-  >(
-    app: RepositoryDeclaredConfigAppDefinition<
-      Dependencies,
-      Members,
-      Slice,
-      ModuleRepositories<Live, Memory>,
-      App,
-      Created
+      Created,
+      Channels
     >,
   ): RepositoryAppBuilder<
     Name,
     Live,
     Memory,
     Dependencies,
-    Members,
     ConfigOf<Slice>,
     App,
-    readonly [],
-    Created
+    Created,
+    Registry
   >;
   withApi(
     app:
       | RepositoryAppDefinition<
           TokenMap,
           unknown,
-          unknown,
           ModuleRepositories<Live, Memory>,
-          unknown
+          unknown,
+          unknown,
+          Channels
         >
       | RepositoryAppDefinitionWithoutConfig<
           TokenMap,
-          unknown,
           ModuleRepositories<Live, Memory>,
-          unknown
+          unknown,
+          unknown,
+          Channels
         >,
   ): object {
+    // The overloads typed `setup.channels`; the builders forward it at runtime.
+    const erased = app as
+      | RepositoryAppDefinition<TokenMap, unknown, ModuleRepositories<Live, Memory>, unknown>
+      | RepositoryAppDefinitionWithoutConfig<TokenMap, ModuleRepositories<Live, Memory>, unknown>;
     // Mirrors the non-repository path: a declared slice is config too, and the
     // one process parse has already produced it (§6).
-    if ("config" in app) {
-      return new RepositoryAppBuilder(this.name, this.repositories, app);
+    if ("config" in erased) {
+      return new RepositoryAppBuilder(this.name, this.#registries(), erased);
     }
-    return new RepositoryUnconfiguredAppBuilder(this.name, this.repositories, app);
+    return new RepositoryUnconfiguredAppBuilder(this.name, this.#registries(), erased);
   }
 }
 
@@ -1269,30 +1163,43 @@ class RepositoryAppBuilder<
   Live extends AnyProvider,
   Memory extends AnyProvider,
   Dependencies extends TokenMap,
-  Members,
   Config,
   App,
-  Reads extends readonly string[] = readonly [],
   Created extends App = App,
+  Registry = undefined,
 > {
+  private readonly repositories: RepositoryRegistry<Live, Memory>;
+  private readonly channels: AnyChannelRegistry | undefined;
+
   constructor(
     private readonly name: Name,
-    private readonly repositories: RepositoryRegistry<Live, Memory>,
+    registries: ModuleRegistries<Live, Memory>,
     private readonly app: RepositoryAppDefinition<
       Dependencies,
-      Members,
       Config,
       ModuleRepositories<Live, Memory>,
       App,
       Created
-    > & { readonly reads?: Reads },
-  ) {}
+    >,
+  ) {
+    this.repositories = registries.repositories;
+    this.channels = registries.channels;
+  }
 
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): ModuleContributions<
     ReturnType<
-      RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+      RepositoryAppBuilder<
+        Name,
+        Live,
+        Memory,
+        Dependencies,
+        Config,
+        App,
+        Created,
+        Registry
+      >["build"]
     > & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
@@ -1300,12 +1207,20 @@ class RepositoryAppBuilder<
     ModuleRepositories<Live, Memory>,
     App,
     Dependencies,
-    Members,
     Created
   > {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
       > & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
@@ -1313,7 +1228,6 @@ class RepositoryAppBuilder<
       ModuleRepositories<Live, Memory>,
       App,
       Dependencies,
-      Members,
       Created
     >({
       declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
@@ -1326,12 +1240,20 @@ class RepositoryAppBuilder<
   withWorkers(...workers: readonly unknown[]) {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
       >,
       ModuleRepositories<Live, Memory>,
       App,
       Dependencies,
-      Members,
       Created
     >({ declaration: this.build(), workers, tasks: [] });
   }
@@ -1340,19 +1262,48 @@ class RepositoryAppBuilder<
   withTasks(...tasks: readonly unknown[]) {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
       >,
       ModuleRepositories<Live, Memory>,
       App,
       Dependencies,
-      Members,
       Created
     >({ declaration: this.build(), workers: [], tasks });
   }
 
+  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions<
+      ReturnType<
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
+      >,
+      ModuleRepositories<Live, Memory>,
+      App,
+      Dependencies,
+      Created
+    >({ declaration: bindingMigrations(this.build(), () => steps), workers: [], tasks: [] });
+  }
+
   build(): ServerFeatureDeclaration<
     Config,
-    Members,
     Dependencies,
     Record<never, never>,
     App,
@@ -1363,60 +1314,62 @@ class RepositoryAppBuilder<
     Name
   > & {
     readonly repositoryRegistry: RepositoryRegistry<Live, Memory>;
-    readonly members: readonly Reads[number][];
-  } {
+  } & ChannelsDeclared<Registry> {
     const app = this.app;
     const registry = this.repositories;
     const name = this.name;
-    const setup = serverFeature<Members>(name)
+    const setup = serverFeature(name)
       .withConfigType<Config>()
       .withDependencies(app.dependencies)
       .withSetup(
         ({
           dependencies,
-          members,
           config,
           secrets,
           resources,
           role,
           repositories,
           repositorySelection,
+          channels,
         }): App | Promise<App> => {
           return app.create({
             dependencies,
-            members,
             config,
             secrets,
             resources,
             role,
             repositories: repositories as ModuleRepositories<Live, Memory>,
             ...(repositorySelection ? { tier: repositorySelection.tier } : {}),
+            ...(channels === undefined ? {} : { channels }),
           });
         },
       )
       .provides(app.contract)
       .build();
-    return {
-      ...setup,
-      // The name is the literal the module was declared with, which is the key
-      // its config slice is stated under. The builder chain above widens it.
-      name,
-      // The registry is read ONCE per install, here, and the instances are
-      // handed to the app and to this module's eventing declaration alike. A
-      // second read would give the two halves separate objects over the same
-      // rows, and a memory tier two separate databases.
-      install: async (args) => {
-        if (!args.repositorySelection) {
-          throw new Error(`Module "${name}" was installed without a repository tier.`);
-        }
-        const repositories = instantiateRepositories(registry, args.repositorySelection);
-        return { ...(await setup.install({ ...args, repositories })), repositories };
+    const declared = declaringChannels(
+      {
+        ...setup,
+        // The name is the literal the module was declared with, which is the key
+        // its config slice is stated under. The builder chain above widens it.
+        name,
+        // The registry is read ONCE per install, here, and the instances are
+        // handed to the app and to this module's eventing declaration alike. A
+        // second read would give the two halves separate objects over the same
+        // rows, and a memory tier two separate databases.
+        install: async (args: FeatureInstallArguments) => {
+          if (!args.repositorySelection) {
+            throw new Error(`Module "${name}" was installed without a repository tier.`);
+          }
+          const repositories = instantiateRepositories(registry, args.repositorySelection);
+          return { ...(await setup.install({ ...args, repositories })), repositories };
+        },
+        ...declaredOwner(app),
+        repositoryRegistry: registry,
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
       },
-      ...declaredOwner(app),
-      members: declaredReads(app),
-      repositoryRegistry: registry,
-      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
-    };
+      this.channels,
+    );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
   }
 
   /**
@@ -1428,22 +1381,38 @@ class RepositoryAppBuilder<
     eventing: FeatureEventing<ModuleRepositories<Live, Memory>, App, unknown, Definition>,
   ): ModuleContributions<
     ReturnType<
-      RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+      RepositoryAppBuilder<
+        Name,
+        Live,
+        Memory,
+        Dependencies,
+        Config,
+        App,
+        Created,
+        Registry
+      >["build"]
     >,
     ModuleRepositories<Live, Memory>,
     App,
     Dependencies,
-    Members,
     Created
   > {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Config,
+          App,
+          Created,
+          Registry
+        >["build"]
       >,
       ModuleRepositories<Live, Memory>,
       App,
       Dependencies,
-      Members,
       Created
     >({ declaration: this.build(), workers: [], tasks: [], eventing: eventing as FeatureEventing });
   }
@@ -1454,65 +1423,58 @@ class RepositoryUnconfiguredAppBuilder<
   Live extends AnyProvider,
   Memory extends AnyProvider,
   Dependencies extends TokenMap,
-  Members extends object,
   App,
-  Reads extends readonly string[] = readonly [],
   Created extends App = App,
+  Registry = undefined,
 > extends RepositoryAppBuilder<
   Name,
   Live,
   Memory,
   Dependencies,
-  Members,
   undefined,
   App,
-  Reads,
-  Created
+  Created,
+  Registry
 > {
   constructor(
     name: Name,
-    repositories: RepositoryRegistry<Live, Memory>,
+    registries: ModuleRegistries<Live, Memory>,
     app: RepositoryAppDefinitionWithoutConfig<
       Dependencies,
-      Members,
       ModuleRepositories<Live, Memory>,
       App,
       Created
-    > & { readonly reads?: Reads },
+    >,
   ) {
     // Named member by member: an app is usually a class, and spreading a class
     // drops its static methods (`create` is not enumerable).
-    super(name, repositories, {
+    super(name, registries, {
       contract: app.contract,
       dependencies: app.dependencies,
-      ...(app.reads === undefined ? {} : { reads: app.reads }),
       ...("secrets" in app ? { secrets: app.secrets } : {}),
       ...("operatorReads" in app ? { operatorReads: app.operatorReads } : {}),
       create: (setup) => app.create(setup),
     } as RepositoryAppDefinition<
       Dependencies,
-      Members,
       undefined,
       ModuleRepositories<Live, Memory>,
       App,
       Created
-    > & { readonly reads?: Reads });
+    >);
   }
 }
 
 class ConfiguredAppBuilder<
   Name extends ModuleName,
   Dependencies extends TokenMap,
-  Members,
   Config,
   App,
-  Reads extends readonly string[] = readonly [],
+  Registry = undefined,
 > {
   constructor(
     private readonly name: Name,
-    private readonly app: AppDefinition<Dependencies, Members, Config, App> & {
-      readonly reads?: Reads;
-    },
+    private readonly app: AppDefinition<Dependencies, Config, App>,
+    private readonly channels?: AnyChannelRegistry,
   ) {}
 
   /**
@@ -1523,24 +1485,22 @@ class ConfiguredAppBuilder<
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): ModuleContributions<
-    ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>["build"]> & {
+    ReturnType<ConfiguredAppBuilder<Name, Dependencies, Config, App, Registry>["build"]> & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
     unknown,
     App,
-    Dependencies,
-    Members
+    Dependencies
   > {
     return withContributions<
-      ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>["build"]> & {
+      ReturnType<ConfiguredAppBuilder<Name, Dependencies, Config, App, Registry>["build"]> & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
       unknown,
       App,
-      Dependencies,
-      Members
+      Dependencies
     >({
       declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
       workers: [],
@@ -1556,6 +1516,15 @@ class ConfiguredAppBuilder<
   /** One-shot work this module contributes to the tasks role. */
   withTasks(...tasks: readonly unknown[]) {
     return withContributions({ declaration: this.build(), workers: [], tasks });
+  }
+
+  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions({
+      declaration: bindingMigrations(this.build(), () => steps),
+      workers: [],
+      tasks: [],
+    });
   }
 
   /** This module's event sourcing, built over the app above. */
@@ -1570,7 +1539,6 @@ class ConfiguredAppBuilder<
 
   build(): ServerFeatureDeclaration<
     Config,
-    Members,
     Dependencies,
     Record<never, never>,
     App,
@@ -1579,46 +1547,48 @@ class ConfiguredAppBuilder<
     undefined,
     undefined,
     Name
-  > & { readonly members: readonly Reads[number][] } {
+  > &
+    ChannelsDeclared<Registry> {
     const app = this.app;
-    const declaration = serverFeature<Members>(this.name)
+    const declaration = serverFeature(this.name)
       .withConfigType<Config>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, secrets, resources, role }) =>
+      .withSetup(({ dependencies, config, secrets, resources, role, channels }) =>
         app.create({
           dependencies,
-          members,
           config,
           secrets,
           resources,
           role,
+          ...(channels === undefined ? {} : { channels }),
         }),
       )
       .provides(app.contract)
       .build();
-    return {
-      ...declaration,
-      name: this.name,
-      repositories: snapshotRepositories(app.repositories),
-      ...declaredOwner(app),
-      members: declaredReads(app),
-      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
-    };
+    const declared = declaringChannels(
+      {
+        ...declaration,
+        name: this.name,
+        repositories: snapshotRepositories(app.repositories),
+        ...declaredOwner(app),
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
+      },
+      this.channels,
+    );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
   }
 }
 
 class UnconfiguredAppBuilder<
   Name extends ModuleName,
   Dependencies extends TokenMap,
-  Members,
   App,
-  Reads extends readonly string[] = readonly [],
+  Registry = undefined,
 > {
   constructor(
     private readonly name: Name,
-    private readonly app: AppDefinitionWithoutConfig<Dependencies, Members, App> & {
-      readonly reads?: Reads;
-    },
+    private readonly app: AppDefinitionWithoutConfig<Dependencies, App>,
+    private readonly channels?: AnyChannelRegistry,
   ) {}
 
   /**
@@ -1629,24 +1599,22 @@ class UnconfiguredAppBuilder<
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): ModuleContributions<
-    ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>["build"]> & {
+    ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Registry>["build"]> & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
     unknown,
     App,
-    Dependencies,
-    Members
+    Dependencies
   > {
     return withContributions<
-      ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>["build"]> & {
+      ReturnType<UnconfiguredAppBuilder<Name, Dependencies, App, Registry>["build"]> & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
       unknown,
       App,
-      Dependencies,
-      Members
+      Dependencies
     >({
       declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
       workers: [],
@@ -1664,6 +1632,15 @@ class UnconfiguredAppBuilder<
     return withContributions({ declaration: this.build(), workers: [], tasks });
   }
 
+  /** Migration steps this module declares, built in the tasks and worker roles only. */
+  withMigrations(...steps: readonly unknown[]) {
+    return withContributions({
+      declaration: bindingMigrations(this.build(), () => steps),
+      workers: [],
+      tasks: [],
+    });
+  }
+
   /** This module's event sourcing, built over the app above. */
   withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
     return withContributions({
@@ -1676,7 +1653,6 @@ class UnconfiguredAppBuilder<
 
   build(): ServerFeatureDeclaration<
     undefined,
-    Members,
     Dependencies,
     Record<never, never>,
     App,
@@ -1685,31 +1661,35 @@ class UnconfiguredAppBuilder<
     undefined,
     undefined,
     Name
-  > & { readonly members: readonly Reads[number][] } {
+  > &
+    ChannelsDeclared<Registry> {
     const app = this.app;
-    const declaration = serverFeature<Members>(this.name)
+    const declaration = serverFeature(this.name)
       .withConfigType<undefined>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, secrets, resources, role }) =>
+      .withSetup(({ dependencies, config, secrets, resources, role, channels }) =>
         app.create({
           dependencies,
-          members,
           config,
           secrets,
           resources,
           role,
+          ...(channels === undefined ? {} : { channels }),
         }),
       )
       .provides(app.contract)
       .build();
-    return {
-      ...declaration,
-      name: this.name,
-      repositories: snapshotRepositories(app.repositories),
-      ...declaredOwner(app),
-      members: declaredReads(app),
-      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
-    };
+    const declared = declaringChannels(
+      {
+        ...declaration,
+        name: this.name,
+        repositories: snapshotRepositories(app.repositories),
+        ...declaredOwner(app),
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
+      },
+      this.channels,
+    );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
   }
 }
 
@@ -1722,7 +1702,6 @@ export type ModuleContributions<
   Repositories = unknown,
   App = unknown,
   Dependencies extends TokenMap = TokenMap,
-  Members = unknown,
   Created = App,
 > = Declaration &
   Readonly<{
@@ -1731,45 +1710,50 @@ export type ModuleContributions<
     readonly eventing: FeatureEventing | undefined;
     withWorkers(
       ...workers: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
     withTasks(
-      bind: ModuleTaskBinder<
+      bind: ModuleTaskBinder<Dependencies, Repositories, Created, DeclaredConfigOf<Declaration>>,
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    withTasks(
+      ...tasks: readonly unknown[]
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    withMigrations(
+      bind: ModuleMigrationBinder<
         Dependencies,
-        Members,
         Repositories,
         Created,
         DeclaredConfigOf<Declaration>
       >,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
-    withTasks(
-      ...tasks: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
+    withMigrations(
+      ...steps: readonly unknown[]
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
     /** What this module binds for the facts its own declarations name. */
     withTransportFacts(
-      bind: ModuleTransportFacts<Dependencies, Members, App>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
+      bind: ModuleTransportFacts<Dependencies, App>,
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
     withEventing<Definition>(
       eventing: FeatureEventing<Repositories, App, unknown, Definition>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
   }>;
 
 /** A built declaration, as the facts and tasks wrappers read the fields they need. */
 interface InstallableDeclaration {
   readonly name: string;
   readonly dependencies: TokenMap;
-  readonly install: (args: FeatureInstallArguments<never>) => Promise<InstalledFeatureState>;
+  readonly install: (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
 }
 
 /** Bind transport facts at install (API role only). */
 function bindingTransportFacts<Declaration extends object>(
   declaration: Declaration,
-  bind: ModuleTransportFacts<TokenMap, never, never>,
+  bind: ModuleTransportFacts<TokenMap, never>,
 ): Declaration {
   const installable = declaration as Declaration & InstallableDeclaration;
 
   return {
     ...declaration,
-    install: async (args: FeatureInstallArguments<never>): Promise<InstalledFeatureState> => {
+    install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
       const state = await installable.install(args);
       if (args.role !== "api") return state;
 
@@ -1781,7 +1765,6 @@ function bindingTransportFacts<Declaration extends object>(
             installable.dependencies,
             args.resolve,
           ) as ResolvedTokens<TokenMap>,
-          members: args.members,
         }),
       };
     },
@@ -1791,13 +1774,13 @@ function bindingTransportFacts<Declaration extends object>(
 /** Build tasks at install (tasks role only), over the App and repositories just installed. */
 function bindingTasks<Declaration extends object>(
   declaration: Declaration,
-  bind: ModuleTaskBinder<TokenMap, never, unknown, never>,
+  bind: ModuleTaskBinder<TokenMap, unknown, never>,
 ): Declaration {
   const installable = declaration as Declaration & InstallableDeclaration;
 
   return {
     ...declaration,
-    install: async (args: FeatureInstallArguments<never>): Promise<InstalledFeatureState> => {
+    install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
       const state = await installable.install(args);
       if (args.role !== "tasks") return state;
 
@@ -1808,11 +1791,39 @@ function bindingTasks<Declaration extends object>(
           installable.dependencies,
           args.resolve,
         ) as ResolvedTokens<TokenMap>,
-        members: args.members,
         config: declaredConfig(args.config),
         secrets: args.secrets ?? undeclaredSecrets(installable.name),
       });
       return { ...state, tasks: [...(state.tasks ?? []), ...built] };
+    },
+  };
+}
+
+/** Build migration steps at install (tasks and worker roles), over the App just installed. */
+function bindingMigrations<Declaration extends object>(
+  declaration: Declaration,
+  bind: ModuleMigrationBinder<TokenMap, unknown, never>,
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: async (args: FeatureInstallArguments): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
+      if (!buildsMigrationSteps(args.role)) return state;
+
+      const built = await bind({
+        app: state.provided as never,
+        repositories: state.repositories,
+        dependencies: resolveTokens(
+          installable.dependencies,
+          args.resolve,
+        ) as ResolvedTokens<TokenMap>,
+        config: declaredConfig(args.config),
+        secrets: args.secrets ?? undeclaredSecrets(installable.name),
+        replayer: args.replayer ?? processProjectionReplayer({ eventing: undefined }),
+      });
+      return { ...state, migrationSteps: [...(state.migrationSteps ?? []), ...built] };
     },
   };
 }
@@ -1823,7 +1834,6 @@ function withContributions<
   Repositories = unknown,
   App = unknown,
   Dependencies extends TokenMap = TokenMap,
-  Members = unknown,
   Created = App,
 >({
   declaration,
@@ -1835,7 +1845,7 @@ function withContributions<
   workers: readonly unknown[];
   tasks: readonly unknown[];
   eventing?: FeatureEventing;
-}): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created> {
+}): ModuleContributions<Declaration, Repositories, App, Dependencies, Created> {
   const contributions = {
     ...declaration,
     workers,
@@ -1855,7 +1865,17 @@ function withContributions<
       }
       return withContributions({ declaration, workers, tasks: [...tasks, ...next], eventing });
     },
-    withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
+    withMigrations: (...next: readonly unknown[]) => {
+      const [bind] = next;
+      const binder = next.length === 1 && isTaskBinder(bind) ? bind : () => next;
+      return withContributions({
+        declaration: bindingMigrations(declaration, binder),
+        workers,
+        tasks,
+        eventing,
+      });
+    },
+    withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never>) =>
       withContributions({
         declaration: bindingTransportFacts(declaration, bind),
         workers,
@@ -1869,12 +1889,12 @@ function withContributions<
         tasks,
         eventing: withAnotherPipeline(eventing, next),
       }),
-  } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
+  } as ModuleContributions<Declaration, Repositories, App, Dependencies, Created>;
 
   return contributions;
 }
 
-function isTaskBinder(value: unknown): value is ModuleTaskBinder<TokenMap, never, unknown, never> {
+function isTaskBinder(value: unknown): value is ModuleTaskBinder<TokenMap, unknown, never> {
   return typeof value === "function";
 }
 
@@ -1893,6 +1913,34 @@ function undeclaredSecrets(feature: string): ScopedSecrets {
  * declaration only gives it a type. This is the single boundary where the
  * parsed value stops being `unknown`; there is no second schema.
  */
+type ChannelInstall = (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
+
+/**
+ * Builds the module's channels once per install, on the tier its stores state, and hands them
+ * to the module class as `setup.channels` (record §5). No registry, nothing changes.
+ */
+function declaringChannels<Declaration extends Readonly<{ name: string; install: unknown }>>(
+  declaration: Declaration,
+  registry: AnyChannelRegistry | undefined,
+): Declaration {
+  if (registry === undefined) return declaration;
+  const { name } = declaration;
+  const install = declaration.install as ChannelInstall;
+  const declaring: ChannelInstall = async (args) => {
+    const selection = args.repositorySelection;
+    if (!selection) throw new Error(`Module "${name}" was installed without a store tier.`);
+    const channels = await instantiateChannels(registry, {
+      tier: selection.tier,
+      members: selection.members,
+      config: args.config,
+      secrets: args.secrets ?? undeclaredSecrets(name),
+      resolve: args.resolve,
+    });
+    return install({ ...args, channels });
+  };
+  return { ...declaration, channelRegistry: registry, install: declaring };
+}
+
 function declaredConfig<Config>(value: unknown): Config {
   return value as Config;
 }

@@ -5,19 +5,19 @@ import {
 } from "@langwatch/api-key-contract";
 import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { MemoryIngestionTemplateRepository } from "../../repositories/memory/memory.ingestion-template.repository.ts";
 import {
   type GovernanceMcpServer,
   GovernanceMcpToolsService,
 } from "../governance-mcp-tools.service.ts";
-import { PersonalIngestionKeyService } from "../personal-ingestion-key.service.ts";
 
 type RegisteredTool = (args: Record<string, unknown>) => Promise<{
   content: { type: "text"; text: string }[];
@@ -112,7 +112,7 @@ async function withIngestionKeys({
       },
     },
     templates,
-    organizations: createApiFixture<OrganizationService>({
+    organizations: createApiFixture<OrganizationApi>({
       getPersonalWorkspace: async () => ({
         team: { id: "team_p", name: "Personal", slug: "personal", createdAtMs: 0 },
         project: { id: "project_p", name: "Personal", slug: "p", apiKey: "k", createdAtMs: 0 },

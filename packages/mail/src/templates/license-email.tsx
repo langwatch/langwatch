@@ -9,8 +9,8 @@ import {
   InlineLink,
   Muted,
   Paragraph,
+  readableDate,
 } from "./email-layout.tsx";
-import { readableDate } from "./readable-date.ts";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const licenseEmailProps = z.object({

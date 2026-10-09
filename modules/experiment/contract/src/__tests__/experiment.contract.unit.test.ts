@@ -53,6 +53,11 @@ describe("Experiment contract", () => {
       dataset: [{ index: 0, entry: { input: "hello" } }],
       evaluations: [],
       timestamps: { createdAt: 1, updatedAt: 1 },
+      completeness: {
+        complete: false,
+        dataset: { received: 1, expected: null },
+        evaluations: { received: 0, expected: 12 },
+      },
     });
     expect(result.success).toBe(true);
   });

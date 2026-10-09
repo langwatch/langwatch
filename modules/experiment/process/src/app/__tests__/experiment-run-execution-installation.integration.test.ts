@@ -32,7 +32,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { WorkbenchExecutionRequest } from "../../services/experiment-workbench-run.service.ts";
+import type { WorkbenchExecutionRequest } from "../../features/workbench/services/experiment-workbench-run.service.ts";
 import {
   bootRunPair,
   connectTestDatabase,

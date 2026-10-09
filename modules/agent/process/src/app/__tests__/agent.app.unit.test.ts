@@ -1,7 +1,6 @@
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, onTestFinished } from "vitest";
 
 import { createAgentAppFixture } from "./agent.fixture.ts";
@@ -128,31 +127,5 @@ describe("AgentModule connected views", () => {
       owner: { userId: "user_1", name: null },
     });
     expect(rows.find((row) => row.id === "agent_hosted")?.selectable).toBe(true);
-  });
-});
-
-describe("AgentModule HTTP agent testing", () => {
-  /** @scenario "Sending a test request from the agent editor executes it" */
-  it("runs the request through the workflow engine and answers its output", async () => {
-    const executed: string[] = [];
-    const { app } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({
-        executeComponent: async (input) => {
-          executed.push(input.origin);
-          return { status: "success", outputs: { output: "pong" } };
-        },
-      }),
-    });
-
-    const result = await app.executeHttpTest({
-      projectId,
-      actorId: "user_1",
-      url: "https://agent.test/chat",
-      method: "POST",
-      bodyTemplate: '{"input": "ping"}',
-    });
-
-    expect(executed).toEqual(["agent_test"]);
-    expect(result).toMatchObject({ success: true, extractedOutput: "pong" });
   });
 });

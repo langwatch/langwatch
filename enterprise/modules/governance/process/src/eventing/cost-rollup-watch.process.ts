@@ -7,10 +7,10 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { computeNextRunAt, Temporal } from "@langwatch/time";
+import { nextCronFireAt, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import type { CostRollupDayComparer } from "../services/cost-rollup-day-comparer.service.ts";
+import type { CostRollupDayComparer } from "../features/cost/services/cost-rollup-day-comparer.service.ts";
 import {
   COST_ROLLUP_WATCH_MAX_ATTEMPTS,
   CostRollupWatchIntent,
@@ -78,7 +78,7 @@ function findChargeDay(occurredAtMs: unknown): string | null {
 
 /** The next check slot strictly after `after`. */
 export function nextCostRollupCheckAt(after: number): number {
-  return computeNextRunAt({
+  return nextCronFireAt({
     cron: COST_ROLLUP_WATCH_CRON,
     timezone: COST_ROLLUP_WATCH_TIMEZONE,
     after: Temporal.Instant.fromEpochMilliseconds(after),

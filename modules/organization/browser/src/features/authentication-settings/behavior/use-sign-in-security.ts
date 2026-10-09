@@ -1,9 +1,15 @@
-import type { SignInSecuritySettings } from "@langwatch/auth-contract";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { SignInSecuritySettings, signInSecurityTrpc } from "@langwatch/auth-contract";
 import { useCallback } from "react";
 
 import type { OrganizationHostApi } from "../../../model/organization-host.ts";
 import { savedSessionMessage, SIGN_IN_SECURITY_OFF } from "../model/sign-in-security.ts";
-import { signInSecurityApi } from "./sign-in-security-api.ts";
+
+/**
+ * The two sign-in security procedures this page calls, derived from auth's
+ * contract: the rules are auth's, the page sits in the organization's settings.
+ */
+const signInSecurityApi = createModuleApi<ContractApiMap<typeof signInSecurityTrpc>>();
 
 /**
  * The organization's two sign-in security rules (GAC-09, GAC-10): state and

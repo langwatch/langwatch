@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { virtualKeyRow } from "../app/__tests__/gateway-virtual-key.fixture.ts";
-import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
+import { GatewayVirtualKeyDtoService } from "../features/virtual-key/services/gateway-virtual-key-dto.service.ts";
 
 const dtos = GatewayVirtualKeyDtoService.create();
 const facts = { archivedProjectIds: new Set<string>() };

@@ -71,30 +71,40 @@ import {
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { nlpInternalSecret, openAiApiKey, Secret } from "@langwatch/secrets";
 
-import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
-import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
-import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
-import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
-import { CodexAccountService } from "../services/codex-account.service.ts";
+import type { ModelProviderCodexGatewayPing } from "../channels/model-provider-codex-gateway-ping.channel.ts";
+import {
+  executionProxyBaseUrlOf,
+  type ModelProviderConnectionPing,
+} from "../channels/model-provider-connection-ping.channel.ts";
+import type { ModelProviderChannels } from "../channels/model-provider.channels.ts";
+import { CodexAccountService } from "../features/codex/services/codex-account.service.ts";
 import {
   CodexOAuthModelProviderTokenRefresherService,
   type CodexTokenRefresher,
-} from "../services/codex-oauth-model-provider-token-refresher.service.ts";
+} from "../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
 import {
   HttpModelProviderCredentialProbeService,
   type ModelProviderCredentialProbe,
-} from "../services/http-model-provider-credential-probe.service.ts";
-import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
+} from "../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import { SsrfModelProviderEgressService } from "../features/credential-probe/services/ssrf-model-provider-egress.service.ts";
+import {
+  WindowedModelProviderConnectionRateLimiterService,
+  type ModelProviderConnectionRateLimiter,
+} from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
+import { ModelProviderEvaluatorModelEnvService } from "../features/defaults/services/model-provider-evaluator-model-env.service.ts";
 import {
   ModelCostPreviewService,
   type ModelCostPreviewSpanReader,
-} from "../services/model-cost-preview.service.ts";
-import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
-import { ModelLimitsService } from "../services/model-limits.service.ts";
+} from "../features/model-cost/services/model-cost-preview.service.ts";
+import { ModelCostRegexSafetyService } from "../features/model-cost/services/model-cost-regex-safety.service.ts";
+import { ModelLimitsService } from "../features/model-cost/services/model-limits.service.ts";
+import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
+import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
+import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderEvaluatorModelEnvService } from "../services/model-provider-evaluator-model-env.service.ts";
 import { ModelProviderExecutionHandleService } from "../services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
@@ -108,17 +118,10 @@ import {
   RegistryModelProviderCatalogService,
   type ModelProviderCatalog,
 } from "../services/registry-model-provider-catalog.service.ts";
-import { SsrfModelProviderEgressService } from "../services/ssrf-model-provider-egress.service.ts";
 import {
   VercelAiModelTranslationService,
   type ModelTranslation,
 } from "../services/vercel-ai-model-translation.service.ts";
-import {
-  WindowedModelProviderConnectionRateLimiterService,
-  type ModelProviderConnectionRateLimiter,
-} from "../services/windowed-model-provider-connection-rate-limiter.service.ts";
-
-export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
 
 /** The feature key the translation call is priced and routed under. */
 const TRANSLATE_FEATURE_KEY = "translate.text";
@@ -128,7 +131,7 @@ const TRANSLATE_FEATURE_KEY = "translate.text";
  * so the cost-rule preview reads through the same request-scoped services as the rest of the
  * call, rather than a process singleton.
  */
-export type SpanReader = unknown;
+type SpanReader = unknown;
 
 /**
  * The collaborators the module composes in `create`: its registry, egress fence, identifier
@@ -142,6 +145,8 @@ export interface ModelProviderInfrastructure {
   translation: ModelTranslation;
   /** The one real generation Test Connection sends to the provider. */
   connectionPing: ModelProviderConnectionPing;
+  /** The same ping for Codex, through the AI gateway on the project's virtual key. */
+  codexGatewayPing: ModelProviderCodexGatewayPing;
   /** The identifier format every row this module writes is minted in. */
   ids: ModelProviderIdFactory;
   /** The OAuth exchange a stored Codex token is refreshed through. */
@@ -165,7 +170,7 @@ export interface ModelProviderInfrastructure {
 }
 
 /** The identifier format this deployment mints a provider, default or cost in. */
-export interface ModelProviderIdFactory {
+interface ModelProviderIdFactory {
   generate(input: Readonly<{ type: "provider" | "default" | "cost" }>): string;
 }
 
@@ -179,19 +184,10 @@ export interface ModelProviderCodexDeviceFlow {
 
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderModule.dependencies,
-  never,
   ModelProviderServerConfig,
-  ModelProviderRepositories
+  ModelProviderRepositories,
+  ModelProviderChannels
 >;
-
-/**
- * The address a resolved model executes against when no NLP engine is
- * configured. Matches the deleted composition's own sentinel.
- */
-const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
-
-/** Where nlpgo answers the execution proxy, once an engine address is named. */
-const EXECUTION_PROXY_PATH = "/go/proxy/v1";
 
 /**
  * What `create` composes the infrastructure over, derived from the contract's
@@ -201,8 +197,6 @@ type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;
-  /** The engine hop's shared credential, as the process resolved it. */
-  nlpInternalSecret: string | undefined;
   /** A system provider's fallback-credential env map. Always empty: see the handoff. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
@@ -226,6 +220,7 @@ export class ModelProviderModule implements ModelProviderApi {
     permissions: AuthzApi,
     dataPrivacy: DataPrivacyApi,
     managed: ManagedProviderApi,
+    secrets: SecretApi,
   };
   static readonly config = modelProviderConfig;
   /**
@@ -283,15 +278,13 @@ export class ModelProviderModule implements ModelProviderApi {
   }
 
   private static withPlatformChain(
-    { repositories, dependencies, config }: ModelProviderSetup,
+    { repositories, channels, dependencies, config }: ModelProviderSetup,
     {
       platformChain,
       nlpInternalSecret,
     }: { platformChain: PlatformProviderChainService; nlpInternalSecret: string | undefined },
   ): ModelProviderModule {
-    const executionProxyBaseUrl = config.nlpServiceUrl
-      ? `${config.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
-      : UNCONFIGURED_EXECUTION_PROXY;
+    const executionProxyBaseUrl = executionProxyBaseUrlOf(config);
     const buildConfig: ModelProviderBuildConfig = {
       egress: {
         blockLocal: config.blockLocalHttpCalls,
@@ -299,13 +292,13 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
-      nlpInternalSecret,
       environment: {},
       probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
     };
     const infrastructure = ModelProviderModule.#composeInfrastructure({
       repositories,
+      channels,
       config: buildConfig,
       dependencies,
     });
@@ -322,10 +315,12 @@ export class ModelProviderModule implements ModelProviderApi {
   /** The collaborators `create` builds over this deployment's config, peers and registry. */
   static #composeInfrastructure({
     repositories,
+    channels,
     config,
     dependencies,
   }: {
     repositories: ModelProviderRepositories;
+    channels: ModelProviderChannels;
     config: ModelProviderBuildConfig;
     dependencies: Pick<ModelProviderSetup["dependencies"], "projects" | "managed">;
   }): ModelProviderInfrastructure {
@@ -350,10 +345,8 @@ export class ModelProviderModule implements ModelProviderApi {
         projects: dependencies.projects,
         executionProxyBaseUrl: config.executionProxyBaseUrl,
       }),
-      connectionPing: modelProviderConnectionPingChannels.live.create({
-        executionProxyBaseUrl: config.executionProxyBaseUrl,
-        nlpInternalSecret: config.nlpInternalSecret,
-      }),
+      connectionPing: channels.connectionPing,
+      codexGatewayPing: channels.codexGatewayPing,
       ids: PrefixedModelProviderIdService.create(),
       codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
       connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
@@ -449,6 +442,8 @@ export class ModelProviderModule implements ModelProviderApi {
       catalog: infrastructure.catalog,
       translation: infrastructure.translation,
       connectionPing: infrastructure.connectionPing,
+      codexGatewayPing: infrastructure.codexGatewayPing,
+      secrets: dependencies.secrets,
       ids: infrastructure.ids,
       codexTokenRefresher: infrastructure.codexTokenRefresher,
       connectionRateLimiter: infrastructure.connectionRateLimiter,

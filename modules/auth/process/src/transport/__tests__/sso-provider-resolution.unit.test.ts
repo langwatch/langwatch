@@ -53,12 +53,10 @@ function transportOver({
   return betterAuthTransportFor(
     {},
     {
-      storage: {
-        adapter: () => (options: BetterAuthOptions) => {
-          const engine = memoryAdapter(database as never)(options);
-          return opening ? openingSsoProviderConfigs({ adapter: engine, cipher }) : engine;
-        },
-      } as never,
+      storage: (options: BetterAuthOptions) => {
+        const engine = memoryAdapter(database)(options);
+        return opening ? openingSsoProviderConfigs({ adapter: engine, cipher }) : engine;
+      },
       ssoIssuers: { issuersForRequest: async () => registeredIssuers },
     },
   );

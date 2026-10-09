@@ -44,7 +44,7 @@ class QueueApp implements QueueApi {
 
   static create({
     repositories,
-  }: FeatureSetup<{}, unknown, undefined, { entries: { count(): number } }>): QueueApp {
+  }: FeatureSetup<{}, undefined, { entries: { count(): number } }>): QueueApp {
     return new QueueApp(repositories.entries);
   }
 

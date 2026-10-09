@@ -7,15 +7,30 @@
 import type { ModuleApiClient, ModuleApiMap } from "@langwatch/api/web";
 import { createContext, useContext } from "react";
 
-import type { UiAnalytics } from "./analytics.ts";
 import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy-targets.ts";
-import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
+import { type HostService, NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
+import type { UiAnalytics } from "./telemetry/analytics.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
 export { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget };
+
+/** The filters a trace list read narrows by, without the project it reads in. */
+export type UiTraceFilterReading = {
+  startDate: number;
+  endDate: number;
+  filters: Record<string, unknown>;
+  query?: string;
+  negateFilters?: boolean;
+};
+
+/** The reader's applied trace filters; a capability travels by declaration (§10.1). */
+export abstract class UiTraceFilters {
+  /** Undefined while no filter narrows anything: a free-text query alone stays unfiltered. */
+  abstract applied(): UiTraceFilterReading | undefined;
+}
 
 /** The composition never filled this port, and something asked it to work. */
 export class UiCapabilityUnavailableError extends Error {
@@ -168,8 +183,8 @@ export abstract class UiSession {
   abstract hasPermission(permission: string): boolean;
 
   /**
-   * Whether the reader holds a permission in the active organization, apart
-   * from any project grant. Ports that cannot answer it fail by name.
+   * Whether the reader holds a permission in the active organization: the active
+   * scope's grant answers, as on main (scope knot Q2). Ports that cannot answer it fail by name.
    */
   hasOrganizationPermission(_permission: string): boolean {
     throw new UiCapabilityUnavailableError("session organization permission");
@@ -371,6 +386,8 @@ export type UiCapabilities = {
    */
   scope?: UiScope;
   session: UiSession;
+  /** The trace filters the reader applied. Absent reads as unfiltered. */
+  traceFilters?: UiTraceFilters;
 };
 
 /** What the composing application chose to answer itself. */
@@ -392,6 +409,8 @@ export type UiCapabilityResolution = {
   scope?: UiScope;
   /** The copy targets that same live host read, over the same organization graph. */
   copyTargets?: UiCopyTargets;
+  /** The trace filters that same live host read off the address. */
+  traceFilters?: UiTraceFilters;
   /**
    * The default only a live host can build — absent for a composition
    * that declared no session source, when the refusal below is the honest answer.
@@ -411,6 +430,7 @@ export function resolveUiCapabilities({
   rpc,
   scope,
   copyTargets,
+  traceFilters,
   session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
@@ -425,6 +445,7 @@ export function resolveUiCapabilities({
     rpc: install.rpc ?? rpc ?? UNAVAILABLE_UI_RPC,
     scope: install.scope ?? scope ?? UNAVAILABLE_UI_SCOPE,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
+    traceFilters: install.traceFilters ?? traceFilters,
   };
 }
 
@@ -483,6 +504,7 @@ export type UiSessionCapabilities = {
   session: UiSession;
   scope: UiScope;
   copyTargets?: UiCopyTargets;
+  traceFilters?: UiTraceFilters;
 };
 
 /**
@@ -495,6 +517,39 @@ export type UiSessionSource = (input: {
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
 }) => UiSessionCapabilities;
+
+/** What every host service's source is called with, on each render (ARCHITECTURE.md §10.1). */
+export type UiHostServiceInput = Readonly<{
+  transport: ModuleApiClient<ModuleApiMap>;
+  feedback: UiFeedback;
+  session: UiSession;
+  scope: UiScope;
+}>;
+
+/** A host service's source: a hook the runtime calls on every render, in the runtime's order. */
+export type UiHostServiceSource<Value> = (input: UiHostServiceInput) => Value;
+
+/** This render's value of each host service, keyed by the service's name. */
+export type UiHostServiceValues = ReadonlyMap<string, unknown>;
+
+const UiHostServiceContext = createContext<UiHostServiceValues>(new Map());
+
+/** Publishes the host services' values to everything a screen renders. */
+export const UiHostServiceProvider = UiHostServiceContext.Provider;
+
+/** One service's value this render, or undefined outside a shell; a service's own hook reads it. */
+export function useHostService<Source extends UiHostServiceSource<unknown>>(
+  service: HostService<Source>,
+): ReturnType<Source> | undefined {
+  const value = useContext(UiHostServiceContext).get(service.name);
+  return isSourceValue<Source>(value) ? value : undefined;
+}
+
+function isSourceValue<Source extends UiHostServiceSource<unknown>>(
+  value: unknown,
+): value is ReturnType<Source> {
+  return value !== undefined;
+}
 
 class UnavailableUiScope extends UiScope {
   activeScope(): never {
@@ -516,4 +571,9 @@ export function useUiScope(): UiScope {
 /** Where this reader could replicate a thing to; absent where no lender is installed. */
 export function useUiCopyTargets(): UiCopyTargets {
   return useOptionalUiCapabilities()?.copyTargets ?? ABSENT_UI_COPY_TARGETS;
+}
+
+/** The trace filters this reader applied; undefined where no lender is installed. */
+export function useUiTraceFilters(): UiTraceFilters | undefined {
+  return useOptionalUiCapabilities()?.traceFilters;
 }

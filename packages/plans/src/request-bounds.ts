@@ -51,6 +51,14 @@ export const requestBounds = [
     enterprise: 4_000,
   },
   {
+    key: "tracesDownloadPageSizeMax",
+    description: "Trace download page size; a larger page is refused, traces tRPC.",
+    unit: "items",
+    free: 10_000,
+    paid: 10_000,
+    enterprise: 10_000,
+  },
+  {
     key: "traceIdsMax",
     description: "Trace id arrays above this are refused, traces tRPC.",
     unit: "items",
@@ -204,7 +212,8 @@ export const requestBounds = [
   },
   {
     key: "datasetAttachmentBytes",
-    description: "Largest file an image or file cell accepts; every other dataset byte bound derives from it.",
+    description:
+      "Largest file an image or file cell accepts; every other dataset byte bound derives from it.",
     unit: "bytes",
     free: DATASET_DEFAULT_BOUNDS.datasetAttachmentBytes,
     paid: DATASET_DEFAULT_BOUNDS.datasetAttachmentBytes,

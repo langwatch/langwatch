@@ -7,11 +7,18 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   createEventingGroupQueueFactory,
   type EventingParticipation,
+  EventLogReadSeat,
+  type EventReadSeat,
   EventSourcing,
   type EventSourcingOptions,
   type EventStore,
   EventStoreProducerOnly,
+  pipelineUpcastsOf,
   type ProcessStore,
+  replayLeanOf,
+  ReplayService,
+  unionReplayTenants,
+  upcastReplayEventSource,
 } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
@@ -20,6 +27,7 @@ import {
   createReadHintsPipeline,
   EventingClickHouseEventRepository,
   EventingClickHouseEventStore,
+  EventingClickHouseReplayEventSource,
   OtelProcessRetentionMetricsAdapter,
   PrismaProcessStore,
   type EventingClickHouseClientResolver,
@@ -59,10 +67,15 @@ export function buildEventing(options: {
   readonly prisma: PrismaClient;
   /** Absent where the role states no queue, which runs projections inline. */
   readonly redis?: RedisConnection;
-  /** Absent on a role that drains nothing and so reads no event log. */
+  /**
+   * The event log's ClickHouse. A draining role appends through it; any role given it reads one
+   * event by id through a seat beside its store, which a producer's store still refuses (Q209).
+   */
   readonly eventLog?: EventingEventLogMembers;
   /** Overrides the half this process's role would otherwise install. */
   readonly participation?: EventingParticipation;
+  /** The tenant directory's privately routed tenants, which a replay lists beside the log's. */
+  readonly privateTenants?: () => AsyncIterable<string>;
 }): BuiltMember<EventSourcing> {
   const { config } = options;
   const processStore = PrismaProcessStore.create({ database: options.prisma });
@@ -71,6 +84,8 @@ export function buildEventing(options: {
     processName: options.processName,
     ...(options.eventLog === undefined ? {} : { eventLog: options.eventLog }),
   });
+  const eventReadSeat =
+    options.eventLog === undefined ? undefined : eventingReadSeat(options.eventLog);
   const queueFactory =
     config.groupQueue === undefined || options.redis === undefined
       ? undefined
@@ -83,6 +98,7 @@ export function buildEventing(options: {
   const eventing = new EventSourcing({
     enabled: true,
     eventStore,
+    ...(eventReadSeat === undefined ? {} : { eventReadSeat }),
     consumersEnabled: config.consumersEnabled,
     executionTarget: config.executionTarget,
     processManagerMode: config.processManagerMode ?? "run",
@@ -95,6 +111,17 @@ export function buildEventing(options: {
       : {
           maintenance: eventingMaintenance({ redis: options.redis, processStore }),
           readHints: readHintsOver(options.redis),
+        }),
+    ...(options.redis === undefined || options.eventLog === undefined
+      ? {}
+      : {
+          replayEngine: replayEngineOver({
+            redis: options.redis,
+            clickhouse: options.eventLog.clickhouse,
+            ...(options.privateTenants === undefined
+              ? {}
+              : { privateTenants: options.privateTenants }),
+          }),
         }),
   });
 
@@ -141,6 +168,51 @@ function readHintsOver(redis: RedisConnection): NonNullable<EventSourcingOptions
     });
 }
 
+/**
+ * One replay run's engine: the event log through the routed member, markers on a standalone
+ * Redis connection sharing no socket with live traffic. A Cluster refuses replay's multi-key
+ * operations (CROSSSLOT), as on main.
+ */
+function replayEngineOver({
+  redis,
+  clickhouse,
+  privateTenants,
+}: {
+  readonly redis: RedisConnection;
+  readonly clickhouse: ClickHouseQueryClient;
+  readonly privateTenants?: () => AsyncIterable<string>;
+}): NonNullable<EventSourcingOptions["replayEngine"]> {
+  return ({ definitions, retentionPolicyResolver }) => {
+    if (redis.isCluster) {
+      throw new Error(
+        "Replay requires a standalone Redis: a Cluster refuses its multi-key operations.",
+      );
+    }
+    const connection = redis.duplicate();
+    const logSource = upcastReplayEventSource({
+      source: new EventingClickHouseReplayEventSource({
+        clickhouse,
+        lean: replayLeanOf(definitions),
+      }),
+      upcasts: pipelineUpcastsOf(definitions),
+    });
+    const service = new ReplayService({
+      eventSource:
+        privateTenants === undefined
+          ? logSource
+          : unionReplayTenants({ source: logSource, listTenants: privateTenants }),
+      redis: connection,
+      ...(retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver }),
+    });
+    return {
+      service,
+      close: async () => {
+        connection.disconnect();
+      },
+    };
+  };
+}
+
 /** Where this role appends: a producer refuses reads, a draining role reads the event log. */
 function eventingEventStore(options: {
   readonly store: EventingStoreConfig;
@@ -166,6 +238,15 @@ function eventingEventStore(options: {
       retention,
     }),
     retention,
+  });
+}
+
+/** One event by id over the event log, whichever store this role appends through. */
+function eventingReadSeat(eventLog: EventingEventLogMembers): EventReadSeat {
+  return EventLogReadSeat.create({
+    repository: EventingClickHouseEventRepository.createForEventReads({
+      resolveClient: eventingClickHouseResolver(eventLog.clickhouse),
+    }),
   });
 }
 

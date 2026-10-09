@@ -16,14 +16,26 @@ function browserDocument() {
 }
 
 describe("given a browser that installs auth", () => {
-  describe("when the kernel renders with only a transport supplied", () => {
-    it("installs the module", async () => {
+  describe("when the kernel renders with a transport and the page's config supplied", () => {
+    it("installs the module and projects the slice it claims", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
         .withModules([authWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
+        .withInjectedConfig(() => ({
+          process: { mode: "test", deployment: "self-hosted", nlp: true },
+          auth: {
+            passkeys: true,
+            identityFrontDoor: false,
+            emailPasswordEnabled: true,
+            signUpMode: "open",
+          },
+        }))
         .render();
 
       expect(installed.modules).toContain(authWeb);
+      expect(installed.config).toEqual({
+        auth: { passkeysEnabled: true, emailPasswordEnabled: true, signUpMode: "open" },
+      });
     });
   });
 

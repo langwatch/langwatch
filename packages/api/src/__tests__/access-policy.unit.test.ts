@@ -2,14 +2,12 @@ import type { AuthzPermission } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import {
+  type AccessPolicy,
   anyAuthenticated,
-  apiKeyPermission,
-  describeAccessPolicy,
   handlerManagedAuth,
   internalSecret,
   policyPermissions,
   publicEndpoint,
-  requires,
 } from "../access-policy.ts";
 import { getRoutePolicy, registerRoutePolicy } from "../route-registry.ts";
 
@@ -22,19 +20,10 @@ type Assert<Value extends true> = Value;
 describe("access policy helpers", () => {
   describe("when a route names a permission the registry does not list", () => {
     /** @scenario "A route policy cannot name a permission outside the registry" */
-    it("is refused at the type level: requires() only accepts a registered permission", () => {
-      type RequiresParam = Parameters<typeof requires>[0];
-      type _RegistryClosed = Assert<Equal<RequiresParam, AuthzPermission>>;
+    it("is refused at the type level: a permission policy only names a registered permission", () => {
+      type PolicyPermission = Extract<AccessPolicy, { kind: "permission" }>["permission"];
+      type _RegistryClosed = Assert<Equal<PolicyPermission, AuthzPermission>>;
       expect(true satisfies _RegistryClosed).toBe(true);
-    });
-  });
-
-  describe("when requiring a permission", () => {
-    it("carries the permission on a permission-kind policy", () => {
-      expect(requires("traces:view")).toEqual({
-        kind: "permission",
-        permission: "traces:view",
-      });
     });
   });
 
@@ -94,15 +83,6 @@ describe("access policy helpers", () => {
       ).toThrow(/non-empty reason/);
     });
   });
-
-  describe("when describing a policy for the registry", () => {
-    it("summarizes each kind", () => {
-      expect(describeAccessPolicy(requires("prompts:manage"))).toBe("requires prompts:manage");
-      expect(describeAccessPolicy(anyAuthenticated())).toBe("any authenticated credential");
-      expect(describeAccessPolicy(publicEndpoint("share link"))).toBe("public — share link");
-      expect(describeAccessPolicy(internalSecret("cron"))).toBe("internal — cron");
-    });
-  });
 });
 
 describe("the route registry for an API-key-ceiling route", () => {
@@ -111,7 +91,7 @@ describe("the route registry for an API-key-ceiling route", () => {
     registerRoutePolicy({
       method: "get",
       path: "/api/ceiling-probe",
-      policy: apiKeyPermission("traces:view"),
+      policy: { kind: "apiKeyPermission", permission: "traces:view" },
       family: "ceiling-probe",
       credentialClass: "project_api_key",
       credential: "api_key",
@@ -121,7 +101,5 @@ describe("the route registry for an API-key-ceiling route", () => {
 
     expect(recorded).toEqual({ kind: "apiKeyPermission", permission: "traces:view" });
     expect(policyPermissions(recorded!)).toEqual(["traces:view"]);
-    expect(describeAccessPolicy(recorded!)).toContain("traces:view");
-    expect(describeAccessPolicy(recorded!)).not.toContain("any authenticated");
   });
 });

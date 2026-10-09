@@ -3,7 +3,7 @@ import type { RateLimiter } from "@langwatch/process-stores";
 import {
   type TraceRateLimitDecision,
   TraceRateLimitRepository,
-} from "../trace-rate-limit.repository.ts";
+} from "../../features/ingestion/repositories/trace-rate-limit.repository.ts";
 
 /** The process's Redis-backed limiter, so a window is shared by every replica. */
 export class RedisTraceRateLimitRepository extends TraceRateLimitRepository {

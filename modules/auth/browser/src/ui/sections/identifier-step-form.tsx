@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, HStack, Input, VStack } from "@langwatch/design-system/primitives";
+import { HStack, Input, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import "../elements/auth-front-door.css";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
 import { SHAPE } from "../../model/front-door-theme.ts";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { MethodDivider } from "./sign-in-method-picker.tsx";
 
 const identifierSchema = z.object({
@@ -85,6 +86,9 @@ export function IdentifierStepForm({
                 minHeight="44px"
                 borderRadius={SHAPE.field}
                 autoComplete="username webauthn"
+                // The address decides the next screen; editing it mid-flight answers a question
+                // nobody is asking any more.
+                disabled={isSubmitting}
                 {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
                 {...emailRegistration}
@@ -103,21 +107,9 @@ export function IdentifierStepForm({
             )}
           </FrontDoorField>
           <VStack width="full" align="stretch" gap="14px" paddingTop="2px">
-            <Button
-              className="lw-front-door-primary"
-              type="submit"
-              width="full"
-              minHeight="44px"
-              fontSize="14px"
-              fontWeight={600}
-              borderRadius={SHAPE.action}
-              backgroundColor={"frontDoor.action"}
-              color={"frontDoor.onAction"}
-              _hover={{ backgroundColor: "frontDoor.actionHover" }}
-              loading={isSubmitting}
-            >
+            <FrontDoorPrimaryButton type="submit" isBusy={isSubmitting}>
               {submitLabel}
-            </Button>
+            </FrontDoorPrimaryButton>
             {footer ? <HStack width="full">{footer}</HStack> : null}
           </VStack>
         </VStack>

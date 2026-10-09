@@ -1,9 +1,12 @@
 import { toaster } from "@langwatch/design-system/toaster";
+import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
 import {
+  isRouteKind,
   type ModelTrouble,
   queryWithoutInstantEvalChip,
   requoteBareTerms,
   resolveInstantEvalChips,
+  type RouteSearchInput,
   type RouteSearchResult,
   splitBareWords,
 } from "@langwatch/trace-contract";
@@ -81,6 +84,19 @@ function phraseNotice({
     interpretedAs: "free_text",
     modelTrouble: result.modelTrouble,
     ...(result.modelErrorCode ? { modelErrorCode: result.modelErrorCode } : {}),
+  };
+}
+
+/**
+ * What trace's router is handed from Instant Eval's answer: the label only when
+ * it names a route trace offers, and the availability as Instant Eval read it.
+ */
+function classificationOf(
+  answer: ExplorerSearchClassification,
+): Pick<RouteSearchInput, "classified" | "isInstantEvalAvailable"> {
+  return {
+    ...(isRouteKind(answer.classified) ? { classified: answer.classified } : {}),
+    isInstantEvalAvailable: answer.isInstantEvalAvailable,
   };
 }
 
@@ -173,7 +189,10 @@ function typedEvalRunOf({
   };
 }
 
-/** Sends a sentence to the router and applies the route it answers with. */
+/**
+ * Asks Instant Eval to classify a sentence, then the router to route it, and
+ * applies the route. A classification that fails routes with none (T2 D3).
+ */
 function useRouteSubmit({
   isLangyAvailable,
   onLangy,
@@ -186,6 +205,7 @@ function useRouteSubmit({
   isRouting: boolean;
 } {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const classifySearch = api.instantEval.classifySearch.useMutation();
   const routeSearch = api.traces.routeSearch.useMutation();
   const applyRoute = useApplyRoute({ onLangy, onInstantEval });
 
@@ -195,40 +215,54 @@ function useRouteSubmit({
       // runs in, not the debounced copy a pending timer may still hold.
       const { timeRange, queryText } = useFilterStore.getState();
       const range = { from: timeRange.from, to: timeRange.to };
-      routeSearch.mutate(
-        {
-          projectId,
-          text,
-          timeRange: range,
-          activeQuery: queryText,
-          lensId: useFilterStore.getState().activeLensId,
-          isLangyAvailable,
-        },
-        {
-          onSuccess: (result) => {
-            if (seq !== submitSeqRef.current) return;
-            applyRoute({ result, text, projectId, timeRange: range });
+      const search = {
+        projectId,
+        text,
+        timeRange: range,
+        activeQuery: queryText,
+        lensId: useFilterStore.getState().activeLensId,
+        isLangyAvailable,
+      };
+      const routeWith = (
+        classification: Pick<RouteSearchInput, "classified" | "isInstantEvalAvailable"> = {},
+      ) =>
+        routeSearch.mutate(
+          { ...search, ...classification },
+          {
+            onSuccess: (result) => {
+              if (seq !== submitSeqRef.current) return;
+              applyRoute({ result, text, projectId, timeRange: range });
+            },
+            onError: (error) => {
+              if (seq !== submitSeqRef.current) return;
+              // The words still get searched, and the reader is told that is
+              // what happened. A sentence coming back as a quoted phrase with
+              // nothing said about it reads as the search having worked.
+              applyQueryText(requoteBareTerms(text));
+              const { title, description } = explainAnyError(error);
+              toaster.create({
+                title,
+                description: [description, PHRASE_INSTEAD_NOTE].filter(Boolean).join(" "),
+                type: "warning",
+              });
+            },
           },
-          onError: (error) => {
-            if (seq !== submitSeqRef.current) return;
-            // The words still get searched, and the reader is told that is
-            // what happened. A sentence coming back as a quoted phrase with
-            // nothing said about it reads as the search having worked.
-            applyQueryText(requoteBareTerms(text));
-            const { title, description } = explainAnyError(error);
-            toaster.create({
-              title,
-              description: [description, PHRASE_INSTEAD_NOTE].filter(Boolean).join(" "),
-              type: "warning",
-            });
-          },
+        );
+      classifySearch.mutate(search, {
+        onSuccess: (answer) => {
+          if (seq !== submitSeqRef.current) return;
+          routeWith(classificationOf(answer));
         },
-      );
+        onError: () => {
+          if (seq !== submitSeqRef.current) return;
+          routeWith();
+        },
+      });
     },
-    [applyQueryText, applyRoute, isLangyAvailable, routeSearch, submitSeqRef],
+    [applyQueryText, applyRoute, classifySearch, isLangyAvailable, routeSearch, submitSeqRef],
   );
 
-  return { route, isRouting: routeSearch.isPending };
+  return { route, isRouting: classifySearch.isPending || routeSearch.isPending };
 }
 
 /** Where a submit goes, once the typed-eval run and the sentence are known. */

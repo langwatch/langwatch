@@ -6,7 +6,7 @@ import type {
   JoinRequestAdmin,
   JoinRequestAudienceProfile,
   JoinRequestAudienceRepository,
-} from "../join-request-audience.repository.ts";
+} from "../../features/join-request/repositories/join-request-audience.repository.ts";
 import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** Who a join-request notice reaches, read off the memory store's own rows. */

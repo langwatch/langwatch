@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { uiTokens } from "@langwatch/module";
 import { z } from "zod";
 
 export const SCIM_FEATURE_ID = "scim" as const;
@@ -286,3 +287,16 @@ export function isScimError(value: unknown): value is ScimError {
     (value as ScimError).schemas[0] === "urn:ietf:params:scim:api:messages:2.0:Error"
   );
 }
+
+// Scim's drawers, by token: the one way a caller opens them (ARCHITECTURE.md §10.1).
+
+/** What a caller hands the provisioning-setup drawer. */
+export type UiProvisioningSetupDrawerProps = {
+  open?: boolean;
+};
+
+const drawers = uiTokens(SCIM_FEATURE_ID);
+
+/** SCIM provisioning for the reader's organization: the address, the tokens, the sync. */
+export const ProvisioningSetupDrawerToken =
+  drawers.drawer<UiProvisioningSetupDrawerProps>("provisioningSetup");

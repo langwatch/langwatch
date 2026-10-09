@@ -40,6 +40,8 @@ import type {
   AutomationSlackDirectory,
   AutomationTraceFilterCompiler,
 } from "../app/automation.app.ts";
+import type { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
+import type { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
 import {
   extractCheckKeys,
   namesEmailRecipients,
@@ -49,11 +51,9 @@ import {
 } from "../rules/automation-authoring.rules.ts";
 import { TRIGGER_KSUID_RESOURCE } from "../rules/automation-row.rules.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
-import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import { AutomationTestFireDestinationService } from "./automation-test-fire-destination.service.ts";
 import { AutomationUpsertService } from "./automation-upsert.service.ts";
 import type { AutomationLogger, AutomationService } from "./automation.service.ts";
-import type { SlackDestinationService } from "./slack-destination.service.ts";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service.ts";
 
 /** What the authoring service reaches. */

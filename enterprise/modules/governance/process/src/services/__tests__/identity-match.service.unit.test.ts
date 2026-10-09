@@ -12,9 +12,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MATCH_EVIDENCE_KIND } from "../../features/identity/rules/identity-evidence.rules.ts";
+import { IdentityMatchService } from "../../features/identity/services/identity-match.service.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { MATCH_EVIDENCE_KIND } from "../../rules/identity-evidence.rules.ts";
-import { IdentityMatchService } from "../identity-match.service.ts";
 
 const ORG = "org_acme";
 const AT = Temporal.Instant.from("2026-09-03T05:41:00Z");

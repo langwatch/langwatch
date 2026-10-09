@@ -13,11 +13,11 @@ import type {
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
-} from "#rules/trace-facet-registry.rules";
+} from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
-import type { TraceFacetDescriptorService } from "./trace-facet-descriptor.service.ts";
+import type { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 
 /** Top values fetched per categorical facet during discovery. */
 const DISCOVER_TOP_N = 50;

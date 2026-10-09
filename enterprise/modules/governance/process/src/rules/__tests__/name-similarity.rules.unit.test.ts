@@ -8,7 +8,7 @@ import {
   nameSimilarity as compareNames,
   nameTokens,
   SUGGESTION_THRESHOLD,
-} from "../name-similarity.rules.ts";
+} from "../../features/identity/rules/name-similarity.rules.ts";
 
 function nameSimilarity(left: string, right: string): number | null {
   const similarity = compareNames(left, right);

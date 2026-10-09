@@ -119,7 +119,6 @@ export const updateSecretInputSchema = z
   .strict();
 export type UpdateSecretInput = z.infer<typeof updateSecretInputSchema>;
 
-export const deleteSecretInputSchema = getSecretInputSchema;
 export type DeleteSecretInput = GetSecretInput;
 
 /** What the tRPC write procedures answer with: the write landed. */

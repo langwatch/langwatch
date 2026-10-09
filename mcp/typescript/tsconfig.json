@@ -30,7 +30,7 @@
     "noUncheckedIndexedAccess": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
-  "include": [".eslintrc.cjs", "**/*.ts"],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules", "./dist/**/*", "./example/**/*"],
   "references": [
     {

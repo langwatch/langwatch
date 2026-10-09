@@ -1,26 +1,13 @@
-/** A presence setting as presence folded it; `unrecorded` until a fact names one. */
-export type FoldedSetting = "on" | "off" | "unrecorded";
-
-/** One project's folded presence facts: unfolded until its creation or a setting is folded. */
-export type FoldedProject =
-  | Readonly<{ kind: "unfolded" }>
-  | Readonly<{ kind: "folded"; organizationId: string; setting: FoldedSetting }>;
-
-/** One presence setting as a fact recorded it, ordered by when it was recorded. */
-export type RecordedSetting = Readonly<{ presenceEnabled: boolean; occurredAt: number }>;
+/** A project's presence settings as their owners hold them, or that they hold no such project. */
+export type PresenceProjectSettings =
+  | Readonly<{ outcome: "known"; projectEnabled: boolean; organizationEnabled: boolean }>
+  | Readonly<{ outcome: "unknown" }>;
 
 /**
- * Presence's durable fold of project's and organization's presence-setting facts. Never expires.
- * A setting write keeps whichever of the stored and given settings is newer by `occurredAt`.
+ * Project's `Project` and organization's `Team` and `Organization` rows, read through their
+ * declared shares (round 46 E1, R40), never a copy. Spec: modules/presence/specs/presence.feature
  */
 export abstract class PresenceSettingsRepository {
-  abstract recordProject(input: { projectId: string; organizationId: string }): Promise<void>;
-  abstract recordProjectSetting(
-    input: { projectId: string; organizationId: string } & RecordedSetting,
-  ): Promise<void>;
-  abstract recordOrganizationSetting(
-    input: { organizationId: string } & RecordedSetting,
-  ): Promise<void>;
-  abstract getProject(input: { projectId: string }): Promise<FoldedProject>;
-  abstract getOrganizationSetting(input: { organizationId: string }): Promise<FoldedSetting>;
+  /** Unknown is an answer, not a failure: presence treats the project as not enabled. */
+  abstract getSettings(input: { projectId: string }): Promise<PresenceProjectSettings>;
 }

@@ -8,9 +8,9 @@ import { ArrowDown, ArrowUp, AudioLines, Bot, Film, Paperclip, User, Wrench } fr
 import type React from "react";
 import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 
-import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
 import { useStoredObjectUrl } from "../../../../behavior/stored-object/use-stored-object-url.ts";
+import { useDensityStore } from "../../../../features/explorer/behavior/density.store.ts";
 import { tryParseChat } from "../../../../model/explorer/trace-table/chat-content.ts";
 import { useDensityTokens } from "../hooks/use-density-tokens.ts";
 

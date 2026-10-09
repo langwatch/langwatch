@@ -178,6 +178,35 @@ describe("what a self-hosted install may call", () => {
   });
 });
 
+describe("one hosted service's state", () => {
+  /** @scenario "A hosted service's state names which half said no" */
+  it("names whether the license carries the service and whether it is still on", async () => {
+    const named = install({ license: licenseNaming(["instant_evals"]) });
+    const switchedOff = install({
+      license: licenseNaming(["instant_evals"]),
+      servicesDisabled: ["instant_evals"],
+    });
+    const unnamed = install({ license: licenseNaming([]) });
+    const unlicensed = install({ license: null });
+    const stateOf = ({ service }: ReturnType<typeof install>) =>
+      service.getServiceState({ organizationId: ORGANIZATION, service: "instant_evals" });
+
+    expect(await stateOf(named)).toEqual({ isEntitled: true, isSwitchedOn: true });
+    expect(await stateOf(switchedOff)).toEqual({ isEntitled: true, isSwitchedOn: false });
+    expect(await stateOf(unnamed)).toEqual({ isEntitled: false, isSwitchedOn: false });
+    expect(await stateOf(unlicensed)).toEqual({ isEntitled: false, isSwitchedOn: false });
+    expect(named.gateway.classifications).toEqual([]);
+  });
+
+  it("answers neither half where the deployment switched Connect off", async () => {
+    const off = install({ license: licenseNaming(["instant_evals"]), permitted: false });
+
+    expect(
+      await off.service.getServiceState({ organizationId: ORGANIZATION, service: "instant_evals" }),
+    ).toEqual({ isEntitled: false, isSwitchedOn: false });
+  });
+});
+
 describe("switching a hosted service", () => {
   /** @scenario "A service the license is not entitled to cannot be switched on" */
   it("refuses a service the registry does not entitle and leaves it off", async () => {

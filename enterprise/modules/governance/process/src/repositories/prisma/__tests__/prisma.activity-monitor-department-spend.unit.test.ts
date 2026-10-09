@@ -5,20 +5,17 @@
  * Spend by department across an organization's projects: combined personal and project spend,
  * and nothing from another organization. Spec: specs/ai-gateway/governance/departments.feature
  */
-import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
-import { ClickHouseQueryClient, TenantGuard } from "@langwatch/clickhouse-client";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
-import { memberGovernanceClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 type SpendRow = {
   projectId: string;
-  actor: string;
-  spendUsdStr: string;
-  requests: string;
-  lastActivityMs: string;
+  value: string;
+  spentUsd: string;
+  requests: number;
+  lastOccurredAtMs: number;
 };
 
 const PROJECTS = [
@@ -33,15 +30,15 @@ const DEPARTMENTS = [
   { id: "rival-engineering", organizationId: "org-rival", name: "Engineering" },
 ];
 
-const row = (projectId: string, actor: string, spend: string): SpendRow => ({
+const row = (projectId: string, value: string, spend: string): SpendRow => ({
   projectId,
-  actor,
-  spendUsdStr: spend,
-  requests: "1",
-  lastActivityMs: "1000",
+  value,
+  spentUsd: spend,
+  requests: 1,
+  lastOccurredAtMs: 1000,
 });
 
-/** What ClickHouse holds, for every organization, answered only for the tenants a query names. */
+/** What trace holds, for every organization, answered only for the projects a read names. */
 const LEDGER: SpendRow[] = [
   row("acme-personal", "mia@acme.test", "10"),
   row("acme-personal", "eli@acme.test", "6"),
@@ -52,19 +49,7 @@ const LEDGER: SpendRow[] = [
 ];
 
 function departmentSpend() {
-  const queries: QueryRequest[] = [];
-  const clickhouse = new ClickHouseQueryClient({
-    tenantGuard: new TenantGuard(),
-    driver: {
-      execute: async <Result>(request: QueryRequest): Promise<QueryResult<Result>> => {
-        queries.push(request);
-        const rows = LEDGER.filter((r) => request.tenantIds?.includes(r.projectId));
-        return { rows: rows as Result[] };
-      },
-      insert: async () => undefined,
-      command: async () => undefined,
-    },
-  });
+  const asked: (readonly string[])[] = [];
   const orgOf = (args?: {
     where?: { team?: { organizationId?: unknown }; organizationId?: unknown };
   }) => args?.where?.team?.organizationId ?? args?.where?.organizationId;
@@ -103,12 +88,22 @@ function departmentSpend() {
         ]),
       },
     }),
-    clickhouse: memberGovernanceClickHouseResolver(clickhouse),
+    clickhouse: {
+      getClient: async () => {
+        throw new Error("spend by department reads no governance table");
+      },
+    },
+    traces: {
+      findSpendByProjectAndValue: async ({ projectIds }) => {
+        asked.push(projectIds);
+        return LEDGER.filter((r) => projectIds.includes(r.projectId));
+      },
+    },
   });
-  return { service, queries };
+  return { service, asked };
 }
 
-describe("PrismaActivityMonitorRepository.spendByDepartment", () => {
+describe("ActivityMonitorService.spendByDepartment", () => {
   describe("when members of two departments spend personally and one department owns a project", () => {
     /** @scenario "Marketing-versus-engineering comparison reads from departments" */
     it("shows each department the sum of its members' personal spend and its own projects' spend, however many teams a member sits in", async () => {
@@ -123,29 +118,24 @@ describe("PrismaActivityMonitorRepository.spendByDepartment", () => {
 
   describe("when another organization has spend under a department of the same name", () => {
     /** @scenario "Spend-by-department query stays tenant-isolated" */
-    it("rolls up none of the other organization's spend and asks ClickHouse only for this organization's projects", async () => {
-      const { service, queries } = departmentSpend();
+    it("rolls up none of the other organization's spend and asks trace only for this organization's projects", async () => {
+      const { service, asked } = departmentSpend();
 
       const rows = await service.spendByDepartment({ organizationId: "org-acme", windowDays: 30 });
 
       expect(rows.map((r) => r.spendUsd).toSorted()).toEqual(["15", "8"]);
-      expect(queries.length).toBeGreaterThan(0);
-      for (const query of queries) {
-        expect(query.tenantIds).toEqual(["acme-personal", "acme-marketing-site"]);
-        expect(query.sql).toMatch(/WHERE\s+TenantId IN \(/);
-        expect(JSON.stringify(query)).not.toMatch(/rival/);
-      }
+      expect(asked).toEqual([["acme-personal", "acme-marketing-site"]]);
     });
   });
 
   describe("when none of the traffic flows through a governance ingestion source", () => {
     /** @scenario "Spend by department aggregates across every project in the org" */
     it("totals the departments from the organization's own projects, personal and department-owned, without a governance project", async () => {
-      const { service, queries } = departmentSpend();
+      const { service, asked } = departmentSpend();
 
       const rows = await service.spendByDepartment({ organizationId: "org-acme", windowDays: 30 });
 
-      expect(queries.flatMap((query) => query.tenantIds ?? [])).toEqual(
+      expect(asked.flat()).toEqual(
         expect.arrayContaining(["acme-personal", "acme-marketing-site"]),
       );
       expect(rows.filter((r) => Number(r.spendUsd) > 0)).toHaveLength(2);

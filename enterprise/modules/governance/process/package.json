@@ -20,10 +20,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./testing": {
-      "types": "./dist/__tests__/testing.d.ts",
-      "default": "./src/__tests__/testing.ts"
     }
   },
   "scripts": {
@@ -66,7 +62,9 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
+    "@langwatch/webhook-contract": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",

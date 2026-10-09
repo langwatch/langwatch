@@ -1,4 +1,3 @@
-export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
 export { licensingProcessModule } from "./licensing.module.ts";
 /** The declared licence tRPC surface. */
 export { licenseTrpcTransport } from "./transport/licensing.trpc.ts";

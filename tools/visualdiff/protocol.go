@@ -161,6 +161,13 @@ type RunnerPlan struct {
 	Stacks  []EditionStack `json:"stacks,omitempty"`
 	// Check photographs a flow only at its expects and its failure, and times each flow.
 	Check bool `json:"check,omitempty"`
+	// Judge asks Haiku about each flagged pair (runner/src/judge.ts).
+	Judge *RunnerJudge `json:"judge,omitempty"`
+}
+
+// RunnerJudge names the verdict cache that outlives the run.
+type RunnerJudge struct {
+	CacheFile string `json:"cacheFile"`
 }
 
 // RunnerSide is one stack the runner drives. Replay names a cached

@@ -680,7 +680,7 @@ describe("the tRPC audit sink", () => {
 
       await trpc.record({
         userId: "user-1",
-        action: "traces.instantEval.enable",
+        action: "instantEval.enable",
         organizationId: "org-1",
         projectId: "project-1",
         targetKind: "organization",

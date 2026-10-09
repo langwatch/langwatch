@@ -7,9 +7,9 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useLangyContextTargetStore } from "../../../behavior/langy-context-target.store.ts";
 import { useLangyStore } from "../../../behavior/langy.store.ts";
-import { useLangyContextArming } from "../../../behavior/use-langy-context-arming.ts";
+import { useLangyContextTargetStore } from "../../../features/context-target/behavior/langy-context-target.store.ts";
+import { useLangyContextArming } from "../../../features/context-target/behavior/use-langy-context-arming.ts";
 import { LangyContextTargetLayer } from "../langy-context-target-layer.tsx";
 
 function Host() {

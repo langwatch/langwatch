@@ -5,12 +5,13 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { SampleChoiceToken } from "@langwatch/enterprise-governance-client";
 
 import { writeSampleChoice } from "./ui/elements/governance-sample-mode.ts";
 
 export const governanceWeb = defineBrowserModule("governance")
-  /** The sample-data choice onboarding's guided tour shows and hides. */
-  .withCapabilities({ sampleChoice: { setSampleChoice: writeSampleChoice } })
+  /** The sample-data choice onboarding's guided tour shows and hides (§10.1). */
+  .lends(SampleChoiceToken, { value: { setSampleChoice: writeSampleChoice } })
   .withHosts({
     requires: ["GovernanceHostApi"],
     mounts: {

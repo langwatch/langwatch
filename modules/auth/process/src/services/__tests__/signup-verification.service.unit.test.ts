@@ -1,7 +1,11 @@
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal } from "@langwatch/time";
-import type { UserApi, UserProfile } from "@langwatch/user-contract";
+import { fromDate, Temporal, toDate, type Instant } from "@langwatch/time";
+import type {
+  AdoptUnconfirmedAccountOutcome,
+  UserApi,
+  UserProfile,
+} from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemorySignUpVerificationMailChannel } from "../../channels/memory/memory.sign-up-verification-mail.channel.ts";
@@ -52,9 +56,12 @@ function makeService({
   budgetAllowed = true,
   emailUnconfigured = false,
   signUpRefused = false,
+  adoption = "adopted",
   mailer,
 }: {
   holder?: UserProfile | null;
+  /** What user's adoption answers for the account the address holds. */
+  adoption?: AdoptUnconfirmedAccountOutcome;
   decision?: RoutingDecision;
   budgetAllowed?: boolean;
   emailUnconfigured?: boolean;
@@ -65,6 +72,8 @@ function makeService({
   const mail = MemorySignUpVerificationMailChannel.create();
   const budgets: string[] = [];
   const lookups: string[] = [];
+  const adoptions: string[] = [];
+  const revoked: string[] = [];
   let clock = NOW;
   let minted = 0;
   let current = holder;
@@ -78,8 +87,15 @@ function makeService({
         lookups.push(email);
         return current;
       },
+      adoptUnconfirmedAccount: async ({ email }) => {
+        adoptions.push(email);
+        return adoption;
+      },
     }),
     route: async () => decision,
+    revokeAllBrowserSessions: async ({ userId }) => {
+      revoked.push(userId);
+    },
     checkSignUp: async () =>
       signUpRefused ? { allowed: false, reason: "invite_only" } : { allowed: true, via: "open" },
     isWithinBudget: async ({ key }) => {
@@ -101,6 +117,8 @@ function makeService({
     mail,
     budgets,
     lookups,
+    adoptions,
+    revoked,
     advance: (milliseconds: number) => {
       clock = clock.add({ milliseconds });
     },
@@ -113,6 +131,18 @@ function makeService({
   };
 }
 
+/** A token row's stored expiry, read back as the Instant the service wrote. */
+function storedExpiry({
+  memory,
+  token,
+}: {
+  memory: MemoryAuthDatabase;
+  token: string;
+}): Instant | undefined {
+  const row = memory.db.VerificationToken.find((candidate) => candidate.token === token);
+  return row && fromDate(row.expires);
+}
+
 describe("given a sign-up address to confirm", () => {
   describe("when the address is submitted", () => {
     it("emails a normalized link that expires in an hour", async () => {
@@ -123,7 +153,7 @@ describe("given a sign-up address to confirm", () => {
       expect(harness.mail.sent).toEqual([
         { email: "sam@acme.com", verificationUrl: "https://app.test/auth/signup?verify=token-1" },
       ]);
-      expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
+      expect(storedExpiry({ memory: harness.memory, token: "token-1" })).toEqual(
         NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
       );
     });
@@ -161,8 +191,8 @@ describe("given a sign-up address to confirm", () => {
         "mailer down",
       );
 
-      expect(sent.memory.sessions.size).toBe(0);
-      expect(down.memory.sessions.size).toBe(0);
+      expect(sent.memory.db.Session.length).toBe(0);
+      expect(down.memory.db.Session.length).toBe(0);
     });
   });
 
@@ -178,7 +208,7 @@ describe("given a sign-up address to confirm", () => {
         addressProof: "token-2",
         freshClaim: true,
       });
-      expect(harness.memory.verificationTokens.get("token-2")?.expires).toEqual(
+      expect(storedExpiry({ memory: harness.memory, token: "token-2" })).toEqual(
         NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
       );
     });
@@ -228,20 +258,81 @@ describe("given a sign-up address to confirm", () => {
       expect(answers.filter((answer) => answer.freshClaim)).toHaveLength(1);
       expect(answers.filter((answer) => answer.addressProof !== null)).toHaveLength(1);
       expect(answers.every((answer) => !answer.accountCreated)).toBe(true);
-      expect(harness.memory.sessions.size).toBe(0);
+      expect(harness.memory.db.Session.length).toBe(0);
     });
   });
 
-  describe("when the address gained an account before the link came back", () => {
-    /** @scenario "A confirmation link never opens an account it did not create" */
-    it("refuses rather than adopting the account", async () => {
+  describe("when the address holds an unfinished account", () => {
+    /** @scenario "A confirmation link adopts an unfinished account on its address" */
+    it("adopts it and answers an existing account for the door to sign in, with no proof", async () => {
       const harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      harness.hold(account({ emailVerified: false }));
+
+      await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+        freshClaim: true,
+      });
+      expect(harness.adoptions).toEqual(["sam@acme.com"]);
+    });
+
+    /** @scenario "Adopting an account ends every session it held before the proof" */
+    it("ends every browser session the adopted account held before the proof", async () => {
+      const harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      const unfinished = account({ emailVerified: false });
+      harness.hold(unfinished);
+
+      await harness.service.completeVerification({ token: "token-1" });
+
+      expect(harness.revoked).toEqual([unfinished.id]);
+    });
+  });
+
+  describe.each(["already_confirmed", "signed_in", "no_account"] as const)(
+    "when user refuses to adopt the account as %s",
+    (adoption) => {
+      /** @scenario "A confirmation link never opens an account it cannot adopt" */
+      it("refuses the way a dead link is, and hands out no proof", async () => {
+        const harness = makeService({ adoption });
+        await harness.service.requestVerification({ email: "sam@acme.com" });
+        harness.hold(account({ emailVerified: adoption === "already_confirmed" }));
+
+        await expect(
+          harness.service.completeVerification({ token: "token-1" }),
+        ).rejects.toMatchObject({ code: "identity_verification_expired" });
+        expect(harness.memory.db.VerificationToken.some((row) => row.token === "token-2")).toBe(
+          false,
+        );
+      });
+
+      /** @scenario "Adopting an account ends every session it held before the proof" */
+      it("ends no session when the adoption is refused", async () => {
+        const harness = makeService({ adoption });
+        await harness.service.requestVerification({ email: "sam@acme.com" });
+        harness.hold(account({ emailVerified: adoption === "already_confirmed" }));
+
+        await harness.service.completeVerification({ token: "token-1" }).catch(() => undefined);
+
+        expect(harness.revoked).toEqual([]);
+      });
+    },
+  );
+
+  describe("when the unfinished account's address now routes to its organization", () => {
+    /** @scenario "A confirmation link never adopts an account its organization's sign-in owns" */
+    it("refuses the way a dead link is and never asks user to adopt", async () => {
+      const harness = makeService({ decision: DOMAIN_DECISION });
       await harness.service.requestVerification({ email: "sam@acme.com" });
       harness.hold(account({ emailVerified: false }));
 
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
+      expect(harness.adoptions).toEqual([]);
     });
   });
 
@@ -249,10 +340,11 @@ describe("given a sign-up address to confirm", () => {
     /** @scenario "A link nobody ever issued is refused the way an expired one is" */
     it("refuses both the same way", async () => {
       const harness = makeService();
-      harness.memory.verificationTokens.set("borrowed", {
+      harness.memory.db.VerificationToken.push({
+        id: "borrowed",
         identifier: "password-reset:sam@acme.com",
         token: "borrowed",
-        expires: NOW.add({ hours: 1 }),
+        expires: toDate(NOW.add({ hours: 1 })),
       });
 
       await expect(
@@ -267,13 +359,14 @@ describe("given a sign-up address to confirm", () => {
   describe("when a link minted before the doors converged carries a credential", () => {
     it("treats the credential as untrusted and hands back the proof instead", async () => {
       const harness = makeService();
-      harness.memory.verificationTokens.set("in-flight", {
+      harness.memory.db.VerificationToken.push({
+        id: "in-flight",
         identifier: `identity-signup-verification:${JSON.stringify({
           email: "sam@acme.com",
           passwordHash: "$2b$10$notthepassword",
         })}`,
         token: "in-flight",
-        expires: NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
+        expires: toDate(NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS })),
       });
 
       await expect(harness.service.completeVerification({ token: "in-flight" })).resolves.toEqual({
@@ -464,7 +557,7 @@ describe("given an installation that cannot send email", () => {
 
       expect(answer).toEqual({ sent: false, addressProof: "token-1" });
       expect(harness.mail.sent).toEqual([]);
-      expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
+      expect(storedExpiry({ memory: harness.memory, token: "token-1" })).toEqual(
         NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
       );
       await expect(
@@ -570,7 +663,7 @@ describe("given an installation that cannot send email", () => {
       await expect(
         harness.service.claimUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
       ).resolves.toBe(false);
-      expect(harness.memory.verificationTokens.has(proof)).toBe(true);
+      expect(harness.memory.db.VerificationToken.some((row) => row.token === proof)).toBe(true);
     });
   });
 });

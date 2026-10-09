@@ -9,7 +9,7 @@ import { z } from "zod";
 export const activationCodeStatusSchema = z.enum(["active", "redeemed", "expired", "revoked"]);
 export type ActivationCodeStatus = z.infer<typeof activationCodeStatusSchema>;
 
-/** A code as the backoffice reads it, with the verdict already worked out. */
+/** A code as the admin console reads it, with the verdict already worked out. */
 export const activationCodeViewSchema = z.object({
   id: z.string(),
   /** The last four characters, which is how two codes are told apart. */
@@ -49,7 +49,7 @@ export const listActivationCodesInputSchema = z.object({
   organizationId: z.string().min(1).optional(),
 });
 
-/** What an operator supplies when minting a code from the backoffice. */
+/** What an operator supplies when minting a code from the admin console. */
 export const issueActivationCodeInputSchema = z.object({
   organizationId: z.string().min(1),
   organizationName: z.string().min(1),

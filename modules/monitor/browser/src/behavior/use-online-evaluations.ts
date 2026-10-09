@@ -22,7 +22,7 @@ export function useOnlineEvaluations({
     { enabled: !!projectId },
   );
 
-  const performance = monitorApi.monitors.getPerformanceForProject.useQuery(
+  const performance = monitorApi.evaluations.getMonitorPerformanceForProject.useQuery(
     { projectId: projectId ?? "", timeZone: timeZone },
     {
       enabled: !!projectId && canViewAnalytics && monitors.isSuccess,

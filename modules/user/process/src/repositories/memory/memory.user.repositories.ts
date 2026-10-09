@@ -6,18 +6,23 @@ import { MemoryUserCredentialRepository } from "./memory.user-signin-credential.
 import { MemoryUserDatabase } from "./memory.user.database.ts";
 import { MemoryUserRepository } from "./memory.user.repository.ts";
 
+/** User's memory stores over a database a test also holds, to read what its writes committed. */
+export function memoryUserRepositoriesOver({
+  database,
+}: Readonly<{ database: MemoryUserDatabase }>): UserRepositories {
+  return {
+    users: MemoryUserRepository.create({ database }),
+    credentials: MemoryUserCredentialRepository.create({ database }),
+    rateLimits: MemoryUserRateLimitRepository.create(),
+    organizationDirectory: MemoryUserOrganizationDirectoryRepository.create(),
+    dataErase: MemoryGdprUserDataEraseRepository.create({ database }),
+  };
+}
+
 export class MemoryUserRepositories {
   static readonly requires = [] as const;
 
   static create(): UserRepositories {
-    const database = MemoryUserDatabase.create();
-
-    return {
-      users: MemoryUserRepository.create({ database }),
-      credentials: MemoryUserCredentialRepository.create({ database }),
-      rateLimits: MemoryUserRateLimitRepository.create(),
-      organizationDirectory: MemoryUserOrganizationDirectoryRepository.create(),
-      dataErase: MemoryGdprUserDataEraseRepository.create({ database }),
-    };
+    return memoryUserRepositoriesOver({ database: MemoryUserDatabase.create() });
   }
 }

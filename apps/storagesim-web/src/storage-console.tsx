@@ -1,13 +1,32 @@
 import { Section } from "@langwatch/design-system-internal";
 import { SimConsole, useSimPoll } from "@langwatch/sim-console";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { BucketsTab } from "./buckets-tab.tsx";
 import { stackFromHost } from "./format.ts";
 import { ObjectsTab } from "./objects-tab.tsx";
 import { RequestsTab } from "./requests-tab.tsx";
 import { storageApi } from "./storage-api.ts";
-import { type TabId, useHashTab } from "./use-hash-tab.ts";
+
+const TABS = ["buckets", "objects", "requests"] as const;
+type TabId = (typeof TABS)[number];
+
+const fromHash = () => TABS.find((tab) => tab === window.location.hash.slice(1)) ?? "buckets";
+
+/** The open tab, kept in location.hash so a tab can be linked to. */
+const useHashTab = () => {
+  const [tab, setTab] = useState<TabId>(fromHash);
+  useEffect(() => {
+    const onChange = () => setTab(fromHash());
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  const open = useCallback((next: TabId) => {
+    window.location.hash = next;
+    setTab(next);
+  }, []);
+  return { tab, open };
+};
 
 const HEADINGS: Record<TabId, { title: string; description: string }> = {
   buckets: {

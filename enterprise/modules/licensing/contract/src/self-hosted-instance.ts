@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The registry of self-hosted installs as it leaves the feature (ADR-156,
@@ -26,7 +27,7 @@ export const SELF_HOSTED_SIGNALS = [
 
 export type SelfHostedSignal = (typeof SELF_HOSTED_SIGNALS)[number];
 
-/** One install as the backoffice reads it. */
+/** One install as the admin console reads it. */
 export const selfHostedInstanceViewSchema = z.object({
   id: z.string(),
   instanceId: z.string(),
@@ -90,4 +91,17 @@ export interface IncomingUsageReport {
   unknownFields: number;
   /** ISO instant the receiver accepted it. */
   receivedAt: string;
+}
+
+/** The registry has never heard from an install with that id. */
+export class SelfHostedInstanceNotFoundError extends HandledError {
+  declare readonly code: "self_hosted_instance_not_found";
+
+  constructor() {
+    super("self_hosted_instance_not_found", "No self-hosted install with that id has reported", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "SelfHostedInstanceNotFoundError";
+  }
 }

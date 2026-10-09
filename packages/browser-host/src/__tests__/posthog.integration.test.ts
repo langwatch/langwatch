@@ -18,7 +18,7 @@ vi.mock("posthog-js", () => ({
   },
 }));
 
-import { type PostHogPublicConfig, usePostHog } from "../posthog.ts";
+import { type PostHogPublicConfig, usePostHog } from "../telemetry/posthog.ts";
 
 let publicEnvData: PostHogPublicConfig | undefined = {
   mode: "test",

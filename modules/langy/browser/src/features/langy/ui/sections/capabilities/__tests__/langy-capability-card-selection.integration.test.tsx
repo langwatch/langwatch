@@ -20,6 +20,10 @@ import {
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
 
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "p_demo", slug: "demo", name: "demo" };
@@ -44,9 +48,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return false;
-  }
-  featureFlag() {
-    return true;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };

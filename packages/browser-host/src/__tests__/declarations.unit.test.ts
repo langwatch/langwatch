@@ -1,55 +1,42 @@
+import { uiTokens } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
-import {
-  NO_UI_DECLARATIONS,
-  uiDeclarations,
-  type UiAuthenticationOverviewCardProps,
-} from "../declarations.ts";
+import { NO_UI_DECLARATIONS, uiDeclarations } from "../declarations.ts";
 
-function Card(_props: UiAuthenticationOverviewCardProps) {
-  return null;
-}
+const Card = uiTokens("organization").extension<{ organizationId: string }>("overviewCard");
+const Other = uiTokens("organization").extension<{ organizationId: string }>("otherCard");
 
-const card = { load: () => Promise.resolve({ default: Card }) };
+const load = () => Promise.resolve({ default: () => null });
 
 describe("uiDeclarations", () => {
-  describe("given two installed modules that both declare an overview card", () => {
+  describe("given two installed modules that both lend an overview card", () => {
     /** @scenario "Declarations are read in install order" */
     it("answers both in install order, each naming its module", () => {
       const declarations = uiDeclarations([
-        { name: "scim", installation: { capabilities: { authenticationOverviewCard: card } } },
-        {
-          name: "sso",
-          installation: {
-            capabilities: { authenticationOverviewCard: { ...card, section: "sign-in" } },
-          },
-        },
+        { name: "scim", installation: { capabilities: {}, lends: [{ token: Card, load }] } },
+        { name: "sso", installation: { capabilities: {}, lends: [{ token: Card, load }] } },
       ]);
 
-      expect(
-        declarations.declared("authenticationOverviewCard").map((entry) => entry.module),
-      ).toEqual(["scim", "sso"]);
-      expect(declarations.declared("authenticationOverviewCard")[1]?.capability.section).toBe(
-        "sign-in",
-      );
+      expect(declarations.lent(Card).map((entry) => entry.module)).toEqual(["scim", "sso"]);
     });
   });
 
-  describe("given a module whose declaration names other capabilities only", () => {
+  describe("given a module whose lends name other tokens only", () => {
     /** @scenario "A module that declared nothing under the name is skipped" */
-    it("contributes nothing under the name it did not declare", () => {
+    it("contributes nothing under the token it did not lend", () => {
       const declarations = uiDeclarations([
-        { name: "auth", installation: { capabilities: { signIn: { load: () => undefined } } } },
+        { name: "auth", installation: { capabilities: {}, lends: [{ token: Other, load }] } },
+        { name: "billing", installation: { capabilities: {} } },
       ]);
 
-      expect(declarations.declared("authenticationOverviewCard")).toEqual([]);
+      expect(declarations.lent(Card)).toEqual([]);
     });
   });
 
   describe("given no declarations were installed", () => {
     /** @scenario "A screen mounted with no shell reads nothing declared" */
     it("reads an empty list", () => {
-      expect(NO_UI_DECLARATIONS.declared("joinOffer")).toEqual([]);
+      expect(NO_UI_DECLARATIONS.lent(Card)).toEqual([]);
     });
   });
 });

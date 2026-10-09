@@ -6,6 +6,7 @@ import {
 } from "@langwatch/eventing";
 import { Temporal, toDate } from "@langwatch/time";
 
+import { EXPERIMENT_RUN_RESULT_COALESCE_MAX_BATCH } from "../rules/experiment-run-event-types.rules.ts";
 import { hasExperiment } from "../rules/experiment-run-key.rules.ts";
 import {
   type EvaluatorResultEvent,
@@ -87,6 +88,8 @@ export class ExperimentRunResultStorageMapProjection
       `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
     // A run without an experiment stores no rows, as main skipped its ClickHouse writes (§9).
     enqueue: { filter: (event) => hasExperiment(event.data.experimentId) },
+    // A row holds one result per target and per evaluator; queued, they go in one insert.
+    coalesceMaxBatch: EXPERIMENT_RUN_RESULT_COALESCE_MAX_BATCH,
   };
 
   private constructor(deps: { store: AppendStore<ClickHouseExperimentRunResultRecord> }) {

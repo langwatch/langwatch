@@ -25,7 +25,7 @@ import {
   mapTraceMetadata,
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
-import type { TraceFullIo } from "../../services/trace-read-full-io.service.ts";
+import type { TraceFullIo } from "../../features/read/services/trace-read-full-io.service.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {

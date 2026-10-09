@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toastActionColor } from "../src/components/toaster.tsx";
+import { toastActionColor } from "../src/components/overlays/toaster.tsx";
 
 /**
  * Toast action color: light mode uses the status color's contrast, dark mode

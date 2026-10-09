@@ -7,9 +7,6 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import {
   explorerHiddenOrigins,
   LANGY_TRACE_ORIGIN,
@@ -18,19 +15,20 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createFacetFilterResolver } from "../../../rules/trace-facet-filter.rules.ts";
+import { createFacetFilterResolver } from "../../../features/facet/rules/trace-facet-filter.rules.ts";
 import {
   andFilterConditions,
   explorerOriginExclusion,
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
-import { translateFilter } from "../../../rules/trace-query.rules.ts";
-import { TraceListService } from "../../../services/trace-list-read.service.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import { TraceListService } from "../../../features/read/services/trace-list-read.service.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
 import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
-} from "../clickhouse.trace-facet-registry.mapper.ts";
+} from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -105,7 +103,7 @@ function compiled({
   queryText: string;
   evalRuns?: ResolvedInstantEvalRun[];
 }): TraceFilterWhere {
-  const filter = translateFilter({
+  const filter = traceQueryTranslation.translateFilter({
     queryText,
     tenantId,
     timeRange,
@@ -391,15 +389,17 @@ async function sidebarCounts({
     discoverUpdates: { publishProjectEvent: async () => {} },
     facets: CLICKHOUSE_FACET_CATALOG,
     repository: repo,
-    evaluations: createApiFixture<EvaluationApi>({}),
-    topicService: createApiFixture<TopicApi>({ getNamesByIds: async () => new Map() }),
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
+    topicNames: { findNamesByIds: async () => new Map() },
   });
   const facets = await service.getFacets({
     tenantId,
     timeRange,
     filterFor: createFacetFilterResolver({
       queryText: query,
-      compile: (text) => translateFilter({ queryText: text, tenantId, timeRange }) ?? undefined,
+      compile: (text) =>
+        traceQueryTranslation.translateFilter({ queryText: text, tenantId, timeRange }) ??
+        undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
     }),
   });

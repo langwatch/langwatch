@@ -14,6 +14,7 @@ import {
   ProjectHomeHost,
   ProjectHomeHostProvider,
   type ProjectHomeDeployment,
+  type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
@@ -95,6 +96,11 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
   }
 
   /** Main's useShowLangy gate: the flag is asked only of a reader it could reveal Langy to. */
+  featureFlag(flag: string): ProjectHomeFlagReading {
+    const answer = this.featureFlagOf(flag);
+    return { enabled: answer === true, isLoading: answer === void 0 };
+  }
+
   langyVisibility(): ProjectHomeLangyVisibility {
     const mayRead = this.mayUseLangy(LANGY_VIEW_PERMISSION);
     const flag = mayRead ? this.featureFlagOf(LANGY_RELEASE_FLAG) : false;

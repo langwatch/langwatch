@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/internal-slack",
+  "langwatch": { "group": "libraries" },
   "version": "0.1.0",
   "private": true,
   "description": "Messages LangWatch sends to its own Slack workspace only, never customer-configured Slack: one Block Kit layout and a typed template per notice, each sent through the owning module's Slack channel.",

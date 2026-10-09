@@ -15,13 +15,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
+import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
 } from "../../repositories/memory/memory.datastore-health.repository.ts";
+import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { UsageReportWorld } from "../../services/__tests__/support/usage-report-peers.ts";
-import { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
   createOpsTestApp,
   OPS_STAFF_ADDRESS,
@@ -65,6 +66,7 @@ function checkupService(): OpsCheckupService {
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,
       productAnalytics: { key: undefined, host: undefined },
+      grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
       bugReportSlackChannel: undefined,
       cloudOps: false,
       adminEmails: [],
@@ -77,7 +79,7 @@ function checkupService(): OpsCheckupService {
     peers: {
       ...world.peers(),
       organizationDirectory: createApiFixture<OrganizationApi>({
-        findAllIds: async () => ["org-1", "org-2"],
+        listAllIds: async () => ({ ids: ["org-1", "org-2"], next: null }),
       }),
       licensing: createApiFixture<LicensingApi>({
         findInstanceIdentity: async () => [],
@@ -117,6 +119,7 @@ function checkupService(): OpsCheckupService {
       postgres: MemoryPostgresHealthRepository.create(),
       clickhouse: MemoryClickHouseHealthRepository.create(),
       redis: MemoryRedisHealthRepository.create(),
+      upgradeLedger: MemoryUpgradeLedgerRepository.create(),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),

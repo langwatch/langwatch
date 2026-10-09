@@ -9,7 +9,7 @@ import {
   readBrowserNotificationPermission,
   requestBrowserNotificationPermission,
   showBrowserNotification,
-} from "../browser-notifications.ts";
+} from "../push/browser-notifications.ts";
 
 type Shown = { title: string; options: { body?: string; tag?: string }; close: () => void };
 

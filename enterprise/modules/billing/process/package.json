@@ -22,12 +22,9 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
-    "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
-    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
@@ -35,7 +32,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/instant-eval-contract": "workspace:*",
+    "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/internal-slack": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mail": "workspace:*",
@@ -53,7 +50,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/usage-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@slack/webhook": "catalog:",
     "@trpc/server": "catalog:",
     "geoip-country": "^5.0.202607010001",
@@ -64,6 +61,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

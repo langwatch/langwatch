@@ -1,0 +1,43 @@
+{
+  "name": "@langwatch/instant-eval-judge-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Instant Evals judge's server half: the cloud classifier, the metered judge call and its own copies of the facts each call checks",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/instant-eval-judge-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "undici": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

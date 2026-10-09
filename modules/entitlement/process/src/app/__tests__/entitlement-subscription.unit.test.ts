@@ -4,14 +4,11 @@ import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
-import { createEntitlementTestUsers } from "./entitlement.fixture.ts";
 
 const free: Plan = {
   planSource: "free",
@@ -44,14 +41,11 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
     .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
-      user: createEntitlementTestUsers(),
       licensing: createApiFixture<LicensingApi>({
         resolve: async () => ({ granted: true, plan: free }),
       }),
       billing,
-      trace: createApiFixture<TraceApi>({}),
       organization: createApiFixture<OrganizationApi>({}),
-      project: createApiFixture<ProjectApi>({}),
     })
     .boot();
 }

@@ -17,11 +17,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useLastWayInWarning } from "../../behavior/use-last-way-in-warning.ts";
-import { readableDate } from "../../model/display-formatters.ts";
 import {
   usePersonalWorkspaceHost,
   type HeldPasskey,

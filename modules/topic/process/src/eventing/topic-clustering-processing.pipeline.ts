@@ -9,17 +9,17 @@ import {
   type EventingSetup,
   type StateProjectionStore,
 } from "@langwatch/eventing";
+import {
+  FIRST_TRACE_RECORDED_EVENT_TYPE,
+  firstTraceRecordedEventDataSchema,
+  TRACE_RECEIVED_EVENT_TYPE,
+  traceReceivedEventDataSchema,
+} from "@langwatch/trace-contract";
 
 import type { TopicModule } from "../app/topic.app.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
-import {
-  TopicClusteringRequestedEventSchema,
-  TopicClusteringRunStartedEventSchema,
-  TopicClusteringRunCompletedEventSchema,
-  TopicClusteringRunFailedEventSchema,
-  TopicClusteringTopicsRecordedEventSchema,
-} from "../rules/topic-clustering-events.rules.ts";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
+import type { TopicClusteringBootstrapService } from "../services/topic-clustering-bootstrap.service.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
@@ -42,6 +42,13 @@ import {
   topicClusteringSeedWake,
 } from "./topic-clustering-seed.process.ts";
 import {
+  TopicClusteringRequestedEventSchema,
+  TopicClusteringRunStartedEventSchema,
+  TopicClusteringRunCompletedEventSchema,
+  TopicClusteringRunFailedEventSchema,
+  TopicClusteringTopicsRecordedEventSchema,
+} from "./topic-clustering.events.ts";
+import {
   RecordClusteringRunCompletedCommand,
   RecordClusteringRunFailedCommand,
   RecordClusteringRunStartedCommand,
@@ -58,7 +65,7 @@ const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
  *  in `topicClusteringProcessManager`, ADR-052 "Approved builder API", like automations. */
-export interface TopicClusteringProcessingPipelineDeps {
+interface TopicClusteringProcessingPipelineDeps {
   /** Postgres run-status read model behind the settings page (ADR-051 §7). */
   topicClusteringRunStatusStore: StateProjectionStore<TopicClusteringRunStatusData>;
   /** Postgres run-history read model (audit; bounded, newest first). */
@@ -68,58 +75,76 @@ export interface TopicClusteringProcessingPipelineDeps {
   dispatch: TopicClusteringDispatchDeps;
   /** The legacy topic-model and schedule seeds, run once across the fleet per wake. */
   seeds: TopicClusteringSeeds;
+  /** Asserts a project's clustering schedule when trace records one of its milestones. */
+  bootstrap: Pick<TopicClusteringBootstrapService, "bootstrap">;
 }
 
 /** The topic_clustering_processing pipeline definition itself, built once per deps. */
 const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingPipelineDeps) => {
-  return definePipeline({
-    name: TOPIC_CLUSTERING_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: "topic_clustering",
-    }),
-  })
-    .withEvents([
-      TopicClusteringRequestedEventSchema,
-      TopicClusteringRunStartedEventSchema,
-      TopicClusteringRunCompletedEventSchema,
-      TopicClusteringRunFailedEventSchema,
-      TopicClusteringTopicsRecordedEventSchema,
-    ])
-    .withPostgresProjection(
-      TopicClusteringRunStatusFoldProjection.create({
-        store: deps.topicClusteringRunStatusStore,
+  return (
+    definePipeline({
+      name: TOPIC_CLUSTERING_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: "topic_clustering",
       }),
-    )
-    .withPostgresProjection(
-      TopicClusteringRunHistoryFoldProjection.create({
-        store: deps.topicClusteringRunHistoryStore,
-      }),
-    )
-    .withPostgresProjection(TopicModelFoldProjection.create({ store: deps.topicModelStore }))
-    .withCommand("requestClustering", RequestTopicClusteringCommand)
-    .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
-    .withCommand("recordClusteringRunCompleted", RecordClusteringRunCompletedCommand)
-    .withCommand("recordClusteringRunFailed", RecordClusteringRunFailedCommand)
-    .withCommand("recordTopics", RecordTopicsCommand, {
-      // Suppress duplicate appends for the same dedupeKey at enqueue (the
-      // boot seed racing the write-path seed, or a retried page). TTL-bound
-      // and best-effort — the fold's stale-seed guard is the correctness
-      // backstop (topic-model.projection.ts).
-      deduplication: {
-        makeId: recordTopicsDedupeId,
-        ttlMs: 60_000,
-      },
     })
-    .withProcessManager(TOPIC_CLUSTERING_PROCESS_NAME, topicClusteringProcessManager(deps.dispatch))
-    .withProcessManager(TOPIC_CLUSTERING_SEED_PROCESS_NAME, (pm) =>
-      pm
-        .state(topicClusteringSeedStateSchema, TOPIC_CLUSTERING_SEED_INITIAL_STATE)
-        .intent("seedTopicModels", topicClusteringSeedSchema, runTopicModelSeed(deps.seeds))
-        .intent("seedSchedules", topicClusteringSeedSchema, runClusteringScheduleSeed(deps.seeds))
-        .schedule({ everyMs: TOPIC_CLUSTERING_SEED_INTERVAL_MS })
-        .onWake(topicClusteringSeedWake),
-    )
-    .build();
+      .withEvents([
+        TopicClusteringRequestedEventSchema,
+        TopicClusteringRunStartedEventSchema,
+        TopicClusteringRunCompletedEventSchema,
+        TopicClusteringRunFailedEventSchema,
+        TopicClusteringTopicsRecordedEventSchema,
+      ])
+      .withPostgresProjection(
+        TopicClusteringRunStatusFoldProjection.create({
+          store: deps.topicClusteringRunStatusStore,
+        }),
+      )
+      .withPostgresProjection(
+        TopicClusteringRunHistoryFoldProjection.create({
+          store: deps.topicClusteringRunHistoryStore,
+        }),
+      )
+      .withPostgresProjection(TopicModelFoldProjection.create({ store: deps.topicModelStore }))
+      .withCommand("requestClustering", RequestTopicClusteringCommand)
+      .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
+      .withCommand("recordClusteringRunCompleted", RecordClusteringRunCompletedCommand)
+      .withCommand("recordClusteringRunFailed", RecordClusteringRunFailedCommand)
+      .withCommand("recordTopics", RecordTopicsCommand, {
+        // Suppress duplicate appends for the same dedupeKey at enqueue (the
+        // boot seed racing the write-path seed, or a retried page). TTL-bound
+        // and best-effort — the fold's stale-seed guard is the correctness
+        // backstop (topic-model.projection.ts).
+        deduplication: {
+          makeId: recordTopicsDedupeId,
+          ttlMs: 60_000,
+        },
+      })
+      .withProcessManager(
+        TOPIC_CLUSTERING_PROCESS_NAME,
+        topicClusteringProcessManager(deps.dispatch),
+      )
+      .withProcessManager(TOPIC_CLUSTERING_SEED_PROCESS_NAME, (pm) =>
+        pm
+          .state(topicClusteringSeedStateSchema, TOPIC_CLUSTERING_SEED_INITIAL_STATE)
+          .intent("seedTopicModels", topicClusteringSeedSchema, runTopicModelSeed(deps.seeds))
+          .intent("seedSchedules", topicClusteringSeedSchema, runClusteringScheduleSeed(deps.seeds))
+          .schedule({ everyMs: TOPIC_CLUSTERING_SEED_INTERVAL_MS })
+          .onWake(topicClusteringSeedWake),
+      )
+      // Trace records a project's first and later traces; the claim makes a redelivery a no-op.
+      .withPeerSubscriber("topicClusteringFirstTraceBootstrap", {
+        eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,
+        data: firstTraceRecordedEventDataSchema.pick({ projectId: true }),
+        handle: ({ projectId }) => deps.bootstrap.bootstrap({ projectId }),
+      })
+      .withPeerSubscriber("topicClusteringTraceReceivedBootstrap", {
+        eventType: TRACE_RECEIVED_EVENT_TYPE,
+        data: traceReceivedEventDataSchema.pick({ projectId: true }),
+        handle: ({ projectId }) => deps.bootstrap.bootstrap({ projectId }),
+      })
+      .build()
+  );
 };
 
 export type TopicClusteringProcessingPipelineDefinition = ReturnType<

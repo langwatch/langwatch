@@ -3,8 +3,7 @@ import { useState } from "react";
 
 import { AutomationSeveritySection } from "../blocks/severity-section.tsx";
 import { AutomationNameField } from "../elements/name-field.tsx";
-import { useConfigComplete, useDraft } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
+import { useConfigComplete, useDraft, useAutomationStore } from "./automation-selectors.ts";
 import { CadenceSection } from "./cadence-section-adapter.tsx";
 import { DeliveryPicker } from "./delivery-picker.tsx";
 import { SubjectSection } from "./subject-section.tsx";

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 /**
  * @see #4991, #4888
@@ -31,8 +31,8 @@ import {
 } from "@langwatch/trace-contract";
 
 import { blobStoreReading } from "../../__tests__/support/trace-blob-store.support.ts";
-import { type TraceBlobStoreService, BlobNotFoundError } from "../../trace-blob-store.service.ts";
-import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
+import { type TraceBlobStoreService, BlobNotFoundError } from "../../../features/media/services/trace-blob-store.service.ts";
+import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

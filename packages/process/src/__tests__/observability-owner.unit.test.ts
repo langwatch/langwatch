@@ -13,6 +13,19 @@ const parse = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [observabilityOwner], environment }).observability;
 
 describe("the observability owner's declaration", () => {
+  describe("given a Grafana in the environment", () => {
+    /** @scenario "Every process role reads the Grafana settings from its observability config" */
+    it("carries its base URL and datasource uid, and nothing when the base is blank", () => {
+      const grafana = parse({
+        GRAFANA_BASE_URL: "https://grafana.example.com",
+        GRAFANA_TEMPO_DATASOURCE_UID: "tempo-prod",
+      }).grafana;
+      expect(grafana.baseUrl).toBe("https://grafana.example.com");
+      expect(grafana.tempoDatasourceUid).toBe("tempo-prod");
+      expect(parse({ GRAFANA_BASE_URL: "" }).grafana.baseUrl).toBeUndefined();
+    });
+  });
+
   describe("given no metrics mode in the environment", () => {
     /** @scenario "No metrics mode is configured" */
     it("pushes over OTLP, which is cheaper than a scrape at our cardinality", () => {

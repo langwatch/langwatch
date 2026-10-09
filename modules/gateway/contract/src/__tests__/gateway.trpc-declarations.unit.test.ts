@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { gatewayBudgetTrpc } from "../gateway-budget.trpc.ts";
+import { gatewayBudgetTrpc } from "../features/budget/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpc } from "../gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpc } from "../gateway-guardrail.trpc.ts";
 import { gatewayUsageTrpc } from "../gateway-usage.trpc.ts";
@@ -19,13 +19,14 @@ function kinds(contract: { members: Readonly<Record<string, { kind: string }>> }
 
 describe("the gateway's declared tRPC namespaces", () => {
   describe("when a client calls the budgets namespace", () => {
-    it("answers under gatewayBudgets with eight procedures", () => {
+    it("answers under gatewayBudgets with nine procedures", () => {
       expect(gatewayBudgetTrpc.namespace).toBe("gatewayBudgets");
       expect(kinds(gatewayBudgetTrpc)).toEqual({
         list: "query",
         listForProject: "query",
         get: "query",
         groupTargets: "query",
+        personalBudget: "query",
         create: "mutation",
         update: "mutation",
         archive: "mutation",

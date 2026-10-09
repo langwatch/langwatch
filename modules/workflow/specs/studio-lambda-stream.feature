@@ -119,3 +119,16 @@ Feature: Optimization studio execution on a per-project Lambda
     Then the stored bytes are sealed under a key made for this run alone
     And the key travels only in the invoke envelope and is stored nowhere
     And the engine opens the body with that key after fetching it
+
+  @unit
+  Scenario: A salted deployment sends the engine a monthly per-project cache key
+    Given a deployment that set S3_KEY_SALT
+    When a studio run is dispatched for a project
+    Then the engine receives an X-S3-Cache-Key derived from the project, the salt and the month
+    And the key is 16 lowercase letters and digits
+
+  @unit
+  Scenario: An unsalted deployment sends no cache key
+    Given a deployment that left S3_KEY_SALT unset
+    When a studio run is dispatched
+    Then the engine receives no X-S3-Cache-Key header

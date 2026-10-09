@@ -26,6 +26,7 @@ import {
   type GovernanceToaster,
 } from "../../behavior/governance-feedback.ts";
 import { useGovernanceScope } from "../../behavior/governance-session.ts";
+import { useWebhookEndpointOptions } from "../../behavior/use-webhook-endpoint-options.ts";
 import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface.tsx";
 import { Link } from "../../ui/elements/governance-link.tsx";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
@@ -913,26 +914,7 @@ function RuleComposer({
               <ThresholdPreview ruleType={composer.ruleType} raw={composer.thresholdConfig} />
             </VStack>
 
-            <Box
-              borderWidth="1px"
-              borderColor="purple.300"
-              backgroundColor="purple.50"
-              padding={3}
-              borderRadius="sm"
-            >
-              <Text fontSize="xs" color="purple.900">
-                <strong>Alert destinations:</strong> alerts surface on the{" "}
-                <Link href="/governance" color="blue.600">
-                  governance dashboard
-                </Link>{" "}
-                today. Slack, PagerDuty, webhook, and email destinations ship in a follow-up
-                release; the composer will gain structured destination fields then. (See{" "}
-                <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.600">
-                  anomaly rules docs
-                </Link>{" "}
-                for the dispatch coverage table.)
-              </Text>
-            </Box>
+            <RuleDestinationField composer={composer} setComposer={setComposer} orgId={orgId} />
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -957,6 +939,97 @@ function RuleComposer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+const NO_DESTINATION = "none";
+
+const destinationText = (value: unknown) => (typeof value === "string" ? value : "");
+
+/** The destination's type, endpoint id and inline URL, empty where the text says nothing. */
+function readDestination(raw: string) {
+  const empty = { type: "", endpointId: "", url: "" };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || "{}");
+  } catch {
+    return empty;
+  }
+  if (typeof parsed !== "object" || parsed === null) return empty;
+  return {
+    type: "type" in parsed ? destinationText(parsed.type) : "",
+    endpointId: "endpointId" in parsed ? destinationText(parsed.endpointId) : "",
+    url: "url" in parsed ? destinationText(parsed.url) : "",
+  };
+}
+
+/** The picker's value: the named endpoint, nothing for an inline webhook, else dashboard only. */
+function destinationPickerValue(destination: ReturnType<typeof readDestination>) {
+  if (destination.type === "webhook_endpoint") return destination.endpointId;
+  if (destination.type === "webhook") return "";
+  return NO_DESTINATION;
+}
+
+/**
+ * Where a rule's alerts go: one of the organisation's webhook endpoints, or the
+ * dashboard only. An inline webhook destination stays on the rule, shown read-only,
+ * until the admin picks an endpoint. Spec: specs/ai-gateway/governance/anomaly-rules.feature
+ */
+function RuleDestinationField({
+  composer,
+  setComposer,
+  orgId,
+}: {
+  composer: ComposerState;
+  setComposer: (next: ComposerState | null) => void;
+  orgId: string;
+}) {
+  const { hasAnyPermission } = useGovernanceScope();
+  const canViewEndpoints = hasAnyPermission("webhookEndpoints:view");
+  const { options, isLoading } = useWebhookEndpointOptions({
+    organizationId: orgId,
+    enabled: canViewEndpoints,
+  });
+  const destination = readDestination(composer.destinationConfig);
+  const isInline = destination.type === "webhook";
+  const pickerOptions = useMemo(
+    () => [{ value: NO_DESTINATION, label: "Governance dashboard only" }, ...options],
+    [options],
+  );
+
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Alert destination
+      </Text>
+      {canViewEndpoints ? (
+        <DashboardSelect
+          ariaLabel="Alert destination"
+          options={pickerOptions}
+          value={destinationPickerValue(destination)}
+          disabled={isLoading}
+          placeholder={isInline ? "Inline webhook" : "Select a webhook endpoint"}
+          onChange={(next) =>
+            setComposer({
+              ...composer,
+              destinationConfig: JSON.stringify(
+                next === NO_DESTINATION ? {} : { type: "webhook_endpoint", endpointId: next },
+              ),
+            })
+          }
+        />
+      ) : (
+        <PermissionRequiredNotice
+          permission="webhookEndpoints:view"
+          detail="Without it you cannot pick a webhook endpoint for this rule's alerts."
+        />
+      )}
+      {isInline ? (
+        <Text fontSize="xs" color="fg.muted">
+          Alerts post to {destination.url} until you pick a webhook endpoint.
+        </Text>
+      ) : null}
+    </VStack>
   );
 }
 

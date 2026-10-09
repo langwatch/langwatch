@@ -5,13 +5,13 @@
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { asJsonDocument } from "@langwatch/langy-contract";
 
-import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
-import { useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
-} from "../../../model/capabilities/capability-registry.ts";
+} from "../../../../../model/langy-capability-registry.ts";
+import { collectionOf, totalOf } from "../../../../tools/model/langy-cli-result-document.ts";
+import { useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,

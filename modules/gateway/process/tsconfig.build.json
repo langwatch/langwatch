@@ -13,14 +13,13 @@
     "./src/__tests__/testing.ts",
     "./src/__tests__/support/postgres.virtual-key.ts",
     "./src/__tests__/support/postgres.gateway-service.ts",
-    "./src/services/gateway-realtime-session-reconciliation.service.ts",
+    "./src/features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts",
     "./src/repositories/prisma/prisma.gateway-change-event.repository.ts",
     "./src/repositories/prisma/prisma.gateway-audit.repository.ts",
     "./src/repositories/prisma/prisma.virtual-key.repository.ts",
     "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
     "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts",
     "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts",
-    "./src/repositories/prisma/prisma.gateway-transaction.repository.ts",
     "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts",
     "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts",
     "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts",
@@ -90,6 +89,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../instant-eval-judge/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -133,6 +135,9 @@
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

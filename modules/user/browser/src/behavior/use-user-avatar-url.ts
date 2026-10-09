@@ -3,7 +3,10 @@
  * reference; any other image is used as it stands. Pending or failed mints answer null.
  * Spec: specs/settings/user-avatar.feature
  */
-import { userApi } from "./user-api.ts";
+import { type ContractApiMap, createModuleApi } from "@langwatch/api/web";
+import type { userTrpc } from "@langwatch/user-contract";
+
+const userApi = createModuleApi<ContractApiMap<typeof userTrpc>>();
 
 const STORED_AVATAR = /^\/api\/user-avatar\/([^/]+)\/([^/?#]+)$/;
 

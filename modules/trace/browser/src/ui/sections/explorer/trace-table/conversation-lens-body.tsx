@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Flex, Text } from "@langwatch/design-system/primitives";
 import {
   getCoreRowModel,
@@ -10,16 +10,16 @@ import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 
 import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
+import type { ConversationGroup } from "../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import { mapTraceListPayload } from "../../../../behavior/explorer/utils/map-trace-list-payload.ts";
 import { type LensConfig } from "../../../../behavior/view.slice.ts";
+import { useConversationTurns } from "../../../../features/conversation/behavior/use-conversation-turns.ts";
 import {
   EXPANDED_BG,
   EXPANDED_BG_CSS,
 } from "../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles.ts";
 import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
-import { useConversationTurns } from "../hooks/use-conversation-turns.ts";
-import { mapTraceListPayload } from "../utils/map-trace-list-payload.ts";
 import { buildConversationColumns } from "./columns.ts";
-import type { ConversationGroup } from "./conversation-groups.ts";
 import { conversationRegistry, RegistryRow } from "./registry/index.ts";
 import { conversationSelectColumnDef } from "./select-column.tsx";
 import { buildConversationPlaceholderRows } from "./skeleton-placeholders.ts";

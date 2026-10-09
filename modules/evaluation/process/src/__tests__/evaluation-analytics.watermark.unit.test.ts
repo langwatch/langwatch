@@ -1,4 +1,4 @@
-import { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
@@ -26,7 +26,17 @@ type Written = {
   appliedEventIds: string[];
 };
 
-class RecordingAnalytics extends AnalyticsService {
+class RecordingAnalytics implements Pick<
+  AnalyticsApi,
+  | "getTimeseries"
+  | "getFeedbacks"
+  | "getTopUsedDocuments"
+  | "upsertEvaluationAnalytics"
+  | "upsertEvaluationAnalyticsBatch"
+  | "findEvaluationAnalytics"
+  | "appendEvaluationAnalyticsRollup"
+  | "appendEvaluationAnalyticsRollupBatch"
+> {
   readonly written: Written[] = [];
 
   async getTimeseries(): Promise<never> {

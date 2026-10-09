@@ -19,6 +19,7 @@ import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
 } from "../../channels/github-api.channel.ts";
+import { MemoryGithubApiAdapter } from "../../channels/memory/memory.github-api.channel.ts";
 import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubAppTokenService } from "../../services/github-app-token.service.ts";
 import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
@@ -93,8 +94,7 @@ function makeAppTokens(
   }> = {},
 ): GithubAppTokenService {
   const tokens = GithubAppTokenService.create({
-    appId: "app-1",
-    privateKey: "test-private-key",
+    api: MemoryGithubApiAdapter.create(),
     tokenCache: unansweredRedisRepositories().tokenCache,
   });
 
@@ -521,6 +521,7 @@ describe("findTurnTokens", () => {
   describe("when no explicit repo is given", () => {
     /** @scenario "Langy still mints a turn token through the connection" */
     /** @scenario "installation tokens are ephemeral" */
+    /** @scenario "The minted token is scoped to the installation and self-expires" */
     it("mints a full-installation-scoped token", async () => {
       const repo = makeRepo([row()]);
       const mint = vi.fn(async () => ({ token: "ghs_all", expiresAt: "" }));
@@ -539,6 +540,7 @@ describe("findTurnTokens", () => {
 
   describe("when an explicit repo is reachable", () => {
     /** @scenario "A Langy turn mints repository-bounded credentials from the connection" */
+    /** @scenario "A known single repository narrows the token scope" */
     it("scopes the token to only that repository", async () => {
       const repo = makeRepo([
         row({

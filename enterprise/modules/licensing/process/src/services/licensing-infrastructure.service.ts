@@ -1,3 +1,4 @@
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ServerRole } from "@langwatch/process";
 
 import type { LicensingInfrastructure } from "../app/licensing.app.ts";
@@ -5,6 +6,13 @@ import type {
   OrganizationLicenseReads,
   OrganizationLicenseRepository,
 } from "../repositories/organization-license.repository.ts";
+import { OrganizationLicenseWriterService } from "./organization-license-writer.service.ts";
+
+/** Organization's licence columns, still written beside licensing's rows (round 37 D6). */
+type LicenseWrites = Pick<OrganizationApi, "setLicense" | "clearLicense">;
+
+type LicenseRows = OrganizationLicenseReads &
+  Pick<OrganizationLicenseRepository, "organizationExists" | "saveLicense" | "clearLicense">;
 
 type SeatCounts = Readonly<{
   getMemberCount: (organizationId: string) => Promise<number>;
@@ -35,24 +43,29 @@ export class LicensingInfrastructureService {
           options.licenses.getOrganizationLicense(organizationId),
         findOrganizationsWithLicense: () => options.licenses.findOrganizationsWithLicense(),
         organizationExists: () => Promise.reject(unavailable()),
-        storeLicense: () => Promise.reject(unavailable()),
-        removeLicense: () => Promise.reject(unavailable()),
+        saveLicense: () => Promise.reject(unavailable()),
+        clearLicense: () => Promise.reject(unavailable()),
+      },
+      organizations: {
+        setLicense: () => Promise.reject(unavailable()),
+        clearLicense: () => Promise.reject(unavailable()),
       },
     });
   }
 
-  /** The licence rows read and written, with the seat counts their owner answers. */
+  /** The licence rows read and written here, mirrored onto organization, with its seat counts. */
   withStorage(
-    options: Readonly<{ licenses: OrganizationLicenseRepository }> & SeatCounts,
+    options: Readonly<{ licenses: LicenseRows; organizations: LicenseWrites }> & SeatCounts,
   ): LicensingInfrastructure {
-    const { licenses } = options;
+    const { licenses, organizations } = options;
+    const writer = OrganizationLicenseWriterService.create({ licenses, organizations });
     return {
       repository: {
         getOrganizationLicense: (organizationId) => licenses.getOrganizationLicense(organizationId),
         findOrganizationsWithLicense: () => licenses.findOrganizationsWithLicense(),
         organizationExists: (organizationId) => licenses.organizationExists(organizationId),
-        storeLicense: (organizationId, license) => licenses.storeLicense(organizationId, license),
-        removeLicense: (organizationId) => licenses.removeLicense(organizationId),
+        storeLicense: (organizationId, license) => writer.store({ organizationId, license }),
+        removeLicense: (organizationId) => writer.remove({ organizationId }),
         getMemberCount: (organizationId) => options.getMemberCount(organizationId),
         getMembersLiteCount: (organizationId) => options.getMembersLiteCount(organizationId),
       },

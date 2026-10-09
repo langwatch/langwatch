@@ -1,7 +1,7 @@
 import { INGESTION_PULL_EVENT_TYPES } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { INGESTION_PULL_MAX_COOLDOWN_MS } from "../../rules/ingestion-pull-cooldown.rules.ts";
+import { INGESTION_PULL_MAX_COOLDOWN_MS } from "../../features/ingestion-pull/rules/ingestion-pull-cooldown.rules.ts";
 import { INGESTION_PULL_STALE_RUN_MS } from "../ingestion-pull.process.ts";
 import { CADENCE_MS, configuredState, onEvent, onWake } from "./ingestion-pull.fixtures.ts";
 

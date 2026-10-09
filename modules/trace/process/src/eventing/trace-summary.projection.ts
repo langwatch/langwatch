@@ -4,8 +4,8 @@ import {
   type FoldEventHandlers,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import {
-  ATTR_KEYS,
   type AnnotationAddedEvent,
   type AnnotationRemovedEvent,
   type AnnotationsBulkSyncedEvent,
@@ -13,7 +13,6 @@ import {
   type LogRecordReceivedEvent,
   type MetricDataPointCorrelatedEvent,
   type NormalizedSpan,
-  NON_BILLABLE_ATTR,
   type OriginResolvedEvent,
   type SpanReceivedEvent,
   spanReceivedEventSchema,
@@ -33,15 +32,17 @@ import {
   type TraceCanonicalisationService,
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+  anchorStorageTime,
+  MAX_PROCESSED_SPANS,
+  spanStorabilityOf,
+  UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
-import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
-} from "../services/trace-io-accumulation.service.ts";
-import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
+} from "../features/derivation/services/trace-io-accumulation.service.ts";
+import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
 import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-summary-fold");
@@ -56,13 +57,6 @@ const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 // ─── Main composition ───────────────────────────────────────────────
 
 /**
- * Max spans fully processed (normalize + derive) into a trace summary. A
- * handful of traces accumulate tens of thousands (reused trace_id, runaway
- * loops); past the cap we only keep counting, to stay visible.
- */
-export const MAX_PROCESSED_SPANS = 512;
-
-/**
  * ±7 days, aligned with TRACE_ANALYTICS_READ_WINDOW_MS — see the `options`
  * docstring for the production measurement that retired the ±2-day width.
  */
@@ -70,9 +64,9 @@ const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Reserved keys for cache/reasoning token sums (per-span numbers don't reach
 // the attribute allowlist, so we fold sums here instead of adding CH columns)
-export const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
-export const RESERVED_CACHE_CREATION_TOKENS = "langwatch.reserved.cache_creation_tokens";
-export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
+const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
+const RESERVED_CACHE_CREATION_TOKENS = "langwatch.reserved.cache_creation_tokens";
+const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
 /**
  * Anthropic's cache-creation split by TTL, summed across the trace's model
  * calls. Rides ONLY api_response_body log events (no span attribute carries

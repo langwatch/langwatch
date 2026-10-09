@@ -108,6 +108,15 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return (await this.findAll(input)).length;
   }
 
+  countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
+    const projectIds = new Set(input.projectIds);
+    return Promise.resolve(
+      [...this.rows.values()].filter(
+        (row) => projectIds.has(row.projectId) && row.archivedAt === null,
+      ).length,
+    );
+  }
+
   async update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario> {
     const existing = await this.findByIdIncludingArchived(input);
     const {

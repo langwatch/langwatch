@@ -1,6 +1,11 @@
 import { PRIVATE_ROUTE_ENV_PREFIX } from "@langwatch/clickhouse-client";
 import { Config, type ProcessConfigOf } from "@langwatch/config";
-import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
+import {
+  credentialsSecret,
+  credentialsSecretPrevious,
+  Secret,
+  sessionSecret,
+} from "@langwatch/secrets";
 import { z } from "zod";
 
 /** Main's per-organisation S3 family prefix, parsed in object-storage-private-accounts.ts. */
@@ -12,6 +17,20 @@ function readDrainTimeoutMs(value: unknown): number | undefined {
   if (Number.isInteger(parsed) && parsed > 0) return parsed;
   console.error(
     `[shutdown] SHUTDOWN_DRAIN_TIMEOUT_MS must be a positive whole number of milliseconds, got "${typeof value === "string" ? value : JSON.stringify(value)}"; using the queue's default drain. The pod's terminationGracePeriodSeconds may not match this budget.`,
+  );
+  return undefined;
+}
+
+/**
+ * `CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE`, valid in (0, 0.5]. Blank means unset; anything
+ * else out of range is a typo, reported and replaced by the limiter's default (0.25).
+ */
+function readLaneReserveShare(value: unknown): number | undefined {
+  if (value === undefined || (typeof value === "string" && value.trim() === "")) return undefined;
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0 && parsed <= 0.5) return parsed;
+  console.warn(
+    `[clickhouse] Invalid CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE "${typeof value === "string" ? value : JSON.stringify(value)}"; using default`,
   );
   return undefined;
 }
@@ -42,6 +61,11 @@ export const storesOwner = {
       serverNodes: c.env("CLICKHOUSE_SERVER_NODES", z.coerce.number().optional()),
       clientsPerProcess: c.env("CLICKHOUSE_CLIENTS_PER_PROCESS", z.coerce.number().optional()),
     },
+    /** Each of reads and inserts keeps this share of the statement slots for itself. */
+    clickhouseStatementLaneReserveShare: c.env(
+      "CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE",
+      z.preprocess(readLaneReserveShare, z.number().optional()),
+    ),
     redis: {
       /** Dev worktree isolation: each stack on one shared server keeps its own queue. */
       dbIndex: c.env("REDIS_DB_INDEX", z.string().optional()),
@@ -85,6 +109,8 @@ export const storesOwner = {
     redis: Secret.load("REDIS_URL", { optional: true }),
     encryption: credentialsSecret,
     encryptionFallback: sessionSecret,
+    /** Opens values sealed before a CREDENTIALS_SECRET rotation; never seals. */
+    encryptionPrevious: credentialsSecretPrevious,
     s3AccessKeyId: Secret.load("S3_ACCESS_KEY_ID", { optional: true }),
     s3SecretAccessKey: Secret.load("S3_SECRET_ACCESS_KEY", { optional: true }),
     s3SessionToken: Secret.load("S3_SESSION_TOKEN", { optional: true }),

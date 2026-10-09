@@ -7,7 +7,7 @@ import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
-import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider, useLangy } from "../../../tools/ui/sections/langy-page-context.tsx";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useLangyWebPush } from "../../behavior/use-langy-web-push.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";

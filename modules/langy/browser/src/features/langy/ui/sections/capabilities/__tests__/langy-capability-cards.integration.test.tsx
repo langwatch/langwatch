@@ -6,7 +6,8 @@
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { toCliToolResult } from "@langwatch/langy-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +20,10 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
+
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
 
 class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
@@ -44,9 +49,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return false;
-  }
-  featureFlag() {
-    return true;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };
@@ -75,14 +77,18 @@ vi.mock("../../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
+const IDLE_HYDRATION: CapabilityData = {
+  status: "idle",
+  rows: [],
+  loadedCount: 0,
+  totalCount: null,
+  isHydrating: false,
+};
+// What the viewer's own fetch of the result's references returned.
+const hydration = vi.hoisted((): { current: CapabilityData | null } => ({ current: null }));
+
 vi.mock("../../../../behavior/use-capability-data.ts", () => ({
-  useCapabilityData: () => ({
-    status: "idle",
-    rows: [],
-    loadedCount: 0,
-    totalCount: null,
-    isHydrating: false,
-  }),
+  useCapabilityData: () => hydration.current ?? IDLE_HYDRATION,
 }));
 
 vi.mock("recharts", async (importOriginal) => {
@@ -97,9 +103,33 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
+import { useLangyStore } from "../../../../../../behavior/langy.store.ts";
+import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
+import { LangyToolActivity } from "../../langy-tool-activity.tsx";
 import { LangyCapabilityRenderer } from "../langy-capability-renderer.tsx";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  hydration.current = null;
+  useLangyStore.setState({ devMode: false });
+  window.matchMedia = originalMatchMedia;
+});
+
+// The setup's matchMedia stub is writable but not configurable; assign, then restore.
+const originalMatchMedia = window.matchMedia;
+
+function mockReducedMotion(matches: boolean) {
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches: query.includes("prefers-reduced-motion") ? matches : false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  });
+}
 
 /**
  * A settled call carrying the result the CLI envelope recorded for it — the
@@ -126,14 +156,38 @@ function settledCall({
   };
 }
 
-function renderCall(call: Parameters<typeof LangyCapabilityRenderer>[0]["call"]) {
-  return render(
+function inHost(node: ReactElement) {
+  return (
     <DesignSystemProvider forcedTheme="light">
-      <LangyHostProvider value={host}>
-        <LangyCapabilityRenderer call={call} />
-      </LangyHostProvider>
-    </DesignSystemProvider>,
+      <LangyHostProvider value={host}>{node}</LangyHostProvider>
+    </DesignSystemProvider>
   );
+}
+
+function renderCall(call: Parameters<typeof LangyCapabilityRenderer>[0]["call"]) {
+  return render(inHost(<LangyCapabilityRenderer call={call} />));
+}
+
+const SEARCH_COMMAND = "langwatch trace search --query 'refund' --format json";
+
+const storedSearch = {
+  traces: [
+    { trace_id: "trace_stored_a", input: { value: "stored question a" } },
+    { trace_id: "trace_stored_b", input: { value: "stored question b" } },
+  ],
+  pagination: { totalHits: 2 },
+};
+
+function traceSearchCall() {
+  return {
+    ...settledCall({
+      name: "langwatch.trace.search",
+      resource: "trace",
+      verb: "search",
+      payload: storedSearch,
+    }),
+    input: { command: SEARCH_COMMAND },
+  };
 }
 
 describe("given Langy ran an experiment and it completed", () => {
@@ -208,6 +262,248 @@ describe("given Langy fetched a scenario simulation", () => {
       expect(screen.getByText("Refund flow")).toBeTruthy();
       expect(screen.getByText("passed")).toBeTruthy();
       expect(screen.getByText(/Open in Simulations/i).closest("a")).toBeTruthy();
+    });
+  });
+});
+
+describe("given Langy looked up one trace", () => {
+  describe("when the panel renders the call", () => {
+    /** @scenario "A single trace lookup renders a span summary" */
+    it("shows a trace card summarising that trace, linking to it", () => {
+      renderCall(
+        settledCall({
+          name: "langwatch.trace.get",
+          resource: "trace",
+          verb: "get",
+          payload: {
+            trace_id: "trace_abc123456789",
+            input: "How long does a refund take?",
+            output: "Refunds land within five working days.",
+          },
+        }),
+      );
+
+      expect(screen.getByText("Trace trace_abc1")).toBeTruthy();
+      expect(screen.getByText("How long does a refund take?")).toBeTruthy();
+      expect(screen.getByText("Refunds land within five working days.")).toBeTruthy();
+      const link = screen.getByText(/Open in Traces/i).closest("a");
+      expect(link?.getAttribute("href")).toContain("trace_abc123456789");
+    });
+  });
+});
+
+describe("given Langy searched traces and the viewer's fetch returned rows", () => {
+  describe("when the panel renders the card", () => {
+    /** @scenario "A card shows current data, fetched as the viewer" */
+    it("draws the rows fetched fresh, not the ones the turn recorded", () => {
+      hydration.current = {
+        status: "hydrated",
+        rows: [{ id: "trace_visible", primary: "fresh question" }],
+        loadedCount: 1,
+        totalCount: 1,
+        isHydrating: false,
+      };
+      renderCall(traceSearchCall());
+
+      expect(screen.getByText("fresh question")).toBeTruthy();
+      expect(screen.queryByText("stored question a")).toBeNull();
+      expect(screen.queryByText("stored question b")).toBeNull();
+    });
+
+    /** @scenario "A card shows current data, fetched as the viewer" */
+    it("draws a teammate's card from their own fetch, so each sees only their rows", () => {
+      hydration.current = {
+        status: "hydrated",
+        rows: [
+          { id: "trace_visible", primary: "fresh question" },
+          { id: "trace_teammate", primary: "teammate-only question" },
+        ],
+        loadedCount: 2,
+        totalCount: 2,
+        isHydrating: false,
+      };
+      renderCall(traceSearchCall());
+
+      expect(screen.getByText("fresh question")).toBeTruthy();
+      expect(screen.getByText("teammate-only question")).toBeTruthy();
+      expect(screen.queryByText("stored question a")).toBeNull();
+    });
+  });
+});
+
+/** The CSS rules that style the first placeholder line, as text. */
+function placeholderStyle(container: HTMLElement): string {
+  const line = container.querySelector('[aria-hidden="true"] > div > div');
+  const classes = [...(line?.classList ?? [])];
+  return [...document.styleSheets]
+    .flatMap((sheet) => [...sheet.cssRules])
+    .map((rule) => rule.cssText)
+    .filter((text) => classes.some((name) => text.includes(`.${name}`)))
+    .join("\n");
+}
+
+describe("given a results card is still fetching its rows", () => {
+  const fetching: CapabilityData = {
+    status: "hydrating",
+    rows: [],
+    loadedCount: 0,
+    totalCount: 34,
+    isHydrating: true,
+  };
+
+  describe("when the card renders", () => {
+    /** @scenario "A card holds its shape while its rows load" */
+    it("shows the honest count and placeholder rows in place of the results", () => {
+      hydration.current = fetching;
+      const { container } = renderCall(traceSearchCall());
+
+      expect(screen.getByText(/^34 traces/)).toBeTruthy();
+      expect(screen.queryByText("stored question a")).toBeNull();
+      expect(container.querySelectorAll('[aria-hidden="true"] > div').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when the reader prefers reduced motion", () => {
+    /** @scenario "A card holds its shape while its rows load" */
+    it("keeps the placeholders still", () => {
+      hydration.current = fetching;
+      mockReducedMotion(false);
+      const moving = placeholderStyle(renderCall(traceSearchCall()).container);
+      cleanup();
+      mockReducedMotion(true);
+      const still = placeholderStyle(renderCall(traceSearchCall()).container);
+
+      expect(moving).toMatch(/animation:\s*(?!none)\S/);
+      expect(still).toMatch(/animation:\s*none/);
+    });
+  });
+});
+
+describe("given Langy has started a trace search that has not returned", () => {
+  function searchMessage(part: Record<string, unknown>): UIMessage {
+    const parts: UIMessage["parts"] = [];
+    Object.assign(parts, [part]);
+    return { id: "assistant-1", role: "assistant", parts };
+  }
+  const started = {
+    type: "tool-bash",
+    toolCallId: "call-1",
+    state: "input-available",
+    input: { command: SEARCH_COMMAND },
+  };
+
+  describe("when the panel renders the turn", () => {
+    /** @scenario "A capability tool still in flight reads as an activity line" */
+    it("shows a pending activity line, and the traces card only once it returns", () => {
+      const { rerender } = render(inHost(<LangyToolActivity message={searchMessage(started)} />));
+
+      expect(screen.getByText(/Searching traces/)).toBeTruthy();
+      expect(screen.queryByText("2 traces")).toBeNull();
+
+      const settled = traceSearchCall();
+      rerender(
+        inHost(
+          <LangyToolActivity
+            message={searchMessage({
+              ...started,
+              state: "output-available",
+              output: settled.output,
+              result: settled.result,
+            })}
+          />,
+        ),
+      );
+
+      expect(screen.getByText("2 traces")).toBeTruthy();
+      expect(screen.queryByText(/Searching traces…/)).toBeNull();
+    });
+  });
+});
+
+describe("given Langy searched traces and the search returned matches", () => {
+  describe("when the panel renders the call", () => {
+    /** @scenario "A trace search renders results inline with no Apply" */
+    it("lists the traces inline, each linking to its trace, with one link to the Trace Explorer", () => {
+      hydration.current = {
+        status: "hydrated",
+        rows: [{ id: "trace_visible", primary: "fresh question" }],
+        loadedCount: 1,
+        totalCount: 1,
+        isHydrating: false,
+      };
+      renderCall(traceSearchCall());
+
+      const row = screen.getByText("fresh question").closest("a");
+      expect(row?.getAttribute("href")).toContain("trace_visible");
+      expect(screen.getByText("View in Trace Explorer").closest("a")).toBeTruthy();
+      expect(screen.queryByText(/Open in Traces/i)).toBeNull();
+      expect(screen.queryByText(/Apply|Discard/)).toBeNull();
+    });
+  });
+});
+
+describe("given Langy ran an analytics query that returned numbers", () => {
+  const analytics = () =>
+    settledCall({
+      name: "langwatch.analytics.query",
+      resource: "analytics",
+      verb: "query",
+      payload: {
+        currentPeriod: [
+          {
+            date: "full",
+            "metadata.model": { "gpt-5-mini": { "0/metadata.trace_id/cardinality": 7 } },
+          },
+        ],
+        previousPeriod: [],
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      },
+    });
+
+  describe("when the panel renders the call", () => {
+    /** @scenario "An analytics query renders as a metrics card" */
+    it("shows the figures, rolling up from zero, and offers no deep link", () => {
+      mockReducedMotion(false);
+      renderCall(analytics());
+      expect(screen.getByText("Traces")).toBeTruthy();
+      expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+      expect(screen.queryByText(/Open in Analytics/i)).toBeNull();
+      cleanup();
+
+      mockReducedMotion(true);
+      renderCall(analytics());
+      expect(screen.getAllByText("7").length).toBeGreaterThan(0);
+      expect(screen.queryByText("0")).toBeNull();
+    });
+  });
+});
+
+describe("given developer mode is on and Langy ran a tool with no capability card", () => {
+  describe("when the panel renders the turn", () => {
+    /** @scenario "An unmapped tool falls through to the raw view" */
+    it("lets me show the tool's raw name, state, input and output", () => {
+      useLangyStore.setState({ devMode: true });
+      const parts: UIMessage["parts"] = [];
+      Object.assign(parts, [
+        {
+          type: "tool-mystery_probe",
+          toolCallId: "call-9",
+          state: "output-available",
+          input: { depth: 3 },
+          output: "probe-finished",
+        },
+      ]);
+      render(
+        inHost(<LangyToolActivity message={{ id: "assistant-2", role: "assistant", parts }} />),
+      );
+
+      fireEvent.click(screen.getByLabelText("Show raw data"));
+
+      const raw = screen.getByText(/"tool": "mystery_probe"/).textContent ?? "";
+      expect(raw).toContain('"state": "output-available"');
+      expect(raw).toContain('"depth": 3');
+      expect(raw).toContain("probe-finished");
     });
   });
 });

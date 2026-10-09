@@ -33,9 +33,10 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryLangyChannels } from "../../channels/memory/memory.langy.channels.ts";
+import { LangyConversationUpdateService } from "../../features/conversation/services/langy-conversation-update.service.ts";
+import { LocalControlLongPollService } from "../../features/local-control/services/langy-local-control-long-poll.service.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import { LangyConversationUpdateService } from "../../services/langy-conversation-update.service.ts";
-import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
 import { LangyModule } from "../langy.app.ts";
 
 const CONVERSATION = {
@@ -184,6 +185,7 @@ function fakePresence(): PresenceApi {
     events: async function* () {},
     cursors: async function* () {},
     readHints: async function* () {},
+    upgradeReadHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };
@@ -264,6 +266,7 @@ async function createApp({
     resources,
     secrets,
     repositories,
+    channels: MemoryLangyChannels.create(),
   });
   const registered = producerEventing().register(
     app.conversationPipeline({ participation: "produce" }),

@@ -14,7 +14,7 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
     selector({ viewMode: "summary" }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
@@ -61,7 +61,7 @@ const turnsState = {
   isLoading: false,
 };
 
-vi.mock("../../hooks/use-conversation-context.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
   useConversationContext: () => ({
     ...turnsState,
     turns: [turnsState.previous, current()],

@@ -106,7 +106,10 @@ describe("cli-api — auth contract", () => {
           upgrade_url: "https://app.test/settings/subscription",
         }),
       );
-      const failure = await listIngestionSources(baseCfg(), { fetchImpl }).catch(
+      const failure = await listIngestionSources(baseCfg(), { fetchImpl }).then(
+        () => {
+          throw new Error("expected the listing to be refused");
+        },
         (error: unknown) => error as { status: number; code: string; message: string },
       );
       expect(failure).toMatchObject({ status: 402, code: "payment_required" });

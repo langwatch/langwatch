@@ -17,6 +17,7 @@ const TARGET_KIND_BY_ACTION: Record<QueueControlAction, string> = {
   queue_move_all_blocked_to_dlq: "queue",
   queue_unblock_group: "queue",
   queue_unblock_all: "queue",
+  queue_reap_stranded: "queue",
 };
 
 /** Records queue dead-letter operator actions on the shared audit log. */

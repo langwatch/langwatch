@@ -5,8 +5,9 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
 
+import { createPublicAppConfigMetaTag } from "@langwatch/config/public-app-config";
 import type { ConfigEnv, UserConfig } from "vite";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import viteConfig from "../../vite.config";
 import { ROOT_DISCOVERY_PATHS, rootDiscoveryProxyPattern } from "../root-discovery-proxy";
@@ -26,6 +27,8 @@ async function resolveConfig(environment: ConfigEnv = buildEnvironment): Promise
     environment,
   )) satisfies UserConfig;
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("given the browser entry of apps/ui", () => {
   describe("when the HTML shell names its entry module", () => {
@@ -74,6 +77,8 @@ describe("given the browser entry of apps/ui", () => {
       // application, which is the one import direction the migration forbids.
       // Asserted on where the entries POINT, not on how vite spells an empty
       // alias — that has been undefined, [], and a plugin on three days.
+      const shell = `<html><head>${createPublicAppConfigMetaTag({ process: {} })}</head></html>`;
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(shell));
       for (const command of ["build", "serve"] as const) {
         const config = await resolveConfig({ ...buildEnvironment, command });
         const alias = config.resolve?.alias ?? [];

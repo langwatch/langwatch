@@ -58,6 +58,9 @@ export abstract class SsoHostApi {
    */
   abstract canManage(): boolean;
 
+  /** Whether this reader may read single sign-on at all (`sso:view`). */
+  abstract canView(): boolean;
+
   /** The reader's own address: every sentence about a refused test names it. */
   abstract currentUserAddress(): string | undefined;
 

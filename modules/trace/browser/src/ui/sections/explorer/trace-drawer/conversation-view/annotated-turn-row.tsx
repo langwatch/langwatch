@@ -1,12 +1,16 @@
 import { Box, Grid, VStack } from "@langwatch/design-system/primitives";
+import type { ParsedTurn as ConversationParsedTurn } from "@langwatch/trace-contract/conversation";
 import { memo } from "react";
 
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 import { FocusedTurnFrame } from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import { ChatTurnRow } from "./chat-turn-row.tsx";
+import { ChatTurnRow, type TurnLayout } from "./chat-turn-row.tsx";
 import { TurnAnnotationRail } from "./turn-annotation-rail.tsx";
-import type { ParsedTurn, TurnLayout } from "./types.ts";
 import { type RailLayout, THREAD_COLUMN_MAX_WIDTH_PX } from "./use-rail-layout.ts";
+
+/** The shared conversation parse, over the rows the drawer's list already holds. */
+export type ParsedTurn = ConversationParsedTurn<TraceListItem>;
 
 /**
  * Lines the stacked rail up with the message text: the card's own 12px

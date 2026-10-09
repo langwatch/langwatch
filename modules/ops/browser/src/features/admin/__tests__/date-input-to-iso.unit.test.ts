@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dateInputToISO } from "../ui/elements/backoffice-cells.tsx";
+import { dateInputToISO } from "../ui/elements/admin-cells.tsx";
 
 /**
  * Regression (#3254): `new Date("2026-04-16").toISOString()` parses as UTC

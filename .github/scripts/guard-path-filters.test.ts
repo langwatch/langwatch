@@ -335,3 +335,54 @@ void describe("aggregatorJobs", () => {
     assert.deepEqual(aggregatorJobs(source), []);
   });
 });
+
+const targetGated = (trigger: string, entries: string[]): string =>
+  [
+    "name: example",
+    "on:",
+    `  ${trigger}:`,
+    "    types: [opened]",
+    "jobs:",
+    "  changes:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - uses: ./.github/actions/detect-changes",
+    "        with:",
+    "          filters: |",
+    "            relevant:",
+    ...entries.map((p) => `              - '${p}'`),
+  ].join("\n");
+
+void describe("given a pull_request_target workflow's gate filter", () => {
+  /** @scenario "A pull_request_target filter may use neither braces nor negation" */
+  void it("reports R4 for braces and for negation, because git pathspecs read neither", () => {
+    const source = targetGated("pull_request_target", ["sdks/{go,python}/**", "!sdks/go/x"]);
+    const issues = inspect("example.yml", source);
+    assert.deepEqual(
+      issues.map((issue) => issue.rule),
+      ["R4", "R4"],
+    );
+    assert.match(issues[0]?.detail ?? "", /braces/);
+    assert.match(issues[1]?.detail ?? "", /negation/);
+  });
+
+  void it("reports nothing for plain globs and literal paths", () => {
+    const source = targetGated("pull_request_target", ["sdks/go/**", "package.json", "a/*.json"]);
+    assert.deepEqual(inspect("example.yml", source), []);
+  });
+
+  void it("leaves a pull_request-only workflow to dorny, which reads braces", () => {
+    assert.deepEqual(
+      inspect("example.yml", targetGated("pull_request", ["sdks/{go,python}/**"])),
+      [],
+    );
+  });
+
+  void it("does not mistake an event-name comparison for the trigger", () => {
+    const source = targetGated("pull_request", ["sdks/{go,python}/**"]).replace(
+      "runs-on: ubuntu-latest",
+      "if: github.event_name != 'pull_request_target'\n    runs-on: ubuntu-latest",
+    );
+    assert.deepEqual(inspect("example.yml", source), []);
+  });
+});

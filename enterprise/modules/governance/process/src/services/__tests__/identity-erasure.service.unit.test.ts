@@ -8,11 +8,14 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { erasureDigest } from "../../features/identity/rules/erasure-digest.rules.ts";
+import {
+  IdentityErasureService,
+  type RollupReplay,
+} from "../../features/identity/services/identity-erasure.service.ts";
+import { SuppressionSnapshotService } from "../../features/identity/services/suppression-snapshot.service.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { MemoryRollupErasureRepository } from "../../repositories/memory/memory.rollup-erasure.repository.ts";
-import { erasureDigest } from "../../rules/erasure-digest.rules.ts";
-import { IdentityErasureService, type RollupReplay } from "../identity-erasure.service.ts";
-import { SuppressionSnapshotService } from "../suppression-snapshot.service.ts";
 
 const SECRET = "a".repeat(32);
 const ORG = "org_a";

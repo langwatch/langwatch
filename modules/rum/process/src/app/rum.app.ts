@@ -1,4 +1,3 @@
-import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import {
   type BrowserTraceReport,
@@ -10,20 +9,16 @@ import {
   rumSecrets,
 } from "@langwatch/rum-contract";
 
-import { rumCollectorChannels } from "../channels/rum-collector-channels.registry.ts";
+import type { RumChannels } from "../channels/rum.channels.ts";
 import type { RumRepositories } from "../repositories/rum.repositories.ts";
-import {
-  COLLECTOR_VARIABLES,
-  collectorHeaders,
-  collectorTargetOf,
-  DEPRECATED_COLLECTOR_VARIABLES,
-} from "../rules/rum-ingest.rules.ts";
-import {
-  BrowserTraceIngestService,
-  type RumCollector,
-} from "../services/browser-trace-ingest.service.ts";
+import { BrowserTraceIngestService } from "../services/browser-trace-ingest.service.ts";
 
-type RumSetup = FeatureSetup<typeof RumModule.dependencies, never, RumConfig, RumRepositories>;
+type RumSetup = FeatureSetup<
+  typeof RumModule.dependencies,
+  RumConfig,
+  RumRepositories,
+  RumChannels
+>;
 
 /** The process-owned browser telemetry ingest capability (ADR-058). */
 export class RumModule implements RumApiContract {
@@ -39,35 +34,12 @@ export class RumModule implements RumApiContract {
     this.#ingest = ingest;
   }
 
-  static async create({ config, secrets, repositories }: RumSetup): Promise<RumModule> {
-    const target = await secrets.into(RumModule.secrets.collectorHeaders, (rawHeaders) =>
-      secrets.into(RumModule.secrets.telemetryHeaders, (rawTelemetryHeaders) =>
-        collectorTargetOf({
-          own: { endpoint: config.collectorEndpoint, headers: collectorHeaders(rawHeaders) },
-          telemetry: {
-            endpoint: config.telemetryEndpoint,
-            headers: collectorHeaders(rawTelemetryHeaders),
-          },
-        }),
-      ),
-    );
-    if (target.configured && target.deprecated) {
-      createLogger("langwatch:rum").warn(
-        { deprecated: DEPRECATED_COLLECTOR_VARIABLES, replacements: COLLECTOR_VARIABLES },
-        `Browser telemetry is forwarding to ${DEPRECATED_COLLECTOR_VARIABLES.join(" and ")}, which are deprecated for it; set ${COLLECTOR_VARIABLES.join(" and ")}`,
-      );
-    }
-    const collector: RumCollector = target.configured
-      ? {
-          configured: true,
-          channel: rumCollectorChannels.live.create({
-            tracesUrl: target.tracesUrl,
-            headers: target.headers,
-          }),
-        }
-      : { configured: false };
+  static async create({ channels, repositories }: RumSetup): Promise<RumModule> {
     return new RumModule(
-      BrowserTraceIngestService.create({ rateLimits: repositories.rateLimits, collector }),
+      BrowserTraceIngestService.create({
+        rateLimits: repositories.rateLimits,
+        collector: channels.collector,
+      }),
     );
   }
 

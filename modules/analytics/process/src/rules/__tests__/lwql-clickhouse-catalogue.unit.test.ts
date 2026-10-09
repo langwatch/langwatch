@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { LWQL_POSTGRES_CATALOG } from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
 import { exposedCatalogueColumns, type LwqlCatalogue } from "../lwql-catalogue.rules.ts";
-import { LWQL_POSTGRES_CATALOG } from "../lwql-postgres-view-catalog.rules.ts";
 import { LWQL_CLICKHOUSE_CATALOGUE, LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const postgres = new Set(LWQL_POSTGRES_CATALOG.map((view) => view.name));

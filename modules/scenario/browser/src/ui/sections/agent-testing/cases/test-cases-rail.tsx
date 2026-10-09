@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { SuiteRail } from "./suite-rail.tsx";
+import { SuiteRail } from "../suite-rail/suite-rail.tsx";
 import type { TestCasesTabModel } from "./use-test-cases-tab.ts";
 
 export function TestCasesRail({ model }: { model: TestCasesTabModel }) {

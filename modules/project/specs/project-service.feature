@@ -87,25 +87,11 @@ Feature: Shared project service
     And it does not construct Prisma or a Project repository per request
 
   @unit
-  Scenario: A deployment without a clustering scheduler refuses by name
-    Given a process composes the project surface with no topic-clustering scheduler
-    When a caller asks for a manual clustering run
-    Then the caller is told this deployment does not offer that service
-    And the refusal reaches the caller by name rather than as an unknown failure
-
-  @unit
-  Scenario: A clustering run that fails inside the platform degrades to an unknown failure
-    Given a process composes the project surface with a clustering scheduler
-    When the scheduler fails for a reason no caller can act on
-    Then the process records the failure
-    And the caller is told only that the request failed, with a trace id to quote
-
-  @unit
   Scenario: A project is born with packaged credentials
     Given a process composes the project service
     When the service creates a project
-    Then the feature package mints the project identifier and the ingestion key
-    And the ingestion key keeps the prefixed 54-byte alphanumeric shape the onboarding snippets are sized against
+    Then the feature package mints the project identifier
+    And the legacy key column holds a value that never authenticates
     And no composition root describes either format
 
   @unit
@@ -144,6 +130,19 @@ Feature: Shared project service
     And it is not marked as backfilled
 
   @unit
+  Scenario: Switching trace sharing off is recorded as project's fact
+    Given a project whose trace sharing is on
+    When a member saves the project settings with trace sharing off
+    Then project records a trace-sharing-disabled fact with the project's organization
+    And the fact carries the id of the member who switched it off
+
+  @unit
+  Scenario: Saving project settings with trace sharing already off records no sharing fact
+    Given a project whose trace sharing is off
+    When a member saves the project settings with trace sharing off
+    Then no trace-sharing-disabled fact is recorded
+
+  @unit
   Scenario: Saving project settings without changing presence records no presence fact
     Given a project whose presence setting is on
     When a member saves the project settings with presence on, or without the presence field
@@ -180,3 +179,37 @@ Feature: Shared project service
     When the backfill-project-presence-setting task runs twice
     Then each run records each project's stored presence setting once, marked backfilled, with no changer
     And each project's fact is keyed alike on both runs, so the second run records nothing new
+
+  @unit
+  Scenario: A new project's created fact carries its team and whether it is personal
+    Given an organization with a shared team
+    When a member creates a project in that team
+    Then project's created fact names the project's team and that it is not personal
+
+  @unit
+  Scenario: A project's department assignment is recorded as project's fact
+    Given a project in team "alpha" of its organization
+    When a department is assigned to it
+    Then project records a department-assigned fact naming the department, team "alpha" and that it is not personal
+    And it is not marked as backfilled
+
+  @unit
+  Scenario: Assigning a department to a project outside the organization records no fact
+    Given a project the assignment does not reach in the named organization
+    When a department is assigned to it
+    Then no department-assigned fact is recorded
+
+  @unit
+  Scenario: Existing projects' departments and teams are recorded by the backfill, idempotently
+    Given an organization with two projects stored before project recorded their departments
+    When the backfill-project-department-assigned task runs twice
+    Then each run records each project's department, team and personal flag once, marked backfilled
+    And each project's fact is keyed alike on both runs, so the second run records nothing new
+
+  @unit
+  Scenario: The model-defaults scope picker offers an archived project
+    Given an organization with a live project, an archived project and the hidden governance project
+    When the live non-governance project ids are read including archived projects
+    Then the live and the archived project are listed
+    And the governance project is not listed
+    And a read that does not ask for archived projects still leaves the archived one out

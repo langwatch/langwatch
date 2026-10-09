@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
-import { DashboardWidgetFrameOverWindow } from "../../../../ui/sections/dashboard-widget-frame.tsx";
+import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import {
   atLeastBoardMinRows,
   BOARD_GRID_ROW_HEIGHT_PX,

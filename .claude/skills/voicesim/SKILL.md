@@ -56,3 +56,11 @@ A call id is `conv_voicesim_0001`, `0002`, ... An unfaked provider path answers 
   (default 500, the rest counted as `droppedEvents`).
 - Drive the loopback port directly; `go test ./services/voicesim` covers the protocol.
 - The Twilio phone transport is not faked.
+
+## From a terminal or agent
+
+`--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
+
+```
+haven voice status | calls | call <id>
+```

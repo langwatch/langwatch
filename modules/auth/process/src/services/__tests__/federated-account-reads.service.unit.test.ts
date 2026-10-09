@@ -1,4 +1,3 @@
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 /**
  * The read a peer is answered from when it owns no `Account` row: which
  * providers let this person in, and none of the rows behind them.
@@ -14,6 +13,7 @@ const serviceOver = (rows: { providerId: string; accountId: string }[]) =>
     accounts: createApiFixture<BetterAuthHooksRepository>({
       findFederatedAccountsForUser: async () => rows,
     }),
+    organizations: { findBySsoDomain: async () => null },
   });
 
 describe("given somebody holding accounts through two providers", () => {
@@ -51,12 +51,13 @@ describe("getSsoSetupStatus()", () => {
     const service = FederatedAccountReadsService.create({
       accounts: createApiFixture<BetterAuthHooksRepository>({
         findFederatedAccountsForUser: async () => rows,
-        getOrganizationBySsoDomain: async ({ domain }: { domain: string }) => {
+      }),
+      organizations: {
+        findBySsoDomain: async ({ domain }) => {
           lookups.push(domain);
-          if (organization === null) throw new OrganizationNotFoundError();
           return organization;
         },
-      }),
+      },
     });
     return { service, lookups };
   };

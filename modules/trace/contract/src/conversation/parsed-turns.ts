@@ -1,11 +1,14 @@
-import { collectAnnotatedMediaParts, type MediaPartData } from "../trace-media-part.collector.ts";
+import {
+  collectAnnotatedMediaParts,
+  type MediaPartData,
+} from "../features/content/trace-media-part.collector.ts";
 import {
   mediaRefBelongsToSide,
   mediaRefToMediaData,
   mediaRoleBelongsToSide,
   type TraceMediaRef,
   type TraceMediaSide,
-} from "../trace-media-ref.ts";
+} from "../features/content/trace-media-ref.ts";
 import {
   extractReadableText,
   extractReasoningText,

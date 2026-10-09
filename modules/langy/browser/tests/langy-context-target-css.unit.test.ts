@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync(
-  join(import.meta.dirname, "../src/behavior/langy-context-target.css"),
+  join(import.meta.dirname, "../src/features/context-target/behavior/langy-context-target.css"),
   "utf8",
 );
 

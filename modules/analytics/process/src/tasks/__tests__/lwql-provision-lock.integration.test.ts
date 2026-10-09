@@ -16,12 +16,12 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
-import { LangWatchQLProductionProvisioningService } from "../../services/langwatch-ql-production-provisioning.service.ts";
+import { LangWatchQLProductionProvisioningService } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlSelfProvisionRequest,
-} from "../../services/langwatch-ql-self-provisioning.service.ts";
+} from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import {
   convergeLwqlAccessModel,
   type LwqlConvergencePlan,

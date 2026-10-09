@@ -1,4 +1,3 @@
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * Trace feature application: one typed contract replacing five previous bags.
@@ -7,13 +6,15 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
  */
 import type { PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi, type CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentTranscript,
+  shouldFilterCodingAgentSpan,
+} from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
-  EvaluationApi,
-  reportEvaluationCommandDataSchema,
+  deriveEvaluatorId,
   type EvaluationRunData,
   type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
@@ -24,20 +25,11 @@ import {
   type FoldProjectionStore,
   createTenantId,
 } from "@langwatch/eventing";
-import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import {
-  InstantEvalApi,
-  type InstantEvalEstimateWire,
-  type InstantEvalOptInAccess,
-  type InstantEvalRunProgress,
-  type InstantEvalRunReference,
-} from "@langwatch/instant-eval-contract";
+import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -45,7 +37,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { type ShareViewer, ShareApi } from "@langwatch/share-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceCapabilityUnavailableError,
   traceRecordSchema,
@@ -69,6 +60,8 @@ import {
   type FacetValuesResult,
   type PromptStudioSpanResult,
   type SessionGroupsResult,
+  type TraceSessionGroupsInput,
+  type TracesSessionsPage,
   type SharedTraceDto,
   type Span,
   type SpanDetail,
@@ -127,14 +120,23 @@ import {
   type OtlpTraceCollectionResult,
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
-  type ExplorerInstantEvalRunInput,
   explorerHiddenOrigins,
   FilterParseError,
   type LangWatchQLTraceFilter,
   type ResolvedInstantEvalRun,
   type TraceDateField,
+  type TraceAttributedRecency,
+  type TraceAttributedSpendComparison,
+  type TraceAttributedSpendSort,
   type TraceAttributedTrace,
+  type TraceAttributedTraceDetail,
+  type TraceAttributedValueComparison,
+  type TraceAttributedValueSpend,
   type TraceAttributeMatch,
+  type TraceCost,
+  type TraceDailyGroupSpend,
+  type TraceDailySpendGroup,
+  type TraceProjectValueSpend,
   type TraceAttributeUsageBucket,
   type TraceAttributeValueSpend,
   type TraceDailySpend,
@@ -149,6 +151,8 @@ import {
   type AssignTopicCommandData,
   type CanonicalizeLogRecordInput,
   type CanonicalizeLogRecordResult,
+  type CanonicalizeSpanAttributesInput,
+  type CanonicalizeSpanAttributesResult,
   type ClassifyClaudeCallInput,
   type ClassifyClaudeCallResult,
   type LogRecordReceivedEventData,
@@ -197,10 +201,6 @@ import type { z } from "zod";
 
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
 import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
-import {
-  buildTraceIngestSourceBillingPipeline,
-  type TraceIngestSourceBillingPipeline,
-} from "../eventing/trace-ingest-source-billing.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
 import {
@@ -209,142 +209,160 @@ import {
 } from "../eventing/trace-project-milestones.pipeline.ts";
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
-import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import {
+  enrichSingleSpanWithClaudeLogContent,
+  isCodingAgentShapedSpan,
+  mapSummaryRowsToClaudeRefs,
+} from "../features/claude-code/rules/claude-code-log-enrichment.rules.ts";
+import type { ClaudeSpanRef } from "../features/claude-code/rules/claude-code-message-index.rules.ts";
+import { ClaudeCodeLogEnrichmentService } from "../features/claude-code/services/claude-code-log-enrichment.service.ts";
+import {
+  extractLlmMessagesForSpan,
+  extractLlmMessagesForTrace,
+} from "../features/conversation/rules/trace-llm-messages.rules.ts";
+import { renderThreadConversation } from "../features/conversation/rules/trace-thread-conversation.rules.ts";
+import { TraceCanonicalisationService as TraceCanonicalisation } from "../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceEventDerivationService } from "../features/derivation/services/trace-event-derivation.service.ts";
+import { TraceIOExtractionService } from "../features/derivation/services/trace-io-extraction.service.ts";
+import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
+import { redactPatchForViewer } from "../features/edit-overlay/rules/trace-edit-overlay-redaction.rules.ts";
+import { restoreWithheldEdits } from "../features/edit-overlay/rules/trace-edit-overlay-restore.rules.ts";
+import type { TraceEditRemoval } from "../features/edit-overlay/services/trace-edit-overlay.service.ts";
+import { TraceEditOverlayService } from "../features/edit-overlay/services/trace-edit-overlay.service.ts";
+import {
+  TraceExportBoundsService,
+  type TraceExportBounds,
+} from "../features/export/services/trace-export-bounds.service.ts";
+import { TraceExportDownloadService } from "../features/export/services/trace-export-download.service.ts";
+import { TraceExportService } from "../features/export/services/trace-export.service.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { ClickHouseTraceFacetRegistryRepository } from "../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
+import {
+  createFacetFilterResolver,
+  type FacetFilterResolver,
+} from "../features/facet/rules/trace-facet-filter.rules.ts";
+import {
+  buildTraceCollectorEvaluationsPipeline,
+  type TraceCollectorEvaluationsDefinition,
+} from "../features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
+import {
+  buildTraceIngestSourceBillingPipeline,
+  type TraceIngestSourceBillingPipeline,
+} from "../features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
+import type { TraceRateLimitRepository } from "../features/ingestion/repositories/trace-rate-limit.repository.ts";
+import { TraceCollectorEvaluationsService } from "../features/ingestion/services/trace-collector-evaluations.service.ts";
+import { TraceCollectorSpanService } from "../features/ingestion/services/trace-collector-span.service.ts";
+import { TraceEdgeSpoolService } from "../features/ingestion/services/trace-edge-spool.service.ts";
+import { TraceIngestAllowanceService } from "../features/ingestion/services/trace-ingest-allowance.service.ts";
+import { TraceIngestCredentialService } from "../features/ingestion/services/trace-ingest-credential.service.ts";
+import { TraceIngestSourceBillingService } from "../features/ingestion/services/trace-ingest-source-billing.service.ts";
+import {
+  TraceIngestionService,
+  TraceIngressCommand,
+  type CodingAgentIngestFilter,
+} from "../features/ingestion/services/trace-ingestion.service.ts";
+import {
+  TraceLegacyReadClickHouseRepository,
+  type ClickHouseTraceLegacyReadOptions,
+} from "../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
+import {
+  type GenerateFilterConditionsResult,
+  translateLegacyFilters,
+} from "../features/legacy/rules/trace-legacy-filter-conditions.rules.ts";
+import {
+  describeTraceLegacyValidationError,
+  traceLegacySearchBodySchema,
+} from "../features/legacy/rules/trace-legacy-search-body.rules.ts";
+import { LegacyFilterMatchingService } from "../features/legacy/services/legacy-filter-matching.service.ts";
+import {
+  AmbiguousTraceIdPrefixError,
+  TraceLegacyReadService,
+  type BlobResolutionDeps,
+} from "../features/legacy/services/trace-legacy-read.service.ts";
+import { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import { TraceEdgeMediaPayloadService } from "../features/media/services/trace-edge-media-payload.service.ts";
+import { TraceEdgeMediaTelemetryService } from "../features/media/services/trace-edge-media-telemetry.service.ts";
+import { TraceScenarioEventMediaService } from "../features/media/services/trace-scenario-event-media.service.ts";
+import { TraceStoredMediaStoreService } from "../features/media/services/trace-stored-media-store.service.ts";
+import {
+  IO_PREVIEW_BYTES,
+  utf8Preview,
+} from "../features/projection/rules/trace-projection-lean.rules.ts";
+import {
+  TraceQueryFieldValuesRepository,
+  type TraceQueryFieldValuesInput,
+  type TraceQueryFieldValuesResult,
+} from "../features/query/repositories/query-field-values.repository.ts";
+import { compile as compileLangWatchQLTraceFilter } from "../features/query/rules/trace-query-langwatch-ql.rules.ts";
+import { extractFreeTextTerms } from "../features/query/rules/trace-query.rules.ts";
+import { TraceAiQueryService } from "../features/query/services/trace-ai-query.service.ts";
+import {
+  TraceQueryClassificationService,
+  type TraceQueryClassifier,
+} from "../features/query/services/trace-query-classification.service.ts";
+import { TraceQueryEvaluationScopeService } from "../features/query/services/trace-query-evaluation-scope.service.ts";
+import { TraceQueryEvaluationService } from "../features/query/services/trace-query-evaluation.service.ts";
+import { TraceQueryFieldsService } from "../features/query/services/trace-query-fields.service.ts";
+import { TraceQueryTranslationService } from "../features/query/services/trace-query-translation.service.ts";
+import { TraceSearchRouterService } from "../features/query/services/trace-search-router.service.ts";
+import { TraceContentReadService as ConcreteTraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
+import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
+import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
+import { LogRecordStorageService } from "../features/read/services/trace-log-record-read.service.ts";
+import { TraceReadBoundsService } from "../features/read/services/trace-read-bounds.service.ts";
+import {
+  TraceReadFullIoService,
+  type TraceFullIo,
+} from "../features/read/services/trace-read-full-io.service.ts";
+import { SpanStorageService } from "../features/read/services/trace-span-storage-read.service.ts";
+import { TraceSummaryService } from "../features/read/services/trace-summary-read.service.ts";
+import {
+  SpanCostSuggestionService,
+  type TraceSpanCostSuggestion,
+} from "../features/span/services/span-cost-suggestion.service.ts";
+import { SpanCostService } from "../features/span/services/span-cost.service.ts";
+import { TraceTopicClusteringReadService } from "../features/topic/services/trace-topic-clustering-read.service.ts";
 import {
   ResolverTraceClickHouse,
   type TraceClickHouseResolver,
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
-import {
-  TraceLegacyReadClickHouseRepository,
-  type ClickHouseTraceLegacyReadOptions,
-} from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
-import {
-  TraceQueryFieldValuesRepository,
-  type TraceQueryFieldValuesInput,
-  type TraceQueryFieldValuesResult,
-} from "../repositories/query-field-values.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
+import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
+import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
-import type { TraceRateLimitRepository } from "../repositories/trace-rate-limit.repository.ts";
 import { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
-  enrichSingleSpanWithClaudeLogContent,
-  isCodingAgentShapedSpan,
-  mapSummaryRowsToClaudeRefs,
-} from "../rules/claude-code-log-enrichment.rules.ts";
-import type { ClaudeSpanRef } from "../rules/claude-code-message-index.rules.ts";
-import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
-import { restoreWithheldEdits } from "../rules/trace-edit-overlay-restore.rules.ts";
-import {
-  createFacetFilterResolver,
-  type FacetFilterResolver,
-} from "../rules/trace-facet-filter.rules.ts";
-import {
   andFilterConditions,
   explorerOriginExclusion,
   findHiddenOriginConditions,
 } from "../rules/trace-filter-hidden-origins.rules.ts";
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
-import {
-  type GenerateFilterConditionsResult,
-  translateLegacyFilters,
-} from "../rules/trace-legacy-filter-conditions.rules.ts";
-import {
-  describeTraceLegacyValidationError,
-  traceLegacySearchBodySchema,
-} from "../rules/trace-legacy-search-body.rules.ts";
-import {
-  extractLlmMessagesForSpan,
-  extractLlmMessagesForTrace,
-} from "../rules/trace-llm-messages.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
-import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
-import { traceMatchesQuery } from "../rules/trace-query-evaluation.rules.ts";
-import { compile as compileLangWatchQLTraceFilter } from "../rules/trace-query-langwatch-ql.rules.ts";
-import { extractFreeTextTerms, translateFilter } from "../rules/trace-query.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
-import { renderThreadConversation } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
-import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
-import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
-import {
-  SpanCostSuggestionService,
-  type TraceSpanCostSuggestion,
-} from "../services/span-cost-suggestion.service.ts";
-import { SpanCostService } from "../services/span-cost.service.ts";
-import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
-import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService as TraceCanonicalisation } from "../services/trace-canonicalisation.service.ts";
-import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
-import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
-import { TraceEdgeMediaPayloadService } from "../services/trace-edge-media-payload.service.ts";
-import { TraceEdgeMediaTelemetryService } from "../services/trace-edge-media-telemetry.service.ts";
-import { TraceEdgeSpoolService } from "../services/trace-edge-spool.service.ts";
-import type { TraceEditRemoval } from "../services/trace-edit-overlay.service.ts";
-import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
-import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
-import {
-  TraceExportBoundsService,
-  type TraceExportBounds,
-} from "../services/trace-export-bounds.service.ts";
-import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
-import { TraceExportService } from "../services/trace-export.service.ts";
-import { TraceIngestAllowanceService } from "../services/trace-ingest-allowance.service.ts";
-import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
-import { TraceIngestSourceBillingService } from "../services/trace-ingest-source-billing.service.ts";
-import {
-  TraceIngestionService,
-  TraceIngressCommand,
-  type CodingAgentIngestFilter,
-} from "../services/trace-ingestion.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
-import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
-import {
-  AmbiguousTraceIdPrefixError,
-  TraceLegacyReadService,
-  type BlobResolutionDeps,
-} from "../services/trace-legacy-read.service.ts";
-import { TraceListService } from "../services/trace-list-read.service.ts";
-import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
-import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
 import {
   TraceMetadataWriteService,
   type TraceSpanIngest,
 } from "../services/trace-metadata-write.service.ts";
-import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
 import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
 import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import type { TraceProcessingCommands } from "../services/trace-processing-commands.service.ts";
 import { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
-import {
-  TraceQueryClassificationService,
-  type TraceQueryClassifier,
-} from "../services/trace-query-classification.service.ts";
-import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
-import {
-  TraceReadFullIoService,
-  type TraceFullIo,
-} from "../services/trace-read-full-io.service.ts";
 import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
-import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
-import { TraceSearchRouterService } from "../services/trace-search-router.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
-import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
-import { TraceStoredMediaStoreService } from "../services/trace-stored-media-store.service.ts";
-import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
-import { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
 import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
 import {
   TraceViewerProtectionService,
@@ -367,10 +385,20 @@ import type {
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 import type * as traceContractModule from "@langwatch/trace-contract";
 
+import { TraceExportProgressService } from "../features/export/services/trace-export-progress.service.ts";
+import { TraceFacetValuesService } from "../features/facet/services/trace-facet-values.service.ts";
 import type {
   CollectorIngestInput,
   CollectorIngestOutcome,
-} from "../rules/trace-collector-body.rules.ts";
+} from "../features/ingestion/rules/trace-collector-body.rules.ts";
+import {
+  TraceCollectorDispatchService,
+  type CollectorEvaluationReportInput,
+  type CollectorSpanIngestInput,
+  type CollectorSpanIngestResult,
+} from "../features/ingestion/services/trace-collector-dispatch.service.ts";
+import { TraceSharedReadService } from "../features/read/services/trace-shared-read.service.ts";
+import { TraceTranscriptReadService } from "../features/read/services/trace-transcript-read.service.ts";
 import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
@@ -379,22 +407,14 @@ import {
   buildContentPrivacy,
   buildSpanContentRedactions,
   mapSpanToDetail,
+  contentSearchTermsForViewer,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
-import {
-  TraceCollectorDispatchService,
-  type CollectorEvaluationReportInput,
-  type CollectorSpanIngestInput,
-  type CollectorSpanIngestResult,
-} from "../services/trace-collector-dispatch.service.ts";
-import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
-import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
-import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
+import { gateSessionCost } from "../rules/trace-view-gates.rules.ts";
 import { TraceTenantUpdateStreamService } from "../services/trace-tenant-update-stream.service.ts";
-import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
 import type {
   TraceLegacyReads,
   TraceLegacySearchFields,
@@ -662,20 +682,15 @@ export interface TraceAppDependencies {
       occurredAt: number;
     }): Promise<unknown>;
   }>;
-  topics: TopicApi;
   broadcast: TracesTrpcEmitters;
   /** The unmapped-model hint the span detail carries; read after the span is protected. */
   spanCostSuggestions: TraceSpanCostSuggestion;
-  evaluations: EvaluationApi;
-  /**
-   * The Instant Eval peer the Explorer's judged searches run through. Absent
-   * on a process that composed Trace without it, and then the four Explorer
-   * operations refuse by name rather than answering an empty run.
-   */
-  instantEvals?: InstantEvalApi;
+  /** Evaluation's shared runs (R40), which `readEvaluationRuns` answers from. */
+  evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findRunsByTraceId">;
+  /** Dates eval chips' runs from instant-eval's shared table; absent, chips stay pending. */
+  explorerEvalRuns?: TraceInstantEvalRunService;
   /** The AI search composer's model seam; absent, the three AI operations refuse by name. */
   models?: Pick<ModelProviderApi, "generateText" | "generateStructured">;
-  codingAgents: CodingAgentApi;
   presence?: PresenceApi;
   share: ShareApi;
   projects: ProjectApi;
@@ -739,7 +754,6 @@ const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
 
 type TraceSetup = FeatureSetup<
   typeof TraceModule.dependencies,
-  never,
   TraceServerConfig,
   TraceRepositories
 >;
@@ -758,10 +772,7 @@ type TraceReaderCompositionOptions = {
   /** A test's summary store; absent, the summary is read off the trace_summaries row. */
   summaryStore?: FoldProjectionStore<TraceSummaryData> | undefined;
   projects: ProjectApi;
-  topics: TopicApi;
   modelProviders: ModelProviderApi;
-  logs: LogApi;
-  annotations: AnnotationApi;
   dataRetention: DataRetentionApi;
   protections: TraceViewerProtectionOptions;
   /**
@@ -783,15 +794,12 @@ type TraceReaderCompositionOptions = {
    */
   ingestAuthz?: Pick<AuthzApi, "hasApiKeyPermission"> | undefined;
   /**
-   * The one question the INGEST path asks Coding Agent: whether a span is
-   * one a coding agent emits about itself, which the receiver drops. Narrow
-   * and separate from the whole `codingAgents` peer below.
+   * Whether a span is one a coding agent emits about itself, which the receiver
+   * drops. Defaults to the coding-agent contract's pure rule; tests swap it.
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
-  evaluations: TraceAppDependencies["evaluations"];
-  /** The Instant Eval peer the Explorer's judged searches run through. */
-  instantEvals?: TraceAppDependencies["instantEvals"];
-  codingAgents: TraceAppDependencies["codingAgents"];
+  /** LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER, negated; absent, the filter is on, as on main. */
+  codingAgentSpanFilterEnabled?: boolean | undefined;
   storedObjects: TraceAppDependencies["storedObjects"];
   /**
    * Gates the edge media hook (`release_trace_media_extraction`). Absent, the
@@ -841,7 +849,6 @@ type TraceTreeCompositionOptions = {
 export class TraceModule implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = {
-    annotations: AnnotationApi,
     /**
      * The API-key directory the deprecated `/api/trace/*` family resolves its
      * own credential through: it opts out of the framework door because a
@@ -849,23 +856,16 @@ export class TraceModule implements TraceApi, CollectorApp {
      */
     apiKeys: ApiKeyApi,
     authz: AuthzApi,
-    codingAgents: CodingAgentApi,
     dataPrivacy: DataPrivacyApi,
     dataRetention: DataRetentionApi,
     plans: EntitlementApi,
-    evaluations: EvaluationApi,
     evaluators: EvaluatorApi,
-    experiments: ExperimentApi,
     featureFlags: FeatureFlagApi,
-    instantEvals: InstantEvalApi,
-    logs: LogApi,
     modelProviders: ModelProviderApi,
-    monitors: MonitorApi,
     presence: PresenceApi,
     projects: ProjectApi,
     share: ShareApi,
     storedObjects: StoredObjectApi,
-    topics: TopicApi,
   };
   /** The span pipeline's settings and the shared public origin `platformUrl` links to. */
   static readonly config = traceConfig;
@@ -885,10 +885,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         resolveS3Client: () =>
           Promise.reject(new TraceCapabilityUnavailableError(role, "a v1 spool object read")),
       }),
-      resolveClickHouseClient,
+      payloads: repositories.eventPayloads,
       logger: createLogger("langwatch:trace:blob-store"),
     });
-    const { publicBaseUrl } = setup.config;
+    const { publicBaseUrl, disableCodingAgentSpanFilter } = setup.config;
     const app = new TraceModule({
       ...TraceModule.composeDependencies({
         ...dependencies,
@@ -898,6 +898,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         blobStore,
         commands,
         dedup: repositories.spanDedup,
+        codingAgentSpanFilterEnabled: !disableCodingAgentSpanFilter,
         ...(publicBaseUrl === undefined ? {} : { publicBaseUrl }),
         requestBounds: dependencies.plans,
         ingestAllowance: TraceIngestAllowanceService.create({ entitlement: dependencies.plans }),
@@ -927,6 +928,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     app.#modelSpend = setup.repositories.modelSpend;
     app.#attributeSpend = setup.repositories.attributeSpend;
+    app.#attributedRollup = setup.repositories.attributedRollup;
     app.#usageCount = setup.repositories.usageCount;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
@@ -936,6 +938,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
+    app.#collectorEvaluations = TraceCollectorEvaluationsService.create({ role });
     app.#processing = TraceProcessingRuntimeAdapter.create({
       role,
       tokenizer,
@@ -988,7 +991,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       : edgeSpool;
     const logRecords = LogRecordStorageService.create({
       repository: options.repositories.logRecords,
-      canonical: options.logs,
     });
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: options.canonicalisation,
@@ -996,17 +998,20 @@ export class TraceModule implements TraceApi, CollectorApp {
         traceCanonicalisation: options.canonicalisation,
         ...(resolve ? { resolveClickHouseClient: resolve } : {}),
         retentionResolver: options.dataRetention,
-        annotations: options.annotations,
+        annotations: {
+          rows: options.repositories.annotations,
+          scores: options.repositories.annotationScores,
+        },
         blobResolutionDeps,
       }),
       editOverlay,
       logRecordStorage: logRecords,
-      evaluationService: options.evaluations,
+      evaluationRuns: options.repositories.evaluationRuns,
     });
     const list = TraceListService.create({
       repository: options.repositories.list,
-      evaluations: options.evaluations,
-      topicService: options.topics,
+      evaluationRuns: options.repositories.evaluationRuns,
+      topicNames: options.repositories.topicNames,
       facets: CLICKHOUSE_FACET_CATALOG,
       discoverUpdates: options.tenantBroadcast,
     });
@@ -1025,7 +1030,9 @@ export class TraceModule implements TraceApi, CollectorApp {
           resolveClient: resolve,
           modelProviders: options.modelProviders,
           queryFieldValues: TraceReadQueryFieldValues.create(list),
-          queryClassification: TraceQueryClassificationService.create(),
+          queryClassification: TraceQueryClassificationService.create({
+            evaluation: TraceModule.#composeQuery().evaluation,
+          }),
           summaryReader: FoldedTraceSummaryReader.create(summaryStore),
           records: {
             getById: async ({ projectId, traceId }) => {
@@ -1060,8 +1067,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         list,
         sessionGroups: SessionGroupsService.create({
           repository: options.repositories.sessionGroups,
-          codingAgentSessions: options.codingAgents,
-          resolveOrganizationId: (projectId) => options.projects.getOrganizationId(projectId),
         }),
         spans: SpanStorageService.create({ repository: spanStorageRepository, blobResolutionDeps }),
         summary: TraceSummaryService.create({
@@ -1079,8 +1084,10 @@ export class TraceModule implements TraceApi, CollectorApp {
       // command sender across both, so a span posted to `/api/collector` and the
       // same span exported over OTLP are one record, not two.
       ingestion: TraceIngestionService.create({
-        codingAgents: options.ingestCodingAgents ?? options.codingAgents,
-        codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
+        codingAgentFilter: options.ingestCodingAgents ?? {
+          shouldFilterSpan: shouldFilterCodingAgentSpan,
+        },
+        codingAgentSpanFilterEnabled: options.codingAgentSpanFilterEnabled ?? true,
         dedup: options.dedup,
         commands: TraceComposedIngressCommand.create(options.commands),
         payloads,
@@ -1097,14 +1104,14 @@ export class TraceModule implements TraceApi, CollectorApp {
           await options.commands.removeAnnotation(input);
         },
       },
-      topics: options.topics,
       projects: options.projects,
       spanCostSuggestions: SpanCostSuggestionService.create({
         modelProviders: options.modelProviders,
       }),
-      evaluations: options.evaluations,
-      ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
-      codingAgents: options.codingAgents,
+      evaluationRuns: options.repositories.evaluationRuns,
+      explorerEvalRuns: TraceInstantEvalRunService.create({
+        runs: options.repositories.instantEvalRuns,
+      }),
       storedObjects: options.storedObjects,
       ...(options.presence ? { presence: options.presence } : {}),
       share: options.share,
@@ -1164,6 +1171,20 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
 
+  /** The trace query compiler and its in-memory mirror, over the ClickHouse facet registry. */
+  static #composeQuery(): {
+    translation: TraceQueryTranslationService;
+    evaluation: TraceQueryEvaluationService;
+  } {
+    const fields = TraceQueryFieldsService.create({
+      facetRegistry: ClickHouseTraceFacetRegistryRepository.create(),
+    });
+    const evaluationScope = TraceQueryEvaluationScopeService.create({ fields });
+    const translation = TraceQueryTranslationService.create({ fields, evaluationScope });
+    const evaluation = TraceQueryEvaluationService.create({ fields, evaluationScope, translation });
+    return { translation, evaluation };
+  }
+
   /** The trace-tree read over this process's ClickHouse and query-value boundaries. */
   static composeTree(options: TraceTreeCompositionOptions): TraceService {
     const clickhouse = ResolverTraceClickHouse.create(options.resolveClient);
@@ -1186,10 +1207,12 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
   #milestones: TraceProjectMilestonesService | null = null;
+  #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
   #attributeSpend: TraceAttributeSpendRepository | null = null;
+  #attributedRollup: TraceAttributedRollupRepository | null = null;
   #usageCount: TraceUsageCountRepository | null = null;
   #preconditionSamples: TracePreconditionSampleService | null = null;
 
@@ -1239,6 +1262,18 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#milestones?.connect(commands);
   }
 
+  /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */
+  collectorEvaluationsPipeline(): TraceCollectorEvaluationsDefinition {
+    return buildTraceCollectorEvaluationsPipeline();
+  }
+
+  /** Binds the sender the collector door records each body's evaluations through. */
+  connectCollectorEvaluations(
+    commands: EventingCommands<TraceCollectorEvaluationsDefinition>,
+  ): void {
+    this.#collectorEvaluations?.connect(commands);
+  }
+
   /** trace_ingest_source_billing: folds governance's billing fact from trace's side (§9, Q82). */
   ingestSourceBillingPipeline(): TraceIngestSourceBillingPipeline {
     const billing = this.#dependencies.ingestSourceBilling;
@@ -1261,8 +1296,13 @@ export class TraceModule implements TraceApi, CollectorApp {
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
+  #queryTranslation: TraceQueryTranslationService;
+  #queryEvaluation: TraceQueryEvaluationService;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
+    const query = TraceModule.#composeQuery();
+    this.#queryTranslation = query.translation;
+    this.#queryEvaluation = query.evaluation;
     this.#transcriptRead = TraceTranscriptReadService.create();
     this.#tenantUpdates = TraceTenantUpdateStreamService.create({
       emitters: dependencies.broadcast,
@@ -1279,23 +1319,17 @@ export class TraceModule implements TraceApi, CollectorApp {
             mappers: traceReadMapperPorts,
           })
         : null;
-    this.#explorerEvals = dependencies.instantEvals
-      ? TraceInstantEvalRunService.create({ instantEvals: dependencies.instantEvals })
-      : null;
+    this.#explorerEvals = dependencies.explorerEvalRuns ?? null;
     const ai = dependencies.models
       ? TraceAiQueryService.create({ models: dependencies.models, facets: this })
       : null;
-    const instantEvals = dependencies.instantEvals;
     this.#aiQuery = ai;
     this.#searchRouter = ai
       ? TraceSearchRouterService.create({
-          classifier: instantEvals ?? null,
           buildFilter: (input) => ai.generateTraceAction(input),
           buildQuestion: (input) => ai.generateInstantEvalQuestion(input),
           routeWithModel: (input) => ai.generateSearchRoute(input),
           listKnownSignals: (input) => this.#listKnownSignals(input),
-          isInstantEvalReleased: async ({ projectId }) =>
-            instantEvals ? instantEvals.isReleased({ projectId }) : false,
           // Main counted langwatch.trace_search.routes; the Prometheus name is pending a ruling.
           recordDecision: () => {},
         })
@@ -1320,50 +1354,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         : null;
   }
 
-  estimateExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalEstimateWire> {
-    return this.#instantEvals().estimateRun(input);
-  }
-
-  startExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalRunProgress> {
-    return this.#instantEvals().startRun(input);
-  }
-
-  cancelExplorerEvalRun(input: {
-    projectId: string;
-    runId: string;
-    requestedByUserId?: string;
-  }): Promise<InstantEvalRunProgress> {
-    return this.#instantEvals().cancelRun(input);
-  }
-
-  getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
-    return this.#instantEvals().getRun(input);
-  }
-
-  getExplorerEvalAccess(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals().getAccess(input);
-  }
-
-  enableExplorerEvals(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals().enable(input);
-  }
-
   /**
-   * The runs a query's `eval` chips claim, checked against the project. A
-   * process composed without the Instant Eval peer can check none, so every
-   * chip stays pending and the read answers what the rest of the query selects.
+   * The runs a query's `eval` chips claim, checked against the project
+   * through instant-eval's shared run table. A claim the project did not
+   * record stays pending, and the read answers what the rest selects.
    */
   async findExplorerEvalRuns(input: {
     projectId: string;
@@ -1429,16 +1423,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     const names = (settled?: PromiseSettledResult<FacetValuesResult>): string[] =>
       settled?.status === "fulfilled" ? settled.value.values.map((entry) => entry.value) : [];
     return { evaluators: names(evaluators), events: names(events) };
-  }
-
-  #instantEvals(): TraceInstantEvalRunService {
-    if (!this.#explorerEvals) {
-      throw new Error(
-        "An Explorer Instant Eval asked for the Instant Eval peer, but this process composed Trace without it",
-      );
-    }
-
-    return this.#explorerEvals;
   }
 
   extractInlineMediaFromEvent(input: {
@@ -1563,10 +1547,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   async listTraces(input: TraceListTracesInput): Promise<TracesForProjectResult> {
-    const pageSize =
-      input.query.pageSize === undefined
-        ? undefined
-        : await this.#readBounds.clampPageSize(input.query.projectId, input.query.pageSize);
+    const pageSize = await this.#boundedPageSize({
+      projectId: input.query.projectId,
+      pageSize: input.query.pageSize,
+      refuseAbove: input.options?.refuseAbove,
+    });
 
     return this.#contentReader.listTraces({
       ...input,
@@ -1575,6 +1560,22 @@ export class TraceModule implements TraceApi, CollectorApp {
         ...(pageSize === undefined ? {} : { pageSize }),
       },
     });
+  }
+  /** The tRPC reads refuse above their named plan bound; every other caller clamps. */
+  async #boundedPageSize({
+    projectId,
+    pageSize,
+    refuseAbove,
+  }: {
+    projectId: string;
+    pageSize: number | undefined;
+    refuseAbove: "tracesPageSizeMax" | "tracesDownloadPageSizeMax" | undefined;
+  }): Promise<number | undefined> {
+    if (pageSize === undefined) return undefined;
+    if (refuseAbove === undefined) return this.#readBounds.clampPageSize(projectId, pageSize);
+    await this.#readBounds.assertPageSizeWithinBound({ projectId, pageSize, bound: refuseAbove });
+
+    return pageSize;
   }
   async listTraceSummaries(input: {
     query: TraceSummaryListQuery;
@@ -2029,6 +2030,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#dependencies.traces.canonicalisation.canonicalizeLogRecord(input);
   }
 
+  canonicalizeSpanAttributes(
+    input: CanonicalizeSpanAttributesInput,
+  ): CanonicalizeSpanAttributesResult {
+    return this.#dependencies.traces.canonicalisation.canonicalizeSpanAttributes(input);
+  }
+
   extractLogRecordIO(input: LogRecordReceivedEventData): {
     input: string | null;
     output: string | null;
@@ -2081,7 +2088,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     evaluations: TraceQueryEvaluationRun[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
-    return traceMatchesQuery(input.query, {
+    return this.#queryEvaluation.traceMatchesQuery(input.query, {
       summary: input.foldState,
       evaluations: input.evaluations,
       events: input.events,
@@ -2126,6 +2133,14 @@ export class TraceModule implements TraceApi, CollectorApp {
     traceIds: readonly string[];
   }): Promise<string[]> {
     return this.#dependencies.traces.existence.findExistingTraceIds(input);
+  }
+
+  findTraceCosts(input: {
+    projectId: string;
+    traceIds: readonly string[];
+    occurredAt: { from: number; to: number };
+  }): Promise<TraceCost[]> {
+    return this.#dependencies.traces.existence.findTraceCosts(input);
   }
 
   loadTraces(input: {
@@ -2228,7 +2243,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       logRecords: this.#dependencies.traces.logRecords,
       logger,
       traceCanonicalisation: this.#dependencies.traces.canonicalisation,
-      codingAgents: this.#dependencies.codingAgents,
     }).enrichCodingAgentSpansFromLogs({
       tenantId: input.projectId,
       traceId: input.traceId,
@@ -2247,33 +2261,11 @@ export class TraceModule implements TraceApi, CollectorApp {
       modelCallRefs: input.modelCallRefs,
       logRows: input.logRows,
       traceCanonicalisation: this.#dependencies.traces.canonicalisation,
-      codingAgents: this.#dependencies.codingAgents,
     });
   }
 
   mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): ClaudeSpanRef[] {
     return mapSummaryRowsToClaudeRefs(rows);
-  }
-
-  codingAgentLogContentKeys(eventName: string): readonly {
-    key: string;
-    category: "input" | "output" | "both";
-  }[] {
-    return this.#dependencies.codingAgents.logContentKeys(eventName);
-  }
-
-  buildCodingAgentTranscript(input: {
-    spans: SpanDetail[];
-    logs: TraceLogRecordReadRow[];
-  }): unknown {
-    return this.#dependencies.codingAgents.buildTranscript({
-      spans: input.spans,
-      logs: input.logs.map((row) => ({
-        timestampMs: row.timeUnixMs,
-        attributes: row.attributes,
-        serviceName: row.resourceAttributes["service.name"] ?? null,
-      })),
-    });
   }
 
   // Legacy content reads live on the cohesive content service.
@@ -2291,14 +2283,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       input.traceIds,
       input.protections,
     );
-  }
-
-  /** One evaluation's inputs, resolved lazily when its card is expanded. */
-  findEvaluationInputs(input: {
-    projectId: string;
-    evaluationId: string;
-  }): Promise<Record<string, unknown> | null> {
-    return this.#dependencies.traces.read.findEvaluationInputs(input);
   }
 
   /** Topic and subtopic counts for the filtered window. */
@@ -2331,7 +2315,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null {
-    return translateFilter({
+    return this.#queryTranslation.translateFilter({
       queryText: input.query,
       tenantId: input.tenantId,
       timeRange: input.timeRange,
@@ -2416,17 +2400,6 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   // -------------------------------------------------------------------------
-  // The project's topics, as the topic-count read labels its buckets
-  // -------------------------------------------------------------------------
-
-  /** The project's topic tree. */
-  readTopics(
-    input: Readonly<{ projectId: string }>,
-  ): Promise<readonly Readonly<{ id: string; name: string; parentId: string | null }>[]> {
-    return this.#dependencies.topics.getAll(input);
-  }
-
-  // -------------------------------------------------------------------------
   // The explorer's list, facet and session reads
   // -------------------------------------------------------------------------
 
@@ -2435,9 +2408,43 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#dependencies.traces.list.getList(params);
   }
 
-  /** One page of the Sessions lens. */
-  readSessionGroups(params: TraceSessionGroupsReadParams): Promise<SessionGroupsResult> {
-    return this.#dependencies.traces.sessionGroups.getSessionGroups(params);
+  /** One Sessions lens page through the viewer's protections; coding-agent fills `codingAgent`. */
+  async readSessionGroups(
+    input: TraceSessionGroupsInput & { protections: Protections },
+  ): Promise<TracesSessionsPage> {
+    const { protections } = input;
+    const filterWhere = this.compileExplorerTraceFilter({
+      query: input.query ?? "",
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      evalRuns: await this.findExplorerEvalRuns({
+        projectId: input.projectId,
+        evalRuns: input.evalRuns,
+      }),
+    });
+    const result = await this.#dependencies.traces.sessionGroups.getSessionGroups({
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      sort: input.sort,
+      pageSize: input.pageSize,
+      cursor: input.cursor,
+      filterWhere,
+      contentTerms: contentSearchTermsForViewer({
+        terms: this.extractTraceFreeTextTerms(input.query ?? ""),
+        protections,
+      }),
+      visibilityCutoffMs: protections.visibilityCutoffMs,
+    });
+
+    return {
+      ...result,
+      sessions: gateSessionCost({
+        sessions: result.sessions.map((session) =>
+          redactV2Content(session, protections, traceReadMapperPorts.contentPrivacy),
+        ),
+        protections,
+      }),
+    };
   }
 
   /**
@@ -2880,6 +2887,122 @@ export class TraceModule implements TraceApi, CollectorApp {
     return this.#attributeSpendRead().findAttributedTraces({ tenantId: projectId, ...query });
   }
 
+  getAttributedSpendComparison(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    actorKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedSpendComparison> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().getAttributedSpendComparison({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findAttributedSpendByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+    sortBy: TraceAttributedSpendSort;
+    sortDirection: "asc" | "desc";
+    limit: number;
+    offset: number;
+  }): Promise<TraceAttributedValueSpend[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findAttributedSpendByValue({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findAttributedSpendComparisonByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedValueComparison[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findAttributedSpendComparisonByValue({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findSpendByProjectAndValue(input: {
+    projectIds: readonly string[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceProjectValueSpend[]> {
+    const { projectIds, ...query } = input;
+    return this.#attributedRollupRead().findSpendByProjectAndValue({
+      tenantIds: projectIds,
+      ...query,
+    });
+  }
+
+  findDailyAttributedSpend(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    groupBy: TraceDailySpendGroup;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailyGroupSpend[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findDailyAttributedSpend({ tenantId: projectId, ...query });
+  }
+
+  countAttributedTracesByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    values: readonly string[];
+    sinceMs: number;
+  }): Promise<{ value: string; count: number }[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().countAttributedTracesByValue({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  findAttributedTracesBefore(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    attributeKeys: readonly string[];
+    beforeMs: number;
+    limit: number;
+  }): Promise<TraceAttributedTraceDetail[]> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().findAttributedTracesBefore({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  getAttributedTraceRecency(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    countSinceMs: readonly number[];
+  }): Promise<TraceAttributedRecency> {
+    const { projectId, ...query } = input;
+    return this.#attributedRollupRead().getAttributedTraceRecency({
+      tenantId: projectId,
+      ...query,
+    });
+  }
+
+  #attributedRollupRead(): TraceAttributedRollupRepository {
+    if (!this.#attributedRollup) {
+      throw new TraceCapabilityUnavailableError("this process", "the attributed trace rollup read");
+    }
+    return this.#attributedRollup;
+  }
+
   #attributeSpendRead(): TraceAttributeSpendRepository {
     if (!this.#attributeSpend) {
       throw new TraceCapabilityUnavailableError("this process", "the attributed trace spend read");
@@ -2995,7 +3118,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** The evaluation runs recorded against one trace. */
   readEvaluationRuns(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {
-    return this.#dependencies.evaluations.findRunsByTraceId(input);
+    return this.#dependencies.evaluationRuns.findRunsByTraceId(input);
   }
 
   /** Port of main's `codingAgentTranscript`: the viewer's protections, then the shared read. */
@@ -3265,19 +3388,22 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /**
-   * One custom SDK evaluation, on the command the workbench's re-scores
-   * also travel. Parsed against its schema rather than cast, so a
-   * differently-spelled field is rejected here, not malformed downstream.
+   * One custom SDK evaluation, recorded as trace's "evaluations received" fact that evaluation
+   * reports from its own side (T1 D1). Unbound in a process with no such pipeline, it refuses.
    */
   reportEvaluation(input: CollectorEvaluationReportInput): Promise<unknown> {
-    return this.#dependencies.evaluations.reportEvaluation(
-      reportEvaluationCommandDataSchema.parse(input),
-    );
+    if (!this.#collectorEvaluations) {
+      throw new TraceCapabilityUnavailableError(
+        "this process",
+        "the trace_collector_evaluations commands",
+      );
+    }
+    return this.#collectorEvaluations.record(input);
   }
 
-  /** The evaluator-id slug rule, as EVALUATION's own module spells it. */
+  /** The evaluator-id slug rule evaluation-contract exports (CI-1 precedent; T1 D3). */
   deriveEvaluatorId(name: string): string {
-    return this.#dependencies.evaluations.deriveEvaluatorId(name);
+    return deriveEvaluatorId({ name });
   }
 
   /** One validated collector body, fanned out to the span and evaluation pipelines. */
@@ -3337,6 +3463,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     try {
       await this.recordTrackedEvent({ project: { id: input.projectId }, body, eventId });
     } catch (error) {
+      // A process with no recorder refuses by name (parity Trace 9); other failures stay swallowed.
+      if (error instanceof TraceIngestionUnavailableError) throw error;
       logger.error({ error }, "unable to dispatch tracked event span");
     }
     return { message: "Event tracked" };
@@ -3446,25 +3574,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       .handleOtlpTraceRequest(input.tenantId, input.traceRequest, DEFAULT_PII_REDACTION_LEVEL)
       .then((result) => result ?? {});
   }
-
-  /** A failure the receiver answered but did not raise. */
-  otlpReportError(
-    error: Error,
-    context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
-  ): void {
-    logger.error(
-      { error, projectId: context.projectId, customerTraceIds: context.customerTraceIds },
-      "the OTLP receiver answered a failure",
-    );
-  }
 }
-
-/**
- * The coding-agent span filter is on by default, exactly as the retired
- * platform application had it: its kill switch was an environment variable read
- * at that process's boot, and no process carries one now.
- */
-const CODING_AGENT_SPAN_FILTER_ENABLED = true;
 
 /** The pipeline handoff, as the receiver's own abstract command. */
 class TraceComposedIngressCommand extends TraceIngressCommand {

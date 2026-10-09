@@ -13,7 +13,7 @@ import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts
 import type { IdentityResolver } from "../rules/identity-storage.rules.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 
-export interface UserBranchDeps {
+interface UserBranchDeps {
   naming: AdapterNaming;
   resolution: IdentityResolver;
   ceremonies: IdentityAccountCeremonies;

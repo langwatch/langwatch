@@ -3,7 +3,6 @@
  * The family's addresses, operation ids, door and access kinds, pinned.
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
-import { DATASET_CEILING_LIMITS, DATASET_DEFAULT_LIMITS } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 
 import { evaluationsLegacyRest } from "../evaluations-legacy.rest.ts";
@@ -11,11 +10,9 @@ import { evaluationsLegacyRest } from "../evaluations-legacy.rest.ts";
 const declaration = evaluationsLegacyRest.router();
 
 const CREDENTIALED = [
-  "postApiEvaluationsBatchLogResults",
   "postApiEvaluationsByEvaluatorEvaluate",
   "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   "postApiGuardrailsByEvaluatorEvaluate",
-  "postApiDatasetEvaluate",
 ];
 
 describe("the public evaluation REST family", () => {
@@ -35,7 +32,6 @@ describe("the public evaluation REST family", () => {
         declaration.routes.map((route) => [route.method, route.path, route.operation]),
       ).toEqual([
         ["get", "/api/evaluations/list", "getApiEvaluationsList"],
-        ["post", "/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults"],
         ["post", "/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate"],
         [
           "post",
@@ -43,7 +39,6 @@ describe("the public evaluation REST family", () => {
           "postApiEvaluationsByEvaluatorBySubpathEvaluate",
         ],
         ["post", "/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate"],
-        ["post", "/api/dataset/evaluate", "postApiDatasetEvaluate"],
       ]);
     });
 
@@ -77,31 +72,14 @@ describe("the public evaluation REST family", () => {
       }
     });
 
-    /** @scenario "The batch log route reads a body up to the largest limit any organization holds" */
-    it("caps the batch log at the ceiling an organization can be raised to and every evaluate door at 30MB", () => {
+    it("caps every evaluate door at 30MB", () => {
       const caps = Object.fromEntries(
         declaration.routes.map((route) => [route.operation, route.bodyLimit?.maxBytes]),
       );
 
-      expect(caps.postApiEvaluationsBatchLogResults).toBe(DATASET_CEILING_LIMITS.rowBytes);
-      expect(DATASET_CEILING_LIMITS.rowBytes).toBeGreaterThan(DATASET_DEFAULT_LIMITS.rowBytes);
       expect(caps.postApiEvaluationsByEvaluatorEvaluate).toBe(30 * 1024 * 1024);
       expect(caps.postApiEvaluationsByEvaluatorBySubpathEvaluate).toBe(30 * 1024 * 1024);
       expect(caps.postApiGuardrailsByEvaluatorEvaluate).toBe(30 * 1024 * 1024);
-      expect(caps.postApiDatasetEvaluate).toBe(30 * 1024 * 1024);
-    });
-
-    /** @scenario "The batch log route reads a body up to the largest limit any organization holds" */
-    it("refuses a body past the ceiling by the batch log's own code", () => {
-      const route = declaration.routes.find(
-        (one) => one.operation === "postApiEvaluationsBatchLogResults",
-      );
-
-      expect(route?.bodyLimit?.onExceeded?.()).toMatchObject({
-        code: "evaluation_log_results_too_large",
-        httpStatus: 413,
-        meta: { maxBytes: DATASET_CEILING_LIMITS.rowBytes },
-      });
     });
   });
 });

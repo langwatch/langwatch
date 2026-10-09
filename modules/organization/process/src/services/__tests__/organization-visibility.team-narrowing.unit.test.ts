@@ -71,6 +71,7 @@ function seededMembership({
       organizationId: "org-1",
       archivedAt: null,
       createdAt: T0,
+      updatedAt: T0,
       personalFeatures: null,
     });
   }

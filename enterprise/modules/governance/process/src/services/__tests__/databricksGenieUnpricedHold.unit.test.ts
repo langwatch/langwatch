@@ -22,7 +22,7 @@ import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.
 import {
   DatabricksGeniePullerService,
   WAREHOUSE_COST_UNREADABLE,
-} from "../databricks-genie-puller.service.ts";
+} from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
 
 vi.mock("../../channels/http/http.governance-http.channel.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../../channels/http/http.governance-http.channel.ts");

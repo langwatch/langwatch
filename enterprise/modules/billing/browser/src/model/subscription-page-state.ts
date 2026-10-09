@@ -47,6 +47,7 @@ export function billingSeatCounts({
   maxMembers,
   newPlannedFullMembers,
   deletedSeatCount,
+  seatUsage,
 }: {
   flags: SubscriptionPlanFlags;
   totalFullMembers: number;
@@ -54,12 +55,15 @@ export function billingSeatCounts({
   maxMembers: number | undefined;
   newPlannedFullMembers: number;
   deletedSeatCount: number;
+  /** Seats in use as the page shows them: the server's count once it answered. */
+  seatUsage: number;
 }) {
   const fromBaseline = flags.isDeveloperPlan || flags.isLicenseOverride;
   const effectiveMaxSeats = fromBaseline ? 1 : maxMembers;
   const billingSeats = fromBaseline
     ? Math.max(
         totalFullMembers,
+        seatUsage,
         (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount,
       )
     : Math.max(
@@ -68,18 +72,37 @@ export function billingSeatCounts({
       );
   // A tiered legacy plan moving to seats bills its members, not the old plan's capacity.
   const upgradeBillingSeats = flags.isTieredLegacyPaidPlan
-    ? Math.max(1, totalFullMembers)
+    ? Math.max(1, totalFullMembers, seatUsage)
     : billingSeats;
   return { effectiveMaxSeats, billingSeats, upgradeBillingSeats };
 }
 
-/** Which change blocks the page shows; a free plan needs an upgrade only once seats change. */
+/**
+ * Seats in use as enforcement counts them (custom roles, open invites) once the
+ * server answered, plus rows planned in the drawer; the page's own count until then.
+ */
+export function seatUsageCount({
+  serverMembersCount,
+  plannedFullMembers,
+  pageCount,
+}: {
+  serverMembersCount: number | undefined;
+  plannedFullMembers: number;
+  pageCount: number;
+}): number {
+  return serverMembersCount === undefined ? pageCount : serverMembersCount + plannedFullMembers;
+}
+
+/** Which change blocks the page shows; a free plan upgrades once seats change or overflow. */
 export function subscriptionChangesRequired({
   flags,
   hasSeatChanges,
+  isOverPlanSeats,
 }: {
   flags: SubscriptionPlanFlags;
   hasSeatChanges: boolean;
+  /** Above the plan's seats, the upgrade (or more seats) is offered up front. */
+  isOverPlanSeats: boolean;
 }) {
   const { isDeveloperPlan, isLicenseOverride, isEnterprisePlan, isTieredLegacyPaidPlan } = flags;
   const isUpgradeSeatsRequired =
@@ -88,8 +111,11 @@ export function subscriptionChangesRequired({
     !isEnterprisePlan &&
     !isLicenseOverride &&
     hasSeatChanges;
+  // A free plan over its seats is offered the upgrade up front, not after an invite is refused.
   const isUpgradePlanRequired =
-    ((isDeveloperPlan && hasSeatChanges) || isTieredLegacyPaidPlan || isLicenseOverride) &&
+    ((isDeveloperPlan && (hasSeatChanges || isOverPlanSeats)) ||
+      isTieredLegacyPaidPlan ||
+      isLicenseOverride) &&
     !isEnterprisePlan;
   const planUpgradeRequired = isDeveloperPlan
     ? hasSeatChanges && !isEnterprisePlan
@@ -97,6 +123,7 @@ export function subscriptionChangesRequired({
   return {
     isUpgradeSeatsRequired,
     isUpgradePlanRequired,
-    updateRequired: isUpgradeSeatsRequired || planUpgradeRequired,
+    updateRequired:
+      isUpgradeSeatsRequired || planUpgradeRequired || (isOverPlanSeats && !isEnterprisePlan),
   };
 }

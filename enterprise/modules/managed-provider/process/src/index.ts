@@ -1,9 +1,1 @@
-export type { ManagedProviderConfiguration } from "./services/managed-provider-configuration.service.ts";
-export {
-  type ManagedProviderCredentials,
-  ManagedProviderCredentialVendor,
-} from "./channels/managed-provider-credentials.channel.ts";
-export { HttpManagedProviderCredentialsChannel } from "./channels/http/http.managed-provider-credentials.channel.ts";
-export { MemoryManagedProviderCredentialsChannel } from "./channels/memory/memory.managed-provider-credentials.channel.ts";
-export { managedProviderCredentialsChannels } from "./channels/managed-provider-credentials-channels.registry.ts";
 export { managedProviderProcessModule } from "./managed-provider.module.ts";

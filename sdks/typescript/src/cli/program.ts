@@ -1658,6 +1658,14 @@ function registerExperimentCommands(program: Command): void {
         "--limit <n>",
         "Maximum rows to print in the table; the JSON answer always carries every row (default 20)",
         "20",
+      )
+      .option(
+        "--require-complete",
+        "Exit with status 2 when the run has not ended or its results are still being stored",
+      )
+      .option(
+        "--wait <seconds>",
+        "Keep reading until the run has ended and every result it reported is stored, including a run just reported that is not stored at all yet; exit with status 2 if it is still partial after this many seconds",
       ),
     async (
       experiment: string,
@@ -1666,6 +1674,8 @@ function registerExperimentCommands(program: Command): void {
         filter?: string;
         evaluator?: string;
         limit?: string;
+        requireComplete?: boolean;
+        wait?: string;
       },
     ) => {
       const { experimentResultsCommand: impl } = await import("./commands/experiment/results.js");

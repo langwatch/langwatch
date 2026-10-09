@@ -34,7 +34,9 @@ export function useSubscriptionMembers(organizationId: string | undefined) {
   const pendingInvitesWithMemberType = useMemo(
     () =>
       (pendingInvites.data ?? [])
-        .filter((inv) => inv.status === "PENDING")
+        // An expired invite holds no seat: enforcement does not count it, so
+        // neither does the seat count nor the checkout.
+        .filter((inv) => inv.displayStatus === "PENDING")
         .map((inv) => ({
           id: inv.id,
           email: inv.email,

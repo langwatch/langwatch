@@ -1,20 +1,20 @@
-import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { formatDuration } from "@langwatch/design-system/display-formatters";
 import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
 
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
+import { useOpenTraceDrawer } from "../../../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts";
 import {
   findMessageContent,
   parseSystemPrompt,
 } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import { EXPANDED_BG_CSS } from "../../../../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles.ts";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
-import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer.ts";
 import { SystemPromptBanner } from "../../../../trace-drawer/conversation-view/system-prompt-banner.tsx";
 import { TraceIdPeek } from "../../../../trace-id-peek.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 import { type RowStyle, StatusDot } from "../../../status-row.tsx";
 import { Bubble } from "./bubble.tsx";
 import { ConversationSummaryLine } from "./conversation-summary.tsx";

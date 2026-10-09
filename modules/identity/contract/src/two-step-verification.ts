@@ -3,7 +3,7 @@
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
-import { amrSchema, secondFactorSatisfactionSchema } from "./mfa-condition.ts";
+import { amrSchema, secondFactorSatisfactionSchema } from "./features/mfa/mfa-condition.ts";
 
 /** An organization that will not let this person turn their second factor off. */
 export const requiringOrganizationSchema = z.object({

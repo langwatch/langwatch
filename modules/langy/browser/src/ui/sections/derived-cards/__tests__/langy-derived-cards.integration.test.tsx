@@ -5,9 +5,9 @@ import type { LangyDerivedCard, LangyDerivedChoicesCard } from "@langwatch/langy
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LangyDerivedCardView } from "../../../../features/transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyFailedCard } from "../../../elements/derived-cards/langy-failed-card.tsx";
 import { LangyChoicesCard } from "../langy-choices-card.tsx";
-import { LangyDerivedCardView } from "../langy-derived-card-view.tsx";
 
 afterEach(cleanup);
 
@@ -88,7 +88,7 @@ describe("Langy derived card presentation", () => {
         <LangyChoicesCard card={card} lockState={lockState} onSelect={onSelect} />
       </DesignSystemProvider>
     );
-    const { container, rerender } = render(view({ status: "open" }));
+    const { rerender } = render(view({ status: "open" }));
 
     fireEvent.click(screen.getByRole("button", { name: "I'd rather describe it" }));
 
@@ -99,9 +99,9 @@ describe("Langy derived card presentation", () => {
 
     rerender(view({ status: "answered", optionIds: ["describe"] }));
 
-    const ticks = container.querySelectorAll("svg.lucide-check");
-    expect(ticks).toHaveLength(1);
-    expect(ticks[0]?.closest("button")?.textContent).toContain("I'd rather describe it");
+    const picked = screen.getByRole("button", { name: "I'd rather describe it" });
+    expect(picked.getAttribute("aria-pressed")).toBe("true");
+    expect((picked as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("answers an open single-select question through the named action", () => {

@@ -16,6 +16,8 @@ export const planSchema = z.object({
   only: z.string().optional(),
   /** maxConsecutiveErrors stops the run after this many visits in a row that errored; 0 never. */
   maxConsecutiveErrors: z.number().int().nonnegative().default(10),
+  /** vision asks a vision model whether each route's settled first screen looks wrong. */
+  vision: z.boolean().default(false),
   credential: z.object({
     email: z.string(),
     password: z.string(),
@@ -49,6 +51,7 @@ export const ORACLES = [
   "error-boundary",
   "nav-404",
   "hang",
+  "vision",
 ] as const;
 export type Oracle = (typeof ORACLES)[number];
 

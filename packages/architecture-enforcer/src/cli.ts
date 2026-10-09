@@ -11,6 +11,7 @@ import {
   type ArchitectureViolation,
   type WorkspaceSnapshot,
 } from "./index.ts";
+import { formatPeerCycleExceptions } from "./policies/boundaries/peer-cycles.ts";
 import { buildReport, formatReport } from "./report.ts";
 
 const USAGE = `architecture-enforcer [options]
@@ -143,6 +144,8 @@ function run(options: CliOptions): 0 | 1 {
     : lintPolicies(snapshot, enabledPolicies(options));
 
   const report = buildReport(findings);
+  if (!options.reviewTestQuality && (!options.only || options.only.includes("peer-cycles")))
+    process.stderr.write(formatPeerCycleExceptions());
 
   if (report.exitCode === 0) {
     const verdict = options.reviewTestQuality

@@ -19,7 +19,7 @@ import {
   organizationCreatedSchema,
   organizationDirectoryCountsSchema,
   organizationMemberDirectorySchema,
-  organizationMemberProvenanceByUserSchema,
+  organizationInvitedMemberIdsSchema,
   organizationMemberRecordSchema,
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
@@ -113,10 +113,10 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withInput(organizationApiMemberScopeSchema)
   .withOutput(organizationMemberRecordSchema)
 
-  /** Why each member is here; a second query so a failure degrades only the chips. */
-  .query("getMemberProvenance")
+  /** The members invitations brought; the browser joins identity's admissions to it. */
+  .query("getInvitedMemberIds")
   .withInput(organizationApiScopeSchema)
-  .withOutput(organizationMemberProvenanceByUserSchema)
+  .withOutput(organizationInvitedMemberIdsSchema)
 
   .mutation("updateTeamMemberRole")
   .withInput(organizationApiUpdateTeamMemberRoleInputSchema)

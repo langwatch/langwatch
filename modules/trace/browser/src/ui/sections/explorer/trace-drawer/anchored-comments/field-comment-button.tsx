@@ -1,4 +1,7 @@
-import { type TraceAnchor, useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
+import {
+  type TraceAnchor,
+  useAnchoredAnnotations,
+} from "../../../../../features/annotation/behavior/use-anchored-annotations.ts";
 import { AnchorCommentButton } from "./anchor-comment-button.tsx";
 
 /**

@@ -15,6 +15,7 @@ export type FeatureCatalogueEntry = {
 
 export type PackageKind =
   | FeaturePackageRole
+  | "client"
   | "library"
   | "application"
   | "dev-runtime"
@@ -27,6 +28,10 @@ export type PackageKind =
 export type PackageManifest = {
   name?: string;
   private?: boolean;
+  /** `false` records a contract package that deliberately declares no callable `*Api`. */
+  callable?: boolean;
+  /** The plan (dev/docs/plans/<name>.md) a designed but unbuilt process package waits on. */
+  staged?: string;
   license?: string;
   exports?: unknown;
   scripts?: Record<string, string>;

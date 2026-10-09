@@ -5,6 +5,8 @@ import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
+import { GovernanceCostNoticesService } from "../../features/cost/services/governance-cost-notices.service.ts";
+import { GovernanceCostSummaryService } from "../../features/cost/services/governance-cost-summary.service.ts";
 import type {
   GovernanceSeatReportRow,
   OcsfSeatReportReader,
@@ -15,8 +17,6 @@ import {
   MemoryGovernanceCostRollupRepository,
 } from "../../repositories/memory/memory.governance-cost-rollup.repository.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
-import { GovernanceCostNoticesService } from "../governance-cost-notices.service.ts";
-import { GovernanceCostSummaryService } from "../governance-cost-summary.service.ts";
 
 export const NOW = Temporal.Instant.from("2026-09-25T12:00:00Z");
 export const TENANT = "governance-project";

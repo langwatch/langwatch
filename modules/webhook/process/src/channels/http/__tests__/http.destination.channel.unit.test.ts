@@ -7,9 +7,13 @@ vi.mock("@langwatch/egress", async (importOriginal) => ({
   fetchValidatedDestination: vi.fn(),
 }));
 
-import { fetchValidatedDestination, type SsrfValidationResult } from "@langwatch/egress";
+import {
+  createSsrfUrlValidator,
+  fetchValidatedDestination,
+  type SsrfValidationResult,
+} from "@langwatch/egress";
 
-import { sendHttpDestination } from "../http.destination.channel.ts";
+import { HttpDestinationChannel, sendHttpDestination } from "../http.destination.channel.ts";
 
 /**
  * Spec: modules/webhook/specs/webhook-egress.feature
@@ -212,5 +216,27 @@ describe("sendHttpDestination", () => {
         expect(error.retryable).toBe(false);
       },
     );
+  });
+});
+
+describe("the live HTTP channel over the packaged fence", () => {
+  describe("when asked to send to a private address", () => {
+    /** @scenario "The live HTTP channel refuses a private address terminally" */
+    it("refuses it permanently before any connection", async () => {
+      mockedFetch.mockClear();
+
+      const error = (await HttpDestinationChannel.create({ tls: { rejectUnauthorized: true } })
+        .send({
+          url: "https://10.0.0.1/hooks/spend",
+          body: "{}",
+          contextLabel: "test",
+          validateUrl: createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] }),
+        })
+        .catch((err: unknown) => err)) as DispatchError;
+
+      expect(error).toBeInstanceOf(DispatchError);
+      expect(error.retryable).toBe(false);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
   });
 });

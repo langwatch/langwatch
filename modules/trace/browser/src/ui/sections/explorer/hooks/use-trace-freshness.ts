@@ -1,13 +1,13 @@
 import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import { useCallback, useEffect, useRef } from "react";
 
-import { useRowPulseStore } from "../../../../behavior/row-pulse.store.ts";
-import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useRowPulseStore } from "../../../../features/explorer/behavior/row-pulse.store.ts";
+import { useSseStatusStore } from "../../../../features/explorer/behavior/sse-status.store.ts";
+import { useVisibleTraceIds } from "../../../../features/explorer/behavior/use-visible-trace-ids.ts";
 import { useTraceUpdateListener } from "../../use-trace-update-listener.ts";
-import { useVisibleTraceIds } from "./use-visible-trace-ids.ts";
 
 // Facets (`traces.discover`) are ~10x more expensive than the table list
 // (~1.2s vs ~0.1s in our perf capture) and they only change when a *new*

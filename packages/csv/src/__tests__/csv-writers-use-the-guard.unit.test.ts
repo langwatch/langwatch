@@ -34,9 +34,9 @@ const GUARD_IMPORT = /from\s+["'](?:@langwatch\/csv(?:\/download)?|\.\/formula-g
 const GUARDED_WRITERS: Record<string, string> = {
   "packages/csv/src/download-csv.ts":
     "the browser-side writer; maps neutralizeFormula over fields and rows",
-  "modules/scenario/process/src/services/scenario-run-export-csv.service.ts":
+  "modules/scenario/process/src/features/run-export/services/scenario-run-export-csv.service.ts":
     "server-side; every free-text cell goes through text() -> neutralizeFormula",
-  "modules/trace/process/src/rules/trace-export-csv.rules.ts":
+  "modules/trace/process/src/features/export/rules/trace-export-csv.rules.ts":
     "server-side; headers and rows both go through neutralizeFormula",
   "modules/experiment/browser/src/ui/sections/batch-evaluation-results.csv.ts":
     "generateCsvContent applies neutralizeFormula before serializing",

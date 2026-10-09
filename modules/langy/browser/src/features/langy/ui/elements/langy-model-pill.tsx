@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { useOverlayZIndex } from "@langwatch/design-system";
 import {
   Box,
   Combobox,
@@ -10,7 +11,11 @@ import {
 } from "@langwatch/design-system/primitives";
 import { modelProviderIcons, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { LANGY_CHAT_FEATURE_KEY, findModelById } from "@langwatch/model-provider-contract";
+import {
+  LANGY_CHAT_FEATURE_KEY,
+  findModelById,
+  modelProviders,
+} from "@langwatch/model-provider-contract";
 import {
   Brain,
   Check,
@@ -42,6 +47,8 @@ interface ModelItem {
   isLangyDefault: boolean;
   profile: ReturnType<typeof profileLangyModel>;
 }
+
+const TURN_ACTIVE_HINT = "Langy is working. You can switch models when it stops.";
 
 const MODEL_GROUPS: {
   id: LangyModelGroup;
@@ -84,6 +91,23 @@ function groupModelsByGroup<T extends { profile: { group: LangyModelGroup } }>(
     ...group,
     items: items.filter((item) => item.profile.group === group.id),
   })).filter((group) => group.items.length > 0);
+}
+
+/** The provider and model a locked pill names on hover. */
+function modelInUseLabel({ currentProvider, label }: { currentProvider: string; label: string }) {
+  const provider = modelProviders[currentProvider as keyof typeof modelProviders]?.name;
+  return provider ? `${provider} · ${label}` : label;
+}
+
+/** How the pill is locked: a turn keeps a focusable aria-disabled button; others are native. */
+function lockOf({ disabled, reason }: { disabled: boolean; reason?: "turn-active" | undefined }) {
+  const byTurn = disabled && reason === "turn-active";
+  return {
+    byTurn,
+    native: disabled && !byTurn,
+    aria: disabled || undefined,
+    pointerEvents: byTurn ? ("auto" as const) : ("none" as const),
+  };
 }
 
 /** What the pill says: the model's label, else its name, else why there is none yet. */
@@ -138,6 +162,7 @@ export const LangyModelPill = memo(function LangyModelPill({
   onChange,
   langyDefaultModel,
   disabled = false,
+  disabledReason,
 }: {
   ref?: React.Ref<HTMLButtonElement>;
   /** Current model, `provider/name`. */
@@ -149,6 +174,8 @@ export const LangyModelPill = memo(function LangyModelPill({
   langyDefaultModel?: string | null;
   /** Lock the picker (e.g. while a turn is in flight) — greyed, can't open. */
   disabled?: boolean;
+  /** Why the picker is locked; only a turn in flight is worth naming on hover. */
+  disabledReason?: "turn-active" | undefined;
 }) {
   // Langy is a licensed codex surface: declaring `langy.chat` re-admits
   // codex models the shared hook fail-closes everywhere else.
@@ -161,6 +188,8 @@ export const LangyModelPill = memo(function LangyModelPill({
   const hasCurrentProvider = currentProvider in modelProviderIcons;
   const modelsLoading = options.length === 0 && selectOptions.length === 0;
   const currentLabel = pillLabel({ optionLabel: modelOption?.label, model, modelsLoading });
+  const modelInUse = modelInUseLabel({ currentProvider, label: currentLabel });
+  const lock = lockOf({ disabled, reason: disabledReason });
 
   const [query, setQuery] = useState("");
 
@@ -186,6 +215,7 @@ export const LangyModelPill = memo(function LangyModelPill({
   // The catalogue is the right list and the wrong front door — see
   // logic/langyModelSuggestions.ts. A short derived shortlist leads; everything
   // else waits behind "More models".
+  const { zIndex } = useOverlayZIndex();
   const searching = query.trim().length > 0;
   const { suggested, more } = useMemo(
     () =>
@@ -228,97 +258,122 @@ export const LangyModelPill = memo(function LangyModelPill({
       {/* Ark anchors the listbox to this Control, not the trigger — without it the listbox lands
        * at the viewport origin. `inline-flex` hugs the pill; never `display: contents`, which has
        * no rect to measure. */}
-      <Combobox.Control display="inline-flex" width="auto" minWidth={0}>
-        <Combobox.Trigger asChild>
-          {/* Collapsed by default to the provider glyph so the rail stays a row of quiet icons;
-           * expands on hover/`:focus-visible` via a pure CSS width transition, so nothing
-           * re-renders. The full model name stays in `aria-label` regardless. */}
-          <chakra.button
-            ref={triggerRef}
-            type="button"
-            disabled={disabled}
-            data-testid="langy-model-picker"
-            data-model={model}
-            data-loading={modelsLoading ? "true" : undefined}
-            aria-label={`Model: ${currentLabel}`}
-            display="inline-flex"
-            alignItems="center"
-            gap={0}
-            height="28px"
-            maxWidth="200px"
-            paddingLeft={1.5}
-            paddingRight={1.5}
-            borderRadius="full"
-            borderWidth="1px"
-            borderStyle="solid"
-            borderColor="border.emphasized"
-            background="bg.surface"
-            color="fg.muted"
-            flexShrink={1}
-            minWidth={0}
-            opacity={disabled ? 0.5 : 1}
-            cursor={disabled ? "not-allowed" : "pointer"}
-            transition="border-color 150ms ease, color 150ms ease, opacity 150ms ease"
-            _hover={disabled ? undefined : { borderColor: "orange.emphasized", color: "fg" }}
-            _focusVisible={{
-              outline: "none",
-              borderColor: "orange.emphasized",
-              color: "fg",
-            }}
-            _disabled={{ pointerEvents: "none" }}
-            css={{
-              "& .model-reveal": {
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                maxWidth: 0,
-                opacity: 0,
-                overflow: "hidden",
-                whiteSpace: "nowrap",
-                transition:
-                  "max-width 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 140ms ease, margin-left 220ms cubic-bezier(0.32, 0.72, 0, 1)",
-              },
-              "&:hover .model-reveal, &:focus-visible .model-reveal, &[data-state='open'] .model-reveal":
-                { maxWidth: "160px", opacity: 1, marginLeft: "6px" },
-              "&[data-loading='true'] .model-reveal": {
-                maxWidth: "180px",
-                opacity: 1,
-                marginLeft: "6px",
-              },
-              "@media (prefers-reduced-motion: reduce)": {
-                "& .model-reveal": { transition: "none" },
-              },
-            }}
-          >
-            {hasCurrentProvider ? (
-              <Box flexShrink={0} display="grid" placeItems="center">
-                <ProviderIconGlyph provider={currentProvider as ProviderKey} size="15px" />
-              </Box>
-            ) : (
-              <Box flexShrink={0} display="grid" placeItems="center" color="fg.subtle">
-                {modelsLoading ? <LoaderCircle size={15} /> : <Layers3 size={15} />}
-              </Box>
-            )}
-            <chakra.span className="model-reveal">
-              <Text textStyle="xs" fontWeight="500" truncate>
-                {currentLabel}
-              </Text>
-              <Box color="fg.subtle" flexShrink={0} display="grid" placeItems="center">
-                <ChevronDown size={12} />
-              </Box>
-            </chakra.span>
-          </chakra.button>
-        </Combobox.Trigger>
-      </Combobox.Control>
+      <Tooltip
+        content={
+          <Box>
+            <Text textStyle="xs" fontWeight="600">
+              {modelInUse}
+            </Text>
+            <Text textStyle="xs">{TURN_ACTIVE_HINT}</Text>
+          </Box>
+        }
+        disabled={!lock.byTurn}
+        openDelay={300}
+        showArrow
+      >
+        <Box display="inline-flex" minWidth={0}>
+          <Combobox.Control display="inline-flex" width="auto" minWidth={0}>
+            <Combobox.Trigger asChild>
+              {/* Collapsed by default to the provider glyph so the rail stays a row of quiet icons;
+               * expands on hover/`:focus-visible` via a pure CSS width transition, so nothing
+               * re-renders. The full model name stays in `aria-label` regardless. */}
+              <chakra.button
+                ref={triggerRef}
+                type="button"
+                // A natively disabled button takes no pointer events, so the turn lock is worn as
+                // aria-disabled and the combobox root refuses to open; other locks stay native.
+                disabled={lock.native}
+                aria-disabled={lock.aria}
+                data-testid="langy-model-picker"
+                data-model={model}
+                data-loading={modelsLoading ? "true" : undefined}
+                aria-label={`Model: ${currentLabel}`}
+                display="inline-flex"
+                alignItems="center"
+                gap={0}
+                height="28px"
+                maxWidth="200px"
+                paddingLeft={1.5}
+                paddingRight={1.5}
+                borderRadius="full"
+                borderWidth="1px"
+                borderStyle="solid"
+                borderColor="border.emphasized"
+                background="bg.surface"
+                color="fg.muted"
+                flexShrink={1}
+                minWidth={0}
+                opacity={disabled ? 0.5 : 1}
+                cursor={disabled ? "not-allowed" : "pointer"}
+                transition="border-color 150ms ease, color 150ms ease, opacity 150ms ease"
+                _hover={disabled ? undefined : { borderColor: "orange.emphasized", color: "fg" }}
+                _focusVisible={{
+                  outline: "none",
+                  borderColor: "orange.emphasized",
+                  color: "fg",
+                }}
+                _disabled={{ pointerEvents: lock.pointerEvents }}
+                css={{
+                  "& .model-reveal": {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    maxWidth: 0,
+                    opacity: 0,
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    transition:
+                      "max-width 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 140ms ease, margin-left 220ms cubic-bezier(0.32, 0.72, 0, 1)",
+                  },
+                  "&:hover .model-reveal, &:focus-visible .model-reveal, &[data-state='open'] .model-reveal":
+                    { maxWidth: "160px", opacity: 1, marginLeft: "6px" },
+                  "&[data-loading='true'] .model-reveal": {
+                    maxWidth: "180px",
+                    opacity: 1,
+                    marginLeft: "6px",
+                  },
+                  "@media (prefers-reduced-motion: reduce)": {
+                    "& .model-reveal": { transition: "none" },
+                  },
+                }}
+              >
+                {hasCurrentProvider ? (
+                  <Box flexShrink={0} display="grid" placeItems="center">
+                    <ProviderIconGlyph provider={currentProvider as ProviderKey} size="15px" />
+                  </Box>
+                ) : (
+                  <Box flexShrink={0} display="grid" placeItems="center" color="fg.subtle">
+                    {modelsLoading ? <LoaderCircle size={15} /> : <Layers3 size={15} />}
+                  </Box>
+                )}
+                <chakra.span className="model-reveal">
+                  <Text textStyle="xs" fontWeight="500" truncate>
+                    {currentLabel}
+                  </Text>
+                  <Box color="fg.subtle" flexShrink={0} display="grid" placeItems="center">
+                    <ChevronDown size={12} />
+                  </Box>
+                </chakra.span>
+              </chakra.button>
+            </Combobox.Trigger>
+          </Combobox.Control>
+        </Box>
+      </Tooltip>
       <Portal>
-        <Combobox.Positioner>
+        <Combobox.Positioner
+          ref={(node: HTMLElement | null) => {
+            // Zag's own layer lands under the panel beside a drawer (z 1600); the list takes the
+            // shared overlay layer, like every menu and popover.
+            node?.style.setProperty("z-index", zIndex, "important");
+          }}
+        >
           <Combobox.Content
             minWidth="240px"
             maxHeight="340px"
             overflowY="auto"
             padding={0}
             borderRadius="12px"
-            background="bg.panel/96"
+            background="bg.panel"
             borderWidth="1px"
             borderColor="border.muted"
             boxShadow="lg"

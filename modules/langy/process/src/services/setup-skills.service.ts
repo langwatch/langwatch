@@ -6,7 +6,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 
 import { SETUP_SKILL_BODIES } from "../rules/setup-skill-bodies.rules.ts";
 
-export type SetupSkillId = keyof typeof SETUP_SKILL_BODIES;
+type SetupSkillId = keyof typeof SETUP_SKILL_BODIES;
 
 /** Serves the skill instructions the "copy a prompt" menu hands to an agent. */
 export class SetupSkillsService {

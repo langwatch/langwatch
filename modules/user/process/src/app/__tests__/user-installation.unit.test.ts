@@ -1,25 +1,15 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  EnterpriseGatewayApi,
-  PersonalVirtualKey,
-  RoutingPolicy,
-} from "@langwatch/enterprise-gateway-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
+import { EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { NotificationService } from "@langwatch/notification-contract";
-import type {
-  OrganizationApi,
-  OrganizationSettings,
-  PersonalWorkspace,
-} from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import { UserApi } from "@langwatch/user-contract";
-import { hash } from "bcrypt";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { userProcessModule } from "../../user.module.ts";
 import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
@@ -28,29 +18,51 @@ function process(
   role: "api" | "worker",
   peers: Readonly<{
     authz?: AuthzApi;
-    enterpriseGateway?: EnterpriseGatewayApi;
-    gateway?: GatewayApi;
     organization?: OrganizationApi;
   }> = {},
 ) {
   return createApp({ role })
     .withModules([userProcessModule])
     .withStores(memoryStores())
-    .withConfig({ user: { publicBaseUrl: undefined } })
+    .withEventing(
+      new EventSourcing({
+        eventStore: EventStoreMemory.createForTesting(),
+        executionTarget: "api",
+        consumersEnabled: false,
+        processManagerMode: "producer-only",
+      }),
+    )
+    .withConfig({
+      user: {
+        publicBaseUrl: undefined,
+        passkeysEnabled: false,
+        mfaEnrollmentOpen: false,
+        localPasswords: false,
+      },
+    })
     .provide({
       auth: createUserTestAuth(),
       authz: peers.authz ?? createApiFixture<AuthzApi>(),
-      "enterprise-gateway": peers.enterpriseGateway ?? createApiFixture<EnterpriseGatewayApi>(),
-      gateway: peers.gateway ?? createApiFixture<GatewayApi>(),
-      governance: createApiFixture<GovernanceRestApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
-      project: createApiFixture<ProjectApi>(),
       "stored-object": createApiFixture<StoredObjectApi>(),
     });
 }
 
 describe("user app installation", () => {
+  /** @scenario "The seed step records a created fact for every existing account" */
+  it("declares the created-fact seed as a background step", async () => {
+    const runtime = await process("worker").boot();
+    try {
+      const step = runtime
+        .migrationSteps(isMigrationStep)
+        .find(({ id }) => id === "user:record-created-facts");
+      expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
     const runtime = await process(role).boot();
 
@@ -58,10 +70,11 @@ describe("user app installation", () => {
       const app = runtime.service(UserApi);
       expect(runtime.module(userProcessModule).provided).toBe(app);
 
-      const created = await app.createCredentialUser({
+      const created = await app.registerCredentialAccount({
         name: "Ada",
         email: "ada@example.com",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
 
       await expect(app.findById({ id: created.id })).resolves.toMatchObject({
@@ -78,13 +91,13 @@ describe("user app installation", () => {
 
     try {
       const app = runtime.service(UserApi);
-      // The real bcrypt hasher this app builds from its own reads, not a
-      // fake one: a rotation must verify against the SAME stored format the
-      // credential row was minted with.
-      const created = await app.createCredentialUser({
+      // The app mints the row with its own bcrypt hasher, so a rotation must
+      // verify against the same stored format.
+      const created = await app.registerCredentialAccount({
         name: "Ada",
         email: "ada@example.com",
-        passwordHash: await hash("first", 10),
+        password: "first",
+        addressConfirmed: false,
       });
 
       await expect(
@@ -111,10 +124,11 @@ describe("user app installation", () => {
     const second = await process("api").boot();
 
     try {
-      const created = await first.service(UserApi).createCredentialUser({
+      const created = await first.service(UserApi).registerCredentialAccount({
         name: "Ada",
         email: "ada@example.com",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
 
       await expect(second.service(UserApi).findById({ id: created.id })).resolves.toBeNull();
@@ -124,131 +138,3 @@ describe("user app installation", () => {
     }
   });
 });
-
-describe("the /me gateway reads", () => {
-  const workspace: PersonalWorkspace = {
-    team: { id: "team-1", name: "Ada's workspace", slug: "ada", createdAtMs: 0 },
-    project: { id: "project-1", name: "Ada", slug: "ada", apiKey: "sk-lw-1", createdAtMs: 0 },
-  };
-  const organization = Object.assign(createUserTestOrganizations(), {
-    getPersonalWorkspace: vi.fn(async () => workspace),
-    getSettings: vi.fn(async (): Promise<OrganizationSettings> => ({
-      id: "org-1",
-      name: "Acme",
-      slug: "acme",
-      supportContact: "it@example.com",
-      presenceEnabled: false,
-      traceSharingEnabled: false,
-      primaryIntent: null,
-      s3Endpoint: null,
-      s3AccessKeyId: null,
-      s3Bucket: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-  });
-
-  /** @scenario "The personal context names the default routing policy the gateway resolves" */
-  it("names the first default routing policy enterprise gateway answers", async () => {
-    const findDefaultRoutingPolicies = vi.fn(async () => [
-      routingPolicy({ id: "policy-team", name: "Team default" }),
-      routingPolicy({ id: "policy-org", name: "Org default" }),
-    ]);
-    const runtime = await process("api", {
-      authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
-      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({ findDefaultRoutingPolicies }),
-      organization,
-    }).boot();
-
-    try {
-      const context = await runtime
-        .service(UserApi)
-        .getPersonalContext({ userId: "user-1", organizationId: "org-1" });
-
-      expect(context.routingPolicy).toEqual({ id: "policy-team", name: "Team default" });
-      expect(findDefaultRoutingPolicies).toHaveBeenCalledWith({
-        organizationId: "org-1",
-        personalTeamId: "team-1",
-      });
-    } finally {
-      await runtime.stop();
-    }
-  });
-
-  /** @scenario "The personal budget warns at the gateway's soft warning on the caller's own key" */
-  it("checks the caller's own key with the gateway and answers a warning", async () => {
-    const checkBudget = vi.fn(async () => ({
-      decision: "soft_warn" as const,
-      warnings: [],
-      blockReason: null,
-      blockedBy: [],
-      scopes: [
-        { scope: "PRINCIPAL", scopeId: "user-1", window: "MONTH", spentUsd: "85", limitUsd: "100" },
-      ],
-    }));
-    const personalVirtualKeyList = vi.fn(async () => [personalKey({ id: "vk-1" })]);
-    const runtime = await process("api", {
-      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({ personalVirtualKeyList }),
-      gateway: createApiFixture<GatewayApi>({ checkBudget }),
-      organization,
-    }).boot();
-
-    try {
-      const budget = await runtime
-        .service(UserApi)
-        .getPersonalBudget({ userId: "user-1", organizationId: "org-1" });
-
-      expect(budget).toMatchObject({ status: "warning", spentUsd: "85", limitUsd: "100" });
-      expect(personalVirtualKeyList).toHaveBeenCalledWith({
-        userId: "user-1",
-        organizationId: "org-1",
-      });
-      expect(checkBudget).toHaveBeenCalledWith({
-        organizationId: "org-1",
-        teamId: "team-1",
-        projectId: "project-1",
-        virtualKeyId: "vk-1",
-        principalUserId: "user-1",
-        projectedCostUsd: 0,
-      });
-    } finally {
-      await runtime.stop();
-    }
-  });
-});
-
-function routingPolicy({ id, name }: { id: string; name: string }): RoutingPolicy {
-  return {
-    id,
-    organizationId: "org-1",
-    name,
-    description: null,
-    modelProviderIds: [],
-    modelAliases: {},
-    defaultModel: null,
-    policyRules: {},
-    isDefault: true,
-    createdAtMs: 0,
-    updatedAtMs: 0,
-    createdById: null,
-    updatedById: null,
-    scopes: [],
-  };
-}
-
-function personalKey({ id }: { id: string }): PersonalVirtualKey {
-  return {
-    id,
-    organizationId: "org-1",
-    name: "Ada's key",
-    description: null,
-    displayPrefix: "lw_vk_",
-    status: "ACTIVE",
-    principalUserId: "user-1",
-    routingPolicyId: null,
-    createdAtMs: 0,
-    updatedAtMs: 0,
-    lastUsedAtMs: null,
-    scopes: [],
-  };
-}

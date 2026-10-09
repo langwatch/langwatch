@@ -49,7 +49,7 @@ class ProjectModule implements ProjectApi {
 
   static create({
     repositories,
-  }: FeatureSetup<{}, unknown, undefined, { projects: ProjectRepository }>): ProjectModule {
+  }: FeatureSetup<{}, undefined, { projects: ProjectRepository }>): ProjectModule {
     return new ProjectModule(repositories.projects);
   }
 
@@ -67,7 +67,7 @@ class StatelessApp {
   static readonly contract = moduleApi<{ ready(): boolean }>()("annotation");
   static readonly dependencies = {};
 
-  static create(_setup: FeatureSetup<{}, unknown, undefined>) {
+  static create(_setup: FeatureSetup<{}, undefined>) {
     return { ready: () => true };
   }
 }
@@ -80,18 +80,28 @@ interface FilesApi {
 
 const FilesApi = moduleApi<FilesApi>()("stored-object");
 
+/** Object storage reaches the module only through its registry, as a store client should. */
+class FileRepositories {
+  static readonly requires = ["objectStorage"] as const;
+
+  static create({ objectStorage }: { objectStorage: ObjectStorage }) {
+    return { storage: objectStorage };
+  }
+}
+
 class FilesApp implements FilesApi {
   static readonly contract = FilesApi;
   static readonly dependencies = {};
-  static readonly reads = ["objectStorage"] as const;
   readonly #storage: ObjectStorage;
 
   private constructor(storage: ObjectStorage) {
     this.#storage = storage;
   }
 
-  static create(setup: FeatureSetup<{}, { objectStorage: ObjectStorage }, undefined>): FilesApp {
-    return new FilesApp(setup.members.objectStorage);
+  static create({
+    repositories,
+  }: FeatureSetup<{}, undefined, { storage: ObjectStorage }>): FilesApp {
+    return new FilesApp(repositories.storage);
   }
 
   storage(): ObjectStorage {
@@ -99,7 +109,10 @@ class FilesApp implements FilesApi {
   }
 }
 
-const files = defineProcessModule("stored-object").withApi(FilesApp).build();
+const files = defineProcessModule("stored-object")
+  .withRepositories(defineRepositories({ live: FileRepositories, memory: FileRepositories }))
+  .withApi(FilesApp)
+  .build();
 
 async function* chunks(...values: string[]): AsyncGenerator<Uint8Array> {
   for (const value of values) yield Buffer.from(value);

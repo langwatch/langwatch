@@ -1,20 +1,24 @@
 /**
  * What a browser installs when it installs trace: the Trace Explorer, the
- * public share page, and the drawer the address bar opens
- * (`?drawer.open=<name>`) under the name the product has always used.
+ * public share page, and the drawers the address bar opens
+ * (`?drawer.open=<name>`) under the names the product has always used.
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
 import {
+  AgentActionsMenuToken,
   AnnotationQueueConversationToken,
+  ConversationThreadToken,
+  EvaluatorTracesMappingToken,
   RenderInputOutputToken,
   SetupWithAgentButtonToken,
   TraceEditButtonToken,
   TraceIdPeekToken,
-} from "@langwatch/trace-contract";
+  TracePreviewHoverCardToken,
+} from "@langwatch/trace-client";
 
 // Declare the `trace:` slices at install, so langy and annotation read them from first paint.
-import "./behavior/annotation-queue-session.store.ts";
+import "./features/annotation/behavior/annotation-queue-session.store.ts";
 import "./behavior/explorer-scope.slice.ts";
 
 export const traceWeb = defineBrowserModule("trace")
@@ -23,10 +27,6 @@ export const traceWeb = defineBrowserModule("trace")
     mounts: { TraceHostApi: { load: () => import("./behavior/trace-host-mount.tsx") } },
   })
   .withScreens({
-    // Path-less: the route table nests every chrome page under it.
-    "layouts/trace-drawer": {
-      load: () => import("./ui/sections/explorer/trace-drawer-layout.tsx"),
-    },
     "pages/[project]/traces": {
       requires: "traces:view",
       load: () => import("./ui/sections/traces/traces-screen.tsx"),
@@ -36,6 +36,13 @@ export const traceWeb = defineBrowserModule("trace")
     },
   })
   .withDrawers({
+    // The routed singleton: every page, the Trace Explorer included, opens the trace here.
+    traceV2Details: {
+      load: async () => ({
+        default: (await import("./ui/sections/explorer/trace-v2-details-drawer.tsx"))
+          .TraceV2DetailsDrawer,
+      }),
+    },
     addDatasetRecord: {
       load: async () => ({
         default: (await import("./ui/sections/datasets/add-dataset-record-drawer.tsx"))
@@ -50,35 +57,36 @@ export const traceWeb = defineBrowserModule("trace")
       }),
     },
   })
-  /** Trace UI that reads trace's own data, lent to the modules that show it (§3.4 rule 7). */
+  /** Held: the presence menu item still travels by name. */
   .withCapabilities({
-    agentActionsMenu: {
-      load: async () => ({
-        default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
-      }),
-    },
-    conversationThread: {
-      load: async () => ({
-        default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
-          .ConversationThread,
-      }),
-    },
-    evaluatorTracesMapping: {
-      load: async () => ({
-        default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))
-          .EvaluatorTracesMapping,
-      }),
-    },
     presenceMenuItem: {
       load: async () => ({
         default: (await import("./ui/sections/presence/presence-menu-item.tsx")).PresenceMenuItem,
       }),
     },
-    tracePreviewHoverCard: {
-      load: async () => ({
-        default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TracePreviewHoverCard,
-      }),
-    },
+  })
+  /** Trace UI that reads trace's own data, lent to the modules that show it (§10.1). */
+  .lends(AgentActionsMenuToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
+    }),
+  })
+  .lends(EvaluatorTracesMappingToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))
+        .EvaluatorTracesMapping,
+    }),
+  })
+  .lends(ConversationThreadToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
+        .ConversationThread,
+    }),
+  })
+  .lends(TracePreviewHoverCardToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TracePreviewHoverCard,
+    }),
   })
   .lends(RenderInputOutputToken, {
     load: async () => ({

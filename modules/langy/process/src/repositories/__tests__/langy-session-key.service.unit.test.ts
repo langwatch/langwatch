@@ -1,19 +1,19 @@
 import { ApiKeyNotFoundError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import {
-  type AuthzService,
+  type AuthzApi,
   type AuthzEffectivePermissionsInput,
   type AuthzEffectivePermissionsOutput,
 } from "@langwatch/authz-contract";
 import { LangySessionKeyScopeError } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal, type Instant } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangySessionKeyMetrics } from "../../services/langy-session-key.service.ts";
+import type { LangySessionKeyMetrics } from "../../features/session-key/services/langy-session-key.service.ts";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,
-} from "../../services/langy-session-key.service.ts";
+} from "../../features/session-key/services/langy-session-key.service.ts";
 import {
   LangySessionKeyRepository,
   type LangySessionKeyRecord,
@@ -21,9 +21,7 @@ import {
 
 class SessionKeyRepository extends LangySessionKeyRepository {
   key: LangySessionKeyRecord | null = null;
-  reapedCount = 0;
   readonly revocations: { apiKeyId: string; revokedAt: Instant }[] = [];
-  readonly reaperCalls: { revokedAt: Instant; name: string }[] = [];
 
   async getProjectScope() {
     return { teamId: "team-1", organizationId: "organization-1" };
@@ -37,11 +35,6 @@ class SessionKeyRepository extends LangySessionKeyRepository {
   async revoke(apiKeyId: string, revokedAt: Instant): Promise<void> {
     this.revocations.push({ apiKeyId, revokedAt });
   }
-
-  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
-    this.reaperCalls.push({ revokedAt: input.now, name: input.name });
-    return this.reapedCount;
-  }
 }
 
 class SessionKeyMetrics implements LangySessionKeyMetrics {
@@ -51,29 +44,28 @@ class SessionKeyMetrics implements LangySessionKeyMetrics {
 function createService(input: {
   repository: SessionKeyRepository;
   apiKeys: ApiKeyApi;
-  authz: AuthzService;
+  authz: AuthzApi;
   metrics: SessionKeyMetrics;
 }): LangySessionKeyService {
   return LangySessionKeyService.create(input);
 }
 
 describe("LangySessionKeyService", () => {
+  /** @scenario "The Langy key is scoped to only its own project" */
   it("mints only the holder's Langy permissions at the project scope", async () => {
     const repository = new SessionKeyRepository();
     const apiKeyCreate: ApiKeyApi["create"] = vi.fn(async () => {
       const apiKey = Object.assign(Object.create(null), { id: "key-1" });
       return { token: "session-token", apiKey };
     });
-    const permissions: Awaited<ReturnType<AuthzService["effectivePermissions"]>> = [
+    const permissions: Awaited<ReturnType<AuthzApi["effectivePermissions"]>> = [
       "project:view",
       "prompts:update",
     ];
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
-    const effectivePermissions: AuthzService["effectivePermissions"] = vi.fn(
-      async () => permissions,
-    );
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
+    const effectivePermissions: AuthzApi["effectivePermissions"] = vi.fn(async () => permissions);
     authz.effectivePermissions = effectivePermissions;
     const metrics = new SessionKeyMetrics();
 
@@ -116,7 +108,7 @@ describe("LangySessionKeyService", () => {
     });
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
     authz.effectivePermissions = vi.fn(async () => [...LANGY_CANDIDATE_PERMISSIONS]);
 
     await createService({
@@ -166,7 +158,7 @@ describe("LangySessionKeyService", () => {
     });
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
     authz.effectivePermissions = vi
       .fn<(args: AuthzEffectivePermissionsInput) => Promise<AuthzEffectivePermissionsOutput>>()
       .mockImplementation(async () => ["project:view", "experiments:delete"]);
@@ -196,7 +188,7 @@ describe("LangySessionKeyService", () => {
     });
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
     // Holds enough to mint a key at all (view), but not the destructive grain.
     authz.effectivePermissions = vi
       .fn<(args: AuthzEffectivePermissionsInput) => Promise<AuthzEffectivePermissionsOutput>>()
@@ -229,7 +221,7 @@ describe("LangySessionKeyService", () => {
       });
       const apiKeys: ApiKeyApi = Object.create(null);
       apiKeys.create = apiKeyCreate;
-      const authz: AuthzService = createApiFixture<AuthzService>();
+      const authz: AuthzApi = createApiFixture<AuthzApi>();
       authz.effectivePermissions = vi.fn(async () => held);
       const service = createService({
         repository: new SessionKeyRepository(),
@@ -315,7 +307,7 @@ describe("LangySessionKeyService", () => {
     });
   });
 
-  it("refuses a non-Langy key and reaps only expired session keys", async () => {
+  it("refuses a non-Langy key", async () => {
     const repository = new SessionKeyRepository();
     repository.key = {
       id: "key-1",
@@ -323,28 +315,17 @@ describe("LangySessionKeyService", () => {
       revokedAt: null,
       isScopedToProject: true,
     };
-    repository.reapedCount = 2;
     const metrics = new SessionKeyMetrics();
     const service = createService({
       repository,
       apiKeys: Object.create(null),
-      authz: createApiFixture<AuthzService>(),
+      authz: createApiFixture<AuthzApi>(),
       metrics,
     });
 
     await expect(
       service.revokeManaged({ apiKeyId: "key-1", projectId: "project-1" }),
     ).resolves.toBe("refused");
-    await expect(service.reapExpired(Temporal.Instant.from("2026-08-26T00:00:00Z"))).resolves.toBe(
-      2,
-    );
-    expect(repository.reaperCalls).toEqual([
-      {
-        revokedAt: Temporal.Instant.from("2026-08-26T00:00:00Z"),
-        name: expect.any(String),
-      },
-    ]);
-    expect(metrics.record).toHaveBeenCalledWith({ operation: "reaped", count: 2 });
     expect(LANGY_CANDIDATE_PERMISSIONS).toContain("project:view");
   });
 });

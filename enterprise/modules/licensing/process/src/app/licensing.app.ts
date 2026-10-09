@@ -1,4 +1,5 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { releaseVersionOf } from "@langwatch/config";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import {
@@ -28,6 +29,7 @@ import {
   type ConnectDeploymentView,
   type DomainClaimLicenseAuthority,
   type ConnectService,
+  type ConnectServiceState,
   type ConnectStatus,
   type InstanceIdentityView,
   type ContractTerms,
@@ -69,7 +71,6 @@ import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
@@ -153,7 +154,6 @@ const logger = createLogger("langwatch:licensing");
 
 type LicensingSetup = FeatureSetup<
   typeof LicensingModule.dependencies,
-  never,
   LicensingServerConfig,
   LicensingRepositories
 >;
@@ -168,7 +168,7 @@ export class LicensingModule implements LicensingApiContract {
     /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
     instantEval: InstantEvalApi,
     /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
-    projects: ProjectApi,
+    scopes: AuthzApi,
   };
   static readonly config = licensingConfig;
   /**
@@ -269,6 +269,7 @@ export class LicensingModule implements LicensingApiContract {
     // own membership classification (a peer, not owned here).
     const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
       licenses: repositories.organizationLicenses,
+      organizations: dependencies.organizations,
       ...seatCountsOver(dependencies.organizations),
     });
     const registryParts = licenseRegistryParts({
@@ -641,6 +642,13 @@ export class LicensingModule implements LicensingApiContract {
     return this.#install.isServiceEnabled(input);
   }
 
+  getConnectServiceState(input: {
+    organizationId: string;
+    service: ConnectService;
+  }): Promise<ConnectServiceState> {
+    return this.#install.getServiceState(input);
+  }
+
   classifyThroughConnect(input: {
     organizationId: string;
     text: string;
@@ -921,7 +929,7 @@ function licenseRegistryOver({
 function hostedServicesOverPeers({
   gateway,
   instantEval,
-  projects,
+  scopes,
 }: {
   gateway: Pick<
     GatewayApi,
@@ -933,11 +941,11 @@ function hostedServicesOverPeers({
     | "resolveApplicableBudgets"
   >;
   instantEval: Pick<InstantEvalApi, "classify" | "priceOf" | "recordSpendForHostedCalls">;
-  projects: Pick<ProjectApi, "findById">;
+  scopes: Pick<AuthzApi, "getScope">;
 }): HostedServicesInfrastructure {
   return {
     budgets: ContractBudgetStoreService.create({ gateway }),
-    usage: HostedUsageReaderService.create({ gateway, projects }),
+    usage: HostedUsageReaderService.create({ gateway, scopes }),
     judge: {
       classify: (input, signal) =>
         instantEval.classify({ ...input, ...(signal ? { signal } : {}) }),

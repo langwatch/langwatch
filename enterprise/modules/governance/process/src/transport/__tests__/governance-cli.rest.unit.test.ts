@@ -18,8 +18,12 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { EnterprisePlanRequiredError, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { TeamNotFoundError } from "@langwatch/organization-contract";
+import {
+  TeamNotFoundError,
+  PersonalWorkspacePendingError,
+  type EnsuredPersonalWorkspace,
+  type OrganizationApi,
+} from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -32,18 +36,18 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { cliDoorRefusal } from "../../rules/governance-cli-answer.rules.ts";
+import { cliDoorRefusal } from "../../features/cli/rules/governance-cli-answer.rules.ts";
+import { GovernanceCliAccessService } from "../../features/cli/services/governance-cli-access.service.ts";
+import { GovernanceCliActivityService } from "../../features/cli/services/governance-cli-activity.service.ts";
+import { GovernanceCliCredentialService } from "../../features/cli/services/governance-cli-credentials.service.ts";
+import type { DefaultGovernanceCliBootstrapService } from "../../features/cli/services/governance-cli-tool-bootstrap.service.ts";
+import { GovernanceCliService } from "../../features/cli/services/governance-cli.service.ts";
+import type { ActivityMonitorService } from "../../features/ingestion-source/services/ingestion-source-activity.service.ts";
+import type { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import type { IngestionTemplateService } from "../../features/ingestion-source/services/ingestion-template.service.ts";
+import type { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
 import type { DefaultGovernanceAiToolCatalogService } from "../../services/ai-tool-catalog.service.ts";
-import { GovernanceCliAccessService } from "../../services/governance-cli-access.service.ts";
-import { GovernanceCliActivityService } from "../../services/governance-cli-activity.service.ts";
-import { GovernanceCliCredentialService } from "../../services/governance-cli-credentials.service.ts";
-import type { DefaultGovernanceCliBootstrapService } from "../../services/governance-cli-tool-bootstrap.service.ts";
-import { GovernanceCliService } from "../../services/governance-cli.service.ts";
 import type { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service.ts";
-import type { ActivityMonitorService } from "../../services/ingestion-source-activity.service.ts";
-import type { IngestionSourceService } from "../../services/ingestion-source.service.ts";
-import type { IngestionTemplateService } from "../../services/ingestion-template.service.ts";
-import type { PersonalIngestionKeyService } from "../../services/personal-ingestion-key.service.ts";
 import { governanceCliRest } from "../governance-cli.rest.ts";
 
 const USER_ID = "user_1";
@@ -94,10 +98,7 @@ type World = {
     permission: AuthzPermission;
   }) => Promise<boolean>;
   supportContact?: string | null;
-  ensurePersonalWorkspace?: () => Promise<{
-    team: { id: string };
-    project: { id: string; slug: string; name: string; apiKey: string };
-  }>;
+  ensurePersonalWorkspace?: () => Promise<EnsuredPersonalWorkspace>;
   personalWorkspace?: {
     team: { id: string };
     project: { id: string; slug: string; name: string; apiKey: string };
@@ -385,9 +386,18 @@ describe("the CLI governance plane", () => {
   });
 
   describe("when the CLI asks for a personal virtual key", () => {
-    const workspace = {
-      team: { id: "team-personal" },
-      project: { id: "project-personal", slug: "personal-bob", name: "Bob", apiKey: "pk" },
+    const workspace: EnsuredPersonalWorkspace = {
+      kind: "ready",
+      workspace: {
+        team: { id: "team-personal", name: "Personal", slug: "personal", createdAtMs: 0 },
+        project: {
+          id: "project-personal",
+          slug: "personal-bob",
+          name: "Bob",
+          apiKey: "pk",
+          createdAtMs: 0,
+        },
+      },
     };
 
     /** @scenario A second machine asks for a key of its own */
@@ -694,13 +704,20 @@ const PERSONAL_WORKSPACE = {
   team: { id: "team_personal" },
   project: { id: "project_personal", slug: "bob", name: "Bob", apiKey: "lw-personal-key-secret" },
 };
+const READY_WORKSPACE: EnsuredPersonalWorkspace = {
+  kind: "ready",
+  workspace: {
+    team: { id: "team_personal", name: "Personal", slug: "personal", createdAtMs: 0 },
+    project: { ...PERSONAL_WORKSPACE.project, createdAtMs: 0 },
+  },
+};
 const OFFBOARDED = { isMember: vi.fn().mockResolvedValue(false) };
 
 describe("the CLI credential routes' tenancy boundary", () => {
   describe("given a caller who can administer their own personal project", () => {
     /** @scenario GET /api/auth/cli/personal-project returns the caller's personal project */
     it("returns its id, slug and name, never a key", async () => {
-      const api = mountCli({ ensurePersonalWorkspace: async () => PERSONAL_WORKSPACE });
+      const api = mountCli({ ensurePersonalWorkspace: async () => READY_WORKSPACE });
 
       const response = await api.get("/api/auth/cli/personal-project");
 
@@ -714,7 +731,7 @@ describe("the CLI credential routes' tenancy boundary", () => {
   describe("given an old CLI asking for a project key", () => {
     /** @scenario An old CLI asking for a project key is told to upgrade */
     it("answers 410 gone with the upgrade hint", async () => {
-      const api = mountCli({ ensurePersonalWorkspace: async () => PERSONAL_WORKSPACE });
+      const api = mountCli({ ensurePersonalWorkspace: async () => READY_WORKSPACE });
 
       const response = await api.post("/api/auth/cli/project-key", { slug: "bob" });
 
@@ -730,7 +747,7 @@ describe("the CLI credential routes' tenancy boundary", () => {
   describe("given a token issued before its user was removed from the organization", () => {
     /** @scenario an offboarded user's pre-removal token cannot mint or return a personal key */
     it("answers 403, creates no workspace, revokes the token and refuses it afterwards", async () => {
-      const ensure = vi.fn().mockResolvedValue(PERSONAL_WORKSPACE);
+      const ensure = vi.fn().mockResolvedValue(READY_WORKSPACE);
       let revoked = () => false;
       const api = mountCli({
         organizations: OFFBOARDED,
@@ -756,7 +773,7 @@ describe("the CLI credential routes' tenancy boundary", () => {
   describe("given a token issued while the member was active, whose seat an admin then disabled", () => {
     /** @scenario a disabled member's pre-disable token cannot mint or return a personal key */
     it("answers 403, creates no workspace and revokes the presented token", async () => {
-      const ensure = vi.fn().mockResolvedValue(PERSONAL_WORKSPACE);
+      const ensure = vi.fn().mockResolvedValue(READY_WORKSPACE);
       const api = mountCli({ organizations: OFFBOARDED, ensurePersonalWorkspace: ensure });
 
       const response = await api.get("/api/auth/cli/personal-project");
@@ -770,7 +787,7 @@ describe("the CLI credential routes' tenancy boundary", () => {
   describe("given a token for a user whose account is deactivated", () => {
     /** @scenario a deactivated user's token cannot mint or return a personal key */
     it("answers 403, creates no workspace and revokes the presented token", async () => {
-      const ensure = vi.fn().mockResolvedValue(PERSONAL_WORKSPACE);
+      const ensure = vi.fn().mockResolvedValue(READY_WORKSPACE);
       const api = mountCli({
         users: { findById: vi.fn().mockResolvedValue({ ...BOB, deactivatedAt: new Date(1) }) },
         ensurePersonalWorkspace: ensure,
@@ -782,6 +799,27 @@ describe("the CLI credential routes' tenancy boundary", () => {
       expect(ensure).not.toHaveBeenCalled();
       expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
     });
+  });
+});
+
+describe("the CLI key route while the personal workspace is set up", () => {
+  /** @scenario "The CLI key route refuses with a retryable 409 while the personal workspace is set up" */
+  it("answers 409 personal_workspace_pending and issues no key", async () => {
+    const personalVirtualKeyIssue = vi.fn();
+    const api = mountCli({
+      personalKeys: {
+        personalVirtualKeyEnsureDefault: vi
+          .fn()
+          .mockRejectedValue(new PersonalWorkspacePendingError()),
+        personalVirtualKeyIssue,
+      },
+    });
+
+    const response = await api.post("/api/auth/cli/virtual-key", { device_label: "desktop" });
+
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain("personal_workspace_pending");
+    expect(personalVirtualKeyIssue).not.toHaveBeenCalled();
   });
 });
 

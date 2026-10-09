@@ -24,13 +24,14 @@ function serviceWhere(options: {
   const findCustomRolePermissions = vi.fn(async () => options.customRolePermissions);
   const assertRoleChangeAllowed = vi.fn(options.assertRoleChangeAllowed);
   const service = OrganizationMembershipService.create({
+    workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     repository: createApiFixture<OrganizationMembershipRepository>({
       findTeamGrants,
       findCustomRolePermissions,
     }),
-    prompts: { seedTagsForOrganization: vi.fn(), reportCompensationFailure: vi.fn() },
+    creations: { created: vi.fn(), reportError: vi.fn() },
     seats: { checkLimit: vi.fn(), assertRoleChangeAllowed },
-    sessions: { revokeAllBrowserSessions: vi.fn() },
+    seatNotices: { memberDisabled: vi.fn() },
     grantCache: { invalidateOrganization: vi.fn() },
     testArrivals: { standingFor: async (): Promise<{ testing: false }> => ({ testing: false }) },
     ceiling: { assertWithinCaller: async () => {} },

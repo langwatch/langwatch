@@ -1,6 +1,10 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EnsuredPersonalWorkspace, OrganizationApi } from "@langwatch/organization-contract";
+import type {
+  EnsuredPersonalWorkspace,
+  OrganizationApi,
+  PersonalWorkspace,
+} from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
@@ -22,6 +26,8 @@ function lifecyclePeers() {
     recordUserDeactivated: { send: async () => undefined },
     recordUserReactivated: { send: async () => undefined },
     recordUserRegistered: { send: async () => undefined },
+    recordUserCreated: { send: async () => undefined },
+    recordUserErased: { send: async () => undefined },
   });
 
   return {
@@ -30,10 +36,17 @@ function lifecyclePeers() {
   };
 }
 
-const ENSURED_WORKSPACE: EnsuredPersonalWorkspace = {
+const PERSONAL_WORKSPACE: PersonalWorkspace = {
   team: { id: "team-1", name: "Personal", slug: "personal", createdAtMs: 0 },
   project: { id: "project-1", name: "Personal", slug: "personal", apiKey: "key-1", createdAtMs: 0 },
-  created: true,
+};
+const ENSURED_WORKSPACE: EnsuredPersonalWorkspace = {
+  kind: "ready",
+  workspace: PERSONAL_WORKSPACE,
+};
+const PENDING_WORKSPACE: EnsuredPersonalWorkspace = {
+  kind: "pending",
+  team: PERSONAL_WORKSPACE.team,
 };
 
 const user: UserFullProfile = {
@@ -60,8 +73,9 @@ class StubRepository implements UserRepository {
   countUsageAmong = vi.fn(async () => ({ emailDomains: {} }));
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
+  findCreatedPage = vi.fn(async () => []);
   findProfiles = vi.fn(async () => [user]);
-  findById = vi.fn(async () => user);
+  findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
@@ -74,6 +88,7 @@ class StubRepository implements UserRepository {
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
   setFirstPassword = vi.fn(async () => "set" as const);
+  adoptUnconfirmed = vi.fn(async () => "adopted" as const);
   findPasskeyNudgeStatus = vi.fn(async () => ({
     hasPasskey: false,
     twoStepEnabled: false,
@@ -117,11 +132,14 @@ class StubAvatarStorage implements UserAvatarStorage {
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-function createService({ auth = createApiFixture<AuthApi>({}) }: { auth?: AuthApi } = {}) {
+function createService({
+  auth = createApiFixture<AuthApi>({}),
+  ensured = ENSURED_WORKSPACE,
+}: { auth?: AuthApi; ensured?: EnsuredPersonalWorkspace } = {}) {
   const repository = new StubRepository();
   const avatarStorage = new StubAvatarStorage();
   const organizations = createApiFixture<OrganizationApi>({
-    ensurePersonalWorkspace: async () => ENSURED_WORKSPACE,
+    ensurePersonalWorkspace: async () => ensured,
   });
   return {
     service: UserService.create({
@@ -159,23 +177,11 @@ describe("UserService", () => {
     });
   });
 
-  it("creates credential and passkey accounts under the deployment's issuer", async () => {
+  it("creates passkey accounts under the deployment's issuer", async () => {
     const { service, repository } = createService();
 
-    await service.createCredentialUser({
-      name: "Grace",
-      email: "grace@example.com",
-      passwordHash: "hash",
-    });
     await service.createPasskeyUser({ email: "passkey@example.com" });
 
-    expect(repository.createCredentialUser).toHaveBeenCalledWith({
-      name: "Grace",
-      email: "grace@example.com",
-      passwordHash: "hash",
-      issuer: ISSUER,
-      emailVerified: false,
-    });
     expect(repository.createPasskeyUser).toHaveBeenCalledWith({
       email: "passkey@example.com",
       issuer: ISSUER,
@@ -186,14 +192,17 @@ describe("UserService", () => {
   it("creates the account a spent mailbox proof earned already confirmed", async () => {
     const { service, repository } = createService();
 
-    await service.createConfirmedCredentialUser({
-      name: "Grace",
-      email: "grace@example.com",
-      passwordHash: "hash",
+    await service.registerCredentialUser({
+      account: { name: "Grace", email: "grace@example.com", passwordHash: "hash" },
+      addressConfirmed: true,
     });
 
     expect(repository.createCredentialUser).toHaveBeenCalledWith(
-      expect.objectContaining({ email: "grace@example.com", emailVerified: true }),
+      expect.objectContaining({
+        email: "grace@example.com",
+        emailVerified: true,
+        selfRegistered: true,
+      }),
     );
   });
 
@@ -247,21 +256,14 @@ describe("UserService", () => {
     });
   });
 
-  /** @scenario "Deactivating a user invalidates every session family" */
   /** @scenario "user.deactivate sets deactivatedAt on the user" */
-  it("marks a user deactivated, then ends their browser sessions", async () => {
-    const revokeAllBrowserSessions = vi.fn(async () => undefined);
-    const auth = createApiFixture<AuthApi>({
-      revokeAllBrowserSessions,
-      revokeCliTokens: async () => ({ revokedCount: 0 }),
-    });
-    const { service, repository } = createService({ auth });
+  it("marks a user deactivated; auth's door ends the sessions after", async () => {
+    const { service, repository } = createService();
     await service.deactivate({ id: "user-1", actor: { type: "system", id: null } });
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
       id: "user-1",
       deactivatedAt: NOW,
     });
-    expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
   });
 
   /** @scenario "user.reactivate clears deactivatedAt on the user" */
@@ -274,25 +276,24 @@ describe("UserService", () => {
     });
   });
 
-  /** @scenario "Changing an email refreshes authenticated identity" */
-  it("normalizes a changed email, then ends every one of the user's sessions", async () => {
-    const revokeAllBrowserSessions = vi.fn(async () => undefined);
-    const { service, repository } = createService({
-      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
-    });
-    await service.updateProfile({ id: "user-1", email: "NEW@Example.com " });
+  /** @scenario "Changing an email stores the normalized address" */
+  it("stores a trimmed, lower-cased address and refuses an unknown account", async () => {
+    const { service, repository } = createService();
+
+    await service.updateEmail({ id: "user-1", email: "NEW@Example.com " });
     expect(repository.updateProfile).toHaveBeenCalledWith({
       id: "user-1",
       email: "new@example.com",
     });
-    expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
+
+    repository.findById.mockResolvedValueOnce(null);
+    await expect(
+      service.updateEmail({ id: "user-9", email: "a@example.com" }),
+    ).rejects.toMatchObject({ code: "user_not_found" });
   });
 
-  it("updates a name without changing email or ending sessions", async () => {
-    const revokeAllBrowserSessions = vi.fn(async () => undefined);
-    const { service, repository } = createService({
-      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
-    });
+  it("updates a name without changing email", async () => {
+    const { service, repository } = createService();
 
     await service.updateProfile({ id: "user-1", name: "Ada Lovelace" });
 
@@ -300,28 +301,12 @@ describe("UserService", () => {
       id: "user-1",
       name: "Ada Lovelace",
     });
-    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
-  });
-
-  it("normalizes an email case-only update without ending sessions", async () => {
-    const revokeAllBrowserSessions = vi.fn(async () => undefined);
-    const { service, repository } = createService({
-      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
-    });
-
-    await service.updateProfile({ id: "user-1", email: "ADA@EXAMPLE.COM" });
-    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
-
-    expect(repository.updateProfile).toHaveBeenCalledWith({
-      id: "user-1",
-      email: "ada@example.com",
-    });
   });
 
   it("rejects a blank normalized email before writing", async () => {
     const { service, repository } = createService();
 
-    await expect(service.updateProfile({ id: "user-1", email: "   " })).rejects.toThrow(ZodError);
+    await expect(service.updateEmail({ id: "user-1", email: "   " })).rejects.toThrow(ZodError);
 
     expect(repository.updateProfile).not.toHaveBeenCalled();
   });
@@ -344,6 +329,19 @@ describe("UserService", () => {
       id: "user-1",
       image: "/api/user-avatar/project-1/object-1",
     });
+  });
+
+  /** @scenario "Uploading an avatar while the personal project is still being created" */
+  it("refuses an avatar as retryable while the personal project is pending, storing nothing", async () => {
+    const { service, repository, avatarStorage } = createService({ ensured: PENDING_WORKSPACE });
+    await expect(
+      service.setAvatar({ userId: "user-1", organizationId: "org-1", imageDataUrl: PNG }),
+    ).rejects.toMatchObject({
+      code: "personal_workspace_pending",
+      retryable: true,
+    });
+    expect(avatarStorage.store).not.toHaveBeenCalled();
+    expect(repository.setAvatar).not.toHaveBeenCalled();
   });
 
   it("owns user-scoped display preferences", async () => {
@@ -644,14 +642,13 @@ describe("the lifecycle facts' clock", () => {
         },
       },
       recordUserRegistered: { send: async () => undefined },
+      recordUserCreated: { send: async () => undefined },
+      recordUserErased: { send: async () => undefined },
     });
     const service = UserService.create({
       repository,
       organizations: createApiFixture<OrganizationApi>({}),
-      auth: createApiFixture<AuthApi>({
-        revokeAllBrowserSessions: async () => undefined,
-        revokeCliTokens: async () => ({ revokedCount: 0 }),
-      }),
+      auth: createApiFixture<AuthApi>({}),
       avatarStorage: new StubAvatarStorage(),
       credentialIssuer: ISSUER,
       now: () => NOW,
@@ -660,6 +657,8 @@ describe("the lifecycle facts' clock", () => {
     });
 
     await service.deactivate({ id: "user-1", actor: { type: "system", id: null } });
+    repository.findById.mockResolvedValueOnce({ ...user, deactivatedAt: toDate(DATABASE_NOW) });
+    await service.recordDeactivated({ id: "user-1", actor: { type: "system", id: null } });
     await service.reactivate({ id: "user-1", actor: { type: "system", id: null } });
 
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({

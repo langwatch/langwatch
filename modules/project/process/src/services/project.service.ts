@@ -5,12 +5,14 @@ import {
   internalProjectKindSchema,
   internalProjectQuerySchema,
   projectPaginationSchema,
+  liveProjectIdsByOrganizationInputSchema,
   projectIdsByOrganizationInputSchema,
   projectNamesByIdsInputSchema,
   projectPresenceInputSchema,
   type ActiveProjectsByScopes,
   type ActiveProjectsByScopesInput,
   type InternalProject,
+  type LiveProjectIdsByOrganizationInput,
   type InternalProjectKind,
   type InternalProjectQuery,
   type OrgAdminResolution,
@@ -30,6 +32,9 @@ import {
   traceDestinationProjectIdsSchema,
   type UpdateProjectInput,
   ProjectNotFoundError,
+  type ProjectIdPage,
+  type ProjectIdPageInput,
+  type ProjectOrganizationPage,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -66,12 +71,15 @@ export class ProjectService {
     return this.repository.findProjectsWithDepartments(input);
   }
 
-  assignProjectDepartment(input: {
+  /** A saved assignment is recorded as project's fact, best effort, for data privacy to fold. */
+  async assignProjectDepartment(input: {
     organizationId: string;
     projectId: string;
     departmentId: string | null;
   }): Promise<boolean> {
-    return this.repository.assignProjectDepartment(input);
+    const assigned = await this.repository.assignProjectDepartment(input);
+    if (assigned) await this.created.departmentAssigned({ projectId: input.projectId });
+    return assigned;
   }
 
   private readonly metadata: ProjectMetadataService;
@@ -79,6 +87,7 @@ export class ProjectService {
   private readonly repository: ProjectRepository;
   private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
+  private readonly created: ProjectCreatedNoticeService;
 
   private constructor({
     metadata,
@@ -86,18 +95,21 @@ export class ProjectService {
     repository,
     credentials,
     organizations,
+    created,
   }: {
     metadata: ProjectMetadataService;
     writes: ProjectWriteService;
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    created: ProjectCreatedNoticeService;
   }) {
     this.metadata = metadata;
     this.writes = writes;
     this.repository = repository;
     this.credentials = credentials;
     this.organizations = organizations;
+    this.created = created;
   }
 
   static create(options: {
@@ -117,6 +129,7 @@ export class ProjectService {
       repository: options.repository,
       credentials: options.credentials,
       organizations: options.organizations,
+      created: options.created,
     });
   }
 
@@ -324,6 +337,14 @@ export class ProjectService {
     return this.repository.countWithTraces(input);
   }
 
+  listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage> {
+    return this.repository.listAllIds(input);
+  }
+
+  listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage> {
+    return this.repository.listAllWithOrganization(input);
+  }
+
   findSharedProjectSlugs(input: {
     organizationId: string;
     memberUserId?: string;
@@ -338,10 +359,12 @@ export class ProjectService {
     return this.repository.findIdsByOrganization(parsed.organizationId);
   }
 
-  findLiveNonGovernanceIdsByOrganization(input: { organizationId: string }): Promise<string[]> {
-    const parsed = projectIdsByOrganizationInputSchema.parse(input);
+  findLiveNonGovernanceIdsByOrganization(
+    input: LiveProjectIdsByOrganizationInput,
+  ): Promise<string[]> {
+    const parsed = liveProjectIdsByOrganizationInputSchema.parse(input);
 
-    return this.repository.findLiveNonGovernanceIds(parsed.organizationId);
+    return this.repository.findLiveNonGovernanceIds(parsed);
   }
 
   findLiveBySlug(input: { slug: string; organizationId: string }): Promise<Project[]> {

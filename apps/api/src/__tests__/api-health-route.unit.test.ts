@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { apiHealthRoute } from "../api-health-route.ts";
+import { apiHealthRoute } from "../main.ts";
 
 describe("the api's health route", () => {
   it("is mounted at the path operational infrastructure already probes", () => {

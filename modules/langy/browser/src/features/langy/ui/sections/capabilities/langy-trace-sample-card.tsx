@@ -4,26 +4,26 @@
 
 import { Button, Text } from "@langwatch/design-system/primitives";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
+import { readableDate } from "@langwatch/time";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { traceContextChip } from "../../../../../behavior/langy-context-chips.ts";
 import { useTraceExplorerScope } from "../../../../../behavior/trace-explorer-scope.ts";
+import type { CapabilityCardInput } from "../../../../../model/langy-capability-registry.ts";
+import { LangyContextTarget } from "../../../../../ui/sections/langy-context-target.tsx";
+import { LangyObservationState } from "../../../../../ui/sections/langy-observation-state.tsx";
+import { traceContextChip } from "../../../../context-target/behavior/langy-context-chips.ts";
 import {
   collectionOf,
   textValue,
   totalOf,
-} from "../../../../../model/langy-cli-result-document.ts";
-import { readableDate } from "../../../../../model/langy-row-format.ts";
+} from "../../../../tools/model/langy-cli-result-document.ts";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
   type TraceSearchQuery,
-} from "../../../../../model/langy-trace-explorer-link.ts";
-import { LangyContextTarget } from "../../../../../ui/sections/langy-context-target.tsx";
-import { LangyObservationState } from "../../../../../ui/sections/langy-observation-state.tsx";
+} from "../../../../transcript/model/langy-trace-explorer-link.ts";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";
-import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry.ts";
 import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
 import {
   CapabilityRow,

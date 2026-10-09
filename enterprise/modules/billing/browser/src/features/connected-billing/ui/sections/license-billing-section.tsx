@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { UiLicenseBillingSectionProps } from "@langwatch/browser-host/declarations";
 import { describeError } from "@langwatch/browser-host/errors";
 import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import type { LicenseBillingSectionProps } from "@langwatch/enterprise-billing-client";
 import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
 import { useState } from "react";
 
@@ -18,7 +18,7 @@ import { ConnectedBillingFields } from "../blocks/connected-billing-fields.tsx";
 import { ConnectedBillingState, OpenInvoices } from "../blocks/connected-billing-state.tsx";
 
 /** Invoice billing for a connected customer, on the license it was sold with. */
-export default function LicenseBillingSection(license: UiLicenseBillingSectionProps) {
+export default function LicenseBillingSection(license: LicenseBillingSectionProps) {
   const query = connectedBillingApi.connectedBilling.get.useQuery(
     { organizationId: license.organizationId },
     {
@@ -46,7 +46,7 @@ function BillingBody({
   license,
   query,
 }: {
-  license: UiLicenseBillingSectionProps;
+  license: LicenseBillingSectionProps;
   query: { error: unknown; data: ConnectedBillingOverview | undefined };
 }) {
   if (query.error) {
@@ -67,7 +67,7 @@ function BillingPanel({
   license,
   overview,
 }: {
-  license: UiLicenseBillingSectionProps;
+  license: LicenseBillingSectionProps;
   overview: ConnectedBillingOverview;
 }) {
   const commands = useConnectedBillingCommands();

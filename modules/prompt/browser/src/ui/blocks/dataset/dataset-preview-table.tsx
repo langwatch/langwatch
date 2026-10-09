@@ -21,7 +21,7 @@ import {
   type DatasetTableRowData,
 } from "../../../model/dataset/dataset-table-context.tsx";
 import { datasetTableCss } from "../../../model/dataset/dataset-table-styles.ts";
-import { JSON_LIKE_TYPES } from "../../elements/dataset/editable-cell.tsx";
+import { JSON_LIKE_TYPES } from "../../../model/dataset/editable-cell-value.ts";
 import { TableCell } from "../../elements/dataset/table-cell.tsx";
 
 export type DatasetPreviewRow = { id?: string; isSelected?: boolean } & Record<string, unknown>;

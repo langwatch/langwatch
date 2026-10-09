@@ -4,18 +4,19 @@
  * @see ../../../specs/dependencies/temporal-time.feature
  */
 
-export { Temporal, type Instant, type PlainDateTime, type ZonedDateTime } from "./temporal.ts";
+export { Temporal, type Instant, type PlainDateTime, type ZonedDateTime } from "./zoned.ts";
 export {
   currentTimeZone,
   fromDate,
   nowInstant,
+  readableDate,
   toDate,
   toEpochMs,
   toZonedDateTime,
   type TimeInput,
   type ZoneOptions,
 } from "./zoned.ts";
-export { computeNextRunAt } from "./cron.ts";
+export { nextCronFireAt } from "./cron.ts";
 export { format } from "./format.ts";
 export {
   compareMoments,

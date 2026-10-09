@@ -3,9 +3,9 @@ import type {
   ProjectionStoreContext,
   FoldStateRead,
 } from "@langwatch/eventing";
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
 
 import type { TraceAnalyticsProjectionRepository } from "../repositories/trace-analytics-projection.repository.ts";
-import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../rules/trace-analytics-projection-version.rules.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
@@ -69,7 +69,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
     appliedEventIds: string[];
   } | null {
     // Always writes, including dimension-only states: the "counts as a trace" gate rides on
-    // `hasSignal` in SQL (TRACE_ANALYTICS_HAS_SIGNAL_SQL), so the fold read-back always finds
+    // `hasSignal` in analytics' SQL predicate, so the fold read-back always finds
     // its row and the executor can trust an absent read (`trustAbsentMiss`).
     const stateWithId: TraceAnalyticsData = state.traceId
       ? state

@@ -1,7 +1,7 @@
 import { GrantScopeTier } from "@langwatch/authz-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
+import type { PersonalTeamScopeReader } from "../../features/personal-workspace/services/personal-team-scope.service.ts";
 
 type PersonalTeamScopeClient = PrismaClient | Prisma.TransactionClient;
 

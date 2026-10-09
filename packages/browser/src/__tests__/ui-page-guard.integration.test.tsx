@@ -18,8 +18,8 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { installedModuleScreens } from "../ui-module-screens.ts";
-import { resolveUiPageAccess, withUiPageGuard } from "../ui-page-guard.tsx";
+import { installedModuleScreens } from "../module/ui-module-screens.ts";
+import { resolveUiPageAccess, withUiPageGuard } from "../page/ui-page-guard.tsx";
 import { defineBrowserModule } from "../web-module.ts";
 
 class SilentNavigation extends UiNavigation {

@@ -22,6 +22,7 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 
+import type { SignInRouterService } from "../features/signin/services/signin-router.service.ts";
 import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
 import type {
   IdentityLookupRepository,
@@ -36,8 +37,8 @@ import type { LinkProposalService } from "./link-proposal.service.ts";
 export interface IdentityLookupServiceDeps {
   reads: IdentityLookupRepository;
   history: IdentityHistoryRepository;
-  /** The auth screens' own router, so this answer cannot drift from theirs. */
-  router: Pick<AuthApi, "route">;
+  /** The router auth asks through `routeSignIn`, so this answer cannot drift from its screens. */
+  router: Pick<SignInRouterService, "route">;
   identity: () => Pick<IdentityService, "detachIdentifier">;
   links: Pick<LinkProposalService, "confirmLink" | "rejectLink">;
   auditLog: AuditLogApi;

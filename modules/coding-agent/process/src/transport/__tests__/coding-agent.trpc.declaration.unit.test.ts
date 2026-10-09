@@ -5,6 +5,11 @@
  */
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { codingAgentTrpc } from "@langwatch/coding-agent-contract";
+import {
+  traceSessionGroupsInputSchema,
+  tracesSessionsPageSchema,
+  tracesTrpc,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { codingAgentTrpcTransport } from "../coding-agent.trpc.ts";
@@ -49,6 +54,7 @@ describe("the codingAgents tRPC surface", () => {
         ["pullRequestDetail", "query"],
         ["session", "query"],
         ["transcript", "query"],
+        ["sessionGroups", "query"],
       ]);
     });
 
@@ -56,6 +62,15 @@ describe("the codingAgents tRPC surface", () => {
       for (const [name, member] of Object.entries(codingAgentTrpc.members)) {
         expect([name, member.output !== undefined]).toEqual([name, true]);
       }
+    });
+  });
+
+  describe("given the Sessions lens page main served as traces.sessions", () => {
+    /** @scenario "The Sessions lens page is served from coding-agent's namespace" */
+    it("declares it as codingAgents.sessionGroups with the same input and page, and traces no longer does", () => {
+      expect(codingAgentTrpc.members.sessionGroups.input).toBe(traceSessionGroupsInputSchema);
+      expect(codingAgentTrpc.members.sessionGroups.output).toBe(tracesSessionsPageSchema);
+      expect(Object.keys(tracesTrpc.members)).not.toContain("sessions");
     });
   });
 
@@ -70,6 +85,7 @@ describe("the codingAgents tRPC surface", () => {
         { procedure: "codingAgents.pullRequestDetail", permission: "traces:view" },
         { procedure: "codingAgents.session", permission: "traces:view" },
         { procedure: "codingAgents.transcript", permission: "traces:view" },
+        { procedure: "codingAgents.sessionGroups", permission: "traces:view" },
       ]);
     });
   });

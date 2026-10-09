@@ -16,6 +16,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
 import { SuiteApi, SuiteNameTakenError } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { isMigrationStep, type MigrationStepReport } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
@@ -74,6 +75,31 @@ describe("suite app installation", () => {
     }
   });
 
+  /** @scenario "The worker hosts the subscriber that reports a run into its suite run" */
+  it("hosts suite's peer lanes on scenario's run facts on the worker", async () => {
+    const eventing = new EventSourcing({
+      enabled: false,
+      processStore: InMemoryProcessStore.createForTesting(),
+    });
+    const runtime = await process("worker").withEventing(eventing).boot();
+
+    try {
+      const lanes = eventing.definitions
+        .find((definition) => definition.metadata.name === "suite_run_processing")
+        ?.open((definition) => definition.globalProjections?.map(({ name }) => name));
+
+      expect(lanes).toEqual(
+        expect.arrayContaining([
+          "suite_run_processing.scenarioRunStarted",
+          "suite_run_processing.scenarioRunFinished",
+          "suite_run_processing.scenarioRunEvaluated",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
     const runtime = await process(role).boot();
 
@@ -88,6 +114,33 @@ describe("suite app installation", () => {
         { id: created.id },
       ]);
       await expect(app.create(plan)).rejects.toBeInstanceOf(SuiteNameTakenError);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker collects suite's replay step as a background step" */
+  it("collects the replay step on the worker and a second pass over it changes nothing", async () => {
+    const runtime = await process("worker").boot();
+
+    try {
+      await runtime.service(SuiteApi).create(plan);
+      const step = runtime
+        .migrationSteps(isMigrationStep)
+        .find(({ id }) => id === "suite:replay-scenario-facts-for-open-runs");
+      const saved: MigrationStepReport[] = [];
+      const pass = () =>
+        step?.run({
+          checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
+          dryRun: false,
+          signal: new AbortController().signal,
+        });
+      const nothingBehind = { openRuns: 0, behindRuns: 0, startsSent: 0, finishesSent: 0 };
+
+      expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
+      await expect(pass()).resolves.toMatchObject(nothingBehind);
+      await expect(pass()).resolves.toMatchObject(nothingBehind);
+      expect(saved.map((report) => report.afterTenantId)).toEqual(["project-1", "project-1"]);
     } finally {
       await runtime.stop();
     }

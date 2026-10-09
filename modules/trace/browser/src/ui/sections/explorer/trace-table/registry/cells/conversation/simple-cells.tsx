@@ -3,11 +3,11 @@ import { chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceStatus } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { formatRelativeTime } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
-import type { TraceStatus } from "../../../../types/trace.ts";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 import { StatusDot, StatusIndicator } from "../../../status-row.tsx";
 import type { CellDef } from "../../types.ts";
 import { createCostCell, createDurationCell, createTokensCell } from "../shared-summary-cells.tsx";

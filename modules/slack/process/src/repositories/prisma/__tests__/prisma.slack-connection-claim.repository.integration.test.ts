@@ -178,6 +178,30 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionClaimRepository", () => {
       expect(read.map((each) => each.claimantId)).toEqual(["trigger-mine"]);
     });
 
+    it("pages claims by claim id and resumes after the last one", async () => {
+      const mine = await stored();
+      const theirs = await stored({ organization: otherOrganizationId });
+      await claim({ connectionId: mine.id, claimantId: `${namespace}-trigger-b` });
+      await claim({ connectionId: mine.id, claimantId: `${namespace}-trigger-a` });
+      await claim({
+        connectionId: theirs.id,
+        claimantId: `${namespace}-trigger-c`,
+        organization: otherOrganizationId,
+      });
+      const ours = (row: { connectionId: string }) =>
+        row.connectionId === mine.id || row.connectionId === theirs.id;
+
+      const all = (await claims.findPage({ limit: 10_000 })).filter(ours);
+      const [first] = all;
+      const rest = (await claims.findPage({ after: first, limit: 10_000 })).filter(ours);
+
+      expect(all).toHaveLength(3);
+      expect(
+        all.filter((row) => row.connectionId === mine.id).map((row) => row.claimantId),
+      ).toEqual([`${namespace}-trigger-a`, `${namespace}-trigger-b`]);
+      expect(rest).toEqual(all.slice(1));
+    });
+
     it("answers no claims for no connections without querying", async () => {
       await expect(claims.findByConnections({ organizationId, ids: [] })).resolves.toEqual([]);
     });

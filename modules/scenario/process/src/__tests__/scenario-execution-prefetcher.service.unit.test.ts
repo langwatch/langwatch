@@ -14,7 +14,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { VoiceTargetReader } from "../services/scenario-target-prefetch.service.ts";
+import type { VoiceTargetReader } from "../features/prefetch/services/scenario-target-prefetch.service.ts";
 import {
   type AgentFetcher,
   createTestScenarioExecutionPrefetcherService,
@@ -26,7 +26,6 @@ import {
   type ProjectSecretsFetcher,
   type PromptFetcher,
   type ScenarioFetcher,
-  type SuiteConfigFetcher,
   type TraceWaitBudgetResolver,
   type WorkflowVersionFetcher,
 } from "./support/scenario-execution-prefetcher.fixture.ts";
@@ -43,9 +42,11 @@ async function prefetchWithFixture({
   deps,
   observeChildEnvironment,
   startedByUserId,
+  plan,
 }: {
   context: ScenarioExecutionPrefetchInput["context"];
   target: TargetConfig;
+  plan?: ScenarioExecutionPrefetchInput["plan"];
   deps: ScenarioPrefetchFixture;
   observeChildEnvironment?: (inputs: ScenarioChildEnvironment) => void;
   startedByUserId?: string;
@@ -54,7 +55,7 @@ async function prefetchWithFixture({
     langwatchEndpoint: "http://app:5560",
     nlpServiceUrl: "http://langwatch_nlp:5561",
     legacyDefaultModel: DEFAULT_MODEL,
-  }).prepare({ context, target, startedByUserId });
+  }).prepare({ context, target, plan, startedByUserId });
   const environment = preparation.childEnvironment.then((inputs) => {
     if (inputs) observeChildEnvironment?.(inputs);
   });
@@ -98,10 +99,6 @@ const defaultModelParamsResult = {
 function createMockDeps(overrides: Partial<ScenarioPrefetchFixture> = {}): ScenarioPrefetchFixture {
   const scenarioFetcher: ScenarioFetcher = {
     getById: vi.fn().mockResolvedValue(defaultScenario),
-  };
-
-  const suiteConfigFetcher: SuiteConfigFetcher = {
-    getBySetId: vi.fn().mockResolvedValue(null),
   };
 
   const promptFetcher: PromptFetcher = {
@@ -181,7 +178,6 @@ function createMockDeps(overrides: Partial<ScenarioPrefetchFixture> = {}): Scena
 
   return {
     scenarioFetcher,
-    suiteConfigFetcher,
     promptFetcher,
     agentFetcher,
     workflowVersionFetcher,
@@ -737,12 +733,6 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
       /** @scenario "A run plan simulator model overrides the scenario default at run time" */
       it("uses the run plan's simulator model over the scenario default", async () => {
         const deps = createMockDeps({
-          suiteConfigFetcher: {
-            getBySetId: vi.fn().mockResolvedValue({
-              simulatorModel: "groq/plan-sim",
-              judgeModel: null,
-            }),
-          },
           agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
           modelParamsProvider: echoingProvider(),
         });
@@ -753,6 +743,7 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
             setId: "__internal__suite_1__suite",
           },
           target: httpTarget,
+          plan: { simulatorModel: "groq/plan-sim" },
           deps,
         });
 
@@ -837,20 +828,14 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
     /** @scenario "A latest alias on the run plan simulator model expands to a concrete model at run time" */
     it("expands a run plan simulator alias before preparing params", async () => {
       const deps = createMockDeps({
-        suiteConfigFetcher: {
-          getBySetId: vi.fn().mockResolvedValue({
-            simulatorModel: "openai/latest-mini",
-            judgeModel: null,
-          }),
-        },
         agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
         modelParamsProvider: echoingProvider(),
       });
 
       const result = await prefetchWithFixture({
-        // The plan is only read for a set id that names one.
         context: { ...defaultContext, setId: "__internal__suite_1__suite" },
         target: httpTarget,
+        plan: { simulatorModel: "openai/latest-mini" },
         deps,
       });
 
@@ -864,20 +849,14 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
     /** @scenario "A latest alias on the run plan judge model expands to a concrete model at run time" */
     it("expands a run plan judge alias before preparing params", async () => {
       const deps = createMockDeps({
-        suiteConfigFetcher: {
-          getBySetId: vi.fn().mockResolvedValue({
-            simulatorModel: null,
-            judgeModel: "gemini/latest",
-          }),
-        },
         agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
         modelParamsProvider: echoingProvider(),
       });
 
       const result = await prefetchWithFixture({
-        // The plan is only read for a set id that names one.
         context: { ...defaultContext, setId: "__internal__suite_1__suite" },
         target: httpTarget,
+        plan: { judgeModel: "gemini/latest" },
         deps,
       });
 
@@ -894,12 +873,6 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
       /** @scenario "A run plan with no model override falls back to the scenario or project default" */
       it("falls back to the default simulator and judge models", async () => {
         const deps = createMockDeps({
-          suiteConfigFetcher: {
-            getBySetId: vi.fn().mockResolvedValue({
-              simulatorModel: null,
-              judgeModel: null,
-            }),
-          },
           agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
           modelParamsProvider: echoingProvider(),
         });
@@ -910,6 +883,7 @@ describe("prefetchWithFixture, when selecting the user-simulator and judge model
             setId: "__internal__suite_1__suite",
           },
           target: httpTarget,
+          plan: {},
           deps,
         });
 

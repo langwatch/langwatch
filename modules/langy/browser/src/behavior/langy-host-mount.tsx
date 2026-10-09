@@ -103,10 +103,6 @@ class CapabilityLangyHost extends LangyHostApi {
     return this.isDemoProject_;
   }
 
-  featureFlag(flag: string): boolean | undefined {
-    return this.session.featureFlag(flag);
-  }
-
   route(): LangyRouteReading {
     const reading = this.routeCapability.reading();
     return { params: reading.params, query: reading.query, pathname: reading.pathname ?? "" };

@@ -2,12 +2,12 @@
 /**
  * @vitest-environment node
  *
- * Billing's peer subscriber on usage's limit-reached fact (ARCHITECTURE §9).
- * @see modules/usage/specs/usage.feature
+ * Billing's peer subscriber on entitlement's limit-reached fact (ARCHITECTURE §9).
+ * @see modules/entitlement/specs/usage.feature
  */
 import type { PlanLimitNotifierInput } from "@langwatch/enterprise-billing-contract";
+import { USAGE_LIMIT_REACHED_EVENT_TYPE } from "@langwatch/entitlement-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { USAGE_LIMIT_REACHED_EVENT_TYPE } from "@langwatch/usage-contract";
 import { describe, expect, it } from "vitest";
 
 import { planLimitReachedSubscriber } from "../plan-limit-reached.subscriber.ts";

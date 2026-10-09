@@ -1,4 +1,4 @@
-import type { LicenseEmailDelivery } from "../services/license-purchase.service.ts";
+import type { LicenseEmailDelivery } from "../features/license-purchase/services/license-purchase.service.ts";
 
 /** The purchased licence, mailed to its buyer with the key attached. */
 export abstract class LicenseEmailChannel {

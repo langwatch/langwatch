@@ -4,12 +4,6 @@
  * Requires LANGWATCH_TEST_DATABASE_URL and LANGWATCH_TEST_CLICKHOUSE_URL; every test gets its own
  * Postgres schema and ClickHouse database, so the shared test databases are never touched.
  */
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { Pool } from "pg";
@@ -23,9 +17,17 @@ import type { UpgradeClickHouse } from "../ports.ts";
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const CH_URL = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
 
-const PRISMA_DIR = fileURLToPath(new URL("../../../prisma-client/prisma/", import.meta.url));
-const LEDGER_MIGRATION = join(PRISMA_DIR, "migrations/20261006130000_upgrade_ledger/migration.sql");
-const PRISMA_BIN = fileURLToPath(new URL("../../node_modules/.bin/prisma", import.meta.url));
+/** The ledger before it was widened (no owner, description or floor), in its own schema. */
+const narrowLedgerDdl = ({ schema }: { schema: string }) =>
+  `CREATE SCHEMA "${schema}";
+CREATE TABLE "${schema}"."_langwatch_upgrade_run" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL,
+  "release" TEXT, "started_at" TIMESTAMP(3) NOT NULL, "finished_at" TIMESTAMP(3), "outcome" TEXT,
+  "plan" JSONB, "report" JSONB, PRIMARY KEY ("id"));
+CREATE TABLE "${schema}"."_langwatch_upgrade_step" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL,
+  "release" TEXT, "mode" TEXT NOT NULL, "status" TEXT NOT NULL,
+  "inferred" BOOLEAN NOT NULL DEFAULT false, "attempt" INTEGER NOT NULL DEFAULT 0,
+  "last_error" TEXT, "report" JSONB, "run_id" TEXT, "started_at" TIMESTAMP(3),
+  "finished_at" TIMESTAMP(3), "updated_at" TIMESTAMP(3) NOT NULL, PRIMARY KEY ("id"));`;
 
 let sequence = 0;
 const scratchName = () => `upgrade_ledger_${Date.now().toString(36)}_${sequence++}`;
@@ -45,7 +47,7 @@ async function openScratch(): Promise<Scratch> {
   const postgres = new Pool({
     connectionString: DB_URL,
     max: 2,
-    options: `-c search_path=${name}`,
+    options: `-c search_path=${name},${name}_upgrade_ledger`,
   });
   const root = createClient({ url: CH_URL });
   await root.command({ query: `CREATE DATABASE ${name}` });
@@ -61,7 +63,7 @@ async function openScratch(): Promise<Scratch> {
     clickhouseClient,
     drop: async () => {
       await postgres.end();
-      await admin.query(`DROP SCHEMA "${name}" CASCADE`);
+      await admin.query(`DROP SCHEMA IF EXISTS "${name}_upgrade_ledger", "${name}" CASCADE`);
       await admin.end();
       await clickhouseClient.close();
       await root.command({ query: `DROP DATABASE IF EXISTS ${name}` });
@@ -152,45 +154,6 @@ async function describeTables(postgres: Pool, schema: string): Promise<unknown> 
   return { columns: columns.rows, constraints: constraints.rows, indexes: indexes.rows };
 }
 
-/** `prisma migrate diff` from the scratch schema to the ledger's two models; 0 means no drift. */
-async function prismaDriftExitCode(schema: string): Promise<number> {
-  const prismaSchema = await readFile(join(PRISMA_DIR, "schema.prisma"), "utf8");
-  const models = [...prismaSchema.matchAll(/^model LangwatchUpgrade\w+ \{[\s\S]*?^\}/gm)].map(
-    (match) => match[0],
-  );
-  expect(models).toHaveLength(2);
-  const dir = await mkdtemp(join(tmpdir(), "upgrade-ledger-"));
-  try {
-    const url = new URL(DB_URL ?? "");
-    url.searchParams.set("schema", schema);
-    await writeFile(
-      join(dir, "ledger.prisma"),
-      `datasource db {\n  provider = "postgresql"\n}\n\n${models.join("\n\n")}\n`,
-    );
-    await writeFile(
-      join(dir, "prisma.config.mjs"),
-      `export default ${JSON.stringify({ schema: "./ledger.prisma", datasource: { url: url.toString() } })};\n`,
-    );
-    const run = promisify(execFile)(
-      PRISMA_BIN,
-      [
-        "migrate",
-        "diff",
-        "--config",
-        join(dir, "prisma.config.mjs"),
-        "--from-config-datasource",
-      ].concat(["--to-schema", join(dir, "ledger.prisma"), "--exit-code"]),
-      { cwd: dir, env: { ...process.env, CHECKPOINT_DISABLE: "1" } },
-    );
-    return await run.then(
-      () => 0,
-      (error: { code?: number }) => error.code ?? 1,
-    );
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
 describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
   let scratch: Scratch;
 
@@ -204,28 +167,19 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
   describe("when the ledger is created", () => {
     /** @scenario "Creating the ledger leaves Prisma's migration history in sync" */
-    it("creates the same tables as Prisma's migration, with no drift from Prisma's models", async () => {
-      const migrated = await openScratch();
-      try {
-        await migrated.postgres.query(await readFile(LEDGER_MIGRATION, "utf8"));
-        await createLedgerTables({ postgres: scratch.postgres });
+    it("creates the run and step tables in the ledger schema and nothing in Prisma's schema", async () => {
+      await givenPrismaHistory(scratch, [{ name: "20260101000000_init", finished: true }]);
+      const before = await describeTables(scratch.postgres, scratch.name);
 
-        const present = await scratch.postgres.query<{ run: string | null; step: string | null }>(
-          `SELECT to_regclass('_langwatch_upgrade_run')::text AS run,
-                  to_regclass('_langwatch_upgrade_step')::text AS step`,
-        );
-        expect(present.rows[0]).toEqual({
-          run: "_langwatch_upgrade_run",
-          step: "_langwatch_upgrade_step",
-        });
-        expect(await describeTables(scratch.postgres, scratch.name)).toEqual(
-          await describeTables(migrated.postgres, migrated.name),
-        );
-        expect(await prismaDriftExitCode(scratch.name)).toBe(0);
-        expect(await prismaDriftExitCode(migrated.name)).toBe(0);
-      } finally {
-        await migrated.drop();
-      }
+      const tables = await createLedgerTables({ postgres: scratch.postgres });
+
+      expect(tables.schema).toBe(`${scratch.name}_upgrade_ledger`);
+      const present = await scratch.postgres.query<{ run: boolean; step: boolean }>(
+        `SELECT to_regclass('${tables.run}') IS NOT NULL AS run,
+                to_regclass('${tables.step}') IS NOT NULL AS step`,
+      );
+      expect(present.rows[0]).toEqual({ run: true, step: true });
+      expect(await describeTables(scratch.postgres, scratch.name)).toEqual(before);
     });
 
     /** @scenario "Creating the ledger twice changes nothing" */
@@ -422,6 +376,274 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
           outcome: "succeeded",
           report: { seeded: {} },
         }),
+      ]);
+    });
+  });
+
+  describe("when the widened ledger is created", () => {
+    /** @scenario "The ledger schema holds the widened ledger's tables and columns" */
+    it("creates every ledger table and the widened columns in the ledger schema", async () => {
+      const tables = await createLedgerTables({ postgres: scratch.postgres });
+      const { rows } = await scratch.postgres.query<{ table_name: string; column_name: string }>(
+        `SELECT table_name, column_name FROM information_schema.columns
+          WHERE table_schema = $1 AND column_name IN ('owner', 'description', 'floor', 'step_id', 'expires_at', 'process_id')
+          ORDER BY table_name, column_name`,
+        [tables.schema],
+      );
+      expect(rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
+        "_langwatch_serving_roster.process_id",
+        "_langwatch_upgrade_lease.expires_at",
+        "_langwatch_upgrade_lease.owner",
+        "_langwatch_upgrade_run.floor",
+        "_langwatch_upgrade_step.description",
+        "_langwatch_upgrade_step.owner",
+        "_langwatch_upgrade_target.step_id",
+      ]);
+    });
+
+    /** @scenario "Widening a ledger that holds a recorded step keeps the step" */
+    it("keeps a step recorded before the widening and leaves its owner and description empty", async () => {
+      const schema = `${scratch.name}_upgrade_ledger`;
+      await scratch.postgres.query(narrowLedgerDdl({ schema }));
+      await scratch.postgres.query(
+        `INSERT INTO "${schema}"."_langwatch_upgrade_step" ("id", "kind", "mode", "status", "attempt", "updated_at")
+         VALUES ('prisma:20260101000000_recorded', 'postgres-schema', 'blocking', 'done', 1, now())`,
+      );
+
+      await ledgerOf(scratch).createTables();
+
+      expect(await ledgerOf(scratch).findSteps()).toEqual([
+        expect.objectContaining({
+          id: "prisma:20260101000000_recorded",
+          status: "done",
+          owner: null,
+          description: null,
+        }),
+      ]);
+    });
+  });
+
+  describe("when targets are recorded", () => {
+    /** @scenario "A target is stored per step and updated in place" */
+    it("holds one row per target, updated in place, with a second target beside it", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.upsertTarget({
+        stepId: "clickhouse:00007",
+        target: "shared",
+        status: "failed",
+        lastError: "connection refused",
+      });
+
+      await ledger.upsertTarget({
+        stepId: "clickhouse:00007",
+        target: "shared",
+        status: "done",
+        version: "7",
+      });
+      await ledger.upsertTarget({ stepId: "clickhouse:00007", target: "org-a", status: "pending" });
+
+      expect(await ledger.findTargets({ stepId: "clickhouse:00007" })).toEqual([
+        expect.objectContaining({ target: "org-a", status: "pending", version: null }),
+        expect.objectContaining({
+          target: "shared",
+          status: "done",
+          version: "7",
+          lastError: null,
+        }),
+      ]);
+    });
+
+    /** @scenario "Targets are listed per step only" */
+    it("lists only the targets of the step asked for", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.upsertTarget({ stepId: "clickhouse:00001", target: "shared", status: "done" });
+      await ledger.upsertTarget({ stepId: "clickhouse:00002", target: "shared", status: "done" });
+
+      const targets = await ledger.findTargets({ stepId: "clickhouse:00002" });
+
+      expect(targets.map((target) => target.stepId)).toEqual(["clickhouse:00002"]);
+    });
+  });
+
+  describe("when the runner lease is contended", () => {
+    const runner = (owner: string) => ({
+      name: "upgrade",
+      owner,
+      image: `image-${owner}`,
+      host: `host-${owner}`,
+    });
+
+    /** @scenario "A lease held by a live owner is refused" */
+    it("refuses a second runner while the first one's lease is live", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.acquireLease({ ...runner("a"), ttlMs: 60_000 });
+
+      const refused = await ledger.acquireLease({ ...runner("b"), ttlMs: 60_000 });
+
+      expect(refused).toBeNull();
+      expect(await ledger.renewLease({ name: "upgrade", owner: "a", ttlMs: 60_000 })).toMatchObject(
+        { owner: "a", image: "image-a" },
+      );
+    });
+
+    /** @scenario "An expired lease is taken over" */
+    it("lets another runner take a lease once it has expired", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.acquireLease({ ...runner("a"), ttlMs: 1 });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const taken = await ledger.acquireLease({ ...runner("b"), ttlMs: 60_000 });
+
+      expect(taken).toMatchObject({ owner: "b", image: "image-b", host: "host-b" });
+      expect(taken?.expiresAt.getTime()).toBeGreaterThan(taken?.heartbeatAt.getTime() ?? Infinity);
+    });
+
+    /** @scenario "A lease is renewed and released only by its owner" */
+    it("renews and releases a lease for its owner and for nobody else", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      const held = await ledger.acquireLease({ ...runner("a"), ttlMs: 60_000 });
+
+      expect(await ledger.renewLease({ name: "upgrade", owner: "b", ttlMs: 60_000 })).toBeNull();
+      expect(await ledger.releaseLease({ name: "upgrade", owner: "b" })).toBe(false);
+      const renewed = await ledger.renewLease({ name: "upgrade", owner: "a", ttlMs: 120_000 });
+      expect(renewed?.expiresAt.getTime()).toBeGreaterThan(held?.expiresAt.getTime() ?? Infinity);
+      expect(await ledger.releaseLease({ name: "upgrade", owner: "a" })).toBe(true);
+      expect(await ledger.acquireLease({ ...runner("b"), ttlMs: 60_000 })).toMatchObject({
+        owner: "b",
+      });
+    });
+  });
+
+  describe("when serving processes report to the serving roster", () => {
+    const serving = (processId: string, steps: string[]) => ({
+      processId,
+      role: "worker",
+      image: "git-abc123",
+      release: null,
+      steps,
+    });
+
+    /** @scenario "A process writes its roster entry and refreshes it in place" */
+    it("keeps one row per process, refreshed with its steps and its original start", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      const first = await ledger.writeRosterEntry(serving("p1", ["a:one", "a:two"]));
+
+      const second = await ledger.writeRosterEntry(serving("p1", ["a:one", "a:two", "a:three"]));
+
+      const live = await ledger.findLiveRoster({ staleAfterMs: 60_000 });
+      expect(live).toEqual([second]);
+      expect(second.steps).toEqual(["a:one", "a:two", "a:three"]);
+      expect(second.startedAt).toEqual(first.startedAt);
+      expect(second.heartbeatAt.getTime()).toBeGreaterThanOrEqual(first.heartbeatAt.getTime());
+    });
+
+    /** @scenario "A roster entry older than the stale bound is not live" */
+    it("does not return a process whose last write is older than the stale bound", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.writeRosterEntry(serving("old", []));
+      await scratch.postgres.query(
+        `UPDATE "_langwatch_serving_roster" SET "heartbeat_at" = "heartbeat_at" - interval '10 minutes'
+          WHERE "process_id" = 'old'`,
+      );
+      await ledger.writeRosterEntry(serving("recent", ["a:one"]));
+
+      const live = await ledger.findLiveRoster({ staleAfterMs: 60_000 });
+
+      expect(live.map((row) => row.processId)).toEqual(["recent"]);
+    });
+
+    /** @scenario "Removing a process's roster entry deletes only its row" */
+    it("deletes the named process's row, keeps the other, and ignores a missing row", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.writeRosterEntry(serving("stopping", ["a:one"]));
+      await ledger.writeRosterEntry(serving("serving", ["a:one"]));
+
+      await ledger.removeRosterEntry({ processId: "stopping" });
+      await ledger.removeRosterEntry({ processId: "stopping" });
+
+      const { rows } = await scratch.postgres.query<{ process_id: string }>(
+        `SELECT "process_id" FROM "_langwatch_serving_roster" ORDER BY "process_id"`,
+      );
+      expect(rows.map((row) => row.process_id)).toEqual(["serving"]);
+    });
+  });
+
+  describe("when declared steps are registered", () => {
+    const declaredStep = (id: string, owner: string, description: string) => ({
+      id,
+      kind: "data" as const,
+      mode: "background" as const,
+      owner,
+      description,
+    });
+
+    /** @scenario "Registering declared steps records them pending with owner and description" */
+    it("records each new step pending with its owner and description", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+
+      await ledger.registerDeclaredSteps({
+        steps: [
+          declaredStep("trace:fold-backfill", "trace", "Backfill the trace fold"),
+          declaredStep("usage:meter-rebuild", "usage", "Rebuild the usage meter"),
+        ],
+      });
+
+      expect(await ledger.findSteps()).toEqual([
+        expect.objectContaining({
+          id: "trace:fold-backfill",
+          status: "pending",
+          inferred: false,
+          owner: "trace",
+          description: "Backfill the trace fold",
+        }),
+        expect.objectContaining({
+          id: "usage:meter-rebuild",
+          status: "pending",
+          owner: "usage",
+        }),
+      ]);
+    });
+
+    /** @scenario "Registering declared steps never overwrites a done step" */
+    it("keeps a done step done and refreshes only its owner and description", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.registerDeclaredSteps({
+        steps: [declaredStep("trace:fold", "trace", "Old text")],
+      });
+      await scratch.postgres.query(
+        `UPDATE "_langwatch_upgrade_step" SET "status" = 'done', "attempt" = 2 WHERE "id" = 'trace:fold'`,
+      );
+
+      const registered = await ledger.registerDeclaredSteps({
+        steps: [declaredStep("trace:fold", "trace", "New text")],
+      });
+
+      expect(registered).toEqual([
+        expect.objectContaining({ status: "done", attempt: 2, description: "New text" }),
+      ]);
+    });
+  });
+
+  describe("when a run starts with a floor", () => {
+    /** @scenario "A run records the floor it applied with" */
+    it("carries the floor on the run it was started with", async () => {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+
+      await ledger.startRun({ kind: "upgrade", floor: "3.20.1" });
+
+      expect(await ledger.findRuns()).toEqual([
+        expect.objectContaining({ kind: "upgrade", floor: "3.20.1" }),
       ]);
     });
   });

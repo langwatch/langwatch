@@ -1,10 +1,12 @@
 {
   "name": "@langwatch/upgrade",
+  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
-  "description": "The upgrade runner's own ledger: the runner-owned _langwatch_upgrade_run and _langwatch_upgrade_step tables beside _prisma_migrations and goose_db_version, and their first seeding from those two records. Storage-engine-free: the caller hands in the Postgres and ClickHouse connections.",
+  "description": "The upgrade runner's own ledger: the runner-owned ledger tables in their own Postgres schema (<schema>_upgrade_ledger), and their first seeding from those two records. Storage-engine-free: the caller hands in the Postgres and ClickHouse connections.",
   "files": [
-    "src"
+    "src",
+    "releases"
   ],
   "type": "module",
   "main": "./src/index.ts",
@@ -13,6 +15,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./dist/*/index.d.ts",
+      "default": "./src/*/index.ts"
     }
   },
   "scripts": {
@@ -21,16 +27,21 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "pg": "^8.22.0",
+    "prisma": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/vitest-config": "workspace:*",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "^8.20.3",
-    "pg": "^8.22.0",
-    "prisma": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

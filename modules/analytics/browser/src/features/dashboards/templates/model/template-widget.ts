@@ -4,11 +4,12 @@
  * source to set up, and the full-width and half-width places on the chart grid.
  */
 
-import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
-} from "../../../../model/dashboard-widget-definition.ts";
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
+
+import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
 import type { BoardTemplateWidget } from "./board-template.ts";
 import { PRESENCE_SQL } from "./source-presence-queries.ts";
 import type { WidgetCode } from "./widget-code-parts.ts";

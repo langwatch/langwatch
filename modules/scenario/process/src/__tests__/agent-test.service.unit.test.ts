@@ -12,7 +12,7 @@ import type { AgentTestTurnChild } from "../app/scenario.app.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 
 const prefetchAgentTestData = vi.fn();
-vi.mock("../services/agent-test-prefetch.service.ts", () => ({
+vi.mock("../features/prefetch/services/agent-test-prefetch.service.ts", () => ({
   AgentTestPrefetchService: {
     create: () => ({ prefetch: (...args: unknown[]) => prefetchAgentTestData(...args) }),
   },

@@ -18,12 +18,9 @@ import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../../../rules/ocsf-codes.rules.ts";
 import type { GovernanceOcsfEvent } from "../../governance.repositories.ts";
-import {
-  ClickHouseOcsfEventsRepository,
-  OCSF_ACTIVITY,
-  OCSF_SEVERITY,
-} from "../clickhouse.ocsf-events.repository.ts";
+import { ClickHouseOcsfEventsRepository } from "../clickhouse.ocsf-events.repository.ts";
 
 const enabled = Boolean(
   process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??

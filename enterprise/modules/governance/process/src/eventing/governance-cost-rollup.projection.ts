@@ -15,10 +15,6 @@ import {
 } from "@langwatch/eventing";
 
 import {
-  GOVERNANCE_COST_ROLLUP_PROJECTION_NAME,
-  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
-} from "../repositories/governance-cost-rollup.repository.ts";
-import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
   encodeGovernanceCostRollupKey,
@@ -28,7 +24,11 @@ import {
   revisionMarkersAfterPull,
   utcDayOf,
   withDerivedRevisionMarkers,
-} from "../rules/governance-cost-rollup-cell.rules.ts";
+} from "../features/cost/rules/governance-cost-rollup-cell.rules.ts";
+import {
+  GOVERNANCE_COST_ROLLUP_PROJECTION_NAME,
+  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+} from "../repositories/governance-cost-rollup.repository.ts";
 
 /** The pulled lane only: the metered lane is read straight off gateway's own ledger. */
 const governanceCostRollupEvents = [

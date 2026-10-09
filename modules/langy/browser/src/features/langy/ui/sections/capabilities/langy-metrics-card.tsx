@@ -6,13 +6,13 @@ import { Text, VStack } from "@langwatch/design-system/primitives";
 import { asJsonDocument } from "@langwatch/langy-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";
 
-import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
-import { formatMoneyShort } from "../../../../../ui/elements/langy-money.tsx";
-import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";
 import {
   type CapabilityCardInput,
   extractToolText,
-} from "../../../model/capabilities/capability-registry.ts";
+} from "../../../../../model/langy-capability-registry.ts";
+import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
+import { formatMoneyShort } from "../../../../../ui/elements/langy-money.tsx";
+import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";
 import { describeFigure, humanMetric } from "../../../model/logic/metric-figure.ts";
 import { LangyCapabilityCard } from "./langy-capability-card.tsx";
 

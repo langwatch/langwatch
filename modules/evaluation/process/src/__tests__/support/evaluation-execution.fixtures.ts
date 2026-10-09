@@ -2,10 +2,8 @@ import {
   type EvaluationExecutionResult,
   type EvaluationRunData,
   type ExecuteEvaluationCommandData,
-  type EvaluationSummary,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
-  type TraceEvaluationData,
   executeEvaluationCommandDataSchema,
   EXECUTE_EVALUATION_COMMAND_TYPE,
   type ExecuteEvaluationCommand as ExecuteEvaluationInput,
@@ -21,10 +19,10 @@ import type {
 } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
-import type { EvaluationAzureSafetyCredentialsResolution } from "../../services/azure-safety-credentials.service.ts";
-import type { EvaluationCostService } from "../../services/evaluation-cost.service.ts";
-import type { ExecuteEvaluationCommandDeps } from "../../services/evaluation-execution-intent.service.ts";
-import type { EvaluationExecutionReceiptService } from "../../services/evaluation-execution-receipt.service.ts";
+import type { EvaluationAzureSafetyCredentialsResolution } from "../../features/evaluators/services/azure-safety-credentials.service.ts";
+import type { EvaluationCostService } from "../../features/execution/services/evaluation-cost.service.ts";
+import type { ExecuteEvaluationCommandDeps } from "../../features/execution/services/evaluation-execution-intent.service.ts";
+import type { EvaluationExecutionReceiptService } from "../../features/execution/services/evaluation-execution-receipt.service.ts";
 
 export function buildExecuteCommand(
   overrides: Partial<ExecuteEvaluationCommandData> = {},
@@ -146,14 +144,6 @@ export class TestEvaluationService {
 
   async findRunsByTraceId(_input: never): Promise<EvaluationRunData[]> {
     return [];
-  }
-
-  async findSummariesByTraceIds(_input: never): Promise<Record<string, EvaluationSummary[]>> {
-    return {};
-  }
-
-  async findTraceEvaluations(_input: never): Promise<Record<string, TraceEvaluationData[]>> {
-    return {};
   }
 
   async findInputs(_input: never): Promise<Record<string, unknown> | null> {

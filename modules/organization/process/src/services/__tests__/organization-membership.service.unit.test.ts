@@ -10,24 +10,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "../organization-member-role.service.ts";
 import {
   OrganizationMembershipService,
   type OrganizationTestArrivals,
 } from "../organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
 const mockAssertRoleChangeAllowed = vi.fn();
-const mockRevokeAllBrowserSessions = vi.fn();
+const mockMemberDisabled = vi.fn();
 const mockCreateAndAssign = vi.fn();
 const mockGetProvisioningSummaryById = vi.fn();
 const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () => ({
   testing: false,
 }));
+
+const personalWorkspaceArchived = vi.fn(() => Promise.resolve());
 
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
@@ -64,6 +66,8 @@ describe("OrganizationMembershipService", () => {
     getMembership: vi.fn(),
     listAllMembers: vi.fn(),
     findMemberTeamBindings: vi.fn(),
+    createSsoDomainMembership: vi.fn(),
+    countMembershipsForUser: vi.fn(),
     deleteMember: vi.fn(),
     setMemberDisabled: vi.fn(),
     updateMemberRole: vi.fn(),
@@ -71,16 +75,16 @@ describe("OrganizationMembershipService", () => {
     getAuditLogs: vi.fn(),
   };
 
-  const mockPrompts: OrganizationPromptSeed = {
-    seedTagsForOrganization: vi.fn(),
-    reportCompensationFailure: vi.fn(),
+  const mockCreations: OrganizationCreationNotice = {
+    created: vi.fn(),
+    reportError: vi.fn(),
   };
   const seats: OrganizationSeatLicense = {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
   };
-  const sessions: OrganizationSessionRevocation = {
-    revokeAllBrowserSessions: mockRevokeAllBrowserSessions,
+  const seatNotices: OrganizationSeatRevocationNotice = {
+    memberDisabled: mockMemberDisabled,
   };
   const grantCache: OrganizationGrantCache = {
     invalidateOrganization: mockInvalidateOrganization,
@@ -111,11 +115,13 @@ describe("OrganizationMembershipService", () => {
     vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue([]);
     vi.mocked(mockRepo.findTeamGrants).mockResolvedValue([]);
     vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);
+    vi.mocked(mockRepo.deleteMember).mockResolvedValue([]);
     service = OrganizationMembershipService.create({
+      workspaceNotices: { personalWorkspaceArchived },
       repository: mockRepo,
-      prompts: mockPrompts,
+      creations: mockCreations,
       seats,
-      sessions,
+      seatNotices,
       grantCache,
       testArrivals,
       ceiling: { assertWithinCaller: async () => {} },
@@ -142,15 +148,20 @@ describe("OrganizationMembershipService", () => {
       expect(mockCreateAndAssign).not.toHaveBeenCalled();
     });
 
-    it("creates one for somebody who simply has no organization yet", async () => {
+    /** @scenario "Every way an organization is created records lw.organization.created" */
+    it("creates one for somebody who simply has no organization yet, and records it", async () => {
       mockCreateAndAssign.mockResolvedValue({
-        organization: { id: "org-123" },
+        organization: { id: "org-123", name: "Acme" },
         team: { id: "team-123" },
       });
 
       await service.createAndAssign({ userId: "user-456", orgName: "Acme" });
 
       expect(mockCreateAndAssign).toHaveBeenCalledTimes(1);
+      expect(mockCreations.created).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        organizationName: "Acme",
+      });
     });
   });
 
@@ -354,10 +365,11 @@ describe("OrganizationMembershipService", () => {
     });
     const refusing = () =>
       OrganizationMembershipService.create({
+        workspaceNotices: { personalWorkspaceArchived },
         repository: mockRepo,
-        prompts: mockPrompts,
+        creations: mockCreations,
         seats,
-        sessions,
+        seatNotices,
         grantCache,
         testArrivals,
         ceiling: { assertWithinCaller },
@@ -515,6 +527,22 @@ describe("OrganizationMembershipService", () => {
       });
     });
 
+    describe("when the removed member owned a personal workspace", () => {
+      /** @scenario "Removing a member records their archived personal teams for project" */
+      it("records the archived personal teams for project", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(membership);
+        vi.mocked(mockRepo.deleteMember).mockResolvedValueOnce(["team_personal"]);
+
+        await service.deleteMember({ organizationId: "org-123", userId: "user-456" });
+
+        expect(personalWorkspaceArchived).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          teamIds: ["team_personal"],
+        });
+      });
+    });
+
     describe("when the credential acts as nobody", () => {
       it("cannot trip the self-removal guard", async () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue(membership);
@@ -572,8 +600,39 @@ describe("OrganizationMembershipService", () => {
         user: { id: "user-456", name: null, email: null },
       };
 
-      /** @scenario "Disabling a member revokes their live browser sessions" */
-      it("revokes every browser session that member holds", async () => {
+      /** @scenario "Disabling a member takes their access away before the call returns" */
+      it("writes the membership and retires the cached authz answers before it returns", async () => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue(activeMember);
+        const order: string[] = [];
+        vi.mocked(mockRepo.setMemberDisabled).mockImplementationOnce(async () => {
+          order.push("membership");
+        });
+        mockMemberDisabled.mockImplementationOnce(async () => {
+          order.push("recorded");
+        });
+        mockInvalidateOrganization.mockImplementationOnce(async () => {
+          order.push("authz");
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        // Both refusals are in place once the call returns; only the sessions are eventual.
+        expect(order).toEqual(["membership", "recorded", "authz"]);
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+        });
+        expect(mockInvalidateOrganization).toHaveBeenCalledWith({ organizationId: "org-123" });
+      });
+
+      /** @scenario "Disabling a member records that their seat was taken away" */
+      it("records the member as disabled after the membership write", async () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue(activeMember);
 
         await service.setMemberDisabled({
@@ -583,14 +642,20 @@ describe("OrganizationMembershipService", () => {
           actingUser: { id: "admin-789" },
         });
 
-        // The membership write comes first: signing them out and then failing
-        // the write would lock out a member whose seat was never revoked.
-        expect(mockRepo.setMemberDisabled).toHaveBeenCalled();
-        expect(mockRevokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-456" });
+        // The membership write comes first: recording the revocation and then failing the
+        // write would sign out a member whose seat was never taken.
+        expect(vi.mocked(mockRepo.setMemberDisabled).mock.invocationCallOrder[0]).toBeLessThan(
+          mockMemberDisabled.mock.invocationCallOrder[0] ?? 0,
+        );
+        expect(mockMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabledByUserId: "admin-789",
+        });
       });
 
-      /** @scenario "Re-enabling a member revokes nothing" */
-      it("revokes nothing when the seat is given back", async () => {
+      /** @scenario "Re-enabling a member records no seat revocation" */
+      it("records nothing when the seat is given back", async () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue({
           ...activeMember,
           disabledAt: Temporal.Instant.from("2026-08-01T00:00:00Z"),
@@ -609,20 +674,19 @@ describe("OrganizationMembershipService", () => {
           actingUser: { id: "admin-789" },
         });
 
-        expect(mockRevokeAllBrowserSessions).not.toHaveBeenCalled();
+        expect(mockMemberDisabled).not.toHaveBeenCalled();
       });
 
-      /** @scenario "A process without a session owner refuses the disable" */
-      it("refuses the disable when no session owner was composed", async () => {
-        const withoutAuth = OrganizationMembershipService.create({
+      /** @scenario "A process that cannot record the seat revocation refuses the disable" */
+      it("refuses the disable when the revocation cannot be recorded", async () => {
+        const unrecorded = OrganizationMembershipService.create({
+          workspaceNotices: { personalWorkspaceArchived },
           repository: mockRepo,
-          prompts: mockPrompts,
+          creations: mockCreations,
           seats,
-          sessions: {
-            revokeAllBrowserSessions: () =>
-              Promise.reject(
-                new Error("this process composes no session owner, so it cannot revoke sessions"),
-              ),
+          seatNotices: {
+            memberDisabled: () =>
+              Promise.reject(new Error("organization_lifecycle is not registered in this process")),
           },
           grantCache,
           testArrivals,
@@ -632,13 +696,13 @@ describe("OrganizationMembershipService", () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue(activeMember);
 
         await expect(
-          withoutAuth.setMemberDisabled({
+          unrecorded.setMemberDisabled({
             organizationId: "org-123",
             userId: "user-456",
             disabled: true,
             actingUser: { id: "admin-789" },
           }),
-        ).rejects.toThrow("this process composes no session owner, so it cannot revoke sessions");
+        ).rejects.toThrow("organization_lifecycle is not registered in this process");
       });
     });
 

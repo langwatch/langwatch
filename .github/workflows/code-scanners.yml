@@ -64,13 +64,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
-          # dorny/paths-filter reads the PR diff from the API; nothing here
-          # touches the working tree.
+          # dorny/paths-filter lists the PR's paths from git trees; nothing
+          # here touches the working tree.
           sparse-checkout: .github
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: github.event_name == 'pull_request'
         id: filter
         with:
+          # Empty: diff with git, never the files API, which stops at 3,000
+          # files (specs/ci/path-filters.feature).
+          token: ""
           # NO NEGATION PATTERNS — dorny ORs a filter's patterns, so a lone
           # `!x` matches everything. See specs/ci/path-filters.feature.
           filters: |

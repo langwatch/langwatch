@@ -1,7 +1,6 @@
-import type { UiEvaluatorEditorValues } from "@langwatch/browser-host/declarations";
 import { Button, HStack, Spacer, Spinner } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
-import { type EvaluatorOutputs } from "@langwatch/evaluator-client";
+import { type EvaluatorEditorValues, type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -155,7 +154,7 @@ function DbEvaluatorForm({
 
   // Unsaved changes live on the node, so they win over the saved evaluator.
   const localConfig = node.data.localConfig;
-  const valuesRef = useRef<UiEvaluatorEditorValues>({
+  const valuesRef = useRef<EvaluatorEditorValues>({
     name: localConfig?.name ?? dbName,
     settings: localConfig?.settings ?? dbSettings,
   });
@@ -188,7 +187,7 @@ function DbEvaluatorForm({
   );
 
   const handleEditorChange = useCallback(
-    (values: UiEvaluatorEditorValues) => {
+    (values: EvaluatorEditorValues) => {
       valuesRef.current = values;
       debouncedSetLocalConfig(values);
     },

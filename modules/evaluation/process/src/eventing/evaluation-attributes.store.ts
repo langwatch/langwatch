@@ -5,11 +5,9 @@ import type {
   FoldStateRead,
 } from "@langwatch/eventing";
 
+import { EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST } from "./evaluation-analytics-fold.projection.ts";
 import {
-  EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
-} from "./evaluation-analytics-fold.projection.ts";
-import {
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
 } from "./evaluation-analytics-row.projection.ts";

@@ -71,7 +71,7 @@ Feature: Shared Dataset service
 
   @unit
   Scenario: The dataset transports move without changing who may call them
-    Given the dataset, dataset record and batch record tRPC surfaces
+    Given the dataset and dataset record tRPC surfaces
     When the process mounts them
     Then every procedure keeps the name its callers already use
     And every procedure keeps the access decision it declared before the move
@@ -128,6 +128,14 @@ Feature: Shared Dataset service
     Given a dataset whose rows were prepared from an uploaded file, so its stored size is recorded
     When the browser reads that dataset
     Then the answer carries the size as a plain number the response can hold
+
+  @integration
+  Scenario: A storage migration pages one project's datasets by id, archived ones included
+    Given a project holding a live and an archived dataset, and another project holding one
+    When a storage migration reads the project's datasets a page at a time
+    Then each page continues after the id the previous page ended on
+    And both of the project's datasets appear with their layout, status and chunk count
+    And the other project's dataset never appears
 
   Rule: The Datasets pages are served from the browser application
 
@@ -192,3 +200,9 @@ Feature: Shared Dataset service
     When its size is checked
     Then it is refused as dataset_attachment_too_large
     And the refusal names the largest size accepted
+
+  @unit
+  Scenario: A dataset upsert names its dataset outright
+    Given a dataset upsert that names an experiment and no dataset name
+    When the input is validated
+    Then it is refused before the application is asked

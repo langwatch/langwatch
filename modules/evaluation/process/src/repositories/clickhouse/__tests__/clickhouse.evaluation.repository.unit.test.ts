@@ -250,52 +250,6 @@ describe("ClickHouseEvaluationRepository", () => {
     }
   });
 
-  it("keeps trace reads newest-first and summaries exactly deduplicated in ClickHouse", async () => {
-    const { client, repository } = harness([
-      [fixtureRow({ EvaluationId: "new", UpdatedAt: 20 })],
-      [
-        fixtureRow({ EvaluationId: "evaluation_1", TraceId: "trace_1" }),
-        fixtureRow({ EvaluationId: "evaluation_2", TraceId: "trace_1", Label: "second" }),
-      ],
-    ]);
-    await expect(
-      repository.findByTraceId({ tenantId: "org_1", traceId: "trace_1" }),
-    ).resolves.toHaveLength(1);
-    const summaries = await repository.findSummariesByTraceIds({
-      tenantId: "org_1",
-      traceIds: ["trace_1"],
-      since: 1_600_000_000_000,
-    });
-    expect(summaries.trace_1).toHaveLength(2);
-    expect(client.queries[0]).toContain("ORDER BY runs.UpdatedAt DESC");
-    expect(client.queries[0]).toContain("max(UpdatedAt)");
-    expect(client.queries[1]).toContain("TraceId IN");
-    expect(client.queries[1]).toContain("max(UpdatedAt)");
-  });
-
-  /** @scenario "Per-trace evaluation reads use the same capability" */
-  it("degrades a per-trace read to its light projection when inputs exceed memory", async () => {
-    const { client, repository } = harness();
-    const lightRow = fixtureRow();
-    delete lightRow.Inputs;
-    const query = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("Memory limit exceeded"))
-      .mockResolvedValueOnce(result([lightRow]));
-    client.query = query;
-
-    await expect(
-      repository.findTraceEvaluations({
-        tenantId: "org_1",
-        traceIds: ["trace_1"],
-      }),
-    ).resolves.toMatchObject({
-      trace_1: [{ evaluationId: "evaluation_1" }],
-    });
-    expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1]?.[0].query).not.toContain("Inputs");
-  });
-
   /** @scenario A single evaluation's inputs can be fetched without scanning the trace */
   it("reads one evaluation's inputs by its sort key and degrades unavailable reads", async () => {
     const { client, repository } = harness([[{ Inputs: '{"input":"hello","output":"world"}' }]]);

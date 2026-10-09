@@ -5,6 +5,7 @@
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
@@ -231,7 +232,7 @@ export const useOpenTargetEditor = () => {
         // Set flow callbacks for the prompt editor using the centralized helper
         // This ensures we never forget a required callback
         setFlowCallbacks(
-          "promptEditor",
+          PromptEditorDrawerToken,
           createPromptEditorCallbacks({
             targetId: target.id,
             updateTarget,
@@ -245,7 +246,7 @@ export const useOpenTargetEditor = () => {
         // Open the drawer with initial config and available sources
         const initialLocalConfig = target.localPromptConfig;
         openDrawer(
-          "promptEditor",
+          PromptEditorDrawerToken,
           {
             promptId: target.promptId,
             // If there are local changes or a pinned version, use that version ID

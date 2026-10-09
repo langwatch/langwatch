@@ -5,30 +5,26 @@ import {
   evaluationRunLookupSchema,
   evaluationRunsByTraceQuerySchema,
   evaluationExecutionResultSchema,
-  evaluationSummariesByTraceIdsQuerySchema,
-  traceEvaluationsQuerySchema,
   executeEvaluationCommandSchema,
   upsertEvaluationRunCommandSchema,
   type EvaluationExecutionResult,
   type EvaluationRunData,
   type EvaluationRunLookup,
-  type EvaluationSummary,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
-  type TraceEvaluationData,
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { EvaluationExecutionService } from "../features/execution/services/evaluation-execution.service.ts";
+import type { EvaluationInputsOffloadService } from "../features/execution/services/evaluation-inputs-offload.service.ts";
+import { MonitorPerformanceService } from "../features/monitors/services/monitor-performance.service.ts";
 import type {
   EvaluationRunRepository,
   EvaluationRetentionLookup,
 } from "../repositories/evaluation.repository.ts";
 import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
-import type { EvaluationExecutionService } from "./evaluation-execution.service.ts";
-import type { EvaluationInputsOffloadService } from "./evaluation-inputs-offload.service.ts";
-import { MonitorPerformanceService } from "./monitor-performance.service.ts";
 
 type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;
@@ -107,23 +103,6 @@ export class EvaluationService {
 
   findRunsByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {
     return this.options.repository.findByTraceId(evaluationRunsByTraceQuerySchema.parse(input));
-  }
-
-  findSummariesByTraceIds(input: {
-    tenantId: string;
-    traceIds: string[];
-    since: number;
-  }): Promise<Record<string, EvaluationSummary[]>> {
-    return this.options.repository.findSummariesByTraceIds(
-      evaluationSummariesByTraceIdsQuerySchema.parse(input),
-    );
-  }
-
-  findTraceEvaluations(input: {
-    tenantId: string;
-    traceIds: string[];
-  }): Promise<Record<string, TraceEvaluationData[]>> {
-    return this.options.repository.findTraceEvaluations(traceEvaluationsQuerySchema.parse(input));
   }
 
   async findInputs(input: {

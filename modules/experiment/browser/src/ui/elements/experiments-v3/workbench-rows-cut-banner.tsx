@@ -25,8 +25,8 @@ export function WorkbenchRowsCutBanner({ cut }: { cut: SavedRecordsCut }) {
       <Text fontSize="sm" color="fg">
         Showing the first {rowCount.format(cut.loadedRows)} of {rowCount.format(cut.totalRows)}{" "}
         rows. This dataset is too large to show in full here. A run still covers all{" "}
-        {rowCount.format(cut.totalRows)} rows, and results for rows that are not shown appear on
-        the run&apos;s results page.
+        {rowCount.format(cut.totalRows)} rows, and results for rows that are not shown appear on the
+        run&apos;s results page.
       </Text>
     </HStack>
   );

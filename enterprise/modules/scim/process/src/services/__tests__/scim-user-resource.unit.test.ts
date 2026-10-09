@@ -17,7 +17,7 @@ import type {
   ScimUserRecord,
   ScimUserResourceRecord,
 } from "../../repositories/scim.repository.ts";
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
@@ -176,16 +176,9 @@ class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-function departments(): ScimDepartmentAssignment {
+function departments(): ScimCostCenterFacts {
   return {
-    departmentResolveByNameOrCreate: vi.fn(async () => ({
-      id: "department-1",
-      organizationId: ORGANIZATION,
-      name: "Engineering",
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-    departmentAssignUser: vi.fn(async () => undefined),
+    recordCostCenterChanged: vi.fn(async () => undefined),
   };
 }
 
@@ -216,7 +209,7 @@ function directory(store: DirectoryStore) {
       prisma: store.repository(),
       writer: new GrantsFake(),
       users,
-      governance: departments(),
+      costCenterFacts: departments(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),
@@ -474,7 +467,7 @@ describe("the organization's own directory resource", () => {
       prisma: repository,
       writer: new GrantsFake(),
       users: directory(store).users,
-      governance: departments(),
+      costCenterFacts: departments(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),

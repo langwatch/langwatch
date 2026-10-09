@@ -8,7 +8,7 @@ import type { Instant } from "@langwatch/time";
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
-} from "../join-request.repository.ts";
+} from "../../features/join-request/repositories/join-request.repository.ts";
 import { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 const PENDING = "PENDING";
@@ -80,16 +80,12 @@ export class MemoryJoinRequestReadRepository implements JoinRequestListReadRepos
     return this.pending((request) => request.userId === args.userId);
   }
 
-  async findApprovedForMembers(args: {
+  async findApprovedForOrganization(args: {
     organizationId: string;
-    userIds: readonly string[];
   }): Promise<JoinRequestAggregateState[]> {
     return [...this.store.joinRequests.values()]
       .filter(
-        (request) =>
-          request.state === "APPROVED" &&
-          request.organizationId === args.organizationId &&
-          args.userIds.includes(request.userId),
+        (request) => request.state === "APPROVED" && request.organizationId === args.organizationId,
       )
       .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
   }

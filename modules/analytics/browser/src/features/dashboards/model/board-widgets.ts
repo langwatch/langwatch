@@ -3,8 +3,9 @@
  * lands, alone or with its whole board. Every widget is an ordinary `dashboardWidgets` row. Pure.
  */
 
+import type { DashboardWidgetDefinition } from "@langwatch/analytics-contract/dashboard-widget-definition";
+
 import { chartGridBottomRow, type ChartGridPlacement } from "../../../model/chart-grid.ts";
-import type { DashboardWidgetDefinition } from "../../../model/dashboard-widget-definition.ts";
 import type { BoardTemplateWidget } from "../templates/index.ts";
 import { atLeastBoardMinRows } from "./board-grid.ts";
 

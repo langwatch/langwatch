@@ -1,7 +1,7 @@
 /**
- * The server half of `identity.*`: the session user's own identity. No permission applies and
- * none is missing — the session proves who the caller is, and every operation acts on that user
- * alone. Spec: specs/identity/identifier-model.feature.
+ * The server half of `identity.*`: the session user's own identity, where the session proves who
+ * the caller is and no permission applies.
+ * Spec: specs/identity/identifier-model.feature.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { IdentityApi, identityTrpc } from "@langwatch/identity-contract";

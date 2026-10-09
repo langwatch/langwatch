@@ -1,4 +1,8 @@
-import type { Dataset } from "@langwatch/dataset-contract";
+import type {
+  BatchEvaluationRecord,
+  BatchEvaluationSummary,
+  Dataset,
+} from "@langwatch/dataset-contract";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import { moduleApi } from "@langwatch/module";
 import type {
@@ -9,13 +13,16 @@ import type {
 } from "@langwatch/workflow-contract";
 
 import type {
+  DatasetEvaluationInput,
+  DatasetEvaluationOutcome,
+} from "./experiment-dataset-evaluation.ts";
+import type {
   ExperimentDspyStep,
   ExperimentDspyStepLookup,
   ExperimentDspyStepSummary,
   ExperimentDspyStepsLookup,
 } from "./experiment-dspy.ts";
-import type { DSPyRunsSummary } from "./experiment-legacy.ts";
-import type { ComputeExperimentRunMetricsCommandData } from "./experiment-run-eventing.commands.ts";
+import type { DSPyRunsSummary, LogBatchEvaluationInput } from "./experiment-legacy.ts";
 import type {
   CompleteExperimentRunInput,
   ExperimentRun,
@@ -120,11 +127,6 @@ export type ExperimentWorkflowCopyInput = Readonly<{
   copiedFromWorkflowId?: string;
 }>;
 
-/** A run's experiment: absent is an answer, since a run may predate its experiment's record. */
-export type ExperimentIdLookupResult =
-  | Readonly<{ kind: "recorded"; experimentId: string }>
-  | Readonly<{ kind: "not_recorded" }>;
-
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): how
  * many experiments were made, since `since` where one is given, and when the
@@ -147,6 +149,13 @@ export interface ExperimentApi {
   findBySlugAndType(
     input: ExperimentSlugLookup & { type: ExperimentType },
   ): Promise<Experiment | null>;
+  /** One row per experiment and dataset: how many batch evaluations ran, cost, mean score. */
+  summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]>;
+  /** Every batch-evaluation record of the experiment the slug names. */
+  listBatchEvaluations(input: {
+    projectId: string;
+    experimentSlug: string;
+  }): Promise<BatchEvaluationRecord[]>;
   list(input: { projectId: string }): Promise<Experiment[]>;
   getPage(input: ExperimentPageInput): Promise<ExperimentPage>;
   findLatest(input: { projectId: string }): Promise<Experiment | null>;
@@ -180,10 +189,12 @@ export interface ExperimentApi {
   recordTargetResult(input: RecordTargetResultInput): Promise<void>;
   recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
   completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
-  /** One experiment trace's cost, sent to the run pipeline to fold into its run. */
-  computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void>;
-  /** The experiment a run was recorded against, or that no experiment recorded it. */
-  lookupExperimentId(input: { tenantId: string; runId: string }): Promise<ExperimentIdLookupResult>;
+  /** Refuses an SDK batch body larger than the project's organization accepts in one request. */
+  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
+  /** Records one SDK batch evaluation: its run, its rows and its verdicts. */
+  logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
+  /** Runs one evaluator over an entry of a saved dataset and records it against an experiment. */
+  evaluateDataset(input: DatasetEvaluationInput): Promise<DatasetEvaluationOutcome>;
   upsertDspyStep(input: ExperimentDspyStep): Promise<void>;
   listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]>;
   listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]>;

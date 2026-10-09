@@ -12,6 +12,7 @@ import {
   opsPlatformTrpc,
   opsProcessTrpc,
   opsQueueTrpc,
+  opsUpgradeTrpc,
 } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
@@ -22,6 +23,7 @@ import { opsOperatorsTrpcTransport } from "../ops-operators.trpc.ts";
 import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsProcessTrpcTransport } from "../ops-process.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
+import { opsUpgradeTrpcTransport } from "../ops-upgrade.trpc.ts";
 import { opsTrpcTransport } from "../ops.trpc.ts";
 
 type Declaration = { router: TrpcRouterMount<never, never> };
@@ -112,6 +114,7 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   getGroupJobs: "query",
   unblockGroup: "mutation",
   unblockAll: "mutation",
+  reapStrandedGroups: "mutation",
   drainGroup: "mutation",
   pausePipeline: "mutation",
   unpausePipeline: "mutation",
@@ -175,16 +178,6 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   getBlob: "query",
   runBlobCleanup: "mutation",
   deleteBlob: "mutation",
-  listSystemMigrations: "query",
-  listMigrationEnrollments: "query",
-  searchMigrationOrganizations: "query",
-  enrollMigrationTenant: "mutation",
-  enrollMigrationCohort: "mutation",
-  withdrawMigrationTenant: "mutation",
-  runSystemMigrationForOrganization: "mutation",
-  runSystemMigrationPass: "mutation",
-  assertSystemMigrationLegacyWritersDrained: "mutation",
-  rollBackSystemMigrationTenant: "mutation",
   listPlatformOperators: "query",
   grantPlatformOperator: "mutation",
   revokePlatformOperator: "mutation",
@@ -201,6 +194,24 @@ const OPERATOR_READERS = [
   "revokePlatformOperator",
   "runBlobCleanup",
   "deleteBlob",
+];
+
+/** The ten system-migration procedures: their kind and the platform permission each asks. */
+const MIGRATION_PROCEDURES = {
+  listSystemMigrations: ["query", "permission-platform:ops:view"],
+  listMigrationEnrollments: ["query", "permission-platform:ops:view"],
+  searchMigrationOrganizations: ["query", "permission-platform:ops:view"],
+  enrollMigrationTenant: ["mutation", "permission-platform:ops:manage"],
+  enrollMigrationCohort: ["mutation", "permission-platform:ops:manage"],
+  withdrawMigrationTenant: ["mutation", "permission-platform:ops:manage"],
+  runSystemMigrationForOrganization: ["mutation", "permission-platform:ops:manage"],
+  runSystemMigrationPass: ["mutation", "permission-platform:ops:manage"],
+  assertSystemMigrationLegacyWritersDrained: ["mutation", "permission-platform:ops:manage"],
+  rollBackSystemMigrationTenant: ["mutation", "permission-platform:ops:manage"],
+} as const;
+
+/** The migration procedures whose handler reads the operator's identity. */
+const MIGRATION_OPERATOR_READERS = [
   "enrollMigrationTenant",
   "enrollMigrationCohort",
   "runSystemMigrationForOrganization",
@@ -306,6 +317,31 @@ describe("the ops tRPC declarations", () => {
       expect(boundFacts(opsTrpcTransport)).toEqual(
         Object.assign({}, ...OPS_TRANSPORTS.map(boundFacts)),
       );
+    });
+  });
+
+  describe("given the system-migration procedures", () => {
+    /** @scenario "The system-migration procedures answer under ops.upgrade and nowhere else" */
+    it("answers the ten under ops.upgrade and nowhere else", () => {
+      const names = Object.keys(MIGRATION_PROCEDURES).toSorted();
+      const upgradeAccess = boundAccess(opsUpgradeTrpcTransport);
+      const upgradeFacts = boundFacts(opsUpgradeTrpcTransport);
+      const leaf = (procedure: string) => procedure.replace("upgrade.", "");
+
+      expect(opsUpgradeTrpc.namespace).toBe("ops.upgrade");
+      for (const [name, [kind, access]] of Object.entries(MIGRATION_PROCEDURES)) {
+        expect(opsUpgradeTrpc.members[name as keyof typeof opsUpgradeTrpc.members].kind).toBe(kind);
+        expect(upgradeAccess[`upgrade.${name}`]).toBe(access);
+      }
+      expect(
+        Object.entries(upgradeFacts)
+          .filter(([name, facts]) => facts.includes("opsOperator") && names.includes(leaf(name)))
+          .map(([name]) => leaf(name))
+          .toSorted(),
+      ).toEqual(MIGRATION_OPERATOR_READERS.toSorted());
+
+      const stillUnderOps = OPS_CONTRACTS.flatMap((contract) => Object.keys(contract.members));
+      expect(stillUnderOps.filter((name) => names.includes(name))).toEqual([]);
     });
   });
 

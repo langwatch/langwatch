@@ -31,7 +31,7 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
   />
 </Frame>
 
-The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
+The budget is in force at once: the next request counts against it. See [How far past a limit spend can go](#how-far-past-a-limit-spend-can-go).
 
 For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
 
@@ -70,7 +70,7 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
   }'
 ```
 
-The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
+The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. A voice session keeps the end user of the request that created it, and every usage report of that session counts against that end user. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
 
 Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
 
@@ -105,6 +105,28 @@ The warning header lists every budget at or past 80 percent as `scope:percent`, 
 A `block` budget with a **Provider** filter removes that provider from the request's provider chain instead of rejecting the request. The request is rejected only when no provider is left.
 
 Two webhook events fire once per period: `gateway.budget.threshold_crossed` at 80 percent and `gateway.budget.breached` at the limit, on `warn` budgets too. See [Webhooks](/features/webhooks).
+
+## How far past a limit spend can go
+
+A budget is checked before a request and debited after it, so spend can pass the limit by a bounded amount:
+
+- **One request.** A request admitted under the limit is served in full, whatever it costs.
+- **Requests in flight.** Requests admitted at the same moment are each checked against the spend recorded so far.
+- **The refresh.** The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
+
+### Voice and realtime sessions
+
+A voice call is one admission that bills for as long as it runs. It is checked when the session is created and debited while it runs: each usage report is its own debit, so budgets see a call in progress.
+
+| Session | Created on | At the limit | Overshoot bound |
+| ------- | ---------- | ------------ | --------------- |
+| Metered by the gateway | `/v1/live/sessions`, `/v1/realtime/calls` | The gateway ends the call. It checks on every usage report and every 30 seconds. | About one minute of the call. |
+| Metered by the client | `/v1/realtime/client_secrets`, `/v1/single-use-token/{token_type}` | The usage answer carries `budget.exceeded: true`. The client closes the socket. The gateway cannot. | The rest of the call, at most the vendor's session length. |
+| Never reported | Either client-metered route | LangWatch charges an estimate when the open window passes. | The estimate. See [Sessions that never report](/ai-gateway/api/realtime#sessions-that-never-report). |
+
+The next session create on a key past its limit answers HTTP 402 in all three cases.
+
+Two settings keep a client-metered session small: a short credential lifetime on the mint (`expires_after.seconds` for OpenAI; an ElevenLabs token lasts 15 minutes and opens one socket) and **max open sessions** on the key, which caps how many calls it holds at once. See [Realtime voice](/ai-gateway/api/realtime#limiting-how-many-calls-a-key-runs-at-once).
 
 ## Windows and cycles
 

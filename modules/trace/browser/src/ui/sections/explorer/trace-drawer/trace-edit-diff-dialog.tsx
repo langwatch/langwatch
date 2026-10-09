@@ -3,6 +3,11 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { useMemo, useState } from "react";
 
 import {
+  applyOverlayToSpansFull,
+  useSpansFullCanonical,
+} from "../../../../features/span/behavior/use-spans-full.ts";
+import { useTraceHeaderCanonical } from "../../../../features/trace-drawer/behavior/use-trace-header.ts";
+import {
   computeLineDiff,
   type DiffLine,
   diffStat,
@@ -10,8 +15,6 @@ import {
 import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
 import { Dialog } from "../../dialog.tsx";
-import { applyOverlayToSpansFull, useSpansFullCanonical } from "../hooks/use-spans-full.ts";
-import { useTraceHeaderCanonical } from "../hooks/use-trace-header.ts";
 
 type DiffTab = "trace" | "spans";
 

@@ -7,7 +7,7 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { datasetContextChip } from "../langy-context-chips.ts";
+import { datasetContextChip } from "../../features/context-target/behavior/langy-context-chips.ts";
 import {
   useLangyPageContextStore,
   useRegisterLangyPageContext,

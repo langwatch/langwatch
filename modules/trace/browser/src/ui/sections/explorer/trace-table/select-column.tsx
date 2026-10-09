@@ -1,7 +1,7 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 
-import type { TraceListItem } from "../types/trace.ts";
-import type { ConversationGroup } from "./conversation-groups.ts";
+import type { ConversationGroup } from "../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
 import type { TraceGroup } from "./registry/cells/group/types.ts";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
 import { SelectHeaderCheckbox } from "./select-header-checkbox.tsx";

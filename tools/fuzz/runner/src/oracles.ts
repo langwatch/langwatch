@@ -11,6 +11,7 @@ export const FINDING_KINDS = [
   "blank-screen",
   "not-found",
   "hang",
+  "vision",
 ] as const;
 export type FindingKind = (typeof FINDING_KINDS)[number];
 

@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import type {
   CostRollupDayComparer,
   CostRollupDayLook,
-} from "../../services/cost-rollup-day-comparer.service.ts";
+} from "../../features/cost/services/cost-rollup-day-comparer.service.ts";
 import {
   COST_ROLLUP_WATCH_PROCESS_NAME,
   type CostRollupWatchState,

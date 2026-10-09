@@ -4,9 +4,11 @@ import type {
   SpendSortField,
 } from "@langwatch/enterprise-governance-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import type { TraceDailySpendGroup } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
+import type { ActivityMonitorTraces } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
 import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResult,
@@ -42,18 +44,33 @@ class RecordedClickHouseResolver implements GovernanceClickHouseResolver {
   }
 }
 
+/** Every trace read the service made, by operation name, with its input. */
+type TraceCall = { op: keyof ActivityMonitorTraces; input: Record<string, unknown> };
+
 function activityMonitor(options: {
   prisma: Parameters<typeof prismaDouble>[0];
-  rowsForQuery: (query: ClickHouseQuery) => unknown;
+  rowsForQuery?: (query: ClickHouseQuery) => unknown;
+  traces?: Partial<ActivityMonitorTraces>;
 }) {
-  const clickhouse = new RecordedClickHouseClient(options.rowsForQuery);
+  const clickhouse = new RecordedClickHouseClient(options.rowsForQuery ?? (() => []));
   const resolver = new RecordedClickHouseResolver(clickhouse);
+  const traceCalls: TraceCall[] = [];
+  const traces = Object.fromEntries(
+    Object.entries(options.traces ?? {}).map(([op, read]) => [
+      op,
+      (input: Record<string, unknown>) => {
+        traceCalls.push({ op: op as TraceCall["op"], input });
+        return (read as (input: unknown) => unknown)(input);
+      },
+    ]),
+  ) as Partial<ActivityMonitorTraces>;
   const service = createActivityMonitorTestService({
     prisma: prismaDouble(options.prisma),
     clickhouse: resolver,
+    traces,
   });
 
-  return { service, clickhouse, resolver };
+  return { service, clickhouse, resolver, traceCalls };
 }
 
 function governanceProjectPrisma() {
@@ -62,46 +79,42 @@ function governanceProjectPrisma() {
   };
 }
 
-const userSortCases: [SpendSortField, SortDir, string][] = [
-  ["spend", "asc", "sum(spendUsd) ASC"],
-  ["spend", "desc", "sum(spendUsd) DESC"],
-  ["requests", "asc", "count() ASC"],
-  ["requests", "desc", "count() DESC"],
-  ["lastActivity", "asc", "max(occurredAt) ASC"],
-  ["lastActivity", "desc", "max(occurredAt) DESC"],
+const GOVERNANCE_ORIGIN = [{ key: "langwatch.origin.kind", value: "ingestion_source" }];
+
+const userSortCases: [SpendSortField, SortDir][] = [
+  ["spend", "asc"],
+  ["spend", "desc"],
+  ["requests", "asc"],
+  ["requests", "desc"],
+  ["lastActivity", "asc"],
+  ["lastActivity", "desc"],
 ];
 
-const timeSeriesGroupCases: [Extract<SpendOverTimeGroupBy, "user" | "model">, string][] = [
-  ["user", "ts.Attributes[{userKey:String}] AS groupKey"],
-  ["model", "arrayElement(ts.Models, 1) AS groupKey"],
+const timeSeriesGroupCases: [
+  Extract<SpendOverTimeGroupBy, "user" | "model">,
+  TraceDailySpendGroup,
+][] = [
+  ["user", { kind: "attribute", key: "langwatch.user_id" }],
+  ["model", { kind: "firstModel" }],
 ];
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("PrismaActivityMonitorRepository rollups", () => {
-  it("short-circuits an org without a governance project before resolving ClickHouse", async () => {
+describe("ActivityMonitorService rollups", () => {
+  it("short-circuits an org without a governance project before asking trace", async () => {
     const prisma = {
       project: { findFirst: vi.fn(async () => null) },
       anomalyAlert: {
         groupBy: vi.fn(async () => [{ severity: "critical", _count: { _all: 2 } }]),
       },
     };
-    const { service, clickhouse, resolver } = activityMonitor({
-      prisma,
-      rowsForQuery: () => [],
-    });
+    const { service, clickhouse, resolver, traceCalls } = activityMonitor({ prisma });
 
     const summary = await service.summary({ organizationId: "empty-org", windowDays: 7 });
-    const users = await service.spendByUser({
-      organizationId: "empty-org",
-      windowDays: 7,
-    });
-    const teams = await service.spendByTeam({
-      organizationId: "empty-org",
-      windowDays: 7,
-    });
+    const users = await service.spendByUser({ organizationId: "empty-org", windowDays: 7 });
+    const teams = await service.spendByTeam({ organizationId: "empty-org", windowDays: 7 });
 
     expect(summary).toEqual({
       spentThisWindowUsd: 0,
@@ -116,6 +129,7 @@ describe("PrismaActivityMonitorRepository rollups", () => {
     expect(teams).toEqual([]);
     expect(resolver.organizationIds).toEqual([]);
     expect(clickhouse.queries).toEqual([]);
+    expect(traceCalls).toEqual([]);
   });
 
   it("returns the current and prior governance-only summary with anomaly totals", async () => {
@@ -128,9 +142,15 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         ]),
       },
     };
-    const { service, clickhouse } = activityMonitor({
+    const { service, traceCalls } = activityMonitor({
       prisma,
-      rowsForQuery: () => [{ thisSpend: "5", prevSpend: "2", thisUsers: "3" }],
+      traces: {
+        getAttributedSpendComparison: async () => ({
+          currentSpendUsd: 5,
+          previousSpendUsd: 2,
+          currentActors: 3,
+        }),
+      },
     });
 
     const summary = await service.summary({ organizationId: "org-a", windowDays: 30 });
@@ -144,27 +164,34 @@ describe("PrismaActivityMonitorRepository rollups", () => {
       openAnomalyCount: 3,
       anomalyBreakdown: { critical: 1, warning: 2, info: 0 },
     });
-    expect(clickhouse.queries[0]!.query).toContain("ts.TenantId = {tenantId:String}");
-    expect(clickhouse.queries[0]!.query_params).toMatchObject({
-      tenantId: "governance-project",
-      originKey: "langwatch.origin.kind",
-    });
+    expect(traceCalls).toEqual([
+      {
+        op: "getAttributedSpendComparison",
+        input: expect.objectContaining({
+          projectId: "governance-project",
+          matches: GOVERNANCE_ORIGIN,
+          actorKey: "langwatch.user_id",
+        }),
+      },
+    ]);
   });
 
   it.each(userSortCases)(
-    "uses the %s/%s user ordering with tenant-bound pagination",
-    async (sortBy, sortDir, orderBy) => {
-      const { service, clickhouse } = activityMonitor({
+    "asks trace for the %s/%s user ordering with tenant-bound pagination",
+    async (sortBy, sortDir) => {
+      const { service, traceCalls } = activityMonitor({
         prisma: governanceProjectPrisma(),
-        rowsForQuery: () => [
-          {
-            actor: "member@example.com",
-            spendUsdStr: "0.123456789",
-            requests: "2",
-            lastActivityMs: "1786619810000",
-            mostUsedTarget: "gpt-5",
-          },
-        ],
+        traces: {
+          findAttributedSpendByValue: async () => [
+            {
+              value: "member@example.com",
+              spentUsd: "0.123456789",
+              requests: 2,
+              lastOccurredAtMs: 1786619810000,
+              firstModel: "gpt-5",
+            },
+          ],
+        },
       });
 
       const rows = await service.spendByUser({
@@ -184,85 +211,83 @@ describe("PrismaActivityMonitorRepository rollups", () => {
           mostUsedTarget: "gpt-5",
         }),
       ]);
-      expect(clickhouse.queries).toHaveLength(1);
-      const query = clickhouse.queries[0]!;
-      expect(query.query).toContain(`ORDER BY ${orderBy}`);
-      expect(query.query).toContain("ts.TenantId = {tenantId:String}");
-      expect(query.query_params).toMatchObject({
-        tenantId: "governance-project",
-        originKey: "langwatch.origin.kind",
-        limit: 7,
-        offset: 3,
-      });
+      expect(traceCalls).toEqual([
+        {
+          op: "findAttributedSpendByValue",
+          input: expect.objectContaining({
+            projectId: "governance-project",
+            matches: GOVERNANCE_ORIGIN,
+            valueKey: "langwatch.user_id",
+            sortBy,
+            sortDirection: sortDir,
+            limit: 7,
+            offset: 3,
+          }),
+        },
+      ]);
     },
   );
+
+  it("reads a user without a first model as no most-used target", async () => {
+    const { service } = activityMonitor({
+      prisma: governanceProjectPrisma(),
+      traces: {
+        findAttributedSpendByValue: async () => [
+          { value: "a@x.test", spentUsd: "1", requests: 1, lastOccurredAtMs: 1, firstModel: "" },
+        ],
+      },
+    });
+
+    const rows = await service.spendByUser({ organizationId: "org-a", windowDays: 30 });
+
+    expect(rows[0]!.mostUsedTarget).toBeNull();
+  });
 
   it("rolls sources into team and org-wide rows before sorting and paging", async () => {
     const prisma = {
       ...governanceProjectPrisma(),
       ingestionSource: {
         findMany: vi.fn(async () => [
-          {
-            id: "source-team",
-            teamId: "team-a",
-            team: { id: "team-a", name: "Product" },
-          },
-          { id: "source-org", teamId: null, team: null },
+          { id: "source-team", team: { id: "team-a", name: "Product" } },
+          { id: "source-org", team: null },
         ]),
       },
     };
-    const { service, clickhouse } = activityMonitor({
+    const { service, traceCalls } = activityMonitor({
       prisma,
-      rowsForQuery: () => [
-        {
-          sourceId: "source-team",
-          thisSpendStr: "2",
-          prevSpendStr: "1",
-          thisRequests: "1",
-          lastActivityMs: "2000",
-        },
-        {
-          sourceId: "source-org",
-          thisSpendStr: "1",
-          prevSpendStr: "3",
-          thisRequests: "4",
-          lastActivityMs: "1000",
-        },
-      ],
+      traces: {
+        findAttributedSpendComparisonByValue: async () => [
+          {
+            value: "source-team",
+            currentSpendUsd: "2",
+            previousSpendUsd: "1",
+            currentRequests: 1,
+            lastCurrentOccurredAtMs: 2000,
+          },
+          {
+            value: "source-org",
+            currentSpendUsd: "1",
+            previousSpendUsd: "3",
+            currentRequests: 4,
+            lastCurrentOccurredAtMs: 1000,
+          },
+        ],
+      },
     });
+    const page = (sortBy: SpendSortField, sortDir: SortDir) =>
+      service.spendByTeam({
+        organizationId: "org-a",
+        windowDays: 30,
+        limit: 1,
+        offset: 0,
+        sortBy,
+        sortDir,
+      });
 
-    const highestSpend = await service.spendByTeam({
-      organizationId: "org-a",
-      windowDays: 30,
-      limit: 1,
-      offset: 0,
-      sortBy: "spend",
-      sortDir: "desc",
-    });
-    const lowestSpend = await service.spendByTeam({
-      organizationId: "org-a",
-      windowDays: 30,
-      limit: 1,
-      offset: 0,
-      sortBy: "spend",
-      sortDir: "asc",
-    });
-    const mostRequests = await service.spendByTeam({
-      organizationId: "org-a",
-      windowDays: 30,
-      limit: 1,
-      offset: 0,
-      sortBy: "requests",
-      sortDir: "desc",
-    });
-    const mostRecent = await service.spendByTeam({
-      organizationId: "org-a",
-      windowDays: 30,
-      limit: 1,
-      offset: 0,
-      sortBy: "lastActivity",
-      sortDir: "desc",
-    });
+    const highestSpend = await page("spend", "desc");
+    const lowestSpend = await page("spend", "asc");
+    const mostRequests = await page("requests", "desc");
+    const mostRecent = await page("lastActivity", "desc");
 
     expect(highestSpend).toEqual([
       expect.objectContaining({
@@ -285,11 +310,12 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         where: { id: { in: ["source-team", "source-org"] }, organizationId: "org-a" },
       }),
     );
-    expect(clickhouse.queries).toHaveLength(4);
-    for (const query of clickhouse.queries) {
-      expect(query.query_params).toMatchObject({
-        tenantId: "governance-project",
-        originKey: "langwatch.origin.kind",
+    expect(traceCalls).toHaveLength(4);
+    for (const call of traceCalls) {
+      expect(call.input).toMatchObject({
+        projectId: "governance-project",
+        matches: GOVERNANCE_ORIGIN,
+        valueKey: "langwatch.ingestion_source.id",
       });
     }
   });
@@ -297,6 +323,7 @@ describe("PrismaActivityMonitorRepository rollups", () => {
   it("keeps a dense daily series and only rolls this org's source mappings into teams", async () => {
     const now = Date.UTC(2026, 7, 25, 14);
     const today = Date.UTC(2026, 7, 25);
+    const dayMs = 24 * 60 * 60 * 1000;
     vi.spyOn(Date, "now").mockReturnValue(now);
     const prisma = {
       ...governanceProjectPrisma(),
@@ -307,21 +334,15 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         ]),
       },
     };
-    const { service, clickhouse } = activityMonitor({
+    const { service, traceCalls } = activityMonitor({
       prisma,
-      rowsForQuery: () => [
-        {
-          bucketMs: String(today - 24 * 60 * 60 * 1000),
-          groupKey: "source-a",
-          spendUsdStr: "1",
-        },
-        {
-          bucketMs: String(today - 24 * 60 * 60 * 1000),
-          groupKey: "source-b",
-          spendUsdStr: "2",
-        },
-        { bucketMs: String(today), groupKey: "source-elsewhere", spendUsdStr: "99" },
-      ],
+      traces: {
+        findDailyAttributedSpend: async () => [
+          { dayStartMs: today - dayMs, value: "source-a", spentUsd: "1" },
+          { dayStartMs: today - dayMs, value: "source-b", spentUsd: "2" },
+          { dayStartMs: today, value: "source-elsewhere", spentUsd: "99" },
+        ],
+      },
     });
 
     const result = await service.spendOverTime({
@@ -331,9 +352,9 @@ describe("PrismaActivityMonitorRepository rollups", () => {
     });
 
     expect(result.buckets).toEqual([
-      { bucketIso: new Date(today - 2 * 24 * 60 * 60 * 1000).toISOString(), points: [] },
+      { bucketIso: new Date(today - 2 * dayMs).toISOString(), points: [] },
       {
-        bucketIso: new Date(today - 24 * 60 * 60 * 1000).toISOString(),
+        bucketIso: new Date(today - dayMs).toISOString(),
         points: [{ key: "team-a", label: "Product", spendUsd: "3" }],
       },
       {
@@ -349,9 +370,10 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         },
       }),
     );
-    expect(clickhouse.queries[0]!.query_params).toMatchObject({
-      tenantId: "governance-project",
-      windowStart: today - 2 * 24 * 60 * 60 * 1000,
+    expect(traceCalls[0]!.input).toMatchObject({
+      projectId: "governance-project",
+      groupBy: { kind: "attribute", key: "langwatch.ingestion_source.id" },
+      window: { startMs: today - 2 * dayMs, endMs: now },
     });
   });
 
@@ -377,21 +399,19 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         ]),
       },
     };
-    const { service, clickhouse } = activityMonitor({
+    const { service, clickhouse, traceCalls } = activityMonitor({
       prisma,
       rowsForQuery: (query) => {
-        if (query.query.includes("FROM trace_summaries")) {
-          return [{ sourceId: "source-a", c: "2" }];
-        }
-
         if (query.query.includes("FROM stored_log_records")) {
           return [
             { sourceId: "source-a", c: "1" },
             { sourceId: "source-b", c: "7" },
           ];
         }
-
         return [{ sourceId: "source-a", c: "3" }];
+      },
+      traces: {
+        countAttributedTracesByValue: async () => [{ value: "source-a", count: 2 }],
       },
     });
 
@@ -415,28 +435,63 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         eventsLast24h: 7,
       },
     ]);
-    expect(clickhouse.queries).toHaveLength(3);
+    expect(clickhouse.queries).toHaveLength(2);
     for (const query of clickhouse.queries) {
       expect(query.query_params).toMatchObject({
         tenantId: "governance-project",
         sourceIds: ["source-a", "source-b"],
       });
     }
+    expect(traceCalls[0]!.input).toMatchObject({
+      projectId: "governance-project",
+      matches: GOVERNANCE_ORIGIN,
+      valueKey: "langwatch.ingestion_source.id",
+      values: ["source-a", "source-b"],
+    });
+  });
+
+  it("sums trace's source recency with the logged and pulled windows", async () => {
+    const { service, traceCalls } = activityMonitor({
+      prisma: governanceProjectPrisma(),
+      rowsForQuery: (query) =>
+        query.query.includes("FROM stored_log_records")
+          ? [{ c24: "1", c7: "2", c30: "3", lastMs: "2000" }]
+          : [{ c24: "0", c7: "0", c30: "0", lastMs: null }],
+      traces: {
+        getAttributedTraceRecency: async () => ({ counts: [4, 5, 6], lastOccurredAtMs: 9000 }),
+      },
+    });
+
+    const metrics = await service.sourceHealthMetrics({
+      organizationId: "org-a",
+      sourceId: "source-a",
+    });
+
+    expect(metrics).toEqual({
+      events24h: 5,
+      events7d: 7,
+      events30d: 9,
+      lastSuccessIso: new Date(9000).toISOString(),
+    });
+    expect(traceCalls[0]!.input).toMatchObject({
+      projectId: "governance-project",
+      matches: [...GOVERNANCE_ORIGIN, { key: "langwatch.ingestion_source.id", value: "source-a" }],
+    });
   });
 
   it.each(timeSeriesGroupCases)(
-    "uses the %s source expression for time-series groups",
-    async (groupBy, expression) => {
-      const { service, clickhouse } = activityMonitor({
+    "asks trace to group the time series by %s",
+    async (groupBy, group) => {
+      const { service, traceCalls } = activityMonitor({
         prisma: governanceProjectPrisma(),
-        rowsForQuery: () => [],
+        traces: { findDailyAttributedSpend: async () => [] },
       });
 
       await service.spendOverTime({ organizationId: "org-a", windowDays: 1, groupBy });
 
-      expect(clickhouse.queries[0]!.query).toContain(expression);
-      expect(clickhouse.queries[0]!.query_params).toMatchObject({
-        tenantId: "governance-project",
+      expect(traceCalls[0]!.input).toMatchObject({
+        projectId: "governance-project",
+        groupBy: group,
       });
     },
   );
@@ -472,56 +527,30 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         ]),
       },
     };
-    const { service, clickhouse } = activityMonitor({
+    const spend = (projectId: string, value: string, spentUsd: string, requests: number) => ({
+      projectId,
+      value,
+      spentUsd,
+      requests,
+      lastOccurredAtMs: 1000,
+    });
+    const { service, traceCalls } = activityMonitor({
       prisma,
-      rowsForQuery: () => [
-        {
-          projectId: "project-a",
-          actor: "direct@example.com",
-          spendUsdStr: "4",
-          requests: "2",
-          lastActivityMs: "4000",
-        },
-        {
-          projectId: "project-a",
-          actor: "team@example.com",
-          spendUsdStr: "3",
-          requests: "1",
-          lastActivityMs: "3000",
-        },
-        {
-          projectId: "project-a",
-          actor: "",
-          spendUsdStr: "2",
-          requests: "1",
-          lastActivityMs: "2000",
-        },
-        {
-          projectId: "project-b",
-          actor: "",
-          spendUsdStr: "1",
-          requests: "1",
-          lastActivityMs: "1000",
-        },
-      ],
+      traces: {
+        findSpendByProjectAndValue: async () => [
+          spend("project-a", "direct@example.com", "4", 2),
+          spend("project-a", "team@example.com", "3", 1),
+          spend("project-a", "", "2", 1),
+          spend("project-b", "", "1", 1),
+        ],
+      },
     });
 
-    const rows = await service.spendByDepartment({
-      organizationId: "org-a",
-      windowDays: 30,
-    });
+    const rows = await service.spendByDepartment({ organizationId: "org-a", windowDays: 30 });
 
     expect(rows).toEqual([
-      expect.objectContaining({
-        departmentId: "department-user",
-        spendUsd: "4",
-        requestCount: 2,
-      }),
-      expect.objectContaining({
-        departmentId: "department-team",
-        spendUsd: "3",
-        requestCount: 1,
-      }),
+      expect.objectContaining({ departmentId: "department-user", spendUsd: "4", requestCount: 2 }),
+      expect.objectContaining({ departmentId: "department-team", spendUsd: "3", requestCount: 1 }),
       expect.objectContaining({
         departmentId: "department-project",
         spendUsd: "2",
@@ -534,10 +563,9 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         requestCount: 1,
       }),
     ]);
-    expect(clickhouse.queries[0]!.tenantIds).toEqual(["project-a", "project-b"]);
-    expect(clickhouse.queries[0]!.query_params).toMatchObject({
-      tenant0: "project-a",
-      tenant1: "project-b",
+    expect(traceCalls[0]!.input).toMatchObject({
+      projectIds: ["project-a", "project-b"],
+      valueKey: "langwatch.user_id",
     });
     expect(prisma.project.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

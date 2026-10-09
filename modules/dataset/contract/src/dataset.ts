@@ -125,6 +125,19 @@ export const datasetSchema = z
   .strict();
 export type Dataset = z.infer<typeof datasetSchema>;
 
+/** Where one dataset's content lives, as a storage migration's inventory reads it. */
+export const datasetStorageEntrySchema = datasetSchema.pick({
+  id: true,
+  projectId: true,
+  contentLayout: true,
+  status: true,
+  chunkCount: true,
+});
+export type DatasetStorageEntry = z.infer<typeof datasetStorageEntrySchema>;
+
+/** One id-ordered page of a project's datasets, after the `afterId` cursor. */
+export type DatasetStoragePageInput = { projectId: string; afterId?: string; limit: number };
+
 /**
  * A dataset as the browser reads it. The stored size is a bigint, which JSON
  * cannot carry, so it crosses as a number: no dataset comes near 2^53 bytes.

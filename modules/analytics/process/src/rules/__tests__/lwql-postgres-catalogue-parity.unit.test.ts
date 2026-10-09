@@ -5,11 +5,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { exposedCatalogueColumns, type LwqlTableCatalogue } from "../lwql-catalogue.rules.ts";
 import {
   LWQL_POSTGRES_CATALOG,
   LWQL_POSTGRES_CATALOGUE,
-} from "../lwql-postgres-view-catalog.rules.ts";
+} from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
+import { exposedCatalogueColumns, type LwqlTableCatalogue } from "../lwql-catalogue.rules.ts";
 import beforeJson from "./fixtures/lwql-postgres-exposure-before.json" with { type: "json" };
 
 /** Columns the derivation exposed and the catalogue omits, by view and source column. */

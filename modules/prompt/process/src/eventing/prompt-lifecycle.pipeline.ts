@@ -6,9 +6,15 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  ORGANIZATION_CREATED_EVENT_TYPE,
+  organizationCreatedEventDataSchema,
+  type OrganizationCreatedEventData,
+} from "@langwatch/organization-contract";
 
 import type { PromptModule } from "../app/prompt.app.ts";
 import type { PromptRepositories } from "../repositories/prompt.repositories.ts";
+import type { PromptService } from "../services/prompt.service.ts";
 import {
   RecordPromptCreatedCommand,
   type RecordPromptCreatedCommandData,
@@ -24,14 +30,35 @@ export type PromptLifecyclePipeline = StaticPipelineDefinition<
   { name: "recordPromptCreated"; payload: RecordPromptCreatedCommandData }
 >;
 
+type PromptTagSeed = Pick<PromptService, "seedTagsForOrganization">;
+
+/** Seeds only the tags an organization lacks, so a redelivered fact seeds nothing twice. */
+export function seedOrganizationPromptTags({
+  tags,
+}: {
+  tags: PromptTagSeed;
+}): (data: OrganizationCreatedEventData) => Promise<void> {
+  return ({ organizationId }: OrganizationCreatedEventData) =>
+    tags.seedTagsForOrganization({ organizationId });
+}
+
 /** The api sends the command; peers (nurturing) react to its event from their own side (§9). */
-export function buildPromptLifecyclePipeline(): PromptLifecyclePipeline {
+export function buildPromptLifecyclePipeline({
+  tags,
+}: {
+  tags: PromptTagSeed;
+}): PromptLifecyclePipeline {
   return definePipeline({
     name: PROMPT_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: PROMPT_AGGREGATE_TYPE }),
   })
     .withEvents([promptCreatedEventSchema])
     .withCommand("recordPromptCreated", RecordPromptCreatedCommand)
+    .withPeerSubscriber("seedOrganizationPromptTags", {
+      eventType: ORGANIZATION_CREATED_EVENT_TYPE,
+      data: organizationCreatedEventDataSchema,
+      handle: seedOrganizationPromptTags({ tags }),
+    })
     .build();
 }
 

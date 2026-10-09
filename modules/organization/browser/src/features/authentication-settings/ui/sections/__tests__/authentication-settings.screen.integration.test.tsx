@@ -4,7 +4,7 @@
  * @see specs/identity/organization-authentication-settings.feature
  */
 import "@testing-library/jest-dom/vitest";
-import type { UiAuthenticationOverviewCardProps } from "@langwatch/browser-host/declarations";
+import type { AuthenticationOverviewCardProps } from "@langwatch/organization-client";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -56,7 +56,7 @@ vi.mock("../../../behavior/use-sign-in-security.ts", () => ({
 
 afterEach(cleanup);
 
-function DeclaredCard({ organizationId, canReadMembership }: UiAuthenticationOverviewCardProps) {
+function DeclaredCard({ organizationId, canReadMembership }: AuthenticationOverviewCardProps) {
   return (
     <div data-testid="declared-card">
       {organizationId}:{String(canReadMembership)}

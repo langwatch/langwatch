@@ -5,7 +5,6 @@ import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
-  Alert,
   Box,
   Button,
   Heading,
@@ -34,6 +33,7 @@ import {
 } from "../../model/role-holders.ts";
 import { BuiltinRoleCard, CustomRoleCard } from "../blocks/role-cards.tsx";
 import { RoleDetailDialog } from "../blocks/role-detail-dialog.tsx";
+import { SectionErrorNotice } from "../elements/section-error-notice.tsx";
 import { RoleDialog } from "./role-dialog.tsx";
 
 type Role = RouterOutputs["role"]["getAll"][number];
@@ -290,17 +290,5 @@ function SectionHeading({
       <Spacer />
       {right}
     </HStack>
-  );
-}
-
-/** A read that failed, said in place rather than as an empty section. */
-function SectionErrorNotice({ title }: { title: string }) {
-  return (
-    <Alert.Root status="error" data-testid="section-error-notice">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>{title}</Alert.Title>
-      </Alert.Content>
-    </Alert.Root>
   );
 }

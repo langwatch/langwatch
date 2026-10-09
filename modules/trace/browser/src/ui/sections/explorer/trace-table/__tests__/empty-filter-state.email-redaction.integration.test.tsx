@@ -23,11 +23,11 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("../../hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ instantEval: null }),
 }));
 
-vi.mock("../../hooks/use-instant-eval-runs.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [] }),
 }));
 

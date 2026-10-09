@@ -6,7 +6,7 @@ import {
   followUpsForResult,
   type SettledToolResult,
   SUGGESTION_LABEL,
-} from "../cli-follow-ups.ts";
+} from "../../../../tools/model/langy-cli-follow-ups.ts";
 
 const traceSearch = (overrides: Partial<SettledToolResult> = {}): SettledToolResult => ({
   name: "langwatch.trace.search",

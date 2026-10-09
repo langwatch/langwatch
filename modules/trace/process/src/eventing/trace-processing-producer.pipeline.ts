@@ -16,10 +16,10 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 
-import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
-import type { TraceIoExtraction } from "../services/trace-io-extraction.service.ts";
-import type { TraceMediaReferenceResolver } from "../services/trace-media-reference.service.ts";
-import type { TraceModelCost } from "../services/trace-model-cost.service.ts";
+import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
+import type { TraceIoExtraction } from "../features/derivation/services/trace-io-extraction.service.ts";
+import type { TraceMediaReferenceResolver } from "../features/media/services/trace-media-reference.service.ts";
+import type { TraceModelCost } from "../features/derivation/services/trace-model-cost.service.ts";
 import type {
   TraceSpanContentDrop,
   TraceSpanCostEnrichment,

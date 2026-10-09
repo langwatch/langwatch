@@ -1,7 +1,12 @@
+import { EVENT_TABLES } from "@langwatch/eventing/tables";
+
 import type { RetentionCategory } from "./data-retention.ts";
 
+/** Eventing's event log, keyed from its own table list (ET-2): retained with the traces. */
+const EVENT_LOG = EVENT_TABLES[0].table;
+
 export const RETENTION_TABLE_CATEGORY_MAP = {
-  event_log: "traces",
+  [EVENT_LOG]: "traces",
   stored_spans: "traces",
   stored_log_records: "traces",
   log_records: "traces",

@@ -5,11 +5,7 @@ import {
   injectPublicAppConfigIntoHtml,
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
-// The resolver reads the server environment, so it deliberately lives on the
-// projection module rather than being re-exported to browser code.
-import { resolveUiPublicBootstrap } from "@langwatch/config/public-app-config/projection";
 import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
-import { pickMailGateway } from "@langwatch/notification-contract";
 import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
@@ -20,6 +16,8 @@ import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { entryCoreChunkGroup, hostMountsChunkGroup } from "./vite/entry-core-chunks";
 import { havenHmrGate } from "./vite/havenHmrGate";
+import { mailPreview } from "./vite/mail-preview";
+import { fetchPublicConfigFromApi } from "./vite/public-config-from-api";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
@@ -237,35 +235,11 @@ function logDevelopmentTlsState(
   devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
-/** The dev server cannot ask the running module, so it feeds the module's own pick from env. */
-function devMailAvailable(env: NodeJS.ProcessEnv): boolean {
-  const pick = pickMailGateway({
-    provider: env.EMAIL_PROVIDER,
-    available: {
-      ses: Boolean(env.USE_AWS_SES && env.AWS_REGION),
-      sendgrid: Boolean(env.SENDGRID_API_KEY),
-      smtp: Boolean(env.SMTP_URL || env.SMTP_HOST),
-      resend: Boolean(env.RESEND_API_KEY),
-    },
-  });
-  return "gateway" in pick && pick.gateway !== null;
-}
-
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
-  // The dev server is its own public address. `dev-stack.sh` aligns BASE_HOST
-  // to PORT for the whole stack; a lone `pnpm dev:ui` with no `.env` gets the
-  // same answer here instead of a boot refusal naming an env var.
+  // The api renders the page's public config; the dev server lifts it from the api's shell.
   const publicConfig =
-    command === "serve"
-      ? resolveUiPublicBootstrap(
-          {
-            ...process.env,
-            BASE_HOST: process.env.BASE_HOST ?? `http://localhost:${FRONTEND_PORT}`,
-          },
-          { mailAvailable: devMailAvailable(process.env) },
-        ).publicConfig
-      : undefined;
+    command === "serve" ? await fetchPublicConfigFromApi({ apiUrl: API_TARGET }) : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server listening,
@@ -282,6 +256,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
       havenHmrGate(),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
+      mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
       pushServiceWorker(),
       shikiReachGuard(),

@@ -1,5 +1,6 @@
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
 import type { DataRetentionCacheRepository } from "./data-retention-cache.repository.ts";
+import type { DataRetentionProjectScopeRepository } from "./data-retention-project-scope.repository.ts";
 import type { DataRetentionRepository } from "./data-retention.repository.ts";
 import type { PinnedTraceRepository } from "./pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "./retroactive-retention.repository.ts";
@@ -11,6 +12,8 @@ export interface DataRetentionRepositories {
   readonly pins: PinnedTraceRepository;
   /** Which organization owns a scope, what it is called, what it resolves to. */
   readonly directory: DataRetentionDirectoryReader;
+  /** Where each project sits, read through project's and organization's shares (R40). */
+  readonly projectScopes: DataRetentionProjectScopeRepository;
   /** The rewrite of rows already captured, when a retention change applies to them. */
   readonly retroactive: RetroactiveRetentionRepository;
   /** The bytes a tenant holds, as the storage card and the plan meter read them. */

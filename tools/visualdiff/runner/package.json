@@ -17,7 +17,7 @@
     "./flows/registry": "./src/flows/registry.ts"
   },
   "scripts": {
-    "capture": "node --experimental-transform-types src/main.ts",
+    "capture": "node --experimental-transform-types src/capture.entrypoint.ts",
     "preflight": "node --experimental-transform-types src/preflight.ts",
     "typecheck": "tsc -b",
     "test": "vitest run"

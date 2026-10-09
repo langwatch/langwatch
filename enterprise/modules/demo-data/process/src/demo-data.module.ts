@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineProcessModule } from "@langwatch/process";
+import type { DemoDataApi, DemoDataConfig } from "@langwatch/enterprise-demo-data-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { DemoDataModule } from "./app/demo-data.app.ts";
 import { demoDataEventing } from "./eventing/demo-data.pipeline.ts";
 import { DemoDataTask } from "./tasks/demo-data.task.ts";
 
-export const demoDataProcessModule = defineProcessModule("demo-data")
+export const demoDataProcessModule: PublishedProcessModule<
+  "demo-data",
+  DemoDataApi,
+  DemoDataConfig
+> = defineProcessModule("demo-data")
   .withApi(DemoDataModule)
   .withEventing(demoDataEventing)
   .withTasks(({ app }: { app: unknown }) => {

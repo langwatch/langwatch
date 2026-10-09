@@ -3,7 +3,7 @@ import { HStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LuColumns2 } from "react-icons/lu";
 
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useDraggableTabsBrowserStore } from "../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { AddPromptButton } from "../sidebar/add-prompt-button.tsx";
 import { TabIdProvider } from "../studio-internals.ts";
 import { DraggableTabsBrowser } from "./draggable-tabs-browser.tsx";

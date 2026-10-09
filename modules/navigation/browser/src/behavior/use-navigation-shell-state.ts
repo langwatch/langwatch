@@ -4,14 +4,10 @@
  */
 
 import { useBreakpointValue } from "@langwatch/design-system/primitives";
+import type { NavigationProject, NavigationUser } from "@langwatch/navigation-contract";
 
 import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
-import {
-  showsDevelopmentIndicator,
-  useNavigationHost,
-  type NavigationProject,
-  type NavigationUser,
-} from "../model/navigation-host.ts";
+import { showsDevelopmentIndicator, useNavigationHost } from "../model/navigation-host.ts";
 import type { ProductId } from "../model/products.ts";
 import {
   projectNavItemAt,

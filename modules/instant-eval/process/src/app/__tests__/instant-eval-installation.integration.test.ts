@@ -18,28 +18,30 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi, GatewayPricedSpend } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  INSTANT_EVAL_REQUEST_TYPE,
   InstantEvalApi,
   type InstantEvalActor,
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_PRICING,
+  INSTANT_EVAL_REQUEST_TYPE,
+  type InstantEvalJudgeApi,
+} from "@langwatch/instant-eval-judge-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, type ModuleSecretsScope } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
   type ProjectApi,
   type ProjectWithTeam,
   projectWithTeamSchema,
 } from "@langwatch/project-contract";
-import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalProcessModule } from "../../instant-eval.module.ts";
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -80,14 +82,6 @@ function planFor({ free }: { free: boolean }): Plan {
     canPublish: !free,
     prices: { USD: free ? 0 : 199, EUR: free ? 0 : 199 },
   };
-}
-
-/** The judge credential, from a chain over a fake environment, scoped as boot scopes it. */
-function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
-  const resolver = SecretsResolver.over(
-    SecretsChain.start({ environment: { JEV_API_KEY: judgeKey } }).withEnv(),
-  );
-  return (owner, declared) => resolver.scopeTo(owner, declared);
 }
 
 const CREATED = new Date("2026-01-01T00:00:00.000Z");
@@ -160,9 +154,10 @@ function installation({
   isOptedIn?: boolean;
   isFreePlan?: boolean;
   classifier?: "jev" | "null" | "memory" | undefined;
-  /** `null` is an install that configured no key of its own. */
+  /** `null` is an install whose Instant Evals judge holds no classifier key. */
   judgeKey?: string | null;
-  isBounded?: boolean;
+  /** `"unset"` is a deployment that never set `INSTANT_EVAL_BOUNDED`. */
+  isBounded?: boolean | "unset";
   /** The gateway operations a hosted call's spend reaches. */
   gateway?: Partial<GatewayApi>;
   /** Whether the organization switched hosted judging on, as licensing answers. */
@@ -178,16 +173,12 @@ function installation({
   recordOptIn?: OrganizationApi["recordInstantEvalsOptIn"];
 } = {}) {
   return (
-    createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
+    createApp({ role: "api" })
       .withModules([instantEvalProcessModule])
       .withConfig({
         "instant-eval": {
           classifier,
-          classifierBaseUrl: undefined,
-          classifierModel: undefined,
-          globalTokensPerSecond: 300_000,
-          tenantTokensPerSecond: 150_000,
-          isBounded,
+          isBounded: isBounded === "unset" ? undefined : isBounded,
           queryTokenBudget: 4_000_000,
           isSaas,
           nodeEnvironment,
@@ -241,6 +232,10 @@ function installation({
         authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
+        }),
+        // The key is the judge's: Instant Evals asks for it on its first call (ADR-174 d. 13).
+        "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>({
+          isClassifierConfigured: async () => judgeKey !== null,
         }),
       })
   );
@@ -511,6 +506,24 @@ describe("given a deployment that bounds the free budget", () => {
   });
 });
 
+describe("given a deployment that never set whether the free budget is bounded", () => {
+  describe("when it is the hosted product", () => {
+    it("bounds the free budget", async () => {
+      await expect(installation({ isBounded: "unset", isSaas: true }).boot()).rejects.toThrow(
+        /needs a Redis connection for the budget holds/,
+      );
+    });
+  });
+
+  describe("when it is a self-hosted installation", () => {
+    it("leaves the free budget unbounded", async () => {
+      await expect(
+        withInstallation({ isBounded: "unset", isSaas: false }, async () => "booted"),
+      ).resolves.toBe("booted");
+    });
+  });
+});
+
 const HOSTED_SPEND = {
   projectId: PROJECT,
   virtualKeyId: "vk-connect",
@@ -626,7 +639,7 @@ describe("given an organization's own Instant Evals switch", () => {
         api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: false, offer: "enable" });
+      expect(access).toEqual({ released: false, offer: "enable", viaConnect: false });
     });
   });
 
@@ -654,7 +667,7 @@ describe("given an organization's own Instant Evals switch", () => {
         (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: true, offer: "enable" });
+      expect(access).toEqual({ released: true, offer: "enable", viaConnect: false });
       expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
     });
   });

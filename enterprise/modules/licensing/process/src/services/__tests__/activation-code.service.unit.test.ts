@@ -283,7 +283,7 @@ describe("redeeming an activation code", () => {
   });
 });
 
-describe("the backoffice side of activation codes", () => {
+describe("the admin side of activation codes", () => {
   it("returns the code once and stores only its hash and hint", async () => {
     const { service, repository } = harness({ rows: [] });
 

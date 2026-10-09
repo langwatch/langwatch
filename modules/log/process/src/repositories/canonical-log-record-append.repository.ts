@@ -1,9 +1,6 @@
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 
-/**
- * Write-only: pipeline appends canonical records here, never reads. {@link
- * CanonicalLogRecordRepository} adds read capability; separate keeps composition honest.
- */
+/** Write-only: the pipeline appends canonical records here; trace owns the reads. */
 export abstract class CanonicalLogRecordAppendRepository {
   abstract ensureLogRecord(record: CanonicalLogRecord, retentionDays?: number): Promise<void>;
 

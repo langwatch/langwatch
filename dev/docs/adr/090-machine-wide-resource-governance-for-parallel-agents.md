@@ -115,3 +115,6 @@ Nothing here touches CI. `CHECK_SLOTS` is already off under CI and a runner runn
 - [ADR-091](./091-haven-gate-agent-admission-and-cost-safety.md) — the hook that lets an agent's tool call reach this governor
 - `platform/app/vitest.config.ts` — the `vmForks` choice and the 573 MB/fork measurement this ADR's arithmetic rests on
 - Measured, not assumed: across 40 transcripts (14,121 cache-writing requests, ~53M cache-write tokens) sub-agents write `ephemeral_5m` 100% of the time and main sessions write `ephemeral_1h` 100% of the time, with no request writing both; a compiled Go panic exits 2; `taskpolicy` supports `-B` (un-demote), `-p` (running process), and `-m` (spawn-time jetsam memory limit)
+
+
+**Amendment 2026-10-09:** ClickHouse runs natively on macOS by default, capped by `max_server_memory_usage`; the colima limits above apply only to the container fallback.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createUiFeatureApiClient } from "../transport.ts";
+import { createUiFeatureApiClient } from "../wire/transport.ts";
 
 const SECRET_INPUT = {
   headers: { Authorization: "Bearer sk-header-secret" },

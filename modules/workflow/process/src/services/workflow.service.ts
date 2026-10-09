@@ -5,7 +5,6 @@ import {
   copyWorkflowCommandSchema,
   createWorkflowCommandSchema,
   dslWithoutHttpAgentSecrets,
-  dslWithoutHttpCredentials,
   publishWorkflowCommandSchema,
   runWorkflowCommandSchema,
   saveWorkflowVersionCommandSchema,
@@ -34,6 +33,12 @@ import type {
   PersistWorkflowVersionInput,
   WorkflowRepository,
 } from "../repositories/workflow.repository.ts";
+import {
+  dslForTargetProject,
+  freshCopyDsl,
+  narrowToPublishedVersion,
+  selectCopiesToPush,
+} from "../rules/workflow-copy-selection.rules.ts";
 import type {
   StudioEventPreparationInput,
   StudioEventPreparer,
@@ -42,11 +47,7 @@ import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service.ts";
 import { WorkflowDslService } from "./workflow-dsl.service.ts";
 import { WorkflowVersionHistoryService } from "./workflow-version-history.service.ts";
 
-/**
- * The app's KSUID resources for a workflow row and a version row
- * (`KSUID_RESOURCES.WORKFLOW`/`WORKFLOW_VERSION`). Literals, not the app's
- * constant table: the prefix is part of the id format already on the database.
- */
+/** KSUID resources for a workflow and a version row; the prefix is already on the database. */
 const WORKFLOW_KSUID_RESOURCE = "workflow";
 const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";
 
@@ -61,15 +62,6 @@ type WorkflowServiceOptions = {
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
 export class WorkflowService {
-  async listFields(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<Record<string, WorkflowMappingFields>> {
-    const sources = await this.options.repository.findFieldSources(input);
-
-    return Object.fromEntries(sources.map(({ id, dsl }) => [id, this.dsl.mappingFields(dsl)]));
-  }
-
   listSummaries(input: {
     projectId: string;
     workflowIds: string[];
@@ -83,6 +75,39 @@ export class WorkflowService {
 
   deleteUncommitted(input: WorkflowReference): Promise<void> {
     return this.options.repository.deleteUncommitted(input);
+  }
+
+  /**
+   * A live workflow's current version as a version_saved fact carries it, with its fields;
+   * none when the workflow is archived or missing, or its current version is not `versionId`.
+   */
+  async findCurrentVersionFacts(
+    input: WorkflowReference & { versionId?: string },
+  ): Promise<{ versionId: string; authorId: string; fields: WorkflowMappingFields }[]> {
+    const workflow = await this.options.repository.findById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: true,
+    });
+    const current = workflow?.currentVersion;
+    if (!current || (input.versionId !== undefined && current.id !== input.versionId)) return [];
+
+    return [
+      {
+        versionId: current.id,
+        authorId: current.authorId ?? "",
+        fields: this.dsl.mappingFields(current.dsl),
+      },
+    ];
+  }
+
+  /** Archives a live graph; an archived or missing one is left alone, so redelivery is harmless. */
+  async archiveIfLive(input: WorkflowReference): Promise<void> {
+    const live = await this.options.repository.findById({
+      id: input.workflowId,
+      projectId: input.projectId,
+    });
+    if (live) await this.options.repository.archiveLinked(input);
   }
 
   static create(options: WorkflowServiceOptions): WorkflowService {
@@ -154,12 +179,7 @@ export class WorkflowService {
   async findEvaluatorWorkflows(input: {
     projectId: string;
   }): Promise<(Workflow & { versions: WorkflowVersion[] })[]> {
-    const workflows = await this.options.repository.findEvaluators(input);
-
-    return workflows.map((workflow) => ({
-      ...workflow,
-      versions: workflow.versions.filter((version) => version.id === workflow.publishedId),
-    }));
+    return narrowToPublishedVersion(await this.options.repository.findEvaluators(input));
   }
 
   getVersions(input: {
@@ -354,12 +374,11 @@ export class WorkflowService {
     const sourceVersion =
       source.latestVersion ??
       (await this.latestVersion(command.sourceWorkflowId, command.sourceProjectId));
-    const cloned = this.dsl.copy(sourceVersion.dsl);
-    // A copy into another project arrives with every HTTP credential blank.
-    const sourceDsl =
-      command.targetProjectId === command.sourceProjectId
-        ? cloned
-        : dslWithoutHttpCredentials(cloned);
+    const sourceDsl = dslForTargetProject({
+      dsl: this.dsl.copy(sourceVersion.dsl),
+      sourceProjectId: command.sourceProjectId,
+      targetProjectId: command.targetProjectId,
+    });
     const dsl = command.copyDatasets
       ? await this.datasetCopies.copy({
           dsl: sourceDsl,
@@ -381,13 +400,7 @@ export class WorkflowService {
     const version = await this.saveVersion({
       workflowId,
       projectId: command.targetProjectId,
-      dsl: {
-        ...dsl,
-        workflow_id: workflowId,
-        version: "1",
-        experiment_id: "",
-        state: {},
-      },
+      dsl: freshCopyDsl({ dsl, workflowId }),
       commitMessage: `Copied from ${source.name}`,
       autoSaved: false,
       authorId: command.authorId,
@@ -421,14 +434,13 @@ export class WorkflowService {
     const sourceVersion =
       source.latestVersion ?? (await this.latestVersion(source.id, input.projectId));
     const copies = await this.options.repository.findCopies(input);
-    const selected = copies.filter(
-      (copy) =>
-        (!input.copyIds || input.copyIds.includes(copy.id)) &&
-        (!input.allowedProjectIds || input.allowedProjectIds.includes(copy.projectId)),
-    );
+    const selected = selectCopiesToPush({ copies, ...input });
     for (const copy of selected) {
-      const cloned = this.dsl.copy(sourceVersion.dsl);
-      const dsl = copy.projectId === input.projectId ? cloned : dslWithoutHttpCredentials(cloned);
+      const dsl = dslForTargetProject({
+        dsl: this.dsl.copy(sourceVersion.dsl),
+        sourceProjectId: input.projectId,
+        targetProjectId: copy.projectId,
+      });
       await this.saveVersion({
         workflowId: copy.id,
         projectId: copy.projectId,

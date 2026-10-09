@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { UNLIMITED } from "./limits.ts";
 import type { MoneyByCurrency } from "./plan-type.ts";
-import { planSeatsAndVolume } from "./quoted-plan.ts";
 
 // The plan facts a signed licence carries. They live here rather than in the
 // licensing feature for the same reason the cloud catalogue does: a template,
@@ -53,20 +52,6 @@ export const licenseResourceLimitsShape = {
   currentMessagesPerMonth: z.number(),
   maxMessagesPerMonth: z.number(),
 } as const;
-
-/**
- * Plan limits a minted license encodes: the enforced levers (member seats,
- * messages volume) plus identity. Projects, teams and experimentation
- * resources are OSS/uncapped and are not part of a license.
- */
-export const mintablePlanLimitsSchema = z.object({
-  maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
-  canPublish: z.boolean(),
-  webhookEndpointsEnabled: z.boolean().optional(),
-  usageUnit: z.enum(["traces", "events"]),
-});
 
 export type LicenseResourceCounts = {
   currentMembers: number;
@@ -185,25 +170,6 @@ export function resolveMembersLite({
   maxMembersLite: number | undefined;
 }): number {
   return maxMembersLite ?? getPlanTemplate(planType)?.maxMembersLite ?? 0;
-}
-
-/** A template's levers, as the mint form fills them in. */
-export function templateFormDefaults(template: LicensePlanTemplate): {
-  maxMembers: number;
-  maxMembersLite: number;
-  maxMessagesPerMonth: number;
-  canPublish: boolean;
-  webhookEndpointsEnabled: boolean | undefined;
-} {
-  return {
-    ...planSeatsAndVolume({
-      members: template.maxMembers,
-      membersLite: template.maxMembersLite,
-      messagesPerMonth: template.maxMessagesPerMonth,
-    }),
-    canPublish: template.canPublish,
-    webhookEndpointsEnabled: template.webhookEndpointsEnabled,
-  };
 }
 
 /** A plan resolved from a licence, or from the absence of one. */

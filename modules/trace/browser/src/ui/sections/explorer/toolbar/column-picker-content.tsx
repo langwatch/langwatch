@@ -7,11 +7,11 @@ import type React from "react";
 import { useMemo, useState } from "react";
 
 import { useViewStore } from "../../../../behavior/explorer.store.ts";
-import type { TimeColumnFormat } from "../../../../behavior/time-format.store.ts";
-import { useTimeFormatStore } from "../../../../behavior/time-format.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { TimeColumnFormat } from "../../../../features/explorer/behavior/time-format.store.ts";
+import { useTimeFormatStore } from "../../../../features/explorer/behavior/time-format.store.ts";
+import { useEvaluatorOptions } from "../../../../features/instant-eval/behavior/use-evaluator-options.ts";
 import { type LensColumnOption, LENS_CAPABILITIES } from "../../../../model/lens-capabilities.ts";
-import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
 import { evalColumnLabel } from "../trace-table/eval-columns.ts";
 import { AddEvalColumnForm, COLUMN_APPENDED_HINT } from "./column-picker/add-eval-column-form.tsx";
 import { VisibleOrderStrip } from "./column-picker/visible-order-strip.tsx";

@@ -1,5 +1,4 @@
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { Evaluator } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
@@ -189,10 +188,6 @@ export interface WorkflowApi {
     projectId: string;
   }): Promise<WorkflowWithVersion>;
   assertInProject(input: { workflowId: string; projectId: string }): Promise<void>;
-  listFields(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<Record<string, WorkflowMappingFields>>;
   listSummaries(input: {
     projectId: string;
     workflowIds: string[];
@@ -201,10 +196,6 @@ export interface WorkflowApi {
   deleteUncommitted(input: WorkflowReference): Promise<void>;
   create(
     input: Omit<CreateWorkflowCommand, "authorId">,
-    by: WorkflowCaller,
-  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
-  copy(
-    input: Omit<CopyWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
   /** Copies a workflow once the caller may create workflows in its source project too. */
@@ -226,8 +217,6 @@ export interface WorkflowApi {
   run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
   /** Runs one public synchronous REST door with its named refusals. */
   runSynchronous(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
-  /** Starts one evaluation run of a committed version. */
-  triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted>;
 
   // -- the Studio's own graph ------------------------------------------------
 
@@ -304,16 +293,6 @@ export interface WorkflowApi {
     newDsl: StudioWorkflow;
   }): Promise<string>;
 
-  // -- the evaluator a published workflow is wrapped in ----------------------
-
-  listEvaluators(input: { projectId: string }): Promise<Evaluator[]>;
-  linkEvaluatorToWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-    name: string;
-  }): Promise<Evaluator>;
-  unlinkEvaluatorFromWorkflow(input: { workflowId: string; projectId: string }): Promise<void>;
-
   // -- what the caller may see in a project other than the scoped one -------
 
   hasProjectPermission(input: {
@@ -383,11 +362,6 @@ export interface WorkflowApi {
     body: Readonly<Record<string, unknown>>;
     principal?: WorkflowRunPrincipal | undefined;
   }): Promise<WorkflowRunAnswer>;
-  toggleSaveAsEvaluator(input: {
-    workflowId: string;
-    projectId: string;
-    isEvaluator: boolean;
-  }): Promise<void>;
   findWorkflowFlags(input: {
     workflowId: string;
     projectId: string;

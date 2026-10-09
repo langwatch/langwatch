@@ -20,11 +20,6 @@ export const monitorApiMonitorInputSchema = z.object({
   projectId: z.string(),
 });
 
-export const monitorApiPerformanceInputSchema = z.object({
-  projectId: z.string(),
-  timeZone: z.string().min(1).max(100).optional(),
-});
-
 export const monitorApiToggleInputSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -85,7 +80,6 @@ export const monitorApiUpdateInputSchema = z.object({
 
 export type MonitorApiProjectInput = z.infer<typeof monitorApiProjectInputSchema>;
 export type MonitorApiMonitorInput = z.infer<typeof monitorApiMonitorInputSchema>;
-export type MonitorApiPerformanceInput = z.infer<typeof monitorApiPerformanceInputSchema>;
 export type MonitorApiToggleInput = z.infer<typeof monitorApiToggleInputSchema>;
 export type MonitorApiCopyInput = z.infer<typeof monitorApiCopyInputSchema>;
 export type MonitorApiNameAvailabilityInput = z.infer<typeof monitorApiNameAvailabilityInputSchema>;

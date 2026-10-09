@@ -4,7 +4,7 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { TriggerSettlementNotificationService } from "../trigger-settlement-notification.service.ts";
+import { TriggerSettlementNotificationService } from "../../features/settlement/services/trigger-settlement-notification.service.ts";
 
 const TRIGGER = { id: "trigger-1", name: "Errors", action: "SEND_SLACK_MESSAGE" };
 const FOLD = { computedInput: "in", computedOutput: "out", occurredAt: 1 };

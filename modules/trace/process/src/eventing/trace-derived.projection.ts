@@ -5,49 +5,49 @@ import {
   type FoldEventHandlers,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
-  annotationAddedEventSchema,
-  annotationRemovedEventSchema,
-  annotationsBulkSyncedEventSchema,
+  anchorStorageTime,
   type AnnotationAddedEvent,
+  annotationAddedEventSchema,
   type AnnotationRemovedEvent,
+  annotationRemovedEventSchema,
   type AnnotationsBulkSyncedEvent,
+  annotationsBulkSyncedEventSchema,
+  firstUsableAnchor,
+  foldSpanIntoTraceAnalytics,
   type LogContributedEvent,
-  type LogRecordReceivedEvent,
   logContributedEventSchema,
+  type LogRecordReceivedEvent,
   logRecordReceivedEventSchema,
-  metricDataPointCorrelatedEventSchema,
+  MAX_PROCESSED_SPANS,
+  mergeModelsMostRecentFirst,
+  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   type MetricDataPointCorrelatedEvent,
-  NON_BILLABLE_ATTR,
+  metricDataPointCorrelatedEventSchema,
   type NormalizedSpan,
   type OriginResolvedEvent,
   originResolvedEventSchema,
-  type SpanReceivedEvent,
-  spanReceivedEventSchema,
-  SYNTHETIC_TRACE_SPAN_NAMES,
-  type TopicAssignedEvent,
-  topicAssignedEventSchema,
-  type TraceNameChangedEvent,
-  traceNameChangedEventSchema,
-  type TraceCanonicalisationService,
-  type TraceSummaryData,
-  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
-  trimAttributesForAnalytics,
-} from "@langwatch/trace-contract";
-
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
-import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../rules/trace-analytics-projection-version.rules.ts";
-import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
-import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
-import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
-import {
-  MAX_PROCESSED_SPANS,
   RESERVED_CACHE_CREATION_TOKENS,
   RESERVED_CACHE_READ_TOKENS,
   RESERVED_REASONING_TOKENS,
-  TraceSummaryFoldProjection,
-} from "./trace-summary.projection.ts";
+  type SpanReceivedEvent,
+  spanReceivedEventSchema,
+  spanStorabilityOf,
+  SYNTHETIC_TRACE_SPAN_NAMES,
+  type TopicAssignedEvent,
+  topicAssignedEventSchema,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+  type TraceCanonicalisationService,
+  type TraceNameChangedEvent,
+  traceNameChangedEventSchema,
+  type TraceSummaryData,
+  trimAttributesForAnalytics,
+  UNSTORABLE_SPAN_SKIPPED,
+} from "@langwatch/trace-contract";
+
+import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
 
@@ -147,7 +147,7 @@ export interface TraceAnalyticsRow {
 
   /**
    * The persistable-signal verdict. NOT a table column — readers derive it
-   * via {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL}. Monotonic: readers may
+   * via analytics' has-signal predicate (Q207). Monotonic: readers may
    * filter on the LATEST version's flag alone.
    */
   hasSignal: boolean;
@@ -256,17 +256,6 @@ export interface TraceAnalyticsData {
 
 /** The storage-anchor rule lives in {@link ./services/storage-anchor.ts}, shared with
  * `traceSummary` (ADR-087) so a second copy can't drift. */
-
-/**
- * {@link hasPersistableSignal} as a SQL predicate over existing columns. The 4th door (version
- * < pre-split) covers rows predating the 00056 columns. Applied by every trace-table reader
- * except the fold read-back.
- */
-export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
-  `(SpanCount > 0` +
-  ` OR EarliestSpanStartMs > 0` +
-  ` OR Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')` +
-  ` OR Version < '${TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}')`;
 
 // ─── Service composition ────────────────────────────────────────────
 
@@ -661,37 +650,6 @@ export class TraceAnalyticsFoldProjection
   }
 
   /**
-   * Roll this span's cache/reasoning token counts into the trace-level
-   * running sums on reserved attribute keys. A `skip_token_accumulation`
-   * span contributes nothing, same gate as prompt/completion tokens.
-   */
-  private static accumulateReservedTokenSums(
-    attributes: Record<string, string>,
-    span: NormalizedSpan,
-    runtime: TraceProjectionRuntimeService,
-  ): void {
-    const cacheTokens = runtime.spanCost.isTokenAccumulationSkipped(span)
-      ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-      : runtime.spanCost.extractCacheTokens(span);
-
-    TraceSummaryFoldProjection.addReservedTokenSum(
-      attributes,
-      RESERVED_CACHE_READ_TOKENS,
-      cacheTokens.cacheReadTokens,
-    );
-    TraceSummaryFoldProjection.addReservedTokenSum(
-      attributes,
-      RESERVED_CACHE_CREATION_TOKENS,
-      cacheTokens.cacheCreationTokens,
-    );
-    TraceSummaryFoldProjection.addReservedTokenSum(
-      attributes,
-      RESERVED_REASONING_TOKENS,
-      cacheTokens.reasoningTokens,
-    );
-  }
-
-  /**
    * Fold one log contribution: bump reserved log count, merge/mirror
    * attributes. Reads `contribution.liftedAttributes`, NOT mergedAttributes,
    * so cost doesn't double-count across replays.
@@ -719,7 +677,7 @@ export class TraceAnalyticsFoldProjection
     let totalCompletionTokenCount = state.totalCompletionTokenCount;
     const model = contribution.liftedAttributes["langwatch.model"];
     if (typeof model === "string" && model.length > 0) {
-      models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(models, [model]);
+      models = mergeModelsMostRecentFirst({ existing: models, incoming: [model] });
     }
     const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
     if (Number.isFinite(cost) && cost > 0) {
@@ -763,7 +721,7 @@ export class TraceAnalyticsFoldProjection
   /**
    * Does this state describe a trace the PRODUCT should count? True on real
    * telemetry, false for dimension-only signal. `storageAnchorMs` is
-   * deliberately NOT a door — see {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL}.
+   * deliberately NOT a door in analytics' has-signal predicate (Q207).
    */
   static hasPersistableSignal(state: TraceAnalyticsData): boolean {
     if (state.spanCount > 0) return true;
@@ -951,69 +909,40 @@ export class TraceAnalyticsFoldProjection
     span: NormalizedSpan;
     runtime: TraceProjectionRuntimeService;
   }): TraceAnalyticsData {
+    // Short-circuit before pricing; the contract fold skips synthetic spans too.
     if (SYNTHETIC_TRACE_SPAN_NAMES.has(span.name)) {
-      // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
-      // timing/cost/IO. The trace-summary fold short-circuits here for the
-      // same reason; slim mirrors that contract.
       return state;
     }
 
-    const view = TraceAnalyticsFoldProjection.asTraceSummaryStateView(state);
-
-    const timing = runtime.spanTiming.accumulateTiming({ state: view, span });
-    const tokens = runtime.spanCost.accumulateTokens({
-      state: view,
+    const spanCost = runtime.spanCost.estimateAccumulatedSpanCost(span);
+    const next = foldSpanIntoTraceAnalytics({
+      state: TraceAnalyticsFoldProjection.asTraceSummaryStateView(state),
       span,
-      totalDurationMs: timing.totalDurationMs,
+      spanCost,
+      spanUnpriced: spanCost <= 0 && runtime.spanCost.isAccumulatedSpanUnpriced(span),
     });
-    const status = runtime.spanStatus.accumulateStatus({ state: view, span });
-
-    // Slim skips TraceIOAccumulationService but still needs IO bookkeeping
-    // fields for `accumulateAttributes`. Feed the neutral "no IO extracted"
-    // values so reserved output_source / *_is_fallback keys land identically.
-    const attributes = runtime.traceAttributes.accumulateAttributes({
-      state: view,
-      span,
-      outputSource: OUTPUT_SOURCE.INFERRED,
-      inputIsFallback: false,
-      outputIsFallback: false,
-      inputMediaRefs: null,
-      outputMediaRefs: null,
-    });
-
-    TraceAnalyticsFoldProjection.accumulateReservedTokenSums(attributes, span, runtime);
-
-    const newModels = runtime.spanCost.extractModelsFromSpan(span);
-    const models = TraceSummaryFoldProjection.mergeModelsMostRecentFirst(state.models, newModels);
-
-    // Mirror the trace-summary fold's trace-level model metadata stamp so the
-    // slim table's Attributes stay consistent with trace_summaries.
-    runtime.traceAttributes.stampModelMetadata({ attributes, models });
-
-    const { traceName, rootSpanStartTimeMs, traceNameFromFallback, rootMetadataFromFallback } =
-      runtime.traceName.resolveFromSpan({ state: view, span });
 
     return {
       ...state,
-      traceId: state.traceId || span.traceId,
-      spanCount: state.spanCount + 1,
-      occurredAt: timing.occurredAt,
-      totalDurationMs: timing.totalDurationMs,
-      models,
-      traceName,
-      traceNameFromFallback,
-      rootMetadataFromFallback,
-      rootSpanStartTimeMs,
-      totalCost: tokens.totalCost,
-      nonBilledCost: tokens.nonBilledCost,
-      unpricedSpanCount: tokens.unpricedSpanCount,
-      unpricedModels: tokens.unpricedModels,
-      totalPromptTokenCount: tokens.totalPromptTokenCount,
-      totalCompletionTokenCount: tokens.totalCompletionTokenCount,
-      timeToFirstTokenMs: tokens.timeToFirstTokenMs,
-      tokensPerSecond: tokens.tokensPerSecond,
-      containsErrorStatus: status.containsErrorStatus,
-      attributes,
+      traceId: next.traceId,
+      spanCount: next.spanCount,
+      occurredAt: next.occurredAt,
+      totalDurationMs: next.totalDurationMs,
+      models: next.models,
+      traceName: next.traceName,
+      traceNameFromFallback: next.traceNameFromFallback ?? false,
+      rootMetadataFromFallback: next.rootMetadataFromFallback ?? false,
+      rootSpanStartTimeMs: next.rootSpanStartTimeMs,
+      totalCost: next.totalCost,
+      nonBilledCost: next.nonBilledCost,
+      unpricedSpanCount: next.unpricedSpanCount ?? 0,
+      unpricedModels: next.unpricedModels ?? [],
+      totalPromptTokenCount: next.totalPromptTokenCount,
+      totalCompletionTokenCount: next.totalCompletionTokenCount,
+      timeToFirstTokenMs: next.timeToFirstTokenMs,
+      tokensPerSecond: next.tokensPerSecond,
+      containsErrorStatus: next.containsErrorStatus,
+      attributes: next.attributes,
     };
   }
 }

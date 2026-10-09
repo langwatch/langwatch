@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -20,16 +20,16 @@ import {
   LuScanSearch,
 } from "react-icons/lu";
 
+import { enterTraceEditMode } from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   usePinTrace,
   useTracePinRead,
   useUnpinTrace,
 } from "../../../../../behavior/writes/use-trace-writes.ts";
+import { useConversationTurns } from "../../../../../features/conversation/behavior/use-conversation-turns.ts";
 import { isPreviewTraceId } from "../../../../../model/preview-trace-id.ts";
 import { showErrorToast } from "../../../errors/index.ts";
-import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
-import { enterTraceEditMode } from "../../utils/trace-edit-mode.ts";
 
 interface TraceOverflowMenuProps {
   traceId: string;

@@ -9,7 +9,7 @@ import type { WebhookEgressService } from "./webhook-egress.service.ts";
 /**
  * What a process must hold before it can deliver to either transport.
  */
-export type WebhookDestinationDeps = Readonly<{
+type WebhookDestinationDeps = Readonly<{
   egress: Pick<WebhookEgressService, "send">;
   allowInsecureLocal: boolean;
   sqs: SqsWebhookSender;
@@ -31,6 +31,7 @@ export class WebhookDestinationDispatchService {
       case "http":
         return HttpWebhookDestinationService.create({
           url: config.url,
+          ...(config.signatureScheme ? { signatureScheme: config.signatureScheme } : {}),
           egress: this.deps.egress,
           allowInsecureLocal: this.deps.allowInsecureLocal,
         });

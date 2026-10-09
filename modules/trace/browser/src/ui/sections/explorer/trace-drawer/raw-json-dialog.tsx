@@ -14,10 +14,10 @@ import type { TraceHeader } from "@langwatch/trace-contract";
 import { useEffect, useMemo, useState } from "react";
 import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons/lu";
 
+import { useSpansFull } from "../../../../features/span/behavior/use-spans-full.ts";
 import { ShikiCodeBlock, useCopyToClipboard } from "../../../../index.ts";
 import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
 import { Dialog } from "../../dialog.tsx";
-import { useSpansFull } from "../hooks/use-spans-full.ts";
 
 type RawTab = "trace" | "spans";
 

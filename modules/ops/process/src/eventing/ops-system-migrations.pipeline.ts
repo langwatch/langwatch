@@ -12,13 +12,13 @@ import type { z } from "zod";
 
 import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
-import { RequestSystemMigrationPassCommand } from "./ops-system-migrations.commands.ts";
 import {
+  RequestSystemMigrationPassCommand,
   SYSTEM_MIGRATION_PASS_AGGREGATE_TYPE,
   type SystemMigrationPassRequestedEvent,
   type systemMigrationPassRequestedEventDataSchema,
   systemMigrationPassRequestedEventSchema,
-} from "./ops-system-migrations.events.ts";
+} from "./ops-system-migrations.commands.ts";
 import {
   SYSTEM_MIGRATION_PASS_PROCESS_NAME,
   runSystemMigrationPass,

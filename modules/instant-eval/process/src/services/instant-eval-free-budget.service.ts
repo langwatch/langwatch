@@ -7,14 +7,14 @@
 
 import {
   INSTANT_EVAL_REQUEST_TYPE,
+  INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetExhaustedError,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { InstantEvalBudgetReservationsRepository } from "../repositories/instant-eval-budget-reservations.repository.ts";
 import {
   freeInstantEvalStanding,
-  INSTANT_EVAL_FREE_BUDGET_USD,
   INSTANT_EVAL_RESERVATION_TTL_MS,
   instantEvalBudgetRoomNanoUsd,
   instantEvalCommittedUsd,

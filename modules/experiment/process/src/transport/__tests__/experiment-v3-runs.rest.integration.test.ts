@@ -22,6 +22,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ExperimentModule, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
 import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import { experimentProcessModule } from "../../experiment.module.ts";
+import { ExperimentRunCommandDispatcherService } from "../../features/run/services/experiment-run-command-dispatcher.service.ts";
+import type { WorkflowEvaluationService } from "../../features/workflow/services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunStreamMessage } from "../../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
@@ -35,8 +37,6 @@ import type {
   ExperimentWorkflowDsl,
 } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
-import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
-import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import {
   experimentV3LegacyRest,
@@ -263,7 +263,7 @@ async function harness({
     bearers: () => identity,
     audit: { record: async () => {} },
   });
-  for (const transport of experimentProcessModule.transports) {
+  for (const transport of experimentProcessModule.transports ?? []) {
     if (transport.protocol !== "rest") continue;
     host.mount(transport.router(), () => app, {
       facts: [
@@ -314,6 +314,19 @@ const runOf = (body: string, accept?: string): RequestInit => ({
 });
 
 /** Each `data:` frame of an event stream, parsed. */
+/** Whether a promise settles inside a window, without waiting on it further. */
+const settlesWithin = ({
+  work,
+  ms,
+}: {
+  work: Promise<unknown>;
+  ms: number;
+}): Promise<"released" | "nothing yet"> =>
+  Promise.race([
+    work.then(() => "released" as const),
+    new Promise<"nothing yet">((resolve) => setTimeout(() => resolve("nothing yet"), ms)),
+  ]);
+
 async function framesOf(response: Response): Promise<{ type: string }[]> {
   const text = await response.text();
 
@@ -392,6 +405,31 @@ describe("POST /api/experiments/:slug/run", () => {
 
       expect(response.status).toBe(404);
       expect(await response.json()).toMatchObject({ code: "experiment_not_found" });
+    });
+  });
+
+  describe("when the call carries no Content-Type or another one", () => {
+    const missing = { experiments: { findBySlugAndType: async () => null } };
+    const bodiless: RequestInit = { method: "POST" };
+    const textPlain: RequestInit = {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: "{}",
+    };
+
+    /** @scenario "A run call is read whatever Content-Type it carries, as on main" */
+    it.each([
+      ["no body and no Content-Type", bodiless],
+      ["a JSON body under text/plain", textPlain],
+    ])("reads %s at both paths and answers the unknown slug 404", async (_case, init) => {
+      const { request, legacy } = await harness(missing);
+
+      for (const call of [request, legacy]) {
+        const response = await call("/nope/run", init);
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ code: "experiment_not_found" });
+      }
     });
   });
 
@@ -848,6 +886,11 @@ describe("GET /api/experiments/runs/:runId/results", () => {
       dataset: [],
       evaluations: [],
       timestamps: { createdAt: 1, updatedAt: 2 },
+      completeness: {
+        complete: false,
+        dataset: { received: 0, expected: null },
+        evaluations: { received: 0, expected: null },
+      },
     }));
     const { request } = await harness({
       experiments: { isActive: async () => true, findRun },
@@ -1032,6 +1075,39 @@ describe("POST /api/experiments/execute", () => {
       const failed = await (await poll(`/runs/${runId}`)).json();
       expect(failed).toMatchObject({ status: "failed", error: "boom_code" });
       expect(Object.keys(failed)).not.toContain("message");
+    });
+
+    /** @scenario "The run id is not given out before the run API can answer for it" */
+    it("holds the frame that names the run until the run API can answer for it", async () => {
+      const made = await harness({
+        experiments: { isActive: async () => true },
+        redis: true,
+        registers: false,
+        worker,
+      });
+      let openTheRun = (): void => undefined;
+      const recordRunStart = made.folds.recordRunStart.bind(made.folds);
+      vi.spyOn(made.folds, "recordRunStart").mockImplementationOnce(
+        (input) =>
+          new Promise<void>((resolve) => {
+            openTheRun = () => void recordRunStart(input).then(resolve);
+          }),
+      );
+
+      const reader = (await made.execute(request)).body?.getReader();
+      if (!reader) throw new Error("the response carries no stream");
+      const frame = reader.read();
+
+      expect(await settlesWithin({ work: frame, ms: 100 })).toBe("nothing yet");
+
+      openTheRun();
+      const named = new TextDecoder().decode((await frame).value);
+      const runId = /"runId":"([^"]+)"/.exec(named)?.[1];
+      if (runId === undefined) throw new Error("the first frame does not name the run");
+      const poll = await made.request(`/runs/${runId}`);
+      expect(poll.status).toBe(200);
+      expect(await poll.json()).toMatchObject({ runId, status: "running" });
+      await reader.cancel();
     });
 
     /** @scenario "A run started from the open page is readable by the run API" */

@@ -11,10 +11,10 @@ import { MemoryOrganizationMembershipRepository } from "../../repositories/memor
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const ORGANIZATION = "org_acme";
@@ -37,10 +37,11 @@ function seedMember(userId: string, role: OrganizationUserRole, disabled = false
 beforeEach(() => {
   memory = MemoryOrganizationDatabase.create();
   service = OrganizationMembershipService.create({
+    workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
-    prompts: createApiFixture<OrganizationPromptSeed>(),
+    creations: createApiFixture<OrganizationCreationNotice>(),
     seats: createApiFixture<OrganizationSeatLicense>(),
-    sessions: createApiFixture<OrganizationSessionRevocation>(),
+    seatNotices: createApiFixture<OrganizationSeatRevocationNotice>(),
     grantCache: createApiFixture<OrganizationGrantCache>(),
     testArrivals: { standingFor: async () => ({ testing: false }) as const },
     ceiling: { assertWithinCaller: async () => {} },

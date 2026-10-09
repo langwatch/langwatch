@@ -170,18 +170,71 @@ Feature: The local development process topology
     When files keep changing so the quiet window never elapses
     Then the restart fires once the max wait since the first change has passed
 
-  # `haven hmr on --ttl` writes the marker the UI's HMR gate reads (apps/ui/
-  # .haven-hmr-gate, unix-ms expiry). An agent's PostToolUse hook renewing it
-  # per write and its Stop hook clearing it gives "reload after the turn".
-  # Installing those hooks is opt-in: see ADR-168.
+  # --- The api lane reloads in-process (ADR-168, B1) ---
+
+  # Restarting the whole process for every edit left a shared checkout's api
+  # booting most of the time. The api lane now loads api and worker through a
+  # Vite module runner and re-links only what an edit reaches; the supervisor
+  # keeps the process, and LANGWATCH_DEV_RELOAD=process restores the old restart.
   @unit
-  Scenario: An agent mid-turn holds the restart until it is released
-    Given the backend lane running under a debounced watch
-    And the agent-turn hold marker names an expiry in the future
-    When the quiet window elapses
-    Then no restart happens while the marker holds
-    And exactly one restart happens once the marker is released or expires
-    And a hold never defers a restart past 60 seconds
+  Scenario: A module edit reloads in-process without a new process
+    Given the api lane reloading in-process under the supervisor
+    When a backend source file the runner loaded changes
+    Then only that module and the modules importing it are evaluated again
+    And the supervisor does not restart the process, so its pid stays the same
+
+  # Node loaded a package.json's resolution and the host's own source natively,
+  # so no module runner can drop them: those still need a new process.
+  @unit
+  Scenario: Only what Node loaded natively restarts the in-process api lane
+    Given the api lane reloading in-process under the supervisor
+    When a package.json or a file of the host's own source changes
+    Then the supervisor restarts the process
+    And a module edit elsewhere is left to the in-process reload
+
+  # A bad edit never exits an in-process host (the old generation keeps
+  # serving), so an exit after it said "backend ready" is a crash.
+  @unit
+  Scenario: An in-process api lane that crashes after booting is started again
+    Given the api lane reloading in-process under the supervisor
+    And the process has said it is ready
+    When the process exits non-zero
+    Then the supervisor starts it again after the quiet window, without waiting for a change
+
+  # ADR-168 step 5: a generation's own close is what releases its stores,
+  # queues and pools, so it runs before the next generation boots.
+  @unit
+  Scenario: A reload disposes the previous generation before the next one boots
+    Given the api lane reloading in-process under the supervisor
+    And a generation serving that attached process listeners while it ran
+    When a module edit links the next generation
+    Then the old generation drains, worker first and then the api
+    And the listeners it left attached are taken off after the drain
+    And listeners the next generation attached while linking stay attached
+
+  # Module-level state leaks a little per generation; a fresh process bounds it.
+  @unit
+  Scenario: The in-process api lane hands over to a fresh process after enough generations
+    Given the api lane reloading in-process under the supervisor
+    And it has served LANGWATCH_DEV_RECYCLE_GENERATIONS generations (50 by default)
+    When the next module edit arrives
+    Then the host logs "backend recycling" with the generation limit as its reason
+    And it drains and exits non-zero, so the supervisor starts a fresh process
+
+  @unit
+  Scenario: The in-process api lane hands over to a fresh process once its memory passes the ceiling
+    Given the api lane reloading in-process under the supervisor
+    And its RSS is above LANGWATCH_DEV_RECYCLE_RSS_MIB (4096 by default)
+    When the next module edit arrives
+    Then the host logs "backend recycling" with the RSS ceiling as its reason
+    And it drains and exits non-zero, so the supervisor starts a fresh process
+
+  @unit
+  Scenario: A generation that did not drain is replaced by a fresh process
+    Given the api lane reloading in-process under the supervisor
+    When the old generation's drain fails during a reload
+    Then the host does not boot the next generation beside it
+    And it logs "backend recycling" and exits non-zero, so the supervisor starts a fresh process
 
   # Only the packages the backend can load matter. pnpm resolves declared
   # dependencies only, so a workspace package that no backend dependency reaches
@@ -234,3 +287,58 @@ Feature: The local development process topology
     When a restart takes it down
     Then it is given the chance to finish before anything forces it
     And a process that ignores SIGTERM is still killed once the grace period elapses
+
+  # --- Developer tools start on the first visit and stop once idle ---
+
+  # Storybook and the mail preview used to run until the dev server stopped,
+  # pnpm wrappers and compiler helpers included. The ui lane's dev server holds
+  # each tool's port (apps/ui/vite/dormant-dev-tool.ts), with or without haven;
+  # haven only routes a hostname to that port.
+
+  @unit
+  Scenario: A developer tool stays dormant until someone visits it
+    Given the ui lane's dev server is running
+    When nobody has opened Storybook or the mail preview
+    Then neither tool's process is running
+    And each tool's port still answers
+    When someone opens the tool's page
+    Then the tool starts and the page is served by it
+
+  @unit
+  Scenario: A health probe does not wake a dormant developer tool
+    Given a dormant developer tool
+    When a health checker, Vite's ping or a HEAD request reaches the tool's port
+    Then the probe gets an answer
+    And the tool stays dormant
+
+  @unit
+  Scenario: Concurrent first visits start one developer tool
+    Given a dormant developer tool
+    When several first visits arrive at once
+    Then the tool is started once and every visit is served by it
+
+  @unit
+  Scenario: An idle developer tool is shut down with its whole process chain
+    Given a developer tool that was visited and then left idle past the idle bound
+    Then the dev server stops the tool's whole process group, pnpm wrappers included
+    And the next visit starts it again
+
+  @unit
+  Scenario: A pinned developer tool stays running when idle
+    Given the developer pinned the tools open with "LANGWATCH_DEV_TOOLS_IDLE=off"
+    When a visited tool sits idle
+    Then it keeps running
+
+  @unit
+  Scenario: A stopped developer tool revives for a tab left open
+    Given a developer tool that was stopped while its page stayed open in a tab
+    When the tab's websocket reconnects
+    Then the connection is refused with a retry hint and the tool is started
+    And the tab's next attempt reaches the running tool
+
+  @unit
+  Scenario: A restarted dev server takes its developer tool port back
+    Given the dev server restarts while the old server still holds a tool's port
+    When the new dev server binds the port
+    Then it retries until the port is released
+    And the tool is not reported as external

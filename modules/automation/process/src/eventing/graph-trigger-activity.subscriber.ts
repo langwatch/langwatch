@@ -5,7 +5,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { AutomationGraphActivity } from "../services/automation-graph-activity.service.ts";
+import type { AutomationGraphActivity } from "../features/graph-alert/services/automation-graph-activity.service.ts";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");
 

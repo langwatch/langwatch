@@ -21,7 +21,6 @@ import {
   type ScimDeliveryReceipt,
 } from "@langwatch/enterprise-scim-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import { HTTPException } from "hono/http-exception";
 
 const JSON_MEDIA_TYPE = "application/json";
 
@@ -30,10 +29,6 @@ export const scimWebhookDelivery = defineRestMiddleware(
   "scimWebhookDelivery",
   scimWebhookDeliveryHeadersSchema,
 );
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -56,7 +51,7 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
   // The HMAC is computed over these exact characters, so nothing parses them
   // first: a parse-then-reserialise verifies nothing.
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(
     publicRoute({
       reason:

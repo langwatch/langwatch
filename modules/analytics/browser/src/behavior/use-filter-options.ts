@@ -44,7 +44,7 @@ export function useFilterOptions({
 /** Topic and subtopic counts under the current filters, minus the topic selection itself. */
 export function useTopicCounts() {
   const { filterParams, queryOpts } = useFilterParams();
-  return analyticsApi.traces.getTopicCounts.useQuery(
+  return analyticsApi.topics.getTopicCounts.useQuery(
     {
       ...filterParams,
       filters: {

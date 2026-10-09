@@ -13,7 +13,7 @@ import {
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { useLentOperations } from "@langwatch/browser-host/lent";
-import { LangyAskToken, type LangyAsk } from "@langwatch/langy-contract";
+import { LangyAskToken, type LangyAsk } from "@langwatch/langy-client";
 import { useMemo, type ReactNode } from "react";
 
 import {

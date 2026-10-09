@@ -1,5 +1,5 @@
 export * from "./scim.contract.ts";
-export * from "./scim-drawers.ts";
+export { scimConfig, scimSecrets, type ScimServerConfig } from "./scim.config.ts";
 export {
   ScimApi,
   type ScimDeliveryReceipt,
@@ -9,8 +9,6 @@ export {
 } from "./scim.api.ts";
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export * from "./scim-token.rest.ts";
-export * from "./scim-webhook.rest.ts";
-export { ScimService } from "./scim.service.ts";
 export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";
 export { scimOversightTrpc } from "./scim-oversight.trpc.ts";
 export {
@@ -26,7 +24,6 @@ export {
   type DirectoryIdentityRow,
   type ListOversightSyncsInput,
   type OversightConnectionInput,
-  type OversightFailure,
   type OversightSync,
   type OversightSyncList,
   type RedriveRetiredApplyInput,
@@ -52,7 +49,6 @@ export {
   type ScimReconciliationFailure,
   type ScimReconciliationScope,
   type ScimSyncStatusCopy,
-  type ScimSyncTone,
 } from "./scim-reconciliation.ts";
 export {
   SCIM_REQUEST_FEED_LIMIT,
@@ -98,7 +94,6 @@ export {
   type ScimTokenSummary,
 } from "./scim-token.ts";
 export { SCIM_ROLES, resolveHighestRole, type ScimRole } from "./scim-role-resolver.ts";
-export * from "./scim.config.ts";
 export {
   emptyScimSync,
   pickRetiredLetter,
@@ -107,10 +102,16 @@ export {
   SCIM_APPLY_OPS,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
+  SCIM_COST_CENTER_CHANGED_EVENT_TYPE,
+  SCIM_COST_CENTER_CHANGED_EVENT_VERSION,
+  SCIM_COST_CENTER_PIPELINE_NAME,
   SCIM_GROUP_MAPPED_EVENT_TYPE,
+  SCIM_MEMBER_AGGREGATE_TYPE,
   SCIM_REVOKE_CAUSES,
   SCIM_SYNC_EVENT_TYPES,
+  SCIM_SYNC_AGGREGATE_TYPE,
   SCIM_SYNC_EVENT_VERSION_LATEST,
+  SCIM_SYNC_PIPELINE_NAME,
   SCIM_SYNC_STATES,
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
@@ -118,6 +119,7 @@ export {
   SCIM_USER_OPS,
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimApplyOp,
+  type ScimCostCenterChangedEventData,
   type ScimRevokeCause,
   type ScimSyncActivityEntry,
   type ScimSyncEventType,
@@ -131,12 +133,13 @@ export {
   scimApplyOpSchema,
   scimApplyRecoveredPayloadSchema,
   scimApplyRetiredPayloadSchema,
+  scimCostCenterChangedEventDataSchema,
   scimGroupMappedPayloadSchema,
   scimRevokeCauseSchema,
   scimSyncFactInputSchema,
   scimSyncFailureSchema,
   scimSyncIdFor,
-  scimSyncStateSchema,
+  scimSyncLifecycleStateSchema,
   scimTokenIssuedPayloadSchema,
   scimTokenRevokedPayloadSchema,
   scimApplyRedrivenPayloadSchema,
@@ -166,4 +169,3 @@ export {
   type ScimSyncCommand,
   type ScimSyncCommandType,
 } from "./scim-sync-commands.ts";
-export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events.ts";

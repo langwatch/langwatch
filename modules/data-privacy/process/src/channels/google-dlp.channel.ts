@@ -1,3 +1,10 @@
+import { Secret } from "@langwatch/secrets";
+
+/** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
+export const googleApplicationCredentials = Secret.load("GOOGLE_APPLICATION_CREDENTIALS", {
+  optional: true,
+});
+
 /** One Google DLP finding over the inspected text, in codepoints as DLP reports them. */
 export type GoogleDlpFinding = Readonly<{
   start: number;

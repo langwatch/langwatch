@@ -53,7 +53,7 @@ export function PersonalBudgetRequestScreen() {
   const period = periodRaw || "current period";
   const hasContext = !!(scope && scopeId && limitUsd !== null && spentUsd !== null);
 
-  const adminQuery = api.user.personalBudget.useQuery(
+  const adminQuery = api.gatewayBudgets.personalBudget.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );

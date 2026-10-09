@@ -20,16 +20,7 @@ export {
   RoleContributionError,
   StoreTierUnstatedError,
 } from "./boot-errors.ts";
-export {
-  buildClaimedMembers,
-  membersFor,
-  membersFrom,
-  noMembers,
-  storesBackedMembers,
-  MissingMemberError,
-  type MemberClaim,
-  type MemberSource,
-} from "./module-members.ts";
+export { buildClaimedMembers, MissingMemberError, type MemberClaim } from "./module-members.ts";
 export type { Tier } from "./tiers.ts";
 export {
   commandsOf,
@@ -41,6 +32,7 @@ export {
   ProjectionReadError,
   type ProjectionReadMap,
   type ProjectionReadTarget,
+  type ProjectionReplayEngine,
 } from "./module-eventing.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
@@ -58,10 +50,13 @@ export {
   type InstallableServerFeature,
   type InstalledFeatureState,
   type ModuleContributions,
+  type ModuleMigrationBinder,
+  type ModuleMigrationSetup,
   type ModuleTaskBinder,
   type ModuleTaskSetup,
   type ModuleTransportFacts,
   type ModuleTransportFactSetup,
+  type PublishedProcessModule,
   serverFeature,
   ServerFeatureAssembly,
   ServerFeatureBuilder,
@@ -69,11 +64,18 @@ export {
   type ModuleOperatorReadsScope,
   type ModuleSecretsScope,
   type ServerRole,
-  withMemoryRepositories,
 } from "./feature-installer.ts";
 export { type ResourceCloser, type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
-export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";
+export { RuntimeLifecycle, cleanupAfterFailure } from "./lifecycle/runtime-lifecycle.ts";
 
+export {
+  defineChannels,
+  type AnyChannelRegistry,
+  type BoundApis,
+  type ChannelRegistry,
+  type ChannelsFor,
+  type ChannelTiers,
+} from "./channel-registry.ts";
 export {
   defineRepositories,
   instantiateRepositories,
@@ -107,7 +109,19 @@ export {
   type ShutdownPhase,
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
-} from "./graceful-shutdown.ts";
+} from "./lifecycle/graceful-shutdown.ts";
+export {
+  processProjectionReplayer,
+  ProjectionReplayUnavailableError,
+} from "./migration/projection-replayer.ts";
+export {
+  MigrationStepCollectionError,
+  type MigrationStepCollectionRefusal,
+  buildsMigrationSteps,
+  collectMigrationSteps,
+  migrationStepsOf,
+} from "./migration/migration-steps.ts";
+export { migrationStepsOverMemory } from "./migration/memory-migration-steps.ts";
 export {
   loadTaskModules,
   parseTaskModuleSpecifiers,

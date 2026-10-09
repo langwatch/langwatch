@@ -44,3 +44,37 @@ Feature: Evaluator service boundary
     When it renders an evaluator picker, card, or editor chrome
     Then the reusable UI uses only the evaluator contract for domain values
     And router, tRPC, Monaco, field-mapping, API-usage, copy, and cascade composition remain in the host
+
+  # The studio's evaluator switch moved here from workflow's optimization.* (round 26, CD-2):
+  # workflow keeps the flags, evaluator the row that wraps a workflow published as one.
+  @unit
+  Scenario: An archived workflow keeps its evaluator publication behaviour
+    Given an archived workflow whose publication row still exists
+    When a caller saves it as an evaluator
+    Then the publication flags and evaluator use that row's name
+
+  @unit
+  Scenario: Saving a workflow as an evaluator creates the one evaluator that wraps it
+    Given a workflow no evaluator wraps yet
+    When a caller saves it as an evaluator
+    Then one workflow evaluator named after the workflow is created
+
+  @unit
+  Scenario: Saving a missing workflow as an evaluator refuses before publication changes
+    Given no workflow publication row exists for the requested project and id
+    When a caller saves it as an evaluator
+    Then workflow_not_found is reported and no publication changes
+
+  @unit
+  Scenario: Switching a workflow off as an evaluator archives the evaluator that wrapped it
+    Given a workflow published as an evaluator
+    When a caller switches it off as an evaluator
+    Then the workflow's evaluator flag is cleared
+    And the evaluator that wrapped it is archived, if one did
+
+  @unit
+  Scenario: A workflow's archive preview names its evaluators at the workflow's grain
+    Given a member who may view workflows but not evaluations
+    When the archive dialog asks which evaluators the workflow backs
+    Then evaluators.listByWorkflow answers under workflows:view
+    And it names each live evaluator by id and name only

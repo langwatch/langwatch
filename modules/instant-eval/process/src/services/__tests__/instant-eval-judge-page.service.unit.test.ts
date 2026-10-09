@@ -5,11 +5,12 @@
  */
 
 import {
+  INSTANT_EVAL_PRICING,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   InstantEvalClassifierUnavailableError,
   InstantEvalFreeBudgetExhaustedError,
   type InstantEvalJudgement,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,7 +18,7 @@ import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
-} from "../../channels/instant-eval-judge.channel.ts";
+} from "../../channels/instant-eval-judging.channel.ts";
 import type { InstantEvalCancellationRepository } from "../../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalJudgmentRecord } from "../../repositories/instant-eval-judgments.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
@@ -25,7 +26,6 @@ import {
   INSTANT_EVAL_CANCEL_POLL_MS,
   INSTANT_EVAL_PAGE_SETTLE_MS,
 } from "../../rules/instant-eval-page-stop.rules.ts";
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import type {
   InstantEvalKeyPage,
   InstantEvalRowKey,

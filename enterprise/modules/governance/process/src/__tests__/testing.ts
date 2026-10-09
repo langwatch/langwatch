@@ -6,7 +6,17 @@ import { PROJECT_KIND, type InternalProject, type ProjectApi } from "@langwatch/
  * feature server — a suite states which substrates it has, not which classes to construct.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 
+import {
+  type DepartmentOrganizations,
+  type DepartmentProjects,
+  DepartmentService,
+} from "../features/identity/services/department.service.ts";
+import {
+  ActivityMonitorService,
+  type ActivityMonitorTraces,
+} from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
 import type { GovernanceClickHouseResolver } from "../repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import {
   PrismaDepartmentRepository,
@@ -16,12 +26,6 @@ import {
   PrismaActivityMonitorRepository,
   type ActivityMonitorDatabase,
 } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
-import {
-  type DepartmentOrganizations,
-  type DepartmentProjects,
-  DepartmentService,
-} from "../services/department.service.ts";
-import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 
 function internalGovernanceProject(id: string): InternalProject {
   return {
@@ -69,14 +73,17 @@ export function createSupportContactOrganizations(
 
 /**
  * The Activity Monitor read model over a suite's own Postgres connection and
- * ClickHouse endpoint; the governance project is read from the same double.
+ * ClickHouse endpoint; the governance project is read from the same double, and
+ * trace spend from the `traces` double (an uncalled read throws by name).
  */
 export function createActivityMonitorTestService(options: {
   prisma: ActivityMonitorDatabase;
   clickhouse: GovernanceClickHouseResolver;
+  traces?: Partial<ActivityMonitorTraces>;
 }): ActivityMonitorService {
   return ActivityMonitorService.create({
     repository: PrismaActivityMonitorRepository.create(options),
+    traces: createApiFixture<TraceApi>(options.traces ?? {}),
     projects: createApiFixture<ProjectApi>({
       findInternal: async ({ organizationId, kind }) => {
         const project = await options.prisma.project.findFirst({

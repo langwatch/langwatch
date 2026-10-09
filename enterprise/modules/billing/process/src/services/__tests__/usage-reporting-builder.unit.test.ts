@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryStripeMetersChannel } from "../../channels/memory/memory.stripe-meters.channel.ts";
 import {
   StripeUsageReportingBuilder,
   StripeUsageReportingUnavailable,
@@ -12,7 +13,7 @@ function meterIdFor(nodeEnvironment: string | undefined): string | undefined {
   const create = vi.spyOn(StripeUsageReportingService, "create");
   try {
     StripeUsageReportingBuilder.create({
-      secretKey: "sk_test_composition",
+      meters: MemoryStripeMetersChannel.create(),
       nodeEnvironment,
     }).build();
     const [deps] = create.mock.calls[0] ?? [];
@@ -45,10 +46,10 @@ describe("StripeUsageReportingBuilder", () => {
      * own skip path logs that once a month rather than raising it at boot.
      */
     /** @scenario "A SaaS worker refuses to compose without the credential its reports are sent with" */
-    it("refuses to build without a secret key", () => {
+    it("refuses to build without the meters channel a secret key opens", () => {
       expect(() =>
         StripeUsageReportingBuilder.create({
-          secretKey: undefined,
+          meters: undefined,
           nodeEnvironment: "production",
         }).build(),
       ).toThrow(StripeUsageReportingUnavailable);

@@ -14,7 +14,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
+import { readableDate } from "@langwatch/time";
 import {
   History,
   MoreVertical,
@@ -35,7 +36,6 @@ import { WebhookDestinationCell } from "../../../features/webhooks/ui/elements/w
 import { WebhookDeliveriesDrawer } from "../../../features/webhooks/ui/sections/webhook-deliveries-drawer.tsx";
 import { WebhookEndpointDrawer } from "../../../features/webhooks/ui/sections/webhook-endpoint-drawer.tsx";
 import { WebhookSecretDialog } from "../../../features/webhooks/ui/sections/webhook-secret-dialog.tsx";
-import { readableDate } from "../../../model/readable-date.ts";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 

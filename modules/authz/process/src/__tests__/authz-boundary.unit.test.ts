@@ -47,7 +47,8 @@ describe("the AuthZ feature boundary", () => {
       expect(existsSync(join(REPOSITORY_ROOT, "packages", "authz-server"))).toBe(false);
       expect(names).not.toContain("@langwatch/authz");
       expect(names).not.toContain("@langwatch/authz-server");
-      expect(typeof contract.AuthzService).toBe("function");
+      expect("AuthzService" in contract).toBe(false);
+      expect(contract.AuthzApi).toBeDefined();
       expect(typeof contract.AuthzGrantsService).toBe("function");
     });
   });
@@ -60,7 +61,7 @@ describe("the AuthZ feature boundary", () => {
         .map(([name]) => name);
 
       expect(minters).toEqual([]);
-      expect(Object.keys(contract.AuthzService)).not.toContain("mintAuthorizationWitness");
+      expect(Object.keys(AuthzService)).not.toContain("mintAuthorizationWitness");
     });
   });
 

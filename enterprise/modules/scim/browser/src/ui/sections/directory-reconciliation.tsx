@@ -24,6 +24,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Plug } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -33,7 +34,6 @@ import {
   type DirectoryChangeRow,
 } from "../../behavior/scim-api.ts";
 import { isRunningConnection } from "../../model/connection-lifecycle.ts";
-import { readableDate } from "../../model/display-formatters.ts";
 import { RecentDirectoryActivity } from "./recent-directory-activity.tsx";
 
 /** The connection's own page: its identity provider, its domains and its event log. */

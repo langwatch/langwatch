@@ -13,14 +13,14 @@ import {
 
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { digestOfToolCall } from "../../../../../model/langy-capability-digest.ts";
-import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";
 import {
   type CapabilityCardInput,
   type CapabilityDescriptor,
   isProposalOutput,
   resolveCapability,
   withDecidedCard,
-} from "../../../model/capabilities/capability-registry.ts";
+} from "../../../../../model/langy-capability-registry.ts";
+import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";
 import { deriveFollowUpChips } from "../../../model/capabilities/follow-up-chips.ts";
 import { LangyAutomationCard } from "../automations/langy-automation-card.tsx";
 import { LangyDatasetCard } from "./langy-dataset-card.tsx";

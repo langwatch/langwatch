@@ -1,18 +1,18 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
+import { VirtualKeyCryptoService } from "../../features/virtual-key/services/virtual-key-crypto.service.ts";
+import { VirtualKeyService } from "../../features/virtual-key/services/virtual-key.service.ts";
 import { PrismaGatewayAuditRepository } from "../../repositories/prisma/prisma.gateway-audit.repository.ts";
 import { PrismaGatewayChangeEventsRepository } from "../../repositories/prisma/prisma.gateway-change-event.repository.ts";
 import { PrismaGatewayKeyBudgetRepository } from "../../repositories/prisma/prisma.gateway-key-budget.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
-import { PrismaGatewayTransactionRepository } from "../../repositories/prisma/prisma.gateway-transaction.repository.ts";
+import { PrismaGatewayTransactionRepository } from "../../repositories/prisma/prisma.gateway.repositories.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../../repositories/prisma/prisma.virtual-key.repository.ts";
 import {
   GatewayScopeResolutionService,
   type GatewayPlatformProviders,
 } from "../../services/gateway-scope-resolution.service.ts";
-import { VirtualKeyCryptoService } from "../../services/virtual-key-crypto.service.ts";
-import { VirtualKeyService } from "../../services/virtual-key.service.ts";
 
 /** A deployment holding no provider keys of its own, which is what a self-hosted install is. */
 const NO_PLATFORM_PROVIDERS: GatewayPlatformProviders = {

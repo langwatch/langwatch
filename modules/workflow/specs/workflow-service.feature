@@ -1,26 +1,6 @@
 Feature: Workflow service boundary
 
   @unit
-  Scenario: An archived workflow keeps its evaluator publication behaviour
-    Given an archived workflow whose publication row still exists
-    When a caller saves it as an evaluator
-    Then the publication flags and evaluator use that row's name
-
-  @unit
-  Scenario: Saving a missing workflow as an evaluator refuses before publication changes
-    Given no workflow publication row exists for the requested project and id
-    When a caller saves it as an evaluator
-    Then workflow_not_found is reported and no publication changes
-
-  @unit
-  Scenario: Linked features discover workflow fields without reading workflow tables
-    Given a project has valid, invalid and archived workflow graphs
-    When a peer lists fields for those workflow identifiers
-    Then one project-scoped batch excludes archived workflows
-    And invalid graphs report unresolved fields
-    And valid graphs preserve all declared input and output identifiers
-
-  @unit
   Scenario: A failed peer copy removes only the newly copied workflow
     Given a copied workflow has current and latest version pointers and version parentage
     When the peer deletes its uncommitted workflow in the target project
@@ -34,6 +14,35 @@ Feature: Workflow service boundary
     When the Workflow service creates the workflow
     Then it persists the definition and its first version
     And callers receive portable Workflow contract values
+
+  @unit
+  Scenario: Saving a Studio graph records the version as a fact agents react to
+    Given a Studio graph saved as a version of a workflow
+    When the save completes
+    Then one version_saved fact is recorded on the workflow's own pipeline, keyed by the version and the instant
+    And recording it never fails or delays the save
+
+  @unit
+  Scenario: A version recorded again carries its fields while it is current
+    Given a workflow whose current version is saved, restored, created or brought back from an archive
+    When workflow records the version_saved fact
+    Then the fact carries the input and output fields of that version
+    And a version that is no longer current, or a workflow that is archived, carries none
+
+  @unit
+  Scenario: Archiving a workflow records the archived fact agents react to
+    Given a live workflow
+    When it is archived on its own, with its linked rows, or by agent's archive cascade
+    Then one archived fact is recorded on the workflow's own pipeline, keyed by the workflow and the instant
+    And recording it never fails or delays the archive
+
+  @unit
+  Scenario: The deploy backfill records each live workflow's current version with its fields
+    Given live workflows across projects, some with a current version, and an archived workflow
+    When the background backfill runs after the old writers are gone
+    Then one version_saved fact with fields is recorded per live workflow with a current version
+    And the archived workflow records nothing, a dry run records nothing
+    And a resumed run skips every project its checkpoint already finished
 
   @unit
   Scenario: A workflow created as an autosave keeps one version across later autosaves
@@ -171,13 +180,6 @@ Feature: Workflow service boundary
     And it does not access the Dataset repository
 
   @unit
-  Scenario: Evaluation remains application composition
-    Given a caller requests `/workflows/:id/evaluate`
-    When the API handles the request
-    Then it composes Workflow version selection with Evaluation execution
-    And Workflow does not own the evaluation run lifecycle
-
-  @unit
   Scenario: Execution dispatch is a Workflow server concern
     Given Workflow resolves a version to run
     When the server executor dispatches it through injected nlpgo infrastructure
@@ -189,6 +191,40 @@ Feature: Workflow service boundary
     Given the caller cannot create workflows in the source project
     When they copy a workflow from it
     Then permission_denied is reported with status 401 and nothing is copied
+
+  @unit
+  Scenario: Copying a workflow agent copies its graph first
+    Given a workflow agent points to a graph in the source project
+    When the caller copies the agent into the target project through workflow.copyAgent
+    Then Workflow copies the graph into the target project, authored by the caller
+    And AgentApi writes the new agent pointing at that copied graph
+    And the source graph and agent are unchanged
+
+  @unit
+  Scenario: Copying an agent with no graph asks Agent alone
+    Given a signature agent in the source project
+    When the caller copies it into the target project through workflow.copyAgent
+    Then no graph is copied and AgentApi writes the new agent with no graph
+
+  @unit
+  Scenario: Copying an agent from a project the caller cannot manage is refused
+    Given the caller cannot manage evaluations in the source project
+    When they copy an agent from it through workflow.copyAgent
+    Then agent_source_permission_denied is reported before the agent is read and nothing is copied
+
+  @unit
+  Scenario: A failed agent write removes the copied graph
+    Given Workflow copied a workflow agent's graph into the target project
+    When AgentApi refuses to write the new agent
+    Then Workflow deletes the uncommitted graph copy
+    And the original failure reaches the caller
+    And a failed removal is logged without replacing the original failure
+
+  @unit
+  Scenario: The agent copy door keeps the agents.copy input, output and permission
+    Given the copy door moved from agents.copy to workflow.copyAgent
+    When the browser copies an agent
+    Then the input, the output and the evaluations:manage permission are the ones agents.copy had
 
   @unit
   Scenario: A workflow that is not a copy has nothing to sync from
@@ -241,10 +277,12 @@ Feature: Workflow service boundary
     And no workflow of another project comes back
 
   @unit
-  Scenario: Archiving a workflow takes its evaluators, agents and monitors with it
+  Scenario: Archiving a workflow takes its agents with it, and its evaluators and monitors after a lag
     Given a workflow backs an evaluator that a monitor uses, and an agent runs it
     When the workflow is archived with its dependants
-    Then the monitor is deleted, the evaluator and the agent are archived, then the workflow
+    Then the agent is archived, then the workflow, and the archived fact is recorded
+    And evaluator archives the evaluator and monitor deletes the monitor from their own sides
+    And the confirmation names the evaluators and monitors from the preview the reader confirmed
 
   @unit
   Scenario: The workflows list reads copy lineage on a process that supplies only stores and declared peers
@@ -471,3 +509,21 @@ Feature: Workflow service boundary
     Given a key that can trigger workflows but not read the workflow
     When it starts a run
     Then it is refused before the trigger is reached
+
+  @unit
+  Scenario: Agent's archived fact archives the graph it cascades to
+    Given Agent records an agent archived naming a live graph of the project
+    When Workflow's peer subscriber handles the fact
+    Then the graph is archived in that project and no other graph changes
+
+  @unit
+  Scenario: An agent archived fact naming no live graph archives nothing
+    Given Agent records an agent archived naming no graph, or a graph already archived or missing
+    When Workflow's peer subscriber handles the fact
+    Then no graph changes and the handler succeeds
+
+  @unit
+  Scenario: A redelivered agent archived fact is harmless
+    Given Workflow already archived the graph for an agent archived fact
+    When the same fact is delivered again
+    Then both deliveries share one deduplication id and the graph is not archived a second time

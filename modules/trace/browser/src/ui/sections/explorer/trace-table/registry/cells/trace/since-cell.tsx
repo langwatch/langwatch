@@ -1,7 +1,7 @@
 import { Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
-import type { TraceListItem } from "../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { useVerboseRelativeTime } from "../../../../utils/use-relative-time.ts";
 import type { CellDef } from "../../types.ts";
 import { TimeHoverCard } from "./time-hover-card.tsx";

@@ -15,6 +15,15 @@ import {
   procedureKinds,
 } from "./support/gateway-trpc.fixture.ts";
 
+const PERSONAL_CONTEXT = {
+  workspace: {
+    team: { id: "team-1", name: "Ada's workspace", slug: "ada", createdAtMs: 0 },
+    project: { id: "project-1", name: "Ada", slug: "ada", apiKey: "", createdAtMs: 0 },
+    created: false,
+  },
+  routingPolicy: { id: "policy-team", name: "Team default" },
+};
+
 function mount(permits: (permission: string) => boolean = () => true) {
   const asked: string[] = [];
   const calls: unknown[] = [];
@@ -25,6 +34,10 @@ function mount(permits: (permission: string) => boolean = () => true) {
     },
     deleteRoutingPolicy: async (input) => {
       calls.push(input);
+    },
+    getPersonalContext: async (input) => {
+      calls.push(input);
+      return PERSONAL_CONTEXT;
     },
     routingPolicyTierSuggestions: (input) => {
       calls.push(input);
@@ -44,6 +57,7 @@ describe("the routingPolicy tRPC namespace", () => {
       list: "query",
       get: "query",
       tierSuggestions: "query",
+      personalContext: "query",
       create: "mutation",
       update: "mutation",
       setDefault: "mutation",
@@ -70,6 +84,17 @@ describe("the routingPolicy tRPC namespace", () => {
     ]);
     expect(asked).toEqual(["routingPolicies:view"]);
     expect(calls).toEqual([{ tier: "fast", boundProviderTypes: [] }]);
+  });
+
+  /** @scenario "The enterprise gateway serves the personal context under organization:view" */
+  it("answers main's user.personalContext body for the caller under organization:view", async () => {
+    const { caller, asked, calls } = mount();
+
+    await expect(caller.personalContext({ organizationId: "org_1" })).resolves.toEqual(
+      PERSONAL_CONTEXT,
+    );
+    expect(asked).toEqual(["organization:view"]);
+    expect(calls).toEqual([{ userId: "user_1", organizationId: "org_1" }]);
   });
 
   it("deletes under routingPolicies:manage and answers main's acknowledgement", async () => {

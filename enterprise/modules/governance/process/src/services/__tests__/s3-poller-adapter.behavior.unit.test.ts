@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
 import { TestObjectStorage } from "../../__tests__/support/puller-test-ports.ts";
-import { S3PollingPullerService } from "../s3-puller.service.ts";
+import { S3PollingPullerService } from "../../features/ingestion-pull/services/s3-puller.service.ts";
 
 const VALID_CONFIG = {
   adapter: "s3_polling" as const,

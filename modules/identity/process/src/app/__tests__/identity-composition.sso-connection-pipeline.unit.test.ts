@@ -21,11 +21,11 @@ import {
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
 import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
 import { IdentityEventStores } from "../../eventing/identity-event-stores.store.ts";
-import { migrationFinalizedEventSchema } from "../../eventing/sso-connection-state.projection.ts";
+import { migrationFinalizedEventSchema } from "../../features/sso-connection/eventing/sso-connection-state.projection.ts";
 import {
   composeSsoConnectionGraph,
   type SsoConnectionGraph,
-} from "../../eventing/sso-connection.pipeline.ts";
+} from "../../features/sso-connection/eventing/sso-connection.pipeline.ts";
 
 /** The models the connection graph reads, none of them touched at composition time. */
 function testDatabase(): PrismaClient {

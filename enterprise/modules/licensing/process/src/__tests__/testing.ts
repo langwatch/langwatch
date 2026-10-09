@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   type LicenseData,
   type LicensingServerConfig,
@@ -9,7 +10,6 @@ import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ResourceScope, type ServerRole } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 // gitleaks:allow — test fixture keys only (not real secrets)
 /**
@@ -273,7 +273,7 @@ export function createTestLicensingApp(
   return LicensingModule.create({
     dependencies: {
       instantEval: createApiFixture<InstantEvalApi>(),
-      projects: createApiFixture<ProjectApi>(),
+      scopes: createApiFixture<AuthzApi>(),
       gateway: createApiFixture<GatewayApi>(),
       organizations: createApiFixture<OrganizationApi>({
         countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),

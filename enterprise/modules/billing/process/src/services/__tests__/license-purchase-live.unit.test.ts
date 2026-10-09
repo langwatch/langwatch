@@ -8,8 +8,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryLicenseEmailChannel } from "../../channels/memory/memory.license-email.channel.ts";
-import { LicensePurchaseDeliveryService } from "../license-purchase-delivery.service.ts";
-import { LicensingLicenseGeneratorService } from "../licensing-license-generator.service.ts";
+import { LicensePurchaseDeliveryService } from "../../features/license-purchase/services/license-purchase-delivery.service.ts";
+import { LicensingLicenseGeneratorService } from "../../features/license-purchase/services/licensing-license-generator.service.ts";
 
 describe("the licence a purchase generates", () => {
   it("is signed by licensing on main's GROWTH tier, handing it no key", async () => {

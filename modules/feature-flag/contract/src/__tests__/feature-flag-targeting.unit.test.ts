@@ -7,7 +7,7 @@ import {
   type FeatureFlagTargetId,
 } from "../feature-flag-targeting.ts";
 
-/** Mirrors the shape every `use-feature-flag.ts` hook requires: both scopes
+/** Mirrors the shape every `useFeatureFlag` read requires: both scopes
  * stated, so a forgotten field is a compile error rather than a silent
  * no-op rule. */
 interface FeatureFlagReadOptions {

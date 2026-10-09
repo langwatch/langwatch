@@ -64,3 +64,16 @@ Feature: The Langy panel's tRPC procedures
     When they choose to have Langy reach their code through GitHub
     Then the choice is written for that person
     And the answer carries the remembered choice
+
+  @unit
+  Scenario: Attaching to a turn in someone else's conversation answers not found
+    Given a turn the person neither started nor can see the conversation of
+    When they attach to the turn's live stream
+    Then the call refuses with the conversation not found error
+    And no turn buffer is opened
+
+  @unit
+  Scenario: The person who started a turn attaches before its conversation is visible
+    Given a turn the person started whose conversation fold has not landed
+    When they attach to the turn's live stream
+    Then the stream opens the turn's buffer without reading the conversation

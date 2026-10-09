@@ -50,12 +50,12 @@ export const gatewaySpendEventing = defineEventingModule({
  * A process manager mounted under the name its durable rows are already keyed
  * by: renaming loses inbox/state/outbox rows.
  */
-export interface GatewaySpendProcessManagerMount {
+interface GatewaySpendProcessManagerMount {
   name: string;
   applier: ProcessManagerApplier<GatewaySpendProcessingEvent>;
 }
 
-export interface EventingGatewaySpendAdapterOptions {
+interface EventingGatewaySpendAdapterOptions {
   /** The spend ledger the fold reads and writes. The `FoldProjectionStore`
    *  built over it stays private to this feature, which is what
    *  `private-runtime-export` requires of a feature server root. */
@@ -174,6 +174,14 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsRepository {
     return Promise.reject(producerOnly(this.processName, "page the spend ledger"));
   }
 
+  readSpendEventsAcrossTenants(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "page the spend ledger across tenants"));
+  }
+
+  findSpendEventAcrossTenants(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "find a spend row across tenants"));
+  }
+
   walkSpendEvents(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "walk the spend ledger"));
   }
@@ -192,6 +200,14 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsRepository {
 
   sumDaysForOrganizationProjects(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "sum the spend ledger by day"));
+  }
+
+  sumWindowByModel(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "sum the spend ledger by model"));
+  }
+
+  sumWindowByVirtualKey(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "sum the spend ledger by virtual key"));
   }
 
   countUsage(): Promise<never> {

@@ -7,15 +7,6 @@ import type { SearchProjectsResult } from "@langwatch/project-contract";
 import type { z } from "zod";
 
 import type {
-  AdminImpersonationStarted,
-  AdminImpersonationStopped,
-  AdminOperationResult,
-  RunAdminOperationInput,
-  StartAdminImpersonationInput,
-  StopAdminImpersonationInput,
-} from "./admin-backoffice.ts";
-import type { AdminIdentity, StartImpersonationInput, StopImpersonationInput } from "./admin.ts";
-import type {
   DeleteBlobInput,
   DeleteBlobResult,
   GetBlobInput,
@@ -26,23 +17,60 @@ import type {
   BlobSweepReport,
   RunBlobCleanupInput,
 } from "./blob-store.ts";
-import type { CheckupAnswer, UsageReportAnswer } from "./checkup.trpc.ts";
-import type { CheckupResult, ExplicitCheckInput, ProjectCheckupReport } from "./checkup.ts";
-import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
 import type {
-  BugReport,
-  BugReportListing,
-  ListBugReportsInput,
-  SubmitBugReport,
-} from "./ops-bug-report.ts";
-import type { DashboardData, GroupInfo } from "./ops-dashboard.ts";
+  AdminImpersonationStarted,
+  AdminImpersonationStopped,
+  AdminOperationResult,
+  RunAdminOperationInput,
+  StartAdminImpersonationInput,
+  StopAdminImpersonationInput,
+} from "./features/admin/admin-operation.ts";
+import type {
+  AdminIdentity,
+  StartImpersonationInput,
+  StopImpersonationInput,
+} from "./features/admin/admin.ts";
+import type { CheckupAnswer, UsageReportAnswer } from "./features/checkup/checkup.trpc.ts";
+import type {
+  CheckupResult,
+  ExplicitCheckInput,
+  ProjectCheckupReport,
+} from "./features/checkup/checkup.ts";
+import type { Anomaly, AnomalyKind } from "./features/dashboard/ops-anomaly.ts";
+import type {
+  DashboardData,
+  GroupInfo,
+  OpsSignUpHealthInput,
+  QueueInfo,
+  QueueSummaryInfo,
+  SignUpHealth,
+} from "./features/dashboard/ops-dashboard.ts";
+import type { OpsSnapshotAbortSignal } from "./features/dashboard/ops-snapshot.service.ts";
 import type {
   AggregateDiscovery,
   AggregateEventView,
   AggregateSearchResult,
   ProjectionStateAtEvent,
-} from "./ops-event-log.ts";
-import type { OpsPlatformOperator } from "./ops-operators.ts";
+} from "./features/event-log/ops-event-log.ts";
+import type { ReplayHistoryEntry, ReplayStatus } from "./features/event-log/ops-replay.ts";
+import type {
+  OpsMigrationCohortResult,
+  OpsMigrationEnrollmentListing,
+  OpsMigrationOrganizationMatch,
+  OpsMigrationOverview,
+  OpsMigrationTargetedRunResult,
+} from "./features/migrations/ops-system-migration.ts";
+import type {
+  OpsUpgradeIdInput,
+  OpsUpgradeListRunsInput,
+  OpsUpgradeListStepsInput,
+  OpsUpgradeReleasePage,
+  OpsUpgradeRun,
+  OpsUpgradeRunPage,
+  OpsUpgradeStatus,
+  OpsUpgradeStepDetail,
+  OpsUpgradeStepPage,
+} from "./features/migrations/ops-upgrade.ts";
 import type {
   AggregateProcessManager,
   DeadLetterCount,
@@ -55,7 +83,7 @@ import type {
   ProcessInstanceRow,
   ProcessOutboxMessageView,
   ProcessWakeRow,
-} from "./ops-process.ts";
+} from "./features/process/ops-process.ts";
 import type {
   OpsBlockedSummary,
   opsListParkedQueueGroupsInputSchema,
@@ -69,11 +97,16 @@ import type {
   OpsQueueGroupsPage,
   opsQueueGroupInputSchema,
   OpsQueueJobsPage,
+  OpsQueueReapedStrandedGroups,
   OpsQueueReconcileOutcome,
-  QueueInfo,
-  QueueSummaryInfo,
-} from "./ops-queue.ts";
-import type { ReplayHistoryEntry, ReplayStatus } from "./ops-replay.ts";
+} from "./features/queue/ops-queue.ts";
+import type {
+  BugReport,
+  BugReportListing,
+  ListBugReportsInput,
+  SubmitBugReport,
+} from "./ops-bug-report.ts";
+import type { OpsPlatformOperator } from "./ops-operators.ts";
 import type {
   ListPausedSchedulesInput,
   ListScheduledJobsInput,
@@ -83,15 +116,6 @@ import type {
   SchedulerAuditEntryView,
   SetScheduleActiveInput,
 } from "./ops-scheduler.ts";
-import type { OpsSignUpHealthInput, SignUpHealth } from "./ops-sign-up-health.ts";
-import type { OpsSnapshotAbortSignal } from "./ops-snapshot.service.ts";
-import type {
-  OpsMigrationCohortResult,
-  OpsMigrationEnrollmentListing,
-  OpsMigrationOrganizationMatch,
-  OpsMigrationOverview,
-  OpsMigrationTargetedRunResult,
-} from "./ops-system-migration.ts";
 import type { ProductAnalyticsTarget } from "./ops.config.ts";
 import type {
   OpsApiGetBadgeCountsOutput,
@@ -281,6 +305,8 @@ export type UnblockAllQueueGroupsInput = {
 
 export type UnblockAllQueueGroupsResult = { unblockedCount: number };
 
+export type ReapStrandedQueueGroupsInput = { requestedBy: string };
+
 export type DrainQueueGroupInput = {
   queueName: string;
   groupId: string;
@@ -420,6 +446,9 @@ export interface OpsApi {
   listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]>;
   unblockQueueGroup(input: UnblockQueueGroupInput): Promise<UnblockQueueGroupResult>;
   unblockAllQueueGroups(input: UnblockAllQueueGroupsInput): Promise<UnblockAllQueueGroupsResult>;
+  reapStrandedQueueGroups(
+    input: ReapStrandedQueueGroupsInput,
+  ): Promise<OpsQueueReapedStrandedGroups>;
   drainQueueGroup(input: DrainQueueGroupInput): Promise<DrainQueueGroupResult>;
   pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void>;
   unpauseQueuePipeline(input: UnpauseQueuePipelineInput): Promise<void>;
@@ -654,6 +683,15 @@ export interface OpsApi {
   getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
   /** The paid checks over a project key; refused on LangWatch Cloud. */
   runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
+  // -- Ops, Upgrades: the upgrade ledger through UpgradeReader, read only (round 8, U2-API) ---
+  getUpgradeStatus(): Promise<OpsUpgradeStatus>;
+  listUpgradeReleases(): Promise<OpsUpgradeReleasePage>;
+  listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage>;
+  /** Refuses with `upgrade_not_found` when the ledger and the image hold no such step. */
+  getUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+  listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
+  /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
+  getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
 }
 
 export const OpsApi = moduleApi<OpsApi>()("ops");

@@ -81,3 +81,634 @@ that a checked claim rather than an asserted one.
 Spec: `specs/identity/identifier-model.feature`,
 `specs/identity/identity-storage-adapter.feature`,
 `modules/identity/specs/package-boundary.feature`.
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## Installation
+
+`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:25`.
+
+Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
+
+## Module API (`IdentityLookupApi`)
+
+The platform operator's identity lookup (D05). The door admits only ops:manage at the platform and hides the surface from everyone else; every act is recorded.
+
+Peers call these through the token, declared at `../contract/src/identity-lookup.ts:188`; nothing else in this package is public.
+
+#### `lookupAddress`
+
+```typescript
+lookupAddress(input: { address: string; operator: IdentityLookupOperator; }): Promise<IdentityLookupAnswer>;
+```
+
+#### `getLookupPerson`
+
+```typescript
+getLookupPerson(input: { userId: string; address: string; operator: IdentityLookupOperator; }): Promise<LookupPersonDetail>;
+```
+
+#### `findLookupActivity`
+
+```typescript
+findLookupActivity(input: { operator: IdentityLookupOperator; }): Promise<LookupOperatorActivityRow[]>;
+```
+
+#### `findDomainClaimQueue`
+
+```typescript
+findDomainClaimQueue(input: { operator: IdentityLookupOperator }): Promise<LookupDomainClaim[]>;
+```
+
+#### `confirmProposedSignIn`
+
+```typescript
+confirmProposedSignIn(input: { userId: string; proposalId: string; operator: IdentityLookupOperator; }): Promise<void>;
+```
+
+#### `rejectProposedSignIn`
+
+```typescript
+rejectProposedSignIn(input: { userId: string; proposalId: string; operator: IdentityLookupOperator; }): Promise<void>;
+```
+
+#### `detachLookupMethod`
+
+```typescript
+detachLookupMethod(input: { userId: string; identifierId: string; operator: IdentityLookupOperator; }): Promise<void>;
+```
+
+#### `endLookupSessions`
+
+A null `identifierId` ends every session; an id ends that method's.
+
+```typescript
+endLookupSessions(input: { userId: string; identifierId: string | null; operator: IdentityLookupOperator; }): Promise<void>;
+```
+
+#### `resendLookupInvitation`
+
+```typescript
+resendLookupInvitation(input: { organizationId: string; inviteId: string; operator: IdentityLookupOperator; }): Promise<LookupInvitationExpiry>;
+```
+
+#### `extendLookupInvitation`
+
+```typescript
+extendLookupInvitation(input: { organizationId: string; inviteId: string; operator: IdentityLookupOperator; }): Promise<LookupInvitationExpiry>;
+```
+
+#### `recordRefusedLookup`
+
+A caller the door refused (Q51): recorded within a shared stranger budget, never thrown.
+
+```typescript
+recordRefusedLookup(input: { operator: IdentityLookupOperator; action: string; args: Readonly<Record<string, string | null>>; }): Promise<void>;
+```
+
+## REST transport
+
+None: this module declares no REST family.
+
+## tRPC transport
+
+### `identityLookup`
+
+Contract `../contract/src/identity-lookup.trpc.ts:24`, router `src/transport/identity-lookup.trpc.ts:51`.
+
+| Procedure                              | Kind     | Gate                             | Input                   | Output                         |
+| -------------------------------------- | -------- | -------------------------------- | ----------------------- | ------------------------------ |
+| `identityLookup.resolve`               | query    | Platform permission `ops:manage` | inline                  | `identityLookupAnswerSchema`   |
+| `identityLookup.person`                | query    | Platform permission `ops:manage` | inline                  | inline                         |
+| `identityLookup.recentActivity`        | query    | Platform permission `ops:manage` | inline                  | inline                         |
+| `identityLookup.claimQueue`            | query    | Platform permission `ops:manage` | inline                  | inline                         |
+| `identityLookup.confirmProposedSignIn` | mutation | Platform permission `ops:manage` | `proposalInputSchema`   | inline                         |
+| `identityLookup.rejectProposedSignIn`  | mutation | Platform permission `ops:manage` | `proposalInputSchema`   | inline                         |
+| `identityLookup.detachMethod`          | mutation | Platform permission `ops:manage` | inline                  | inline                         |
+| `identityLookup.endSessions`           | mutation | Platform permission `ops:manage` | inline                  | inline                         |
+| `identityLookup.resendInvitation`      | mutation | Platform permission `ops:manage` | `invitationInputSchema` | `lookupInvitationExpirySchema` |
+| `identityLookup.extendInvitation`      | mutation | Platform permission `ops:manage` | `invitationInputSchema` | `lookupInvitationExpirySchema` |
+
+```typescript
+// identityLookup.resolve
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:26
+interface Input {
+  address: string;
+}
+type Output = z.infer<typeof identityLookupAnswerSchema>; // ../contract/src/identity-lookup.ts:65
+
+// identityLookup.person
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:30
+interface Input {
+  userId: string;
+  address: string;
+}
+// Output: lookupPersonDetailSchema.nullable() (inline, ../contract/src/identity-lookup.trpc.ts:31)
+
+// identityLookup.recentActivity
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:34
+type Input = Record<string, unknown>;
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:35
+type Output = {
+  auditId: string;
+  operatorUserId: string | null;
+  operatorName: string | null;
+  act: string;
+  address: string | null;
+  atMs: number;
+}[];
+
+// identityLookup.claimQueue
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:38
+type Input = Record<string, unknown>;
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:39
+type Output = {
+  connectionId: string;
+  organizationId: string;
+  organizationName: string | null;
+  domain: string;
+  waitingSinceMs: number;
+}[];
+
+// identityLookup.confirmProposedSignIn
+// Input: proposalInputSchema, ../contract/src/identity-lookup.trpc.ts:14
+interface Input {
+  userId: string;
+  proposalId: string;
+}
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:43
+type Output = unknown;
+
+// identityLookup.rejectProposedSignIn
+type Input = z.infer<typeof proposalInputSchema>; // ../contract/src/identity-lookup.trpc.ts:14
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:47
+type Output = unknown;
+
+// identityLookup.detachMethod
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:50
+interface Input {
+  userId: string;
+  identifierId: string;
+}
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:51
+type Output = unknown;
+
+// identityLookup.endSessions
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:55
+interface Input {
+  userId: string;
+  identifierId?: string | null;
+}
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:61
+type Output = unknown;
+
+// identityLookup.resendInvitation
+// Input: invitationInputSchema, ../contract/src/identity-lookup.trpc.ts:19
+interface Input {
+  organizationId: string;
+  inviteId: string;
+}
+// Output: lookupInvitationExpirySchema, ../contract/src/identity-lookup.ts:172
+interface Output {
+  expiresAtMs: number | null;
+}
+
+// identityLookup.extendInvitation
+type Input = z.infer<typeof invitationInputSchema>; // ../contract/src/identity-lookup.trpc.ts:19
+type Output = z.infer<typeof lookupInvitationExpirySchema>; // ../contract/src/identity-lookup.ts:172
+```
+
+### `identity`
+
+Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.trpc.ts:25`.
+
+| Procedure                               | Kind     | Gate                                                                                                                                                              | Input                             | Output                         |
+| --------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------ |
+| `identity.completeVerification`         | mutation | No permission: completes the session user's own email verification; the ceremony proves the record is pinned to that user, and no organization scope applies      | `completeVerificationInputSchema` | inline                         |
+| `identity.myTestArrival`                | query    | No permission: answers where the session user's own sign-in leaves them; the caller usually belongs to no organization yet, which is the condition being reported | `emptyInputSchema`                | `ssoTestArrivalStandingSchema` |
+| `identity.myIdentifiers`                | query    | No permission: lists the session user's own sign-in identifiers; no organization scope applies and no other account is reachable                                  | `emptyInputSchema`                | inline                         |
+| `identity.myMethodsLastUsed`            | query    | No permission: reads when the session user's own sign-in methods last minted a session; no organization scope applies and no other account is reachable           | `emptyInputSchema`                | `methodsLastUsedSchema`        |
+| `identity.addEmailIdentifier`           | mutation | No permission: adds an identifier to the session user's own account; no organization scope applies                                                                | inline                            | `emailIdentifierAddedSchema`   |
+| `identity.resendIdentifierConfirmation` | mutation | No permission: re-sends the session user's own address confirmation; the ceremony proves the identifier is theirs                                                 | inline                            | inline                         |
+| `identity.removeIdentifier`             | mutation | No permission: removes an identifier from the session user's own account; the identity guards decide, and no organization scope applies                           | inline                            | inline                         |
+
+```typescript
+// identity.completeVerification
+// Input: completeVerificationInputSchema, ../contract/src/identity.trpc.ts:17
+interface Input {
+  identifierId: string;
+  verificationId: string;
+  token: string;
+  codeVerifier: string;
+}
+// Output: inline, ../contract/src/identity.trpc.ts:28
+interface Output {
+  verified: true;
+}
+
+// identity.myTestArrival
+// Input: emptyInputSchema, ../contract/src/identity.trpc.ts:14
+type Input = Record<string, unknown>;
+// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:73
+type Output =
+  | {
+      testing: true;
+      connectionId: string;
+      organizationId: string;
+      organizationName: string;
+    }
+  | {
+      testing: false;
+    };
+
+// identity.myIdentifiers
+type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
+// Output: z.array(accountIdentifierSchema) (inline, ../contract/src/identity.trpc.ts:36)
+
+// identity.myMethodsLastUsed
+type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
+// Output: methodsLastUsedSchema, ../contract/src/account-identifiers.ts:34
+interface Output {
+  byIdentifier: Record<string, string>;
+  secondFactorAt: string | null;
+}
+
+// identity.addEmailIdentifier
+// Input: inline, ../contract/src/identity.trpc.ts:43
+interface Input {
+  email: string;
+  codeChallenge: string;
+}
+// Output: emailIdentifierAddedSchema, ../contract/src/account-identifiers.ts:30
+interface Output {
+  identifierId: string;
+}
+
+// identity.resendIdentifierConfirmation
+// Input: inline, ../contract/src/identity.trpc.ts:48
+interface Input {
+  identifierId: string;
+  codeChallenge: string;
+}
+// Output: inline, ../contract/src/identity.trpc.ts:50
+interface Output {
+  sent: true;
+}
+
+// identity.removeIdentifier
+// Input: inline, ../contract/src/identity.trpc.ts:53
+interface Input {
+  identifierId: string;
+}
+// Output: inline, ../contract/src/identity.trpc.ts:54
+interface Output {
+  removed: true;
+}
+```
+
+### `identity.joinRequests`
+
+Contract `../contract/src/features/join-request/join-request.trpc.ts:35`, router `src/transport/join-request.trpc.ts:104`.
+
+| Procedure                                  | Kind     | Gate                                                                                                                                                                                                                     | Input                                   | Output                            |
+| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | --------------------------------- |
+| `identity.joinRequests.lookup`             | query    | No permission: the caller is asking about organizations they are not in yet, so there is no scope to hold a permission on; the handler answers only for the session's OWN verified addresses and reveals nothing else    | inline                                  | `joinRequestLookupSchema`         |
+| `identity.joinRequests.offer`              | query    | No permission: the same own-verified-address answer `lookup` gives, minus the domains this caller has dismissed; no other person's organizations are reachable                                                           | inline                                  | `joinRequestLookupSchema`         |
+| `identity.joinRequests.dismissOffer`       | mutation | No permission: the caller silencing their own offer, on the domain their own session's verified address holds                                                                                                            | inline                                  | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.admitAutomatically` | mutation | No permission: admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else                                            | `joinRequestApiAdmitInputSchema`        | `joinRequestAdmittedSchema`       |
+| `identity.joinRequests.mine`               | query    | No permission: the caller's own pending requests, keyed by their session id                                                                                                                                              | inline                                  | `joinRequestMineSchema`           |
+| `identity.joinRequests.request`            | mutation | No permission: asking to join is the one action a non-member takes on an organization; the handler proves the organization was OFFERED to this caller's verified domain and refuses anything else as if it did not exist | `joinRequestApiRequestInputSchema`      | `joinRequestFiledSchema`          |
+| `identity.joinRequests.withdraw`           | mutation | No permission: the requester withdrawing their own request, matched on the session's user id                                                                                                                             | `joinRequestApiWithdrawInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.pending`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestPendingSchema`        |
+| `identity.joinRequests.approve`            | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.reject`             | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.joining`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestJoiningSchema`        |
+| `identity.joinRequests.setJoining`         | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiSetJoiningInputSchema`   | `joinRequestJoiningChangedSchema` |
+| `identity.joinRequests.automaticJoins`     | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestAutomaticJoinsSchema` |
+| `identity.joinRequests.getJoinAdmissions`  | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiAdmissionsInputSchema`   | inline                            |
+
+```typescript
+// identity.joinRequests.lookup
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:42
+type Input = unknown;
+// Output: joinRequestLookupSchema, ../contract/src/features/join-request/join-request.trpc.ts:33
+type Output = unknown;
+
+// identity.joinRequests.offer
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:47
+type Input = unknown;
+type Output = z.infer<typeof joinRequestLookupSchema>; // ../contract/src/features/join-request/join-request.trpc.ts:33
+
+// identity.joinRequests.dismissOffer
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:52
+type Input = Record<string, unknown>;
+// Output: joinRequestWriteAckSchema, ../contract/src/features/join-request/join-request.responses.ts:63
+interface Output {
+  success: true;
+}
+
+// identity.joinRequests.admitAutomatically
+// Input: joinRequestApiAdmitInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:29
+interface Input {
+  origin?: "web" | "cli";
+}
+// Output: joinRequestAdmittedSchema, ../contract/src/features/join-request/join-request.responses.ts:35
+interface Output {
+  organization: {
+    organizationId: string;
+    name: string;
+    colleagueCount: number;
+  } | null;
+}
+
+// identity.joinRequests.mine
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:62
+type Input = unknown;
+// Output: joinRequestMineSchema, ../contract/src/features/join-request/join-request.responses.ts:20
+type Output = {
+  joinRequestId: string;
+  requestedAt: unknown;
+  expiresAt: unknown | null;
+  organizationId: string;
+}[];
+
+// identity.joinRequests.request
+// Input: joinRequestApiRequestInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:23
+interface Input {
+  organizationId: string;
+  origin?: "web" | "cli";
+}
+// Output: joinRequestFiledSchema, ../contract/src/features/join-request/join-request.responses.ts:26
+interface Output {
+  joinRequestId: string;
+  state: "PENDING" | "APPROVED";
+}
+
+// identity.joinRequests.withdraw
+// Input: joinRequestApiWithdrawInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:33
+interface Input {
+  joinRequestId: string;
+}
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
+
+// identity.joinRequests.pending
+// Input: joinRequestApiOrganizationScopeSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
+interface Input {
+  organizationId: string;
+}
+// Output: joinRequestPendingSchema, ../contract/src/features/join-request/join-request.responses.ts:67
+type Output = {
+  joinRequestId: string;
+  requestedAt: unknown;
+  expiresAt: unknown | null;
+  userId: string;
+  name: string;
+  domain: string;
+  seat: "MEMBER" | "DEVELOPER";
+}[];
+
+// identity.joinRequests.approve
+// Input: joinRequestApiDecisionInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:39
+interface Input {
+  organizationId: string;
+  joinRequestId: string;
+}
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
+
+// identity.joinRequests.reject
+type Input = z.infer<typeof joinRequestApiDecisionInputSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:39
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
+
+// identity.joinRequests.joining
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
+// Output: joinRequestJoiningSchema, ../contract/src/features/join-request/join-request.responses.ts:79
+interface Output {
+  domainJoin: "off" | "request" | "auto";
+  joinDomains: string[];
+  joinerRole: "MEMBER" | "DEVELOPER";
+}
+
+// identity.joinRequests.setJoining
+// Input: joinRequestApiSetJoiningInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:46
+interface Input {
+  organizationId: string;
+  domainJoin: "off" | "request" | "auto";
+  domains?: string[];
+  joinerRole?: "MEMBER" | "DEVELOPER";
+}
+// Output: joinRequestJoiningChangedSchema, ../contract/src/features/join-request/join-request.responses.ts:89
+interface Output {
+  previous: "off" | "request" | "auto";
+  next: "off" | "request" | "auto";
+  previousDomains: string[];
+  nextDomains: string[];
+  previousJoinerRole: "MEMBER" | "DEVELOPER";
+  nextJoinerRole: "MEMBER" | "DEVELOPER";
+}
+
+// identity.joinRequests.automaticJoins
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
+// Output: joinRequestAutomaticJoinsSchema, ../contract/src/features/join-request/join-request.responses.ts:50
+type Output = {
+  joinRequestId: string;
+  userId: string;
+  name: string;
+  domain: string;
+  joinedAt: unknown | null;
+}[];
+
+// identity.joinRequests.getJoinAdmissions
+// Input: joinRequestApiAdmissionsInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:55
+interface Input {
+  organizationId: string;
+  userIds: string[];
+}
+// Output: inline, ../contract/src/features/join-request/join-request.trpc.ts:102
+type Output = {
+  userId: string;
+  domain: string;
+  automatic: boolean;
+}[];
+```
+
+### `twoStepVerification`
+
+Contract `../contract/src/two-step-verification.trpc.ts:16`, router `src/transport/two-step-verification.trpc.ts:30`.
+
+| Procedure                            | Kind     | Gate                                                                                                                                                                                    | Input                     | Output                                   |
+| ------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ---------------------------------------- |
+| `twoStepVerification.account`        | query    | No permission: the caller's own two-step verification, answered for the session's user id alone                                                                                         | inline                    | `twoStepAccountStandingSchema`           |
+| `twoStepVerification.disable`        | mutation | No permission: the caller turning off their own two-step verification, matched on the session's user id; the password and a current code are the proof                                  | inline                    | `twoStepDisabledSchema`                  |
+| `twoStepVerification.standing`       | query    | No permission: the caller asking whether an organization's second-factor requirement holds them; answered for the session's own user id, and the same shape for a member and a stranger | `organizationInputSchema` | `organizationMfaStandingSchema`          |
+| `twoStepVerification.requirement`    | query    | Permission `organization:manage`                                                                                                                                                        | `organizationInputSchema` | `organizationMfaRequirementSchema`       |
+| `twoStepVerification.setRequirement` | mutation | Permission `organization:manage`                                                                                                                                                        | inline                    | `organizationMfaRequirementChangeSchema` |
+| `twoStepVerification.memberFactors`  | query    | Permission `organization:manage`                                                                                                                                                        | `organizationInputSchema` | inline                                   |
+
+```typescript
+// twoStepVerification.account
+// Input: inline, ../contract/src/two-step-verification.trpc.ts:18
+type Input = Record<string, unknown>;
+// Output: twoStepAccountStandingSchema, ../contract/src/two-step-verification.ts:17
+interface Output {
+  offered: boolean;
+  enabled: boolean;
+  holdsPasskey: boolean;
+  requiringOrganizations: {
+    organizationId: string;
+    name: string;
+    slug: string;
+  }[];
+}
+
+// twoStepVerification.disable
+// Input: inline, ../contract/src/two-step-verification.trpc.ts:23
+interface Input {
+  password?: string;
+  code: string;
+}
+// Output: twoStepDisabledSchema, ../contract/src/two-step-verification.ts:84
+interface Output {
+  disabled: true;
+}
+
+// twoStepVerification.standing
+// Input: organizationInputSchema, ../contract/src/two-step-verification.trpc.ts:14
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof organizationMfaStandingSchema>; // ../contract/src/two-step-verification.ts:43
+
+// twoStepVerification.requirement
+type Input = z.infer<typeof organizationInputSchema>; // ../contract/src/two-step-verification.trpc.ts:14
+// Output: organizationMfaRequirementSchema, ../contract/src/two-step-verification.ts:62
+interface Output {
+  mfaRequired: boolean;
+  offered: boolean;
+  connection: {
+    connected: boolean;
+    assertedFactors: ("pwd" | "otp" | "pin" | "saml" | "oidc" | "phw" | "hwk" | "swk" | "mfa")[];
+    assertsSecondFactor: boolean;
+  };
+}
+
+// twoStepVerification.setRequirement
+// Input: inline, ../contract/src/two-step-verification.trpc.ts:40
+interface Input {
+  organizationId: string;
+  mfaRequired: boolean;
+}
+// Output: organizationMfaRequirementChangeSchema, ../contract/src/two-step-verification.ts:69
+interface Output {
+  previous: boolean;
+  next: boolean;
+}
+
+// twoStepVerification.memberFactors
+type Input = z.infer<typeof organizationInputSchema>; // ../contract/src/two-step-verification.trpc.ts:14
+// Output: z.array(organizationMemberFactorSchema) (inline, ../contract/src/two-step-verification.trpc.ts:45)
+```
+
+## Sockets
+
+None: this module declares no websocket, rawsocket or rawhttp door.
+
+## Workers
+
+### Pipeline `identity_maintenance` (aggregate `global`)
+
+Declared at `src/eventing/identity.pipeline.ts:51`.
+
+| Kind            | Name                        | Handles                                                                                           | Declared at                            |
+| --------------- | --------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| process manager | `breakGlassExpiryWarn`      | every 1 h (`BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS = 60 * 60 * 1000`); intents `warn` (outbox)       | `src/eventing/identity.pipeline.ts:71` |
+| process manager | `ssoDomainReproofSweep`     | every 8 h (`SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/identity.pipeline.ts:87` |
+| peer subscriber | `userRegistered`            | `lw.user.registered` from [user](../../user/README.md)                                            | `src/eventing/identity.pipeline.ts:58` |
+| peer subscriber | `joinRequestInviteAccepted` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:63` |
+| peer subscriber | `joinRequestMembersInvited` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:67` |
+
+### Pipeline `identity` (aggregate `user_identity`)
+
+Declared at `src/eventing/user-identity.pipeline.ts:90`. Events: `identifierAttachedEventSchema`, `identifierVerifiedEventSchema`, `identifierDeadEndedEventSchema`, `primaryChangedEventSchema`, `identifierDetachedEventSchema`, `userErasedEventSchema`, `linkProposedEventSchema`, `linkConfirmedEventSchema`, `linkRejectedEventSchema`, `mfaEnrolledEventSchema`, `mfaConfirmedEventSchema`, `mfaEnrollmentExpiredEventSchema`, `mfaDisabledEventSchema`, `backupCodeConsumedEventSchema`, `backupCodesRegeneratedEventSchema`, `mfaVerificationFailedEventSchema`.
+
+| Kind                | Name                                                                          | Handles | Declared at                                  |
+| ------------------- | ----------------------------------------------------------------------------- | ------- | -------------------------------------------- |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:119` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:124` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:129` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:134` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:139` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:144` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:149` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:154` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:164` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:169` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:174` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:179` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:184` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:189` |
+| command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:194` |
+| Postgres projection | `≈ new IdentityStateFoldProjection({ store: deps.identityProjectionStore, })` | –       | `src/eventing/user-identity.pipeline.ts:114` |
+| Postgres projection | `≈ new MfaEnrollmentStateFoldProjection({ store: deps.mfaProjectionStore, })` | –       | `src/eventing/user-identity.pipeline.ts:159` |
+
+### Pipeline `join-requests` (aggregate `join_request`)
+
+Declared at `src/features/join-request/eventing/join-request.pipeline.ts:92`. Events: `joinRequestedEventSchema`, `joinApprovedEventSchema`, `joinRejectedEventSchema`, `joinExpiredEventSchema`, `joinWithdrawnEventSchema`.
+
+| Kind                | Name                                                                                | Handles | Declared at                                                       |
+| ------------------- | ----------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------- |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:110` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:115` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:120` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:125` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:130` |
+| process manager     | `joinRequestLifecycle`                                                              | –       | `src/features/join-request/eventing/join-request.pipeline.ts:137` |
+| Postgres projection | `≈ new JoinRequestStateFoldProjection({ store: deps.joinRequestProjectionStore, })` | –       | `src/features/join-request/eventing/join-request.pipeline.ts:105` |
+
+### Pipeline `sso-connections` (aggregate `sso_connection`)
+
+Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:188`. Events: `connectionRegisteredEventSchema`, `domainClaimedEventSchema`, `domainClaimApprovedEventSchema`, `domainClaimRejectedEventSchema`, `connectionDiscardedEventSchema`, `verificationRequestedEventSchema`, `domainAttestedEventSchema`, `domainWithdrawnEventSchema`, `domainVerifiedEventSchema`, `domainProofWaveredEventSchema`, `domainProofLapsedEventSchema`, `domainProofRecoveredEventSchema`, `connectionActivatedEventSchema`, `connectionSuspendedEventSchema`, `connectionResumedEventSchema`, `teardownRequestedEventSchema`, `connectionTornDownEventSchema`, `connectionArrivalPolicySetEventSchema`, `connectionRenamedEventSchema`, `connectionIdpUpdatedEventSchema`, `replacementConnectionRegisteredEventSchema`, `migrationRouteSelectedEventSchema`, `migrationFinalizationStartedEventSchema`, `migrationFinalizedEventSchema`.
+
+| Kind                | Name                                                                                 | Handles                                                         | Declared at                                                           |
+| ------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:225` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:230` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:235` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:240` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:245` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:250` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:255` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:260` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:265` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:270` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:275` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:280` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:285` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:290` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:295` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:300` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:305` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:310` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:315` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:320` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:325` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:330` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:335` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:340` |
+| process manager     | `connectionTeardown`                                                                 | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:347` |
+| process manager     | `ssoDomainProofNotification`                                                         | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:350` |
+| subscriber          | `scimDirectoryMove`                                                                  | `lw.identity.migration_finalized` from [identity](../README.md) | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:353` |
+| Postgres projection | `≈ new SsoConnectionStateFoldProjection({ store: deps.connectionProjectionStore, })` | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:220` |
+
+## Configuration
+
+| Kind   | Leaf                          | Environment variable           | Declared at                             |
+| ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:472`           |
+| config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:28` |
+| config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:30` |
+| config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:32` |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`             | `../contract/src/identity.config.ts:34` |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`          | `../contract/src/identity.config.ts:35` |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`      | `../contract/src/identity.config.ts:36` |
+
+<!-- readme:generated:end -->

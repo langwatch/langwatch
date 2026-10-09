@@ -1,17 +1,17 @@
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
-import { SpanCostService } from "./span-cost.service.ts";
-import type { TraceSpanNormalization } from "./span-normalization.service.ts";
-import { SpanStatusService } from "./span-status.service.ts";
-import { SpanTimingService } from "./span-timing.service.ts";
-import { TraceAttributeAccumulationService } from "./trace-attribute-accumulation.service.ts";
-import { TraceIOAccumulationService } from "./trace-io-accumulation.service.ts";
-import type { TraceIoExtraction } from "./trace-io-extraction.service.ts";
-import type { TraceMediaReferenceResolver } from "./trace-media-reference.service.ts";
-import type { TraceModelCost } from "./trace-model-cost.service.ts";
-import { TraceNameResolutionService } from "./trace-name-resolution.service.ts";
+import { SpanCostService } from "../features/span/services/span-cost.service.ts";
+import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
+import { SpanStatusService } from "../features/span/services/span-status.service.ts";
+import { SpanTimingService } from "../features/span/services/span-timing.service.ts";
+import { TraceAttributeAccumulationService } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
+import { TraceIOAccumulationService } from "../features/derivation/services/trace-io-accumulation.service.ts";
+import type { TraceIoExtraction } from "../features/derivation/services/trace-io-extraction.service.ts";
+import type { TraceMediaReferenceResolver } from "../features/media/services/trace-media-reference.service.ts";
+import type { TraceModelCost } from "../features/derivation/services/trace-model-cost.service.ts";
+import { TraceNameResolutionService } from "../features/derivation/services/trace-name-resolution.service.ts";
 import { TraceOriginService } from "./trace-origin.service.ts";
-import { TracePromptAccumulationService } from "./trace-prompt-accumulation.service.ts";
+import { TracePromptAccumulationService } from "../features/derivation/services/trace-prompt-accumulation.service.ts";
 
 /**
  * The deterministic collaborators shared by Trace's three event projections.

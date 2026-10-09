@@ -51,10 +51,11 @@ describe("avatar objects over the stored-object store", () => {
         isDuplicate: false,
       }));
       const app = appOver(createApiFixture<StoredObjectApi>({ storeFromBytes }));
-      const person = await app.createCredentialUser({
+      const person = await app.registerCredentialAccount({
         name: "Sam",
         email: "sam@acme.com",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
 
       const result = await app.setOwnAvatar({
@@ -120,7 +121,10 @@ describe("avatar objects over the stored-object store", () => {
   });
 
   describe("when a signed-in person asks for an avatar's URL", () => {
-    /** @scenario "A signed-in person gets a signed URL only for an uploaded avatar" */
+    /**
+     * @scenario "A signed-in person gets a signed URL only for an uploaded avatar"
+     * @scenario "A signed-in teammate gets a signed URL for another user's uploaded avatar"
+     */
     it("asks for a signed URL held to the avatar purpose and owner kind", async () => {
       const getReadUrlForPurpose = vi.fn<StoredObjectApi["getReadUrlForPurpose"]>(async () => ({
         url: "/api/stored-objects/obj-1/content?sig=sealed",

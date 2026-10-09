@@ -26,6 +26,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
+    "better-auth": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

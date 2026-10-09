@@ -16,7 +16,7 @@ import {
   newAttachment,
   opensOnAttach,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import type { InheritedSuite } from "./run-evaluators";
+import type { InheritedSuite } from "../run-evaluators/run-evaluators";
 import { useAddExtraFlow } from "./use-add-extra-flow";
 
 /** A plan level attachment reads no scenario field. */

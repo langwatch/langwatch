@@ -88,6 +88,7 @@ describe("the workflow module's transport declarations", () => {
         ["cascadeArchive", "mutation", "workflows:delete"],
         ["archive", "mutation", "workflows:delete"],
         ["generateCommitMessage", "mutation", "workflows:update"],
+        ["copyAgent", "mutation", "evaluations:manage"],
       ]);
     });
 
@@ -110,9 +111,7 @@ describe("the workflow module's transport declarations", () => {
         ["chat", "mutation", "workflows:manage"],
         ["getPublishedWorkflow", "query", "workflows:view"],
         ["disableAsComponent", "mutation", "workflows:update"],
-        ["disableAsEvaluator", "mutation", "workflows:update"],
         ["toggleSaveAsComponent", "mutation", "workflows:update"],
-        ["toggleSaveAsEvaluator", "mutation", "workflows:update"],
         ["getComponents", "query", "workflows:view"],
       ]);
     });
@@ -125,7 +124,6 @@ describe("the workflow module's transport declarations", () => {
         ["GET", "/:id", "getApiWorkflowsById", "workflows:view"],
         ["PATCH", "/:id", "patchApiWorkflowsById", "workflows:update"],
         ["DELETE", "/:id", "deleteApiWorkflowsById", "workflows:manage"],
-        ["POST", "/:id/evaluate", "postApiWorkflowsByIdEvaluate", "workflows:create"],
       ]);
       expect(createWorkflowRest().router().namespace).toBe("workflows");
     });

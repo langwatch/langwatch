@@ -1,17 +1,30 @@
 import {
   auditLogHistoryEntrySchema,
+  auditLogTargetEntrySchema,
   type AuditLogEntry,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
 import { generate } from "@langwatch/ksuid";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { type Instant, Temporal, nowInstant, toDate } from "@langwatch/time";
 
 import type { AuditLogRepository } from "../audit-log.repository.ts";
-import type { MemoryAuditLogRow, MemoryAuditLogStore } from "./memory.audit-log.store.ts";
+
+type MemoryAuditLogRow = AuditLogEntry & {
+  id: string;
+  createdAt: Instant;
+  idempotencyKey?: string;
+};
+
+/** The rows both memory twins share: an entry recorded through one is a touch the other reads. */
+export class MemoryAuditLogStore {
+  readonly rows: MemoryAuditLogRow[] = [];
+}
 
 export class MemoryAuditLogRepository implements AuditLogRepository {
   private constructor(private readonly store: MemoryAuditLogStore) {}
@@ -28,20 +41,22 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
 
   async createOnce({
     entry,
-    id,
+    idempotencyKey,
     occurredAt,
   }: {
     entry: AuditLogEntry;
-    id: string;
+    idempotencyKey: string;
     occurredAt: number;
   }): Promise<RecordedAuditLogEntry> {
-    const existing = this.store.rows.find((row) => row.id === id);
+    const existing = this.store.rows.find((row) => row.idempotencyKey === idempotencyKey);
     if (existing !== undefined) {
       return { id: existing.id, occurredAt: existing.createdAt.epochMilliseconds };
     }
+    const id = generate("audit").toString();
     this.store.rows.push({
       ...entry,
       id,
+      idempotencyKey,
       createdAt: Temporal.Instant.fromEpochMilliseconds(occurredAt),
     });
     return { id, occurredAt };
@@ -73,6 +88,26 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
         args: row.args ?? null,
       }),
     );
+  }
+
+  async findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    // Reversed first, so entries written in one millisecond read last-written first.
+    return this.store.rows
+      .filter((row) => row.targetKind === input.targetKind)
+      .toReversed()
+      .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt))
+      .slice(0, input.limit)
+      .map((row) =>
+        auditLogTargetEntrySchema.parse({
+          id: row.id,
+          createdAt: toDate(row.createdAt),
+          action: row.action,
+          targetId: row.targetId ?? null,
+          projectId: row.projectId ?? null,
+          userId: row.userId ?? null,
+          metadata: row.metadata ?? null,
+        }),
+      );
   }
 }
 

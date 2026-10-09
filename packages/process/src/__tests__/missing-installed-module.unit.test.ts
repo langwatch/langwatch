@@ -20,12 +20,11 @@ function runtime(): ProcessBoot {
         role,
         modules,
         config: {},
-        members: {
+        stores: {
           order: [],
           read(name) {
             throw new Error(`Unexpected member: ${name}`);
           },
-          async close() {},
         },
         surface: () => ({ hosts: {}, serve: () => "handler" }),
       }),
@@ -42,7 +41,7 @@ function peerModule({
   class PeerApp {
     static readonly contract = token;
     static readonly dependencies = {};
-    static create(_setup: FeatureSetup<Record<never, never>, object, undefined>) {
+    static create(_setup: FeatureSetup<Record<never, never>, undefined>) {
       return { read: () => name };
     }
   }
@@ -54,7 +53,7 @@ function dependentModule({ constructed }: { constructed: string[] }) {
   class DependentApp {
     static readonly contract = DependentApi;
     static readonly dependencies = { workflows: WorkflowApi, auditLog: AuditLogApi };
-    static create(_setup: FeatureSetup<typeof DependentApp.dependencies, object, undefined>) {
+    static create(_setup: FeatureSetup<typeof DependentApp.dependencies, undefined>) {
       constructed.push("agent");
       return { read: () => "agent" };
     }
@@ -69,6 +68,8 @@ describe("given a module that declares other modules' Apis as peers", () => {
      * @scenario "A process installing agent without the modules it needs refuses to boot"
      * @scenario "A module whose collaborating module is not installed refuses to boot"
      * @scenario "A process installing a module that needs authorization without the authz module refuses to boot"
+     * @scenario "A process missing a module the record needs refuses to boot by name"
+     * @scenario "A deployment that did not install a needed module refuses to boot by name"
      */
     it("refuses the boot naming the module and the peer, and constructs nothing", async () => {
       const constructed: string[] = [];

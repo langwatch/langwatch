@@ -12,9 +12,12 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import type React from "react";
 import { useMemo } from "react";
 
+import type {
+  TraceEvalResult,
+  TraceListItem,
+} from "../../../../../../../behavior/explorer/types/trace.ts";
+import { useTraceSpanTree } from "../../../../../../../features/span/behavior/use-trace-span-tree.ts";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
-import { useTraceSpanTree } from "../../../../hooks/use-trace-span-tree.ts";
-import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";
 import { spanTypeColor } from "../../../../utils/span-type-color.ts";
 import { evalChipColor, formatEvalScore } from "../../shared-chips.tsx";
 import type { AddonDef } from "../../types.ts";

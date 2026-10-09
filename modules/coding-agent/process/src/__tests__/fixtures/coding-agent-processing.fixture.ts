@@ -295,6 +295,7 @@ export class TestModelProviderService implements ModelProviderApi {
 
 /** The log and metric reactions, inert unless a test hands its own. */
 export const inertReceivedFacts: CodingAgentProcessingPipelineDeps["receivedFacts"] = {
+  contributeReceivedSpan: async () => undefined,
   contributeReceivedLogRecord: async () => undefined,
   contributeReceivedMetricPoint: async () => undefined,
 };
@@ -303,6 +304,7 @@ export const inertReceivedFacts: CodingAgentProcessingPipelineDeps["receivedFact
 export function buildTestCodingAgentProcessingPipeline(
   github?: GithubApi,
   receivedFacts: CodingAgentProcessingPipelineDeps["receivedFacts"] = inertReceivedFacts,
+  installationBackfill?: CodingAgentProcessingPipelineDeps["installationBackfill"],
 ) {
   return EventingCodingAgentProcessingAdapter.create({
     traceCanonicalisation: new TestTraceCanonicalisationService(),
@@ -315,6 +317,7 @@ export function buildTestCodingAgentProcessingPipeline(
     sessionContextMemo: MemorySessionContextMemoRepository.create(),
     sessionFoldCache: MemoryCodingAgentSessionFoldCacheRepository.create(),
     github,
+    installationBackfill,
     receivedFacts,
   }).build();
 }

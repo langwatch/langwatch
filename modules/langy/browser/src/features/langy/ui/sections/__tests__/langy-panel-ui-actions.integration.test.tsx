@@ -13,7 +13,7 @@ import { z } from "zod";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { type LangyUiActionHandlers } from "../../../../../model/ui-actions/langy-ui-action-types.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.
@@ -194,6 +194,13 @@ const flagsRef = {
   current: { release_langy_ui_actions: true } as Record<string, boolean>,
 };
 
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: (flag: string) => ({
+    enabled: flagsRef.current[flag] ?? false,
+    isLoading: false,
+  }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project() {
     return { id: PROJECT_ID, slug: "demo", name: "demo" };
@@ -218,9 +225,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return false;
-  }
-  featureFlag(flag: string) {
-    return flagsRef.current[flag] ?? false;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/demo/experiments" };

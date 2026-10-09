@@ -52,11 +52,12 @@ Three things, briefly:
 
 If the handover names one, do that. If it names a manifest, spawn it:
 
-1. Write the roster row in `.claude/coordinator/LANES.md` **first**.
+1. Write the roster row in the local lane roster file (gitignored, beside LANE.md) **first**.
 2. Spawn with the Agent tool: `subagent_type` `lane`, `model` set to what the
    manifest names, prompt built from the paste in `.claude/coordinator/LANE.md`.
 3. Add to the prompt the one or two things a lane is most likely to get wrong on
-   this particular task.
+   this particular task. Cite the module pages for the owned paths (`modules/<id>/README.md`)
+   and tell the lane to read those READMEs first, instead of restating the module in the brief.
 
 State model, effort and context size at every spawn, with one clause saying why.
 The routing table is COORDINATOR.md section 3. The ceiling is the record's: at most

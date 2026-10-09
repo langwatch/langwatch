@@ -8,19 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./session": {
-      "types": "./dist/session.d.ts",
-      "default": "./src/session.ts"
-    },
     "./declaration": {
       "langwatch-declaration-source": "./src/auth.web.ts",
       "types": "./dist/auth.web.d.ts",
       "default": "./src/auth.web.ts"
-    },
-    "./auth": {
-      "langwatch-declaration-source": "./src/auth.ts",
-      "types": "./dist/auth.d.ts",
-      "default": "./src/auth.ts"
     }
   },
   "scripts": {
@@ -38,6 +29,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-client": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

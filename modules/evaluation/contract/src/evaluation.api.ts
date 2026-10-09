@@ -14,7 +14,6 @@ import type {
   EvaluationSlugMatch,
   GuardrailCheckInput,
   GuardrailCheckOutcome,
-  LogBatchEvaluationInput,
   RunEvaluatorInput,
   SavedEvaluatorLookup,
   SavedEvaluatorResolution,
@@ -30,6 +29,7 @@ import type {
   UpsertEvaluationRunCommand,
 } from "./evaluation.commands.ts";
 import type {
+  MonitorPerformanceForProjectInput,
   MonitorPerformanceQuery,
   OnlineEvaluationPerformance,
 } from "./evaluation.performance.ts";
@@ -37,22 +37,13 @@ import type {
   EvaluationInputsQuery,
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
-  EvaluationSummariesByTraceIdsQuery,
-  EvaluatorEffectiveSettingsQuery,
-  TraceEvaluationsQuery,
 } from "./evaluation.queries.ts";
 import type {
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
-  EvaluatorEffectiveSettings,
 } from "./evaluation.responses.ts";
-import type {
-  EvaluationExecutionResult,
-  EvaluationRunData,
-  EvaluationSummary,
-  TraceEvaluationData,
-} from "./evaluation.ts";
+import type { EvaluationExecutionResult, EvaluationRunData } from "./evaluation.ts";
 import type { TopicClusteringOutcome, TopicClusteringRequest } from "./langevals-clustering.ts";
 import type { PiiDetectionOutcome, PiiDetectionRequest } from "./langevals-pii-detection.ts";
 
@@ -75,38 +66,26 @@ export interface EvaluationApi {
   getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
   findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
-  findSummariesByTraceIds(
-    input: EvaluationSummariesByTraceIdsQuery,
-  ): Promise<Record<string, EvaluationSummary[]>>;
-  findTraceEvaluations(
-    input: TraceEvaluationsQuery,
-  ): Promise<Record<string, TraceEvaluationData[]>>;
   findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
   getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
+  /** The seven-day trend of every monitor the project has; none when it has no monitors. */
+  findMonitorPerformance(
+    input: MonitorPerformanceForProjectInput,
+  ): Promise<OnlineEvaluationPerformance[]>;
 
-  // The public evaluation doors: the SDK's batch result log and the four
-  // evaluate paths reach the same capability every other caller does.
+  // The public evaluation doors: the evaluate paths reach the same capability
+  // every other caller does.
 
-  /** Refuses an SDK batch body larger than the project's organization accepts in one request. */
-  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
-  /** Records one SDK batch evaluation: its run, its rows and its verdicts. */
-  logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
   /** Runs one evaluator over one input, and never rejects for a domain reason. */
   runEvaluator(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
   /** Runs one guardrail's evaluator until its deadline or the caller's abort; records its cost. */
   checkGuardrail(input: GuardrailCheckInput): Promise<GuardrailCheckOutcome>;
   /** One saved evaluator, ready to run; throws when no evaluator answers to it. */
   resolveSavedEvaluator(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
-  /** The settings a run would use for an evaluator and a monitor's parameters, flag included. */
-  getEvaluatorEffectiveSettings(
-    input: EvaluatorEffectiveSettingsQuery,
-  ): Promise<EvaluatorEffectiveSettings>;
   /** One monitor by slug, or null. */
   findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
   /** One dataset by slug, or null. */
   findDatasetBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
-  /** One experiment by slug, or null. */
-  findExperimentBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
   /** The model the project's cascade resolves for one feature key, or null. */
   findModelForFeature(input: EvaluationModelLookup): Promise<string | null>;
   /** Records what a run of an evaluator cost. */
@@ -117,8 +96,6 @@ export interface EvaluationApi {
   reportEvaluation(data: ReportEvaluationCommandData): Promise<void>;
   /** Queues a trace's online evaluation with the trigger's delay and dedup. */
   queueTraceEvaluation(data: ExecuteEvaluationCommandData): Promise<void>;
-  /** The evaluator-id slug rule for an evaluation that names no evaluator. */
-  deriveEvaluatorId(name: string): string;
   /** The evaluation half of a trigger's legacy filters against a trace's runs. */
   matchesEvaluationFilters(input: {
     filters: Readonly<Record<string, unknown>>;

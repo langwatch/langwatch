@@ -8,12 +8,12 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DefaultGovernanceAiToolCatalogService } from "../ai-tool-catalog.service.ts";
 import {
   GovernanceCliCredentialService,
   type GovernanceCliCredentialMembers,
-} from "../governance-cli-credentials.service.ts";
-import type { PersonalIngestionKeyService } from "../personal-ingestion-key.service.ts";
+} from "../../features/cli/services/governance-cli-credentials.service.ts";
+import type { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
+import type { DefaultGovernanceAiToolCatalogService } from "../ai-tool-catalog.service.ts";
 
 const caller = {
   user_id: "user_1",

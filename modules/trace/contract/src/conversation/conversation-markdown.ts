@@ -1,4 +1,4 @@
-import { formatDuration, isoTimestamp } from "../trace-time-format.ts";
+import { formatDuration, isoTimestamp } from "../features/list/trace-time-format.ts";
 import { extractSystemText } from "../transcript/transcript-text-extraction.ts";
 import {
   clipKeepingEnds,

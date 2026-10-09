@@ -4,7 +4,7 @@
  * `CustomGraph.graph` persists as a `DashboardWidgetDefinition`.
  */
 
-import type { DashboardWidgetQuery } from "../dashboard-widget-definition.ts";
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
 /** Bucketed trace counts — the canonical follows-everything statement. */
 const BUCKETED_TRACES_SQL = `SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,

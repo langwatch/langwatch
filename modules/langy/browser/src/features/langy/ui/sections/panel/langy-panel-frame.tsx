@@ -3,13 +3,13 @@ import { motion } from "motion/react";
 import { type ComponentProps, type ReactNode, type RefObject } from "react";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
-import type { useLangyContextDropZone } from "../../../../../behavior/use-langy-context-drop-zone.ts";
-import { PANEL_ROOT_ATTR } from "../../../../../model/composer-morph-geometry.ts";
 import {
   FLOATING_PEEK_NEAR_PX,
   SIDEBAR_PEEK_NEAR_PX,
 } from "../../../../../model/langy-peek-dock.ts";
 import { LangyWave } from "../../../../../ui/elements/langy-wave.tsx";
+import { PANEL_ROOT_ATTR } from "../../../../composer/model/composer-morph-geometry.ts";
+import type { useLangyContextDropZone } from "../../../../context-target/behavior/use-langy-context-drop-zone.ts";
 import type {
   useLangyPanelPeek,
   useLangyPanelPlacement,

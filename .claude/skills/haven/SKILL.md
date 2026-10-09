@@ -14,7 +14,12 @@ reference is `tools/thuishaven/README.md`; the processes and flags are in
 guessing a flag.
 
 Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/haven.mk`);
-`make haven install` puts plain `haven` on your PATH.
+`make haven install` puts plain `haven` on your PATH and installs what the machine
+needs. With no TTY it runs `haven install --yes` (no prompts; on macOS also the
+native tier: `brew install grafana prometheus loki` and the pinned ClickHouse,
+Tempo and Alloy downloads). colima is optional. A failed non-required row is
+logged and the run carries on. Re-running is a no-op;
+`haven install --list --agent` reports without installing.
 
 ## As an agent
 
@@ -26,6 +31,10 @@ Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/hav
 | Only warnings and worse                     | `haven logs api --level warn --agent`           |
 | Last distinct failures, grouped             | `haven errors --agent`                          |
 | Recent root spans of this stack             | `haven traces --json`                           |
+| One trace's span tree                       | `haven traces <trace-id> --json`                |
+| Slow or failing traces                      | `haven traces --min-duration 500ms --errors`    |
+| Full info/debug stream from Loki            | `haven logs api --loki --since 1h --grep boom`  |
+| Logs for one trace                          | `haven logs --trace <trace-id>`                 |
 
 - Bare `haven up` without a TTY never returns and dies with your shell. Always `-d`.
 - `--agent` (or `HAVEN_AGENT=1`) makes output plain: no colour, no redraws.
@@ -54,6 +63,8 @@ https://hub.langwatch.localhost               every stack on the machine
 `ui`, `api`, `go` (gateway and nlp), `sims`, `langy`. The api lane hosts the worker, so
 `haven logs api` and `haven logs worker` each show half of it. Under
 `LANGWATCH_DEV_ONE_PROCESS=1` ui, api and worker are one `app` lane: see `dev-runtime`.
+Under `LANGWATCH_GO_ONE_PROCESS=1` (a trial) the `go` lane also hosts the simulators
+and no `sims` lane runs; `haven logs <sim>` still reads each one. Langy stays its own lane.
 
 ```bash
 haven logs api -t                 # follow one service
@@ -61,6 +72,23 @@ haven logs go --since 5m --level error
 haven restart sims                # bounce one lane; nothing else restarts
 haven restart api                 # restart the whole lane
 ```
+
+## The stack's own traces and logs
+
+This is the stack's OTel telemetry (Tempo, Loki), not product traces. Every read is
+filtered to this worktree and prints a Grafana deep link (a `grafana` field in `--json`).
+
+```bash
+haven traces --service api --name checkout --since 1h   # filters; also --min-duration, --errors
+haven traces <trace-id> --json                          # span tree plus the link
+haven logs api --loki --level info --grep timeout       # Loki: what the muted consoles never printed
+haven logs --trace <trace-id>                           # Loki lines carrying that trace_id
+```
+
+`--loki` and `--trace` need the observability stack (`haven up`); services match as
+substrings of the OTel service name. `--grep` also filters the plain captured read.
+`--trace` finds only lines whose structured metadata carries `trace_id`; when none do,
+it is empty, so fall back to `--since` around the trace's start time.
 
 Only `haven down` followed by `haven up` reloads a changed `.env`. `haven restart` does
 not.
@@ -88,7 +116,6 @@ not.
 | Evaluators (monitors, evaluations)         | `haven up +langevals`                               |
 | Zero-cost model answers                    | `haven up +llm`                                     |
 | Try a PR in its own worktree               | `haven pr <number>`                                 |
-| Hold Vite reloads during an agent turn     | `haven hmr on --ttl 60s`, `haven hmr off`           |
 | Run a heavy command under the machine slot | `haven run`, `haven slot run -- <cmd>`              |
 
 Seed presets are in `haven help db` (`demo`, `onboarding`, `post-onboarding` and more).

@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/api",
+  "langwatch": { "group": "framework" },
   "version": "0.0.0",
   "private": true,
   "description": "LangWatch's API framework: the transport-agnostic error, access-policy and capability vocabulary, the Hono REST service framework (./rest), and the typed tRPC root and policy spine (./trpc)",
@@ -25,6 +26,10 @@
     "./dates": {
       "types": "./dist/dates.d.ts",
       "default": "./src/dates.ts"
+    },
+    "./json-text-field": {
+      "types": "./dist/json-text-field.d.ts",
+      "default": "./src/json-text-field.ts"
     },
     "./rest": {
       "types": "./dist/rest/index.d.ts",

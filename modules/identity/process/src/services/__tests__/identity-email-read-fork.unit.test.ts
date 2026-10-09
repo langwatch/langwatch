@@ -164,6 +164,36 @@ describe("the identity email read fork over Postgres", () => {
       expect(calls.identifiers).toBe(0);
       expect(calls.latchUser).toBe(0);
     });
+
+    /** @scenario "The gate costs nothing before anyone is enrolled" */
+    it("settles every user with one read, and stops short-circuiting once someone finalizes", async () => {
+      const clock = { now: NOW };
+      const options = {
+        anyoneFinalized: false,
+        statusByUser: { "user-1": "finalized" },
+        identifiers: [identifier()],
+        cacheTtlMs: 60_000,
+      };
+      const { emails, calls } = build(options, clock);
+
+      await Promise.all(
+        ["user-1", "user-2", "user-3"].map((userId) => emails.resolveEmail({ userId })),
+      );
+      await emails.resolveEmail({ userId: "user-4" });
+
+      expect(calls.latchAnyone).toBe(1);
+      expect(calls.latchUser).toBe(0);
+
+      options.anyoneFinalized = true;
+      clock.now += 60_001;
+
+      await expect(emails.resolveEmail({ userId: "user-1" })).resolves.toEqual({
+        kind: "resolved",
+        email: "alex@example.test",
+      });
+      expect(calls.latchAnyone).toBe(2);
+      expect(calls.latchUser).toBe(1);
+    });
   });
 
   describe("given the user's backfill is held rather than finalized", () => {

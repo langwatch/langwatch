@@ -12,11 +12,13 @@ import {
   type OwnEventLog,
   type ReadHintTarget,
   type ReadHintMap,
+  type ReplayService,
+  type SealedPipelineDefinition,
 } from "@langwatch/eventing";
 import type { TrpcContract, TrpcContractMember } from "@langwatch/module";
 
 import type { ServerRole } from "./feature-installer.ts";
-import type { RuntimeService } from "./runtime-lifecycle.ts";
+import type { RuntimeService } from "./lifecycle/runtime-lifecycle.ts";
 import type { DeclaredTransports } from "./transport-mounting.ts";
 
 /**
@@ -134,8 +136,22 @@ export interface EventingHost {
   holdConsumers?(): void;
   /** Starts consuming; the kernel calls it when the booted runtime starts. */
   startConsumers?(): void;
+  /** Stops taking jobs and intents, in-flight work finishing; absent where none can pause. */
+  pauseConsumers?(): void | Promise<void>;
+  /** Takes jobs again after `pauseConsumers`. */
+  resumeConsumers?(): void | Promise<void>;
   /** Wakes one process manager's outbox in this process; absent where none runs. */
   notifyOutbox?(processName: string): void;
+  /** Every pipeline registered so far, read at call time; absent where none can be listed. */
+  readonly definitions?: readonly SealedPipelineDefinition[] | undefined;
+  /** Opens one replay run's engine over the event log; absent where the role holds no log. */
+  replayEngine?(): ProjectionReplayEngine | undefined;
+}
+
+/** One replay run's engine, opened by the eventing member and closed when the run ends. */
+export interface ProjectionReplayEngine {
+  readonly service: ReplayService;
+  close(): Promise<void>;
 }
 
 /**
@@ -316,6 +332,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
     get eventStore() {
       return host.eventStore;
     },
+    get definitions() {
+      return host.definitions;
+    },
     register: registerPipelines(host.register.bind(candidate)),
     ...(typeof host.describe === "function"
       ? { describe: describePipelines(host.describe.bind(candidate)) }
@@ -332,10 +351,29 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
     ...(typeof host.notifyOutbox === "function"
       ? { notifyOutbox: host.notifyOutbox.bind(candidate) }
       : {}),
+    ...(typeof host.replayEngine === "function"
+      ? { replayEngine: host.replayEngine.bind(candidate) }
+      : {}),
+    ...consumerControls(host, candidate),
+  };
+}
+
+/** The consumer start and pause pairs a host offers, each copied only whole. */
+function consumerControls(
+  host: Partial<EventingHost>,
+  candidate: object,
+): Pick<EventingHost, "holdConsumers" | "startConsumers" | "pauseConsumers" | "resumeConsumers"> {
+  return {
     ...(typeof host.holdConsumers === "function" && typeof host.startConsumers === "function"
       ? {
           holdConsumers: host.holdConsumers.bind(candidate),
           startConsumers: host.startConsumers.bind(candidate),
+        }
+      : {}),
+    ...(typeof host.pauseConsumers === "function" && typeof host.resumeConsumers === "function"
+      ? {
+          pauseConsumers: host.pauseConsumers.bind(candidate),
+          resumeConsumers: host.resumeConsumers.bind(candidate),
         }
       : {}),
   };
@@ -350,7 +388,13 @@ export function eventingConsumers(eventing: EventingHost | undefined): RuntimeSe
   eventing.holdConsumers();
   // The eventing member closes what these consumers opened, after the drain.
   return [
-    { name: "eventing consumers", start: () => eventing.startConsumers?.(), stop: () => void 0 },
+    {
+      name: "eventing consumers",
+      start: () => eventing.startConsumers?.(),
+      stop: () => void 0,
+      pause: () => eventing.pauseConsumers?.(),
+      resume: () => eventing.resumeConsumers?.(),
+    },
   ];
 }
 

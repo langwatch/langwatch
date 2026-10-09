@@ -13,7 +13,7 @@ import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 const TABLE_NAME = "stored_objects" as const;
 
 /** The one operation the legacy stored-object index needs, as the driver exposes it. */
-export type StoredObjectsClickHouseClient = Readonly<{
+type StoredObjectsClickHouseClient = Readonly<{
   query(input: {
     query: string;
     query_params: Record<string, unknown>;

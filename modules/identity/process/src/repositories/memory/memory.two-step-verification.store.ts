@@ -1,7 +1,7 @@
 import type {
   AccountSecondFactors,
   OrganizationMfaSetting,
-} from "../two-step-verification.repository.ts";
+} from "../../features/mfa/repositories/two-step-verification.repository.ts";
 
 type MemoryTwoStepPerson = AccountSecondFactors & {
   name: string | null;

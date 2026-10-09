@@ -1,5 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
-import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
@@ -12,7 +10,6 @@ import type {
   MonitorIdInput,
   MonitorNameAvailabilityInput,
   MonitorPatchInput,
-  MonitorPerformanceInput,
   MonitorReplicationInput,
   MonitorRunnableCheckInput,
   MonitorSummary,
@@ -65,8 +62,6 @@ export interface MonitorApi {
   copy(input: MonitorCopyInput): Promise<Monitor>;
   /** The copy itself, once the evaluator (if any) already exists in the target. */
   replicate(input: MonitorReplicationInput): Promise<Monitor>;
-  /** The last seven days of score and pass rate for each of the project's monitors. */
-  performanceForProject(input: MonitorPerformanceInput): Promise<OnlineEvaluationPerformance[]>;
   /** The platform address for a monitor resource. */
   platformUrl(input: { projectSlug: string; path: string }): string;
   /** The usage report's figures (ADR-156, section 10). */
@@ -74,10 +69,3 @@ export interface MonitorApi {
 }
 
 export const MonitorApi = moduleApi<MonitorApi>()("monitor");
-
-/** Monitor's settings: only the shared deployment origin its platform links are built on. */
-export const monitorConfig = Config.define(() => ({
-  publicBaseUrl,
-}));
-
-export type MonitorServerConfig = ConfigOf<typeof monitorConfig>;

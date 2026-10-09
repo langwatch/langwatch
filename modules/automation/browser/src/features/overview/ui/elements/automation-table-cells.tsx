@@ -15,11 +15,10 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import { type TimeInput, nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { HelpCircle, Plus } from "lucide-react";
 import { Fragment } from "react";
 
-import { readableDate } from "../../../../model/display-formatters.ts";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 import { ClampedText } from "../../../../ui/elements/clamped-text.tsx";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";

@@ -1,19 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import path from "path";
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createHmrGate, type HmrReloadChannel } from "../havenHmrGate";
 
 describe("havenHmrGate", () => {
-  let dir: string;
   let sentMessages: unknown[];
   let server: HmrReloadChannel;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    dir = mkdtempSync(path.join(tmpdir(), "haven-hmr-gate-"));
     sentMessages = [];
     server = {
       ws: {
@@ -26,7 +20,6 @@ describe("havenHmrGate", () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    rmSync(dir, { recursive: true, force: true });
   });
 
   function fakeCtx(): string[] {
@@ -34,9 +27,7 @@ describe("havenHmrGate", () => {
   }
 
   function build() {
-    const gate = createHmrGate({
-      markerPath: path.join(dir, ".haven-hmr-gate"),
-    });
+    const gate = createHmrGate();
     gate.attach(server);
     return (modules: string[]) => gate.hotUpdate(modules);
   }
@@ -66,23 +57,6 @@ describe("havenHmrGate", () => {
 
       // Burst goes quiet for longer than burstSettleMs (default 500ms).
       vi.advanceTimersByTime(600);
-      expect(sentMessages).toEqual([{ type: "full-reload" }]);
-    });
-  });
-
-  describe("when an explicit haven hmr on marker is active", () => {
-    it("gates even a single isolated update until the marker's TTL lifts", () => {
-      const markerPath = path.join(dir, ".haven-hmr-gate");
-      writeFileSync(markerPath, String(Date.now() + 1000));
-
-      const gate = createHmrGate({ markerPath });
-      gate.attach(server);
-      const handleHotUpdate = (modules: string[]) => gate.hotUpdate(modules);
-
-      expect(handleHotUpdate(fakeCtx())).toEqual([]);
-      expect(sentMessages).toHaveLength(0);
-
-      vi.advanceTimersByTime(1300); // past the 1s TTL + the 250ms safety margin
       expect(sentMessages).toEqual([{ type: "full-reload" }]);
     });
   });

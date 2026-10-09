@@ -5,12 +5,12 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { LangyAskToken } from "@langwatch/langy-contract";
+import { GuidedOnboardingToken, LangyAskToken } from "@langwatch/langy-client";
 
 import { langyApi } from "./behavior/langy-api.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
 // Declares the `langy:` slices at install, so other modules read them from first paint.
-import "./behavior/langy-context-target.store.ts";
+import "./features/context-target/behavior/langy-context-target.store.ts";
 import "./behavior/langy-page-context.store.ts";
 import "./behavior/langy-registrations.store.ts";
 
@@ -24,9 +24,9 @@ export const langyWeb = defineBrowserModule("langy")
     },
   })
   // All another module may do to the panel: dock it with a kickoff and hear
-  // the scope it entered, or ask it a question with the view it is about. A
-  // consumer's own host reads the ask by token; nothing else reaches the store.
-  .withCapabilities({ guidedOnboarding: langyGuidedOnboarding })
+  // the scope it entered, or ask it a question with the view it is about, each
+  // lent by token; nothing else reaches Langy's store.
+  .lends(GuidedOnboardingToken, { value: langyGuidedOnboarding })
   .lends(LangyAskToken, { load: () => import("./behavior/langy-ask.capability.ts") })
   .withHosts({
     requires: ["LangyHostApi"],

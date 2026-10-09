@@ -135,6 +135,8 @@ export class ProjectWriteService {
       projectId: project.id,
       organizationId: input.organizationId,
       createdByUserId: input.userId ?? null,
+      teamId: project.teamId,
+      isPersonal: project.isPersonal,
     });
 
     return project;

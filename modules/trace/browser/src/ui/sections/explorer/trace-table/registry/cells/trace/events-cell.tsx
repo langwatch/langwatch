@@ -1,6 +1,6 @@
 import { HStack, Skeleton, Text } from "@langwatch/design-system/primitives";
 
-import type { TraceListItem } from "../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { EventBadge } from "../../shared-chips.tsx";
 import type { CellDef } from "../../types.ts";
 

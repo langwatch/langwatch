@@ -7,9 +7,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { GovernanceAgentsScreenService } from "../../features/agents/services/governance-agents-screen.service.ts";
 import { MemoryDiscoveredAgentRepository } from "../../repositories/memory/memory.discovered-agent.repository.ts";
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
-import { GovernanceAgentsScreenService } from "../governance-agents-screen.service.ts";
 
 const NOW = fromDate(new Date("2026-09-09T12:00:00.000Z"));
 const ORGANIZATION_ID = "org-1";

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { CostRollupDayComparer } from "../services/cost-rollup-day-comparer.service.ts";
+import type { CostRollupDayComparer } from "../features/cost/services/cost-rollup-day-comparer.service.ts";
 
 const logger = createLogger("langwatch:governance:cost-rollup:watch");
 

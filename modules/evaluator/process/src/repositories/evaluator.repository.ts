@@ -30,6 +30,8 @@ export interface EvaluatorRepository {
   /** The public address: the id, and failing that the project-unique slug. */
   findByIdOrSlug(input: { idOrSlug: string; projectId: string }): Promise<Evaluator | undefined>;
   findAll(input: { projectId: string }): Promise<Evaluator[]>;
+  /** Active evaluators across the projects, which the cloud Free evaluator cap counts. */
+  countActiveByProjects(input: { projectIds: string[] }): Promise<number>;
   findCopies(input: { evaluatorId: string }): Promise<EvaluatorCopy[]>;
   create(input: PersistEvaluatorInput): Promise<Evaluator>;
   update(input: EvaluatorUpdateInput): Promise<Evaluator>;

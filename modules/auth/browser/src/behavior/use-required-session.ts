@@ -28,6 +28,9 @@ export const noOrgBouncerRoutes = [
   // Where a single sign-on test sign-in lands: the tester belongs to no
   // organization by design, and the bootstrap is what that page replaces.
   "/auth/sso-test-complete",
+  // A new zero-org user landing here must reach the parked target, not be
+  // bounced to onboarding first.
+  "/auth/resume",
   "/onboarding/welcome",
   "/onboarding/[team]/project",
   "/onboarding/product",

@@ -261,6 +261,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         secretParameters: jobData.secretParameters,
       },
       target: jobData.target,
+      ...(jobData.plan !== undefined ? { plan: jobData.plan } : {}),
       startedByUserId: jobData.startedByUserId,
       startedByApiKeyId: jobData.startedByApiKeyId,
     });

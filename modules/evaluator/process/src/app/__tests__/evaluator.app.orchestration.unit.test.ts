@@ -3,6 +3,7 @@
  * What the application does beyond passing a call on: config
  * validation, workflow/archive rules, and per-project filtering. These
  * moved out of the tRPC class, so assertions target stable error codes.
+ * @see modules/evaluator/specs/evaluator-deleted-fact.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -83,10 +84,9 @@ describe("given a workflow that already backs an evaluator", () => {
 });
 
 describe("when the archive confirmation is opened", () => {
-  it("names the linked workflow and the monitors that go with it", async () => {
-    const ports = graph({
-      findMonitorsUsingEvaluator: vi.fn(async () => [{ id: "monitor-1", name: "Guard" }]),
-    });
+  /** @scenario "the archive confirmation names only the linked workflow" */
+  it("names the linked workflow, and leaves the monitors to monitor", async () => {
+    const ports = graph();
     const { app, repository } = anApp({ ports });
     await repository.create({
       id: "evaluator-1",
@@ -101,7 +101,6 @@ describe("when the archive confirmation is opened", () => {
       app.getRelatedEntities({ id: "evaluator-1", projectId: "project-1" }),
     ).resolves.toEqual({
       workflow: { id: "workflow-1", name: "Judge" },
-      monitors: [{ id: "monitor-1", name: "Guard" }],
     });
   });
 
@@ -124,9 +123,13 @@ describe("when the archive confirmation is opened", () => {
 });
 
 describe("when an evaluator is cascade archived", () => {
-  it("deletes its monitors, archives it, and archives its workflow", async () => {
-    const ports = graph({ deleteMonitorsUsingEvaluator: vi.fn(async () => ({ count: 2 })) });
-    const { app, repository } = anApp({ ports });
+  /** @scenario "a cascade archive records that the evaluator was deleted" */
+  it("archives it and its workflow, then records the deleted fact", async () => {
+    const { app, repository } = anApp();
+    const sent: unknown[] = [];
+    app.connectLifecycle({
+      recordEvaluatorDeleted: { send: async (data) => void sent.push(data) },
+    });
     await repository.create({
       id: "evaluator-1",
       projectId: "project-1",
@@ -138,9 +141,17 @@ describe("when an evaluator is cascade archived", () => {
 
     const result = await app.cascadeArchive({ id: "evaluator-1", projectId: "project-1" });
 
-    expect(result.deletedMonitorsCount).toBe(2);
+    expect(result).not.toHaveProperty("deletedMonitorsCount");
     expect(result.archivedWorkflow).toEqual({ id: "workflow-1" });
     expect(result.evaluator.archivedAt).not.toBeNull();
+    expect(sent).toEqual([
+      {
+        tenantId: "project-1",
+        projectId: "project-1",
+        evaluatorId: "evaluator-1",
+        occurredAt: expect.any(Number),
+      },
+    ]);
   });
 });
 

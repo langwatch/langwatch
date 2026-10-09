@@ -74,6 +74,13 @@ function widgetResource(
   };
 }
 
+/** The project analytics paths stay in project's namespace for good (§8, ruling 2026-10-05). */
+const PROJECT_ANALYTICS = {
+  owner: "project",
+  reason: "dashboard serves the project's analytics sub-resource under its project path",
+  permanent: true,
+} as const;
+
 /**
  * The type is written out rather than inferred so the declaration emit
  * stays portable.
@@ -91,6 +98,7 @@ export const dashboardWidgetRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/dashboard-widgets",
     "getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetProjectParamsSchema)
   .withPermission("analytics:view")
   .withMiddleware(dashboardWidgetUrl)
@@ -116,6 +124,7 @@ export const dashboardWidgetRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/dashboard-widgets",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetProjectParamsSchema)
   .withInput(createDashboardWidgetSchema)
   .withPermission("analytics:create")
@@ -151,6 +160,7 @@ export const dashboardWidgetRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId",
     "getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withPermission("analytics:view")
   .withMiddleware(dashboardWidgetUrl)
@@ -177,6 +187,7 @@ export const dashboardWidgetRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId",
     "patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withInput(updateDashboardWidgetSchema)
   .withPermission("analytics:update")
@@ -213,6 +224,7 @@ export const dashboardWidgetRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withInput(assignDashboardWidgetToDashboardSchema)
   .withPermission("analytics:update")
@@ -244,6 +256,7 @@ export const dashboardWidgetRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId",
     "deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
   )
+  .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withPermission("analytics:delete")
   .withOutput(z.void())

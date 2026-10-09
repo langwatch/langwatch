@@ -16,18 +16,17 @@ import {
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
-import { Secret } from "@langwatch/secrets";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
-import { googleDlpChannels } from "../channels/google-dlp-channels.registry.ts";
+import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
+import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
+import { DataPrivacyProjectScopeService } from "../services/data-privacy-project-scope.service.ts";
 import { DataPrivacyScopeAuthorizationService } from "../services/data-privacy-scope-authorization.service.ts";
 import { DataPrivacySnapshotService } from "../services/data-privacy-snapshot.service.ts";
 import { DataPrivacyService } from "../services/data-privacy.service.ts";
@@ -82,9 +81,9 @@ const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,
-  never,
   DataPrivacyServerConfig,
-  DataPrivacyRepositories
+  DataPrivacyRepositories,
+  DataPrivacyChannels
 >;
 
 /** Applies a closure to the resolved credential without handing the value out. */
@@ -94,15 +93,13 @@ type GoogleCredentialsUse = <Out>(build: (credential: string | undefined) => Out
 export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
   static readonly dependencies = {
-    projects: ProjectApi,
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
-    evaluation: EvaluationApi,
   };
   static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
-    googleApplicationCredentials: Secret.load("GOOGLE_APPLICATION_CREDENTIALS", { optional: true }),
+    googleApplicationCredentials,
   } as const;
 
   #privacy: DataPrivacyService;
@@ -111,7 +108,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
   #scopeAuthorization: DataPrivacyScopeAuthorizationService;
   #contentDrop: ContentDropPolicyService;
   #spanContentDrop: OtlpSpanContentDropService;
-  #projects: ProjectApi;
   #googleCredentials: GoogleCredentialsUse;
 
   private constructor(services: {
@@ -121,7 +117,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
     scopeAuthorization: DataPrivacyScopeAuthorizationService;
     contentDrop: ContentDropPolicyService;
     spanContentDrop: OtlpSpanContentDropService;
-    projects: ProjectApi;
     googleCredentials: GoogleCredentialsUse;
   }) {
     this.#privacy = services.privacy;
@@ -130,12 +125,12 @@ export class DataPrivacyModule implements DataPrivacyApi {
     this.#scopeAuthorization = services.scopeAuthorization;
     this.#contentDrop = services.contentDrop;
     this.#spanContentDrop = services.spanContentDrop;
-    this.#projects = services.projects;
     this.#googleCredentials = services.googleCredentials;
   }
 
   static async create({
     repositories,
+    channels,
     dependencies,
     config,
     secrets,
@@ -148,21 +143,24 @@ export class DataPrivacyModule implements DataPrivacyApi {
     );
     const metrics = PiiAnalysisMetricsOtelService.create();
     const presidio = PresidioRedactionService.create({
-      evaluation: dependencies.evaluation,
+      presidio: channels.presidio,
       metrics,
       timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
     });
     const analysis = PiiAnalysisService.create({
       presidio,
       dlp: GoogleDlpRedactionService.create({
-        dlp: googleCredentials((credential) => googleDlpChannels.live.create({ credential })),
+        dlp: channels.dlp,
         disabled: config.googleDlpDisabled === true || config.googleDlpDisabled === "true",
         metrics,
       }),
     });
+    const projectScopes = DataPrivacyProjectScopeService.create({
+      repository: repositories.projectScopes,
+    });
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
-      projects: dependencies.projects,
+      scopes: projectScopes,
       lineage: dependencies.permissions,
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
@@ -192,7 +190,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
         dataPrivacy: privacy,
         nativePolicyEnforced: config.enforcement !== "off",
       }),
-      projects: dependencies.projects,
       googleCredentials,
     });
   }
@@ -318,7 +315,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   async #authorizeScopeWrite(
     input: { projectId: string; scope: DataPrivacyScope } & DataPrivacyCallerInput,
   ): Promise<string> {
-    await this.#scopeAuthorization.assertScopeBelongsToProjectOrganization({
+    const organizationId = await this.#scopeAuthorization.assertScopeBelongsToProjectOrganization({
       projectId: input.projectId,
       scope: input.scope,
     });
@@ -326,8 +323,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
       userId: input.userId,
       scope: input.scope,
     });
-    const project = await this.#projects.getWithTeam(input.projectId);
 
-    return project.team.organizationId;
+    return organizationId;
   }
 }

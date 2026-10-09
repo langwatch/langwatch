@@ -21,6 +21,8 @@ function lifecyclePeers() {
     recordUserDeactivated: { send: async () => undefined },
     recordUserReactivated: { send: async () => undefined },
     recordUserRegistered: { send: async () => undefined },
+    recordUserCreated: { send: async () => undefined },
+    recordUserErased: { send: async () => undefined },
   });
 
   return {

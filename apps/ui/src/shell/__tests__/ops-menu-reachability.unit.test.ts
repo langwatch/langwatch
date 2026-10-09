@@ -1,4 +1,3 @@
-import type { SettingsMenuGroup } from "@langwatch/navigation-browser/chrome";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
 /**
  * Every internal ops page the route table registers must be reachable from the settings
@@ -11,6 +10,8 @@ import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 const { cloudAdminGroup, instanceGroup, isSettingsMenuItemActive, opsGroup } =
   await navigationWeb.installation.capabilities.chrome.load();
+
+type SettingsMenuGroup = ReturnType<typeof opsGroup>;
 
 /**
  * Every `/ops` page the route table registers; a detail page drops to its parent, reached

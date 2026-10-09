@@ -3,8 +3,11 @@ import {
   AnnotationNotFoundError,
   AnnotationQueueItemNotFoundError,
 } from "@langwatch/annotation-contract";
+import { EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { annotationProcessModule } from "../../annotation.module.ts";
@@ -23,10 +26,18 @@ import {
 /**
  * Test setup that mirrors production: named memory access and injected peers.
  */
-function process() {
-  return createApp({ role: "api" })
+function process(role: "api" | "worker" = "api") {
+  return createApp({ role })
     .withModules([annotationProcessModule])
     .withStores(memoryStores())
+    .withEventing(
+      new EventSourcing({
+        eventStore: EventStoreMemory.createForTesting(),
+        executionTarget: "api",
+        consumersEnabled: false,
+        processManagerMode: "producer-only",
+      }),
+    )
     .provide({
       project: createAnnotationTestProjects(),
       organization: createAnnotationTestOrganizations(),
@@ -45,6 +56,17 @@ const input = {
 };
 
 describe("annotation app installation", () => {
+  /** @scenario "The annotation module declares its pipeline and no migration step" */
+  it("registers annotation_lifecycle and declares no migration step", async () => {
+    const runtime = await process("worker").boot();
+
+    try {
+      expect(runtime.migrationSteps(isMigrationStep)).toEqual([]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it("installs a working app", async () => {
     const runtime = await process().boot();
 

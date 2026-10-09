@@ -151,7 +151,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. A self-serve organization on the hosted service switches them on itself from the search bar, and that opt-in counts whatever this says. A deployment with no classifier configured keeps them unavailable either way.",
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. A self-serve organization on the hosted service switches them on itself from the search bar, and that opt-in counts whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals, whatever this says; one that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
     key: "release_lwql_workbench",
@@ -273,13 +273,6 @@ export const FEATURE_FLAGS = [
       "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
   },
   {
-    key: "release_langy_promo_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Shows the Langy teaser banner to people who do not have Langy. It never grants access; target its audience through operator rules.",
-  },
-  {
     key: "release_custom_chart_playground",
     scope: "SYSTEM",
     defaultValue: false,
@@ -294,6 +287,13 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
+  },
+  {
+    key: "release_ui_home_signal_focused_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: modules/project/specs/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
   },
   {
     key: "release_ui_comparison_leaderboard_enabled",

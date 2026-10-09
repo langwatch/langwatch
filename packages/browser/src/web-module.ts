@@ -1,5 +1,8 @@
 import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
+import type { UiHostServiceSource } from "@langwatch/browser-host/capabilities";
 import type {
+  HostService,
+  HostServiceIdentity,
   ReleaseFlagToken,
   UiComponentToken,
   UiDrawerToken,
@@ -9,7 +12,6 @@ import type {
   UiOperationsToken,
   UiTokenIdentity,
 } from "@langwatch/browser-host/declarations";
-import type { DrawersDifferingFromMap } from "@langwatch/browser-host/drawer";
 import type { ComponentType } from "react";
 import type { output, ZodType } from "zod";
 
@@ -66,6 +68,12 @@ export type WebDrawer = Readonly<{
 
 export type WebDrawers = Readonly<Record<string, WebDrawer>>;
 
+/** A host service this module provides, and the chunk whose default export is its source. */
+export type WebHostServiceProvision = Readonly<{
+  service: HostServiceIdentity;
+  load: Loaded<UiHostServiceSource<unknown>>;
+}>;
+
 /** A chunk a token's owner lends, whose default export is the token's shape. */
 type Loaded<Shape> = () => Promise<{ readonly default: Shape }>;
 
@@ -108,8 +116,20 @@ type EmptyDeclaration = Readonly<{
   capabilities: Empty;
 }>;
 
-/** The page's config slices a module reads, each by its owner's name and that owner's schema. */
-export type WebModuleConfig = Readonly<{ slices: Readonly<Record<string, ZodType>> }>;
+/**
+ * The page's config slices a module claims, each by its owner's name and that
+ * owner's schema, and the projection its installed value is made from. The
+ * projection's parameter is `never` so any typed projection is stored as-is.
+ */
+export type WebModuleConfig = Readonly<{
+  slices: Readonly<Record<string, ZodType>>;
+  project: (parsed: never) => unknown;
+}>;
+
+/** What a projection reads: each claimed owner's slice, parsed by that owner's schema. */
+export type ClaimedConfigSlices<Slices extends Readonly<Record<string, ZodType>>> = {
+  readonly [Owner in keyof Slices]: output<Slices[Owner]>;
+};
 
 export type WebModuleInstallation = Readonly<{
   name: string;
@@ -122,6 +142,8 @@ export type WebModuleInstallation = Readonly<{
   capabilities: WebCapabilities;
   /** What this module lends or registers by token, in declaration order. */
   lends: readonly UiLend[];
+  /** The host services this module provides, in declaration order (ARCHITECTURE.md §10.1). */
+  provides?: readonly WebHostServiceProvision[];
   api?: unknown;
   /** The contracts whose cache policies the api's reads follow. */
   apiContracts?: readonly CacheDeclaringContract[];
@@ -183,6 +205,7 @@ export class WebModule<
       hosts: { requires: [], mounts: {} },
       capabilities: {},
       lends: [],
+      provides: [],
       failureInterceptors: [],
     });
   }
@@ -232,11 +255,7 @@ export class WebModule<
 
   withDrawers<const Drawers extends WebDrawers>(
     drawers: Drawers,
-    ..._checked: [CheckedKeyedRecord<Drawers>] extends [never]
-      ? [never]
-      : [DrawersDifferingFromMap<Drawers>] extends [never]
-        ? []
-        : [drawerPropsDifferFromTheMap: DrawersDifferingFromMap<Drawers>]
+    ..._checked: [CheckedKeyedRecord<Drawers>] extends [never] ? [never] : []
   ): WebModule<
     Name,
     Requirements,
@@ -252,8 +271,7 @@ export class WebModule<
 
   /**
    * Lends to peers by token: a component, operations or hooks token this module owns, or any
-   * module's extension token. The default is checked against the token's shape and, until the
-   * string path goes, also declared under the token's name for `declared(name)`.
+   * module's extension token. The default is checked against the token's shape.
    */
   lends<Props>(
     token: OwnedBy<UiComponentToken<Props>, Name> | UiExtensionToken<Props>,
@@ -288,6 +306,17 @@ export class WebModule<
       ...this.#installation,
       drawers: { ...this.#installation.drawers, [token.key]: source },
       lends: [...this.#installation.lends, { token, load: source.load }],
+    });
+  }
+
+  /** Provides a host service browser-host declares; `createUi` refuses none or two providers. */
+  provides<Source extends UiHostServiceSource<unknown>>(
+    service: HostService<Source>,
+    source: { load: Loaded<Source> },
+  ): WebModule<Name, Requirements, Config, Declaration, Precise> {
+    return this.#next({
+      ...this.#installation,
+      provides: [...(this.#installation.provides ?? []), { service, load: source.load }],
     });
   }
 
@@ -343,21 +372,20 @@ export class WebModule<
     });
   }
 
-  withConfig<const Slices extends Readonly<Record<string, ZodType>>>(
+  /** Claims `slices` and installs `project`'s answer as this module's config (rulings R1). */
+  withConfig<const Slices extends Readonly<Record<string, ZodType>>, Value>(
     slices: Slices,
+    project: (parsed: ClaimedConfigSlices<Slices>) => Value,
   ): WebModule<
     Name,
     Merge<Requirements, RequirementFields<"injected-config">>,
-    Merge<
-      Config,
-      { readonly [Key in Name]: { readonly [Owner in keyof Slices]: output<Slices[Owner]> } }
-    >,
+    Merge<Config, { readonly [Key in Name]: Value }>,
     Declaration,
     Precise
   > {
     return this.#next({
       ...this.#installation,
-      config: { slices },
+      config: { slices, project },
       requirements: mergeNames(this.#installation.requirements, ["injected-config"]),
     });
   }

@@ -223,6 +223,27 @@ export class QueuedPayloadInvalidError extends NonRetryableGroupQueueError {
 }
 
 /**
+ * A dequeued event whose type nothing on this worker declares: mid rolling deploy, an older
+ * worker took a newer release's event. Retryable, so the queue's retry budget is the drain window
+ * in which a worker declaring it takes the job; once spent it exhausts like any job (§9).
+ */
+export class UndeclaredQueuedEventTypeError extends RecoverableError {
+  override readonly name = "UndeclaredQueuedEventTypeError";
+  readonly eventType: string;
+  readonly declaredBy: string;
+
+  constructor({ eventType, declaredBy }: { eventType: string; declaredBy: string }) {
+    super(
+      `Queued event type "${eventType}" is not declared by ${declaredBy} on this worker; ` +
+        "retrying so a worker that declares it takes the job (rolling-deploy drain)",
+      { eventType, declaredBy },
+    );
+    this.eventType = eventType;
+    this.declaredBy = declaredBy;
+  }
+}
+
+/**
  * Error thrown when validation fails (invalid data, missing fields, etc.).
  */
 export class ValidationError extends CriticalError {

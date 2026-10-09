@@ -38,11 +38,14 @@ export class SaaSPlanProviderService extends BillingService {
 
     // Unreachable through the wiring: a self-hosted deployment resolves its plan from the
     // license provider, and this one is only constructed on the SaaS branch. It answers the
-    // free baseline rather than a tier, because a plan resolved without a subscription and
-    // without a license is not a plan anyone bought.
+    // free baseline without the cloud Free creation caps: self-hosted is uncapped with or
+    // without a license.
     if (!this.isSaas) {
       return {
         ...getFreePlanLimits(),
+        maxScenarios: undefined,
+        maxScenarioSets: undefined,
+        maxEvaluators: undefined,
         overrideAddingLimitations,
       };
     }

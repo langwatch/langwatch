@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { OffboardIncompleteError } from "@langwatch/authz-contract";
-import { CannotRemoveLastAdminError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
@@ -177,9 +176,7 @@ describe("ScimDeprovisionService", () => {
         const grants = new GrantsFake();
         const lifecycle = new LifecycleFake();
         const organization = new OrganizationAdministrationFake();
-        organization.assertRemovalKeepsAnAdministrator.mockRejectedValueOnce(
-          new CannotRemoveLastAdminError(),
-        );
+        organization.findActiveOrganizationAdministrators.mockResolvedValueOnce([USER_ID]);
         const service = ScimDeprovisionService.create({ grants, lifecycle, organization });
 
         await expect(
@@ -191,9 +188,8 @@ describe("ScimDeprovisionService", () => {
           }),
         ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
 
-        expect(organization.assertRemovalKeepsAnAdministrator).toHaveBeenCalledWith({
+        expect(organization.findActiveOrganizationAdministrators).toHaveBeenCalledWith({
           organizationId: ORGANIZATION_ID,
-          userId: USER_ID,
         });
         expect(grants.offboard).not.toHaveBeenCalled();
         expect(lifecycle.applyFailed).toHaveBeenCalledWith({
@@ -225,7 +221,7 @@ describe("ScimDeprovisionService", () => {
         });
 
         expect(
-          organization.assertRemovalKeepsAnAdministrator.mock.invocationCallOrder[0],
+          organization.findActiveOrganizationAdministrators.mock.invocationCallOrder[0],
         ).toBeLessThan(grants.offboard.mock.invocationCallOrder[0] ?? 0);
         expect(lifecycle.applyFailed).not.toHaveBeenCalled();
       });

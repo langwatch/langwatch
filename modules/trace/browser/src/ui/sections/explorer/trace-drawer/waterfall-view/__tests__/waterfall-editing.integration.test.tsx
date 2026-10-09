@@ -14,7 +14,7 @@ vi.mock("react-router", async (importOriginal) => ({
   ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
+vi.mock("../../../../../../behavior/explorer/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({
     data: mocks.storedPatch ? { patch: mocks.storedPatch } : undefined,
   }),

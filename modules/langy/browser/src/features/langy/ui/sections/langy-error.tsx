@@ -1,12 +1,13 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { AlertCircle, ChevronRight, RotateCcw } from "lucide-react";
+import { AlertCircle, ChevronRight, RotateCcw, Settings } from "lucide-react";
 import { useState } from "react";
 
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
-import type {
-  LangyErrorPresentation,
-  LangySerializedReason,
+import {
+  type LangyErrorPresentation,
+  type LangySerializedReason,
+  MODEL_PROVIDERS_SETTINGS_HREF,
 } from "../../behavior/logic/langy-error-explainer.ts";
 
 // The retry sits behind the same restrained warm hairline the accent cards use
@@ -30,17 +31,7 @@ export function LangyError({
   if (presentation.render === "suppress") return null;
 
   const action = presentation.action ? (
-    <Button
-      size="xs"
-      variant="outline"
-      borderColor={CALM_ACCENT_BORDER}
-      color="orange.fg"
-      fontWeight="560"
-      onClick={() => onAction?.(presentation.action!.kind)}
-    >
-      <RotateCcw size={12} aria-hidden="true" />
-      {presentation.action.label}
-    </Button>
+    <ErrorActionButton action={presentation.action} onAction={onAction} />
   ) : null;
 
   if (presentation.render === "inline") {
@@ -206,6 +197,69 @@ function ErrorDetails({
       ) : null}
     </VStack>
   );
+}
+
+type ErrorAction = NonNullable<LangyErrorPresentation["action"]>;
+
+/**
+ * The settings action is a real link: it says where it goes, opens in a new tab on request and
+ * works on a surface that passes no handler. A caller that handles it takes over the click.
+ */
+function ErrorActionButton({
+  action,
+  onAction,
+}: {
+  action: ErrorAction;
+  onAction?: (kind: ErrorAction["kind"]) => void;
+}) {
+  if (action.kind === "configure-model") {
+    return (
+      <Button
+        size="xs"
+        variant="outline"
+        borderColor={CALM_ACCENT_BORDER}
+        color="orange.fg"
+        fontWeight="560"
+        asChild
+      >
+        <a
+          href={MODEL_PROVIDERS_SETTINGS_HREF}
+          onClick={(event) => {
+            if (!onAction || isModifiedClick(event)) return;
+            event.preventDefault();
+            onAction("configure-model");
+          }}
+        >
+          <Settings size={12} aria-hidden="true" />
+          {action.label}
+        </a>
+      </Button>
+    );
+  }
+  return (
+    <Button
+      size="xs"
+      variant="outline"
+      borderColor={CALM_ACCENT_BORDER}
+      color="orange.fg"
+      fontWeight="560"
+      onClick={() => onAction?.(action.kind)}
+    >
+      <RotateCcw size={12} aria-hidden="true" />
+      {action.label}
+    </Button>
+  );
+}
+
+/** A click the browser should handle itself: a new tab, a new window, a download. */
+function isModifiedClick(event: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean {
+  return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 }
 
 function formatMetaValue(val: unknown): string {

@@ -1,4 +1,5 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import type { LangyResourceContext } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
@@ -11,7 +12,6 @@ import {
 } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
-import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
 import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";

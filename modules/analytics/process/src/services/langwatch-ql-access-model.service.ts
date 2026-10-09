@@ -9,8 +9,8 @@ import {
   type LangWatchQLResourceLimits,
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
 
+import { LangWatchQLAppFunctionStatementsService } from "../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
-import { LangWatchQLAppFunctionStatementsService } from "../services/langwatch-ql-app-function-statements.service.ts";
 import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 
 const sqlText = LangWatchQLSqlTextService.create();
@@ -61,7 +61,9 @@ export interface LangWatchQLTable {
  * fails a conflicting hash closed without starving the rest.
  */
 const LWQL_TENANT_PREDICATE_TEMPLATE =
-  "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
+  "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} " +
+  "WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) " +
+  "GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
 
 /**
  * The key map's self-policy, a set membership too (`lwqlKeyMapSelfFilter.sql`): ClickHouse applies

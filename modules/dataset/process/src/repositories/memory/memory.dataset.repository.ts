@@ -2,9 +2,13 @@ import {
   DatasetNotFoundError,
   datasetColumnsSchema,
   datasetSchema,
+  datasetStorageEntrySchema,
   type Dataset,
+  type DatasetStorageEntry,
+  type DatasetStoragePageInput,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
+import { generate } from "@langwatch/ksuid";
 import { toDate, type Instant } from "@langwatch/time";
 
 import type {
@@ -27,7 +31,6 @@ function toDataset({ sourceStoredObjectId: _source, ...row }: DatasetRow): Datas
 
 export class MemoryDatasetRepository implements DatasetRepository {
   #database: MemoryDatasetDatabase;
-  #nextId = 0;
 
   private constructor(database: MemoryDatasetDatabase) {
     this.#database = database;
@@ -73,6 +76,19 @@ export class MemoryDatasetRepository implements DatasetRepository {
     return row ? toDataset(row) : null;
   }
 
+  async findStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]> {
+    return this.#database
+      .datasets()
+      .filter(
+        (row) => row.projectId === input.projectId && (!input.afterId || row.id > input.afterId),
+      )
+      .toSorted((left, right) => Number(left.id > right.id) - Number(left.id < right.id))
+      .slice(0, input.limit)
+      .map(({ id, projectId, contentLayout, status, chunkCount }) =>
+        datasetStorageEntrySchema.parse({ id, projectId, contentLayout, status, chunkCount }),
+      );
+  }
+
   async findAll(input: {
     projectId: string;
     page: number;
@@ -95,9 +111,8 @@ export class MemoryDatasetRepository implements DatasetRepository {
 
   async create(input: DatasetCreateInput): Promise<Dataset> {
     const now = toDate(this.#database.now());
-    this.#nextId += 1;
     const row: DatasetRow = {
-      id: `dataset_${this.#nextId}`,
+      id: generate("dataset").toString(),
       projectId: input.projectId,
       name: input.name,
       slug: input.slug,

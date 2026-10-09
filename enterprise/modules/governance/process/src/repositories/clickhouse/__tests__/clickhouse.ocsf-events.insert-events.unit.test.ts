@@ -15,12 +15,9 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../../../rules/ocsf-codes.rules.ts";
 import type { GovernanceOcsfEvent } from "../../governance.repositories.ts";
-import {
-  ClickHouseOcsfEventsRepository,
-  OCSF_ACTIVITY,
-  OCSF_SEVERITY,
-} from "../clickhouse.ocsf-events.repository.ts";
+import { ClickHouseOcsfEventsRepository } from "../clickhouse.ocsf-events.repository.ts";
 
 function makeRepository() {
   const insert = vi.fn().mockResolvedValue(undefined);

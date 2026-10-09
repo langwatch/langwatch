@@ -2,8 +2,11 @@ import { Accordion, Badge, Box, HStack, Icon, Text } from "@langwatch/design-sys
 import { type ReactNode, useRef } from "react";
 import { LuChevronDown, LuMessageSquare } from "react-icons/lu";
 
-import { getDrawerDensityTokens, useDensityStore } from "../../../../../behavior/density.store.ts";
 import { useSectionPresenceStore } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
+import {
+  getDrawerDensityTokens,
+  useDensityStore,
+} from "../../../../../features/explorer/behavior/density.store.ts";
 import { PresenceSection } from "../../../../elements/presence/presence-section.tsx";
 import { SectionPresenceDot } from "../../../../elements/presence/section-presence-dot.tsx";
 

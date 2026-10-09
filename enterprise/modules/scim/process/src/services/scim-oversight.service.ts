@@ -18,7 +18,6 @@ import {
   pickRetiredLetter,
   type ScimSyncState,
 } from "@langwatch/enterprise-scim-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimDeprovisionService } from "./scim-deprovision.service.ts";
@@ -33,7 +32,7 @@ function isRedrivable(op: string): op is ScimRemovalOperation {
 
 interface ScimOversightDeps {
   syncs: Pick<ScimSyncReadsService, "listForOperator" | "findForOperator">;
-  organizations: Pick<OrganizationApi, "findProvisioningSummary">;
+  organizations: Pick<ScimRepository, "findOrganizationNames">;
   identities: Pick<ScimRepository, "findDirectoryIdentities">;
   lifecycle: Pick<ScimSyncLifecycle, "applyRedriven">;
   deprovision: Pick<ScimDeprovisionService, "removeAccess">;
@@ -118,16 +117,11 @@ export class ScimOversightService {
   }
 
   private async organizationNames(organizationIds: string[]): Promise<Map<string, string>> {
-    const unique = [...new Set(organizationIds)];
-    const summaries = await Promise.all(
-      unique.map((organizationId) =>
-        this.deps.organizations.findProvisioningSummary(organizationId),
-      ),
-    );
+    const named = await this.deps.organizations.findOrganizationNames({
+      organizationIds: [...new Set(organizationIds)],
+    });
 
-    return new Map(
-      summaries.flatMap((summary) => (summary ? [[summary.id, summary.name] as const] : [])),
-    );
+    return new Map(named.map(({ id, name }) => [id, name] as const));
   }
 }
 

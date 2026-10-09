@@ -68,8 +68,10 @@ async function replayTenantForState({
 > {
   // One accumulator per tenant: a projection key may group several aggregates,
   // so we fold the whole tenant before writing one row per key.
+  const retentionResolver =
+    projection.retentionPolicyResolver ?? ctx.accumulatorOpts.retentionResolver;
   const accumulator = projection.open<ReplayAccumulator>(
-    (definition) => new StateAccumulator(definition, ctx.accumulatorOpts),
+    (definition) => new StateAccumulator(definition, { retentionResolver }),
   );
   const totalBatches = Math.ceil(tenantAggregates.length / aggregateBatchSize);
   let aggregatesCompleted = aggregatesCompletedSoFar;

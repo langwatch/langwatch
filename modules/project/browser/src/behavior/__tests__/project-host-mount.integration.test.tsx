@@ -13,7 +13,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclaringModule } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { ProjectSwitcherToken } from "@langwatch/project-contract";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -71,7 +71,10 @@ vi.mock("../project-api.ts", () => ({
 }));
 
 const drawer = { openDrawer: vi.fn() };
-vi.mock("@langwatch/browser-host/use-drawer", () => ({ useDrawer: () => drawer }));
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDrawer: () => drawer,
+}));
 
 import { useProjectHost } from "../../model/project-host.ts";
 import ProjectHostMount from "../project-host-mount.tsx";

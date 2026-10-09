@@ -7,6 +7,7 @@ import { useCallback, useState } from "react";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
 import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream.ts";
 import { useDejaViewLink } from "../../../behavior/use-deja-view-link.ts";
+import type { RunSettledCallbacks } from "../../../behavior/use-drawer-run-callbacks.ts";
 import { useRunAgainActions } from "./use-run-again-actions.ts";
 
 /**
@@ -38,9 +39,12 @@ function useOpenRunInTraces({
 export function useScenarioRunDetail({
   scenarioRunId,
   open,
+  runCallbacks,
 }: {
   scenarioRunId: string | undefined;
   open: boolean;
+  /** Where Run Again goes once the new run settles; the drawer's default when absent. */
+  runCallbacks?: RunSettledCallbacks;
 }) {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
@@ -74,6 +78,7 @@ export function useScenarioRunDetail({
     scenarioId,
     projectId: project?.id,
     projectSlug: project?.slug,
+    runCallbacks,
   });
   const handleOpenInTraces = useOpenRunInTraces({
     projectSlug: project?.slug,

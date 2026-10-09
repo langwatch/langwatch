@@ -81,6 +81,7 @@ describe("given a person who holds a credential sign-in method", () => {
       ]);
     });
 
+    /** @scenario "Credential password hashes never leave the user feature" */
     it("answers with a word, never with what it read", async () => {
       const { service } = composeService({ id: ACCOUNT_ID, passwordHash: STORED_HASH });
 

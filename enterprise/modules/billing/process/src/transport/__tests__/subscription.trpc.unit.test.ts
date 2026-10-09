@@ -27,8 +27,6 @@ const findLastNonCancelledSubscription =
   vi.fn<BillingSubscriptionApi["findLastNonCancelledSubscription"]>();
 const previewProration = vi.fn<BillingSubscriptionApi["previewProration"]>();
 const notifyProspective = vi.fn<BillingSubscriptionApi["notifyProspective"]>();
-const createSubscriptionWithInvites =
-  vi.fn<BillingSubscriptionApi["createSubscriptionWithInvites"]>();
 const listInvoices = vi.fn<BillingSubscriptionApi["listInvoices"]>();
 
 const billing: BillingSubscriptionApi = {
@@ -39,7 +37,6 @@ const billing: BillingSubscriptionApi = {
   findLastNonCancelledSubscription,
   previewProration,
   notifyProspective,
-  createSubscriptionWithInvites,
   listInvoices,
 };
 
@@ -71,6 +68,7 @@ beforeEach(() => {
 
 describe("given the mounted subscription router", () => {
   describe("when its procedures are read", () => {
+    /** @scenario "The invite checkout is organization's procedure" */
     it("exposes exactly the names the billing page calls", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "addTeamMemberOrEvents",
@@ -80,7 +78,6 @@ describe("given the mounted subscription router", () => {
         "manage",
         "previewProration",
         "prospective",
-        "upgradeWithInvites",
       ]);
     });
 
@@ -100,7 +97,6 @@ describe("given the mounted subscription router", () => {
         manage: "mutation",
         previewProration: "query",
         prospective: "mutation",
-        upgradeWithInvites: "mutation",
       });
     });
   });
@@ -168,29 +164,6 @@ describe("when the billing portal is opened", () => {
       customerId: CUSTOMER,
       baseUrl: "https://app",
       organizationId: ORGANIZATION,
-    });
-  });
-});
-
-describe("when seats are bought for people who are not members yet", () => {
-  it("carries the invitations through the same checkout", async () => {
-    createSubscriptionWithInvites.mockResolvedValue({ url: "https://checkout" });
-
-    await caller.upgradeWithInvites({
-      organizationId: ORGANIZATION,
-      baseUrl: "https://app",
-      totalSeats: 4,
-      invites: [{ email: "bo@acme.com", role: "MEMBER" }],
-    });
-
-    expect(createSubscriptionWithInvites).toHaveBeenCalledWith({
-      organizationId: ORGANIZATION,
-      baseUrl: "https://app",
-      membersToAdd: 4,
-      customerId: CUSTOMER,
-      invites: [{ email: "bo@acme.com", role: "MEMBER" }],
-      // Who invited: organization bounds the invitations by what they hold.
-      invitedBy: { id: "user_ana" },
     });
   });
 });

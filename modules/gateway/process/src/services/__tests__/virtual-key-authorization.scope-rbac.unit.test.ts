@@ -11,14 +11,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { VirtualKeyAuthorizationRepository } from "../../repositories/virtual-key-authorization.repository.ts";
 import {
   type GatewayPermissionScope,
   type GatewayScopePermissions,
   type ActorContext,
   type Scope,
   VirtualKeyAuthorizationService,
-} from "../virtual-key-authorization.service.ts";
+} from "../../features/virtual-key/services/virtual-key-authorization.service.ts";
+import { VirtualKeyAuthorizationRepository } from "../../repositories/virtual-key-authorization.repository.ts";
 
 const ORG: Scope = { scopeType: "ORGANIZATION", scopeId: "acme" };
 const PLATFORM: Scope = { scopeType: "TEAM", scopeId: "platform" };

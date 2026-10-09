@@ -5,7 +5,7 @@ import {
   type TranscriptLogRecord,
   fillToolCallGaps,
 } from "./coding-agent-transcript-state.ts";
-import { parseMaybeJson, pickNumber, pickString } from "./coding-agent-transcript-value.ts";
+import { parseMaybeJson, pickNumber } from "./coding-agent-transcript-value.ts";
 import type { TranscriptEntry } from "./coding-agent-transcript.ts";
 import {
   WITHHELD_PROMPT_TEXT,
@@ -13,6 +13,7 @@ import {
   parseMcpToolName,
   deriveConversationKey,
 } from "./telemetry/coding-agent-normalization.ts";
+import { pickString } from "./telemetry/coding-agent-span.ts";
 
 export function collectLogEntries(
   logs: TranscriptLogRecord[],

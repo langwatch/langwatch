@@ -57,7 +57,7 @@ function fixture(input: {
 }) {
   const current =
     input.current === undefined ? { contentLayout: "postgres", useS3: false } : input.current;
-  const projectFindMany = vi.fn(async () => [{ id: "project_1" }]);
+  const listAllIds = vi.fn(async () => ({ ids: ["project_1"], next: null }));
   const datasetFindFirst = vi.fn(async () => current);
   const lockedDatasetFindFirst = vi.fn(async () => current);
   const datasetFindMany = vi.fn();
@@ -84,7 +84,6 @@ function fixture(input: {
   }
 
   const database = {
-    project: { findMany: projectFindMany },
     dataset: {
       findFirst: datasetFindFirst,
       findMany: datasetFindMany,
@@ -103,6 +102,7 @@ function fixture(input: {
   const migration = DatasetMigrationService.create({
     repository: PrismaDatasetMigrationRepository.create({ database: database as never }),
     storage: input.storage ?? storage,
+    projects: { listAllIds },
   });
 
   return {
@@ -324,9 +324,9 @@ describe("PrismaDatasetMigrationRepository", () => {
 
   it("reports a pending schema without leaking a database error to the task", async () => {
     const subject = fixture({});
-    subject.database.project.findMany = vi.fn(async () => {
-      throw Object.assign(new Error("P2022"), { code: "P2022" });
-    });
+    subject.datasetFindMany
+      .mockReset()
+      .mockRejectedValue(Object.assign(new Error("P2022"), { code: "P2022" }));
 
     await expect(subject.migration.run()).resolves.toEqual({
       status: "schema-pending",

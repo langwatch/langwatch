@@ -25,11 +25,12 @@ Feature: First sign-in for a provisioned directory member
     Then the same connection's active provisioned member may be selected
 
   @integration
-  Scenario: Provisioned sign-in evidence stays inside the native transaction
-    Given the callback transaction disables a provisioned membership
-    When sign-in resolution reads that membership
-    Then it sees the uncommitted disable and refuses the account link
-    And the transaction context is unavailable after the callback completes
+  Scenario: A member disabled before sign-in is refused and nothing is provisioned
+    Given the connection provisioned a member whose membership was disabled and committed
+    When its verified identity provider signs that member in
+    Then identity reads the committed membership and refuses the account link
+    And no account is attached and no session is issued
+    And a membership that does not exist is refused the same way
 
   @unit @regression
   Scenario: The native account-link refusal maps to a stable sign-in error

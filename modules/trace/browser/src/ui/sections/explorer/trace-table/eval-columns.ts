@@ -1,7 +1,7 @@
 import { EVAL_FIELD_LABELS, type EvalColumnField } from "@langwatch/trace-contract";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 
-import type { TraceEvalResult, TraceListItem } from "../types/trace.ts";
+import type { TraceEvalResult, TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
 
 /**
  * Table-layer helpers for per-evaluator eval columns. The id grammar

@@ -13,7 +13,7 @@ import {
 import {
   questionToolCallIdsIn,
   questionWaitCardParts,
-} from "../../../../../model/langy-question-tool.ts";
+} from "../../../../tools/model/langy-question-tool.ts";
 
 const QUESTIONS = [
   {

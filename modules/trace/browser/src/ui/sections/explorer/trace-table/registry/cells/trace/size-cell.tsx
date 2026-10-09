@@ -1,8 +1,8 @@
 import { Text } from "@langwatch/design-system/primitives";
 
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { formatBytes } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
 
 /**

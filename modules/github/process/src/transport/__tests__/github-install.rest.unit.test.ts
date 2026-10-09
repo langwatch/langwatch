@@ -101,27 +101,6 @@ function mount(
 
       return { accountLogin: "acme" };
     },
-    handleWebhookEvent: async (input) => {
-      webhookEvents.push({ action: input.action, installationId: input.installationId });
-    },
-    parsePullRequestEvent: () => null,
-    applyPullRequestEvent: async () => true,
-    applyWebhookPayload: async ({ payload, eventType }) => {
-      if (eventType !== "installation" && eventType !== "installation_repositories") return;
-
-      const action = typeof payload.action === "string" ? payload.action : undefined;
-      const installation = payload.installation;
-      const id =
-        typeof installation === "object" &&
-        installation !== null &&
-        "id" in installation &&
-        typeof installation.id === "number"
-          ? installation.id
-          : undefined;
-      if (action && id !== undefined) {
-        webhookEvents.push({ action, installationId: String(id) });
-      }
-    },
   };
 
   const installation: GithubInstallApi = {
@@ -140,12 +119,27 @@ function mount(
     recordAudit: async (entry) => {
       audits.push({ action: entry.action });
     },
-    backfillPullRequestMappings: async () => {},
-    receiveWebhook: async ({ rawBody, signature, eventType, deliveryId }) => {
+    recordInstallationConnected: async () => {},
+    receiveWebhook: async ({ rawBody, signature, eventType }) => {
       const read = readGithubWebhook({ rawBody, signature, secret: WEBHOOK_SECRET });
       if ("refused" in read) return read;
+      if (eventType !== "installation" && eventType !== "installation_repositories") {
+        return { received: true };
+      }
 
-      await service.applyWebhookPayload?.({ payload: read.envelope, eventType, deliveryId });
+      const payload = read.envelope;
+      const action = typeof payload.action === "string" ? payload.action : undefined;
+      const installation = payload.installation;
+      const id =
+        typeof installation === "object" &&
+        installation !== null &&
+        "id" in installation &&
+        typeof installation.id === "number"
+          ? installation.id
+          : undefined;
+      if (action && id !== undefined) {
+        webhookEvents.push({ action, installationId: String(id) });
+      }
 
       return { received: true };
     },

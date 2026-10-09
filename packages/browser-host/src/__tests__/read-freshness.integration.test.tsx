@@ -10,9 +10,13 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import type { UiCachePlan } from "../cache-tiers.ts";
-import { persistUiQueries, sealedUiQueryStore, type UiQueryStore } from "../query-persistence.ts";
-import { useReadFreshness } from "../read-freshness.ts";
+import type { UiCachePlan } from "../query/cache-tiers.ts";
+import {
+  persistUiQueries,
+  sealedUiQueryStore,
+  type UiQueryStore,
+} from "../query/query-persistence.ts";
+import { useReadFreshness } from "../query/read-freshness.ts";
 
 const plan: UiCachePlan = {
   persisted: new Set(["organization.getAll"]),

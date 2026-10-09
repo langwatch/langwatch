@@ -10,21 +10,20 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
-import type { UserApi } from "@langwatch/user-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
 import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
 import { MemoryOrganizationSpendRepository } from "../../repositories/memory/memory.organization-spend.repository.ts";
+import { MemoryTenancyRepository } from "../../repositories/memory/memory.tenancy.repository.ts";
 import { MemoryUsageMembershipRepository } from "../../repositories/memory/memory.usage-membership.repository.ts";
 import type { OrganizationSpendRepository } from "../../repositories/organization-spend.repository.ts";
+import { EntitlementModule } from "../entitlement.app.ts";
 import {
   createEntitlementTestApp,
-  createEntitlementTestUsers,
   fixedEntitlementSource,
   TestUsageWarnings,
 } from "./entitlement.fixture.ts";
@@ -41,30 +40,6 @@ const free: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-function operatorDirectory(
-  profiles: Record<string, { email: string | null; name: string | null }>,
-) {
-  return createApiFixture<UserApi>({
-    findById: async ({ id }) => {
-      const profile = profiles[id];
-      if (!profile) return null;
-
-      return {
-        id,
-        name: profile.name,
-        email: profile.email,
-        emailVerified: true,
-        image: null,
-        pendingSsoSetup: false,
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-        lastLoginAt: null,
-        deactivatedAt: null,
-      };
-    },
-  });
-}
-
 /** A rollup reader that answers nothing and remembers what it was asked. */
 class RecordingSpendRepository implements OrganizationSpendRepository {
   readonly asked: ListOrganizationSpendInput[] = [];
@@ -75,6 +50,13 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
     return [];
   }
 }
+
+describe("entitlement's dependencies", () => {
+  /** @scenario "Trace is no longer asked to count usage" */
+  it("names no TraceApi: traces are counted off entitlement's own meter", () => {
+    expect(Object.values(EntitlementModule.dependencies)).not.toContain(TraceApi);
+  });
+});
 
 describe("entitlement app installation", () => {
   /**
@@ -100,26 +82,16 @@ describe("entitlement app installation", () => {
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
-          user: createEntitlementTestUsers(),
           billing: createApiFixture<BillingApi>({
             getActiveSubscriptionPlan: async () => free,
             getPricingModel: async () => ({ pricingModel: null }),
-            countBillableEventsByProjects: async ({ projectIds }) =>
-              projectIds.map((projectId) => ({ projectId, count: 11 })),
             sendUsageWarning: async (input) => {
               warned.push(input);
               return { sent: true, notificationId: "notification-1" };
             },
           }),
-          trace: createApiFixture<TraceApi>({
-            countTracesByProjects: async ({ projectIds }) =>
-              projectIds.map((projectId) => ({ projectId, count: 7 })),
-          }),
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
-          }),
-          project: createApiFixture<ProjectApi>({
-            listIdsByOrganization: async () => ["project-1"],
           }),
           licensing: createApiFixture<LicensingApi>({
             resolve: async () => ({ granted: true, plan: free }),
@@ -140,7 +112,7 @@ describe("entitlement app installation", () => {
         });
 
         await expect(app.getUsage({ organizationId: "organization-1" })).resolves.toMatchObject({
-          currentMonthMessagesCount: 11,
+          currentMonthMessagesCount: 0,
           membersCount: 0,
           usageUnit: "events",
         });
@@ -159,7 +131,8 @@ describe("entitlement app installation", () => {
             currentMonthMessagesCount: 900,
             maxMonthlyUsageLimit: 1_000,
             crossedThreshold: 90,
-            projectCounts: [{ projectId: "project-1", count: 11 }],
+            // The memory stores hold no Project rows, so the organisation owns none yet.
+            projectCounts: [],
           },
         ]);
       } finally {
@@ -181,13 +154,10 @@ describe("entitlement app installation", () => {
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
-          user: createEntitlementTestUsers(),
           billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
-          trace: createApiFixture<TraceApi>({}),
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),
-          project: createApiFixture<ProjectApi>({}),
           licensing: createApiFixture<LicensingApi>({
             resolve: (input) => source.resolve(input),
           }),
@@ -314,27 +284,19 @@ describe("entitlement app installation", () => {
   });
 
   describe("given a plan resolved for the operator behind a request", () => {
-    /** @scenario "An impersonating operator is resolved through the user directory" */
-    it("looks the impersonator's address up before the sources see it", async () => {
-      const seen: (string | null | undefined)[] = [];
+    /** @scenario "An impersonating operator reaches the sources by identifier" */
+    it("names the impersonator by id, with no directory lookup", async () => {
+      const seen: (string | undefined)[] = [];
       const app = createEntitlementTestApp({
         infrastructure: {
           baseline: free,
           authorization: {
             resolve: (user) => {
-              seen.push(user?.impersonator?.email);
+              seen.push(user?.impersonator?.id);
 
-              return {
-                overrideAddingLimitations: user?.impersonator?.email === "staff@langwatch.ai",
-              };
+              return { overrideAddingLimitations: user?.impersonator?.id === "staff-1" };
             },
           },
-        },
-        dependencies: {
-          users: operatorDirectory({
-            "user-1": { email: "person@example.com", name: "Person" },
-            "staff-1": { email: "staff@langwatch.ai", name: "Staff" },
-          }),
         },
       });
 
@@ -349,7 +311,7 @@ describe("entitlement app installation", () => {
         app.getActivePlan({ organizationId: "organization-1", operator: { id: "user-1" } }),
       ).resolves.toMatchObject({ overrideAddingLimitations: false });
 
-      expect(seen).toEqual(["staff@langwatch.ai", undefined]);
+      expect(seen).toEqual(["staff-1", undefined]);
     });
   });
 
@@ -419,6 +381,7 @@ describe("entitlement app installation", () => {
         repositories: {
           membership: MemoryUsageMembershipRepository.create({ memory: database }),
           spend: MemoryOrganizationSpendRepository.create({ memory: database }),
+          tenancy: MemoryTenancyRepository.create({ memory: database }),
         },
         infrastructure: { baseline: free },
       });
@@ -451,6 +414,7 @@ describe("entitlement app installation", () => {
             memory: MemoryEntitlementDatabase.create(),
           }),
           spend,
+          tenancy: MemoryTenancyRepository.create({ memory: MemoryEntitlementDatabase.create() }),
         },
         infrastructure: { baseline: free },
       });

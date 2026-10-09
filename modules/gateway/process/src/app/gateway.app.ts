@@ -20,6 +20,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   virtualKeyBudgetInputSchema,
   type GatewayBudgetOverviewForUser,
+  type GatewayPersonalBudget,
   type GatewayAuthorizedKeyCaller,
   type GatewayAuthorizedVirtualKeyCaller,
   type GatewayKeyCaller,
@@ -51,12 +52,18 @@ import {
   type GatewaySpendSummariesPage,
   type GatewaySpendSummariesQuery,
   type GatewaySpendByRequestTypeQuery,
+  type GatewayConfirmedSpendPage,
+  type GatewayConfirmedSpendQuery,
   type GatewaySpendEventPage,
   type GatewayCaller,
   GatewayWindow,
   type VirtualKeyApiApplicableBudgetsInput,
   type VirtualKeySpendThisMonth,
   type GatewaySpendEventsPageQuery,
+  type GatewaySpendEventsAcrossTenantsQuery,
+  type GatewaySpendEventsAcrossTenantsPage,
+  type GatewaySpendEventAcrossTenantsQuery,
+  type SpendEventRow,
   type gatewayInternalBucketSpendAnswers,
   type gatewayInternalChangesAnswers,
   type gatewayInternalCodexRefreshAnswers,
@@ -140,7 +147,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
+import { recordSpanCommandDataSchema, TraceApi } from "@langwatch/trace-contract";
 // The billing envelope is the webhook platform's, and a reconciliation pull has
 // to answer the same bytes a push delivers, so it ARRIVES from that contract.
 import {
@@ -159,6 +166,10 @@ import {
   type GatewayGovernanceEventsDefinition,
 } from "../eventing/gateway-governance-events.pipeline.ts";
 import {
+  buildGatewayInstantEvalJudgeSpendPipeline,
+  type GatewayInstantEvalJudgeSpendPipeline,
+} from "../eventing/gateway-instant-eval-judge-spend.pipeline.ts";
+import {
   buildGatewayPulledUsageLedgerPipeline,
   type GatewayPulledUsageLedgerPipeline,
 } from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
@@ -168,8 +179,55 @@ import {
   EventingGatewaySpendAdapter,
   GatewaySpendProducerAdapter,
 } from "../eventing/gateway-spend.pipeline.ts";
+import { GatewayApplicableBudgetsService } from "../features/budget/services/gateway-applicable-budgets.service.ts";
+import { GatewayBudgetChangeDedupeService } from "../features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { GatewayBudgetCrossingService } from "../features/budget/services/gateway-budget-crossing.service.ts";
+import { GatewayBudgetLedgerService } from "../features/budget/services/gateway-budget-ledger.service.ts";
+import { BudgetOverviewService } from "../features/budget/services/gateway-budget-overview.service.ts";
+/**
+ * The gateway feature's application: the one typed thing every door is given. A caller arrives
+ * as {@link GatewayActor}, an argument rather than read from session/request, so one check
+ * serves both a browser session and an API key.
+ */
+import {
+  GatewayEndUserCapsService,
+  type GatewayEndUserCap,
+} from "../features/budget/services/gateway-end-user-caps.service.ts";
+import { GatewayPersonalBudgetService } from "../features/budget/services/gateway-personal-budget.service.ts";
+import {
+  GatewayRealtimeSessionReconciliationService,
+  realtimeSessionReconciliationConfig,
+} from "../features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
+import { GatewayRealtimeSessionSweepService } from "../features/realtime-session/services/gateway-realtime-session-sweep.service.ts";
+import type { GatewayRealtimeSessionCollaborators } from "../features/realtime-session/services/gateway-realtime-session.service.ts";
+import { FixedGatewaySettlementPolicyService } from "../features/spend/services/fixed-gateway-settlement-policy.service.ts";
+import { GatewayInstantEvalJudgeSpendService } from "../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
+import { GatewaySpendDebitService } from "../features/spend/services/gateway-spend-debit.service.ts";
+import { GatewaySpendEventsService } from "../features/spend/services/gateway-spend-events.service.ts";
+import {
+  GatewaySpendReconciliationService,
+  type GatewaySpendScope,
+  type GatewaySpendScopeQuery,
+} from "../features/spend/services/gateway-spend-reconciliation.service.ts";
+import { GatewaySpendScopeService } from "../features/spend/services/gateway-spend-scope.service.ts";
+import {
+  GatewayUsageService,
+  type UsageWindow,
+} from "../features/spend/services/gateway-spend-summary.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
+import {
+  GatewayVirtualKeyDtoService,
+  type VirtualKeyCamelDto,
+  type VirtualKeySnakeDto,
+} from "../features/virtual-key/services/gateway-virtual-key-dto.service.ts";
+import {
+  VirtualKeyAuthorizationService,
+  type VirtualKeyActor,
+} from "../features/virtual-key/services/virtual-key-authorization.service.ts";
+import { VirtualKeyCryptoService } from "../features/virtual-key/services/virtual-key-crypto.service.ts";
+import { VirtualKeyDirectBudgetService } from "../features/virtual-key/services/virtual-key-direct-budget.service.ts";
+import { VirtualKeyService } from "../features/virtual-key/services/virtual-key.service.ts";
 import type { GatewayAgentCacheEntryRepository } from "../repositories/gateway-agent-cache.repository.ts";
-import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayBudgetRepository } from "../repositories/gateway-budget.repository.ts";
 import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
@@ -181,29 +239,14 @@ import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
-import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
-import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
 import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
-import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
-import { GatewayBudgetCrossingService } from "../services/gateway-budget-crossing.service.ts";
-import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
-import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
 import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
 import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-webhook.service.ts";
-/**
- * The gateway feature's application: the one typed thing every door is given. A caller arrives
- * as {@link GatewayActor}, an argument rather than read from session/request, so one check
- * serves both a browser session and an API key.
- */
-import {
-  GatewayEndUserCapsService,
-  type GatewayEndUserCap,
-} from "../services/gateway-end-user-caps.service.ts";
 import {
   GatewayGovernanceEventsService,
   type GatewayGovernanceSignals,
@@ -217,43 +260,12 @@ import type { GatewaySpendCommandSender } from "../services/gateway-internal-pro
 import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
 import { GatewayOrganizationDirectoryService } from "../services/gateway-organization-directory.service.ts";
 import {
-  GatewayRealtimeSessionReconciliationService,
-  realtimeSessionReconciliationConfig,
-} from "../services/gateway-realtime-session-reconciliation.service.ts";
-import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
-import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
-import {
   GatewayScopeResolutionService,
   type GatewayPlatformProviders,
 } from "../services/gateway-scope-resolution.service.ts";
-import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
-import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
-import {
-  GatewaySpendReconciliationService,
-  type GatewaySpendScope,
-  type GatewaySpendScopeQuery,
-} from "../services/gateway-spend-reconciliation.service.ts";
-import { GatewaySpendScopeService } from "../services/gateway-spend-scope.service.ts";
-import {
-  GatewayUsageService,
-  type UsageWindow,
-} from "../services/gateway-spend-summary.service.ts";
 import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
-import {
-  GatewayVirtualKeyDtoService,
-  type VirtualKeyCamelDto,
-  type VirtualKeySnakeDto,
-} from "../services/gateway-virtual-key-dto.service.ts";
 import { GatewayService } from "../services/gateway.service.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
-import {
-  VirtualKeyAuthorizationService,
-  type VirtualKeyActor,
-} from "../services/virtual-key-authorization.service.ts";
-import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
-import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
-import { VirtualKeyService } from "../services/virtual-key.service.ts";
 import type {
   GatewayInternalBucketRequest,
   GatewayInternalChangesRequest,
@@ -271,14 +283,14 @@ import type { GatewaySpendDoorApi } from "../transport/gateway-spend.rest.ts";
  * API key or legacy project key. What it IS belongs to the process's authentication, not this
  * feature — the doors hand one straight to the checks below and never read it.
  */
-export type GatewayActor = unknown;
+type GatewayActor = unknown;
 
 /**
  * A key's own budget, as the write service takes it. The canonical parser is
  * schemas.virtualKeyBudgetInput, so its decimal regex and positive-amount refinement are never
  * restated here.
  */
-export type GatewayVirtualKeyBudgetInput = Readonly<{
+type GatewayVirtualKeyBudgetInput = Readonly<{
   limitUsd: string;
   window: "DAY" | "WEEK" | "MONTH";
   onBreach?: "BLOCK" | "WARN";
@@ -289,7 +301,7 @@ export type GatewayVirtualKeyBudgetInput = Readonly<{
  * Virtual-key read/write capability, as every door calls it — one description where there were
  * three, which differed only in which optional fields each remembered to mention.
  */
-export type GatewayVirtualKeyOperations = Readonly<{
+type GatewayVirtualKeyOperations = Readonly<{
   getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
   findById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
   findLiveWithPrincipal(input: {
@@ -430,7 +442,7 @@ type GatewayCacheRulePageInput = GatewayService extends {
   : never;
 
 /** A draft or existing key, as the applicable-budget resolver takes it. */
-export type GatewayApplicableBudgetTarget = Readonly<{
+type GatewayApplicableBudgetTarget = Readonly<{
   organizationId: string;
   virtualKeyId: string | null;
   scopes: readonly GatewayVirtualKeyScope[];
@@ -443,12 +455,12 @@ export type GatewayApplicableBudgetTarget = Readonly<{
  * package cannot reach, or decisions against role bindings/memberships it cannot see. Everything
  * else lives in this package directly.
  */
-export type GatewayRestInfrastructure = Readonly<{
+type GatewayRestInfrastructure = Readonly<{
   /** Absent only where this process mounts no agent-cache family. */
   agentCache?: GatewayAgentCacheEntryRepository | undefined;
 }>;
 
-export interface GatewayAppDependencies extends GatewayRestInfrastructure {
+interface GatewayAppDependencies extends GatewayRestInfrastructure {
   // ── The feature's own services and stores ────────────────────────────────
 
   /** The virtual-key read and write capability. */
@@ -666,7 +678,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   }): Promise<Map<string, { spentUsd: string; requests: number }>>;
 }
 
-export type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastructure;
+type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastructure;
 
 /** The brokered-voice services, each derived from this module's own stores and peers. */
 type GatewayVoiceServices = Readonly<{
@@ -720,12 +732,9 @@ type GatewayBudgetOverviewDeps = Readonly<{
   organizations: OrganizationApi;
   featureFlags: FeatureFlagApi;
   traces: Pick<TraceApi, "findModelSpend">;
+  /** Where the /me banner's request-increase link points; absent, it carries none. */
+  publicBaseUrl: string | undefined;
 }>;
-
-/** Unread by `overviewForUser`; only the budget's own `findBudgetOverview` uses this port. */
-const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
-  findBudget: async () => null,
-};
 
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
@@ -743,10 +752,10 @@ type GatewayControlPlanePeers = Readonly<{
   monitors: MonitorApi;
   /** The deployment's own providers, which a license's managed key dispatches on. */
   platformProviders: GatewayPlatformProviders;
-  /** The per-virtual-key spend the usage surfaces read, one tenant at a time. */
+  /** The per-virtual-key spend the usage surfaces read. */
   traces: Pick<
     TraceApi,
-    "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+    "findSpendByProjectAndValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
   >;
 }>;
 
@@ -1082,7 +1091,6 @@ function extractSessionActor(value: object): { user: { id: string } } | null {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayModule.dependencies,
-  never,
   GatewayServerConfig,
   GatewayRepositories
 >;
@@ -1188,6 +1196,27 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
           await sender.send(data);
         },
       },
+      attribution: {
+        findSessionAttribution: async ({ virtualKeyId, projectId }) => {
+          const [[key], project] = await Promise.all([
+            repositories.internalStore.findVirtualKeysForAttribution([virtualKeyId]),
+            setup.dependencies.projects.findTraceDestination(projectId),
+          ]);
+          return { principalUserId: key?.principalUserId ?? null, teamId: project?.teamId ?? null };
+        },
+      },
+      budgets: controlPlane.budgetDecisions,
+      // The settled span rides the trace module's ingress command, like any collected span.
+      spanIngestion: {
+        ingestNormalizedSpan: async (input) => {
+          await setup.dependencies.traces.recordSpan(
+            recordSpanCommandDataSchema.parse({
+              ...input,
+              occurredAt: nowInstant().epochMilliseconds,
+            }),
+          );
+        },
+      },
     };
     const config = GatewayConfigMaterialiserService.create({
       scopeResolution: controlPlane.internalScopeResolution,
@@ -1279,6 +1308,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         organizations: setup.dependencies.organizations,
         featureFlags: setup.dependencies.featureFlags,
         traces: setup.dependencies.traces,
+        publicBaseUrl: setup.config?.publicBaseUrl,
       },
       addresses: {
         baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
@@ -1302,6 +1332,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
+  #personalBudget: GatewayPersonalBudgetService | undefined;
   #budgetLedger: GatewayBudgetLedgerService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
   #internalAnswers: GatewayInternalDoorService;
@@ -1403,6 +1434,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   pulledUsageLedgerPipeline(): GatewayPulledUsageLedgerPipeline {
     return buildGatewayPulledUsageLedgerPipeline({
       ledger: this.#dependencies.budgetSpend ? this.#budgetLedgerService : void 0,
+    });
+  }
+
+  /** gateway_instant_eval_judge_spend: the ledger row for each judge call (ADR-174 dec. 13). */
+  instantEvalJudgeSpendPipeline(): GatewayInstantEvalJudgeSpendPipeline {
+    return buildGatewayInstantEvalJudgeSpendPipeline({
+      spend: GatewayInstantEvalJudgeSpendService.create({
+        projects: this.#dependencies.projects,
+        recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
+      }),
     });
   }
 
@@ -1652,7 +1693,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }
 
   /** One voice reconciliation tick, what the reconcile process manager's intent runs. */
-  reconcileRealtimeSessions(): Promise<{ examined: number; confirmed: number; expired: number }> {
+  reconcileRealtimeSessions(): Promise<{
+    examined: number;
+    confirmed: number;
+    expired: number;
+    settled: number;
+    estimated: number;
+  }> {
     return this.#voice.reconciliation.poll();
   }
 
@@ -1793,18 +1840,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       throw new Error("The gateway budget-overview family was mounted without its members");
 
     return (this.#budgetOverview ??= BudgetOverviewService.create({
-      // Unread by `overviewForUser`: only the budget's own `findBudgetOverview` read uses it.
-      repository: unusedBudgetOverviewRepository,
       organizations: deps.organizations,
       featureFlags: deps.featureFlags,
-      // The service asks for one principal's own active keys; this application
-      // has no narrower read than the org's full key list, so it filters the
-      // same way the service's own Prisma-backed reader would.
       personalVirtualKeys: {
         listActiveForPrincipal: async ({ userId, organizationId }) =>
-          (await this.#dependencies.virtualKeys.getAll(organizationId))
-            .filter((vk) => vk.principalUserId === userId && vk.revokedAt === null)
-            .map((vk) => ({ id: vk.id })),
+          (
+            await this.#dependencies.virtualKeys.findLiveWithPrincipal({
+              organizationId,
+              principalUserId: userId,
+            })
+          ).map((vk) => ({ id: vk.id })),
       },
       budgetDecisions: this.#dependencies.budgetDecisions,
       providerLabels: {
@@ -1821,6 +1866,27 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     includeTopModels?: boolean;
   }): Promise<GatewayBudgetOverviewForUser> {
     return this.#budgetOverviewService.overviewForUser(input);
+  }
+
+  /** Built once and reused, on the /me banner every personal page reads. */
+  get #personalBudgetService(): GatewayPersonalBudgetService {
+    const deps = this.#budgetOverviewDeps;
+    if (!deps)
+      throw new Error("The gateway personal-budget family was mounted without its members");
+
+    return (this.#personalBudget ??= GatewayPersonalBudgetService.create({
+      personalKeys: this.#dependencies.virtualKeys,
+      budgetDecisions: this.#dependencies.budgetDecisions,
+      organizations: deps.organizations,
+      publicBaseUrl: deps.publicBaseUrl,
+    }));
+  }
+
+  getPersonalBudget(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<GatewayPersonalBudget> {
+    return this.#personalBudgetService.getPersonalBudget(input);
   }
 
   #agentCacheService(): GatewayAgentCacheService {
@@ -1994,6 +2060,18 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     });
   }
 
+  async listConfirmedSpendByRequestType(
+    input: GatewayConfirmedSpendQuery,
+  ): Promise<GatewayConfirmedSpendPage> {
+    const service = this.#dependencies.spendEvents;
+    // No ledger means nothing was ever recorded on it, so there is nothing to copy.
+    if (!service) return { rows: [], nextCursor: null };
+    return service.listConfirmedSpendByRequestType({
+      ...input,
+      tenantIds: [...input.tenantIds],
+    });
+  }
+
   async findSpendDaysForOrganizationProjects(input: {
     tenantIds: readonly string[];
     fromDay: string;
@@ -2002,6 +2080,30 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const service = this.#dependencies.spendEvents;
     if (!service) return [];
     return service.findSpendDaysForOrganizationProjects(input);
+  }
+
+  async listSpendEventsAcrossTenants(
+    input: GatewaySpendEventsAcrossTenantsQuery,
+  ): Promise<GatewaySpendEventsAcrossTenantsPage> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return { rows: [], nextCursor: null };
+    return service.getSpendEventsAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
+  }
+
+  async findSpendEventAcrossTenants(
+    input: GatewaySpendEventAcrossTenantsQuery,
+  ): Promise<SpendEventRow | null> {
+    const service = this.#dependencies.spendEvents;
+    if (!service) return null;
+    return service.findSpendEventAcrossTenants({
+      ...input,
+      tenantIds: [...input.tenantIds],
+      statuses: [...input.statuses],
+    });
   }
 
   async listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage> {

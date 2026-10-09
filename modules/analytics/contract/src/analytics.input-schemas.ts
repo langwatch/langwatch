@@ -2,12 +2,12 @@ import { flexibleDateSchema } from "@langwatch/api/dates";
 import { z } from "zod";
 
 import { filterFieldsEnum } from "./analytics.filter-field.ts";
-import { langWatchQLQueryResultSchema, langWatchQLSchema } from "./analytics.lwql.ts";
 import type {
   AnalyticsFeedbacksResult,
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
 } from "./analytics.timeseries.ts";
+import { langWatchQLQueryResultSchema, langWatchQLSchema } from "./features/lwql/analytics.lwql.ts";
 
 /** `T[]` unwrapped to `T`; anything else unchanged. */
 type Unpacked<T> = T extends (infer U)[] ? U : T;

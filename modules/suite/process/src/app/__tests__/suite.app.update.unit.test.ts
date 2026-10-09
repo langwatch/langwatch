@@ -49,11 +49,9 @@ const agentApi = createApiFixture<AgentApi>({
   create: mockMethod(),
   update: mockMethod(),
   archive: mockMethod(),
-  relatedEntities: mockMethod(),
   cascadeArchive: mockMethod(),
   getCopies: mockMethod(),
   getSourceOfCopy: mockMethod(),
-  copy: mockMethod(),
   pushToCopies: mockMethod(),
   syncFromSource: mockMethod(),
   getHistory: mockMethod(),
@@ -62,8 +60,6 @@ const agentApi = createApiFixture<AgentApi>({
   getReferenceStates: mockMethod(),
   getConnectedByNameAndEnvironment: mockMethod(),
   getConnectedByName: mockMethod(),
-  testTurn: mockMethod(),
-  testRun: mockMethod(),
 });
 
 const promptApi = createApiFixture<PromptApi>({
@@ -113,7 +109,6 @@ const projectApi = createApiFixture<ProjectApi>({
   create: mockMethod(),
   updateSettings: mockMethod(),
   archive: mockMethod(),
-  requestTopicClustering: mockMethod(),
   touchCodingAgentPullRequestSeen: mockMethod(),
 });
 

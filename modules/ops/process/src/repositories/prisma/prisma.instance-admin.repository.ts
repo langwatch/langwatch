@@ -4,20 +4,20 @@ import type {
   AdminOperationInput,
   AdminOperationParams,
   AdminOperationResult,
-  UserWithBackofficeIncludes,
+  UserWithAdminIncludes,
 } from "@langwatch/ops-contract";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generated";
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 
-import { toBackofficeUserRow } from "../../rules/backoffice-user-row.rules.ts";
-import { AdminBackofficeRepository } from "../instance-admin.repository.ts";
+import { toAdminUserRow } from "../../rules/admin-user-row.rules.ts";
+import { InstanceAdminRepository } from "../instance-admin.repository.ts";
 import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
   PROJECT_SAFE_SELECT,
 } from "./prisma.admin.repository.ts";
 
-const USER_BACKOFFICE_INCLUDE = {
+const USER_ADMIN_INCLUDE = {
   orgMemberships: {
     include: {
       organization: {
@@ -35,13 +35,13 @@ const USER_BACKOFFICE_INCLUDE = {
 /**
  * Private Prisma/React-Admin adapter for the Ops instance admin surface.
  */
-export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
+export class PrismaInstanceAdminRepository extends InstanceAdminRepository {
   private constructor(private readonly database: AdminDatabase) {
     super();
   }
 
-  static create(database: AdminDatabase): PrismaAdminBackofficeRepository {
-    return new PrismaAdminBackofficeRepository(database);
+  static create(database: AdminDatabase): PrismaInstanceAdminRepository {
+    return new PrismaInstanceAdminRepository(database);
   }
 
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {
@@ -80,9 +80,8 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
           this.database.user,
           {
             ...query.where,
-            include: USER_BACKOFFICE_INCLUDE,
-            map: (users: UserWithBackofficeIncludes[]) =>
-              users.map((user) => toBackofficeUserRow(user)),
+            include: USER_ADMIN_INCLUDE,
+            map: (users: UserWithAdminIncludes[]) => users.map((user) => toAdminUserRow(user)),
           },
         );
       case "organization":

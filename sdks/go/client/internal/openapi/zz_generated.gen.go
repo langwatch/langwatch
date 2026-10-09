@@ -9720,6 +9720,144 @@ func (e CreateAgentJSONBody2ConfigScenarioMappings1Type) Valid() bool {
 	}
 }
 
+// Defines values for CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType.
+const (
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeBool               CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "bool"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeChatMessages       CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "chat_messages"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeCode               CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "code"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeDataset            CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "dataset"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeDict               CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "dict"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeFile               CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "file"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeFloat              CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "float"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeImage              CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "image"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeInt                CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "int"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeJsonSchema         CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "json_schema"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeList               CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "list"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListBool           CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "list[bool]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListFloat          CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "list[float]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListInt            CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "list[int]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListStr            CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "list[str]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeLlm                CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "llm"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypePromptingTechnique CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "prompting_technique"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeSignature          CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "signature"
+	CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeStr                CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType = "str"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType enum.
+func (e CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeBool:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeChatMessages:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeCode:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeDataset:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeDict:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeFile:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeFloat:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeImage:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeInt:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeJsonSchema:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeList:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListBool:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListFloat:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListInt:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeListStr:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeLlm:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypePromptingTechnique:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeSignature:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsTypeStr:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType.
+const (
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeBool               CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "bool"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeChatMessages       CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "chat_messages"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeCode               CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "code"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeDataset            CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "dataset"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeDict               CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "dict"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeFile               CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "file"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeFloat              CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "float"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeImage              CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "image"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeInt                CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "int"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeJsonSchema         CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "json_schema"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeList               CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "list"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListBool           CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "list[bool]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListFloat          CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "list[float]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListInt            CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "list[int]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListStr            CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "list[str]"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeLlm                CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "llm"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypePromptingTechnique CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "prompting_technique"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeSignature          CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "signature"
+	CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeStr                CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType = "str"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType enum.
+func (e CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeBool:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeChatMessages:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeCode:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeDataset:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeDict:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeFile:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeFloat:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeImage:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeInt:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeJsonSchema:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeList:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListBool:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListFloat:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListInt:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeListStr:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeLlm:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypePromptingTechnique:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeSignature:
+		return true
+	case CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsTypeStr:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateAgentJSONBody2Type.
 const (
 	CreateAgentJSONBody2TypeWorkflow CreateAgentJSONBody2Type = "workflow"
@@ -21203,7 +21341,11 @@ func (e PostApiV1Query200JSONResponseBodyCompletenessState) Valid() bool {
 
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
+	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
+	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
+	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
+	INSTANTEVALSKIPPED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
 	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
@@ -21213,7 +21355,15 @@ const (
 // Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyDiagnosticsCode enum.
 func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	switch e {
+	case APPFUNCTIONRESULTTRUNCATED:
+		return true
+	case APPFUNCTIONUNRESOLVEDKEYS:
+		return true
+	case APPFUNCTIONVALUETRUNCATED:
+		return true
 	case INCOMPLETECOMPARISONPERIOD:
+		return true
+	case INSTANTEVALSKIPPED:
 		return true
 	case MISSINGTIMEBUCKETS:
 		return true
@@ -37303,7 +37453,31 @@ type CreateAgentJSONBody2 struct {
 		ScenarioOutputField *string                                                                        `json:"scenarioOutputField,omitempty"`
 		VersionId           *string                                                                        `json:"version_id,omitempty"`
 		Versions            *map[string]interface{}                                                        `json:"versions,omitempty"`
-		WorkflowId          *string                                                                        `json:"workflow_id,omitempty"`
+		WorkflowFields      *struct {
+			FieldsResolved bool `json:"fieldsResolved"`
+			InputFields    []struct {
+				Desc       *string                                                 `json:"desc,omitempty"`
+				Hidden     *bool                                                   `json:"hidden,omitempty"`
+				Identifier string                                                  `json:"identifier"`
+				JsonSchema *map[string]interface{}                                 `json:"json_schema,omitempty"`
+				Optional   *bool                                                   `json:"optional,omitempty"`
+				Prefix     *string                                                 `json:"prefix,omitempty"`
+				Type       CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType `json:"type"`
+				Value      interface{}                                             `json:"value,omitempty"`
+			} `json:"inputFields"`
+			OutputFields []struct {
+				Desc       *string                                                  `json:"desc,omitempty"`
+				Hidden     *bool                                                    `json:"hidden,omitempty"`
+				Identifier string                                                   `json:"identifier"`
+				JsonSchema *map[string]interface{}                                  `json:"json_schema,omitempty"`
+				Optional   *bool                                                    `json:"optional,omitempty"`
+				Prefix     *string                                                  `json:"prefix,omitempty"`
+				Type       CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType `json:"type"`
+				Value      interface{}                                              `json:"value,omitempty"`
+			} `json:"outputFields"`
+			RecordedAt int `json:"recordedAt"`
+		} `json:"workflowFields,omitempty"`
+		WorkflowId *string `json:"workflow_id,omitempty"`
 	} `json:"config"`
 	CopiedFromAgentId *string                  `json:"copiedFromAgentId,omitempty"`
 	Name              string                   `json:"name"`
@@ -37346,6 +37520,12 @@ type CreateAgentJSONBody2ConfigScenarioMappings1Type string
 type CreateAgentJSONBody_2_Config_ScenarioMappings_AdditionalProperties struct {
 	union json.RawMessage
 }
+
+// CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType defines parameters for CreateAgent.
+type CreateAgentJSONBody2ConfigWorkflowFieldsInputFieldsType string
+
+// CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType defines parameters for CreateAgent.
+type CreateAgentJSONBody2ConfigWorkflowFieldsOutputFieldsType string
 
 // CreateAgentJSONBody2Type defines parameters for CreateAgent.
 type CreateAgentJSONBody2Type string
@@ -40863,6 +41043,10 @@ type PostApiEvaluationsBatchLogResultsJSONBody struct {
 		Status    PostApiEvaluationsBatchLogResultsJSONBody_Evaluations_Status `json:"status"`
 		TargetId  *string                                                      `json:"target_id,omitempty"`
 	} `json:"evaluations,omitempty"`
+	Expected *struct {
+		Dataset     int `json:"dataset"`
+		Evaluations int `json:"evaluations"`
+	} `json:"expected,omitempty"`
 	ExperimentId   *string  `json:"experiment_id,omitempty"`
 	ExperimentSlug *string  `json:"experiment_slug,omitempty"`
 	Name           *string  `json:"name,omitempty"`
@@ -149460,6 +149644,19 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Completeness What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts
+		Completeness struct {
+			Complete bool `json:"complete"`
+			Dataset  struct {
+				Expected *int `json:"expected"`
+				Received int  `json:"received"`
+			} `json:"dataset"`
+			Evaluations struct {
+				Expected *int `json:"expected"`
+				Received int  `json:"received"`
+			} `json:"evaluations"`
+		} `json:"completeness"`
+
 		// Dataset One row per dataset entry, with what the target predicted
 		Dataset []struct {
 			Cost *float32 `json:"cost,omitempty"`
@@ -159238,6 +159435,7 @@ type PostApiSuitesByIdRunResponse struct {
 		} `json:"items"`
 		JobCount        float32 `json:"jobCount"`
 		PlanName        *string `json:"planName,omitempty"`
+		PlanSlug        string  `json:"planSlug"`
 		Scheduled       bool    `json:"scheduled"`
 		SetId           string  `json:"setId"`
 		SkippedArchived struct {
@@ -178136,6 +178334,19 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Completeness What is stored against what the run reported. Results are stored after they are reported, so a read can hold part of a run: `complete` is false until the run has ended and every reported row and evaluation is stored. `expected` is null when the run reported no counts
+			Completeness struct {
+				Complete bool `json:"complete"`
+				Dataset  struct {
+					Expected *int `json:"expected"`
+					Received int  `json:"received"`
+				} `json:"dataset"`
+				Evaluations struct {
+					Expected *int `json:"expected"`
+					Received int  `json:"received"`
+				} `json:"evaluations"`
+			} `json:"completeness"`
+
 			// Dataset One row per dataset entry, with what the target predicted
 			Dataset []struct {
 				Cost *float32 `json:"cost,omitempty"`
@@ -188615,6 +188826,7 @@ func ParsePostApiSuitesByIdRunResponse(rsp *http.Response) (*PostApiSuitesByIdRu
 			} `json:"items"`
 			JobCount        float32 `json:"jobCount"`
 			PlanName        *string `json:"planName,omitempty"`
+			PlanSlug        string  `json:"planSlug"`
 			Scheduled       bool    `json:"scheduled"`
 			SetId           string  `json:"setId"`
 			SkippedArchived struct {

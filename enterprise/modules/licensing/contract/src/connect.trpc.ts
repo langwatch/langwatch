@@ -11,7 +11,7 @@ import {
   connectServicesSetSchema,
   connectStatusSchema,
 } from "./connect-install.ts";
-import { CONNECT_SERVICES } from "./connect-services.ts";
+import { CONNECT_SERVICES } from "./issued-license.ts";
 
 const organizationInput = z.object({ organizationId: z.string().min(1) });
 

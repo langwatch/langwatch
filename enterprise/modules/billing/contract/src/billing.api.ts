@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import { moduleApi, uiTokens } from "@langwatch/module";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {
@@ -9,7 +9,6 @@ import type {
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
   UsageWarningDecision,
-  USAGE_UNKNOWN,
 } from "./billing-types.ts";
 import type {
   ConnectedAddCommitRequest,
@@ -20,10 +19,12 @@ import type {
   ConnectedRenewRequest,
 } from "./connected-billing.schemas.ts";
 import type { RenewalCompletion } from "./connected-billing.ts";
+import type { Currency } from "./pricing.ts";
+import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
 
 /**
- * The staff member a backoffice command is checked against: the impersonator
- * where one is borrowing a customer's session. `null` is nobody signed in.
+ * The staff member the platform door admitted for an admin console command: the
+ * impersonator where one is borrowing a customer's session.
  */
 export type BillingStaff = Readonly<{ id: string; email?: string | null | undefined }>;
 
@@ -31,36 +32,36 @@ export type BillingStaff = Readonly<{ id: string; email?: string | null | undefi
  * What the billing module answers other modules: invoice billing for a
  * connected self-hosted customer (ADR-156 section 7). Every operation refuses
  * off LangWatch Cloud, and where no payment provider is configured. The
- * backoffice operations answer anyone without the platform-operator grant not found.
+ * admin console operations trust the platform door (Q43): staff only, writes need ops:manage.
  */
 export interface BillingApi {
   /** The commercial state of one connected customer. */
   getConnectedBillingOverview(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingOverview>;
   /** Onboards a customer, or completes an onboarding that stopped halfway. */
   onboardConnectedCustomer(
     input: ConnectedOnboardRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView>;
   /** Raises the commit mid-term: a second paid credit, and the budget with it. */
   addConnectedCommit(
     input: ConnectedAddCommitRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedCreditGrantView>;
   renewConnectedTerm(
     input: ConnectedRenewRequest,
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<ConnectedBillingAccountView>;
   completeConnectedRenewalIfDue(
     input: { organizationId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<RenewalCompletion>;
   /** Finance received the money outside the payment provider. */
   markConnectedInvoicePaidOutOfBand(
     input: { stripeInvoiceId: string },
-    by: BillingStaff | null,
+    staff: BillingStaff,
   ): Promise<void>;
   /**
    * One seat invoicing pass: decides every seat change licensing recorded that
@@ -74,14 +75,6 @@ export interface BillingApi {
    * subscription's own limit overrides; the free plan where none is active or off Cloud.
    */
   getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
-  /**
-   * This UTC billing month's approximate billable events per named project, 0 where a project
-   * has none; unknown when no analytics store is composed. Main's `EventUsageService`.
-   */
-  countBillableEventsByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN>;
   /**
    * Mails the organization's admins the usage warning entitlement decided, once per threshold a
    * month. Billing counts nothing: the threshold and per-project counts arrive decided.
@@ -98,28 +91,18 @@ export interface BillingApi {
   getPricingModel(input: {
     organizationId: string;
   }): Promise<{ pricingModel: BillingPricingModel | null }>;
+  /**
+   * Opens a seat checkout for `membersToAdd`, the customer resolved from `customerEmail`. Answers
+   * the pending subscription organization holds the checkout's invitations against (C2 A).
+   */
+  createSeatCheckout(input: {
+    organizationId: string;
+    baseUrl: string;
+    membersToAdd: number;
+    currency?: Currency;
+    billingInterval?: SubscriptionBillingInterval;
+    customerEmail: string | null;
+  }): Promise<{ url: string | null; subscriptionId: string }>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");
-
-/** What billing lends to screens it does not own: a core screen renders it directly (§11). */
-
-/** The "need more?" card. It reads the plan itself and takes nothing. */
-export type ContactSalesProps = Record<string, never>;
-
-/** A seat change waiting in licensing's upgrade dialog; billing prices and confirms it. */
-export type SeatProrationPreviewProps = {
-  variant: {
-    organizationId: string;
-    currentSeats: number;
-    newSeats: number;
-    /** `quotedAt` is the instant the quote on screen was priced, when one loaded. */
-    onConfirm: (quotedAt?: number) => Promise<void>;
-  };
-  open: boolean;
-  onClose: () => void;
-};
-
-export const ContactSalesToken = uiTokens("billing").component<ContactSalesProps>("contactSales");
-export const SeatProrationPreviewToken =
-  uiTokens("billing").component<SeatProrationPreviewProps>("seatProrationPreview");

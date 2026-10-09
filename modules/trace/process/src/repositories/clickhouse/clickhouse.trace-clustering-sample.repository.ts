@@ -4,7 +4,7 @@ import {
   type TraceClusteringSampleCounts,
   TraceClusteringSampleRepository,
   type TraceClusteringSampleRow,
-} from "../trace-clustering-sample.repository.ts";
+} from "../../features/topic/repositories/trace-clustering-sample.repository.ts";
 import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const countsRowsSchema = z.array(

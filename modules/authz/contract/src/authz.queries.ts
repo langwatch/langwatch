@@ -319,6 +319,20 @@ export type AuthzListOrganizationBindingsInput = z.infer<
   typeof authzListOrganizationBindingsInputSchema
 >;
 
+/** Asks for the members who administer an organisation and can still sign in to it. */
+export const authzFindActiveOrganizationAdministratorsInputSchema = z
+  .object({ organizationId: z.string() })
+  .strict();
+export type AuthzFindActiveOrganizationAdministratorsInput = z.infer<
+  typeof authzFindActiveOrganizationAdministratorsInputSchema
+>;
+
+/** The user ids of those administrators: organisation role ADMIN on a seat not disabled. */
+export const authzActiveOrganizationAdministratorsSchema = z.array(z.string());
+export type AuthzActiveOrganizationAdministrators = z.infer<
+  typeof authzActiveOrganizationAdministratorsSchema
+>;
+
 export const authzListUserAndGroupBindingsInputSchema = z
   .object({
     organizationId: z.string(),

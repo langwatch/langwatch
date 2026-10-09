@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
+  accountLivenessKey,
   type BackfillDiff,
   backfillParityDiffs,
   IdentityCommandRefusedError,
@@ -16,6 +17,7 @@ import {
   establishUserEmailCommandId,
 } from "../rules/identity-command-id.rules.ts";
 import type { IdentityAdoptionWrites } from "../rules/identity-writes.rules.ts";
+import { isUnprovenAccount } from "../rules/unproven-account.rules.ts";
 import { mintUserHashKey } from "../rules/user-hash-key.rules.ts";
 import {
   type IdentityBackfillPlanService,
@@ -34,9 +36,10 @@ const MAX_REPORTED_DIFFS = 50;
 export type IdentityBackfillOutcome =
   | { status: "finalized"; report: { kind: "user_missing" | "no_email" } }
   | { status: "finalized"; report: { kind: "adopted"; identifiers: number } }
-  | { status: "migrated"; report: { kind: "parity"; diffs: BackfillDiff[] } };
+  | { status: "migrated"; report: { kind: "parity"; diffs: BackfillDiff[] } }
+  | { status: "migrated"; report: { kind: "unproven_account" } };
 
-export interface IdentityBackfillServiceDeps {
+interface IdentityBackfillServiceDeps {
   now?: () => number;
 }
 
@@ -113,6 +116,12 @@ export class IdentityBackfillService {
       return { status: "finalized", report: { kind: "no_email" } };
     }
 
+    if (isUnprovenAccount(user)) {
+      // Held on the legacy branch, where a confirmation link's adoption drops every pre-proof
+      // credential; the pass writes nothing until the address is proven (Alex, 2026-10-06).
+      return { status: "migrated", report: { kind: "unproven_account" } };
+    }
+
     if (user.userHashKey === null) {
       await this.users.storeUserHashKeyIfMissing({
         userId,
@@ -134,6 +143,7 @@ export class IdentityBackfillService {
       planned,
     });
     await this.detachOrphanedIdentifiers({ userId, accounts });
+    await this.dropGoneCredentials({ userId, accounts });
 
     const outcome = await this.prove({ userId, planned });
     if (outcome.status === "finalized") {
@@ -241,6 +251,29 @@ export class IdentityBackfillService {
         }),
       );
     }
+  }
+
+  /**
+   * Level-triggered: every identifier whose `Account` row is gone, detached or not, names a
+   * carried credential row with no sign-in method behind it any more.
+   */
+  private async dropGoneCredentials({
+    userId,
+    accounts,
+  }: {
+    userId: string;
+    accounts: BackfillAccountRow[];
+  }): Promise<void> {
+    const liveAccountIds = new Set(accounts.map((account) => account.id));
+    const rows = await this.reads.findIdentifierRows({ userId });
+    const goneAccountIds = new Set<string>();
+    for (const row of rows) {
+      if (row.accountId === null) continue;
+      // A credential row carries its `Account` row's id, which is the liveness key.
+      const accountId = accountLivenessKey(row.accountId);
+      if (!liveAccountIds.has(accountId)) goneAccountIds.add(accountId);
+    }
+    await this.secrets.dropCredentials({ userId, accountIds: [...goneAccountIds] });
   }
 
   /**

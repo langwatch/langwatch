@@ -1,6 +1,6 @@
-import type { CanonicalLogRecordRepository } from "./canonical-log-record.repository.ts";
+import type { CanonicalLogRecordAppendRepository } from "./canonical-log-record-append.repository.ts";
 
-/** The rows this module owns: the canonical log records, appended and read by trace. */
+/** The rows this module owns: the canonical log records the pipeline appends. */
 export interface LogRepositories {
-  readonly logRecords: CanonicalLogRecordRepository;
+  readonly logRecords: CanonicalLogRecordAppendRepository;
 }

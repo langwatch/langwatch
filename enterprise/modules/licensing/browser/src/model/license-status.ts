@@ -1,7 +1,5 @@
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import { toEpochMs } from "@langwatch/time";
-
-import { readableDate } from "./display-formatters.ts";
+import { toEpochMs, readableDate } from "@langwatch/time";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */
 export type LicenseStatusWithMetadata = Extract<LicenseStatus, { hasLicense: true; plan: string }>;
@@ -75,14 +73,6 @@ export function formatLimitOrUnlimited(value: number): string {
     return "Unlimited";
   }
   return value.toLocaleString();
-}
-
-/**
- * Formats a current/max pair for display.
- * Example: "5 / 10" or "5 / Unlimited"
- */
-export function formatResourceUsage(current: number, max: number): string {
-  return `${current.toLocaleString()} / ${formatLimitOrUnlimited(max)}`;
 }
 
 /**

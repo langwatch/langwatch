@@ -6,7 +6,6 @@ import type {
 } from "@langwatch/enterprise-nurturing-contract";
 import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { onboardingExperimentProperties } from "@langwatch/onboarding-contract";
 import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -29,6 +28,7 @@ import {
   fireInviteAccepted,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
+import { activationTrackInput } from "../rules/nurturing-posthog-activation.rules.ts";
 import {
   fireIntegrationMethod,
   integrationMethodFor,
@@ -187,6 +187,8 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(firePromptCreated(signal));
       case "signed_up":
         return this.sendSignup(signal);
+      case "user_created":
+        return this.identifyCreated(signal);
       case "team_member_invited":
         return this.teamMemberInvited(signal);
       case "invite_accepted":
@@ -258,38 +260,21 @@ export class NurturingDeliveryService {
             currentPath: signal.state.currentPath,
           }),
         );
-      case "scenario_created": {
-        const variant = signal.onboardingVariant;
-        return track({
-          userId: signal.userId,
-          event: "scenario_created",
-          properties: variant
-            ? { onboarding_variant: variant, ...onboardingExperimentProperties(variant) }
-            : {},
-        });
-      }
+      case "scenario_created":
       case "scenario_run_succeeded":
-        return track({
-          userId: signal.userId,
-          event: "scenario_run_succeeded",
-          properties: {
-            scenario_id: signal.scenarioId ?? null,
-            run_id: signal.runId,
-            connected_agent: true,
-            ...onboardingExperimentProperties(signal.onboardingVariant),
-          },
-        });
       case "first_trace_integrated":
-        return track({
-          userId: signal.userId,
-          event: "first_trace_integrated",
-          properties: { sdk_language: signal.sdkLanguage, sdk_framework: signal.sdkFramework },
-        });
+      case "project_active_day":
+        return track(activationTrackInput(signal));
       case "experiment_ran":
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
       case "user_registered":
         return track({ userId: signal.userId, event: "signed_up" });
+      case "user_created":
+        return posthog.identify({
+          userId: signal.userId,
+          properties: { created_at: isoOf(signal.occurredAt) },
+        });
       case "signed_up":
         return posthog.track(fireOrganizationCreated(signal));
       case "team_member_invited":
@@ -302,18 +287,6 @@ export class NurturingDeliveryService {
         return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
       case "checkout_completed":
         return this.checkoutCompleted({ posthog, signal });
-      case "project_active_day":
-        return track({
-          userId: signal.userId,
-          event: "project_active_day",
-          properties: {
-            source: signal.source,
-            ...(signal.daysSinceSignup == null
-              ? {}
-              : { days_since_signup: signal.daysSinceSignup }),
-            ...onboardingExperimentProperties(signal.onboardingVariant),
-          },
-        });
       default:
         return;
     }
@@ -340,6 +313,26 @@ export class NurturingDeliveryService {
       .findById({ id: signal.userId })
       .then((user) =>
         this.sendCustomerIoCalls(fireSignup({ ...signal, email: user?.email, name: user?.name })),
+      )
+      .catch(reportFailure);
+  }
+
+  /** A minted account: Customer.io learns the person, its address and name read fresh (§9). */
+  private identifyCreated(signal: NurturingSignalOf<"user_created">): void {
+    void this.deps.users
+      .findById({ id: signal.userId })
+      .then((user) =>
+        this.sendCustomerIoCalls([
+          {
+            type: "identify",
+            userId: signal.userId,
+            traits: {
+              ...(user?.email ? { email: user.email } : {}),
+              ...(user?.name ? { name: user.name } : {}),
+              createdAt: isoOf(signal.occurredAt),
+            },
+          },
+        ]),
       )
       .catch(reportFailure);
   }

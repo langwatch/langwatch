@@ -1,8 +1,18 @@
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
+import {
+  processWebConfigSchema,
+  type ProcessWebConfig,
+  type PublicAppConfig,
+} from "@langwatch/config/public-app-config";
 
-import { checkHostMounts } from "./ui-host-mounts.ts";
-import { checkLends } from "./ui-module-lends.ts";
-import { checkScreenAddresses } from "./ui-screen-addresses.ts";
+import { checkHostMounts } from "./module/ui-host-mounts.ts";
+import {
+  checkHostServices,
+  loadHostServices,
+  type UiHostServiceRun,
+  UI_HOST_SERVICES,
+} from "./module/ui-module-host-services.ts";
+import { checkLends } from "./module/ui-module-lends.ts";
+import { checkScreenAddresses } from "./page/ui-screen-addresses.ts";
 import { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 import type {
   CheckedUiModules,
@@ -30,6 +40,8 @@ export type UiRenderResult<Config extends object = SupplyRecord> = Readonly<{
   modules: readonly SupplyModule[];
   config: Config;
   supplied: SupplyRecord;
+  /** Each host service's loaded source, in the runtime's order; the shell runs them. */
+  hostServices: readonly UiHostServiceRun[];
 }>;
 
 export class BrowserConfigMissingError extends Error {
@@ -41,13 +53,32 @@ export class BrowserConfigMissingError extends Error {
   }
 }
 
+/** Names the module that refused its slices, or the owner slice nothing installed admits. */
 export class BrowserConfigRefusedError extends Error {
   readonly code = "browser_config_refused";
+  readonly module?: string;
+  readonly owner?: string;
 
-  constructor(readonly module: string) {
-    super(`The browser configuration was refused by module ${JSON.stringify(module)}.`);
+  constructor(refusal: Readonly<{ module: string }> | Readonly<{ owner: string }>) {
+    super(
+      "module" in refusal
+        ? `The browser configuration was refused by module ${JSON.stringify(refusal.module)}.`
+        : `The browser configuration slice ${JSON.stringify(refusal.owner)} was refused.`,
+    );
     this.name = "BrowserConfigRefusedError";
+    if ("module" in refusal) this.module = refusal.module;
+    else this.owner = refusal.owner;
   }
+}
+
+/** The owner every composition admits: the process's own slice (rulings R2). */
+const PROCESS_OWNER = "process";
+
+/** The process owner's slice, parsed: a composition reads it before render, for its transport. */
+export function readUiProcessConfig(envelope: PublicAppConfig): ProcessWebConfig {
+  const parsed = processWebConfigSchema.safeParse(envelope[PROCESS_OWNER]);
+  if (!parsed.success) throw new BrowserConfigRefusedError({ owner: PROCESS_OWNER });
+  return parsed.data;
 }
 
 export class BrowserMountMissingError extends Error {
@@ -185,15 +216,21 @@ export class UiSupply<
       mountedByShell: [...KERNEL_MOUNTED_HOSTS, ...this.#state.mountedByShell],
     });
     checkLends({ modules: this.#state.modules });
+    checkHostServices({ modules: this.#state.modules, services: UI_HOST_SERVICES });
     checkScreenAddresses({ modules: this.#state.modules });
     const mount = this.#resolveMount();
     const config = this.#readConfig();
+    const hostServices = await loadHostServices({
+      modules: this.#state.modules,
+      services: UI_HOST_SERVICES,
+    });
     return {
       document: this.#state.document,
       mount,
       modules: this.#state.modules,
       config,
       supplied: this.#state.supplied,
+      hostServices,
     };
   }
 
@@ -228,7 +265,10 @@ export class UiSupply<
       throw new BrowserConfigMissingError();
     }
 
-    const slices: Record<string, unknown> = {};
+    refuseUnclaimed({ envelope, modules: configured });
+    readUiProcessConfig(envelope);
+
+    const installed: Record<string, unknown> = {};
     for (const module of configured) {
       const declaration = module.installation.config;
       if (!declaration) continue;
@@ -237,13 +277,29 @@ export class UiSupply<
         for (const [owner, schema] of Object.entries(declaration.slices)) {
           read[owner] = schema.parse(envelope[owner]);
         }
-        slices[module.name] = read;
+        installed[module.name] = declaration.project(read as never);
       } catch {
-        throw new BrowserConfigRefusedError(module.name);
+        throw new BrowserConfigRefusedError({ module: module.name });
       }
     }
-    return slices;
+    return installed;
   }
+}
+
+/** One image writes and reads the envelope, so an owner no installed module claims is skew. */
+function refuseUnclaimed({
+  envelope,
+  modules,
+}: {
+  envelope: PublicAppConfig;
+  modules: readonly SupplyModule[];
+}): void {
+  const claimed = new Set([PROCESS_OWNER]);
+  for (const module of modules) {
+    for (const owner of Object.keys(module.installation.config?.slices ?? {})) claimed.add(owner);
+  }
+  const unclaimed = Object.keys(envelope).find((owner) => !claimed.has(owner));
+  if (unclaimed !== void 0) throw new BrowserConfigRefusedError({ owner: unclaimed });
 }
 
 export function createUi(options: CreateUiOptions): UiSupply {

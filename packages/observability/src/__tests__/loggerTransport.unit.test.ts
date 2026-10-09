@@ -120,6 +120,35 @@ describe("configured Node logger transports", () => {
     printed.mockRestore();
   });
 
+  /**
+   * @scenario A failing transport warns once and its lines are dropped quietly
+   * @scenario The transport resumes when the endpoint returns
+   */
+  it("warns once, stays quiet while down and resumes on a fresh worker after the interval", () => {
+    vi.useFakeTimers();
+    const first = fakeTransport();
+    const second = fakeTransport();
+    pinoMock.transport.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const reported = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const printed = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    createLoggerFactory({ environment: "production" }).createLogger("transport-resume");
+    const [, stream] = pinoMock.pino.mock.lastCall ?? [];
+    first.fail(new Error("the worker has exited"));
+    first.fail(new Error("the worker has exited"));
+    stream?.write("while down\n");
+    vi.advanceTimersByTime(30_000);
+    stream?.write("after the endpoint returns\n");
+    second.fail(new Error("the worker has exited"));
+
+    expect(reported).toHaveBeenCalledOnce();
+    expect(first.write).not.toHaveBeenCalled();
+    expect(second.write).toHaveBeenCalledWith("after the endpoint returns\n");
+    reported.mockRestore();
+    printed.mockRestore();
+    vi.useRealTimers();
+  });
+
   it("falls back to stdout when a configured transport cannot initialize", () => {
     pinoMock.transport.mockImplementation(() => {
       throw new Error("transport unavailable");

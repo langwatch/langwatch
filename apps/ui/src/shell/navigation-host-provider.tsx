@@ -5,23 +5,34 @@
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
+import {
+  useUiCapabilities,
+  useUiDeployment,
+  useUiRpc,
+  useUiScope,
+} from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import {
+  setGraphicsQualityOverride,
+  useGraphicsQualityOverrideStore,
+  type GraphicsQualityOverride,
+} from "@langwatch/browser-host/facilities";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
-import type {
-  NavigationAccountMenu,
-  NavigationLangy,
-  NavigationScopeWrite,
-  NavigationUser,
-} from "@langwatch/navigation-browser/navigation";
+import type { NavigationScopeWrite, NavigationUser } from "@langwatch/navigation-contract";
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import { useLangyStore } from "./behavior/langy/langy.store.ts";
-import { browserNavigationHosts } from "./navigation-host";
-import { readNavigationDeployment } from "./navigation-host-deployment";
+import {
+  browserNavigationHosts,
+  type NavigationAccountMenu,
+  type NavigationLangy,
+} from "./navigation-host";
+import { navigationDeploymentOf } from "./navigation-host-deployment";
 import { offersLangyAsk, offersPresenceMenuItem, opsAccessOf } from "./navigation-host-gates";
 import {
   openableTeamsOf,
@@ -75,12 +86,25 @@ function rememberScope({
  * an empty one: every scope answer below is read off that one query, so
  * rendering the chrome around a refusal would leave it empty forever.
  */
+const GRAPHICS_QUALITY_LABELS: Record<GraphicsQualityOverride, string> = {
+  auto: "Auto",
+  on: "On",
+  off: "Off",
+};
+
+function setGraphicsQualityFromMenu(value: string): void {
+  if (value === "auto" || value === "on" || value === "off") setGraphicsQualityOverride(value);
+}
+
 export function UiNavigationHost({
   children,
   commandBar = false,
   capabilities,
+  process,
 }: {
   children: ReactNode;
+  /** The process owner's slice, handed down by the chrome. */
+  process: ProcessWebConfig;
   /** Auth's session and organization's scope, loaded before the shell rendered. */
   capabilities: UiRootCapabilities;
   /**
@@ -89,7 +113,7 @@ export function UiNavigationHost({
    */
   commandBar?: boolean;
 }) {
-  const { host, failure } = useNavigationHostReading({ commandBar, capabilities });
+  const { host, failure } = useNavigationHostReading({ commandBar, capabilities, process });
 
   if (failure.departing) return <LoadingScreen />;
   if (failure.copy) {
@@ -121,9 +145,11 @@ function useNavigationHostReading({
     presenceMenuItem,
     impersonationBanner,
   },
+  process,
 }: {
   commandBar: boolean;
   capabilities: UiRootCapabilities;
+  process: ProcessWebConfig;
 }) {
   const { session, navigation, documentTitle, route } = useUiCapabilities();
   const activeScope = useUiScope().activeScope();
@@ -187,7 +213,11 @@ function useNavigationHostReading({
     [organization, currentUser?.id, organizationRole, scopeCapability],
   );
 
-  const deployment = useMemo(readNavigationDeployment, []);
+  const uiDeployment = useUiDeployment();
+  const deployment = useMemo(
+    () => navigationDeploymentOf({ deployment: uiDeployment, process }),
+    [uiDeployment, process],
+  );
 
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
@@ -243,20 +273,27 @@ function useNavigationHostReading({
   // The header carries ops's impersonation banner whenever the session says so
   // (specs/auth/impersonation-banner.feature). Presence is offered only on the
   // surface that broadcasts it, its switches off the graph already read.
+  const graphicsQualityOverride = useGraphicsQualityOverrideStore();
   const accountMenu = useMemo<NavigationAccountMenu>(() => {
     const ImpersonationBanner = impersonationBanner.default;
     const headerBanner = currentUser?.impersonator ? (
       <ImpersonationBanner user={currentUser} />
     ) : null;
-    if (!offersPresenceMenuItem(routePattern)) return { headerBanner };
+    const graphicsQuality = {
+      value: graphicsQualityOverride,
+      label: GRAPHICS_QUALITY_LABELS[graphicsQualityOverride],
+      set: setGraphicsQualityFromMenu,
+    };
+    if (!offersPresenceMenuItem(routePattern)) return { headerBanner, graphicsQuality };
     const flags = presenceFlagsOf({
       read,
       organizationId: activeScope.organizationId,
       projectId: activeScope.projectId,
     });
     const PresenceMenuItem = presenceMenuItem.default;
-    return { headerBanner, presence: <PresenceMenuItem {...flags} /> };
+    return { headerBanner, graphicsQuality, presence: <PresenceMenuItem {...flags} /> };
   }, [
+    graphicsQualityOverride,
     routePattern,
     read,
     activeScope.organizationId,
@@ -274,6 +311,10 @@ function useNavigationHostReading({
     (drawer: string, params?: Record<string, string>) => {
       openDrawer(drawer, params ?? {});
     },
+    [openDrawer],
+  );
+  const openDrawerByToken = useCallback(
+    <Props,>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => openDrawer(drawer, props),
     [openDrawer],
   );
 
@@ -323,6 +364,7 @@ function useNavigationHostReading({
           signOut: () => void auth.signOutUi(),
           setDocumentTitle,
           openDrawer: openDrawerByName,
+          openDrawerByToken,
         },
       ),
     [
@@ -350,6 +392,7 @@ function useNavigationHostReading({
       scopeCapability,
       setDocumentTitle,
       openDrawerByName,
+      openDrawerByToken,
       navigationHost,
     ],
   );

@@ -1,10 +1,9 @@
 /** Seam that a composition can plug a registry into, so error copy isn't baked into the app. */
 
-import type { AuthErrorExplanation } from "./auth-host.ts";
+import type { AuthErrorExplanation } from "@langwatch/auth-contract";
+
 import { frontDoorErrorCopy } from "./front-door-error-copy.ts";
 import type { AuthHandledError } from "./read-handled-error.ts";
-
-export type { AuthErrorExplanation } from "./auth-host.ts";
 
 /** Registry function that reads the whole error to fill in templated copy. */
 export type ExplainErrorCode = (error: AuthHandledError) => AuthErrorExplanation | null;

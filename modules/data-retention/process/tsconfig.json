@@ -21,10 +21,19 @@
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
@@ -52,6 +61,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"

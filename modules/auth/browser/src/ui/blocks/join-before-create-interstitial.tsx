@@ -7,6 +7,7 @@ import {
   resolveJoinBeforeCreate,
 } from "../../model/join-before-create.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 
 /** Offer to join existing organization before creating workspace; joining leads. */
 export function JoinBeforeCreateInterstitial({
@@ -78,14 +79,12 @@ export function JoinBeforeCreateInterstitial({
         workspace.
       </Text>
       {decision.organizations.map((organization) => (
-        <Button
+        <FrontDoorPrimaryButton
           key={organization.id}
-          colorPalette="orange"
-          width="full"
           onClick={() => onJoinOrganization(organization)}
         >
           Join {organization.name} ({colleagues(organization.colleagueCount)})
-        </Button>
+        </FrontDoorPrimaryButton>
       ))}
       <Button variant="outline" width="full" onClick={onCreateWorkspace}>
         Create a new organization

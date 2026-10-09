@@ -55,7 +55,15 @@ function makeDatabase() {
     async () => null,
   );
   const state = { committed: false };
+  const outboxCreateMany = vi.fn(async (args?: { data: unknown }) => ({
+    count: [args?.data].flat().length,
+  }));
   const client: PrismaClient = prismaDouble({
+    processManagerOutbox: { createMany: outboxCreateMany, findMany: vi.fn(async () => []) },
+    processManagerOutboxAttempt: {},
+    processManagerInbox: {},
+    processManagerInstance: {},
+    $executeRaw: vi.fn(async () => 0),
     user: {
       findMany: vi.fn(async () => []),
       findUnique: userFindUnique,
@@ -85,6 +93,7 @@ function makeDatabase() {
     accountUpdate,
     accountFindFirst,
     passkeyCount,
+    outboxCreateMany,
     state,
   };
 }
@@ -108,7 +117,7 @@ describe("PrismaUserRepository credential creation", () => {
     ).resolves.toEqual({ id: "user-1", accountId: "account-1", accountCreatedAtMs: 1_000 });
     expect(userCreate).toHaveBeenCalledWith({
       data: { name: "Ada", email: "ada@example.com", emailVerified: true },
-      select: { id: true },
+      select: { id: true, createdAt: true },
     });
     expect(accountCreate).toHaveBeenCalledWith({
       data: {
@@ -143,7 +152,7 @@ describe("PrismaUserRepository credential creation", () => {
      * `select` hands every scalar on `User`, throwing `unrecognized_keys` from
      * inside the repository — which is how both signup routes answered 500.
      */
-    it("asks for the id alone, so a credential signup survives the full row", async () => {
+    it("asks for the id and its stamp alone, so a credential signup survives the full row", async () => {
       const { database, userCreate } = makeDatabase();
 
       await expect(
@@ -155,10 +164,10 @@ describe("PrismaUserRepository credential creation", () => {
           emailVerified: false,
         }),
       ).resolves.toEqual({ id: "user-1", accountId: "account-1", accountCreatedAtMs: 1_000 });
-      expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
+      expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true, createdAt: true });
     });
 
-    it("asks for the id alone on the passkey route too", async () => {
+    it("asks for the id and its stamp alone on the passkey route too", async () => {
       const { database, userCreate } = makeDatabase();
 
       await expect(
@@ -168,7 +177,70 @@ describe("PrismaUserRepository credential creation", () => {
           emailVerified: true,
         }),
       ).resolves.toEqual({ id: "user-1" });
-      expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
+      expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true, createdAt: true });
+    });
+  });
+
+  describe("when an account is minted", () => {
+    /** @scenario "Every account mint records user's created fact" */
+    it("appends the created fact to the outbox in the mint's transaction", async () => {
+      const { database, outboxCreateMany } = makeDatabase();
+
+      await repositoryOver(database).createPasskeyUser({
+        email: "ada@example.com",
+        issuer: ISSUER,
+        emailVerified: true,
+      });
+
+      expect(outboxCreateMany.mock.calls[0]?.[0]?.data).toEqual([
+        expect.objectContaining({
+          processName: "userLifecycleFacts",
+          tenantId: "user-1",
+          messageKey: "user-1:created",
+          intentType: "recordCreated",
+          payload: { tenantId: "user-1", userId: "user-1", occurredAt: 0 },
+        }),
+      ]);
+    });
+
+    /** @scenario "A self-service registration is recorded as user's fact" */
+    it("appends the registered fact beside it for a self-registration", async () => {
+      const { database, outboxCreateMany } = makeDatabase();
+
+      await repositoryOver(database).createCredentialUser({
+        name: "Ada",
+        email: "ada@example.com",
+        passwordHash: "hash",
+        issuer: ISSUER,
+        emailVerified: true,
+        selfRegistered: true,
+      });
+
+      expect(outboxCreateMany.mock.calls[0]?.[0]?.data).toEqual([
+        expect.objectContaining({ messageKey: "user-1:created" }),
+        expect.objectContaining({
+          messageKey: "user-1:registered",
+          payload: {
+            tenantId: "user-1",
+            userId: "user-1",
+            occurredAt: 0,
+            accountId: "account-1",
+            createdAtMs: 1_000,
+            email: "ada@example.com",
+          },
+        }),
+      ]);
+    });
+
+    /** @scenario "A mint whose fact cannot be committed writes no account" */
+    it("fails the whole transaction when the outbox row cannot be written", async () => {
+      const { database, outboxCreateMany, state } = makeDatabase();
+      outboxCreateMany.mockRejectedValueOnce(new Error("outbox unavailable"));
+
+      await expect(
+        repositoryOver(database).create({ name: "Ada", email: "ada@example.com" }),
+      ).rejects.toThrow("outbox unavailable");
+      expect(state.committed).toBe(false);
     });
   });
 

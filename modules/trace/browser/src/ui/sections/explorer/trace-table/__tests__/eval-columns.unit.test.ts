@@ -1,7 +1,10 @@
 import { formatEvalColumnId, isEvalColumnId, parseEvalColumnId } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { TraceEvalResult, TraceListItem } from "../../types/trace.ts";
+import type {
+  TraceEvalResult,
+  TraceListItem,
+} from "../../../../../behavior/explorer/types/trace.ts";
 import {
   buildEvalColumnDef,
   evalColumnLabel,

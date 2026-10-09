@@ -30,11 +30,11 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 
-import { describeChipContext } from "../../../../behavior/langy-chip-context.ts";
-import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store.ts";
 import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
 import { LANGY_ANSWER_HERE_OR_TERMINAL } from "../../../../model/langy-local-waits.ts";
 import type { LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+import { describeChipContext } from "../../../context-target/behavior/langy-chip-context.ts";
+import { useLangyContextTargetStore } from "../../../context-target/behavior/langy-context-target.store.ts";
 import { LangyComposerPalette, type PaletteMode } from "../elements/langy-composer-palette.tsx";
 import { LangyModelPill } from "../elements/langy-model-pill.tsx";
 
@@ -132,6 +132,11 @@ export const AWAITING_ANSWER_TERMINAL_PLACEHOLDER = LANGY_ANSWER_HERE_OR_TERMINA
 export const COMPOSER_DATA_USE_NOTICE = "Note: these chats are used by LangWatch to improve Langy.";
 
 /** The gutter under the composer card: none on the hero, tighter when floating. */
+/** A turn in flight is the one lock reason the model pill names on hover. */
+function turnLock({ turnActive }: { turnActive: boolean }) {
+  return turnActive ? ("turn-active" as const) : undefined;
+}
+
 function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }) {
   if (hero) return 0;
   return floating ? 2 : 3.5;
@@ -418,6 +423,7 @@ function ComposerImpl({
                 // greys out until the turn settles rather than offering a
                 // choice that wouldn't take.
                 disabled={disabled || turnActive}
+                disabledReason={turnLock({ turnActive })}
               />
               <SigilButton
                 sigil="#"
@@ -516,6 +522,7 @@ function composerKeyHandler({
 /**
  * What the empty field says, in the state the composer is actually in — never a promise to
  * send (there's no queue), and pointed at the open card rather than blaming Langy for the wait.
+ * A card holds a turn, so a pending entry with no turn in flight is a leftover: read idle.
  */
 export function composerPlaceholder({
   awaitingAnswer,
@@ -529,7 +536,7 @@ export function composerPlaceholder({
   /** What it says when nothing is running and nothing is waiting. */
   idle: string;
 }): string {
-  if (awaitingAnswer) {
+  if (awaitingAnswer && turnActive) {
     return terminalConnected ? AWAITING_ANSWER_TERMINAL_PLACEHOLDER : AWAITING_ANSWER_PLACEHOLDER;
   }
   return turnActive ? MID_TURN_PLACEHOLDER : idle;

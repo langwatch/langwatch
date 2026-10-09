@@ -8,8 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { FeatureFlagApi } from "../feature-flag.api.ts";
-import { VOICE_AGENTS_FLAG_KEY } from "../voice-agents.message.ts";
-import { isVoiceAgentsEnabledForProject } from "../voice-agents.ts";
+import { isVoiceAgentsEnabledForProject, VOICE_AGENTS_FLAG_KEY } from "../voice-agents.ts";
 
 const unused = (name: string) => async (): Promise<never> => {
   throw new Error(`this suite does not call FeatureFlagApi.${name}`);

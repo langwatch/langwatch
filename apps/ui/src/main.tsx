@@ -1,6 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-import { createUi } from "@langwatch/browser";
+import { createUi, type UiRenderResult } from "@langwatch/browser";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
 import type {
   UiDeployment,
@@ -37,6 +37,7 @@ import {
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { UiRuntime } from "@langwatch/browser/runtime";
 import { UiShell } from "@langwatch/browser/shell";
+import { readUiProcessConfig } from "@langwatch/browser/supply";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
@@ -49,15 +50,19 @@ import type { FallbackProps } from "react-error-boundary";
 import { useLocation, useRouteError } from "react-router";
 
 import { browserModules } from "./browser-modules.generated.ts";
-import { composeUiDesignSystem } from "./design-system";
 import { installedUiDeclarations } from "./shell/ui-declarations";
-import { loadUiRootCapabilities, type UiRootCapabilities } from "./shell/ui-root-capabilities";
+import {
+  composeUiDesignSystem,
+  loadUiRootCapabilities,
+  type UiRootCapabilities,
+} from "./shell/ui-root-capabilities";
 import { uiRouteTable } from "./shell/ui-route-table";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
+import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
 import {
-  parseUiFeatureConfig,
   uiDeploymentOf,
+  uiFeatureConfigOf,
   uiTelemetryOf,
   type UiFeatureConfig,
 } from "./ui-feature-config";
@@ -78,8 +83,7 @@ const NO_ATTRIBUTION_CAPTURE = () => void 0;
  * reads every landing URL before a navigation can drop its query string.
  */
 const useAttributionCapture =
-  installedUiDeclarations.declared("firstTouchAttribution")[0]?.capability.useCapture ??
-  NO_ATTRIBUTION_CAPTURE;
+  lentFirstTouchAttribution(installedUiDeclarations)?.useCapture ?? NO_ATTRIBUTION_CAPTURE;
 
 function UiAttributionCapture({ children }: { children: ReactNode }) {
   useAttributionCapture();
@@ -143,6 +147,7 @@ function browserUiCapabilitiesHook({
   session: auth,
   scope: organization,
   copyTargets: lending,
+  traceFilters: filtering,
 }: UiRootCapabilities) {
   return function useBrowserUiCapabilities({
     transport,
@@ -151,7 +156,7 @@ function browserUiCapabilitiesHook({
     transport: UiFeatureApiTransport;
     feedback: UiFeedback;
   }): UiSessionCapabilities {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const isPublicRoute = organization.isUiPublicRoute(pathname);
     const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
     const scopeReading = organization.useUiScopeReading({ transport, session: sessionReading });
@@ -168,10 +173,17 @@ function browserUiCapabilitiesHook({
       userId: sessionReading.user?.id,
     });
 
+    const scope = organization.createBrowserUiScope({ reading: scopeReading, session });
+    const traceFilters = filtering.useUiTraceFiltersReading({
+      search,
+      projectId: scope.activeScope().projectId ?? void 0,
+    });
+
     return {
       session,
-      scope: organization.createBrowserUiScope({ reading: scopeReading, session }),
+      scope,
       copyTargets: lending.createBrowserUiCopyTargets({ reading: copyTargets }),
+      traceFilters: filtering.createBrowserUiTraceFilters({ reading: traceFilters }),
     };
   };
 }
@@ -189,6 +201,7 @@ class BrowserUiShell extends UiShell {
     hosts,
     failures,
     rootCapabilities,
+    hostServices,
   }: {
     config: UiFeatureConfig;
     isDevelopment: boolean;
@@ -201,6 +214,7 @@ class BrowserUiShell extends UiShell {
     hosts: readonly UiModuleHostMount[];
     failures: readonly UiFailureInterceptor[];
     rootCapabilities: UiRootCapabilities;
+    hostServices: UiRenderResult["hostServices"];
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
     return new BrowserUiShell(
@@ -218,6 +232,7 @@ class BrowserUiShell extends UiShell {
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: browserUiCapabilitiesHook(rootCapabilities),
+          hostServices,
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
@@ -248,7 +263,7 @@ class BrowserUiShell extends UiShell {
         pages: {
           loaders: uiUnservedPageLoaders,
           table: uiRouteTable,
-          shellLayouts: uiShellLayouts(rootCapabilities),
+          shellLayouts: uiShellLayouts({ root: rootCapabilities, config }),
           errorFallback: UiPageError,
           rootErrorBoundary: UiBootPageError,
         },
@@ -283,14 +298,15 @@ class BrowserUiShell extends UiShell {
  */
 export async function startUi(): Promise<void> {
   const served = readPublicAppConfig(document);
-  const config = parseUiFeatureConfig(served);
+  // The framework's own slice: the transport is built before the supply renders.
+  const process = readUiProcessConfig(served);
   // Every answer's session version reaches the watch the shell invalidates reads from.
   const sessionVersions = SessionVersionWatch.create();
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient({
     fetch: sessionVersionFetch({ watch: sessionVersions }),
-    isDevelopment: config.process.mode === "development",
+    isDevelopment: process.mode === "development",
   });
   const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })
@@ -298,6 +314,7 @@ export async function startUi(): Promise<void> {
     .withTransport(transport)
     .withInjectedConfig(() => served)
     .render();
+  const config = uiFeatureConfigOf({ process, installed: installed.config });
 
   configureDocsRuntime({ mode: config.process.mode, hostname: window.location.hostname });
   UiRuntime.create({
@@ -314,6 +331,7 @@ export async function startUi(): Promise<void> {
       hosts: installedModuleHostMounts(installed.modules),
       failures: installedModuleFailures(installed.modules),
       rootCapabilities,
+      hostServices: installed.hostServices,
     }),
   }).start();
 }

@@ -37,6 +37,15 @@ export const retentionScopeTargetInputSchema = z.object({
   scope: retentionScopeInputSchema,
 });
 
+/**
+ * A scope write may name the organisation the page sits in, and the target must sit there too;
+ * without one the server reads it from the target the door approved (RETENTION-ORG, 2026-10-09).
+ */
+export const retentionScopeWriteInputSchema = z.object({
+  ...retentionScopeTargetInputSchema.shape,
+  organizationId: z.string().min(1).optional(),
+});
+
 export const retentionTriggerRetroactiveInputSchema = z.strictObject({
   ...retroactiveMutationProjectInputSchema.shape,
   category: retentionCategorySchema,
@@ -53,14 +62,14 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .withOutput(retentionPolicySnapshotSchema)
 
   /**
-   * Set one category's retention at one scope. `projectId` is deliberately not
-   * acted on: the authorized target is `scope`, and both the permission and the
-   * plan gate run against the scope's own organization.
+   * Set one category's retention at one scope. The door asks the permission on
+   * `scope`; `projectId` is not acted on, and the plan gate reads `organizationId`, or the
+   * target's own organisation when none is named.
    */
   .mutation("setForScope")
   .withInput(
     z.object({
-      ...retentionScopeTargetInputSchema.shape,
+      ...retentionScopeWriteInputSchema.shape,
       category: retentionCategorySchema,
       retentionDays: retentionDaysInputSchema,
     }),
@@ -73,13 +82,13 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
    * dialog names the real number rather than a guessed one.
    */
   .query("previewScopeRemoval")
-  .withInput(retentionScopeTargetInputSchema)
+  .withInput(retentionScopeWriteInputSchema)
   .withOutput(resolvedRetentionSchema)
 
   /** Remove one category's override at one scope; the next tier then applies. */
   .mutation("removeForScope")
   .withInput(
-    z.object({ ...retentionScopeTargetInputSchema.shape, category: retentionCategorySchema }),
+    z.object({ ...retentionScopeWriteInputSchema.shape, category: retentionCategorySchema }),
   )
 
   /** Rewrite the project's existing rows to the retention the cascade resolves. */

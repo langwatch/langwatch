@@ -15,9 +15,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -34,6 +36,11 @@ const (
 	pgUser    = "prisma"
 	pgPass    = "prisma"
 	pgAdminDB = "mydb"
+
+	// hostPostgresURL is the server haven runs on the host: its role and port
+	// (tools/thuishaven/domain/postgres.go). A run only ever creates and drops
+	// its own apidiff_<run>_<side> databases there, never haven's lw_* ones.
+	hostPostgresURL = "postgres://" + pgUser + ":" + pgPass + "@127.0.0.1:5432/postgres"
 
 	chUser = "default"
 	chPass = "langwatch"
@@ -91,6 +98,9 @@ type BootConfig struct {
 	CHURL          string
 	RedisURL       string
 	ComposeProject string
+	// ComposePostgres runs Postgres in the compose project too (full
+	// isolation); otherwise the managed path uses haven's host server.
+	ComposePostgres bool
 	// UseHaven boots each instance as a haven stack under its own run-scoped
 	// slug instead of provisioning infrastructure here. Default wherever haven
 	// is installed; see haven.go for why.
@@ -104,6 +114,9 @@ type BootConfig struct {
 	// BranchHead boots the branch from -branch-dir's HEAD in its persistent
 	// worktree under -no-haven too, leaving -branch-dir itself untouched.
 	BranchHead bool
+	// SweepDays drops apidiff_* databases older than this many days at the
+	// start of a run; 0 skips the sweep.
+	SweepDays int
 }
 
 // Instance is one booted API copy.
@@ -476,6 +489,9 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 		plan.Commands = append(plan.Commands,
 			"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
 			"drop the run's databases; the compose project stays up for the next run", release)
+		if !cfg.ComposePostgres && cfg.PGURL == "" {
+			plan.Commands = append(plan.Commands, "postgres: haven's host server "+redactURL(hostPostgresURL)+", databases "+DatabaseName(runID, "branch")+" and "+DatabaseName(runID, "main"))
+		}
 		return plan, nil
 	}
 	plan.MainSlug = HavenSlug(runID, "main")
@@ -540,6 +556,9 @@ type bootState struct {
 	// detach starts a command that outlives the run; nil is detachCommand.
 	detach   func(spec commandSpec, log string) error
 	override string
+	// hostPostgres says the managed path keeps Postgres on the host server
+	// while ClickHouse and Redis stay in compose.
+	hostPostgres bool
 	// reusedPorts says override came from an earlier run, whose stack may
 	// still be up on its ports; startInfra falls back to fresh ones.
 	reusedPorts bool
@@ -548,6 +567,11 @@ type bootState struct {
 	// processesMu guards processes: a worker respawn appends from its own
 	// goroutine while teardown may be killing.
 	processesMu sync.Mutex
+	// abort stops the run with a cause when a worker dies for good; nil
+	// outside `run`. tornDown is set when teardown starts, so killing the
+	// workers is not read as their dying.
+	abort    context.CancelCauseFunc
+	tornDown atomic.Bool
 	// havenSlugs are the stacks this run started, in order. The teardown
 	// destroys these and nothing else.
 	havenSlugs []string
@@ -655,6 +679,7 @@ func (state *bootState) branchTree() string {
 // already carries the developer's own haven stack, and `haven up` there
 // replaced its registration.
 func (state *bootState) bootHaven(ctx context.Context, booted *Booted) error {
+	state.sweepOnHaven(ctx)
 	booted.A.Dir = state.branchDir
 	if err := state.prepareHavenInstances(ctx, booted); err != nil {
 		return err
@@ -680,6 +705,9 @@ func (state *bootState) prepareLayout() error {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Join(state.workRoot, "logs"), 0o750); err != nil {
+		return err
+	}
+	if err := writeRunPID(state.workRoot); err != nil {
 		return err
 	}
 	state.runID = RunID(state.workRoot)
@@ -914,6 +942,7 @@ func (state *bootState) resolveInfra() error {
 		return nil
 	}
 	state.override = composeOverridePath(state.cfg.BranchDir, state.cfg.ComposeProject)
+	state.hostPostgres = !state.cfg.ComposePostgres
 	if ports, ok := readOverridePorts(state.override); ok {
 		state.infra.pgPort, state.infra.chPort, state.infra.redisPort = ports[0], ports[1], ports[2]
 		state.reusedPorts = true
@@ -947,6 +976,22 @@ func (state *bootState) setComposeURLs() {
 	state.infra.pgServer = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", pgUser, pgPass, state.infra.pgPort, pgAdminDB)
 	state.infra.chServer = fmt.Sprintf("http://%s:%s@127.0.0.1:%d", chUser, chPass, state.infra.chPort)
 	state.infra.redisServer = fmt.Sprintf("redis://127.0.0.1:%d", state.infra.redisPort)
+	if state.hostPostgres {
+		state.infra.pgServer = hostPostgresURL
+	}
+}
+
+// pgInCompose says Postgres is administered by `docker compose exec`.
+func (state *bootState) pgInCompose() bool {
+	return state.override != "" && !state.hostPostgres
+}
+
+// composeServices are the services the managed stack starts.
+func composeServices(hostPostgres bool) []string {
+	if hostPostgres {
+		return []string{"redis", "clickhouse"}
+	}
+	return []string{"postgres", "redis", "clickhouse"}
 }
 
 // preflight validates external infrastructure BEFORE the two pnpm installs.
@@ -955,6 +1000,13 @@ func (state *bootState) setComposeURLs() {
 // (which falls back to $USER) and dies at prisma with P1010, and an admin
 // database that does not exist dies at the first CREATE DATABASE.
 func (state *bootState) preflight(ctx context.Context) error {
+	if state.hostPostgres {
+		state.logf("preflight: checking haven's host postgres at %s is reachable", redactURL(state.infra.pgServer))
+		if _, err := state.pgQuery(ctx, "SELECT 1"); err != nil {
+			return fmt.Errorf("preflight host postgres %s (start it with `haven up`, or pass -compose-postgres): %w", redactURL(state.infra.pgServer), err)
+		}
+		return nil
+	}
 	if state.override != "" {
 		state.logf("preflight: managed compose stack, no external endpoints to validate")
 		return nil
@@ -1038,8 +1090,8 @@ func (state *bootState) startInfra(ctx context.Context) error {
 
 // composeUp starts the stack, or finds it already up from an earlier run.
 func (state *bootState) composeUp(ctx context.Context) error {
-	state.logf("infra: docker compose up (pg :%d, clickhouse :%d, redis :%d)", state.infra.pgPort, state.infra.chPort, state.infra.redisPort)
-	args := composeArgs(state.compose(), "up", "-d", "postgres", "redis", "clickhouse", "--wait")
+	state.logf("infra: docker compose up %v (clickhouse :%d, redis :%d)", composeServices(state.hostPostgres), state.infra.chPort, state.infra.redisPort)
+	args := composeArgs(state.compose(), append(append([]string{"up", "-d"}, composeServices(state.hostPostgres)...), "--wait")...)
 	if err := state.runHost(ctx, "docker", args...); err != nil {
 		return fmt.Errorf("compose up: %w", err)
 	}
@@ -1086,7 +1138,7 @@ func (state *bootState) pgAdmin(ctx context.Context, sql string) error {
 // external run fail at the first CREATE DATABASE with 'database "mydb" does
 // not exist'.
 func (state *bootState) adminDatabase() string {
-	if state.override != "" {
+	if state.pgInCompose() {
 		return pgAdminDB
 	}
 	parsed, err := url.Parse(state.infra.pgServer)
@@ -1102,7 +1154,7 @@ func (state *bootState) adminDatabase() string {
 // pgQuery runs one SQL statement and returns its stdout (psql -tA).
 func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error) {
 	var output bytes.Buffer
-	if state.override != "" {
+	if state.pgInCompose() {
 		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", state.adminDatabase(), "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
 		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
 		return strings.TrimSpace(output.String()), err
@@ -1122,7 +1174,7 @@ func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error)
 // stdout (psql -tA).
 func (state *bootState) pgQueryDB(ctx context.Context, database, sql string) (string, error) {
 	var output bytes.Buffer
-	if state.override != "" {
+	if state.pgInCompose() {
 		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", database, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
 		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
 		return strings.TrimSpace(output.String()), err
@@ -1184,7 +1236,7 @@ func (state *bootState) bootTimeout() time.Duration {
 
 // pgAdminDB runs one SQL statement against a specific database.
 func (state *bootState) pgAdminDB(ctx context.Context, database, sql string) error {
-	if state.override != "" {
+	if state.pgInCompose() {
 		return state.runHost(ctx, "docker", pgAdminArgs(state.compose(), database, sql)...)
 	}
 	if _, err := exec.LookPath("psql"); err != nil {
@@ -1219,9 +1271,15 @@ func psqlDatabaseURL(serverURL, database string) (string, error) {
 
 // chAdmin runs one ClickHouse statement over the HTTP interface.
 func (state *bootState) chAdmin(ctx context.Context, query string) error {
+	_, err := state.chQuery(ctx, query)
+	return err
+}
+
+// chQuery runs one ClickHouse statement and returns the response body.
+func (state *bootState) chQuery(ctx context.Context, query string) (string, error) {
 	endpoint, err := url.Parse(state.infra.chServer)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// A server URL may carry a database as its path; administrative
 	// statements address the server itself.
@@ -1229,25 +1287,31 @@ func (state *bootState) chAdmin(ctx context.Context, query string) error {
 	endpoint.RawQuery = "query=" + url.QueryEscape(query)
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	client := &http.Client{Timeout: 30 * time.Second}
 	response, err := client.Do(request)
 	if err != nil {
-		return fmt.Errorf("clickhouse %q: %w", query, err)
+		return "", fmt.Errorf("clickhouse %q: %w", query, err)
 	}
 	defer response.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("clickhouse %q: status %d: %s", query, response.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("clickhouse %q: status %d: %s", query, response.StatusCode, strings.TrimSpace(string(body)))
 	}
-	return nil
+	return strings.TrimSpace(string(body)), nil
 }
 
 // prepareDatabases recreates both instances' databases unless -keep is set.
 // ClickHouse databases are created by the clickhouse-migrate task's goose
 // bootstrap; here they only need dropping for freshness.
 func (state *bootState) prepareDatabases(ctx context.Context) error {
+	if state.cfg.SweepDays > 0 {
+		maxAge := time.Duration(state.cfg.SweepDays) * 24 * time.Hour
+		if err := state.sweepStaleDatabases(ctx, maxAge, false); err != nil {
+			state.logf("%v", err)
+		}
+	}
 	if state.cfg.Keep {
 		state.logf("databases: -keep set, reusing existing")
 		return nil
@@ -1288,19 +1352,11 @@ func (state *bootState) migrateAndSeed(ctx context.Context, instance Instance) e
 	if err != nil {
 		return err
 	}
-	state.logf("migrate %s: prisma + clickhouse", instance.Name)
-	steps := []struct {
-		name string
-		args []string
-	}{
-		{"prisma migrate", instance.Profile.prismaMigrateArgv},
-		{"clickhouse migrate", instance.Profile.clickhouseMigrateArgv},
-		{"seed", instance.Profile.seedArgv},
-	}
-	for _, step := range steps {
-		spec := commandSpec{name: "pnpm", args: step.args, dir: instance.Dir, env: env}
+	state.logf("migrate %s: the profile's preparation, then the seed", instance.Name)
+	for _, args := range append(slices.Clone(instance.Profile.migrateArgvs), instance.Profile.seedArgv) {
+		spec := commandSpec{name: "pnpm", args: args, dir: instance.Dir, env: env}
 		if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
-			return fmt.Errorf("%s %s: %w", step.name, instance.Name, err)
+			return fmt.Errorf("%s %s: %w", strings.Join(args, " "), instance.Name, err)
 		}
 	}
 	return nil
@@ -1477,16 +1533,80 @@ func (state *bootState) startWorker(ctx context.Context, instance *Instance) err
 // refused database connection there left a whole run with no projections.
 var workerRespawnWindow = 5 * time.Minute
 
-// respawnOnEarlyExit restarts a worker once when it dies during its own boot.
+// workerLogTail is how many trailing log lines a dead worker's stop prints.
+const workerLogTail = 100
+
+// workerDeathError is why a run stopped: a side's worker exited again after
+// its one restart, so nothing on that side would ever project.
+type workerDeathError struct {
+	side    string
+	logPath string
+}
+
+func (dead *workerDeathError) Error() string {
+	return fmt.Sprintf("the %s worker exited again after its one restart; stopping (log %s)", dead.side, dead.logPath)
+}
+
+// workerLogPath is where an instance's worker writes, named by its side.
+func workerLogPath(workRoot, instanceName string) string {
+	return filepath.Join(workRoot, "logs", instanceName+"-worker.log")
+}
+
+// respawnOnEarlyExit restarts a worker once when it dies during its own boot,
+// then watches the restart: a second exit stops the run (workerDied).
 func (state *bootState) respawnOnEarlyExit(ctx context.Context, command *exec.Cmd, process instanceProcess) {
 	started := time.Now()
 	if err := command.Wait(); err == nil || ctx.Err() != nil || time.Since(started) > workerRespawnWindow {
 		return
 	}
 	state.logf("%s exited during boot; starting it once more", process.logName)
-	if _, _, err := state.spawn(ctx, process); err != nil {
+	second, _, err := state.spawn(ctx, process)
+	if err != nil {
 		state.logf("%s restart: %v", process.logName, err)
+		state.workerDied(process)
+		return
 	}
+	_ = second.Wait()
+	if ctx.Err() == nil && !state.tornDown.Load() {
+		state.workerDied(process)
+	}
+}
+
+// workerDied names the side, prints the last lines of its worker log and
+// cancels the run with a workerDeathError, which the caller turns into exit 2.
+func (state *bootState) workerDied(process instanceProcess) {
+	side := strings.TrimSuffix(process.logName, "-worker")
+	label := "branch"
+	if side == "main" {
+		label = "base (main)"
+	}
+	logPath := filepath.Join(state.workRoot, "logs", process.logName+".log")
+	state.logf("%s worker exited a second time; stopping the run. Last %d lines of %s:\n%s",
+		label, workerLogTail, logPath, tailLines(logPath, workerLogTail))
+	if state.abort != nil {
+		state.abort(&workerDeathError{side: label, logPath: logPath})
+	}
+}
+
+// tailLines reads the last count lines of a file, or says why it cannot.
+func tailLines(path string, count int) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return "(no log: " + err.Error() + ")"
+	}
+	defer file.Close()
+	const window = 256 << 10
+	info, err := file.Stat()
+	if err != nil {
+		return "(no log: " + err.Error() + ")"
+	}
+	buffer := make([]byte, min(info.Size(), window))
+	read, err := file.ReadAt(buffer, info.Size()-int64(len(buffer)))
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "(no log: " + err.Error() + ")"
+	}
+	lines := strings.Split(strings.TrimRight(string(buffer[:read]), "\n"), "\n")
+	return strings.Join(lines[max(0, len(lines)-count):], "\n")
 }
 
 // instanceProcess is one process an instance runs on its composed env.
@@ -1579,6 +1699,7 @@ func (state *bootState) teardown() {
 // booted instances share one state, and whichever runs second finds it done.
 func (state *bootState) teardownOnceOnly() {
 	defer phaseDone(state.stderr, "teardown", time.Now())
+	state.tornDown.Store(true)
 	if state.infraDone != nil {
 		<-state.infraDone
 	}

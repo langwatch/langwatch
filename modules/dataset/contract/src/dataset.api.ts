@@ -1,8 +1,7 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 import type { StoredObjectsCreateUploadOutput } from "@langwatch/stored-object-contract";
 
-import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
+import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-evaluation.schemas.ts";
 import type { DatasetLimits } from "./dataset-limits.ts";
 import type { DatasetApiDeleteInput } from "./dataset.schemas.ts";
 import type {
@@ -28,6 +27,8 @@ import type {
   DatasetRecord,
   DatasetRecordMutationResult,
   DatasetRecordPage,
+  DatasetStorageEntry,
+  DatasetStoragePageInput,
   DatasetWithRecords,
   DeleteDatasetRecordsInput,
   ListDatasetsInput,
@@ -76,7 +77,6 @@ export interface DatasetApi {
     projectId: string;
     datasetId?: string;
     slugOrId?: string;
-    experimentId?: string;
     name?: string;
     columnTypes?: DatasetColumns;
     datasetRecords?: UpsertDatasetInput["datasetRecords"];
@@ -156,10 +156,10 @@ export interface DatasetApi {
   summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]>;
   /** One batch-evaluation row, written as `POST /api/dataset/evaluate` records it. */
   createBatchEvaluation(input: BatchEvaluationEntry): Promise<void>;
-  /** Every batch-evaluation record of the experiment the slug names. */
+  /** Every batch-evaluation record of one experiment; experiment resolves the slug. */
   listBatchEvaluations(input: {
     projectId: string;
-    experimentSlug: string;
+    experimentId: string;
   }): Promise<BatchEvaluationRecord[]>;
   /**
    * The platform's own address for one dataset resource, built from the
@@ -167,15 +167,13 @@ export interface DatasetApi {
    * static with no request-scoped builder, so the app composes this link.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
+  /**
+   * One id-ordered page of the project's datasets for a storage migration's
+   * inventory, archived ones included: they remain recoverable customer data.
+   */
+  listStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]>;
   /** The usage report's figures for these projects. */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount>;
 }
 
 export const DatasetApi = moduleApi<DatasetApi>()("dataset");
-
-/** Dataset's settings: only the shared deployment origin its platform links are built on. */
-export const datasetConfig = Config.define(() => ({
-  publicBaseUrl,
-}));
-
-export type DatasetServerConfig = ConfigOf<typeof datasetConfig>;

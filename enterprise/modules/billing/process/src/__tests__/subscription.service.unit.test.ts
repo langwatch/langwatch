@@ -3,22 +3,24 @@ import {
   PlanTypes,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
+import { MemoryStripeCustomersChannel } from "../channels/memory/memory.stripe-customers.channel.ts";
+import { MemoryStripeInvoicesChannel } from "../channels/memory/memory.stripe-invoices.channel.ts";
+import { MemoryStripeSubscriptionsChannel } from "../channels/memory/memory.stripe-subscriptions.channel.ts";
 import { type BillingSubscriptionRepository, type BillingSubscriptionNotifier } from "../index.ts";
 import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/memory.seat-event-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
+import type {
+  BillingSubscription,
+  BillingSubscriptionStatus,
+} from "../rules/billing-stripe-shapes.rules.ts";
 import { RECENT_INVOICES_LIMIT } from "../services/billing-invoices.service.ts";
-import {
-  type SeatCheckoutInvites,
-  SeatEventSubscriptionService,
-} from "../services/seat-event-subscription.service.ts";
+import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
@@ -44,25 +46,21 @@ const subscriptionRecord = (
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 
-const createMockStripe = () => ({
-  subscriptions: {
-    retrieve: vi.fn(),
-    update: vi.fn(),
-    cancel: vi.fn(),
-  },
-  checkout: {
-    sessions: {
-      create: vi.fn(),
-    },
-  },
-  billingPortal: {
-    sessions: {
-      create: vi.fn(),
-    },
-  },
-  invoices: {
-    list: vi.fn(),
-  },
+/** A subscription as the provider holds it, with only the fields these paths read. */
+const providerSubscription = ({
+  id = "sub_stripe_1",
+  status = "active",
+  items = [],
+}: {
+  id?: string;
+  status?: BillingSubscriptionStatus;
+  items?: { id: string; priceId: string }[];
+}): BillingSubscription => ({
+  id,
+  status,
+  canceledAt: null,
+  billingThreshold: null,
+  items: items.map((item) => ({ ...item, unitAmount: null, interval: null })),
 });
 
 const createMockRepository = (): {
@@ -101,6 +99,12 @@ const createMockOrganizationRepository = (): {
   findStripeCustomerId: vi.fn(),
   findName: vi.fn(),
   findFirstTeamId: vi.fn(),
+  findBillingProfile: vi.fn(),
+  claimStripeCustomerId: vi.fn(),
+  findWithAdministrators: vi.fn(),
+  findActiveMemberIds: vi.fn(),
+  findSelfHostedCustomers: vi.fn(),
+  listIds: vi.fn(),
 });
 
 const createMockNotifier = (): BillingSubscriptionNotifier => ({
@@ -110,11 +114,14 @@ const createMockNotifier = (): BillingSubscriptionNotifier => ({
 const createMockSeatEventService = () =>
   Object.assign(
     SeatEventSubscriptionService.create({
-      stripe: stripeDouble(),
+      stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
       subscriptions: MemorySeatEventSubscriptionRepository.create(MemoryBillingStore.create()),
-      invites: createApiFixture<SeatCheckoutInvites>({}),
+      abandoned: { seatCheckoutsAbandoned: vi.fn() },
       prices: TEST_PRICES,
-      customerCurrency: StripeCustomerCurrencyService.create(StripeErrorTranslatorService.create()),
+      customerCurrency: StripeCustomerCurrencyService.create({
+        customers: MemoryStripeCustomersChannel.create(),
+        stripeErrors: StripeErrorTranslatorService.create(),
+      }),
     }),
     {
       createSeatEventCheckout: vi.fn(),
@@ -126,13 +133,11 @@ const createMockSeatEventService = () =>
 
 const createServiceWithSeatEventFns = ({
   repository,
-  stripe: stripeInstance,
   itemCalculator: calc,
   organizationRepository: orgRepo,
   seatEventService,
 }: {
   repository: ReturnType<typeof createMockRepository>;
-  stripe: ReturnType<typeof createMockStripe>;
   itemCalculator: ReturnType<typeof createMockItemCalculator>;
   organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
   seatEventService: ReturnType<typeof createMockSeatEventService>;
@@ -140,7 +145,8 @@ const createServiceWithSeatEventFns = ({
   BillingSubscriptionService.create({
     repository,
     organizationRepository: orgRepo,
-    stripe: stripeDouble(stripeInstance),
+    stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
+    stripeInvoices: MemoryStripeInvoicesChannel.create(),
     itemCalculator: calc,
     seatEventService,
     notifier: createMockNotifier(),
@@ -148,7 +154,8 @@ const createServiceWithSeatEventFns = ({
   });
 
 describe("BillingSubscriptionService", () => {
-  let stripe: ReturnType<typeof createMockStripe>;
+  let stripeInvoices: MemoryStripeInvoicesChannel;
+  let stripeSubscriptions: MemoryStripeSubscriptionsChannel;
   let repository: ReturnType<typeof createMockRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
   let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
@@ -160,7 +167,8 @@ describe("BillingSubscriptionService", () => {
       const localService = BillingSubscriptionService.create({
         repository: createMockRepository(),
         organizationRepository: createMockOrganizationRepository(),
-        stripe: stripeDouble(createMockStripe()),
+        stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
+        stripeInvoices: MemoryStripeInvoicesChannel.create(),
         itemCalculator: createMockItemCalculator(),
         notifier: createMockNotifier(),
         stripeErrors: StripeErrorTranslatorService.create(),
@@ -176,14 +184,16 @@ describe("BillingSubscriptionService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    stripe = createMockStripe();
+    stripeInvoices = MemoryStripeInvoicesChannel.create();
+    stripeSubscriptions = MemoryStripeSubscriptionsChannel.create();
     repository = createMockRepository();
     itemCalculator = createMockItemCalculator();
     organizationRepository = createMockOrganizationRepository();
     service = BillingSubscriptionService.create({
       repository,
       organizationRepository: organizationRepository,
-      stripe: stripeDouble(stripe),
+      stripeSubscriptions,
+      stripeInvoices,
       itemCalculator: itemCalculator,
       notifier: createMockNotifier(),
       stripeErrors: StripeErrorTranslatorService.create(),
@@ -202,11 +212,12 @@ describe("BillingSubscriptionService", () => {
             plan: PlanTypes.LAUNCH,
           }),
         );
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
+        stripeSubscriptions.seed({
+          subscription: providerSubscription({
+            items: [{ id: "si_1", priceId: "price_launch" }],
+          }),
         });
         itemCalculator.getItemsToUpdate.mockReturnValue([{ id: "si_1", quantity: 1 }]);
-        stripe.subscriptions.update.mockResolvedValue({});
 
         const result = await service.updateSubscriptionItems({
           organizationId: "org_123",
@@ -218,9 +229,9 @@ describe("BillingSubscriptionService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
-          items: [{ id: "si_1", quantity: 1 }],
-        });
+        expect(stripeSubscriptions.updates).toEqual([
+          { subscriptionId: "sub_stripe_1", change: { items: [{ id: "si_1", quantity: 1 }] } },
+        ]);
       });
     });
 
@@ -234,11 +245,12 @@ describe("BillingSubscriptionService", () => {
             plan: PlanTypes.LAUNCH,
           }),
         );
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
+        stripeSubscriptions.seed({
+          subscription: providerSubscription({
+            items: [{ id: "si_1", priceId: "price_launch" }],
+          }),
         });
         itemCalculator.getItemsToUpdate.mockReturnValue([]);
-        stripe.subscriptions.update.mockResolvedValue({});
 
         await service.updateSubscriptionItems({
           organizationId: "org_123",
@@ -268,11 +280,12 @@ describe("BillingSubscriptionService", () => {
             plan: PlanTypes.LAUNCH,
           }),
         );
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
+        stripeSubscriptions.seed({
+          subscription: providerSubscription({
+            items: [{ id: "si_1", priceId: "price_launch" }],
+          }),
         });
         itemCalculator.getItemsToUpdate.mockReturnValue([]);
-        stripe.subscriptions.update.mockResolvedValue({});
 
         await service.updateSubscriptionItems({
           organizationId: "org_123",
@@ -321,9 +334,7 @@ describe("BillingSubscriptionService", () => {
             status: SubscriptionStatus.ACTIVE,
           }),
         );
-        stripe.subscriptions.cancel.mockResolvedValue({
-          status: "canceled",
-        });
+        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
 
         const result = await service.createOrUpdateSubscription({
           organizationId: "org_123",
@@ -333,6 +344,7 @@ describe("BillingSubscriptionService", () => {
         });
 
         expect(result.url).toBe("https://app.test/settings/subscription");
+        expect(stripeSubscriptions.cancellations).toEqual([{ subscriptionId: "sub_stripe_1" }]);
         expect(repository.updateStatus).toHaveBeenCalledWith({
           id: "sub_db_1",
           status: SubscriptionStatus.CANCELLED,
@@ -349,12 +361,7 @@ describe("BillingSubscriptionService", () => {
             status: SubscriptionStatus.ACTIVE,
           }),
         );
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          items: { data: [] },
-        });
-        stripe.subscriptions.update.mockResolvedValue({
-          status: "active",
-        });
+        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
 
         const result = await service.createOrUpdateSubscription({
           organizationId: "org_123",
@@ -376,10 +383,6 @@ describe("BillingSubscriptionService", () => {
       it("creates checkout session for new plan", async () => {
         repository.findLastNonCancelled.mockResolvedValue(null);
         repository.createPending.mockResolvedValue(subscriptionRecord({ id: "sub_new" }));
-        stripe.checkout.sessions.create.mockResolvedValue({
-          url: "https://checkout.stripe.com/session",
-        });
-
         const result = await service.createOrUpdateSubscription({
           organizationId: "org_123",
           baseUrl: "https://app.test",
@@ -387,18 +390,15 @@ describe("BillingSubscriptionService", () => {
           customerId: "cus_123",
         });
 
-        expect(result.url).toBe("https://checkout.stripe.com/session");
+        expect(result.url).toBe(stripeSubscriptions.checkoutSessions[0]?.url);
         expect(repository.createPending).toHaveBeenCalledWith({
           organizationId: "org_123",
           plan: PlanTypes.LAUNCH,
         });
-        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            mode: "subscription",
-            customer: "cus_123",
-            client_reference_id: "subscription_setup_sub_new",
-          }),
-        );
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toMatchObject({
+          customerId: "cus_123",
+          clientReferenceId: "subscription_setup_sub_new",
+        });
       });
     });
 
@@ -438,7 +438,10 @@ describe("BillingSubscriptionService", () => {
       it("propagates the error", async () => {
         repository.findLastNonCancelled.mockResolvedValue(null);
         repository.createPending.mockResolvedValue(subscriptionRecord({ id: "sub_new" }));
-        stripe.checkout.sessions.create.mockRejectedValue(new Error("Stripe checkout failed"));
+        stripeSubscriptions.refuse({
+          operation: "createCheckoutSession",
+          error: new Error("Stripe checkout failed"),
+        });
 
         await expect(
           service.createOrUpdateSubscription({
@@ -460,10 +463,11 @@ describe("BillingSubscriptionService", () => {
             status: SubscriptionStatus.ACTIVE,
           }),
         );
-        stripe.subscriptions.retrieve.mockResolvedValue({
-          items: { data: [] },
+        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
+        stripeSubscriptions.refuse({
+          operation: "updateSubscription",
+          error: new Error("Stripe update failed"),
         });
-        stripe.subscriptions.update.mockRejectedValue(new Error("Stripe update failed"));
 
         await expect(
           service.createOrUpdateSubscription({
@@ -487,7 +491,10 @@ describe("BillingSubscriptionService", () => {
             status: SubscriptionStatus.ACTIVE,
           }),
         );
-        stripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe cancel failed"));
+        stripeSubscriptions.refuse({
+          operation: "cancelSubscription",
+          error: new Error("Stripe cancel failed"),
+        });
 
         await expect(
           service.createOrUpdateSubscription({
@@ -507,21 +514,19 @@ describe("BillingSubscriptionService", () => {
     describe("when called with valid customer and base URL", () => {
       /** @scenario EESubscriptionService creates billing portal session */
       it("creates portal session with return URL", async () => {
-        stripe.billingPortal.sessions.create.mockResolvedValue({
-          url: "https://billing.stripe.com/session",
-        });
-
         const result = await service.createBillingPortalSession({
           customerId: "cus_123",
           baseUrl: "https://app.test",
           organizationId: "org_123",
         });
 
-        expect(result.url).toBe("https://billing.stripe.com/session");
-        expect(stripe.billingPortal.sessions.create).toHaveBeenCalledWith({
-          customer: "cus_123",
-          return_url: "https://app.test/settings/subscription",
-        });
+        expect(stripeSubscriptions.portalSessions).toEqual([
+          {
+            customerId: "cus_123",
+            returnUrl: "https://app.test/settings/subscription",
+            url: result.url,
+          },
+        ]);
       });
     });
   });
@@ -600,66 +605,56 @@ describe("BillingSubscriptionService", () => {
     });
   });
 
-  describe("createSubscriptionWithInvites()", () => {
+  describe("createSeatCheckout()", () => {
     describe("when seatEventFns is not configured", () => {
       it("raises seat_billing_unavailable", async () => {
         await expect(
-          service.createSubscriptionWithInvites({
+          service.createSeatCheckout({
             organizationId: "org_123",
             baseUrl: "https://app.test",
             membersToAdd: 3,
             customerId: "cus_123",
-            invites: [{ email: "alice@example.com", role: "MEMBER" as any }],
-            invitedBy: { id: "user_1" },
           }),
         ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
       });
     });
 
     describe("when seatEventFns is configured", () => {
-      it("creates seat event checkout with mapped invites", async () => {
+      it("opens a seat checkout and answers its pending subscription", async () => {
         const seatEventService = createMockSeatEventService();
         const svcWithSeats = createServiceWithSeatEventFns({
           repository,
-          stripe,
           itemCalculator,
           organizationRepository,
           seatEventService,
         });
 
-        organizationRepository.findFirstTeamId.mockResolvedValue("team_1");
-        organizationRepository.findPricingModel.mockResolvedValue("SEAT_EVENT");
+        organizationRepository.findPricingModel.mockResolvedValue("TIERED");
         (seatEventService.createSeatEventCheckout as ReturnType<typeof vi.fn>).mockResolvedValue({
           url: "https://checkout.stripe.com/seat-session",
+          subscriptionId: "sub_pending",
         });
 
-        const result = await svcWithSeats.createSubscriptionWithInvites({
-          organizationId: "org_123",
-          baseUrl: "https://app.test",
-          membersToAdd: 2,
-          customerId: "cus_123",
-          invites: [
-            { email: "alice@example.com", role: "MEMBER" as any },
-            { email: "bob@example.com", role: "ADMIN" as any },
-          ],
-          invitedBy: { id: "user_1" },
-        });
-
-        expect(result.url).toBe("https://checkout.stripe.com/seat-session");
-        expect(seatEventService.createSeatEventCheckout).toHaveBeenCalledWith(
-          expect.objectContaining({
+        await expect(
+          svcWithSeats.createSeatCheckout({
             organizationId: "org_123",
-            customerId: "cus_123",
+            baseUrl: "https://app.test",
             membersToAdd: 2,
-            invitations: {
-              invites: [
-                { email: "alice@example.com", role: "MEMBER", teamIds: "team_1" },
-                { email: "bob@example.com", role: "ADMIN", teamIds: "team_1" },
-              ],
-              by: { id: "user_1" },
-            },
+            customerId: "cus_123",
           }),
-        );
+        ).resolves.toEqual({
+          url: "https://checkout.stripe.com/seat-session",
+          subscriptionId: "sub_pending",
+        });
+        expect(seatEventService.createSeatEventCheckout).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          customerId: "cus_123",
+          baseUrl: "https://app.test",
+          currency: "EUR",
+          billingInterval: "monthly",
+          membersToAdd: 2,
+          isUpgradeFromTiered: true,
+        });
       });
     });
   });
@@ -681,7 +676,6 @@ describe("BillingSubscriptionService", () => {
         const seatEventService = createMockSeatEventService();
         const svcWithSeats = createServiceWithSeatEventFns({
           repository,
-          stripe,
           itemCalculator,
           organizationRepository,
           seatEventService,
@@ -720,7 +714,7 @@ describe("BillingSubscriptionService", () => {
         });
 
         expect(result).toEqual([]);
-        expect(stripe.invoices.list).not.toHaveBeenCalled();
+        expect(stripeInvoices.listings).toEqual([]);
       });
     });
 
@@ -739,12 +733,13 @@ describe("BillingSubscriptionService", () => {
     describe("when the provider rate-limits the invoice list", () => {
       it("fails with a retryable provider-unavailable error", async () => {
         organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
-        stripe.invoices.list.mockRejectedValue(
-          new Stripe.errors.StripeRateLimitError({
+        stripeInvoices.refuse({
+          operation: "listInvoices",
+          error: new Stripe.errors.StripeRateLimitError({
             message: "slow down",
             type: "rate_limit_error",
           }),
-        );
+        });
 
         await expect(
           service.listInvoices({ organizationId: "org_with_stripe" }),
@@ -755,12 +750,13 @@ describe("BillingSubscriptionService", () => {
     describe("when the provider is unreachable for the invoice list", () => {
       it("fails with the same retryable provider-unavailable error", async () => {
         organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
-        stripe.invoices.list.mockRejectedValue(
-          new Stripe.errors.StripeConnectionError({
+        stripeInvoices.refuse({
+          operation: "listInvoices",
+          error: new Stripe.errors.StripeConnectionError({
             message: "network down",
             type: "api_error",
           }),
-        );
+        });
 
         await expect(
           service.listInvoices({ organizationId: "org_with_stripe" }),
@@ -772,7 +768,7 @@ describe("BillingSubscriptionService", () => {
       it("lets the original error through rather than dressing it as handled", async () => {
         const providerError = new Error("No such customer");
         organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
-        stripe.invoices.list.mockRejectedValue(providerError);
+        stripeInvoices.refuse({ operation: "listInvoices", error: providerError });
 
         const error = await service
           .listInvoices({ organizationId: "org_with_stripe" })
@@ -787,39 +783,40 @@ describe("BillingSubscriptionService", () => {
       it("returns mapped invoices excluding drafts", async () => {
         organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
 
-        stripe.invoices.list.mockResolvedValue({
-          data: [
-            {
-              id: "inv_1",
-              number: "INV-001",
-              created: 1700000000,
-              amount_due: 5000,
-              currency: "usd",
-              status: "paid",
-              invoice_pdf: "https://pdf.example.com/inv_1",
-              hosted_invoice_url: "https://hosted.example.com/inv_1",
-            },
-            {
-              id: "inv_draft",
-              number: null,
-              created: 1700001000,
-              amount_due: 3000,
-              currency: "eur",
-              status: "draft",
-              invoice_pdf: null,
-              hosted_invoice_url: null,
-            },
-          ],
+        stripeInvoices.seed({
+          invoice: {
+            id: "inv_1",
+            customerId: "cus_123",
+            number: "INV-001",
+            created: 1700000000,
+            amountDue: 5000,
+            currency: "usd",
+            status: "paid",
+            pdfUrl: "https://pdf.example.com/inv_1",
+            hostedUrl: "https://hosted.example.com/inv_1",
+          },
+        });
+        stripeInvoices.seed({
+          invoice: {
+            id: "inv_draft",
+            customerId: "cus_123",
+            number: null,
+            created: 1700001000,
+            amountDue: 3000,
+            currency: "eur",
+            status: "draft",
+            pdfUrl: null,
+            hostedUrl: null,
+          },
         });
 
         const result = await service.listInvoices({
           organizationId: "org_with_stripe",
         });
 
-        expect(stripe.invoices.list).toHaveBeenCalledWith({
-          customer: "cus_123",
-          limit: RECENT_INVOICES_LIMIT,
-        });
+        expect(stripeInvoices.listings).toEqual([
+          { customerId: "cus_123", limit: RECENT_INVOICES_LIMIT },
+        ]);
 
         expect(result).toEqual([
           {

@@ -1,7 +1,7 @@
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
+import { USAGE_MONTH_COUNTED_EVENT_TYPE } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { USAGE_MONTH_COUNTED_EVENT_TYPE } from "@langwatch/usage-contract";
 import { describe, expect, it } from "vitest";
 
 import { BillingModule, type ConnectedBillingPeers } from "../../app/billing.app.ts";
@@ -9,7 +9,10 @@ import { billingProcessModule } from "../../billing.module.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import { BillingErrorReporterService } from "../../services/billing-error-reporter.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
-import { StripeUsageReportingUnavailable } from "../../services/usage-reporting.service.ts";
+import {
+  StripeUsageReportingBuilder,
+  StripeUsageReportingUnavailable,
+} from "../../services/usage-reporting.service.ts";
 import type { UsageWarningService } from "../../services/usage-warning.service.ts";
 import {
   BILLING_MONTH_COUNTED_SUBSCRIBER_NAME,
@@ -20,9 +23,6 @@ import {
 const peers: ConnectedBillingPeers = {
   licensing: createApiFixture<ConnectedBillingPeers["licensing"]>({}),
   authorization: { can: async () => false },
-  auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({}),
-  organizations: createApiFixture<ConnectedBillingPeers["organizations"]>({}),
-  gateway: createApiFixture<ConnectedBillingPeers["gateway"]>({}),
 };
 
 const MONTH_COUNTED_LANE = `billing_reporting.${BILLING_MONTH_COUNTED_SUBSCRIBER_NAME}`;
@@ -90,7 +90,11 @@ describe("the monthly billing roll-up's eventing declaration", () => {
           nodeEnvironment: "test",
         },
         peers,
-        stripeSecretKey: undefined,
+        usageReporting: () =>
+          StripeUsageReportingBuilder.create({
+            meters: undefined,
+            nodeEnvironment: "test",
+          }).build(),
       });
 
       const pipeline = app.reportingPipeline({ participation: "consume" });
@@ -116,7 +120,11 @@ describe("the monthly billing roll-up's eventing declaration", () => {
           nodeEnvironment: "test",
         },
         peers,
-        stripeSecretKey: undefined,
+        usageReporting: () =>
+          StripeUsageReportingBuilder.create({
+            meters: undefined,
+            nodeEnvironment: "test",
+          }).build(),
       });
 
     /** @scenario "A SaaS worker refuses to compose without the credential its reports are sent with" */
@@ -144,7 +152,11 @@ describe("the monthly billing roll-up's eventing declaration", () => {
           nodeEnvironment: "test",
         },
         peers,
-        stripeSecretKey: undefined,
+        usageReporting: () =>
+          StripeUsageReportingBuilder.create({
+            meters: undefined,
+            nodeEnvironment: "test",
+          }).build(),
       }).reportingPipeline({ participation: "produce" });
 
       expect(pipeline.globalProjections?.map(({ name }) => name)).not.toContain(

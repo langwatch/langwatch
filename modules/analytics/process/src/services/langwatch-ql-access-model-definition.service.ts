@@ -9,6 +9,9 @@ import {
   type LangWatchQLResourceLimits,
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
 
+import type { PostgresNamedCollection } from "../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
+import { LangWatchQLViewProvisioningService } from "../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import { LangWatchQLViewStatementsService } from "../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
@@ -19,10 +22,7 @@ import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "./langwatch-ql-catalog-shapes.service.ts";
-import type { PostgresNamedCollection } from "./langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service.ts";
-import { LangWatchQLViewProvisioningService } from "./langwatch-ql-view-provisioning.service.ts";
-import { LangWatchQLViewStatementsService } from "./langwatch-ql-view-statements.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const catalogShapes = LangWatchQLCatalogShapesService.create();

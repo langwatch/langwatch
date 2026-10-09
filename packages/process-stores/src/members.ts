@@ -4,7 +4,7 @@
  * `audit` is not on it, since that peer is resolved via `withAudit`.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { EventSourcing } from "@langwatch/eventing";
+import type { EventReadSeat, EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -172,17 +172,19 @@ export type DatabaseTarget =
     }>;
 
 /**
- * What the process hands a module: one record, fifteen keys. `clickhouse`
+ * What the process hands a module: one record, sixteen keys. `clickhouse`
  * and `objectStorage` are each ONE client that routes internally, so "every
  * statement names its tenant" is structural, not a rule to remember.
  */
-export interface ProcessMembers {
+export interface StoreClients {
   readonly prisma: PrismaClient;
   readonly clickhouse: ClickHouseQueryClient;
   readonly clickhouseAdmin: ClickHouseAdmin;
   readonly databaseTarget: DatabaseTarget;
   readonly redis: RedisConnection;
   readonly eventing: EventSourcing;
+  /** One event of a tenant's stream by id (Q209): eventing's seat, or one refusing each read. */
+  readonly eventReadSeat: EventReadSeat;
   readonly objectStorage: ObjectStorage;
   readonly clock: Clock;
   readonly encryption: Encryption;
@@ -195,14 +197,14 @@ export interface ProcessMembers {
 }
 
 /** One member's name. A misspelling is a compile error where it is written. */
-export type MemberName = keyof ProcessMembers;
+export type StoreClientName = keyof StoreClients;
 
 /**
  * Every member name, in construction order - load-bearing, and asserted by
  * this package's tests: `prisma` precedes `clickhouse`/`objectStorage` (both
  * route through its directory read), `redis` precedes what's built over it.
  */
-export const MEMBER_NAMES = [
+export const STORE_CLIENT_NAMES = [
   "logger",
   "clock",
   "secrets",
@@ -218,12 +220,8 @@ export const MEMBER_NAMES = [
   "idempotency",
   "rateLimiter",
   "eventing",
-] as const satisfies readonly MemberName[];
-
-/** The record a module is handed for the names it declared in `static readonly reads`. */
-export type MembersRead<Names extends readonly MemberName[]> = {
-  readonly [Name in Names[number]]: ProcessMembers[Name];
-};
+  "eventReadSeat",
+] as const satisfies readonly StoreClientName[];
 
 /** What a process's opened stores hand boot: names in build order, values on demand. */
 export interface StoresMemberSource {

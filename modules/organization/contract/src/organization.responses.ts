@@ -265,6 +265,13 @@ export const organizationMemberProvenanceSchema = z.discriminatedUnion("source",
 export type OrganizationMemberProvenance = z.infer<typeof organizationMemberProvenanceSchema>;
 
 /** Every member's provenance, keyed by user id; everybody asked about has an answer. */
+/** Organization's half of member provenance: its members, and whom an invitation brought. */
+export const organizationInvitedMemberIdsSchema = z.object({
+  memberUserIds: z.array(z.string()),
+  invitedUserIds: z.array(z.string()),
+});
+export type OrganizationInvitedMemberIds = z.infer<typeof organizationInvitedMemberIdsSchema>;
+
 export const organizationMemberProvenanceByUserSchema = z.record(
   z.string(),
   organizationMemberProvenanceSchema,

@@ -10,6 +10,7 @@ import {
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
+import { PromptEditorDrawerToken, PromptListDrawerToken } from "@langwatch/prompt-client";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -38,13 +39,6 @@ import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 import { useOpenEvaluatorEditor } from "./use-open-evaluator-editor.ts";
 import { scrollToTargetColumn, useOpenTargetEditor } from "./use-open-target-editor.ts";
-
-/** The picker a switched target reopens, by the kind of target it replaces. */
-const SWITCH_DRAWERS = {
-  prompt: "promptList",
-  agent: "agentList",
-  evaluator: "evaluatorList",
-} as const satisfies Record<Exclude<TargetConfig["type"], "workflow">, string>;
 
 /** Collects a not-yet-created prompt's mapping edits into `pending.current`, keyed by input. */
 const recordPendingMapping =
@@ -141,7 +135,7 @@ export const useWorkbenchTargetSelection = () => {
       // Set up flow callbacks for the prompt editor using the centralized helper
       // This ensures we never forget a required callback
       setFlowCallbacks(
-        "promptEditor",
+        PromptEditorDrawerToken,
         createPromptEditorCallbacks({
           targetId,
           updateTarget,
@@ -155,7 +149,7 @@ export const useWorkbenchTargetSelection = () => {
       // Open the prompt editor drawer for the newly added target
       // Reset stack to prevent back button when switching between targets
       openDrawer(
-        "promptEditor",
+        PromptEditorDrawerToken,
         {
           promptId: prompt.id,
           urlParams: { targetId },
@@ -368,7 +362,7 @@ export const useWorkbenchAddTargetFlow = ({
     // Handler to open promptEditor for new prompts with proper props
     const openNewPromptEditor = () => {
       openDrawer(
-        "promptEditor",
+        PromptEditorDrawerToken,
         {
           // Pass available sources via complexProps
           availableSources,
@@ -381,12 +375,12 @@ export const useWorkbenchAddTargetFlow = ({
     };
 
     // Set flow callbacks for the entire add-target flow
-    setFlowCallbacks("promptList", {
+    setFlowCallbacks(PromptListDrawerToken, {
       onSelect: handleSelectPrompt,
       // Custom onCreateNew to open promptEditor with availableSources
       onCreateNew: openNewPromptEditor,
     });
-    setFlowCallbacks("promptEditor", {
+    setFlowCallbacks(PromptEditorDrawerToken, {
       // New prompts collect their mappings here, applied when the prompt is saved.
       onInputMappingsChange: recordPendingMapping(pendingMappingsRef),
       onSave: (savedPrompt: SavedPrompt) => {
@@ -456,10 +450,10 @@ export const useWorkbenchAddTargetFlow = ({
       evaluatorType === COMPARISON_EVALUATOR_TYPE ||
       evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
     if (!isComparisonType) return;
-    // Wait for the workbench store to finish hydrating (loadState sets
-    // experimentId atomically with targets/datasets); reading getState() before
-    // then would snapshot an empty picker and lock it in (the guard below blocks
-    // a later refresh).
+    // Wait for the workbench store to finish hydrating (the loader sets
+    // experimentId, then calls loadState in the same synchronous pass);
+    // reading getState() before then would snapshot an empty picker and
+    // lock it in (the guard below blocks a later refresh).
     if (!experimentId) return;
     // Flow context already present → a live Add/edit flow (or an earlier run of
     // this effect) wired it up. Also the loop guard.
@@ -511,7 +505,7 @@ export const useWorkbenchAddTargetFlow = ({
       switchingTargetIdRef.current = target.id;
 
       // Set up flow callbacks (same as handleAddTarget but we open specific drawer)
-      setFlowCallbacks("promptList", {
+      setFlowCallbacks(PromptListDrawerToken, {
         onSelect: handleSelectPrompt,
       });
       setFlowCallbacks("agentList", {
@@ -522,7 +516,9 @@ export const useWorkbenchAddTargetFlow = ({
       });
 
       // A workflow target has no picker to reopen.
-      if (target.type !== "workflow") openDrawer(SWITCH_DRAWERS[target.type]);
+      if (target.type === "prompt") openDrawer(PromptListDrawerToken);
+      else if (target.type === "agent") openDrawer("agentList");
+      else if (target.type === "evaluator") openDrawer("evaluatorList");
     },
     [
       openDrawer,

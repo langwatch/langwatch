@@ -74,6 +74,9 @@
       "path": "modules/identity/contract/tsconfig.build.json"
     },
     {
+      "path": "modules/instant-eval-judge/contract/tsconfig.build.json"
+    },
+    {
       "path": "modules/instant-eval/contract/tsconfig.build.json"
     },
     {
@@ -90,6 +93,9 @@
     },
     {
       "path": "modules/monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "modules/navigation/contract/tsconfig.build.json"
     },
     {
       "path": "modules/notification/contract/tsconfig.build.json"
@@ -147,9 +153,6 @@
     },
     {
       "path": "modules/trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "modules/usage/contract/tsconfig.build.json"
     },
     {
       "path": "modules/user/contract/tsconfig.build.json"

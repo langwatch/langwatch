@@ -65,12 +65,7 @@ class ComposedKeyApp extends KeyApp {
   }
 
   static create(
-    setup: FeatureSetup<
-      typeof ComposedKeyApp.dependencies,
-      Readonly<Record<string, unknown>>,
-      undefined,
-      KeyRepositories
-    >,
+    setup: FeatureSetup<typeof ComposedKeyApp.dependencies, undefined, KeyRepositories>,
   ): ComposedKeyApp {
     return new ComposedKeyApp(setup.repositories);
   }
@@ -138,7 +133,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: eventing.host }),
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
       })
         .withModules([module])
         .boot();
@@ -159,7 +154,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       const runtime = await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: eventing.host }),
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
       })
         .withModules([module])
         .boot();
@@ -183,7 +178,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: { ...eventing.host, notifyOutbox } }),
+        stores: liveMemberSourceOf({ eventing: { ...eventing.host, notifyOutbox } }),
       })
         .withModules([module])
         .boot();
@@ -202,7 +197,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       const runtime = await new ApplicationBuilder({
         role: "api",
-        members: liveMemberSourceOf({ eventing: eventing.host }),
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
       })
         .withModules([module])
         .boot();
@@ -220,7 +215,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: eventing.host }),
+        stores: liveMemberSourceOf({ eventing: eventing.host }),
       })
         .withModules([module])
         .boot();
@@ -263,7 +258,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: host }),
+        stores: liveMemberSourceOf({ eventing: host }),
       })
         .withModules([module])
         .boot();
@@ -314,7 +309,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: host }),
+        stores: liveMemberSourceOf({ eventing: host }),
       })
         .withModules([module])
         .boot();
@@ -345,7 +340,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: runtimeStatingNothing() }),
+        stores: liveMemberSourceOf({ eventing: runtimeStatingNothing() }),
       })
         .withModules([module])
         .boot();
@@ -363,7 +358,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "api",
-        members: liveMemberSourceOf({ eventing: runtimeStatingNothing() }),
+        stores: liveMemberSourceOf({ eventing: runtimeStatingNothing() }),
       })
         .withModules([module])
         .boot();
@@ -402,7 +397,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: host }),
+        stores: liveMemberSourceOf({ eventing: host }),
       })
         .withModules([module])
         .boot();
@@ -437,7 +432,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       const runtime = await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: host }),
+        stores: liveMemberSourceOf({ eventing: host }),
       })
         .withModules([module])
         .boot();
@@ -465,7 +460,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
         .withEventing(keyEventing());
       await new ApplicationBuilder({
         role: "worker",
-        members: liveMemberSourceOf({ eventing: host }),
+        stores: liveMemberSourceOf({ eventing: host }),
       })
         .withModules([module])
         .boot();
@@ -494,7 +489,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       const runtime = await new ApplicationBuilder({
         role: "tasks",
-        members: liveMemberSourceOf({}),
+        stores: liveMemberSourceOf({}),
       })
         .withModules([module])
         .boot();

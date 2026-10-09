@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/webhook-verify",
+  "langwatch": { "group": "libraries" },
   "version": "0.1.0",
   "description": "Verify LangWatch webhook signatures, with Hono and Express middleware",
   "keywords": [

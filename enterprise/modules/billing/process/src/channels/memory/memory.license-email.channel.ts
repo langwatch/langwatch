@@ -1,4 +1,4 @@
-import type { LicenseEmailDelivery } from "../../services/license-purchase.service.ts";
+import type { LicenseEmailDelivery } from "../../features/license-purchase/services/license-purchase.service.ts";
 import { LicenseEmailChannel } from "../license-email.channel.ts";
 
 /** Records the licences it would have mailed, for suites and mail-less deployments. */

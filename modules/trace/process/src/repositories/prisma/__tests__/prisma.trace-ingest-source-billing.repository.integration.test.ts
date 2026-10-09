@@ -15,7 +15,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, describe } from "vitest";
 
-import { describeIngestSourceBillingContract } from "../../__tests__/trace-ingest-source-billing.repository.contract.ts";
+import { describeIngestSourceBillingContract } from "../../../features/ingestion/repositories/__tests__/trace-ingest-source-billing.repository.contract.ts";
 import { PrismaTraceIngestSourceBillingRepository } from "../prisma.trace-ingest-source-billing.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

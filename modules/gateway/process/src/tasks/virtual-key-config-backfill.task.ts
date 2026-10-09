@@ -1,5 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
 import { type Instant, nowInstant } from "@langwatch/time";
 
@@ -58,18 +59,24 @@ export type VirtualKeyConfigBackfillOutcome = Readonly<{
  */
 export async function backfillVirtualKeyConfig({
   repository,
+  organizations,
   execute,
   now = () => nowInstant(),
 }: {
   repository: GatewayVirtualKeyConfigBackfillRepository;
+  organizations: Pick<OrganizationApi, "listAllIds">;
   execute: boolean;
   now?: () => Instant;
 }): Promise<VirtualKeyConfigBackfillOutcome> {
-  const organizationIds = await repository.findOrganizationIds();
   const virtualKeys: VirtualKeyRow[] = [];
-  for (const organizationId of organizationIds) {
-    virtualKeys.push(...(await repository.findVirtualKeys({ organizationId })));
-  }
+  let after: string | undefined;
+  do {
+    const page = await organizations.listAllIds({ after, limit: ORGANIZATION_ID_PAGE_LIMIT });
+    for (const organizationId of page.ids) {
+      virtualKeys.push(...(await repository.findVirtualKeys({ organizationId })));
+    }
+    after = page.next ?? undefined;
+  } while (after !== undefined);
 
   let touched = 0;
   let routingPoliciesMinted = 0;
@@ -328,21 +335,25 @@ export class VirtualKeyConfigBackfillTask extends Task {
 
   private constructor(
     private readonly repository: () => GatewayVirtualKeyConfigBackfillRepository,
+    private readonly organizations: Pick<OrganizationApi, "listAllIds">,
   ) {
     super();
   }
 
   static create({
     repository,
+    organizations,
   }: {
     repository: () => GatewayVirtualKeyConfigBackfillRepository;
+    organizations: Pick<OrganizationApi, "listAllIds">;
   }): VirtualKeyConfigBackfillTask {
-    return new VirtualKeyConfigBackfillTask(repository);
+    return new VirtualKeyConfigBackfillTask(repository, organizations);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     await backfillVirtualKeyConfig({
       repository: this.repository(),
+      organizations: this.organizations,
       execute: args.includes("--execute"),
     });
   }

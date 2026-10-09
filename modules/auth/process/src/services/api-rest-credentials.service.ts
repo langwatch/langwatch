@@ -1,10 +1,4 @@
 import {
-  OrganizationAuthenticationUnavailableError,
-  OrganizationCredentialClassMismatchError,
-  OrganizationInvalidCredentialsError,
-  OrganizationMissingCredentialsError,
-  OrganizationNotFoundForCredentialError,
-  OrganizationPermissionError,
   ProjectInvalidCredentialsError,
   ProjectMissingCredentialsError,
   ProjectRequiredError,
@@ -13,7 +7,6 @@ import {
   ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
   type ApiKeyApi,
-  type ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
 import { assertKeyKind, keyCredentialOf, type RestKeyKind } from "@langwatch/api/rest";
 import {
@@ -24,16 +17,22 @@ import {
   type RestProjectIdentity,
   type RestResolvedProjectCredential,
 } from "@langwatch/authorization";
-import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import {
-  OrganizationNotFoundError,
-  TeamNotFoundError,
-  type OrganizationApi,
-} from "@langwatch/organization-contract";
+import { type OrganizationApi } from "@langwatch/organization-contract";
 
+import {
+  asked,
+  extractApiKeyRequestCredentials,
+  type ApiKeyRequestCredentials,
+} from "../rules/api-credential-request.rules.ts";
+import { ApiKeyHoldsService } from "./api-key-holds.service.ts";
+import {
+  ApiOrganizationCredentialsService,
+  type ApiOrganizationCredential,
+} from "./api-organization-credentials.service.ts";
 import { CliDeviceSessionService } from "./cli-device-session.service.ts";
 
 export type ApiProjectCredential = Readonly<{
@@ -51,10 +50,7 @@ export type CliAccessProject = Readonly<{
   project: RestProjectIdentity;
 }>;
 
-export type ApiOrganizationCredential = Readonly<{
-  resolved: ResolvedOrganizationApiKeyToken;
-  markUsed: () => void;
-}>;
+export type { ApiOrganizationCredential };
 
 export type ApiKeyDoorCredential = Readonly<{
   principal: RestKeyDoorPrincipal;
@@ -103,8 +99,12 @@ export class ApiRestCredentialsService {
   private readonly organizations: ApiRestCredentialPeers["organizations"];
   private readonly cliProjects: ApiRestCredentialPeers["cliProjects"];
   private readonly logger: Pick<Logger, "error">;
+  private readonly keyHolds: ApiKeyHoldsService;
+  private readonly organizationCredentials: ApiOrganizationCredentialsService;
 
   private constructor(peers: Required<ApiRestCredentialPeers>) {
+    this.keyHolds = ApiKeyHoldsService.create({ authz: peers.authz });
+    this.organizationCredentials = ApiOrganizationCredentialsService.create(peers);
     this.apiKeys = peers.apiKeys;
     this.authz = peers.authz;
     this.organizations = peers.organizations;
@@ -280,7 +280,11 @@ export class ApiRestCredentialsService {
     const { reach } = input;
     const credential = await this.identifyKey({ request: input.request });
     for (const permission of asked(input.permissions)) {
-      const allowed = await this.#keyHolds({ principal: credential.principal, permission, reach });
+      const allowed = await this.keyHolds.holds({
+        principal: credential.principal,
+        permission,
+        reach,
+      });
       if (!allowed)
         throw keyPermissionRefusal({ credential, permission, ...(reach ? { reach } : {}) });
     }
@@ -288,76 +292,28 @@ export class ApiRestCredentialsService {
     return credential;
   }
 
-  /** A legacy project key holds everything by its class, as on the project door. */
-  async #keyHolds(input: {
-    principal: RestKeyDoorPrincipal;
-    permission: AuthzPermission;
-    reach: ApiKeyPermissionReach | undefined;
-  }): Promise<boolean> {
-    const { principal, permission, reach } = input;
-    if (principal.kind === "project") return true;
-    if (principal.kind === "cliAccessToken") {
-      // The token is its person inside one project, so it holds nothing organization-wide.
-      if (reach === "organization") return false;
-
-      return this.authz.hasProjectPermission({
-        userId: principal.userId,
-        projectId: principal.projectId,
-        permission,
-      });
-    }
-
-    const key = {
-      apiKeyId: principal.apiKeyId,
-      userId: principal.userId,
-      organizationId: principal.organizationId,
-      permission,
-    };
-    const project = principal.resolvedProject;
-    if (reach !== "organization" && project) {
-      return this.authz.hasApiKeyPermission({ ...key, scope: { type: "project", ...project } });
-    }
-    if (reach !== "grants") {
-      return this.authz.hasApiKeyPermission({
-        ...key,
-        scope: { type: "org", id: principal.organizationId },
-      });
-    }
-
-    return this.#heldOnAnyGrant(key);
+  authenticateOrganization(
+    input: Parameters<ApiOrganizationCredentialsService["authenticateOrganization"]>[0],
+  ): Promise<ApiOrganizationCredential> {
+    return this.organizationCredentials.authenticateOrganization(input);
   }
 
-  /** A key holds what its grants give, so asking at each granted scope covers its whole reach. */
-  async #heldOnAnyGrant(key: {
-    apiKeyId: string;
-    userId: string | null;
-    organizationId: string;
-    permission: AuthzPermission;
-  }): Promise<boolean> {
-    const grants = await this.authz.listApiKeyBindings({
-      organizationId: key.organizationId,
-      apiKeyIds: [key.apiKeyId],
-    });
-    const answers = await Promise.all(
-      grants.map(async ({ scopeType, scopeId }) => {
-        if (scopeType === "PROJECT") {
-          const decision = await this.authz.getApiKeyProjectDecision({
-            ...key,
-            projectId: scopeId,
-          });
+  identifyOrganization(
+    input: Parameters<ApiOrganizationCredentialsService["identifyOrganization"]>[0],
+  ): Promise<ApiOrganizationCredential> {
+    return this.organizationCredentials.identifyOrganization(input);
+  }
 
-          return decision.outcome === "allowed";
-        }
+  authorizeOrganizationRoute(
+    input: Parameters<ApiOrganizationCredentialsService["authorizeOrganizationRoute"]>[0],
+  ): Promise<PermissionDecision> {
+    return this.organizationCredentials.authorizeOrganizationRoute(input);
+  }
 
-        return this.authz.hasApiKeyPermission({
-          ...key,
-          scope:
-            scopeType === "TEAM" ? { type: "team", id: scopeId } : { type: "org", id: scopeId },
-        });
-      }),
-    );
-
-    return answers.some(Boolean);
+  authorizeOrganizationTeamRoute(
+    input: Parameters<ApiOrganizationCredentialsService["authorizeOrganizationTeamRoute"]>[0],
+  ): Promise<PermissionDecision> {
+    return this.organizationCredentials.authorizeOrganizationTeamRoute(input);
   }
 
   /** A project-bound access token (`lw_at_`, header or bearer) as its person. */
@@ -384,93 +340,6 @@ export class ApiRestCredentialsService {
       markUsed: () => {},
       actsAsPerson: { userId: held.userId },
     };
-  }
-
-  async authenticateOrganization(input: {
-    request: Request;
-    permissions: readonly AuthzPermission[];
-  }): Promise<ApiOrganizationCredential> {
-    const identified = await this.identifyOrganization({ request: input.request });
-    const resolved = identified.resolved;
-    for (const permission of asked(input.permissions)) {
-      const allowed = await this.authz.hasApiKeyPermission({
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
-        organizationId: resolved.organizationId,
-        scope: { type: "org", id: resolved.organizationId },
-        permission,
-      });
-      if (!allowed) throw new OrganizationPermissionError(permission);
-    }
-
-    return identified;
-  }
-
-  async identifyOrganization(input: { request: Request }): Promise<ApiOrganizationCredential> {
-    const credentials = extractApiKeyRequestCredentials(input.request);
-    if (!credentials) throw new OrganizationMissingCredentialsError();
-
-    const resolved = await this.resolveOrganization(credentials.token);
-    await this.assertOrganizationExists(resolved.organizationId);
-
-    return {
-      resolved,
-      markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
-    };
-  }
-
-  async authorizeOrganizationRoute(input: {
-    credential: ResolvedOrganizationApiKeyToken;
-    permission: AuthzPermission;
-    projectId: string;
-  }): Promise<PermissionDecision> {
-    const decision = await this.authz.getApiKeyProjectDecision({
-      apiKeyId: input.credential.apiKeyId,
-      userId: input.credential.userId,
-      organizationId: input.credential.organizationId,
-      projectId: input.projectId,
-      permission: input.permission,
-    });
-
-    // No `denialReason`: this door answers from the KEY's grants, and none of
-    // the five reasons the vocabulary names is the one that decided a project
-    // the key may not reach.
-    return { permitted: decision.outcome === "allowed", organizationRole: null };
-  }
-
-  /**
-   * A route-scoped permission at a team (finding H4). The team's organization is read from the
-   * team, never taken from the key; a team outside the key's organization answers as missing.
-   */
-  async authorizeOrganizationTeamRoute(input: {
-    credential: ResolvedOrganizationApiKeyToken;
-    permission: AuthzPermission;
-    teamId: string;
-  }): Promise<PermissionDecision> {
-    const { apiKeyId, userId, organizationId } = input.credential;
-    if (!(await this.isTeamOf({ teamId: input.teamId, organizationId }))) {
-      throw new TeamNotFoundError(input.teamId);
-    }
-    const permitted = await this.authz.hasApiKeyPermission({
-      apiKeyId,
-      userId,
-      organizationId,
-      scope: { type: "team", id: input.teamId },
-      permission: input.permission,
-    });
-
-    return { permitted, organizationRole: null };
-  }
-
-  private async isTeamOf(input: { teamId: string; organizationId: string }): Promise<boolean> {
-    try {
-      const scope = await this.authz.getScope({ teamId: input.teamId });
-
-      return scope.type === "team" && scope.organizationId === input.organizationId;
-    } catch (error) {
-      if (AuthzScopeNotFoundError.is(error)) return false;
-      throw error;
-    }
   }
 
   /**
@@ -526,36 +395,6 @@ export class ApiRestCredentialsService {
     return reachable.flat();
   }
 
-  private async resolveOrganization(token: string): Promise<ResolvedOrganizationApiKeyToken> {
-    let resolution;
-    try {
-      resolution = await this.apiKeys.resolveOrganizationToken({ token });
-    } catch (error) {
-      this.logger.error({ error }, "Organization credential resolution failed");
-      throw new OrganizationAuthenticationUnavailableError();
-    }
-
-    if (resolution.ok) return resolution.resolved;
-    throw resolution.reason === "wrong_credential_class"
-      ? new OrganizationCredentialClassMismatchError()
-      : new OrganizationInvalidCredentialsError();
-  }
-
-  private async assertOrganizationExists(organizationId: string): Promise<void> {
-    try {
-      await this.organizations.getSettings({ organizationId });
-    } catch (error) {
-      if (error instanceof OrganizationNotFoundError) {
-        throw new OrganizationNotFoundForCredentialError();
-      }
-      this.logger.error(
-        { error, organizationId },
-        "Organization lookup failed while authenticating an organization credential",
-      );
-      throw new OrganizationAuthenticationUnavailableError();
-    }
-  }
-
   private isWithinCeiling(input: {
     resolved: Extract<RestResolvedProjectCredential, { type: "apiKey" }>;
     permission: AuthzPermission;
@@ -569,13 +408,6 @@ export class ApiRestCredentialsService {
       permission,
     });
   }
-}
-
-/** A door asked no permission is a mis-wired route: refused, never admitted. */
-function asked(permissions: readonly AuthzPermission[]): readonly AuthzPermission[] {
-  if (permissions.length === 0) throw new Error("A credential door was asked no permission");
-
-  return permissions;
 }
 
 /** The one denial every tier answers with, at the scope the key was asked at. */
@@ -617,47 +449,4 @@ function apiKeyCeilingRefusal(
     return new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
   }
   return new ApiKeyPermissionDeniedError(permission);
-}
-
-type ApiKeyRequestCredentials = Readonly<{
-  token: string;
-  projectId: string | null;
-}>;
-
-function extractApiKeyRequestCredentials(request: Request): ApiKeyRequestCredentials | null {
-  const authorization = request.headers.get("authorization");
-  const xAuthToken = request.headers.get("x-auth-token");
-  const xProjectId = request.headers.get("x-project-id");
-
-  if (!xAuthToken && authorization?.toLowerCase().startsWith("basic ")) {
-    const parsed = parseBasicCredentials(authorization.slice(6));
-    if (parsed) {
-      return parsed;
-    }
-  }
-
-  if (authorization?.toLowerCase().startsWith("bearer ")) {
-    const token = authorization.slice(7).trim();
-    if (token) {
-      return { token, projectId: xProjectId };
-    }
-  }
-
-  return xAuthToken ? { token: xAuthToken, projectId: xProjectId } : null;
-}
-
-function parseBasicCredentials(value: string): ApiKeyRequestCredentials | null {
-  try {
-    const decoded = Buffer.from(value, "base64").toString("utf-8");
-    const separator = decoded.indexOf(":");
-    if (separator < 1 || separator === decoded.length - 1) {
-      return null;
-    }
-    return {
-      projectId: decoded.slice(0, separator),
-      token: decoded.slice(separator + 1),
-    };
-  } catch {
-    return null;
-  }
 }

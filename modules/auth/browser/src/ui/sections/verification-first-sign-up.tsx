@@ -1,5 +1,5 @@
 import { isSafeReturnToPath, type SignUpEnrollment } from "@langwatch/auth-contract";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -13,12 +13,13 @@ import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
+import { JOIN_BEFORE_CREATE_PATH } from "../../model/join-before-create.ts";
 import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
-import { JOIN_BEFORE_CREATE_PATH } from "../../model/sign-up-destination.ts";
 import { useTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { SuccessPulse } from "../elements/success-pulse.tsx";
@@ -188,7 +189,7 @@ export function VerificationFirstSignUp() {
   // The address's domain routes through an identity provider, which makes the account.
   const [routedEmail, setRoutedEmail] = useState<string | null>(null);
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
-  // The single-use proof `user.register` spends; only where no account stands behind the address.
+  // The single-use proof `auth.register` spends; only where no account stands behind the address.
   const [addressProof, setAddressProof] = useState<string | null>(null);
   // False where the installation cannot send email: the proof confirms nobody's address.
   const [addressConfirmed, setAddressConfirmed] = useState(true);
@@ -824,9 +825,7 @@ function PostLinkRoutingFailure({
       ) : (
         <Text>We couldn't check how this address should sign in.</Text>
       )}
-      <Button className="lw-front-door-primary" width="full" onClick={() => void onRetry()}>
-        Try again
-      </Button>
+      <FrontDoorPrimaryButton onClick={() => void onRetry()}>Try again</FrontDoorPrimaryButton>
     </AuthCard>
   );
 }

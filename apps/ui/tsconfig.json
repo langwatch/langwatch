@@ -137,13 +137,16 @@
       "path": "../../modules/navigation/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/navigation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/notification/browser/tsconfig.build.json"
     },
     {
-      "path": "../../modules/notification/contract/tsconfig.build.json"
+      "path": "../../modules/onboarding/browser/tsconfig.build.json"
     },
     {
-      "path": "../../modules/onboarding/browser/tsconfig.build.json"
+      "path": "../../modules/onboarding/client/tsconfig.build.json"
     },
     {
       "path": "../../modules/ops/browser/tsconfig.build.json"
@@ -153,6 +156,9 @@
     },
     {
       "path": "../../modules/organization/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/organization/client/tsconfig.build.json"
     },
     {
       "path": "../../modules/organization/contract/tsconfig.build.json"

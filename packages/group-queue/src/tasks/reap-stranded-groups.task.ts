@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import { Task } from "@langwatch/task";
 import { nowInstant } from "@langwatch/time";
 
 import type { GroupQueueRedis } from "../dependencies-adapter.ts";
@@ -179,43 +178,4 @@ async function* scan({
     cursor = next;
     for (const key of keys) yield key;
   } while (cursor !== "0");
-}
-
-/**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * group-queue-reap-stranded-groups -- --apply --min-age-hours=6`.
- */
-export class GroupQueueReapStrandedGroupsTask extends Task {
-  readonly name = "group-queue-reap-stranded-groups";
-  readonly description =
-    "Finds GroupQueue groups no dispatcher can reach and, with --apply, deletes them and recounts pending jobs.";
-
-  private constructor(
-    private readonly redis: () => GroupQueueRedis,
-    private readonly keyPrefix: string,
-  ) {
-    super();
-  }
-
-  static create({
-    redis,
-    keyPrefix = DEFAULT_GROUP_QUEUE_KEY_PREFIX,
-  }: {
-    redis: () => GroupQueueRedis;
-    keyPrefix?: string;
-  }): GroupQueueReapStrandedGroupsTask {
-    return new GroupQueueReapStrandedGroupsTask(redis, keyPrefix);
-  }
-
-  async run({ args, signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    const minAge = args.find((arg) => arg.startsWith("--min-age-hours="))?.split("=")[1];
-    const report = await reapStrandedGroups({
-      redis: this.redis(),
-      keyPrefix: this.keyPrefix,
-      apply: args.includes("--apply"),
-      signal,
-      ...(minAge === undefined ? {} : { minAgeHours: Number(minAge) }),
-    });
-    logger.info({ report: { ...report, groups: report.groups.length } }, "reaper finished");
-  }
 }

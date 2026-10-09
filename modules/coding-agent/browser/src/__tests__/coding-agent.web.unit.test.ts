@@ -4,7 +4,7 @@ import { createUi } from "@langwatch/browser";
 import {
   CodingAgentPullRequestsTableToken,
   CodingAgentSessionsTableToken,
-} from "@langwatch/coding-agent-contract";
+} from "@langwatch/coding-agent-client";
 import { describe, expect, it } from "vitest";
 
 import { codingAgentWeb } from "../coding-agent.web.ts";
@@ -29,6 +29,7 @@ describe("given a browser that installs coding-agent", () => {
   });
 
   describe("when user's workspace reads a lent activity table", () => {
+    /** @scenario Trace and coding-agent lend by their client tokens */
     it.each([
       ["pull requests", CodingAgentPullRequestsTableToken],
       ["sessions", CodingAgentSessionsTableToken],

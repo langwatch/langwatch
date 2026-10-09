@@ -1,4 +1,5 @@
 import type { OnboardingVariant } from "@langwatch/onboarding-contract";
+import type { PersonalFeatures } from "@langwatch/organization-contract";
 import type {
   ActiveProjectsByScopesInput,
   CreateProjectInput,
@@ -15,6 +16,9 @@ import type {
   TraceDestinationProject,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
+  ProjectIdPage,
+  ProjectIdPageInput,
+  ProjectOrganizationPage,
   ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -89,7 +93,10 @@ export interface ProjectRepository {
   findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]>;
   findIdentity(id: string): Promise<ProjectIdentity | null>;
   findIdsByOrganization(organizationId: string): Promise<string[]>;
-  findLiveNonGovernanceIds(organizationId: string): Promise<string[]>;
+  findLiveNonGovernanceIds(input: {
+    organizationId: string;
+    includeArchived: boolean;
+  }): Promise<string[]>;
   findLiveByIdInOrganization(input: { id: string; organizationId: string }): Promise<Project[]>;
   findLiveBySlugInOrganization(input: { slug: string; organizationId: string }): Promise<Project[]>;
   findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
@@ -108,6 +115,20 @@ export interface ProjectRepository {
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
+  /** Creates a team's personal project once and answers its id; a second call creates nothing. */
+  createPersonal(input: {
+    id: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+    ownerUserId: string;
+  }): Promise<string>;
+  /** Archives the live personal projects in these teams; a second call changes nothing. */
+  archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void>;
+  /** Revives the archived personal project in this team; a second call changes nothing. */
+  revivePersonalInTeam(input: { teamId: string }): Promise<void>;
+  /** Stores a personal project's feature switches; a shared project is left untouched. */
+  updatePersonalFeatures(input: { projectId: string; features: PersonalFeatures }): Promise<void>;
   /** Main `personal-team-scope.ts:90-97`: a personal project's owner, archived or not. */
   findPersonalProjectOwner(input: {
     organizationId: string;
@@ -124,4 +145,8 @@ export interface ProjectRepository {
     memberUserId?: string;
     limit: number;
   }): Promise<string[]>;
+  /** Every project id, archived included, ordered by id and paged by cursor. */
+  listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
+  /** Every project with its team's organisation, archived included, paged like `listAllIds`. */
+  listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
 }

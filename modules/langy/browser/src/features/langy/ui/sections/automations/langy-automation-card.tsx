@@ -6,15 +6,15 @@
 import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { NamedSlackConnection } from "@langwatch/slack-contract";
 
-import type { CapabilityTone } from "../../../../../model/langy-capability-registry.ts";
+import {
+  buildResourceHref,
+  type CapabilityCardInput,
+  type CapabilityTone,
+} from "../../../../../model/langy-capability-registry.ts";
 import {
   useLangyAutomationNow,
   useLangySlackConnections,
 } from "../../../behavior/use-langy-automation-data.ts";
-import {
-  buildResourceHref,
-  type CapabilityCardInput,
-} from "../../../model/capabilities/capability-registry.ts";
 import {
   automationCondition,
   automationDestinations,

@@ -17,7 +17,6 @@ import {
   type AuthzRevokeBindingsWhereInput,
   type AuthzRevokeBindingsWhereOutput,
   type AuthzRevokeResourceGrantsInput,
-  type AuthzService,
   type EffectivePermissions,
   type AuthzServerConfig,
   AuthzScopeNotFoundError,
@@ -76,7 +75,7 @@ export interface AuthzCompatibilityLedger {
   deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
 }
 
-export type AuthzSetup = FeatureSetup<Readonly<{}>, never, AuthzServerConfig, AuthzRepositories>;
+export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzServerConfig, AuthzRepositories>;
 
 /**
  * The legacy import speaks the command vocabulary directly: it supplies
@@ -117,13 +116,16 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
   }
 }
 
+/** The decision service's public surface; a test app states only the slice it drives. */
+type AuthzPermissions = Pick<AuthzPermissionService, keyof AuthzPermissionService>;
+
 /** The composed callable authorization boundary. */
 export class AuthzModule implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
   static readonly config = authzServerConfig;
   static readonly publicConfig = authzBrowserConfig.project;
-  #permissions: AuthzService;
+  #permissions: AuthzPermissions;
   #grantIdentity = AuthzGrantIdentityService.create();
   #grants: AuthzGrantsService;
   /**
@@ -143,6 +145,11 @@ export class AuthzModule implements AuthzApi {
   /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no migration. */
   #migration: SystemMigration | undefined;
   /**
+   * The permission service as built here, for the membership reads the contract's service does
+   * not declare; absent on an app built by {@link AuthzModule.fromServices}.
+   */
+  #memberships: AuthzPermissionService | undefined;
+  /**
    * Absent on an app built by {@link AuthzModule.fromServices}, which composes no version store.
    */
   #sessionVersions: AuthzSessionVersionService | undefined;
@@ -152,13 +159,14 @@ export class AuthzModule implements AuthzApi {
   #platformOperators: AuthzPlatformOperatorsService | undefined;
 
   private constructor(
-    permissions: AuthzService,
+    permissions: AuthzPermissions,
     grants: AuthzGrantsService,
     options: Readonly<{
       demoProjectId?: string | undefined;
       demoProjectUserId?: string | undefined;
       admissions?: AuthzAdmissionService;
       migration?: SystemMigration;
+      memberships?: AuthzPermissionService;
       sessionVersions?: AuthzSessionVersionService;
       platformOperators?: AuthzPlatformOperatorsService;
       eventing?: Readonly<{
@@ -173,6 +181,7 @@ export class AuthzModule implements AuthzApi {
     this.#dispatcher = options.eventing?.dispatcher;
     this.#demoProjectId = options.demoProjectId;
     this.#demoProjectUserId = options.demoProjectUserId;
+    this.#memberships = options.memberships;
     this.#admissions = options.admissions;
     this.#migration = options.migration;
     this.#sessionVersions = options.sessionVersions;
@@ -268,6 +277,7 @@ export class AuthzModule implements AuthzApi {
       demoProjectUserId: serverConfig.demoProjectUserId,
       admissions: AuthzAdmissionService.create({ admissions: repositories.admissions }),
       migration,
+      memberships: permissions,
       sessionVersions,
       platformOperators,
       eventing: { pipeline, dispatcher },
@@ -288,7 +298,7 @@ export class AuthzModule implements AuthzApi {
    * and grants graph as the legacy transport collaborators.
    */
   static fromServices(input: {
-    permissions: AuthzService;
+    permissions: AuthzPermissions;
     grants: AuthzGrantsService;
     config?: AuthzServerConfig | undefined;
   }): AuthzModule {
@@ -397,6 +407,8 @@ export class AuthzModule implements AuthzApi {
   isOnEngine: AuthzApi["isOnEngine"] = (a) => this.#permissions.isOnEngine(a);
   findEngineCutoverAt: AuthzApi["findEngineCutoverAt"] = (a) =>
     this.#permissions.findEngineCutoverAt(a);
+  findActiveOrganizationAdministrators: AuthzApi["findActiveOrganizationAdministrators"] = (a) =>
+    this.memberships().findActiveOrganizationAdministrators(a);
   readPendingAdmission: AuthzApi["readPendingAdmission"] = (a) =>
     this.admissions().readPendingAdmission(a);
   completeAdmission: AuthzApi["completeAdmission"] = (a) => this.admissions().completeAdmission(a);
@@ -492,6 +504,16 @@ export class AuthzModule implements AuthzApi {
       );
     }
     return this.#platformOperators;
+  }
+
+  private memberships(): AuthzPermissionService {
+    if (!this.#memberships) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no membership " +
+          "reads: compose it through AuthzModule.create to read an organization's administrators.",
+      );
+    }
+    return this.#memberships;
   }
 
   private admissions(): AuthzAdmissionService {

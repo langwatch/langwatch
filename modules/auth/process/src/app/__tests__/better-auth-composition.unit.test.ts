@@ -13,16 +13,40 @@ import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-con
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
+import type * as Observability from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
+import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
+import { LiveAuthRepositories } from "../../repositories/live/live.auth.repositories.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS, type SignInProvidersConfig } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
+
+const authLog = vi.hoisted(() => ({
+  loggerName: "langwatch:auth",
+  lines: [] as { level?: number; absent?: unknown; [field: string]: unknown }[],
+}));
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const original = await importOriginal<typeof Observability>();
+  const harness = await vi.importActual<typeof TestHarness>("@langwatch/test-harness");
+  const captured = harness.createTestLogger();
+  authLog.lines = captured.lines;
+
+  return {
+    ...original,
+    createLogger: (name: string, options?: Parameters<typeof original.createLogger>[1]) =>
+      name === authLog.loggerName ? captured.logger : original.createLogger(name, options),
+  };
+});
 
 const BROWSER_SESSION = {
   secret: "test-session-secret",
@@ -55,6 +79,7 @@ async function appFor(
     mounts?: SignInProviderMounts;
     askedFor?: MountsRequest[];
     identity?: IdentityApi;
+    repositories?: AuthRepositories;
   } = {},
 ): Promise<AuthModule> {
   return AuthModule.create({
@@ -67,18 +92,20 @@ async function appFor(
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: { ...NO_SIGN_IN_PROVIDERS, ...providers.config },
       signUpMode: "open",
       publicBaseUrl: undefined,
       nodeEnvironment: undefined,
     },
-    repositories: MemoryAuthRepositories.create(),
+    repositories: providers.repositories ?? MemoryAuthRepositories.create(),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
-      identity: providers.identity ?? createApiFixture<IdentityApi>(),
+      identity: providers.identity ?? createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -94,16 +121,7 @@ async function appFor(
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      // Better Auth's storage and hook repositories take the client and query
-      // nothing until a request reaches them; no test below reaches one.
-      prisma: {} as never,
-      redis: null as never,
-      identityEmails: undefined as never,
-      invites: null,
-      processName: "langwatch-api",
-    },
+    channels: MemoryAuthChannels.create(),
     resources: { own: () => undefined } as never,
     // The deployment's session key reaches the app through its declared handle.
     secrets: new ScopedSecrets(async (handle, build) =>
@@ -148,6 +166,33 @@ describe("given a deployment that named one", () => {
     expect(await app.betterAuth()).toBe(await app.betterAuth());
   });
 
+  describe("when several callers ask for Better Auth", () => {
+    /** @scenario "The API process composes the identity branch when it has an event stack" */
+    it("hands the stock Prisma engine to identity's storage adapter and reports the absent shadow once", async () => {
+      authLog.lines.length = 0;
+      const app = await appFor(true, {
+        // The API composes the live tier; its storage queries nothing until a request reaches it.
+        repositories: LiveAuthRepositories.create({
+          prisma: {} as never,
+          redis: null as never,
+          rateLimiter: {} as never,
+          encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+        }),
+      });
+
+      await Promise.all([app.betterAuth(), app.betterAuth()]);
+      const context = await (await app.betterAuth()).$context;
+
+      expect(context.adapter.id).toBe("prisma");
+      const absences = authLog.lines.filter((line) => Array.isArray(line.absent));
+      expect(absences).toHaveLength(1);
+      expect(absences[0]).toMatchObject({
+        level: 40,
+        absent: ["sign-in-router-shadow"],
+      });
+    });
+  });
+
   it("verifies a browser session through that instance and accepts what it accepts", async () => {
     const app = await appFor(true);
     const getSession = vi.fn(async () => VERIFIED);
@@ -188,6 +233,7 @@ describe("when Better Auth deletes a user", () => {
     const erased: { id: string }[] = [];
     const app = await appFor(true, {
       identity: createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
         ceremonies: () => ({
           beforeUserDelete: async (user) => void erased.push(user),
           createAccountIdentifier: async () => ({ pinned: false }),
@@ -297,6 +343,7 @@ describe("given enterprise SSO answers the deployment's sign-in providers", () =
     const askedFor: MountsRequest[] = [];
     const moved: unknown[] = [];
     const identity = createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
       moveLegacyMicrosoftAccountKey: async ({ profile }) => {
         moved.push(profile);
       },

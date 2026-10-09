@@ -33,13 +33,13 @@ import {
   type PulledUsagePricingDeps,
 } from "../../eventing/pulled-usage-ledger.intent.ts";
 import { PulledUsageEventingAdapter } from "../../eventing/pulled-usage.pipeline.ts";
-import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
-import type { IngestionPullMetricsSink } from "../ingestion-pull-metrics.service.ts";
+import { IngestionPullListingService } from "../../features/ingestion-pull/services/ingestion-pull-listing.service.ts";
+import type { IngestionPullMetricsSink } from "../../features/ingestion-pull/services/ingestion-pull-metrics.service.ts";
 import {
   type IngestionPullOutcomeChannel,
   type IngestionPullRunner,
   IngestionPullService,
-} from "../ingestion-pull.service.ts";
+} from "../../features/ingestion-pull/services/ingestion-pull.service.ts";
 
 class FixedSchedule implements IngestionPullScheduler {
   nextRunAt(input: { cron: string; after: number }): number {

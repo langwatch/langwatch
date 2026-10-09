@@ -7,15 +7,14 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { lwqlAppFunctionNames } from "../../rules/langwatch-ql-app-function-catalog.rules.ts";
-import { LWQL_EVAL_FUNCTION_CATALOG } from "../../rules/langwatch-ql-eval-function-catalog.rules.ts";
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
-import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
+import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { LWQL_EVAL_FUNCTION_CATALOG } from "../../features/app-functions/rules/langwatch-ql-eval-function-catalog.rules.ts";
 import {
   type LangWatchQLServerFunctionRow,
   LangWatchQLAppFunctionStatementsService,
   LWQL_SQL_UDF_ORIGIN,
-} from "../../services/langwatch-ql-app-function-statements.service.ts";
+} from "../../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
+import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -25,6 +24,7 @@ import {
   selectRows,
   startLangWatchQLClickHouse,
 } from "./lwql-clickhouse-harness.ts";
+import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
 
 const statements = LangWatchQLAppFunctionStatementsService.create();
 const accessModel = LangWatchQLAccessModelService.create();

@@ -25,9 +25,9 @@ Feature: Setup snippets name the address readers reach the installation on
     Then the address every setup snippet copies is "https://app.example"
 
   @unit
-  Scenario: The development server projects the public URL the same way
-    Given the development server reads BASE_HOST "http://localhost:5560" and NEXTAUTH_URL "http://localhost:5580"
-    When it projects the page's public config
+  Scenario: The development server carries the api's public URL unchanged
+    Given the api's shell names "http://localhost:5580" as the auth slice's public URL
+    When the development server lifts the page's public config from it
     Then the auth slice names "http://localhost:5580" as the public URL
 
   @integration

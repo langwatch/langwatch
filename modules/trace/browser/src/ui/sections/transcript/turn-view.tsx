@@ -1,7 +1,7 @@
 import { getDisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import type { ContentBlock, ConversationTurn } from "@langwatch/trace-contract/transcript";
 
-import { useIsScenarioRole } from "../../../behavior/scenario-role.store.tsx";
+import { useIsScenarioRole } from "../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import { AssistantTurnCard } from "./assistant-turn-card.tsx";
 import { BlockStack } from "./block-stack.tsx";
 import { SystemTurnView } from "./system-turn-view.tsx";

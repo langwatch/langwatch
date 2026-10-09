@@ -7,13 +7,17 @@ import { z } from "zod";
 
 import { licenseRefreshOutcomeSchema } from "./connect-install.ts";
 import { storeLicenseInputSchema } from "./license.commands.ts";
-import { licenseOrganizationQuerySchema } from "./license.queries.ts";
 import {
   licenseRemovedSchema,
   licenseStatusSchema,
   licenseUploadedSchema,
   ssoGateStatusSchema,
 } from "./license.ts";
+
+export const licenseOrganizationQuerySchema = z.object({
+  organizationId: z.string().min(1),
+});
+export type LicenseOrganizationQuery = z.infer<typeof licenseOrganizationQuerySchema>;
 
 export const licenseTrpc = defineTrpcContract("license")
   .query("getStatus")

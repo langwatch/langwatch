@@ -24,7 +24,6 @@ import {
   type SsoAssertionApi,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { compare, hash } from "bcrypt";
@@ -34,6 +33,7 @@ import type { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type { AdapterFactory } from "better-auth/adapters";
 import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import {
   findSubmittedAddresses,
@@ -44,7 +44,6 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
-  BetterAuthStorage,
 } from "../better-auth.channel.ts";
 import {
   afterAccountCreate,
@@ -62,6 +61,7 @@ import {
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
 import {
+  type PasskeySignUpEligibility,
   passkeySignUpRegistration,
   type SignUpVerification,
 } from "./http.passkey-sign-up.channel.ts";
@@ -118,7 +118,7 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
 
 /**
  * Seals better-auth's own sign-up route unconditionally, before any licence
- * is read: creation belongs to `user.register`'s pending-confirmation latch,
+ * is read: creation belongs to `auth.register`'s pending-confirmation latch,
  * else email-mode (the common case) would stay wide open to the raw route.
  */
 function refuseDirectEmailSignUp(pathname: string): void {
@@ -363,7 +363,7 @@ export const createAuthOptions = ({
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
-  storage: BetterAuthStorage;
+  storage: AdapterFactory<BetterAuthOptions>;
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;
   shadow: SignInRouterShadow;
@@ -410,7 +410,7 @@ export const createAuthOptions = ({
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,
    * forever.
    */
-  database: storage.adapter() as NonNullable<BetterAuthOptions["database"]>,
+  database: storage,
 
   /**
    * The only header BetterAuth's rate limiter (and session IP tracking) reads, with no
@@ -443,6 +443,13 @@ export const createAuthOptions = ({
       pendingSsoSetup: { type: "boolean", defaultValue: false, input: false },
       deactivatedAt: { type: "date", required: false, input: false },
       lastLoginAt: { type: "date", required: false, input: false },
+      // Read by the session-create refusal; hidden so get-session stays unchanged.
+      signupConfirmationPending: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+        returned: false,
+      },
     },
   },
   session: {
@@ -561,7 +568,6 @@ export const createAuthOptions = ({
         before: createBeforeUserCreateHook({ policy: signUpPolicy, findGoverningConnections }),
         after: async (user) => {
           await afterUserCreate({
-            repo,
             user: {
               id: user.id,
               email: user.email,
@@ -586,10 +592,13 @@ export const createAuthOptions = ({
     account: {
       create: {
         before: async (account, context) => {
-          await createBeforeAccountCreateHook({ repo, federation, findGoverningConnections })(
-            account,
-            context,
-          );
+          await createBeforeAccountCreateHook({
+            repo,
+            organizations: hooks.organizations,
+            federation,
+            findGoverningConnections,
+            linkProposals: hooks.linkProposals,
+          })(account, context);
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
@@ -661,6 +670,7 @@ export const createAuthOptions = ({
         after: async (session) => {
           await afterSessionCreate({
             repo,
+            organizations: hooks.organizations,
             userId: session.userId,
             announcements: hooks.announcements,
           });
@@ -858,12 +868,13 @@ type BetterAuthTransportOptions = Readonly<{
   idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
   /** The persistence boundary every database hook reads and writes through. */
   database: BetterAuthHooksRepository;
-  /** The instance's storage engine — see {@link BetterAuthStorage}. */
-  storage: BetterAuthStorage;
+  /** better-auth's whole `database:` entry: identity's storage adapter (ADR-116 §1). */
+  storage: AdapterFactory<BetterAuthOptions>;
   deployment: BetterAuthDeploymentConfiguration;
   federation: BetterAuthFederation;
   identity: BetterAuthIdentityCeremonies;
   invites: BetterAuthHookCollaborators["invites"];
+  organizations: BetterAuthHookCollaborators["organizations"];
   announcements: BetterAuthAnnouncements;
   shadow: SignInRouterShadow;
   /** The grant ledger an SSO auto-join writes its membership through. */
@@ -878,13 +889,15 @@ type BetterAuthTransportOptions = Readonly<{
   ssoActivity: BetterAuthHookCollaborators["ssoActivity"];
   /** Which of a cutover's two connections a callback belongs to. */
   ssoMigration: BetterAuthHookCollaborators["ssoMigration"];
+  /** Where a refused sign-in link leaves a proposal for an administrator. */
+  linkProposals: BetterAuthHookCollaborators["linkProposals"];
   /**
    * Sends the password-reset link.
    */
   sendResetPassword: (input: { email: string; token: string }) => Promise<void>;
   secondaryStorage: NonNullable<BetterAuthOptions["secondaryStorage"]>;
-  /** Presence decides whether Better Auth's rate limiter uses secondary storage. */
-  redis: RedisConnection | null;
+  /** Whether Better Auth's rate limiter counts in the shared secondary storage. */
+  sharedStorage: boolean;
   signUpVerification: SignUpVerification & SignUpAddressConfirmation;
   users: UserApi;
   /** Whether an already proved password may open this deployment's local door
@@ -896,6 +909,8 @@ type BetterAuthTransportOptions = Readonly<{
   findGoverningConnections: FindGoverningConnections;
   /** Who the installation lets create an account. */
   signUpPolicy: SignUpPolicy;
+  /** Whether a proven address still enrols a passkey here, asked at both ends of the ceremony. */
+  passkeySignUpEligibility: PasskeySignUpEligibility;
   /** Identity's answer to what a session records at mint (D06). */
   mintClaims: Pick<IdentityApi, "claimsForMint">;
 }>;
@@ -912,7 +927,8 @@ const transportOptions = ({
   federation,
   identity,
   invites,
-  redis,
+  organizations,
+  sharedStorage,
   secondaryStorage,
   sendResetPassword,
   shadow,
@@ -923,7 +939,9 @@ const transportOptions = ({
   signInLockout,
   findGoverningConnections,
   signUpPolicy,
+  passkeySignUpEligibility,
   ssoMigration,
+  linkProposals,
   storage,
   users,
   idTokenIssuerRefusals,
@@ -949,11 +967,13 @@ const transportOptions = ({
     hooks: {
       federation,
       invites,
+      organizations,
       announcements,
       authzGrants,
       arrivals,
       ssoActivity,
       ssoMigration,
+      linkProposals,
     },
   });
   return {
@@ -970,6 +990,7 @@ const transportOptions = ({
                 users,
                 verification: signUpVerification,
                 policy: signUpPolicy,
+                eligibility: passkeySignUpEligibility,
               }),
             }),
           ]
@@ -980,7 +1001,7 @@ const transportOptions = ({
     secondaryStorage,
     rateLimit: {
       ...authOptions.rateLimit,
-      storage: redis ? "secondary-storage" : "memory",
+      storage: sharedStorage ? "secondary-storage" : "memory",
     },
     emailAndPassword: {
       ...authOptions.emailAndPassword,

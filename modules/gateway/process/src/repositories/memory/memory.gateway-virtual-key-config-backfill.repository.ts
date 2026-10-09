@@ -24,10 +24,6 @@ export class MemoryGatewayVirtualKeyConfigBackfillRepository extends GatewayVirt
     super();
   }
 
-  async findOrganizationIds(): Promise<string[]> {
-    return this.store.organizations.map((organization) => organization.id);
-  }
-
   async findVirtualKeys({ organizationId }: { organizationId: string }): Promise<VirtualKeyRow[]> {
     return [...this.store.virtualKeys.values()]
       .filter((key) => key.organizationId === organizationId)

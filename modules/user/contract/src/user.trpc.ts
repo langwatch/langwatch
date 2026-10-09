@@ -1,12 +1,6 @@
-import {
-  cliBootstrapResultSchema,
-  governanceBudgetOverviewForUserSchema,
-  personalUsageRollupSchema,
-} from "@langwatch/enterprise-governance-contract";
 /**
  * Every `user.*` procedure and the one `identity.*` procedure this module owns.
- * The names are the browser's cache keys. `personalUsage`, `budgetOverview` and
- * `cliBootstrap` read through Enterprise governance, which is always installed.
+ * The names are the browser's cache keys. The /me governance reads are `governance.*`.
  */
 import { defineTrpcContract } from "@langwatch/module";
 
@@ -19,32 +13,21 @@ import {
   userApiLinkedAccountsSchema,
   userApiOkSchema,
   userApiUpdatedNameSchema,
-  userApiPersonalBudgetSchema,
-  userApiBrowserSessionEndedSchema,
-  userApiBrowserSessionSchema,
-  userApiPersonalContextSchema,
   userApiSuccessSchema,
 } from "./user.responses.ts";
 import {
-  userApiBudgetOverviewInputSchema,
-  userApiChangePasswordInputSchema,
   userApiEmptyInputSchema,
-  userApiEndBrowserSessionInputSchema,
   userApiNotificationTopicInputSchema,
   userApiOrganizationInputSchema,
-  userApiPersonalUsageInputSchema,
-  userApiRegisterInputSchema,
   userApiRequestBudgetIncreaseInputSchema,
   userApiSetAvatarInputSchema,
   userApiSetLastHomePathInputSchema,
   userApiSetNotificationPreferenceInputSchema,
-  userApiSetPasswordInputSchema,
   userApiUnlinkAccountInputSchema,
   userApiUpdateNameInputSchema,
   userApiUserInputSchema,
 } from "./user.schemas.ts";
 import {
-  createdUserSchema,
   userAccountInfoSchema,
   userNotificationPreferenceSchema,
   userSecureAccountOfferSchema,
@@ -55,12 +38,6 @@ import {
 } from "./user.ts";
 
 export const userTrpc = defineTrpcContract("user")
-  // The account predates itself here: `register` is the signup form's backend
-  // and runs with no caller at all.
-  .mutation("register")
-  .withInput(userApiRegisterInputSchema)
-  .withOutput(createdUserSchema)
-
   // The address an uploaded avatar's `image` carries (`/api/user-avatar/:projectId/:userAvatarId`),
   // answered with the signed URL the browser renders it from (Alex, 2026-09-30).
   .query("getAvatarUrl")
@@ -122,32 +99,9 @@ export const userTrpc = defineTrpcContract("user")
   .withInput(userApiUpdateNameInputSchema)
   .withOutput(userApiUpdatedNameSchema)
 
-  // Reading the browsers somebody is signed in on, and ending one of them.
-  // Both answer about the CALLER's own account: the session id never names
-  // whose it is, so nothing here can reach somebody else's list.
-  .query("browserSessions")
-  .withInput(userApiEmptyInputSchema)
-  .withOutput(userApiBrowserSessionSchema.array())
-
-  .mutation("endBrowserSession")
-  .withInput(userApiEndBrowserSessionInputSchema)
-  .withOutput(userApiBrowserSessionEndedSchema)
-
   .query("hasPassword")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiHasPasswordSchema)
-
-  .mutation("setPassword")
-  .withInput(userApiSetPasswordInputSchema)
-  .withOutput(userApiSuccessSchema)
-
-  .mutation("changePassword")
-  .withInput(userApiChangePasswordInputSchema)
-  .withOutput(userApiSuccessSchema)
-
-  .mutation("deactivate")
-  .withInput(userApiUserInputSchema)
-  .withOutput(userApiSuccessSchema)
 
   .mutation("reactivate")
   .withInput(userApiUserInputSchema)
@@ -161,14 +115,6 @@ export const userTrpc = defineTrpcContract("user")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiSuccessSchema)
 
-  .query("personalContext")
-  .withInput(userApiOrganizationInputSchema)
-  .withOutput(userApiPersonalContextSchema)
-
-  .query("personalBudget")
-  .withInput(userApiOrganizationInputSchema)
-  .withOutput(userApiPersonalBudgetSchema)
-
   .mutation("requestBudgetIncrease")
   .withInput(userApiRequestBudgetIncreaseInputSchema)
   .withOutput(userApiBudgetIncreaseRequestedSchema)
@@ -180,16 +126,4 @@ export const userTrpc = defineTrpcContract("user")
   .query("homePagePickerState")
   .withInput(userApiOrganizationInputSchema)
   .withOutput(userApiHomePagePickerStateSchema)
-
-  .query("personalUsage")
-  .withInput(userApiPersonalUsageInputSchema)
-  .withOutput(personalUsageRollupSchema)
-
-  .query("budgetOverview")
-  .withInput(userApiBudgetOverviewInputSchema)
-  .withOutput(governanceBudgetOverviewForUserSchema)
-
-  .query("cliBootstrap")
-  .withInput(userApiOrganizationInputSchema)
-  .withOutput(cliBootstrapResultSchema)
   .build();

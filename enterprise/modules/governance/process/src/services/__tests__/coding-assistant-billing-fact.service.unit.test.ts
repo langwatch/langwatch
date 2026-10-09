@@ -1,8 +1,8 @@
 import type { RecordCodingAssistantBillingCommand } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
+import { CodingAssistantBillingFactService } from "../../features/cost/services/coding-assistant-billing-fact.service.ts";
 import { MemoryCostAttributionPolicyRepository } from "../../repositories/memory/memory.cost-attribution-policy.repository.ts";
-import { CodingAssistantBillingFactService } from "../coding-assistant-billing-fact.service.ts";
 
 const AT = 1_760_000_000_000;
 
@@ -10,13 +10,17 @@ function world({
   seed,
   failing = false,
 }: {
-  seed: { organizationId: string; config: unknown }[];
+  seed: { organizationId: string; config: unknown; enabled?: boolean }[];
   failing?: boolean;
 }) {
   const sent: RecordCodingAssistantBillingCommand[] = [];
   const policies = MemoryCostAttributionPolicyRepository.create({ seed });
   const facts = CodingAssistantBillingFactService.create({
     policies,
+    organizationIds: async ({ after }) => {
+      const ids = ["org-1", "org-2", "org-3"].filter((id) => after === undefined || id > after);
+      return { ids, next: null };
+    },
     clock: () => AT,
     record: async (command) => {
       if (failing) throw new Error("queue unavailable");
@@ -61,11 +65,24 @@ describe("CodingAssistantBillingFactService", () => {
       expect(sent.every((command) => command.data.recordedAtMs === AT)).toBe(true);
     });
 
-    it("records the source as not billed once its config is disabled", async () => {
-      const { facts, sent, policies } = world({
-        seed: [{ organizationId: "org-1", config: { assistantKind: "codex", bundledPlan: false } }],
+    it("records the source as not billed when no config exists", async () => {
+      const { facts, sent } = world({ seed: [] });
+
+      await facts.recordForOrganization({ organizationId: "org-1" });
+
+      expect(billedBySource(sent, "org-1").codex).toBe(false);
+    });
+
+    it("records the source as not billed when its config is disabled", async () => {
+      const { facts, sent } = world({
+        seed: [
+          {
+            organizationId: "org-1",
+            config: { assistantKind: "codex", bundledPlan: false },
+            enabled: false,
+          },
+        ],
       });
-      policies.replace({ organizationId: "org-1", configs: [] });
 
       await facts.recordForOrganization({ organizationId: "org-1" });
 
@@ -81,7 +98,7 @@ describe("CodingAssistantBillingFactService", () => {
 
   describe("when the backfill runs", () => {
     /** @scenario "A backfill records the billing fact for configs written before it existed" */
-    it("records facts for every organization holding an enabled coding-assistant config", async () => {
+    it("records facts for every organization, a page of ids at a time", async () => {
       const { facts, sent } = world({
         seed: [
           { organizationId: "org-1", config: { assistantKind: "codex", bundledPlan: false } },
@@ -91,7 +108,7 @@ describe("CodingAssistantBillingFactService", () => {
 
       const totals = await facts.backfill();
 
-      expect(totals).toEqual({ organizations: 2, recorded: 14 });
+      expect(totals).toEqual({ afterOrganizationId: "org-3", organizations: 3, recorded: 21 });
       expect(billedBySource(sent, "org-1").codex).toBe(true);
       expect(billedBySource(sent, "org-2").cursor).toBe(false);
     });

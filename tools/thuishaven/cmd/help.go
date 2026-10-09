@@ -62,7 +62,8 @@ hostname through the portless proxy:
 
 The six simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
 idp and storage run by default; llm, voice and analytics come with "haven up +llm
-+voice +analytics". Read one's output with "haven logs <name>".
++voice +analytics". Read one's output with "haven logs <name>". Drive one from a
+terminal with "haven mail|llm|analytics|storage|voice <verb>" (--json on every read).
 
     mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
 
@@ -175,6 +176,8 @@ var envHelpText = `Environment variables.
     LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
     LANGWATCH_DEV_ONE_PROCESS=1  Run ui + api + worker as one app lane (ADR-168);
                                  haven up -f switches a running stack.
+    LANGWATCH_GO_ONE_PROCESS=1   Host the simulators in the go lane: one Go process
+                                 for the data plane and sims (trial; Langy apart).
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
@@ -189,6 +192,7 @@ var envHelpText = `Environment variables.
     LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH container when no stacks run.
     LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 3/64 of RAM, 1536-4096).
     HAVEN_CH_IMAGE=<image>       Override the pinned Altinity ClickHouse image.
+    HAVEN_CH_RUNTIME=native|container  Where ClickHouse runs (default native on macOS, container elsewhere).
     HAVEN_CLICKHOUSE_FULL_LOGS=1 Keep ClickHouse's stock logging. By default
                                  haven disables the high-volume system logs
                                  (text_log, trace_log, the metric logs), caps
@@ -228,12 +232,20 @@ var envHelpText = `Environment variables.
     (also LANGWATCH_HAVEN_CH_MEMORY_MB and HAVEN_REDIS_MAXMEMORY_MB, above.)
 
   Containers, langy and observability
-    HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
+    HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + container-tier obs run on
                                  (default: default). A profile haven creates is
                                  capped; one that already exists is never resized.
     LANGWATCH_HAVEN_OBS=0        Skip starting the observability stack on "up".
-                                 On by default: it shares ClickHouse's colima VM,
-                                 which is already paying for itself.
+                                 On by default. On macOS it runs natively (brew
+                                 grafana, prometheus, loki plus Tempo 3.1.0,
+                                 Alloy 1.20.1 and Pyroscope 2.3.2, which haven fetches and
+                                 sha256-checks into its home); no VM.
+    LANGWATCH_HAVEN_OBS_TIER=x   native | container. Default native on macOS,
+                                 container (the LGTM image on colima) elsewhere.
+    HAVEN_OBS_TEMPO_BIN=<path>   Tempo binary for the native tier, instead of the
+                                 pinned download (PATH when none is pinned).
+    HAVEN_OBS_ALLOY_BIN=<path>   Alloy binary for the native tier, likewise.
+    HAVEN_OBS_PYROSCOPE_BIN=<p>  Pyroscope binary for the native tier, likewise.
     HAVEN_OBS_IMAGE=<image>      Override the pinned LGTM bundle image.
     LW_OBS_GRAFANA_PORT=3000     Grafana port (also LW_OBS_OTLP_HTTP_PORT=4318,
                                  LW_OBS_OTLP_GRPC_PORT=4317).

@@ -29,6 +29,7 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
         emailVerified: true,
         createdAt: true,
         userHashKey: true,
+        lastLoginAt: true,
       },
     });
     if (!user) throw new UserNotFoundError(userId);
@@ -38,6 +39,7 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
       emailVerified: user.emailVerified,
       createdAtMs: user.createdAt.getTime(),
       userHashKey: user.userHashKey,
+      lastLoginAtMs: user.lastLoginAt?.getTime() ?? null,
     };
   }
 

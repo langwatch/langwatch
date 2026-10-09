@@ -1,5 +1,6 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { type FoldProjectionStore, RedisCachedFoldStore } from "@langwatch/eventing";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import { SimulationRunStateStore } from "../../eventing/simulation-eventing.store.ts";
 import { SimulationRunMetricsAppendStore } from "../../eventing/simulation-run-metrics.store.ts";
@@ -19,8 +20,8 @@ export class RedisSimulationRunProcessingRepository implements SimulationRunProc
   private readonly resolveClient: SimulationEventingClickHouseResolver;
 
   private constructor(
-    clickhouse: ProcessMembers["clickhouse"],
-    private readonly redis: ProcessMembers["redis"],
+    clickhouse: ClickHouseQueryClient,
+    private readonly redis: RedisConnection,
   ) {
     this.resolveClient = ClickHouseSimulationSession.resolver(clickhouse);
   }
@@ -28,7 +29,10 @@ export class RedisSimulationRunProcessingRepository implements SimulationRunProc
   static create({
     clickhouse,
     redis,
-  }: Pick<ProcessMembers, "clickhouse" | "redis">): RedisSimulationRunProcessingRepository {
+  }: {
+    clickhouse: ClickHouseQueryClient;
+    redis: RedisConnection;
+  }): RedisSimulationRunProcessingRepository {
     return new RedisSimulationRunProcessingRepository(clickhouse, redis);
   }
 

@@ -27,7 +27,7 @@ export type FrontDoorAsked = z.infer<typeof frontDoorAskedSchema>;
 
 /**
  * `POST /api/auth/sign-up/confirm-address`: the address a spent link confirmed, whether
- * an account stands behind it, the single-use proof `user.register` spends where none
+ * an account stands behind it, the single-use proof `auth.register` spends where none
  * does, and whether this spend opened a session.
  */
 export const signUpVerificationResultSchema = z

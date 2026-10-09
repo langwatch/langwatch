@@ -30,6 +30,7 @@ const deletedSpelling = z
     section: z.string().min(1),
     ruled: z.string().nullable(),
     note: z.string().min(1).optional(),
+    exemptPaths: z.array(z.string().min(1)).min(1).optional(),
   })
   .refine((entry) => (entry.kind === "prose") === (entry.pattern === undefined), {
     message: "a prose entry has no pattern, and every other kind has one",
@@ -39,6 +40,9 @@ const deletedSpelling = z
   })
   .refine((entry) => (entry.kind === "file") === (entry.path !== undefined), {
     message: "a file entry, and only a file entry, names a path pattern",
+  })
+  .refine((entry) => entry.exemptPaths === undefined || entry.kind !== "prose", {
+    message: "a prose entry has no matcher, so it has nothing to exempt",
   });
 
 const deletedSpellingList = z.object({
@@ -119,7 +123,7 @@ const TEACHING_DIRECTORIES = [".claude/rules", ".claude/skills", "dev/docs"] as 
 const TEACHING_EXCLUDED = /^dev\/docs\/(?:adr|plans|reports)\//;
 const TEACHING_FILES = ["CLAUDE.md"] as const;
 
-/** CLAUDE.md, .claude/rules, .claude/skills and dev/docs outside adr/, plans/ and dated reports/: Markdown only. */
+/** CLAUDE.md, .claude/rules, .claude/skills and dev/docs outside adr/, plans/, reports/. */
 export function teachingSurfaces(snapshot: WorkspaceSnapshot): string[] {
   const { root } = snapshot;
   const found = TEACHING_FILES.map((file) => join(root, file)).filter((file) => existsSync(file));
@@ -172,6 +176,11 @@ const CODE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 /** Generated output repeats its source, which is where the spelling is counted. */
 const GENERATED = /(?:^|\/)generated\/|\.generated\./;
 
+/** A ruled, deliberate use: the list names the files that keep a spelling (exemptPaths). */
+function isExempt({ entry, path }: { entry: DeletedSpelling; path: string }): boolean {
+  return entry.exemptPaths?.includes(path) === true;
+}
+
 function codeViolation({
   entry,
   file,
@@ -199,18 +208,34 @@ export function lintDeletedSpellingsInCode(snapshot: WorkspaceSnapshot): Archite
   const files = spellings.flatMap((entry) =>
     entry.path === undefined ? [] : [{ entry, path: new RegExp(entry.path) }],
   );
+
+  return CODE_DIRECTORIES.flatMap((directory) =>
+    directoryViolations({ snapshot, directory, matcher, files }),
+  );
+}
+
+function directoryViolations({
+  snapshot,
+  directory,
+  matcher,
+  files,
+}: {
+  snapshot: WorkspaceSnapshot;
+  directory: string;
+  matcher: Matcher;
+  files: { entry: DeletedSpelling; path: RegExp }[];
+}): ArchitectureViolation[] {
+  const { root } = snapshot;
   const violations: ArchitectureViolation[] = [];
 
-  for (const directory of CODE_DIRECTORIES) {
-    for (const file of snapshot.files({ directory: join(root, directory), accept: () => true })) {
-      const path = workspacePath({ root, file });
-      for (const { entry } of files.filter((candidate) => candidate.path.test(path))) {
-        violations.push(codeViolation({ entry, file: path }));
-      }
-      if (!CODE_FILE.test(path) || GENERATED.test(path) || path === DELETED_SPELLINGS_RATCHET)
-        continue;
-      violations.push(...codeMatches({ matcher, file, path }));
+  for (const file of snapshot.files({ directory: join(root, directory), accept: () => true })) {
+    const path = workspacePath({ root, file });
+    for (const { entry } of files.filter((candidate) => candidate.path.test(path))) {
+      if (!isExempt({ entry, path })) violations.push(codeViolation({ entry, file: path }));
     }
+    if (!CODE_FILE.test(path) || GENERATED.test(path) || path === DELETED_SPELLINGS_RATCHET)
+      continue;
+    violations.push(...codeMatches({ matcher, file, path }));
   }
 
   return violations;
@@ -235,7 +260,9 @@ function codeMatches({
     const line = lineOf({ starts, offset });
     const text = source.slice(starts[line - 1], starts[line] ?? source.length);
 
-    return isDeletionNote(text) ? [] : [codeViolation({ entry, file: path, line })];
+    return isDeletionNote(text) || isExempt({ entry, path })
+      ? []
+      : [codeViolation({ entry, file: path, line })];
   });
 }
 

@@ -7,7 +7,7 @@ import type {
 } from "../../channels/governance-http.channel.ts";
 import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
 import type { GovernanceObjectStore } from "../../channels/object-store.channel.ts";
-import { S3PollingPullerService } from "../s3-puller.service.ts";
+import { S3PollingPullerService } from "../../features/ingestion-pull/services/s3-puller.service.ts";
 
 const httpConfig = {
   adapter: "http_polling",

@@ -58,7 +58,6 @@ export const apiKeyTrpcUpdateInputSchema = z
     bindings: z.array(grantWriteSchema).min(1).max(20).optional(),
   })
   .superRefine(refineRestrictedPermissions);
-export type ApiKeyTrpcUpdateInput = z.infer<typeof apiKeyTrpcUpdateInputSchema>;
 
 export const apiKeyTrpcRevokeInputSchema = z.object({
   organizationId: z.string(),

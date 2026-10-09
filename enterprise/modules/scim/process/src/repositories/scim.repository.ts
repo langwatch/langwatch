@@ -119,6 +119,10 @@ export interface ScimDirectoryClaim {
 /** Semantic store used by the SCIM service; no transport or ORM vocabulary. */
 export abstract class ScimRepository {
   abstract findOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null>;
+  /** Names of the organisations that exist, read through organization's declared share. */
+  abstract findOrganizationNames(input: {
+    organizationIds: readonly string[];
+  }): Promise<{ id: string; name: string }[]>;
   // Declared as properties of function type, not method shorthand: tests hold
   // a mock repository and reference these members unbound (e.g.
   // `expect(repo.addMembership).toHaveBeenCalledWith(...)`), which
@@ -243,6 +247,12 @@ export abstract class ScimRepository {
   }): Promise<number>;
   /** At most two rows; a token naming more than one authenticates nobody. */
   abstract findTokensByHashes(hashedTokens: string[]): Promise<ScimTokenIdentity[]>;
+  /** Stores a token's digest under another pepper or scheme; the token itself is unchanged. */
+  abstract replaceTokenDigest(input: {
+    tokenId: string;
+    hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
+  }): Promise<void>;
   abstract findTokenIdsForConnection(input: {
     organizationId: string;
     connectionId: string;

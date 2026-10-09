@@ -37,7 +37,7 @@ import {
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
 
-import type { TraceQueryFieldValuesRepository } from "../repositories/query-field-values.repository.ts";
+import type { TraceQueryFieldValuesRepository } from "../features/query/repositories/query-field-values.repository.ts";
 import type { TraceFullRecordRepository } from "../repositories/trace-full-record.repository.ts";
 import {
   type TraceProjectedReadRepository,
@@ -45,8 +45,8 @@ import {
 } from "../repositories/trace-projected-read.repository.ts";
 import type { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
-import type { TraceQueryClassifier } from "./trace-query-classification.service.ts";
-import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service.ts";
+import type { TraceQueryClassifier } from "../features/query/services/trace-query-classification.service.ts";
+import { TraceQueryFieldCatalogueService } from "../features/query/services/trace-query-field-catalogue.service.ts";
 
 export interface TraceEventDerivation {
   derive(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;

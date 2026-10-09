@@ -6,7 +6,7 @@ import {
   ModelSelectorToken,
   type ModelDisplayProps,
   type ModelSelectorProps,
-} from "@langwatch/model-provider-contract";
+} from "@langwatch/model-provider-client";
 
 /** Model-provider's display of one chosen model, rendered as model-provider lends it. */
 export function LLMModelDisplay(props: ModelDisplayProps) {

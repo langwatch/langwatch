@@ -15,9 +15,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
+import { grandfatheredConnectionFacts } from "../../features/sso-connection/rules/sso-connection-grandfather-facts.rules.ts";
 import { identityProcessModule } from "../../identity.module.ts";
 import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
-import { grandfatheredConnectionFacts } from "../../rules/sso-connection-grandfather-facts.rules.ts";
 
 /** An empty secrets chain: every optional handle, the sign-ups webhook included, reads as unset. */
 const noSecretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));
@@ -33,7 +33,14 @@ async function bootIdentity() {
     .withModules([identityProcessModule])
     .withStores(memoryStores())
     .withConfig({
-      identity: { ssoDomainProofDnsServers: [], isSaas: false, publicBaseUrl: undefined },
+      identity: {
+        ssoDomainProofDnsServers: [],
+        isSaas: false,
+        publicBaseUrl: undefined,
+        passkeysEnabled: false,
+        mfaEnrollmentOpen: false,
+        localPasswords: false,
+      },
     })
     .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))
     .provide({

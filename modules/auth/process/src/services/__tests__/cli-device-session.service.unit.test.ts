@@ -12,18 +12,53 @@ import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.c
 import { MemoryCliDeviceSessionRepository } from "../../repositories/memory/memory.cli-device-session.repository.ts";
 import { CliDeviceSessionService } from "../cli-device-session.service.ts";
 
-function setup() {
+function setup({ refreshTokenTtlSeconds }: { refreshTokenTtlSeconds?: number } = {}) {
   const store = MemoryCliDeviceSessionRepository.create();
   return {
     store,
     sessions: CliDeviceSessionService.create({
       store,
       settlements: MemoryCliDeviceSettlementChannel.create(),
+      refreshTokenTtlSeconds,
     }),
   };
 }
 
 const clientInfo = { hostname: "host", platform: "darwin", session_started_at: 100 };
+
+describe("the refresh-token lifetime a minted CLI session carries", () => {
+  const mintedLifetimes = async (sessions: CliDeviceSessionService) => {
+    const minted = await sessions.mintSession({
+      userId: "alice",
+      organizationId: "org",
+      clientInfo,
+    });
+    const record = await sessions.getRefreshToken(minted.refreshToken);
+    return { answered: minted.refreshTtlSeconds, storedMs: record.expires_at - record.issued_at };
+  };
+
+  describe("when the deployment names no lifetime", () => {
+    /** @scenario "A CLI refresh token lives 90 days unless the deployment says otherwise" */
+    it("mints the refresh token for 90 days", async () => {
+      const ninetyDays = 90 * 24 * 60 * 60;
+      await expect(mintedLifetimes(setup().sessions)).resolves.toEqual({
+        answered: ninetyDays,
+        storedMs: ninetyDays * 1000,
+      });
+    });
+  });
+
+  describe("when the operator shortens it", () => {
+    /** @scenario "An operator shortens the CLI refresh-token lifetime" */
+    it("mints the refresh token, and its stored expiry, for the shorter window", async () => {
+      const { sessions } = setup({ refreshTokenTtlSeconds: 3600 });
+      await expect(mintedLifetimes(sessions)).resolves.toEqual({
+        answered: 3600,
+        storedMs: 3600 * 1000,
+      });
+    });
+  });
+});
 
 describe("the CLI token records a peer reads and revokes", () => {
   describe("when a person holds a minted CLI session", () => {

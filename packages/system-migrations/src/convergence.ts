@@ -1,11 +1,5 @@
 import { createLogger } from "@langwatch/observability";
 
-import {
-  SystemMigrationRecordNotFoundError,
-  type SystemMigrationStateRepository,
-} from "./state.repository.ts";
-import type { SystemMigration } from "./system-migration.ts";
-import type { TenantSource } from "./tenant-source.ts";
 import type { MigrationPassSummary } from "./types.ts";
 
 /**
@@ -14,16 +8,6 @@ import type { MigrationPassSummary } from "./types.ts";
  * uses; this loop only decides whether another pass is worth running.
  */
 export type SystemMigrationPass = (input: { signal: AbortSignal }) => Promise<MigrationPassSummary>;
-export type SystemMigrationExecutionMode = "background" | "startup";
-
-export class SystemMigrationStartupIncompleteError extends Error {
-  declare readonly cause?: unknown;
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message);
-    if (options?.cause !== undefined) this.cause = options.cause;
-    this.name = "SystemMigrationStartupIncompleteError";
-  }
-}
 
 const logger = createLogger("langwatch:system-migrations:boot");
 
@@ -53,13 +37,9 @@ export function startSystemMigrations(args: { runPass: SystemMigrationPass }): {
   const loop = driveSystemMigrationsToConvergence({
     signal: controller.signal,
     runPass: args.runPass,
-  })
-    .then((summary) => {
-      logger.info({ summary }, "system migration pass finished");
-    })
-    .catch((error) => {
-      logger.error({ error }, "system migration pass failed; next boot retries");
-    });
+  }).catch((error) => {
+    logger.error({ error }, "system migration pass failed; next boot retries");
+  });
   return {
     stop: async () => {
       controller.abort();
@@ -69,139 +49,9 @@ export function startSystemMigrations(args: { runPass: SystemMigrationPass }): {
 }
 
 /**
- * Run the existing leased runner to a startup-safe point. A startup migration
- * succeeds only when every in-cohort tenant has a durable `finalized` record;
- * claimed work from another replica is re-read on the next bounded pass.
- */
-export async function runSystemMigrationsAtStartup(args: {
-  runPass: SystemMigrationPass;
-  state: SystemMigrationStateRepository;
-  tenants: TenantSource;
-  migrations: readonly SystemMigration[];
-  cohort: (input: { tenantId: string; migrationName: string }) => boolean | Promise<boolean>;
-  signal?: AbortSignal;
-  maxPasses?: number;
-  pollDelayMs?: number;
-}): Promise<void> {
-  const signal = args.signal ?? new AbortController().signal;
-  const { maxPasses, pollDelayMs } = startupOptions(args);
-  let lastWaiting: StartupState | undefined;
-  for (let pass = 0; pass < maxPasses; pass++) {
-    assertStartupActive(signal);
-    try {
-      await args.runPass({ signal });
-    } catch (error) {
-      throw new SystemMigrationStartupIncompleteError("startup migration pass failed", {
-        cause: error,
-      });
-    }
-    assertStartupActive(signal);
-    const outcome = await startupState(args);
-    assertStartupActive(signal);
-    if (outcome.kind === "complete") return;
-    if (outcome.kind === "blocked") {
-      throw new SystemMigrationStartupIncompleteError(
-        `startup migration blocked at ${outcome.migrationName}/${outcome.tenantId} (${outcome.status})`,
-      );
-    }
-    lastWaiting = outcome;
-    await sleep({ ms: pollDelayMs, signal });
-  }
-  throw new SystemMigrationStartupIncompleteError(
-    lastWaiting?.kind === "waiting"
-      ? `startup migration did not finalize ${lastWaiting.migrationName}/${lastWaiting.tenantId} (${lastWaiting.status}) within the retry bound`
-      : "startup migration did not reach durable finalization within the retry bound",
-  );
-}
-
-function startupOptions(args: { maxPasses?: number; pollDelayMs?: number }): {
-  maxPasses: number;
-  pollDelayMs: number;
-} {
-  const maxPasses = args.maxPasses ?? MAX_PASSES;
-  const pollDelayMs = args.pollDelayMs ?? PASS_INTERVAL_MS;
-  if (!Number.isFinite(maxPasses) || !Number.isInteger(maxPasses) || maxPasses <= 0)
-    throw new RangeError("maxPasses must be a positive finite integer");
-  if (!Number.isFinite(pollDelayMs) || pollDelayMs < 0)
-    throw new RangeError("pollDelayMs must be a finite non-negative number");
-  return { maxPasses, pollDelayMs };
-}
-
-function assertStartupActive(signal: AbortSignal): void {
-  if (signal.aborted)
-    throw new SystemMigrationStartupIncompleteError("startup migration aborted", {
-      cause: signal.reason,
-    });
-}
-
-type StartupScanArgs = {
-  state: SystemMigrationStateRepository;
-  tenants: TenantSource;
-  migrations: readonly SystemMigration[];
-  cohort: (input: { tenantId: string; migrationName: string }) => boolean | Promise<boolean>;
-};
-
-/** Every tenant id, page by page, in the source's order. */
-async function* pagedTenantIds(tenants: TenantSource): AsyncGenerator<string> {
-  let cursor: string | null = null;
-  for (;;) {
-    const page = await tenants.findTenantIdsAfter({ cursor, limit: 100 });
-    if (page.length === 0) return;
-    cursor = page[page.length - 1] ?? null;
-    yield* page;
-  }
-}
-
-/** A tenant is blocked by a parked or rolled-back migration, else waits on its first unfinished. */
-async function tenantStartupState({
-  args,
-  tenantId,
-}: {
-  args: StartupScanArgs;
-  tenantId: string;
-}): Promise<StartupState> {
-  let waiting: StartupState = { kind: "complete" };
-  for (const migration of args.migrations) {
-    if (!(await args.cohort({ tenantId, migrationName: migration.name }))) continue;
-    const record = await args.state
-      .getRecord({ migrationName: migration.name, tenantId })
-      .catch(undefinedWhenNotFound);
-    if (record?.status === "rolled_back" || record?.status === "parked") {
-      return { kind: "blocked", migrationName: migration.name, tenantId, status: record.status };
-    }
-    if (record?.status !== "finalized" && waiting.kind === "complete") {
-      waiting = {
-        kind: "waiting",
-        migrationName: migration.name,
-        tenantId,
-        status: record?.status ?? "pending",
-      };
-    }
-  }
-  return waiting;
-}
-
-async function startupState(args: StartupScanArgs): Promise<StartupState> {
-  let sawTenant = false;
-  let waiting: StartupState = { kind: "complete" };
-  for await (const tenantId of pagedTenantIds(args.tenants)) {
-    sawTenant = true;
-    const tenantState = await tenantStartupState({ args, tenantId });
-    if (tenantState.kind === "blocked") return tenantState;
-    if (waiting.kind === "complete") waiting = tenantState;
-  }
-  return sawTenant ? waiting : { kind: "complete" };
-}
-
-type StartupState =
-  | { kind: "complete" }
-  | { kind: "waiting"; migrationName: string; tenantId: string; status: string }
-  | { kind: "blocked"; migrationName: string; tenantId: string; status: string };
-
-/**
- * The same loop, awaited rather than backgrounded: the boot-chain shape, for
- * a caller that must not return before the fleet stopped moving. A loop still
- * moving at the cap rejects, naming the pass count, so the boot refuses (main).
+ * The same loop, awaited rather than backgrounded. Bounded and never a gate:
+ * a loop still moving at the cap stops and says the fleet did not settle, and
+ * a held or parked tenant is reported, never waited on (plan §6.8, Alex Q7).
  */
 export async function driveSystemMigrationsToConvergence({
   signal,
@@ -221,10 +71,7 @@ export async function driveSystemMigrationsToConvergence({
     // convergence would log a false "nothing left to do" at shutdown.
     if (signal.aborted) return;
     if (converged({ summary, leaseGranted })) {
-      logger.info(
-        { summary, passes: pass },
-        "system migrations converged; nothing advanced on the last pass",
-      );
+      logSettled({ summary, passes: pass });
       return;
     }
     logger.info({ summary, pass }, continuingBecause({ summary, leaseGranted }));
@@ -233,10 +80,22 @@ export async function driveSystemMigrationsToConvergence({
   // Loud on purpose. Passes are supposed to run out of work.
   logger.error(
     { passes: MAX_PASSES },
-    "system migrations still reported progress after the maximum passes; stopping. A migration whose status keeps changing without settling is the likely cause",
+    `system migrations did not settle after ${MAX_PASSES} passes; stopping without claiming success. Nothing waits on them and later passes carry on. A migration whose status keeps changing is the likely cause`,
   );
-  throw new SystemMigrationStartupIncompleteError(
-    `System migration preflight did not converge after ${MAX_PASSES} passes`,
+}
+
+/** Settled is not success: held and parked tenants are named in the log, never hidden. */
+function logSettled({ summary, passes }: { summary: MigrationPassSummary; passes: number }): void {
+  if (summary.held + summary.parked === 0) {
+    logger.info(
+      { summary, passes },
+      "system migrations settled; nothing advanced on the last pass",
+    );
+    return;
+  }
+  logger.warn(
+    { summary, passes, held: summary.held, parked: summary.parked },
+    "system migrations settled with tenants held or parked; they stay on their legacy path and nothing waits on them",
   );
 }
 
@@ -317,9 +176,4 @@ function sleep({ ms, signal }: { ms: number; signal: AbortSignal }): Promise<voi
     timer.unref?.();
     signal.addEventListener("abort", done, { once: true });
   });
-}
-
-function undefinedWhenNotFound(error: unknown): undefined {
-  if (error instanceof SystemMigrationRecordNotFoundError) return undefined;
-  throw error;
 }

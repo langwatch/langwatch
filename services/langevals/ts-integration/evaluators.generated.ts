@@ -588,6 +588,11 @@ export const evaluatorsSchema = z.object({
         .default(
           "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
         ),
+      min: z.number().optional().describe("The lowest score the prompt asks for; unset reads as 0"),
+      max: z
+        .number()
+        .optional()
+        .describe("The highest score the prompt asks for; unset reads as 1"),
     }),
   }),
   "langevals/off_topic": z.object({
@@ -1695,6 +1700,14 @@ Use an LLM as a judge with custom prompt to do a numeric score evaluation of the
         description: "The system prompt to use for the LLM to run the evaluation",
         default:
           "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
+      },
+      min: {
+        description: "The lowest score the prompt asks for; unset reads as 0",
+        default: undefined,
+      },
+      max: {
+        description: "The highest score the prompt asks for; unset reads as 1",
+        default: undefined,
       },
     },
     envVars: [],

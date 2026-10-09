@@ -1,9 +1,6 @@
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import Redis from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../../rules/anomaly-constants.rules.ts";
 import { RedisAnomalyRateTrackerRepository } from "../redis.anomaly-rate-tracker.repository.ts";
 
 function redisFake() {
@@ -104,49 +101,6 @@ describe("RedisAnomalyRateTrackerRepository", () => {
 
     expect(await tracker.perMinuteSeries("proj_acme", 180)).toEqual([0, 0, 9]);
     expect(hashes.get("obs:tenant_rate:proj_acme")?.has(staleMinute)).toBe(false);
-  });
-
-  describe("given the kill-switch flag is enabled for one tenant", () => {
-    /** @scenario "Kill-switch FF makes the rate tracker record() a no-op on the hot path" */
-    it("writes nothing for that tenant and keeps recording the others", async () => {
-      const { redis, pipelineSpy } = redisFake();
-      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>();
-      const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "rate tracker flags");
-      const tracker = RedisAnomalyRateTrackerRepository.create({
-        redis,
-        now: () => now,
-        featureFlags: flags,
-      });
-      isEnabled.mockImplementation(
-        async (_key, target) => target.kind === "project" && target.projectId === "proj_killed",
-      );
-
-      await tracker.record("proj_killed");
-      await tracker.record("proj_open");
-
-      expect(pipelineSpy).toHaveBeenCalledTimes(1);
-      expect(await tracker.findActiveTenants()).toEqual(["proj_open"]);
-      expect(isEnabled).toHaveBeenCalledWith(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
-        kind: "project",
-        projectId: "proj_killed",
-      });
-    });
-
-    it("records the enqueue anyway when the flag service is down", async () => {
-      const { redis } = redisFake();
-      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>();
-      const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "rate tracker flags");
-      const tracker = RedisAnomalyRateTrackerRepository.create({
-        redis,
-        now: () => now,
-        featureFlags: flags,
-      });
-      isEnabled.mockRejectedValue(new Error("down"));
-
-      await tracker.record("proj_open");
-
-      expect(await tracker.findActiveTenants()).toEqual(["proj_open"]);
-    });
   });
 
   it("keeps cache read failures non-fatal and forwards a custom TTL", async () => {

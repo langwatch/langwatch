@@ -8,14 +8,16 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FACET_REGISTRY } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import type { ExpressionCategoricalDef, RangeFacetDef } from "../trace-facet-registry.rules.ts";
-import { traceMatchesQuery, traceQueryFieldNeeds } from "../trace-query-evaluation.rules.ts";
-import { translateFilter } from "../trace-query.rules.ts";
+import {
+  traceFacetRegistry as FACET_REGISTRY,
+  traceQueryEvaluation,
+  traceQueryTranslation,
+} from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import type { ExpressionCategoricalDef, RangeFacetDef } from "../../features/facet/rules/trace-facet-registry.rules.ts";
 
 const evaluateQueryInMemory = (queryText: string, trace: InMemoryTrace) =>
-  traceMatchesQuery(queryText, trace);
-const queryNeeds = (queryText: string) => traceQueryFieldNeeds(queryText);
+  traceQueryEvaluation.traceMatchesQuery(queryText, trace);
+const queryNeeds = (queryText: string) => traceQueryEvaluation.traceQueryFieldNeeds(queryText);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -692,7 +694,7 @@ describe("FieldDef SQL/read parity", () => {
       "[%s] compiles against its registry expression",
       (key, def) => {
         const literal = def.kind === "range" ? "1" : "x";
-        const compiled = translateFilter({
+        const compiled = traceQueryTranslation.translateFilter({
           queryText: `${key}:${literal}`,
           tenantId: "tenant-1",
           timeRange: { from: 0, to: 1 },
@@ -736,7 +738,7 @@ describe("given a filter field that collides with an Object.prototype member", (
   describe("when the save-time gate compiles it", () => {
     it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
-        translateFilter({
+        traceQueryTranslation.translateFilter({
           queryText: `${field}:x`,
           tenantId: "tenant-1",
           timeRange: { from: 0, to: 1 },
@@ -840,7 +842,7 @@ describe("the in-memory free-text narrowing", () => {
 
     // The same filter compiled for ClickHouse does reach span names, which is
     // the asymmetry the spec records.
-    const compiled = translateFilter({
+    const compiled = traceQueryTranslation.translateFilter({
       queryText: "codex",
       tenantId: "tenant-1",
       timeRange: { from: 0, to: 1 },
@@ -874,7 +876,7 @@ describe("the in-memory free-text narrowing", () => {
 
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
-    return translateFilter({
+    return traceQueryTranslation.translateFilter({
       queryText: query,
       tenantId: "tenant-1",
       timeRange: { from: 1000, to: 2000 },

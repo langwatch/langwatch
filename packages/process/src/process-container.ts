@@ -12,7 +12,7 @@ import type { BootedRuntime } from "./application.ts";
 import type { InstallableServerFeature } from "./feature-installer.ts";
 import type { ServedApplication } from "./server.ts";
 
-export type ProcessModule = InstallableServerFeature<never> & {
+export type ProcessModule = InstallableServerFeature & {
   readonly publicConfig?: (config: unknown, api: unknown) => unknown;
 };
 /** An owner the server's config named that is also an installable module. */
@@ -25,7 +25,7 @@ export function isProcessModule(owner: ConfigOwner): owner is ProcessModule {
  */
 export type BootedApplication = ServedApplication &
   Readonly<{ service<Api>(token: ModuleApiToken<Api>): Api }> &
-  Pick<BootedRuntime<unknown>, "tasks">;
+  Pick<BootedRuntime<unknown>, "tasks" | "migrationSteps" | "holdWork" | "role">;
 /** What one role boots: its modules, its pipelines' participation and, on the api, transports. */
 export type ProcessBootInput = Readonly<{
   role: "api" | "worker" | "tasks";
@@ -58,7 +58,7 @@ export class ApiProcessContainer extends ProcessContainer {
     return this;
   }
 
-  boot(): Promise<Omit<BootedApplication, "tasks">> {
+  boot(): Promise<Omit<BootedApplication, "tasks" | "migrationSteps">> {
     if (!this.#transports)
       throw new Error("surface must be selected with exposeTransports before boot.");
     const selected = this.#transports.selected;

@@ -326,8 +326,8 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "mail",
-		summary: "read this worktree's caught email: address | list | get <id> | wait | clear",
-		args:    "<address|list|get|wait|clear> [id]",
+		summary: "read this worktree's caught email: address | list | get <id> | links <id> | wait | delete <id> | clear",
+		args:    "<address|list|get|links|wait|delete|clear> [id]",
 		maxArgs: 2,
 		flags: []flagSpec{
 			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
@@ -339,6 +339,47 @@ var baseTable = []commandSpec{
 		run: runMail,
 	},
 	{
+		name:    "llm",
+		summary: "llmsim's calls and settings: info | calls | call <id> | clear | set --error <status> --seed <value>",
+		args:    "<info|calls|call|clear|set> [id]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--error", takesValue: true, value: "<status>", summary: "set: force this 4xx/5xx on generation calls (0 turns it off)"},
+			flagSpec{long: "--seed", takesValue: true, value: "<value>", summary: "set: seed for deterministic replies (\"random\" or empty to unseed)"},
+		),
+		run: runLLM,
+	},
+	{
+		name:    "analytics",
+		summary: "analyticssim's caught PostHog and Customer.io calls: status | records | clear | wait",
+		args:    "<status|records|clear|wait>",
+		maxArgs: 1,
+		flags: simFlags(
+			flagSpec{long: "--provider", takesValue: true, value: "<name>", summary: "records/wait: posthog or customerio"},
+			flagSpec{long: "--kind", takesValue: true, value: "<kind>", summary: "records/wait: only this kind of record"},
+			flagSpec{long: "--event", takesValue: true, value: "<name>", summary: "records/wait: only this event name"},
+			flagSpec{long: "--id", takesValue: true, value: "<id>", summary: "records/wait: only this distinct or person id"},
+			flagSpec{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+		),
+		run: runAnalytics,
+	},
+	{
+		name:    "storage",
+		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | requests",
+		args:    "<buckets|objects|object|requests> [bucket] [key]",
+		maxArgs: 3,
+		flags:   simFlags(flagSpec{long: "--raw", summary: "object: the stored bytes instead of the metadata"}),
+		run:     runStorage,
+	},
+	{
+		name:    "voice",
+		summary: "voicesim's calls: status | calls | call <id>",
+		args:    "<status|calls|call> [id]",
+		maxArgs: 2,
+		flags:   simFlags(),
+		run:     runVoice,
+	},
+	{
 		name:    "logs",
 		summary: "captured service logs from any terminal: all interleaved, or the named ones",
 		args:    "[service…]",
@@ -347,6 +388,9 @@ var baseTable = []commandSpec{
 			{long: "--tail", short: "-t", summary: "stream live"},
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
+			{long: "--loki", summary: "read the full stream from the stack's Loki (info/debug the consoles mute)"},
+			{long: "--grep", takesValue: true, value: "<text>", summary: "only lines containing text"},
+			{long: "--trace", takesValue: true, value: "<trace-id>", summary: "Loki lines for one trace (implies --loki)"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
 			{long: "--raw", summary: "the child's own bytes, unrendered"},
 			{long: "--json", summary: "one JSON object per line, lane stamped on"},
@@ -467,14 +511,16 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "hmr",
-		summary: "AI-gated HMR: on [--ttl <dur>] defers Vite reloads, off resumes",
+		summary: "retired no-op: reloads are debounced, there is no hold (ADR-168)",
 		args:    "[on|off|status]",
 		maxArgs: 1,
+		// Kept so agent hooks still calling `haven hmr on --ttl <dur>` exit 0.
 		flags: []flagSpec{
-			{long: "--ttl", takesValue: true, value: "<dur>", summary: "how long the gate holds (default 30s)"},
+			{long: "--ttl", takesValue: true, value: "<dur>", summary: "ignored"},
 		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunHMR(ctx, d.worktree, inv.raw)
+		run: func(_ context.Context, _ deps, _ invocation) error {
+			fmt.Println("haven hmr is retired: reloads are debounced and nothing holds them; remove the call")
+			return nil
 		},
 	},
 	{

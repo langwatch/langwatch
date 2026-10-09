@@ -11,8 +11,10 @@ import {
   OrganizationSlugTakenError,
   OrganizationUserRole,
   TeamNotFoundError,
+  type FullyLoadedOrganization,
   type OrganizationFounding,
   type OrganizationIntent,
+  type OrganizationWithMembersAndTheirTeams,
   type TeamUserRole,
   type User,
 } from "@langwatch/organization-contract";
@@ -33,13 +35,11 @@ import type {
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
-  FullyLoadedOrganization,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationMembershipRepository,
   OrganizationProvisioningSummary,
-  OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
@@ -559,7 +559,32 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return { outcome: "created", seat };
   }
 
-  async deleteMember(input: DeleteMemberInput): Promise<void> {
+  async createSsoDomainMembership({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<"created" | "already-present"> {
+    if (this.membershipRow({ organizationId, userId })) return "already-present";
+    const now = nowInstant();
+    this.memory.organizationUsers.push({
+      userId,
+      organizationId,
+      role: OrganizationUserRole.MEMBER,
+      disabledAt: null,
+      createdAt: now,
+      updatedAt: now,
+      pendingSsoGrantId: null,
+    });
+    return "created";
+  }
+
+  async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
+    return this.memory.organizationUsers.filter((row) => row.userId === userId).length;
+  }
+
+  async deleteMember(input: DeleteMemberInput): Promise<string[]> {
     const { organizationId, userId } = input;
     const row = this.membershipRow({ organizationId, userId });
     if (!row) throw new MemberNotFoundError(userId);
@@ -580,13 +605,13 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     );
 
     const archivedAt = nowInstant();
+    const archivedTeamIds: string[] = [];
     for (const team of this.teamsOf(organizationId)) {
       if (team.ownerUserId !== userId || !team.isPersonal || team.archivedAt) continue;
       team.archivedAt = archivedAt;
-      for (const project of this.memory.projects.values()) {
-        if (project.teamId === team.id && project.isPersonal) project.archivedAt = archivedAt;
-      }
+      archivedTeamIds.push(team.id);
     }
+    return archivedTeamIds;
   }
 
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {

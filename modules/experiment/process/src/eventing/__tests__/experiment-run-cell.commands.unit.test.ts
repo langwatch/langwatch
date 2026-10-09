@@ -3,15 +3,15 @@ import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import {
-  EXPERIMENT_RUN_COMMAND_TYPES,
-  EXPERIMENT_RUN_EVENT_TYPES,
-} from "../../rules/experiment-run-event-types.rules.ts";
 import type {
   ExperimentCellExecution,
   ExperimentCellRequest,
   ExperimentRunCellService,
-} from "../../services/experiment-run-cell.service.ts";
+} from "../../features/run/services/experiment-run-cell.service.ts";
+import {
+  EXPERIMENT_RUN_COMMAND_TYPES,
+  EXPERIMENT_RUN_EVENT_TYPES,
+} from "../../rules/experiment-run-event-types.rules.ts";
 import {
   type ExecuteExperimentCellCommandData,
   ExecuteExperimentCellCommand,

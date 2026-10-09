@@ -27,6 +27,7 @@ class PostApiSuitesByIdRunResponse200:
         job_count (float):
         skipped_archived (PostApiSuitesByIdRunResponse200SkippedArchived):
         items (list[PostApiSuitesByIdRunResponse200ItemsItem]):
+        plan_slug (str):
         plan_name (str | Unset):
         created (bool | Unset):
     """
@@ -37,6 +38,7 @@ class PostApiSuitesByIdRunResponse200:
     job_count: float
     skipped_archived: PostApiSuitesByIdRunResponse200SkippedArchived
     items: list[PostApiSuitesByIdRunResponse200ItemsItem]
+    plan_slug: str
     plan_name: str | Unset = UNSET
     created: bool | Unset = UNSET
 
@@ -56,6 +58,8 @@ class PostApiSuitesByIdRunResponse200:
             items_item = items_item_data.to_dict()
             items.append(items_item)
 
+        plan_slug = self.plan_slug
+
         plan_name = self.plan_name
 
         created = self.created
@@ -70,6 +74,7 @@ class PostApiSuitesByIdRunResponse200:
                 "jobCount": job_count,
                 "skippedArchived": skipped_archived,
                 "items": items,
+                "planSlug": plan_slug,
             }
         )
         if plan_name is not UNSET:
@@ -104,6 +109,8 @@ class PostApiSuitesByIdRunResponse200:
 
             items.append(items_item)
 
+        plan_slug = d.pop("planSlug")
+
         plan_name = d.pop("planName", UNSET)
 
         created = d.pop("created", UNSET)
@@ -115,6 +122,7 @@ class PostApiSuitesByIdRunResponse200:
             job_count=job_count,
             skipped_archived=skipped_archived,
             items=items,
+            plan_slug=plan_slug,
             plan_name=plan_name,
             created=created,
         )

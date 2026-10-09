@@ -1,0 +1,88 @@
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { Logger } from "@langwatch/observability";
+import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
+
+import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
+import { TraceIngressPayload } from "./trace-ingestion.service.ts";
+
+/**
+ * The write half of the ADR-022 claim check: the edge size check, and the
+ * transient spool of an over-threshold command payload. The queued command
+ * carries only the reference the worker reads back.
+ */
+
+// FAIL-OPEN, deliberately. This is oversize PROTECTION, not the durability
+// boundary, so an unreachable spool degrades to the inline route rather than
+// refusing the span. The warning names what was skipped.
+export class TraceEdgeSpoolService extends TraceIngressPayload {
+  static create(options: {
+    spool: Pick<TraceBlobStoreService, "putSpool">;
+    logger: Logger;
+    featureFlags?: Pick<FeatureFlagApi, "isEnabled">;
+  }): TraceEdgeSpoolService {
+    return new TraceEdgeSpoolService(options);
+  }
+
+  private constructor(
+    private readonly options: {
+      spool: Pick<TraceBlobStoreService, "putSpool">;
+      logger: Logger;
+      featureFlags?: Pick<FeatureFlagApi, "isEnabled">;
+    },
+  ) {
+    super();
+  }
+
+  async prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData> {
+    if (!(await this.isOffloadEnabled(data.tenantId))) {
+      return data;
+    }
+
+    const serialized = JSON.stringify(data);
+    const byteLength = Buffer.byteLength(serialized, "utf8");
+    if (byteLength <= COMMAND_INLINE_THRESHOLD) {
+      return data;
+    }
+
+    const projectId = data.tenantId;
+    const traceId = String(data.span.traceId);
+    const spanId = String(data.span.spanId);
+
+    try {
+      const spoolRef = await this.options.spool.putSpool({
+        projectId,
+        traceId,
+        spanId,
+        // The body is the command as the worker will read it back, so the
+        // string already computed for the size check is the body.
+        body: Buffer.from(serialized, "utf8"),
+      });
+
+      // The attributes are what made it oversized and they are in the spool
+      // object now; leaving them on the command would defeat the whole check.
+      return { ...data, spoolRef, span: { ...data.span, attributes: [] } };
+    } catch (error) {
+      this.options.logger.warn(
+        { error, projectId, traceId, spanId, byteLength },
+        "oversize protection skipped; queue carries full payload",
+      );
+
+      return data;
+    }
+  }
+
+  private async isOffloadEnabled(projectId: string): Promise<boolean> {
+    const flags = this.options.featureFlags;
+    if (!flags) return true;
+    try {
+      return await flags.isEnabled("release_trace_blob_offload", { kind: "project", projectId });
+    } catch (error) {
+      this.options.logger.warn(
+        { error, projectId },
+        "blob offload flag lookup failed; inline route",
+      );
+
+      return false;
+    }
+  }
+}

@@ -64,13 +64,18 @@ func BuildRows(captures []Capture, diffs []Diff) []Row {
 		}
 		out = append(out, *row)
 	}
-	sort.SliceStable(out, func(a, b int) bool {
-		if out[a].Finding() != out[b].Finding() {
-			return out[a].Finding()
-		}
-		return out[a].Ratio > out[b].Ratio
-	})
+	sortRows(out)
 	return out
+}
+
+// sortRows orders rows worst-first: findings, then by diff ratio.
+func sortRows(rows []Row) {
+	sort.SliceStable(rows, func(a, b int) bool {
+		if rows[a].Finding() != rows[b].Finding() {
+			return rows[a].Finding()
+		}
+		return rows[a].Ratio > rows[b].Ratio
+	})
 }
 
 // rowLayout compares a screen's two screenshots, or nothing when a side is missing.

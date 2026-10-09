@@ -4,7 +4,7 @@ import { CostAttributionPolicyRepository } from "../cost-attribution-policy.repo
 
 /** The cost-attribution twin: enabled coding-assistant tile configs per organization. */
 export class MemoryCostAttributionPolicyRepository extends CostAttributionPolicyRepository {
-  private readonly configs = new Map<string, unknown[]>();
+  private readonly configs = new Map<string, { config: unknown; enabled: boolean }[]>();
 
   private constructor() {
     super();
@@ -13,28 +13,29 @@ export class MemoryCostAttributionPolicyRepository extends CostAttributionPolicy
   static create({
     seed = [],
   }: {
-    seed?: readonly { organizationId: string; config: unknown }[];
+    seed?: readonly { organizationId: string; config: unknown; enabled?: boolean }[];
   } = {}): MemoryCostAttributionPolicyRepository {
     const repository = new MemoryCostAttributionPolicyRepository();
-    for (const { organizationId, config } of seed) {
+    for (const { organizationId, config, enabled = true } of seed) {
       repository.configs.set(organizationId, [
         ...(repository.configs.get(organizationId) ?? []),
-        config,
+        { config, enabled },
       ]);
     }
     return repository;
   }
 
   async enabledCodingAssistantConfigs(organizationId: string): Promise<unknown[]> {
-    return this.configs.get(organizationId) ?? [];
+    return this.enabledConfigs(organizationId);
   }
 
   async organizationsWithEnabledCodingAssistants(): Promise<string[]> {
-    return [...this.configs].filter(([, configs]) => configs.length > 0).map(([id]) => id);
+    return [...this.configs.keys()].filter((id) => this.enabledConfigs(id).length > 0);
   }
 
-  /** Replaces an organization's enabled configs, as an admin edit would. */
-  replace({ organizationId, configs }: { organizationId: string; configs: unknown[] }): void {
-    this.configs.set(organizationId, configs);
+  private enabledConfigs(organizationId: string): unknown[] {
+    return (this.configs.get(organizationId) ?? [])
+      .filter((entry) => entry.enabled)
+      .map((entry) => entry.config);
   }
 }

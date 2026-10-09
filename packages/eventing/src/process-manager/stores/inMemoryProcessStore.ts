@@ -4,6 +4,7 @@ import { safeDiagnosticError } from "../failureDiagnostic.ts";
 import type { ProcessRef } from "../processManager.types.ts";
 import type {
   AppendIntentsResult,
+  CallerTransaction,
   CommitResult,
   DueWake,
   FailedOutboxAttempt,
@@ -181,17 +182,21 @@ export class InMemoryProcessStore implements ProcessStore {
   }
 
   /**
-   * The transient path: intents only, no instance and no inbox marker. The
-   * durable adapter drops its transaction here too; this one is atomic per
-   * call regardless, so the shared insert is the whole implementation.
+   * The transient path: intents only, no instance and no inbox marker. This
+   * store has no transactions to join, so a caller's transaction is ignored
+   * and the shared insert, atomic per call, is the whole implementation.
    */
-  async appendIntents(params: {
+  async appendIntents({
+    transaction: _transaction,
+    ...params
+  }: {
     ref: ProcessRef;
     tenantId: string;
     userId?: string;
     sourceEventId: string | null;
     messages: NewOutboxMessage[];
     now: number;
+    transaction?: CallerTransaction;
   }): Promise<AppendIntentsResult> {
     return this.insertMessages(params);
   }

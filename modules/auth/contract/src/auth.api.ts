@@ -4,6 +4,16 @@ import type {
   SignedInWith,
 } from "@langwatch/identity-contract";
 import { moduleApi } from "@langwatch/module";
+import type {
+  UpdateUserEmailInput,
+  UserCaller,
+  UserLifecycleChangeInput,
+  UserProfile,
+  ChangeOwnPasswordInput,
+  SetOwnFirstPasswordInput,
+  CreatedUser,
+  RegisterCredentialAccountInput,
+} from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type {
@@ -199,6 +209,25 @@ export interface AuthApi {
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
+
+  /**
+   * Retires an account: user's write refuses the last active operator, then every browser
+   * session and CLI token ends, then user records the fact. A refused write ends nothing.
+   */
+  deactivateUser(input: UserLifecycleChangeInput): Promise<UserProfile>;
+  /** The same retirement, for oneself or by a platform operator who is not impersonating. */
+  deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
+  /** Writes the address through user, then ends every session that cached the old one. */
+  changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
+  /** Fills an empty credential slot through user, then ends every other session (D-A1U-4). */
+  setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
+  /** Verifies the current password and replaces it, then ends every other session. */
+  changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
+  /**
+   * The signup form's door (D-A1U-2): the origin, the mode, the throttle and the sign-up
+   * policy, then the address proof is spent and user mints the account.
+   */
+  registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
 
   /** Whether this attempt is inside the budget the door asked for, and how
    *  long to wait when it is not — the refusal's words name the seconds. */

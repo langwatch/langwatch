@@ -1,4 +1,4 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { GithubRepositories } from "../github.repositories.ts";
 import { PostgresGithubRepositories } from "../prisma/prisma.github.repositories.ts";
@@ -14,8 +14,8 @@ export class LiveGithubRepositories {
     prisma,
     redis,
   }: {
-    prisma: ProcessMembers["prisma"];
-    redis: ProcessMembers["redis"];
+    prisma: Parameters<typeof PostgresGithubRepositories.create>[0]["prisma"];
+    redis: RedisConnection;
   }): GithubRepositories {
     return {
       ...PostgresGithubRepositories.create({ prisma }),

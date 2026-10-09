@@ -3,8 +3,7 @@ import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/prim
 import { Lock, TrendingUp, Zap } from "lucide-react";
 
 import { SourceCard } from "../elements/source-card.tsx";
-import { useDraft } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
+import { useDraft, useAutomationStore } from "./automation-selectors.ts";
 import { CadenceSection } from "./cadence-section-adapter.tsx";
 import type { ConditionSource } from "./draft-model.ts";
 import { SubjectSection } from "./subject-section.tsx";

@@ -26,10 +26,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { GovernanceCostRollupFoldProjection } from "../../eventing/governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../../eventing/governance-cost-rollup.store.ts";
+import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../features/ingestion-pull/services/pulled-usage-record.service.ts";
+import {
+  type AzureDailyCost,
+  azureCostEvents,
+} from "../../features/microsoft/rules/azure-cost-management.rules.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../../repositories/clickhouse/clickhouse.governance-cost-rollup.repository.ts";
-import { type AzureDailyCost, azureCostEvents } from "../../rules/azure-cost-management.rules.ts";
-import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 
 const PERIOD = ["2026-01-13", "2026-01-14", "2026-01-15"] as const;
 /** What the provider reported for each day: one dollar, in nano-dollars. */

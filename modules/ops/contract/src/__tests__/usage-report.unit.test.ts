@@ -198,3 +198,37 @@ describe("given a report from a newer or older install", () => {
     expect(optionalUsageReportKeys()).not.toContain("instance_id");
   });
 });
+
+describe("given ops health from an install older or newer than the upgrade summary", () => {
+  const health = {
+    snapshot_at: null,
+    failed_jobs_total: null,
+    queues: null,
+    pipelines: null,
+    migrations: null,
+  };
+  const upgrade = {
+    state: "current",
+    release: "3.21.0",
+    floor: "3.20.1",
+    failed_steps: 0,
+    failed_targets: 0,
+    held_tenants: null,
+  };
+  const report = (opsHealth: object) => ({
+    event: "daily_usage_stats",
+    instance_id: "install-1",
+    ops_health: opsHealth,
+  });
+
+  /** @scenario "A report with or without the upgrade summary is accepted" */
+  it("accepts both, and keeps the summary where it was sent", () => {
+    const older = usageReportBodySchema.safeParse(report(health));
+    const newer = usageReportBodySchema.safeParse(report({ ...health, upgrade }));
+
+    expect(older.success).toBe(true);
+    expect(older.data?.ops_health).not.toHaveProperty("upgrade");
+    expect(newer.success).toBe(true);
+    expect(newer.data?.ops_health?.upgrade).toEqual(upgrade);
+  });
+});

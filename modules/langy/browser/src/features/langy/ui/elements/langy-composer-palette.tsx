@@ -1,3 +1,4 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import {
   Box,
   Combobox,
@@ -7,18 +8,19 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { disabledLangySkillIds, LANGY_SKILL_GATE_FLAG } from "@langwatch/langy-contract";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
+import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 import {
   absorbContextTarget,
   type LangyContextTargetDescriptor,
   useLangyContextTargetStore,
-} from "../../../../behavior/langy-context-target.store.ts";
-import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
-import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
-import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+} from "../../../context-target/behavior/langy-context-target.store.ts";
 
 /**
  * The composer's command palette — `/` for skills, `#` for context.
@@ -214,7 +216,11 @@ export function LangyComposerPalette({
   const activeChipIds = useLangyContextTargetStore((s) => s.activeChipIds);
   const setSpotlight = useLangyContextTargetStore((s) => s.setSpotlight);
   const chrome = MODE_CHROME[mode];
-  const { enabled: gateFlagOn } = useFeatureFlag(LANGY_SKILL_GATE_FLAG);
+  const { project, organization } = useOrganizationTeamProject();
+  const { enabled: gateFlagOn } = useFeatureFlag(LANGY_SKILL_GATE_FLAG, {
+    projectId: project?.id ?? NOT_TARGETED,
+    organizationId: organization?.id ?? NOT_TARGETED,
+  });
   const hiddenSkillIds = useMemo(
     () => new Set(disabledLangySkillIds(() => gateFlagOn)),
     [gateFlagOn],

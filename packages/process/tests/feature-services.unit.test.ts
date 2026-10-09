@@ -15,12 +15,8 @@ interface ProjectApi {
 }
 const ProjectApi = moduleApi<ProjectApi>()("project");
 
-/**
- * The members this module reads. Each is always supplied, because a module is
- * handed exactly the names it declared and boot refuses one this process
- * cannot answer.
- */
-interface DeclaredMembers {
+/** What one run tells the module below; set by the harness before each boot. */
+interface RunState {
   events: string[];
   bootFailure: Error | null;
   startFailure: Error | null;
@@ -28,6 +24,15 @@ interface DeclaredMembers {
   starting: (() => Promise<void>) | null;
   capture: ((resources: ResourceOwnership) => void) | null;
 }
+
+let run: RunState = {
+  events: [],
+  bootFailure: null,
+  startFailure: null,
+  stopFailure: null,
+  starting: null,
+  capture: null,
+};
 
 /** What one test states about the run, before the harness completes it. */
 type Harness = Readonly<{
@@ -42,21 +47,13 @@ type Harness = Readonly<{
 class ProjectModule implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = {};
-  static readonly reads = [
-    "events",
-    "bootFailure",
-    "startFailure",
-    "stopFailure",
-    "starting",
-    "capture",
-  ] as const;
 
   private constructor() {}
 
   static create({
-    members,
     resources,
-  }: FeatureSetup<typeof ProjectModule.dependencies, DeclaredMembers, undefined>): ProjectApi {
+  }: FeatureSetup<typeof ProjectModule.dependencies, undefined>): ProjectApi {
+    const members = run;
     const { events } = members;
     resources.own("connection", () => {
       events.push("connection:close");
@@ -95,17 +92,15 @@ class ProjectModule implements ProjectApi {
 
 const project = defineProcessModule("project").withApi(ProjectModule).build();
 function graph(harness: Harness, role: ServerRole = "api") {
-  return new ApplicationBuilder({
-    role,
-    members: memberSourceOf<DeclaredMembers>({
-      events: harness.events,
-      bootFailure: harness.bootFailure ?? null,
-      startFailure: harness.startFailure ?? null,
-      stopFailure: harness.stopFailure ?? null,
-      starting: harness.starting ?? null,
-      capture: harness.capture ?? null,
-    }),
-  }).withModules([project]);
+  run = {
+    events: harness.events,
+    bootFailure: harness.bootFailure ?? null,
+    startFailure: harness.startFailure ?? null,
+    stopFailure: harness.stopFailure ?? null,
+    starting: harness.starting ?? null,
+    capture: harness.capture ?? null,
+  };
+  return new ApplicationBuilder({ role, stores: memberSourceOf({}) }).withModules([project]);
 }
 
 describe("feature-owned runtime services", () => {

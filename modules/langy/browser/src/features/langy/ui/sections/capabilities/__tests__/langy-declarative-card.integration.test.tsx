@@ -12,6 +12,7 @@ import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resolveCapability } from "../../../../../../model/langy-capability-registry.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -21,7 +22,6 @@ import {
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
 import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
-import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
 import { type LangySend, LangySendProvider } from "../../langy-send-context.tsx";
 import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
 
@@ -30,6 +30,10 @@ import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
  * `useRouter`, which throws outside a `LangyHostProvider` — the component
  * moved from reading Next's router directly to reading it off the host.
  */
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "project-acme", slug: "acme", name: "acme" };
@@ -54,9 +58,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return false;
-  }
-  featureFlag() {
-    return true;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };
@@ -417,6 +418,44 @@ describe("LangyDeclarativeCard", () => {
 
         expect(screen.getByText("Delete automation")).toBeTruthy();
         expect(screen.getByText("Removed.")).toBeTruthy();
+      });
+    });
+  });
+
+  describe("given the onboarding commands Langy runs at the end of a guided path", () => {
+    describe("when the complete-path card renders", () => {
+      /** @scenario "The done marker is one line" */
+      it("draws the one line the result carries, and no label and value rows", () => {
+        renderCard({
+          name: "langwatch.onboarding.complete-path",
+          input: { command: "langwatch onboarding complete-path coding --format json" },
+          output: { text: "Coding Agent Tracking set up" },
+        });
+
+        expect(screen.getByText("Coding Agent Tracking set up")).toBeTruthy();
+        expect(screen.queryByText("text")).toBeNull();
+        expect(screen.queryByText(/Couldn.t read this result/)).toBeNull();
+      });
+    });
+
+    describe("when the state card renders", () => {
+      /** @scenario "The onboarding state card reads in customer copy" */
+      it("draws the picks, the provider and the tour as label and value rows", () => {
+        renderCard({
+          name: "langwatch.onboarding.state",
+          input: { command: "langwatch onboarding state --format json" },
+          output: {
+            paths: "Evals & LLM Ops, Gateway",
+            currentPath: "Evals & LLM Ops",
+            provider: "OpenAI · gpt-5.2",
+            tour: "Completed",
+          },
+        });
+
+        expect(screen.getByText("current path")).toBeTruthy();
+        expect(screen.getByText("Evals & LLM Ops, Gateway")).toBeTruthy();
+        expect(screen.getByText("OpenAI · gpt-5.2")).toBeTruthy();
+        expect(screen.getByText("Completed")).toBeTruthy();
       });
     });
   });

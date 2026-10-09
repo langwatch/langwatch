@@ -7,6 +7,7 @@
  */
 import {
   Config,
+  gatewayAddressOf,
   gatewayInternalUrl,
   gatewayLegacyUrl,
   gatewayPublicUrl,
@@ -14,7 +15,6 @@ import {
   publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
-import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
 import { Secret } from "@langwatch/secrets/secret";
 import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
@@ -54,9 +54,9 @@ export function governanceGatewayBaseUrl({
 }: {
   config: GovernanceConfig | undefined;
 }): string {
-  return resolveGatewayBaseUrl({
-    LW_GATEWAY_PUBLIC_URL: config?.gatewayPublicUrl,
-    LW_GATEWAY_BASE_URL: config?.gatewayLegacyUrl,
-    IS_SAAS: config?.isSaas ?? false,
+  return gatewayAddressOf({
+    publicUrl: config?.gatewayPublicUrl,
+    legacyUrl: config?.gatewayLegacyUrl,
+    isSaas: config?.isSaas ?? false,
   });
 }

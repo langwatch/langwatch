@@ -14,6 +14,7 @@ import type {
   NewOutboxMessage,
   ProcessStore,
 } from "../process-manager/stores/processStore.types.ts";
+import { wireFoldEventLoaders, wireMapEventLoader } from "../projections/eventLogLoaders.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import { ProjectionRouter } from "../projections/projectionRouter.ts";
 import { DispatchError } from "../queues/dispatchError.ts";
@@ -21,7 +22,7 @@ import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues/
 import type { EventStore, EventStoreReadContext } from "../stores/eventStore.types.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type {
-  EventSourcingOptions,
+  EventOrderingOptions,
   EventSourcingServiceOptions,
 } from "./eventSourcingService.types.ts";
 import {
@@ -54,7 +55,7 @@ export class EventSourcingService<
   private readonly aggregateType: AggregateType;
   private readonly allowedEventTypes: ReadonlySet<string>;
   private readonly eventStore: EventStore<EventType>;
-  private readonly options: EventSourcingOptions<EventType>;
+  private readonly options: EventOrderingOptions<EventType>;
   private readonly queueManager: QueueManager<EventType>;
   private readonly router: ProjectionRouter<EventType, ProjectionTypes>;
   private readonly globalRegistry?: ProjectionRegistry<Event>;
@@ -217,72 +218,7 @@ export class EventSourcingService<
   ): void {
     if (!foldProjections) return;
     for (const { definition: fold, open } of foldProjections) {
-      // If the projection doesn't already have an eventLoader, provide one
-      // that fetches events from the event store sorted by occurredAt.
-      if (!fold.eventLoader && eventStore) {
-        const capturedAggregateType = aggregateType;
-        const capturedEventStore = eventStore;
-        fold.eventLoader = async (ctx: {
-          tenantId: string;
-          aggregateId: string;
-          occurredAtMs?: number;
-        }) => {
-          const events = await capturedEventStore.getEvents({
-            aggregateId: ctx.aggregateId,
-            context: { tenantId: createTenantId(ctx.tenantId) },
-            aggregateType: capturedAggregateType,
-            anchorOccurredAtMs: ctx.occurredAtMs,
-          });
-          return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
-        };
-      }
-      // Companion loader for refoldOnStoreMiss: history up to AND including
-      // the delivered event in log order, so a store-miss re-fold can never
-      // pre-apply an event that is persisted but still queued for this
-      // projection (per-aggregate FIFO delivers it next).
-      if (!fold.eventLoaderUpTo && eventStore) {
-        const capturedAggregateType = aggregateType;
-        const capturedEventStore = eventStore;
-        fold.eventLoaderUpTo = async (ctx: {
-          tenantId: string;
-          aggregateId: string;
-          upToEvent: Event;
-        }) => {
-          const events = await capturedEventStore.getEventsUpTo({
-            aggregateId: ctx.aggregateId,
-            context: { tenantId: createTenantId(ctx.tenantId) },
-            aggregateType: capturedAggregateType,
-            upToEvent: ctx.upToEvent as EventType,
-          });
-          return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
-        };
-      }
-      // Paginated companion loader for the store-miss re-fold streaming path.
-      // Returns one (timestamp, eventId)-ordered page — the executor pages
-      // through it so a huge aggregate's history never lands in memory whole.
-      // No occurredAt re-sort: the streaming path is used only for
-      // order-insensitive folds, where page order is immaterial.
-      if (!fold.eventLoaderUpToPaged && eventStore && eventStore.getEventsUpToPaged) {
-        const capturedAggregateType = aggregateType;
-        const capturedEventStore = eventStore;
-        fold.eventLoaderUpToPaged = async (ctx: {
-          tenantId: string;
-          aggregateId: string;
-          upToEvent: Event;
-          after: { timestamp: number; eventId: string } | undefined;
-          limit: number;
-        }) => {
-          const events = await capturedEventStore.getEventsUpToPaged!({
-            aggregateId: ctx.aggregateId,
-            context: { tenantId: createTenantId(ctx.tenantId) },
-            aggregateType: capturedAggregateType,
-            upToEvent: ctx.upToEvent as EventType,
-            after: ctx.after,
-            limit: ctx.limit,
-          });
-          return [...events];
-        };
-      }
+      wireFoldEventLoaders({ fold, log: { aggregateType, eventStore } });
       open((definition) => this.router.registerFoldProjection(definition));
     }
   }
@@ -305,27 +241,8 @@ export class EventSourcingService<
     eventStore: EventStore<EventType>,
   ): void {
     if (!mapProjections) return;
-    for (const { definition: mapProj, open } of mapProjections) {
-      // Auto-wire the log-ordered history loader for
-      // `options.dedupeByIdempotencyKey` — same shape as the fold
-      // projections' eventLoaderUpTo.
-      if (!mapProj.eventLoaderUpTo && eventStore) {
-        const capturedAggregateType = aggregateType;
-        const capturedEventStore = eventStore;
-        mapProj.eventLoaderUpTo = async (ctx: {
-          tenantId: string;
-          aggregateId: string;
-          upToEvent: Event;
-        }) => {
-          const events = await capturedEventStore.getEventsUpTo({
-            aggregateId: ctx.aggregateId,
-            context: { tenantId: createTenantId(ctx.tenantId) },
-            aggregateType: capturedAggregateType,
-            upToEvent: ctx.upToEvent as EventType,
-          });
-          return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
-        };
-      }
+    for (const { definition: map, open } of mapProjections) {
+      wireMapEventLoader({ map, log: { aggregateType, eventStore } });
       open((definition) => this.router.registerMapProjection(definition));
     }
   }

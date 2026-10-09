@@ -1,10 +1,11 @@
 import "@testing-library/jest-dom/vitest";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 // @vitest-environment jsdom
 /**
  * The picker that adds a column to an evaluation.
  * @see specs/experiments-v3/target-type-selector.feature
  */
-import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { PromptListDrawerToken } from "@langwatch/prompt-client";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -110,7 +111,7 @@ describe("given the picker that adds a column to an evaluation", () => {
 
       await clickCard("prompt");
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("promptList", {}, { replace: true });
+      expect(mockOpenDrawer).toHaveBeenCalledWith(PromptListDrawerToken, {}, { replace: true });
     });
 
     /** @scenario "Choosing an agent goes to the agent list" */

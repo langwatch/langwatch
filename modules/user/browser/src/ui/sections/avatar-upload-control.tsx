@@ -1,6 +1,6 @@
 import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { chakra, Box, Button, Center, HStack } from "@langwatch/design-system/primitives";
+import { chakra, Box, Button, Center, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
@@ -11,6 +11,10 @@ import {
   useShowErrorToast,
 } from "../../behavior/personal-workspace-feedback.ts";
 import { useCurrentUser } from "../../behavior/personal-workspace-session.ts";
+import {
+  PERSONAL_WORKSPACE_WAIT_HINT,
+  usePersonalWorkspaceWait,
+} from "../../behavior/use-personal-workspace-wait.ts";
 import { useUserAvatarUrl } from "../../behavior/use-user-avatar-url.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { processAvatarImage } from "../../model/process-avatar-image.ts";
@@ -77,6 +81,7 @@ function AvatarPhotoDialog({
   isBusy,
   isSaving,
   isRemoving,
+  waiting,
   onChange,
   onRemove,
   onSave,
@@ -91,6 +96,7 @@ function AvatarPhotoDialog({
   isBusy: boolean;
   isSaving: boolean;
   isRemoving: boolean;
+  waiting: boolean;
   onChange: () => void;
   onRemove: () => void;
   onSave: () => void;
@@ -115,6 +121,11 @@ function AvatarPhotoDialog({
               borderColor="border.muted"
             />
           </Center>
+          {waiting && (
+            <Text fontSize="xs" color="fg.muted" textAlign="center" as="output" display="block">
+              {PERSONAL_WORKSPACE_WAIT_HINT}
+            </Text>
+          )}
         </Dialog.Body>
         <Dialog.Footer>
           {hasPreview ? (
@@ -122,7 +133,12 @@ function AvatarPhotoDialog({
               <Button variant="ghost" onClick={onCancel} disabled={isBusy}>
                 Cancel
               </Button>
-              <Button colorPalette="orange" onClick={onSave} loading={isSaving} disabled={isBusy}>
+              <Button
+                colorPalette="orange"
+                onClick={onSave}
+                loading={isSaving}
+                disabled={isBusy || waiting}
+              >
                 Save photo
               </Button>
             </HStack>
@@ -166,6 +182,7 @@ export function AvatarUploadControl({ organizationId }: { organizationId: string
   const currentImage = actor?.image ?? null;
   const name = actor?.name ?? actor?.email ?? null;
 
+  const workspaceWait = usePersonalWorkspaceWait({ organizationId });
   const setAvatar = api.user.setAvatar.useMutation({
     onSuccess: async () => {
       await host.refreshSession();
@@ -173,7 +190,10 @@ export function AvatarUploadControl({ organizationId }: { organizationId: string
       setIsOpen(false);
       toaster.create({ title: "Photo updated", type: "success" });
     },
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't update photo" }),
+    onError: (error) => {
+      if (workspaceWait.absorb(error)) return;
+      showErrorToast({ error, fallbackTitle: "Couldn't update photo" });
+    },
   });
 
   const removeAvatar = api.user.removeAvatar.useMutation({
@@ -243,6 +263,7 @@ export function AvatarUploadControl({ organizationId }: { organizationId: string
         isBusy={isBusy}
         isSaving={setAvatar.isPending}
         isRemoving={removeAvatar.isPending}
+        waiting={workspaceWait.waiting}
         onChange={() => fileInputRef.current?.click()}
         onRemove={() => removeAvatar.mutate({})}
         onSave={() => {

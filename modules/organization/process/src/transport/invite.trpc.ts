@@ -43,6 +43,14 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
     .withPermission("organization:manage")
     .handle(({ app, input }) => app.listPendingInvitations(input))
 
+    /** The seat checkout and the invitations that motivated it, as one act (C2 A). */
+    .procedure("upgradeWithInvites")
+    .withFacts(organizationSessionPersonFact)
+    .withPermission("organization:manage")
+    .handle(({ app, input, actor }, person) =>
+      app.createSeatCheckoutWithInvites(input, callerOf(actor, person)),
+    )
+
     /** The invitee's own act: they hold the code and are not a member yet. */
     .procedure("acceptInvite")
     .withFacts(organizationSessionPersonFact)

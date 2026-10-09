@@ -6,7 +6,6 @@ import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
-import { ScenarioApi } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -30,14 +29,13 @@ async function bootAgent(role: Role) {
     role,
     modules: [agentProcessModule],
     config: { agent: { replicaCount: 1, relayMaxPayloadMb: undefined, publicBaseUrl: undefined } },
-    members: { ...memoryStores(), close: async () => void 0 },
+    stores: memoryStores(),
     peers: [
       testPeer({ token: ApiKeyApi, instance: createApiFixture<ApiKeyApi>() }),
       testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>() }),
       testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
       testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
       testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
-      testPeer({ token: ScenarioApi, instance: createApiFixture<ScenarioApi>() }),
       testPeer({ token: SecretApi, instance: createApiFixture<SecretApi>() }),
       testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
       testPeer({ token: UserApi, instance: createApiFixture<UserApi>() }),

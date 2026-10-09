@@ -1,7 +1,6 @@
 import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo } from "react";
 
-import { useDensityStore } from "../../../../../behavior/density.store.ts";
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import {
   type AttributeKey,
@@ -13,6 +12,13 @@ import {
   type Section,
 } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { useDensityStore } from "../../../../../features/explorer/behavior/density.store.ts";
+import type { NumericMode } from "../../../../../features/explorer/behavior/numeric-mode.store.ts";
+import {
+  selectNumericModesFor,
+  useNumericModeStore,
+} from "../../../../../features/explorer/behavior/numeric-mode.store.ts";
 import {
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,
@@ -26,26 +32,23 @@ import {
   RANGE_DEFAULTS,
   SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
-} from "../../../../../behavior/facet-constants.ts";
-import { applyLensOrder, useFacetLensStore } from "../../../../../behavior/facet-lens.store.ts";
+} from "../../../../../features/facet/behavior/facet-constants.ts";
+import {
+  applyLensOrder,
+  useFacetLensStore,
+} from "../../../../../features/facet/behavior/facet-lens.store.ts";
 import {
   selectVisibilityFor,
   useFacetVisibilityStore,
-} from "../../../../../behavior/facet-visibility.store.ts";
-import type { NumericMode } from "../../../../../behavior/numeric-mode.store.ts";
-import {
-  selectNumericModesFor,
-  useNumericModeStore,
-} from "../../../../../behavior/numeric-mode.store.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+} from "../../../../../features/facet/behavior/facet-visibility.store.ts";
+import { useFilteredTraceFacets } from "../../../../../features/facet/behavior/use-filtered-trace-facets.ts";
+import { useTraceFacets } from "../../../../../features/facet/behavior/use-trace-facets.ts";
 import { hashColor } from "../../../../../model/display-formatters.ts";
 import {
   type FacetCountState,
   mergeFacetDescriptors,
 } from "../../../../../model/explorer/filter-sidebar/merge-facet-descriptors.ts";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
-import { useFilteredTraceFacets } from "../../hooks/use-filtered-trace-facets.ts";
-import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 import { facetLabel, sortBySectionOrder } from "../utils.ts";
 

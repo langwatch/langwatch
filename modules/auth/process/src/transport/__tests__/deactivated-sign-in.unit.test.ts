@@ -29,6 +29,7 @@ function repoAnswering(deactivatedAt: Instant | null, signupConfirmationPending 
     deactivatedAt,
     pendingSsoSetup: false,
     signupConfirmationPending,
+    emailVerified: true,
   }));
   const findFederatedAccountsForUser = vi.fn(async () => [
     { providerId: "auth0", accountId: "waad|acme|sam" },
@@ -73,6 +74,7 @@ const CONTINUING = collaboratorsAnswering({ action: "continue" });
 function identityAnswering(identifierId: string | null) {
   const asked: SessionClaimsMintInput[] = [];
   const identity = createApiFixture<IdentityApi>({
+    createStorageAdapter: ({ legacyEngine }) => legacyEngine,
     claimsForMint: async (input) => {
       asked.push(input);
       const local =

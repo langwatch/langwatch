@@ -1,4 +1,4 @@
-import type { SearchFieldGroup } from "../trace-query-metadata.ts";
+import type { SearchFieldGroup } from "../features/query/trace-query-metadata.ts";
 import type { SuggestionState } from "./get-suggestion-state.ts";
 import { getFieldSuggestions, getValueSuggestions } from "./suggestion-items.ts";
 

@@ -1,56 +1,33 @@
 import {
   Config,
+  idpSimulatorUrl,
   isSaas,
+  localPasswords,
+  mfaEnrollmentOpen,
   nodeEnvironment,
+  passkeysEnabled,
+  positiveSafeIntegerOrUndefined,
   publicBaseUrl,
   signInProviders,
   signUpMode,
+  trustedIdpOrigins,
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
-import { SignInMethodPolicyService } from "@langwatch/identity-contract";
 import { z } from "zod";
-
-/**
- * Browser-session identity. Secret and URL are a refinement (both or neither);
- * mfaEnrollmentOpen is literal "on"; passkeys are offered unless "off"; other values refused.
- */
-const onSwitch = z
-  .union([z.literal("on"), z.literal("")])
-  .optional()
-  .transform((value) => value === "on");
-
-/** Passkeys are offered on every deployment an operator has not turned them off on. */
-const passkeySwitch = z
-  .enum(["off", "on"])
-  .optional()
-  .transform((value) => SignInMethodPolicyService.deploymentOffersPasskeys(value));
-
-/** An explicit on/off switch, off when unset. */
-const onOffSwitch = z
-  .enum(["off", "on"])
-  .optional()
-  .transform((value) => value === "on");
 
 export const authServerConfig = Config.define((c) => ({
   sessionUrl: c.env("NEXTAUTH_URL", z.string().optional()),
-  mfaEnrollmentOpen: c.env("MFA_ENROLLMENT_OPEN", onSwitch),
-  passkeysEnabled: c.env("PASSKEYS_ENABLED", passkeySwitch),
+  /** The shared capability switches identity and user read too (round 48, A1-a). */
+  mfaEnrollmentOpen,
+  passkeysEnabled,
   /** Absent falls back to the session secret; a passkey handle must stay stable. */
   passkeyHandleSecret: c.env("PASSKEY_HANDLE_SECRET", z.string().optional()),
-  /**
-   * Identity providers this operator trusts outright, beyond the ones their
-   * customers registered: commas or spaces, and the way on for a provider
-   * inside a private network. Honoured in production too.
-   */
-  trustedIdpOrigins: c.env("SSO_TRUSTED_IDP_ORIGINS", z.string().optional()),
-  /**
-   * The identity-provider simulator a development worktree runs, trusted
-   * outside production ONLY — it signs whatever it is asked to sign.
-   */
-  idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
+  /** The operator's trusted identity providers, and the worktree simulator outside production. */
+  trustedIdpOrigins,
+  idpSimulatorUrl,
   /** D09: this deployment issues its own passwords beside a federated provider. */
-  localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", onOffSwitch),
+  localPasswords,
   /**
    * The Auth0 Machine-to-Machine app a password change goes through; absent,
    * the login app's `AUTH0_CLIENT_ID` stands in, as main's did.
@@ -65,6 +42,14 @@ export const authServerConfig = Config.define((c) => ({
   /** Process facts (§3.3): where links point, and what is trusted outside production only. */
   publicBaseUrl,
   nodeEnvironment,
+  /**
+   * How long an idle CLI refresh token lives, in seconds. Unset or unreadable keeps the
+   * service's default quarter, as main did; shorten it so a stolen CLI config goes stale sooner.
+   */
+  cliRefreshTokenTtlSeconds: c.env(
+    "LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS",
+    z.string().optional().transform(positiveSafeIntegerOrUndefined),
+  ),
 }));
 
 /**

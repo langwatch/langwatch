@@ -19,5 +19,9 @@ export {
   type UseTRPCQueryResult,
   type WireOf,
 } from "./module-api.ts";
-export { trpcQueryFilter, trpcQueryKey, type TrpcQueryKey } from "./trpc-query-key.ts";
-export { useInvalidateProcedure } from "./use-invalidate-procedure.ts";
+export {
+  trpcQueryFilter,
+  trpcQueryKey,
+  type TrpcQueryKey,
+  useInvalidateProcedure,
+} from "./trpc-query-key.ts";

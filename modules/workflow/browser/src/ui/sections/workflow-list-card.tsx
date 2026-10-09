@@ -8,6 +8,7 @@ import { toEpochMs } from "@langwatch/time";
 import type { WorkflowCascadeArchive } from "@langwatch/workflow-contract";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
+import { useWorkflowArchivePreview } from "../../behavior/use-workflow-archive-preview.ts";
 import { workflowApi, type WorkflowListRow } from "../../behavior/workflow-api.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog.tsx";
@@ -44,10 +45,11 @@ export function WorkflowListCard({
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] = useState(false);
 
-  const relatedEntitiesQuery = workflowApi.workflow.getRelatedEntities.useQuery(
-    { workflowId: workflowId ?? "", projectId: projectId ?? "" },
-    { enabled: isDeleteDialogOpen && !!workflowId && !!projectId },
-  );
+  const relatedEntitiesQuery = useWorkflowArchivePreview({
+    workflowId,
+    projectId,
+    enabled: isDeleteDialogOpen,
+  });
 
   const workflow = workflowId
     ? workflows?.find((candidate) => candidate.id === workflowId)
@@ -87,7 +89,7 @@ export function WorkflowListCard({
           onSuccess: (result) => {
             setIsDeleteDialogOpen(false);
             void utils.workflow.getAll.invalidate();
-            const parts = describeCascadeArchive(result);
+            const parts = describeCascadeArchive({ result, related: relatedEntitiesQuery.data });
             host.succeeded({
               title: `Workflow "${name}" deleted`,
               ...(parts.length > 0 ? { description: `Also deleted: ${parts.join(", ")}` } : {}),
@@ -192,15 +194,19 @@ function countLabel(count: number, noun: string): string[] {
   return count > 0 ? [`${count} ${noun}${count > 1 ? "s" : ""}`] : [];
 }
 
-function describeCascadeArchive(
-  result: Pick<
-    WorkflowCascadeArchive,
-    "archivedEvaluatorsCount" | "archivedAgentsCount" | "deletedMonitorsCount"
-  >,
-): string[] {
+/** Evaluators and their monitors go after a lag, so the preview the reader confirmed names them. */
+function describeCascadeArchive({
+  result,
+  related,
+}: {
+  result: Pick<WorkflowCascadeArchive, "archivedAgentsCount">;
+  related:
+    | { evaluators: readonly { id: string }[]; monitors: readonly { id: string }[] }
+    | undefined;
+}): string[] {
   return [
-    ...countLabel(result.archivedEvaluatorsCount, "evaluator"),
+    ...countLabel(related?.evaluators.length ?? 0, "evaluator"),
     ...countLabel(result.archivedAgentsCount, "agent"),
-    ...countLabel(result.deletedMonitorsCount, "online evaluation"),
+    ...countLabel(related?.monitors.length ?? 0, "online evaluation"),
   ];
 }

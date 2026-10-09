@@ -22,7 +22,7 @@ Feature: License registry
   # ============================================================================
 
   @unit
-  Scenario: A license issued from the backoffice is recorded
+  Scenario: A license issued from the admin console is recorded
     When an operator issues a license for customer organization "ACME" with 50 seats
     Then the registry holds a row for that license linked to "ACME"
     And the row records the plan, the seats, the term and who issued it
@@ -61,10 +61,11 @@ Feature: License registry
     Then the registry holds a row for that license
 
   @unit
-  Scenario: The minted license and its registry row are written together
-    Given the mint script applied a license to an organization
+  Scenario: A minted license whose organization write fails leaves no registry row
+    Given the mint script recorded a license in the registry for an organization
     When writing the license onto the organization fails
-    Then the registry row is rolled back with it
+    Then the registry row is deleted again
+    And the mint fails
 
   @unit
   Scenario: The registry stores a hash of the token, not the token
@@ -272,7 +273,7 @@ Feature: License registry
     Then the organization created for "ACME" has an id that starts with "organization_"
 
   @integration
-  Scenario: The backoffice lists licenses with their state
+  Scenario: The admin console lists licenses with their state
     Given licenses in the registry that are active, revoked and expired
     When an operator opens the licenses screen
     Then each license shows its customer, seats, term, status, entitled services and whether an instance is bound

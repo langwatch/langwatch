@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   buildChildEnvironment,
   type ScenarioChildProcessConfig,
-} from "../services/node-scenario-child.service.ts";
+} from "../features/child/services/node-scenario-child.service.ts";
 import { type ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 const parentKeys = [

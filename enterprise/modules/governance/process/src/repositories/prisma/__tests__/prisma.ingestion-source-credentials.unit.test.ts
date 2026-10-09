@@ -10,7 +10,7 @@ import { aesEncryption } from "@langwatch/process-stores";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { credentialsOf } from "../../../rules/ingestion-credentials.rules.ts";
+import { credentialsOf } from "../../../features/ingestion-pull/rules/ingestion-credentials.rules.ts";
 import { PrismaIngestionSourceCredentialsMapper } from "../prisma.ingestion-source-credentials.mapper.ts";
 import { PrismaIngestionSourceRepository } from "../prisma.ingestion-source.repository.ts";
 

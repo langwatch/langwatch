@@ -39,6 +39,12 @@ Feature: Deleted spellings stay deleted
       Then it counts neither
 
     @unit @architecture
+    Scenario: A file the list exempts by path keeps a ruled use of the spelling
+      Given a spelling whose list entry names an exempt path
+      When the code guard runs
+      Then the exempt file is not reported and the same spelling in another file still is
+
+    @unit @architecture
     Scenario: A new use over the list is refused and a removal must lower it
       Given a spelling whose count in code rose above the shrink-only list
       When the ratchet compares the counts

@@ -24,7 +24,7 @@ beforeEach(() => {
 
 // Compact vs comfortable is gated by the density store; force compact so
 // the row path under test is the one in the screenshot.
-vi.mock("../../../../../behavior/density.store.ts", async (importOriginal) => ({
+vi.mock("../../../../../features/explorer/behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: { density: string }) => unknown) =>
     selector({ density: "compact" }),

@@ -110,6 +110,7 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
   });
 
   describe("given a preflight target blocked by the deadline", () => {
+    /** @scenario "Work the preflight itself failed or blocked refuses startup" */
     it("still refuses to start", async () => {
       const queue = createQueue();
       await targetGroupWithPendingWork("blocked-group");
@@ -151,6 +152,7 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
   });
 
   describe("given a group the preflight adopted clean", () => {
+    /** @scenario "Work the preflight itself failed or blocked refuses startup" */
     it("refuses, naming it, when the group fails under the preflight", async () => {
       const queue = createQueue();
       await queue.registerPreflightGroups(() => ["doomed"]);

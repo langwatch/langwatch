@@ -6,7 +6,7 @@ import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import type { License } from "../../model/license-terms.ts";
 import { LicensesTable } from "../blocks/licenses-table.tsx";
 import { ActivationCodesSection } from "./activation-codes-section.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 import { LicenseDetailDrawer } from "./license-detail-drawer.tsx";
 import { LicenseIssueDrawer } from "./license-issue-drawer.tsx";
 import { LicenseRevokeDialog } from "./license-revoke-dialog.tsx";
@@ -35,7 +35,7 @@ export default function LicensesView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Licenses"
         searchValue={search}
         onSearchChange={(value) => {
@@ -62,7 +62,7 @@ export default function LicensesView() {
           onRevoke={setRevoking}
           onResetBinding={(license) => commands.resetInstanceBinding.mutate({ id: license.id })}
         />
-      </BackofficeTable>
+      </AdminTable>
 
       <ActivationCodesSection />
 

@@ -11,8 +11,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SCORER = join(SRC, "rules/name-similarity.rules.ts");
-const SUGGESTION_JOB = join(SRC, "services/identity-match-suggestion.service.ts");
+const SCORER = join(SRC, "features/identity/rules/name-similarity.rules.ts");
+const SUGGESTION_JOB = join(SRC, "features/identity/services/identity-match-suggestion.service.ts");
 const COMPOSITION_ROOT = join(SRC, "app/governance.app.ts");
 const STATIC_IMPORT = /(?:import|export)\s[^;]*?from\s+["']([^"']+)["']/g;
 const SCHEDULE_TOKENS = [/\.schedule\(/, /\beveryMs\b/, /\bonWake\b/, /\bcron\b/i];
@@ -83,7 +83,7 @@ describe("the identity match engine's reach", () => {
   describe("given every path that serves a request", () => {
     it("has exactly the suggestion job importing the scorer", () => {
       expect(importersOf({ target: SCORER })).toEqual([
-        "services/identity-match-suggestion.service.ts",
+        "features/identity/services/identity-match-suggestion.service.ts",
       ]);
     });
 

@@ -49,6 +49,7 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",
     "hono-openapi": "catalog:",
     "ioredis": "catalog:",

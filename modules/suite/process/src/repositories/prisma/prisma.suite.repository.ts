@@ -131,6 +131,15 @@ export class PrismaSuiteRepository extends SuiteRepository {
     return rows.map(mapSuite);
   }
 
+  async findProjectIdsHoldingSuites(): Promise<string[]> {
+    const rows = await this.database.simulationSuite.findMany({
+      distinct: ["projectId"],
+      select: { projectId: true },
+      orderBy: { projectId: "asc" },
+    });
+    return rows.map((row) => row.projectId);
+  }
+
   async resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]> {
     return this.database.$transaction(async (transaction) => {
       // The row lock is by id and projectId alone. A `kind`/`archivedAt` predicate here would

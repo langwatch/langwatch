@@ -205,6 +205,16 @@ work on the scale of the dispatch water-fill itself, and it sits on a hot
 path every ClickHouse caller in the app crosses. It removes the _class_ of
 incident; decision 1 no longer even attempts to.
 
+**Note (#8480).** The statement limiter now also reserves a minimum per
+statement _kind_ — inserts versus reads. That is a different axis from the
+per-producer share deferred above: it bounds what the statement _is_, not who
+issued it, and does not pretend to be max-min fairness. It keeps the
+lone-producer property this section insists on — either kind may borrow every
+slot except the other kind's small reserve — so a flood of one kind can no
+longer starve the other, while an insert-only or read-only process still uses
+the whole budget less the other kind's reserve. Decision 2 remains the answer for bounding a single
+_producer_; this does not close that gap.
+
 ## Rationale / Trade-offs
 
 **Why not raise the statement budget?** It is per-server on purpose and sized

@@ -529,6 +529,20 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then the request is refused as forbidden, naming the plan
       So a knowable refusal is never reported as an unknown platform failure
 
+    @unit
+    Scenario: A migrated legacy-scheme endpoint keeps delivering without the plan flag
+      Given an organization whose plan lacks webhook endpoints
+      And an endpoint governance migrated from an inline anomaly destination with the legacy scheme
+      When governance requests delivery of an anomaly alert to it
+      Then the alert is queued for delivery as it was before the migration
+
+    @unit
+    Scenario: A migrated endpoint signs with the rule's existing shared secret
+      Given an inline anomaly destination with a shared secret
+      When governance's migration creates its endpoint with that secret
+      Then the endpoint signs with the rule's shared secret
+      And no route input accepts a shared secret
+
   Rule: The emitted events log is the primitive, webhooks ride it
 
     @integration

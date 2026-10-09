@@ -5,13 +5,15 @@
  */
 import "@testing-library/jest-dom/vitest";
 import type * as errorsModule from "@langwatch/browser-host/errors";
-import type { UpgradeModalSeatsVariant } from "@langwatch/browser-host/upgrade-modal-store";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import type { SeatProrationPreviewProps } from "@langwatch/enterprise-billing-client";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SeatProrationPreview } from "../seat-proration-preview.tsx";
+
+type UpgradeModalSeatsVariant = SeatProrationPreviewProps["variant"] & { mode: "seats" };
 
 const { previewQuery, showErrorToastMock } = vi.hoisted(() => ({
   previewQuery: vi.fn(),

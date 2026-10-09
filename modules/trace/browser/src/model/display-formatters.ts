@@ -1,9 +1,4 @@
-import { nowInstant, Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
-
-/** The moment a screen prints, as the `Date` the Intl formatters take. */
-export function readableDate(value: TimeInput) {
-  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
-}
+import { nowInstant, readableDate } from "@langwatch/time";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;

@@ -3,10 +3,10 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { useRef } from "react";
 
 import { copyShareLink } from "../../../../../behavior/share/share-links.ts";
+import { useShareTrace } from "../../../../../features/trace-drawer/behavior/use-share-trace.ts";
 import { ShareTraceDialogBody } from "../../../../blocks/share/share-trace-dialog-body.tsx";
 import { Dialog } from "../../../dialog.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
-import { useShareTrace } from "../../hooks/use-share-trace.ts";
 
 /**
  * The share dialog's frame around the mint form and the link list (`ui/blocks/share`):

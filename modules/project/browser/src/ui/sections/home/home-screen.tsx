@@ -16,7 +16,9 @@ import { homeApi } from "../../../behavior/home-api.ts";
 import { GuidedOnboardingOffer, PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { safeReturnToPath } from "../../../model/project-switch.ts";
+import { HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
 import { DocsGuides } from "./components/docs-guides.tsx";
+import { HomeFortune } from "./components/home-fortune.tsx";
 import { HomePageBanners } from "./components/home-page-banners.tsx";
 import { LangyHomeHero } from "./components/langy-home-hero.tsx";
 import { LearningResources } from "./components/learning-resources.tsx";
@@ -28,8 +30,9 @@ import { useProjectReach } from "./components/use-project-reach.ts";
 import { WelcomeHeader } from "./components/welcome-header.tsx";
 
 /**
- * The application shell is not this page's — chrome layout draws it. Two
- * compositions: the Langy home for a reader with Langy, the classic home otherwise.
+ * The application shell is not this page's — chrome layout draws it. A
+ * briefing for the returning user, not a lobby. Three compositions resolve
+ * in strict order (SIGNAL-FOCUSED, LANGY, CLASSIC); signal-focused wins outright.
  */
 export function HomePage() {
   const composition = useHomeComposition();
@@ -70,6 +73,7 @@ export function HomePage() {
             {composition === "classic" && <ClassicGuidedOffer />}
 
             {composition === "undecided" && <HomeCompositionSkeleton />}
+            {composition === "signal-focused" && <SignalFocusedHome />}
             {composition === "langy" && <LangyHome />}
             {composition === "classic" && (
               <>
@@ -80,6 +84,9 @@ export function HomePage() {
               </>
             )}
 
+            {/* Dev-only chrome (the briefing mock switcher and the Langy
+                home's state switcher) belongs with the footer links, not next
+                to the greeting. */}
             <LearningResources />
           </VStack>
         </Container>
@@ -145,6 +152,39 @@ function ConsideringLangWatch() {
   );
 }
 
+/**
+ * The signal-focused home: the briefing sheet leads, then a two-column chrome
+ * grid whose cards stagger (the first in each column at natural height, the
+ * second filling the rest), then recent work.
+ */
+function SignalFocusedHome() {
+  return (
+    <>
+      <HomeBriefingSection />
+      <Grid
+        templateColumns={{ base: "1fr", lg: "1fr 1fr" }}
+        gap={4}
+        width="full"
+        alignItems="stretch"
+      >
+        <VStack gap={4} align="stretch" minWidth={0}>
+          <HomePageBanners />
+          <Box flex="1" display="flex" minHeight="120px">
+            <DocsGuides />
+          </Box>
+        </VStack>
+        <VStack gap={4} align="stretch" minWidth={0}>
+          <SetupHairline />
+          <Box flex="1" display="flex" minHeight="100px">
+            <HomeFortune />
+          </Box>
+        </VStack>
+      </Grid>
+      <RecentItemsSection />
+    </>
+  );
+}
+
 /** The guided offer for the classic home: hidden until the project's reach says it is new. */
 function ClassicGuidedOffer() {
   const reach = useProjectReach();
@@ -155,7 +195,7 @@ function ClassicGuidedOffer() {
 /**
  * What the page shows before it knows which home it is. Flags used to
  * resolve to classic, paint it, then swap, so the home visibly changed
- * shape on cold load. This commits to nothing: just the shape both share.
+ * shape on cold load. This commits to nothing: just the shape all three share.
  */
 function HomeCompositionSkeleton() {
   return (

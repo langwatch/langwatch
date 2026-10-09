@@ -18,7 +18,7 @@ describe("spentSubline", () => {
 
   describe("when the organization has an AI-Gateway budget", () => {
     // The regression this pins: the card used to append "of $100.00 budget"
-    // from `user.personalBudget`, which resolves the gateway budget covering
+    // from `gatewayBudgets.personalBudget`, which resolves the gateway budget covering
     // virtual-key traffic. That ledger is not the tool spend this card totals,
     // so the figure read as a cap on usage it never governs. No budget input
     // reaches this function at all, which is the point.

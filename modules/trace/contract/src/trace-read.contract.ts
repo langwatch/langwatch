@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { TraceSummaryData } from "./features/ingest/trace-projection.ts";
 import { evaluationResultSchema, evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import type {
   ChatMessage,
@@ -11,7 +12,6 @@ import type {
   Trace,
 } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import type { TraceSummaryData } from "./trace-projection.ts";
 
 /**
  * The results the legacy trace read answers with. They are the contract between that read and
@@ -200,19 +200,6 @@ export const topicCountsResultSchema = z.object({
   subtopicCounts: z.array(z.object({ key: z.string(), count: z.number() })),
 });
 
-/** The named topic and subtopic counts the trace filters render. */
-export const namedTopicCountsSchema = z.object({
-  topicCounts: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() })),
-  subtopicCounts: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      count: z.number(),
-      parentId: z.string().nullable().optional(),
-    }),
-  ),
-});
-
 export const customersAndLabelsResultSchema = z.object({
   customers: z.array(z.string()),
   labels: z.array(z.string()),
@@ -225,3 +212,11 @@ export const distinctFieldNamesResultSchema = z.object({
   metadataKeys: z.array(fieldNameSchema),
   evaluationNames: z.array(fieldNameSchema),
 });
+
+/** A trace's settled total cost; null when no span of it carried a cost. */
+export const traceCostSchema = z.object({
+  traceId: z.string(),
+  totalCost: z.number().nullable(),
+});
+
+export type TraceCost = z.infer<typeof traceCostSchema>;

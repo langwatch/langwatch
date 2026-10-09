@@ -51,7 +51,7 @@ function provideWidenedClient() {
   const widened: {} = licenseSource;
   const consumer = createApp({ role: "api" }).withModules([licenseConsumerModule]);
   // @ts-expect-error a client widened to an empty object no longer implements the interface
-  return consumer.provide({ licenseSource: widened });
+  return consumer.provide({ licensing: widened });
 }
 
 describe("given a server app linked to an annotation API with callable use cases", () => {
@@ -72,7 +72,7 @@ describe("given a root providing an implementation through a feature API token",
     it("is accepted only while the implementation stays complete", () => {
       const consumer = createApp({ role: "api" }).withModules([licenseConsumerModule]);
 
-      expect(consumer.provide({ licenseSource })).toBeDefined();
+      expect(consumer.provide({ licensing: licenseSource })).toBeDefined();
       expect(provideWidenedClient).toBeTypeOf("function");
     });
   });

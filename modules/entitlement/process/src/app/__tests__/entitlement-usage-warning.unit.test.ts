@@ -1,6 +1,5 @@
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { applyPlanTypeEntitlements } from "@langwatch/enterprise-licensing-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -22,40 +21,44 @@ function warningsOver(counts: ProjectUsageCounts) {
       throw new Error("off Cloud, no subscription is read");
     },
     getPricingModel: async () => ({ pricingModel: null }),
-    countBillableEventsByProjects: async ({ projectIds }) => {
-      counted.push(projectIds);
-      return counts;
-    },
     sendUsageWarning: async (input) => {
       sent.push(input);
       return { sent: true, notificationId: "notification-1" };
     },
   });
-  const peers = {
-    billing,
-    traces: {
-      countTracesByProjects: async () => {
-        throw new Error("a free plan off Cloud is metered in events");
-      },
-    },
-    organizations: createApiFixture<OrganizationApi>({}),
-    projects: { listIdsByOrganization: async () => ["project-1", "project-2"] },
+  const tenancy = {
+    findProjectIds: async () => ["project-1", "project-2"],
+    findMeteredOrganizationIds: async () => ["org-1"],
   };
   const plans = EntitlementService.create({
     baseline: coreBaselinePlan({ isSaas: false }),
     license: { resolve: async () => ({ granted: false }) },
     enrichers: [{ enrich: applyPlanTypeEntitlements }],
   });
-  const counter = UsageService.overPeers({
-    isSaas: false,
+  const counter = UsageService.create({
+    organizations: {
+      getProjectIds: () => tenancy.findProjectIds(),
+      getPricingModel: async () => ({ pricingModel: null }),
+    },
+    traceCounter: {
+      getCountByProjects: async () => {
+        throw new Error("a free plan off Cloud is metered in events");
+      },
+    },
+    eventCounter: {
+      getCountByProjects: async ({ projectIds }) => {
+        counted.push(projectIds);
+        return counts;
+      },
+    },
     planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
-    peers,
+    deployment: { isSaas: false },
   });
   const warnings = UsageWarningService.create({
     billing,
     counter,
     plans,
-    peers,
+    tenancy,
     isSaas: false,
     logger: createTestLogger().logger,
   });

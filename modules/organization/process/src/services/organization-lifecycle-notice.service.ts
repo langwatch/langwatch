@@ -6,12 +6,19 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type {
+  RecordCreatedCommandData,
   RecordIntegrationMethodChosenCommandData,
   RecordInviteAcceptedCommandData,
+  RecordMemberDisabledCommandData,
   RecordMembersInvitedCommandData,
   RecordPersonalWorkspaceProvisionedCommandData,
+  RecordPersonalTeamCreatedCommandData,
+  RecordPersonalWorkspaceArchivedCommandData,
+  RecordPersonalWorkspaceRevivedCommandData,
+  RecordPersonalWorkspaceFeaturesChangedCommandData,
   RecordPresenceSettingChangedCommandData,
   RecordSignedUpCommandData,
+  RecordTraceSharingDisabledCommandData,
 } from "../eventing/organization-lifecycle.events.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
@@ -23,7 +30,14 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordInviteAccepted: Sender<RecordInviteAcceptedCommandData>;
   recordIntegrationMethodChosen: Sender<RecordIntegrationMethodChosenCommandData>;
   recordPersonalWorkspaceProvisioned: Sender<RecordPersonalWorkspaceProvisionedCommandData>;
+  recordPersonalTeamCreated: Sender<RecordPersonalTeamCreatedCommandData>;
+  recordPersonalWorkspaceArchived: Sender<RecordPersonalWorkspaceArchivedCommandData>;
+  recordPersonalWorkspaceRevived: Sender<RecordPersonalWorkspaceRevivedCommandData>;
+  recordPersonalWorkspaceFeaturesChanged: Sender<RecordPersonalWorkspaceFeaturesChangedCommandData>;
   recordPresenceSettingChanged: Sender<RecordPresenceSettingChangedCommandData>;
+  recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
+  recordMemberDisabled: Sender<RecordMemberDisabledCommandData>;
+  recordCreated: Sender<RecordCreatedCommandData>;
 }>;
 
 /**
@@ -71,11 +85,9 @@ export class OrganizationLifecycleNoticeService {
     });
   }
 
-  /** Project records the new personal project as created, so analytics writes its key-map row. */
-  personalWorkspaceProvisioned(
-    input: Recorded<RecordPersonalWorkspaceProvisionedCommandData>,
-  ): void {
-    this.#send(this.#senders?.recordPersonalWorkspaceProvisioned, {
+  /** Project creates the personal team's project, mints its key and records it as created. */
+  personalTeamCreated(input: Recorded<RecordPersonalTeamCreatedCommandData>): void {
+    this.#send(this.#senders?.recordPersonalTeamCreated, {
       ...this.#envelope(input.organizationId),
       ...input,
     });
@@ -116,6 +128,69 @@ export class OrganizationLifecycleNoticeService {
     const sender = this.#senders?.recordPresenceSettingChanged;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
     await sender.send({ ...this.#envelope(input.organizationId), ...input, backfilled: true });
+  }
+
+  /** Trace sharing switched off; awaited and loud, since share revokes only on this record. */
+  async traceSharingDisabled(
+    input: Readonly<{
+      organizationId: string;
+      projectIds: string[];
+      changedByUserId: string | null;
+    }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordTraceSharingDisabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A seat taken away; awaited and loud, since user ends the sessions only on this record. */
+  async memberDisabled(
+    input: Readonly<{ organizationId: string; userId: string; disabledByUserId: string | null }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordMemberDisabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** An organization now exists; awaited and loud, since prompt seeds tags only on this record. */
+  async created(
+    input: Readonly<{ organizationId: string; organizationName: string }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordCreated;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A member's personal teams archived; awaited and loud, since project archives only on this. */
+  async personalWorkspaceArchived(
+    input: Recorded<RecordPersonalWorkspaceArchivedCommandData>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordPersonalWorkspaceArchived;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A personal team revived; awaited and loud, since project revives only on this record. */
+  async personalWorkspaceRevived(
+    input: Recorded<RecordPersonalWorkspaceRevivedCommandData>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordPersonalWorkspaceRevived;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** Feature switches changed; awaited and loud, since project stores them only on this. */
+  async personalWorkspaceFeaturesChanged(
+    input: Recorded<RecordPersonalWorkspaceFeaturesChangedCommandData>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordPersonalWorkspaceFeaturesChanged;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId ?? input.projectId), ...input });
+  }
+
+  /** Reports a failure its caller must not raise over the error it is already throwing. */
+  reportError(error: unknown): void {
+    this.dependencies.reportError(error);
   }
 
   #envelope(tenantId: string) {

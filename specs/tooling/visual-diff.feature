@@ -170,3 +170,23 @@ Feature: Visual diff between two refs
     When a run seeds coding-assistant sessions
     Then its logs and spans carry each session's identity and branch
     And they use the same event names and hook scope the ingest CLI sends
+
+  @unit
+  Scenario: A sharded run renders every route and flow exactly once across its shards
+    Given a run split into eight shards
+    When each shard plans its routes and flows
+    Then every declared route and flow falls in exactly one shard
+
+  @unit
+  Scenario: A run stopped at its deadline reports what it captured as partial
+    Given a shard whose deadline passes during capture
+    When the run stops
+    Then it writes its report for what it captured
+    And the summary and outcome mark the run as partial
+
+  @unit
+  Scenario: Merging shards produces one report, and a missing shard makes it partial
+    Given the run directories of a sharded run
+    When the shards are merged
+    Then one report, summary and findings stream cover every shard
+    And a missing or cut-short shard marks the merged run as partial

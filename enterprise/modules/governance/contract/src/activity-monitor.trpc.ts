@@ -16,7 +16,7 @@ import {
   spendOverTimeGroupBySchema,
   spendOverTimeResultSchema,
   spendSortFieldSchema,
-} from "./ingestion-source-activity.queries.ts";
+} from "./features/ingestion/ingestion-source-activity.queries.ts";
 
 const organizationScope = z.object({ organizationId: z.string() });
 const windowQuery = z.object({

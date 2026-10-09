@@ -1,6 +1,6 @@
-import type { UiJoinOfferProps } from "@langwatch/browser-host/declarations";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import type { JoinOfferProps } from "@langwatch/organization-client";
 import type { ReactNode } from "react";
 
 import { useOrganizationHost } from "../../../../model/organization-host.ts";
@@ -18,7 +18,7 @@ export function JoinYourTeamTakeover({
   fallback = null,
   currentOrganizationId,
   origin = "web",
-}: UiJoinOfferProps) {
+}: JoinOfferProps) {
   const host = useOrganizationHost();
   const offer = useJoinOffer({ currentOrganizationId: currentOrganizationId ?? null, origin });
   const { view, asking, dismissing, ask, dismiss, checkAgain } = offer;

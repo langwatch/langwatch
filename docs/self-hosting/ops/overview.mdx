@@ -19,6 +19,7 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 | Need to debug a specific trace or aggregate    | [Deja View](/self-hosting/ops/dejaview): time-travel through the event stream                                |
 | Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces                                    |
 | SSO setup or directory sync needs investigation | The identity and directory Backoffice pages below                                                            |
+| An upgrade is running, behind or failed       | `/ops/upgrades`: the installation's state, each release's steps and every run ([Upgrade Guide](/self-hosting/upgrade#while-it-runs-and-after)) |
 | An upgrade is waiting on an organization migration | `/ops/migrations`: inspect its result and report                                                          |
 | Failed jobs need reprocessing                  | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ                                 |
 
@@ -77,6 +78,7 @@ across organizations.
 | `/ops/backoffice/identity-lookup` | Find an account, inspect its identity state and sign it out everywhere when required. |
 | `/ops/backoffice/sso-connections` | Inspect connection state and domain evidence, investigate setup, or pause and resume a connection. |
 | `/ops/backoffice/directory-sync` | Inspect SCIM sync failures, provisioning attempts and external user mappings. Retry a retired apply after fixing its cause. |
+| `/ops/upgrades` | Follow an upgrade: the installation's state, each release's steps and every run with its phases and error. |
 | `/ops/migrations` | Inspect migration progress and reports, or run a targeted migration for an organization. |
 
 Pausing SSO stops new sign-ins through the connection. It leaves existing
@@ -92,11 +94,11 @@ and will be retried. **Finalized** means the organization completed that
 migration. A run that is waiting for an earlier migration has not changed the
 organization yet. Do not treat starting a migration as proof it finished.
 
-For an identity and access upgrade, follow the
-[two-stage migration checklist](/self-hosting/upgrade#complete-identity-and-access-migrations-first)
-before deploying the new version. Check every required migration, including
-users as well as organizations. Credential repair is recurring and does not
-finalize; the one-time backfills must finalize.
+Identity and access migrations run automatically after each upgrade; see
+[Automatic identity and access migration](/self-hosting/upgrade#automatic-identity-and-access-migration).
+Check every required migration, including users as well as organizations.
+Credential repair is recurring and does not finalize; the one-time backfills
+must finalize.
 
 ## Architecture Context
 

@@ -13,7 +13,7 @@ import {
 import { ScimApi, scimOversightTrpc, type ScimOperator } from "@langwatch/enterprise-scim-contract";
 
 const STAFF_LIST_REASON =
-  "back-office surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design";
+  "admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design";
 
 /** The impersonator where there is one: debugging a customer stays operator work. */
 function operatorOf(actor: TrpcHandlerActor): ScimOperator {

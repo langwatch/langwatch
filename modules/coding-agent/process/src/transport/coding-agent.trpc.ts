@@ -73,4 +73,10 @@ export const codingAgentTrpcTransport: TrpcRouterDeclaration<
       viewerUserId: actor.id,
     }),
   )
+
+  .procedure("sessionGroups")
+  .withPermission(CODING_AGENT_PERMISSION)
+  .handle(({ app, input, actor }) =>
+    app.readSessionGroupsForViewer({ ...input, viewerUserId: actor.id }),
+  )
   .build();

@@ -9,7 +9,8 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({
     closeDrawer: vi.fn(),
     openDrawer: vi.fn(),
@@ -29,14 +30,12 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/browser-host/upgrade-modal-store", () => ({
-  useUpgradeModalStore: (selector?: (state: { open: () => void }) => unknown) => {
-    const state = { open: vi.fn() };
-    return typeof selector === "function" ? selector(state) : state;
-  },
+vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useLentHooks: () => ({ openLiteMemberRestriction: vi.fn() }),
 }));
 
-vi.mock("../../../../behavior/use-model-providers-settings.ts", () => ({
+vi.mock("../../../../features/model-selection/behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     modelMetadata: {
       "openai/gpt-5-mini": {
@@ -59,7 +58,7 @@ vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/use-model-limits.ts", () => ({
+vi.mock("../../../../features/model-selection/behavior/use-model-limits.ts", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 
@@ -94,6 +93,7 @@ vi.mock("../../../../behavior/prompt-api.ts", () => ({
   },
 }));
 vi.mock("@langwatch/prompt-client", () => ({
+  PromptEditorDrawerToken: { key: "promptEditor" },
   promptClient: {
     useUtils: () => ({ prompts: { getByIdOrHandle: { invalidate: vi.fn() } } }),
     prompts: {

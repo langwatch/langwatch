@@ -7,8 +7,8 @@
 
 import { useMemo } from "react";
 
-import { useWidgetDraft } from "../../../behavior/use-widget-draft.ts";
-import { useWidgetPreview } from "../../../behavior/use-widget-preview.ts";
+import { useWidgetDraft } from "../../dashboard-widget/behavior/use-widget-draft.ts";
+import { useWidgetPreview } from "../../dashboard-widget/behavior/use-widget-preview.ts";
 import { BLANK_WIDGET } from "../model/blank-widget.ts";
 import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";

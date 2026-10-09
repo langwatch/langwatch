@@ -57,6 +57,21 @@ export type SlackConnectionSecret = z.infer<typeof slackConnectionSecretSchema>;
 export const slackConnectionClaimantSchema = z.object({ id: z.string(), label: z.string() });
 export type SlackConnectionClaimant = z.infer<typeof slackConnectionClaimantSchema>;
 
+/** One claim on a connection: who holds it, from which project. */
+export const slackConnectionClaimSchema = z.object({
+  connectionId: z.string(),
+  projectId: z.string(),
+  claimant: slackConnectionClaimantSchema,
+});
+export type SlackConnectionClaim = z.infer<typeof slackConnectionClaimSchema>;
+
+/** One page of every claim, by claim id; `next` resumes after it and is null on the last page. */
+export const slackConnectionClaimPageSchema = z.object({
+  claims: z.array(slackConnectionClaimSchema),
+  next: z.string().nullable(),
+});
+export type SlackConnectionClaimPage = z.infer<typeof slackConnectionClaimPageSchema>;
+
 /** One `GET /api/slack-connections` item: picked field by field, so no secret rides along. */
 export const slackConnectionRestResponseSchema = z.object({
   id: z

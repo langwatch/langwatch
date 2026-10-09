@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PresenceAvatarStack, type PresencePeer } from "../src/components/presence.tsx";
+import { PresenceAvatarStack, type PresencePeer } from "../src/components/display/presence.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);

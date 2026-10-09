@@ -18,8 +18,8 @@ import {
   type SsoApi as SsoApiContract,
   type SignInProviderMounts,
   type ActivateSsoConnectionInput,
-  type BackofficeSsoConnection,
-  type BackofficeSsoConnectionPage,
+  type AdminSsoConnection,
+  type AdminSsoConnectionPage,
   type ListSsoConnectionsInput,
   type OperatorSsoMigrationProgressInput,
   type RegisterSsoConnectionInput,
@@ -111,9 +111,9 @@ export type SsoConnectionTeardownRequest = Commanded<SsoConnectionReasonInput> &
   Readonly<{ graceMs: number }>;
 
 export interface SsoConnectionLedger {
-  list(input: ListSsoConnectionsInput): Promise<BackofficeSsoConnectionPage>;
+  list(input: ListSsoConnectionsInput): Promise<AdminSsoConnectionPage>;
   /** `null` when no connection carries that id; absence is a normal answer here. */
-  findById(input: SsoConnectionByIdInput): Promise<BackofficeSsoConnection | null>;
+  findById(input: SsoConnectionByIdInput): Promise<AdminSsoConnection | null>;
   registerConnection(input: Commanded<RegisterSsoConnectionInput>): Promise<unknown>;
   claimDomain(input: Commanded<SsoDomainTarget>): Promise<void>;
   approveDomainClaim(input: Commanded<SsoDomainTarget>): Promise<void>;
@@ -264,7 +264,7 @@ class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
   }
 }
 
-type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, never, SsoConfig>;
+type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, SsoConfig>;
 
 /** Every credential this module resolves, alongside the deployment facts. */
 async function resolveConfiguration(
@@ -408,19 +408,19 @@ export class SsoModule implements SsoApiContract {
     const logger = createLogger("langwatch:sso");
     // A peer may not be invoked while the process constructs, so the ledger
     // forwards to identity per call rather than being fetched here.
-    const backoffice = () => dependencies.identity.ssoBackoffice();
+    const admin = () => dependencies.identity.ssoAdmin();
     const connections: SsoConnectionLedger = {
-      list: (input) => backoffice().list(input),
-      findById: (input) => backoffice().findById(input),
-      registerConnection: (input) => backoffice().registerConnection(input),
-      claimDomain: (input) => backoffice().claimDomain(input),
-      approveDomainClaim: (input) => backoffice().approveDomainClaim(input),
-      rejectDomainClaim: (input) => backoffice().rejectDomainClaim(input),
-      attestDomain: (input) => backoffice().attestDomain(input),
-      activateConnection: (input) => backoffice().activateConnection(input),
-      suspendConnection: (input) => backoffice().suspendConnection(input),
-      resumeConnection: (input) => backoffice().resumeConnection(input),
-      requestTeardown: (input) => backoffice().requestTeardown(input),
+      list: (input) => admin().list(input),
+      findById: (input) => admin().findById(input),
+      registerConnection: (input) => admin().registerConnection(input),
+      claimDomain: (input) => admin().claimDomain(input),
+      approveDomainClaim: (input) => admin().approveDomainClaim(input),
+      rejectDomainClaim: (input) => admin().rejectDomainClaim(input),
+      attestDomain: (input) => admin().attestDomain(input),
+      activateConnection: (input) => admin().activateConnection(input),
+      suspendConnection: (input) => admin().suspendConnection(input),
+      resumeConnection: (input) => admin().resumeConnection(input),
+      requestTeardown: (input) => admin().requestTeardown(input),
     };
     const ceremony = () => dependencies.identity.ssoDomainCeremony();
     const domains: SsoDomainCeremonyLedger = {
@@ -567,7 +567,7 @@ export class SsoModule implements SsoApiContract {
   async listConnections(
     input: ListSsoConnectionsInput,
     by: SsoOperator,
-  ): Promise<BackofficeSsoConnectionPage> {
+  ): Promise<AdminSsoConnectionPage> {
     return this.#audited({
       by,
       action: "getAll",
@@ -579,7 +579,7 @@ export class SsoModule implements SsoApiContract {
   async findConnection(
     input: SsoConnectionByIdInput,
     by: SsoOperator,
-  ): Promise<BackofficeSsoConnection | undefined> {
+  ): Promise<AdminSsoConnection | undefined> {
     return this.#audited({
       by,
       action: "getById",

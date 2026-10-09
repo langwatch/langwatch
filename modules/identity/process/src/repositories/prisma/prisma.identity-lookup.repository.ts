@@ -5,6 +5,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { PrismaSsoConnectionProjectionRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-projection.repository.ts";
 import {
   type IdentityLookupRepository,
   type LookupConnectionRow,
@@ -14,7 +15,6 @@ import {
   type LookupMembershipRow,
   type LookupUserRow,
 } from "../identity-lookup.repository.ts";
-import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
 /** The identifier states that count as proof of who somebody works for. */
 const VERIFIED_IDENTIFIER_STATES = ["VERIFIED", "PRIMARY"] as const;

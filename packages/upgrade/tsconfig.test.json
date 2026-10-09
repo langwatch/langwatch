@@ -12,7 +12,16 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
       "path": "../ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../secrets/tsconfig.build.json"
     },
     {
       "path": "../vitest-config/tsconfig.build.json"

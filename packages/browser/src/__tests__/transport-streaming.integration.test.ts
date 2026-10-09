@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
-import { createUiFeatureApiClient } from "../transport.ts";
+import { createUiFeatureApiClient } from "../wire/transport.ts";
 
 /**
  * One request per call against tRPC's own fetch handler, the one `/api/trpc`

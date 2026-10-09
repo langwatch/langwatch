@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PeopleListing } from "../rules/people-listing.rules.ts";
+import type { PeopleListing } from "../features/identity/rules/people-listing.rules.ts";
 
 /** Asking a Databricks workspace for its whole user list over SCIM. Never throws. */
 export interface DatabricksScimUsersChannel {

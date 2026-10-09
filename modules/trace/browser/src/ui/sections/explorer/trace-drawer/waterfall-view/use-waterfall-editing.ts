@@ -3,11 +3,11 @@ import { expandDeletedSpanIds } from "@langwatch/trace-contract";
 import { useCallback, useMemo } from "react";
 
 import { useTraceDrawer, getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
-import type { SpanEditDraft } from "../../../../../behavior/trace-edit.store.ts";
+import type { SpanEditDraft } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import {
   selectIsSpanDeleted,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 
 const NO_DRAFT_NAMES: ReadonlyMap<string, string> = new Map();
 

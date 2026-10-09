@@ -1,8 +1,16 @@
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
-import { moduleApi, defineTrpcContract } from "@langwatch/module";
+import type {
+  InstantEvalClassifierLimits,
+  InstantEvalJudgement,
+  InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
-import type { InstantEvalJudgement, InstantEvalQuestion } from "./instant-eval-judging.ts";
+import type {
+  InstantEvalQueryJudging,
+  InstantEvalQueryJudgingInput,
+} from "./instant-eval-judging.ts";
 import type { InstantEvalJudgmentStatus, InstantEvalTarget } from "./instant-eval-limits.ts";
 import type {
   InstantEvalEstimateWire,
@@ -172,16 +180,6 @@ export interface InstantEvalApi {
   }): Promise<InstantEvalRunProgress[]>;
 
   /**
-   * The runs a reader named, dated, so a judgement read can be bounded by the
-   * window each was written in. Lenient like {@link findRunProgress}: a run
-   * this project does not own is dropped rather than refused.
-   */
-  findRunWindows(input: {
-    projectId: string;
-    references: readonly InstantEvalRunReference[];
-  }): Promise<InstantEvalRunWindow[]>;
-
-  /**
    * One classification of a peer's own text rather than a run's rows, which is
    * how the trace search bar routes a sentence. A judge that cannot answer
    * skips, so the caller falls back instead of failing the read.
@@ -193,6 +191,19 @@ export interface InstantEvalApi {
     /** Aborts the judgement when the caller has gone, as a hosted call's request does. */
     signal?: AbortSignal;
   }): Promise<InstantEvalJudgement>;
+
+  /**
+   * One synchronous query's judged columns, their texts in place (Alex, 2026-10-06, "Judge
+   * cycle"): holds the query token budget's price, judges, records the spend once, then drops
+   * the hold. Refuses an exhausted budget or an oversized query before anything is judged.
+   */
+  judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging>;
+
+  /**
+   * The limits of the judge `judgeQuery` sends to, so a caller trims a conversation to them
+   * before asking (Alex, 2026-10-08, round 26 CD-4). Published by the judge, never assumed.
+   */
+  getJudgeLimits(): InstantEvalClassifierLimits;
 
   /** What judging these input tokens cost LangWatch and what the customer is charged, in USD. */
   priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number };
@@ -219,5 +230,3 @@ export interface InstantEvalApi {
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");
-
-export const instantEvalTrpc = defineTrpcContract("instantEval").build();

@@ -30,7 +30,7 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/managed-provider/contract/tsconfig.build.json"
+      "path": "../../../enterprise/modules/managed-provider/client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/error-views/tsconfig.build.json"
@@ -40,6 +40,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

@@ -1,5 +1,3 @@
-import type { Project, ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * The `/api/teams` family against the real composed application, not a
@@ -11,9 +9,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   organizationModuleSetup,
+  seedMemoryProject,
   type OrganizationModuleSetup,
 } from "../../app/__tests__/support/organization-module-setup.ts";
 import { OrganizationModule } from "../../app/organization.app.ts";
+import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
 import {
   CREDENTIAL,
@@ -33,41 +33,6 @@ const ARCHIVED_TEAM_ID = "team_archived";
 const COLLEAGUE_ID = "user-colleague";
 const OUTSIDER_ID = "user-outsider";
 const NOW = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
-
-/** One project row, as the project boundary answers `listByTeam` with. */
-function projectRow(overrides: Partial<Project> = {}): Project {
-  return {
-    id: "project_1",
-    name: "First Project",
-    slug: "first-project",
-    apiKey: "sk-lw-base-key-of-the-project",
-    lwqlKey: "lwql-key",
-    teamId: SHARED_TEAM_ID,
-    language: "python",
-    framework: "langchain",
-    kind: "application",
-    firstMessage: false,
-    integrated: false,
-    createdAt: toDate(NOW),
-    updatedAt: toDate(NOW),
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
-    isPersonal: false,
-    ownerUserId: null,
-    personalFeatures: null,
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-    ...overrides,
-  };
-}
 
 /**
  * The application `OrganizationModule.create` builds, over the memory tier of its own registry
@@ -96,13 +61,17 @@ async function application() {
     role: "ADMIN",
   });
 
-  const sharedProjects = [projectRow()];
-  const projects = createApiFixture<ProjectApi>(
-    { listByTeam: async (input) => (input.teamId === SHARED_TEAM_ID ? [...sharedProjects] : []) },
-    "ProjectApi",
-  );
-
-  const setup = organizationModuleSetup({ permissions, projects });
+  const memory = MemoryOrganizationDatabase.create();
+  seedMemoryProject({
+    memory,
+    id: "project_1",
+    name: "First Project",
+    slug: "first-project",
+    teamId: SHARED_TEAM_ID,
+    organizationId: ORGANIZATION_ID,
+    at: NOW,
+  });
+  const setup = organizationModuleSetup({ permissions, memory });
   const { repositories } = setup;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(toDate(NOW));
@@ -159,9 +128,7 @@ async function seed(
     resources: {
       teamId: PERSONAL_TEAM_ID,
       teamSlug: "--personal-owner",
-      projectId: "project_personal",
       projectSlug: "personal-owner",
-      projectApiKey: "sk-lw-personal",
       ownerBindingId: "binding-owner-personal",
     },
   });

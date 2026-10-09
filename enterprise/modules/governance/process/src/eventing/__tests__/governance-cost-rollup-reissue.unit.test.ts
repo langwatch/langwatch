@@ -2,7 +2,7 @@
 /** Port of main's fold key and reissue tests. Spec: specs/governance/governance-cost-rollup.feature */
 import { describe, expect, it } from "vitest";
 
-import { governanceCostRollupTotals } from "../../rules/governance-cost-rollup-cell.rules.ts";
+import { governanceCostRollupTotals } from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
 import {
   DAY_START_MS,
   HOUR_MS,

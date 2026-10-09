@@ -4,10 +4,10 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { NavigationProject } from "@langwatch/navigation-contract";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { NavigationProject } from "../../../model/navigation-host.ts";
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { MainMenuSections } from "../main-menu.tsx";
 

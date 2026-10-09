@@ -1,6 +1,8 @@
-import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
-import { LambdaClient } from "@aws-sdk/client-lambda";
-import { AgentApi } from "@langwatch/agent-contract";
+import {
+  AgentApi,
+  type AgentApiCopyRequest,
+  type AgentCopyCreated,
+} from "@langwatch/agent-contract";
 import { ApiKeyApi, ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -10,17 +12,14 @@ import { AuthzApi } from "@langwatch/authz-contract";
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
-import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { SecretApi } from "@langwatch/secret-contract";
-import { nlpInternalSecret, Secret } from "@langwatch/secrets";
+import { nlpInternalSecret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   clearDsl,
@@ -55,11 +54,8 @@ import {
   type WorkflowPushToCopies,
   type WorkflowDsl,
   type WorkflowEvaluatorFields,
-  type WorkflowEvaluationRequest,
-  type WorkflowEvaluationStarted,
   type WorkflowLineageRow,
   type WorkflowListRow,
-  type WorkflowMappingFields,
   type PublishedWorkflowAnswer,
   type WorkflowPublicationFlags,
   type WorkflowReference,
@@ -80,27 +76,23 @@ import {
   WorkflowOptimizationRemovedError,
   WorkflowStudioEventInvalidError,
   workflowStudioRestEventSchema,
-  nlpLambdaFleetFromSecret,
-  type NlpLambdaFleetFields,
 } from "@langwatch/workflow-contract";
 
 import { LambdaWorkflowStudioStreamChannel } from "../channels/aws.lambda-workflow-studio-stream.channel.ts";
-import { AwsNlpLambdaArnResolverChannel } from "../channels/aws.nlp-lambda-arn-resolver.channel.ts";
-import { AwsNlpLambdaFleetChannel } from "../channels/aws.nlp-lambda-fleet.channel.ts";
-import { AwsNlpLambdaInvokeChannel } from "../channels/aws.nlp-lambda-invoke.channel.ts";
-import { AwsNlpLambdaStreamInvokeChannel } from "../channels/aws.nlp-lambda-stream-invoke.channel.ts";
-import {
-  HttpWorkflowNlpRuntimeAdapter,
-  UnconfiguredWorkflowNlpRuntimeAdapter,
-} from "../channels/http/http.workflow-nlp-runtime.channel.ts";
-import {
-  HttpWorkflowStudioStreamAdapter,
-  UnconfiguredWorkflowStudioStreamAdapter,
-} from "../channels/http/http.workflow-studio-stream.channel.ts";
+import { HttpWorkflowNlpRuntimeAdapter } from "../channels/http/http.workflow-nlp-runtime.channel.ts";
 import type {
   NlpLambdaFunctionReader,
   WorkflowStudioStream,
 } from "../channels/nlp-lambda.channel.ts";
+import {
+  nlpLambdaFleetSecret,
+  s3KeySaltSecret,
+  type WorkflowChannels,
+} from "../channels/workflow.channels.ts";
+import {
+  buildWorkflowAgentArchiveCascadePipeline,
+  type WorkflowAgentArchiveCascadePipeline,
+} from "../eventing/workflow-agent-archive-cascade.pipeline.ts";
 import {
   buildWorkflowLifecyclePipeline,
   type WorkflowLifecyclePipeline,
@@ -113,10 +105,6 @@ import {
 } from "../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import { relayTurnCeilingMs } from "../rules/execute-sync-relay.rules.ts";
-import {
-  buildStudioLambdaConfig,
-  studioLambdaConfigFingerprint,
-} from "../rules/nlp-lambda-config.rules.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 import { dispatchKeyFloorMs } from "../rules/workflow-run-key.rules.ts";
 import {
@@ -127,6 +115,7 @@ import {
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import { NlpLambdaRuntimeService } from "../services/nlp-lambda-runtime.service.ts";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
+import { WorkflowAgentCopyService } from "../services/workflow-agent-copy.service.ts";
 import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
 import { WorkflowCodeCompletionService } from "../services/workflow-code-completion.service.ts";
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
@@ -146,6 +135,7 @@ import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispa
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
 import { WorkflowService } from "../services/workflow.service.ts";
+import type { WorkflowBrowserApi } from "../transport/workflow.trpc.ts";
 
 const logger = createLogger("langwatch:workflows");
 
@@ -199,10 +189,6 @@ export interface WorkflowLineageReads {
     workflowId: string;
     projectId: string;
   }): Promise<readonly Readonly<{ id: string; name: string }>[]>;
-  listMonitorsForEvaluators(input: {
-    projectId: string;
-    evaluatorIds: readonly string[];
-  }): Promise<readonly Readonly<{ id: string; name: string; evaluatorId: string }>[]>;
   cascadeArchive(input: {
     projectId: string;
     workflowId: string;
@@ -232,11 +218,6 @@ export interface WorkflowPublicationReads {
 /** The model call behind an autogenerated commit message. */
 interface WorkflowCommitMessageWriter {
   generate(input: { projectId: string; previousDsl: string; nextDsl: string }): Promise<string>;
-}
-
-/** Starting one evaluation run through the deployment's evaluations pipeline. */
-interface WorkflowEvaluationTrigger {
-  trigger(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted>;
 }
 
 /** One Monaco completion for the studio's code editor. */
@@ -307,8 +288,6 @@ interface WorkflowInfrastructure {
   executeSyncRelay: WorkflowExecuteSyncRelayService;
   /** The ONE workflow graph service on this process. */
   workflows: WorkflowService;
-  /** The evaluators a workflow is published as. */
-  evaluators: EvaluatorApi;
   /** The dataset copies a Studio graph carries with it into another project. */
   datasets: DatasetApi;
   /** How a Studio graph is prepared before any version of it is written. */
@@ -317,13 +296,14 @@ interface WorkflowInfrastructure {
   httpSecrets: WorkflowHttpSecrets;
   /** The agent mappings a saved Studio graph refreshes, best effort. */
   agentMappings: WorkflowAgentMapping;
+  /** Writes the row of an agent copy whose graph this module copied first. */
+  agents: AgentApi;
   /** The bare row a Studio copy lands in, before its first version exists. */
   workflowRows: WorkflowRowRepository;
   permissions: WorkflowPermissionProbe;
   lineage: WorkflowLineageReads;
   publications: WorkflowPublicationReads;
   commitMessages: WorkflowCommitMessageWriter;
-  evaluations: WorkflowEvaluationTrigger;
   codeCompletions: WorkflowCodeCompletions;
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
@@ -343,16 +323,10 @@ interface WorkflowInfrastructure {
 
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowModule.dependencies,
-  never,
   WorkflowServerConfig,
-  WorkflowRepositories
+  WorkflowRepositories,
+  WorkflowChannels
 >;
-
-/** The per-project studio fleet (`LANGWATCH_NLP_LAMBDA_CONFIG`): a credential, not config. */
-const nlpLambdaFleetSecret = Secret.load("LANGWATCH_NLP_LAMBDA_CONFIG", { optional: true });
-
-/** Main's retry budget, enough to ride out a cold fleet's concurrency burst. */
-const NLP_LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
 
 /** Where studio graphs and workflow runs execute, and the fleet the daily sweep reads. */
 type WorkflowEngine = Readonly<{
@@ -363,118 +337,43 @@ type WorkflowEngine = Readonly<{
   perProjectEngines: boolean;
 }>;
 
-/**
- * Main's precedence: a named fleet wins, and one that cannot be used refuses by
- * name rather than falling back; with none, the engine address; with neither,
- * every run refuses by name. See modules/workflow/specs/studio-lambda-stream.feature.
- */
-async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
-  const named = await setup.secrets.into(nlpLambdaFleetSecret, (raw) =>
-    nlpLambdaFleetFromSecret.safeParse(raw),
-  );
-  if (!named.success) {
-    const reason =
-      named.error.issues[0]?.message ?? "The NLP Lambda fleet configuration cannot be used.";
-    logger.error({ reason }, "the named NLP Lambda fleet is unusable; studio runs will refuse");
+/** The channels' engine, with a project-function fleet's ARNs resolved over its AWS channels. */
+function composeEngine(setup: WorkflowSetup): WorkflowEngine {
+  const { engine } = setup.channels;
+  if (engine.kind === "single") return engine;
 
-    return {
-      stream: UnconfiguredWorkflowStudioStreamAdapter.create({ reason }),
-      runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create({ reason }),
-      perProjectEngines: true,
-    };
-  }
-
-  // The engine hop's shared credential (ADR-132); the process holds the same handle.
-  const internalSecret = await setup.secrets.into(nlpInternalSecret, (secret) => secret);
-  if (named.data) return lambdaEngine({ fields: named.data, setup, internalSecret });
-
-  const serviceUrl = setup.config.nlpServiceUrl;
-  if (!serviceUrl) {
-    return {
-      stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
-      runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create(),
-      perProjectEngines: false,
-    };
-  }
-
-  return {
-    stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl, internalSecret }),
-    runtime: HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl, internalSecret }),
-    perProjectEngines: false,
-  };
-}
-
-/** Each project's own function, resolved once cluster-wide and invoked over AWS. */
-function lambdaEngine({
-  fields,
-  setup,
-  internalSecret,
-}: {
-  fields: NlpLambdaFleetFields;
-  setup: WorkflowSetup;
-  internalSecret: string | undefined;
-}): WorkflowEngine {
-  const config = buildStudioLambdaConfig({
-    fields: {
-      region: fields.AWS_REGION,
-      accessKeyId: fields.AWS_ACCESS_KEY_ID,
-      secretAccessKey: fields.AWS_SECRET_ACCESS_KEY,
-      roleArn: fields.role_arn,
-      imageUri: fields.image_uri,
-      cacheBucket: fields.cache_bucket,
-      subnetIds: fields.subnet_ids,
-      securityGroupIds: fields.security_group_ids,
-    },
-    langwatchEndpoint: setup.config.publicBaseUrl ?? "",
-    codeBlockTimeoutRawValue: setup.config.nlpCodeBlockTimeoutSeconds,
-    stagingThresholdBytesRawValue: setup.config.stagingThresholdBytes,
-    stagingTtlSecondsRawValue: setup.config.stagingTtlSeconds,
-  });
-  const credentials = { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey };
-  const lambda = new LambdaClient({
-    region: config.region,
-    credentials,
-    maxAttempts: NLP_LAMBDA_CLIENT_MAX_ATTEMPTS,
-  });
-  // One SDK attempt: its retry re-invokes a function that may already run customer code.
-  const invokeLambda = new LambdaClient({ region: config.region, credentials, maxAttempts: 1 });
-  const logs = new CloudWatchLogsClient({ region: config.region, credentials });
-  setup.resources.own("Workflow NLP Lambda clients", () => {
-    lambda.destroy();
-    invokeLambda.destroy();
-    logs.destroy();
-  });
-
+  setup.resources.own("Workflow NLP Lambda clients", () => engine.close());
   const arns = NlpLambdaRuntimeService.create({
     cache: setup.repositories.nlpLambdaArns,
-    resolver: AwsNlpLambdaArnResolverChannel.create({ lambda, logs, config, logger }),
-    imageUri: config.imageUri,
-    configFingerprint: studioLambdaConfigFingerprint(config),
+    resolver: engine.resolver,
+    imageUri: engine.imageUri,
+    configFingerprint: engine.configFingerprint,
     logger,
   });
   const functions: NlpLambdaFunctionReader = {
     arnFor: ({ projectId }) => arns.resolveArn(projectId),
   };
   const staging = setup.repositories.payloadStaging;
-  const { stagingThresholdBytes, stagingTtlSeconds } = config;
+  const { stagingThresholdBytes, stagingTtlSeconds, internalSecret, cacheKeySalt } = engine;
 
   return {
     stream: LambdaWorkflowStudioStreamChannel.create({
       functions,
-      invoke: AwsNlpLambdaStreamInvokeChannel.create({ lambda }),
+      invoke: engine.streamInvoke,
       staging,
       stagingThresholdBytes,
       stagingTtlSeconds,
       internalSecret,
+      cacheKeySalt,
     }),
     runtime: HttpWorkflowNlpRuntimeAdapter.onProjectFunctions({
       functions,
-      lambda: AwsNlpLambdaInvokeChannel.create({ lambda: invokeLambda }),
+      lambda: engine.invoke,
       staging,
       stagingConfig: { stagingThresholdBytes, stagingTtlSeconds },
       internalSecret,
     }),
-    fleet: AwsNlpLambdaFleetChannel.create({ lambda, logs, logger }),
+    fleet: engine.fleet,
     perProjectEngines: true,
   };
 }
@@ -495,7 +394,6 @@ function lineageOf({
     findWorkflowWithCopies: (input) => rows.findWorkflowWithCopies(input),
     findLatestVersionNumber: (input) => rows.findLatestVersionNumber(input),
     listAgents: (input) => linked.listAgents(input),
-    listMonitorsForEvaluators: (input) => linked.listMonitorsForEvaluators(input),
     cascadeArchive: (input) => linked.cascadeArchive(input),
   };
 }
@@ -578,11 +476,9 @@ function relatedProjectIdsOf(workflow: WorkflowLineageRow): readonly string[] {
   ];
 }
 
-export class WorkflowModule implements WorkflowApi {
+export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   static readonly contract = WorkflowApi;
   static readonly dependencies = {
-    /** The evaluators a workflow is published as - a peer's App, not a member. */
-    evaluators: EvaluatorApi,
     /** Resolves a Studio graph's models before any version of it is written. */
     modelProviders: ModelProviderApi,
     /** The agent mappings a saved Studio graph refreshes, best effort. */
@@ -593,10 +489,6 @@ export class WorkflowModule implements WorkflowApi {
     authz: AuthzApi,
     /** Mints the key a run calls LangWatch back with. */
     apiKeys: ApiKeyApi,
-    /** Registers and runs a workflow's evaluation over its batch. */
-    experiments: ExperimentApi,
-    /** The monitors an archived workflow's evaluators back, deleted with it. */
-    monitors: MonitorApi,
     /** Stores an HTTP node's typed token; reads the listed secrets a Studio run receives. */
     secrets: SecretApi,
   };
@@ -605,10 +497,11 @@ export class WorkflowModule implements WorkflowApi {
   static readonly secrets = {
     nlpLambdaFleet: nlpLambdaFleetSecret,
     nlpInternal: nlpInternalSecret,
+    s3KeySalt: s3KeySaltSecret,
   } as const;
 
   static async create(setup: WorkflowSetup): Promise<WorkflowModule> {
-    const engine = await composeEngine(setup);
+    const engine = composeEngine(setup);
     const datasets = setup.dependencies.datasets;
     const llmParameters = ModelProviderWorkflowLlmParameters.create({
       modelProviders: setup.dependencies.modelProviders,
@@ -660,23 +553,18 @@ export class WorkflowModule implements WorkflowApi {
         : { publicBaseUrl: setup.config.publicBaseUrl }),
       workflows,
       datasets,
-      evaluators: setup.dependencies.evaluators,
       studioDsl: ModelProviderWorkflowStudioDslService.create({
         modelProviders: setup.dependencies.modelProviders,
       }),
       httpSecrets: WorkflowHttpSecretsService.create(setup.dependencies.secrets),
       agentMappings: WorkflowAgentMappingService.create({ agents: setup.dependencies.agents }),
+      agents: setup.dependencies.agents,
       workflowRows: setup.repositories.workflowRows,
-      evaluations: {
-        trigger: (input) => setup.dependencies.experiments.triggerWorkflowEvaluation(input),
-      },
       lineage: lineageOf({
         rows: setup.repositories.lineage,
         linked: WorkflowLinkedRowsService.create({
           workflows,
           agents: setup.dependencies.agents,
-          evaluators: setup.dependencies.evaluators,
-          monitors: setup.dependencies.monitors,
         }),
       }),
       publications: publicationsOf(setup.repositories.lineage),
@@ -695,6 +583,7 @@ export class WorkflowModule implements WorkflowApi {
   #studioCopies: WorkflowStudioCopyService;
   #publication: WorkflowPublicationService;
   #copyLineage: WorkflowCopyLineageService;
+  #agentCopies: WorkflowAgentCopyService;
 
   private constructor(infrastructure: WorkflowInfrastructure) {
     this.#infrastructure = infrastructure;
@@ -703,6 +592,7 @@ export class WorkflowModule implements WorkflowApi {
       studioDsl: infrastructure.studioDsl,
       httpSecrets: infrastructure.httpSecrets,
       agentMappings: infrastructure.agentMappings,
+      recordVersionSaved: (input) => this.#recordVersionSaved(input),
     });
     this.#studioCopies = WorkflowStudioCopyService.create({
       datasets: infrastructure.datasets,
@@ -716,6 +606,11 @@ export class WorkflowModule implements WorkflowApi {
       permissions: infrastructure.permissions,
       workflows: infrastructure.workflows,
       studioVersions: this.#studioVersions,
+    });
+    this.#agentCopies = WorkflowAgentCopyService.create({
+      agents: infrastructure.agents,
+      permissions: infrastructure.permissions,
+      workflows: infrastructure.workflows,
     });
   }
 
@@ -762,13 +657,6 @@ export class WorkflowModule implements WorkflowApi {
     return this.#infrastructure.workflows.assertInProject(input);
   }
 
-  listFields(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<Record<string, WorkflowMappingFields>> {
-    return this.#infrastructure.workflows.listFields(input);
-  }
-
   listSummaries(input: {
     projectId: string;
     workflowIds: string[];
@@ -776,8 +664,10 @@ export class WorkflowModule implements WorkflowApi {
     return this.#infrastructure.workflows.listSummaries(input);
   }
 
-  archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
-    return this.#infrastructure.workflows.archiveLinked(input);
+  async archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
+    const archived = await this.#infrastructure.workflows.archiveLinked(input);
+    this.#recordArchived(input);
+    return archived;
   }
 
   deleteUncommitted(input: WorkflowReference): Promise<void> {
@@ -827,6 +717,12 @@ export class WorkflowModule implements WorkflowApi {
     const created = await this.#infrastructure.workflows.create({ ...input, dsl, authorId: by.id });
 
     this.#recordCreated({ workflowId: created.workflow.id, projectId: input.projectId, by });
+    this.#recordVersionSaved({
+      projectId: input.projectId,
+      workflowId: created.workflow.id,
+      versionId: created.version.id,
+      authorId: by.id,
+    });
 
     return created;
   }
@@ -852,6 +748,66 @@ export class WorkflowModule implements WorkflowApi {
       .catch((error: unknown) => this.#infrastructure.signals.failed(error, { projectId }));
   }
 
+  /**
+   * Records a version that was saved, restored or brought back with its workflow, with the
+   * fields it offers while it is current; never failing or delaying the write.
+   */
+  #recordVersionSaved(input: {
+    projectId: string;
+    workflowId: string;
+    versionId?: string;
+    authorId?: string;
+  }): void {
+    const { projectId, workflowId, versionId, authorId } = input;
+    void this.#infrastructure.workflows
+      .findCurrentVersionFacts({ projectId, workflowId, versionId })
+      .then(async (current) => {
+        const commands = this.#lifecycleCommands;
+        if (!commands) throw new Error("workflow_lifecycle pipeline senders are not connected yet");
+        const facts =
+          current.length > 0 || versionId === undefined || authorId === undefined
+            ? current
+            : [{ versionId, authorId, fields: undefined }];
+        for (const fact of facts) {
+          await commands.recordWorkflowVersionSaved.send({
+            tenantId: projectId,
+            occurredAt: nowInstant().epochMilliseconds,
+            projectId,
+            workflowId,
+            versionId: fact.versionId,
+            authorId: authorId ?? fact.authorId,
+            ...(fact.fields ? { fields: fact.fields } : {}),
+          });
+        }
+      })
+      .catch((error: unknown) => this.#infrastructure.signals.failed(error, { projectId }));
+  }
+
+  /** Records an archived workflow, never failing or delaying the archive. */
+  #recordArchived(input: WorkflowReference): void {
+    void Promise.resolve()
+      .then(() => {
+        if (!this.#lifecycleCommands) {
+          throw new Error("workflow_lifecycle pipeline senders are not connected yet");
+        }
+        return this.#lifecycleCommands.recordWorkflowArchived.send({
+          tenantId: input.projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          ...input,
+        });
+      })
+      .catch((error: unknown) =>
+        this.#infrastructure.signals.failed(error, { projectId: input.projectId }),
+      );
+  }
+
+  /** Records an archive, or the current version of a workflow brought back from one. */
+  #recordArchiveChange(input: WorkflowReference & { unarchive?: boolean }): void {
+    const { unarchive, ...reference } = input;
+    if (unarchive) this.#recordVersionSaved(reference);
+    else this.#recordArchived(reference);
+  }
+
   /** The workflow lifecycle pipeline this module registers, built once by {@link create}. */
   lifecyclePipeline(): WorkflowLifecyclePipeline {
     return this.#infrastructure.lifecycle;
@@ -862,12 +818,42 @@ export class WorkflowModule implements WorkflowApi {
     this.#lifecycleCommands = commands;
   }
 
-  /** Copies a workflow into another project, attributed to its caller. */
-  copy(
-    input: Omit<CopyWorkflowCommand, "authorId">,
-    by: WorkflowCaller,
-  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    return this.#infrastructure.workflows.copy({ ...input, authorId: by.id });
+  /** Records a live workflow's current version with its fields, for the backfill; false if none. */
+  async recordCurrentVersionFields(input: WorkflowReference): Promise<boolean> {
+    const commands = this.#lifecycleCommands;
+    if (!commands) throw new Error("workflow_lifecycle pipeline senders are not connected yet");
+    const facts = await this.#infrastructure.workflows.findCurrentVersionFacts(input);
+    for (const fact of facts) {
+      await commands.recordWorkflowVersionSaved.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+        ...fact,
+      });
+    }
+    return facts.length > 0;
+  }
+
+  /** Archives an agent's graph once agent records the archive, from workflow's own side (§9). */
+  agentArchiveCascadePipeline(): WorkflowAgentArchiveCascadePipeline {
+    return buildWorkflowAgentArchiveCascadePipeline({
+      workflows: {
+        archiveIfLive: async (input) => {
+          await this.#infrastructure.workflows.archiveIfLive(input);
+          this.#recordArchived(input);
+        },
+      },
+    });
+  }
+
+  /** This module's own application, which the browser door reads through. */
+  workflows(): WorkflowApi {
+    return this;
+  }
+
+  /** Copies an agent into another project, bringing a copy of a workflow agent's graph. */
+  copyAgent(input: AgentApiCopyRequest, by: WorkflowCaller): Promise<AgentCopyCreated> {
+    return this.#agentCopies.copyAgent(input, by);
   }
 
   /** Copies a workflow once the caller may create workflows in its source project too. */
@@ -893,8 +879,14 @@ export class WorkflowModule implements WorkflowApi {
   }
 
   /** Makes a stored version current again. */
-  restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
-    return this.#infrastructure.workflows.restoreVersion(input);
+  async restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
+    const version = await this.#infrastructure.workflows.restoreVersion(input);
+    this.#recordVersionSaved({
+      projectId: input.projectId,
+      workflowId: version.workflowId,
+      versionId: version.id,
+    });
+    return version;
   }
 
   /** Publishes one version, attributed to the caller who asked for it. */
@@ -908,8 +900,14 @@ export class WorkflowModule implements WorkflowApi {
   }
 
   /** Archives one workflow, or restores it when `unarchive` is set. */
-  archive(input: ArchiveWorkflowCommand): Promise<Workflow> {
-    return this.#infrastructure.workflows.archive(input);
+  async archive(input: ArchiveWorkflowCommand): Promise<Workflow> {
+    const workflow = await this.#infrastructure.workflows.archive(input);
+    this.#recordArchiveChange({
+      workflowId: workflow.id,
+      projectId: workflow.projectId,
+      unarchive: input.unarchive,
+    });
+    return workflow;
   }
 
   /** Runs a workflow synchronously, on its published version unless one is named. */
@@ -959,11 +957,6 @@ export class WorkflowModule implements WorkflowApi {
       inputs: { ...input.body },
       principal: input.principal,
     });
-  }
-
-  /** Starts one evaluation run of a committed version. */
-  async triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
-    return this.#infrastructure.evaluations.trigger(input);
   }
 
   // -- the Studio's own save and copy ----------------------------------------
@@ -1132,66 +1125,6 @@ export class WorkflowModule implements WorkflowApi {
     });
   }
 
-  // -- the evaluator a published workflow is wrapped in -----------------------
-
-  /** Every evaluator in the project. */
-  listEvaluators(input: { projectId: string }): Promise<Evaluator[]> {
-    return this.#infrastructure.evaluators.getAll(input);
-  }
-
-  /**
-   * Create-or-rename rather than create: a workflow republished after a rename
-   * must not leave the picker showing the old name, and a second evaluator for
-   * one workflow would be two rows the picker cannot tell apart.
-   */
-  async linkEvaluatorToWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-    name: string;
-  }): Promise<Evaluator> {
-    const { workflowId, projectId, name } = input;
-    const [existing] = await this.#infrastructure.evaluators.listByWorkflow({
-      workflowId,
-      projectId,
-    });
-
-    if (existing) {
-      return this.#infrastructure.evaluators.update({
-        id: existing.id,
-        projectId,
-        data: { name },
-      });
-    }
-
-    return this.#infrastructure.evaluators.create({
-      id: newEvaluatorId(),
-      projectId,
-      name,
-      type: "workflow",
-      config: {},
-      workflowId,
-    });
-  }
-
-  /**
-   * Nothing may keep an evaluator pointing at a workflow that no longer offers
-   * itself as one. A workflow never published as an evaluator has nothing to
-   * archive, which is a no-op rather than a refusal.
-   */
-  async unlinkEvaluatorFromWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<void> {
-    const [linked] = await this.#infrastructure.evaluators.listByWorkflow(input);
-
-    if (!linked) return;
-
-    await this.#infrastructure.evaluators.archive({
-      id: linked.id,
-      projectId: input.projectId,
-    });
-  }
-
   // -- what the caller may see elsewhere -------------------------------------
 
   hasProjectPermission(input: {
@@ -1300,76 +1233,35 @@ export class WorkflowModule implements WorkflowApi {
   }
 
   /**
-   * What archiving this workflow would take with it - the evaluators and
-   * agents bound to it, and the monitors those evaluators back.
+   * What archiving this workflow takes with it: the agents that run it. The browser names
+   * the evaluators and their monitors from evaluator's and monitor's clients.
    */
   async getRelatedEntities(input: {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowRelatedEntities> {
-    const evaluators = (await this.listEvaluators({ projectId: input.projectId }))
-      .filter((evaluator) => evaluator.workflowId === input.workflowId)
-      .map(({ id, name }) => ({ id, name }));
+    // Copied out of the readonly view: the dialog types this list as a plain array.
+    const agents = await this.#infrastructure.lineage.listAgents(input);
 
-    // Copied out of the readonly views: the confirmation dialog these lists
-    // feed types them as plain arrays, and a readonly element type would
-    // narrow a client payload that is identical on the wire.
-    const agents = [...(await this.#infrastructure.lineage.listAgents(input))];
-
-    const evaluatorIds = evaluators.map((evaluator) => evaluator.id);
-    const monitors =
-      evaluatorIds.length > 0
-        ? [
-            ...(await this.#infrastructure.lineage.listMonitorsForEvaluators({
-              projectId: input.projectId,
-              evaluatorIds,
-            })),
-          ]
-        : [];
-
-    return { evaluators, agents, monitors };
+    return { agents: [...agents] };
   }
 
   /**
-   * Archives the workflow and everything downstream of it in one transaction:
-   * linked evaluators and agents are archived, and the monitors those
-   * evaluators back are deleted outright.
+   * Archives the workflow and the agents that run it; evaluator archives the
+   * evaluators it backs from the archived fact, and monitor deletes their
+   * monitors from evaluator's, after a lag (plan §7).
    */
-  cascadeArchive(input: {
+  async cascadeArchive(input: {
     projectId: string;
     workflowId: string;
     unarchive?: boolean;
   }): Promise<WorkflowCascadeArchive> {
-    return this.#infrastructure.lineage.cascadeArchive(input);
+    const archived = await this.#infrastructure.lineage.cascadeArchive(input);
+    this.#recordArchiveChange(input);
+    return archived;
   }
 
   // -- the Optimization Studio's publication flags ---------------------------
-
-  async toggleSaveAsEvaluator(input: {
-    workflowId: string;
-    projectId: string;
-    isEvaluator: boolean;
-  }): Promise<void> {
-    const workflow = await this.#infrastructure.publications.findFlags(input);
-    if (!workflow) {
-      throw new WorkflowNotFoundError(input.workflowId, input.projectId);
-    }
-
-    await this.#infrastructure.publications.setFlags({
-      workflowId: input.workflowId,
-      projectId: input.projectId,
-      isEvaluator: input.isEvaluator,
-      isComponent: !input.isEvaluator,
-    });
-
-    if (input.isEvaluator) {
-      await this.linkEvaluatorToWorkflow({
-        workflowId: input.workflowId,
-        projectId: input.projectId,
-        name: workflow.name,
-      });
-    }
-  }
 
   findWorkflowFlags(input: {
     workflowId: string;

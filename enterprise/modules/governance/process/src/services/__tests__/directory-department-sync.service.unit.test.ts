@@ -6,12 +6,12 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 // Port of main's directoryDepartmentSync unit and integration tests, over the memory tier.
 import { describe, expect, it } from "vitest";
 
+import { DepartmentService } from "../../features/identity/services/department.service.ts";
+import { DirectoryDepartmentSyncService } from "../../features/identity/services/directory-department-sync.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../features/microsoft/rules/dataverse-environment-service.rules.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../features/microsoft/rules/microsoft-graph-directory.rules.ts";
 import { MemoryDepartmentRepository } from "../../repositories/memory/memory.department.repository.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../rules/dataverse-environment-service.rules.ts";
-import { DIRECTORY_REPORT_ACTION } from "../../rules/microsoft-graph-directory.rules.ts";
-import { DepartmentService } from "../department.service.ts";
-import { DirectoryDepartmentSyncService } from "../directory-department-sync.service.ts";
 
 const ORG = "org_dirdept";
 const OID = "f6481ec4-0000-4000-8000-0000000000a1";

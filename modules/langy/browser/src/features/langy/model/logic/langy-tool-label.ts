@@ -1,7 +1,7 @@
 import { classifyGithubStep, parseLangwatchCommand } from "@langwatch/langy-contract";
 
+import { resolveCapabilityProgress } from "../../../../model/langy-capability-registry.ts";
 import { findSkill } from "../../../../model/shared/langy/langy-skills.ts";
-import { resolveCapabilityProgress } from "../capabilities/capability-registry.ts";
 
 /**
  * What a tool call is DOING, in human words.

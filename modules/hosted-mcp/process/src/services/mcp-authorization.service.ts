@@ -17,7 +17,6 @@ import {
   type McpAuthorizeAnswer,
 } from "../rules/mcp-authorize.rules.ts";
 
-export type { McpApprovalOutcome, McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";
 const AUTH_CODE_TTL_SECONDS = 600;
 
 /** 256 bits, the length every other one-time OAuth credential here is minted at. */
@@ -33,7 +32,7 @@ export const MCP_AUTHORIZE_PERMISSION = "project:update" as const;
 export type McpApprover = Readonly<{ user: Readonly<{ id: string }> }>;
 
 /** The project an authorization code is minted against. */
-export type McpAuthorizeProject = Readonly<{
+type McpAuthorizeProject = Readonly<{
   id: string;
   organizationId: string;
   /** When the project was archived, in whatever shape the host holds one. */
@@ -41,7 +40,7 @@ export type McpAuthorizeProject = Readonly<{
 }>;
 
 /** One approval, as the consent page posted it. */
-export type McpApprovalRequest = Readonly<{
+type McpApprovalRequest = Readonly<{
   approver: McpApprover;
   projectId: string;
   clientId: string;

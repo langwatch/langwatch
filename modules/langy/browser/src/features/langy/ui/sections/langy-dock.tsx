@@ -1,10 +1,10 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { lazyChunk } from "@langwatch/browser-host/navigation";
 import { LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { Suspense, useState } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
-import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LangyLauncher } from "./langy-launcher.tsx";

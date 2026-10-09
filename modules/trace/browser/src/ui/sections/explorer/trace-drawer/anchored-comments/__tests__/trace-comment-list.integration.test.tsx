@@ -8,7 +8,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../../behavior/use-annotations-by-trace-ids.ts";
 
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -23,8 +23,8 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 import { setWindowAddress } from "../../../../../../__tests__/window-location-router.ts";
-import { useFocusSectionStore } from "../../../../../../behavior/focus-section.store.ts";
 import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
+import { useFocusSectionStore } from "../../../../../../features/trace-drawer/behavior/focus-section.store.ts";
 import { TraceCommentList } from "../trace-comment-list.tsx";
 
 const TRACE_ID = "trace-1";

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TestModelProviderService } from "../../__tests__/support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "../../__tests__/support/query-classification.fake.ts";
 import { traceReadPorts } from "../../__tests__/support/trace-read-ports.fake.ts";
-import { TraceQueryFieldValuesRepository } from "../../repositories/query-field-values.repository.ts";
+import { TraceQueryFieldValuesRepository } from "../../features/query/repositories/query-field-values.repository.ts";
 import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,

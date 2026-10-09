@@ -2,7 +2,7 @@ import type { UIMessage } from "ai";
 import { type RefObject, useCallback, useRef } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
-import { langyDraftToRestore } from "../../../../model/langy-draft-recovery.ts";
+import { langyDraftToRestore } from "../../../composer/model/langy-draft-recovery.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 
 /** How one send behaves beyond its text. */

@@ -372,7 +372,7 @@ REST route passes the request's own `AbortSignal`, the runner checks it between
 classifications, and an abort propagates rather than being counted as a row that
 could not be judged.
 
-## Amendment, 2026-09-30: a query does not judge
+## Amendment, 2026-09-30: a query does not judge (reverted 2026-10-06)
 
 The amendment above describes judging inside the synchronous query. The tree
 never built that. A query's eval column answers with the text to be judged, and
@@ -382,6 +382,13 @@ per-query ceilings live on the page: `instant_eval_questions_too_long` and
 `instant_eval_query_budget_exceeded` refuse a page before it is sent.
 
 ### Ideas not built
+
+Reverted on 2026-10-06 (Alex, "Inline eval" in
+`.claude/coordinator/rulings-2026-10-06-rounds.md`): synchronous judging is restored as main had
+it, and the list below is the restoration's scope rather than ideas set aside. Analytics judges
+through an `InstantEvalApi` operation, holds `queryTokenBudget` around the judging and records the
+spend once per query; the sync path hydrates extraction too. How analytics reaches the judge
+without a new peer cycle is held (`held-questions.md`, `lwql-sync-eval`).
 
 - A synchronous query that judges its own rows, with the classifier called in the hydration stage.
 - `instant_eval_classifier_unavailable` as a refusal of a whole query when nothing could be judged.

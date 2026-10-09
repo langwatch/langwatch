@@ -9,7 +9,7 @@ import type { UserApi } from "@langwatch/user-contract";
 /** The one user read a key-authenticated turn needs, from the user module. */
 export type LangyActorUserReader = Pick<UserApi, "findById">;
 
-export type LangyActorResolution =
+type LangyActorResolution =
   | { ok: true; session: LangyCredentialSession }
   | { ok: false; reason: "actor-missing"; message: string };
 

@@ -11,13 +11,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createTraceDestinationProjects } from "../../__tests__/support/trace-destination-project-service.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
+import { GatewaySpendScopeService } from "../../features/spend/services/gateway-spend-scope.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import { GatewaySpendScopeService } from "../../services/gateway-spend-scope.service.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();

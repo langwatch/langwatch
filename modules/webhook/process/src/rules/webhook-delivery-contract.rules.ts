@@ -6,14 +6,8 @@
  * and per-endpoint process state, and the retry ladder a failing endpoint climbs.
  */
 
-import type { Event, IntentContext } from "@langwatch/eventing";
-import {
-  type GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  type GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  type GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  type GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-  type SpendUsage,
-} from "@langwatch/gateway-contract";
+import type { IntentContext } from "@langwatch/eventing";
+import { type SpendUsage } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { z } from "zod";
@@ -80,12 +74,6 @@ export type SettleSpendCommandData = SpendOutcomeAttributionData & {
   tenantId: string;
   reason: string;
 };
-
-export type GatewaySpendProcessingEvent =
-  | (Event<AdmitSpendCommandData> & { type: typeof GATEWAY_SPEND_ADMITTED_EVENT_TYPE })
-  | (Event<ConfirmSpendCommandData> & { type: typeof GATEWAY_SPEND_CONFIRMED_EVENT_TYPE })
-  | (Event<FailSpendCommandData> & { type: typeof GATEWAY_SPEND_FAILED_EVENT_TYPE })
-  | (Event<SettleSpendCommandData> & { type: typeof GATEWAY_SPEND_SETTLED_EVENT_TYPE });
 
 /** Deleted (gone) and disabled (paused, the receiver is expected back) are different promises. */
 export type WebhookDeliveryDisposition =

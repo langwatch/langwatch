@@ -11,11 +11,11 @@ import { passesTraceOriginGuards } from "@langwatch/trace-contract";
 import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-trigger-match.subscriber.ts";
 import { handleGraphTriggerActivity } from "../eventing/graph-trigger-activity.subscriber.ts";
 import { handleTraceAlertTriggerMatch } from "../eventing/trace-alert-trigger-match.subscriber.ts";
+import type { AutomationGraphActivity } from "../features/graph-alert/services/automation-graph-activity.service.ts";
+import type { AutomationMatchRecordMetricsSink } from "../features/runaway/services/automation-match-record-metrics.service.ts";
+import type { AutomationTriggerMatchRecorder } from "../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { AutomationEvaluationTriggerFilter } from "./automation-evaluation-trigger-filter.service.ts";
-import type { AutomationGraphActivity } from "./automation-graph-activity.service.ts";
-import type { AutomationMatchRecordMetricsSink } from "./automation-match-record-metrics.service.ts";
-import type { AutomationTriggerMatchRecorder } from "./automation-trigger-match-dispatcher.service.ts";
 
 /**
  * Evaluation event subscribers using four narrow ports instead of two capability

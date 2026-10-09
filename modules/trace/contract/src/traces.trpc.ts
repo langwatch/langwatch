@@ -8,20 +8,22 @@ import { defineTrpcContract } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
-import { aiActionResultSchema, aiQueryResultSchema } from "./trace-ai-query.ts";
+import { explorerInstantEvalRunsSchema } from "./features/evaluation/trace-instant-eval.schemas.ts";
+import { FIRST_TRACE_RECORDED_EVENT_TYPE } from "./features/ingest/trace-project-milestones.events.ts";
+import { discoverResultSchema, facetValuesResultSchema } from "./features/list/trace-list-view.ts";
+import { aiActionResultSchema, aiQueryResultSchema } from "./features/query/trace-ai-query.ts";
+import {
+  routeSearchInputSchema,
+  routeSearchResultSchema,
+} from "./features/query/trace-search-route.ts";
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
-import { explorerInstantEvalRunsSchema } from "./trace-instant-eval.schemas.ts";
-import { discoverResultSchema, facetValuesResultSchema } from "./trace-list-view.ts";
 import { checkPreconditionsSchema } from "./trace-precondition.schemas.ts";
-import { FIRST_TRACE_RECORDED_EVENT_TYPE } from "./trace-project-milestones.events.ts";
 import {
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
-  namedTopicCountsSchema,
   tracesForProjectResultSchema,
 } from "./trace-read.contract.ts";
 import { traceMetadataResponseSchema, traceMetadataUpdateSchema } from "./trace-rest.schemas.ts";
-import { routeSearchInputSchema, routeSearchResultSchema } from "./trace-search-route.ts";
 import { sharedTraceDtoSchema } from "./trace-share.schemas.ts";
 import {
   spanDetailSchema,
@@ -36,10 +38,10 @@ import {
   tracesChangedNameSchema,
   tracesConversationContextSchema,
   tracesEvaluationRunsSchema,
+  tracesFieldRedactionStatusSchema,
   tracesListEventsSchema,
   tracesListPageSchema,
   tracesNewCountSchema,
-  tracesSessionsPageSchema,
   tracesSpanDetailsSchema,
   tracesSpanLangwatchSignalsSchema,
   tracesSpansDeltaSchema,
@@ -60,6 +62,10 @@ import { spanTreePageSchema } from "./trace.ts";
  */
 const TRACES_PAGE_SIZE_MAX = resolveRequestBound("tracesPageSizeMax", "ENTERPRISE");
 const TRACE_IDS_MAX = resolveRequestBound("traceIdsMax", "ENTERPRISE");
+const TRACES_DOWNLOAD_PAGE_SIZE_MAX = resolveRequestBound(
+  "tracesDownloadPageSizeMax",
+  "ENTERPRISE",
+);
 
 /**
  * Offset pagination was dropped for ClickHouse (deep OFFSET degrades badly;
@@ -125,6 +131,18 @@ const sortSchema = z.object({
   direction: z.enum(["asc", "desc"]),
 });
 
+/** One Sessions lens page request, which coding-agent serves as `codingAgents.sessionGroups`. */
+export const traceSessionGroupsInputSchema = z.object({
+  projectId: z.string(),
+  timeRange: timeRangeSchema,
+  sort: sortSchema.optional(),
+  pageSize: z.number().int().min(1).max(100).default(50),
+  cursor: z.string().optional(),
+  query: z.string().nullish(),
+  evalRuns: explorerInstantEvalRunsSchema,
+});
+export type TraceSessionGroupsInput = z.infer<typeof traceSessionGroupsInputSchema>;
+
 /**
  * Ceiling on one `listEvents` call, matching the list's largest page size.
  * The read is a primary-key `IN` over `(TenantId, TraceId, SpanId)`, so it
@@ -156,22 +174,9 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(traceScopeSchema)
   .withOutput(evaluationSchema.array().optional())
 
-  /**
-   * Protected (not public-share): keyed by evaluationId, which is only
-   * tenant-scoped, so a share token could otherwise read any evaluation's
-   * inputs in the project by supplying another id. Stays project-gated.
-   */
-  .query("getEvaluationInputs")
-  .withInput(z.object({ projectId: z.string(), evaluationId: z.string() }))
-  .withOutput(z.record(z.string(), z.unknown()).nullable())
-
   .query("getEvaluationsMultiple")
   .withInput(z.object({ projectId: z.string(), traceIds: z.array(z.string()).max(TRACE_IDS_MAX) }))
   .withOutput(z.record(z.string(), evaluationSchema.array()))
-
-  .query("getTopicCounts")
-  .withInput(traceFilterInputSchema)
-  .withOutput(namedTopicCountsSchema)
 
   .query("getCustomersAndLabels")
   .withInput(traceFilterInputSchema)
@@ -232,8 +237,19 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(z.object({ projectId: z.string(), startDate: z.number(), endDate: z.number() }))
   .withOutput(distinctFieldNamesResultSchema)
 
+  // Whether this viewer may read captured input and output, and who can if they may not.
+  .query("getFieldRedactionStatus")
+  .withInput(z.object({ projectId: z.string() }))
+  .withOutput(tracesFieldRedactionStatusSchema)
+
   .mutation("getAllForDownload")
-  .withInput(z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape }))
+  .withInput(
+    z.object({
+      ...traceListInputSchema.shape,
+      ...downloadExtrasSchema.shape,
+      pageSize: z.number().int().positive().max(TRACES_DOWNLOAD_PAGE_SIZE_MAX).optional(),
+    }),
+  )
   .withOutput(tracesForProjectResultSchema)
 
   /**
@@ -267,20 +283,6 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesListPageSchema)
-
-  .query("sessions")
-  .withInput(
-    z.object({
-      projectId: z.string(),
-      timeRange: timeRangeSchema,
-      sort: sortSchema.optional(),
-      pageSize: z.number().int().min(1).max(100).default(50),
-      cursor: z.string().optional(),
-      query: z.string().nullish(),
-      evalRuns: explorerInstantEvalRunsSchema,
-    }),
-  )
-  .withOutput(tracesSessionsPageSchema)
 
   .query("listEvents")
   .withInput(

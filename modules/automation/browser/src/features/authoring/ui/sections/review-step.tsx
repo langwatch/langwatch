@@ -6,8 +6,7 @@ import { watchSummary, watchSummaryLine } from "../../model/watch-summary.ts";
 import { DailyCapAdviceAlert } from "../blocks/daily-cap-advice-alert.tsx";
 import { ReviewSection } from "../blocks/review-section.tsx";
 import { AutomationSeveritySection } from "../blocks/severity-section.tsx";
-import { useDraft } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
+import { useDraft, useAutomationStore } from "./automation-selectors.ts";
 import {
   configurationSummary,
   filtersAreSet,

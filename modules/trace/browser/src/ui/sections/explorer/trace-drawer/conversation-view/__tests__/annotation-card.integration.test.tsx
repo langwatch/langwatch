@@ -13,7 +13,7 @@ vi.mock("react-router", async (importOriginal) => ({
   ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../../behavior/use-annotations-by-trace-ids.ts";
 import { AnnotationCard } from "../annotation-card.tsx";
 
 const SCORE_NAMES = new Map([

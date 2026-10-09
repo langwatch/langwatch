@@ -13,7 +13,9 @@ export function useAnnotationQueueWalk({
   /** The item the URL names. Absent starts at the front of the queue. */
   queueItemId?: string | undefined;
 } = {}) {
-  const project = useAnnotationHost().project();
+  const host = useAnnotationHost();
+  const project = host.project();
+  const scopeStatus = host.scopeStatus();
 
   const step = annotationApi.annotation.getQueueWalkStep.useQuery(
     { projectId: project?.id ?? "", ...(queueItemId ? { queueItemId } : {}) },
@@ -34,7 +36,12 @@ export function useAnnotationQueueWalk({
     nextItemId: step.data?.nextItemId ?? null,
     // An unanswered read is a queue still being read, not an empty one.
     queueFinished: step.data?.queueFinished ?? false,
-    queueLoading: step.isLoading,
+    // A disabled read is not loading to react-query; a resolving scope is, to the reviewer.
+    queueLoading: scopeStatus === "loading" || step.isLoading,
+    /** The read failed with nothing in hand, so nothing can be said of the queue. */
+    queueFailed: step.isError && !step.data,
+    /** No project to read the queue in: the scope failed, or resolved to none. */
+    scopeUnavailable: scopeStatus === "unavailable" || (scopeStatus === "ready" && !project),
     /** The item above is the one the reviewer has left; the one they asked for is in flight. */
     stepIsStale: step.isPlaceholderData,
   };

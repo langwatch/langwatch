@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { RICH_ARRIVAL_TRACE_ID } from "../data/sample-preview-traces.ts";
+import { RICH_ARRIVAL_TRACE_ID } from "../../../../../behavior/explorer/onboarding/data/sample-preview-traces.ts";
 
 /**
  * Global `<style>` tag for the rich-arrival row's tour highlight — the soft blue halo +

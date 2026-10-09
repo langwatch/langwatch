@@ -1,8 +1,10 @@
+import { CODEX_EXEC_SCOPE, isCodexScope } from "@langwatch/coding-agent-contract";
+import { CodexCanonicaliserService } from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
-import { CodexCanonicaliserService } from "../codex-canonicaliser.service.ts";
 import { createExtractorContext, createLogExtractorContext } from "./test-helpers.ts";
 
+const scopes = { isCodexScope, execScope: CODEX_EXEC_SCOPE };
 const SCOPE = "openai.codex"; // scope-agnostic; gating is on event.name
 
 describe("CodexCanonicaliserService.applyLog", () => {
@@ -18,7 +20,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         "user.email": "alex@example.com",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({
         "langwatch.model": "gpt-5.5",
@@ -39,7 +41,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         input_token_count: "100",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({
         "langwatch.model": "gpt-5.5",
@@ -56,7 +58,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         "user.email": "alex@example.com",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({
         "langwatch.model": "gpt-5.5",
@@ -73,7 +75,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         prompt: "what is 2+2?",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({
         "langwatch.input": "what is 2+2?",
@@ -86,7 +88,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         "event.name": "codex.user_prompt",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -104,7 +106,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         "conversation.id": SESSION_ID,
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({
         "gen_ai.conversation.id": SESSION_ID,
@@ -122,7 +124,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         "conversation.id": SESSION_ID,
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out["gen_ai.conversation.id"]).toBe(SESSION_ID);
       expect(ctx.out["langwatch.thread.id"]).toBe(SESSION_ID);
@@ -136,7 +138,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         "conversation.id": SESSION_ID,
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({
         "gen_ai.conversation.id": SESSION_ID,
@@ -152,7 +154,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         "conversation.id": SESSION_ID,
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.bag.attrs.get("conversation.id")).toBe(SESSION_ID);
     });
@@ -164,7 +166,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         prompt: "just say ping",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({ "langwatch.input": "just say ping" });
       expect(ctx.recordRule).not.toHaveBeenCalledWith("codex/conversation_id");
@@ -178,7 +180,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         model: "claude-opus-4-7",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -190,7 +192,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         model: "gpt-5.5",
       });
 
-      CodexCanonicaliserService.create().applyLog(ctx);
+      CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -215,7 +217,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({
         "langwatch.span.type": "agent",
@@ -247,7 +249,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(6905);
       expect(ctx.out["gen_ai.usage.cache_read.input_tokens"]).toBe(36096);
@@ -268,7 +270,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(100);
     });
@@ -288,7 +290,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["gen_ai.conversation.id"]).toBe("019e9bfe-7749-7440-8506-39152afbc9ff");
     });
@@ -308,7 +310,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["gen_ai.conversation.id"]).toBe("019e9bfe-92ad-7591-a7fd-d6250ce88904");
     });
@@ -331,7 +333,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["gen_ai.conversation.id"]).toBe("019e9bfe-92ad-7591-a7fd-d6250ce88904");
     });
@@ -349,7 +351,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
     });
@@ -369,7 +371,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["gen_ai.usage.reasoning_tokens"]).toBe(10);
     });
@@ -386,7 +388,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
       expect(ctx.out["langwatch.span.type"]).toBe("llm");
@@ -407,7 +409,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["langwatch.span.type"]).toBe("llm");
       expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
@@ -423,7 +425,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
     });
@@ -440,7 +442,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -461,7 +463,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -478,7 +480,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({
         "langwatch.span.type": "agent",
@@ -508,7 +510,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({ "langwatch.cost.non_billable": "true" });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/bundled-cost");
@@ -528,7 +530,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({ "langwatch.cost.non_billable": "true" });
       expect(ctx.recordRule).toHaveBeenCalledWith("codex/bundled-cost");
@@ -545,7 +547,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({ "langwatch.cost.non_billable": "true" });
     });
@@ -567,7 +569,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalledWith("codex/bundled-cost");
@@ -586,7 +588,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
         },
       );
 
-      CodexCanonicaliserService.create().apply(ctx);
+      CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
       expect(ctx.out).toEqual({});
       expect(ctx.recordRule).not.toHaveBeenCalled();
@@ -608,7 +610,7 @@ describe("CodexCanonicaliserService.apply on the codex_exec scope (exec wire)", 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
   });
@@ -625,7 +627,7 @@ describe("CodexCanonicaliserService.apply on the codex_exec scope (exec wire)", 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["langwatch.span.type"]).toBe("llm");
   });
@@ -647,7 +649,7 @@ describe("CodexCanonicaliserService.apply on the codex_exec scope (exec wire)", 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("max");
     expect(ctx.out["gen_ai.usage.reasoning_tokens"]).toBe(233);
@@ -667,7 +669,7 @@ describe("CodexCanonicaliserService.apply on the codex_exec scope (exec wire)", 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
     expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
@@ -692,7 +694,7 @@ describe("CodexCanonicaliserService.apply on the codex_exec scope (exec wire)", 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
     expect(ctx.recordRule).toHaveBeenCalledWith("codex/skip-exec-rollup-usage");
@@ -708,7 +710,7 @@ describe("CodexCanonicaliserService.apply on the codex_exec scope (exec wire)", 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBeUndefined();
   });
@@ -731,7 +733,7 @@ describe("CodexCanonicaliserService.apply on the codex-app-server scope", () => 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["gen_ai.request.model"]).toBe("gpt-5.5");
     expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(400);
@@ -753,7 +755,7 @@ describe("CodexCanonicaliserService.apply on the codex-app-server scope", () => 
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["langwatch.reserved.skip_token_accumulation"]).toBe("true");
   });
@@ -774,7 +776,7 @@ describe("CodexCanonicaliserService turn-span cache writes", () => {
       },
     );
 
-    CodexCanonicaliserService.create().apply(ctx);
+    CodexCanonicaliserService.create({ scopes }).apply(ctx);
 
     expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(384);
   });
@@ -791,7 +793,7 @@ describe("CodexCanonicaliserService.applyLog reasoning effort", () => {
       output_token_count: "240",
     });
 
-    CodexCanonicaliserService.create().applyLog(ctx);
+    CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("max");
     expect(ctx.out["langwatch.model"]).toBe("gpt-5.5");
@@ -804,7 +806,7 @@ describe("CodexCanonicaliserService.applyLog reasoning effort", () => {
       reasoning_effort: "high",
     });
 
-    CodexCanonicaliserService.create().applyLog(ctx);
+    CodexCanonicaliserService.create({ scopes }).applyLog(ctx);
 
     expect(ctx.out["gen_ai.request.reasoning_effort"]).toBe("high");
   });

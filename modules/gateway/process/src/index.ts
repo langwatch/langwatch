@@ -7,7 +7,7 @@ export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
 export { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
-export type { GatewaySpendApp } from "./services/gateway-spend-reconciliation.service.ts";
+export type { GatewaySpendApp } from "./features/spend/services/gateway-spend-reconciliation.service.ts";
 export { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
@@ -21,7 +21,7 @@ export type {
   UsageSummary,
   UsageWindow,
   VirtualKeyUsageSummary,
-} from "./services/gateway-spend-summary.service.ts";
+} from "./features/spend/services/gateway-spend-summary.service.ts";
 export type {
   GatewayBudgetSpendRecord,
   BudgetBucketBoundary,
@@ -82,24 +82,8 @@ export type {
   GatewayClickHouseInstanceResolver,
 } from "./repositories/clickhouse/clickhouse.gateway-open-admissions-sweep.repository.ts";
 export type { OpenAdmission } from "./repositories/gateway-open-admissions.repository.ts";
-export * from "./eventing/gateway-spend.pipeline.ts";
 export type { GatewaySpendState } from "./eventing/gateway-spend.projection.ts";
 export type * from "./services/gateway.service.ts";
-
-/**
- * The feature's application: the one thing every door is given, holding every
- * service and port the seven transports reach and owning the virtual-key write
- * pre-flight both doors used to run for themselves.
- */
-export type {
-  GatewayActor,
-  GatewayAppDependencies,
-  GatewayInfrastructure,
-  GatewayRestInfrastructure,
-  GatewayApplicableBudgetTarget,
-  GatewayVirtualKeyBudgetInput,
-  GatewayVirtualKeyOperations,
-} from "./app/gateway.app.ts";
 
 /**
  * The gateway control plane: virtual keys, budgets, guardrail evaluation, realtime voice
@@ -108,7 +92,7 @@ export type {
 export type {
   CreateVirtualKeyInput,
   CreatedVirtualKey,
-} from "./services/virtual-key-validation.service.ts";
+} from "./features/virtual-key/services/virtual-key-validation.service.ts";
 export type {
   ActorContext,
   MembershipSet,
@@ -117,8 +101,8 @@ export type {
   VirtualKeyActor,
   VirtualKeyReader,
   VirtualKeySessionActor,
-} from "./services/virtual-key-authorization.service.ts";
-export type { ApplicableBudget } from "./services/gateway-applicable-budgets.service.ts";
+} from "./features/virtual-key/services/virtual-key-authorization.service.ts";
+export type { ApplicableBudget } from "./features/budget/services/gateway-applicable-budgets.service.ts";
 export type {
   ElevenLabsApiCredential,
   ElevenLabsCredentialCollaborators,
@@ -127,10 +111,10 @@ export type {
 export type {
   GatewayRealtimeSessionCollaborators,
   ReserveInput,
-} from "./services/gateway-realtime-session.service.ts";
+} from "./features/realtime-session/services/gateway-realtime-session.service.ts";
 export type { ReserveResult } from "./repositories/gateway-realtime-session.repository.ts";
 export type { GatewayJwtClaims, GatewayJwtSubject } from "./services/gateway-jwt.service.ts";
-export type { ElevenLabsCredentialReader } from "./services/gateway-realtime-session-reconciliation.service.ts";
+export type { ElevenLabsCredentialReader } from "./features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
 export {
   elevenLabsConversationReportSchema,
   type ElevenLabsConversationChannel,
@@ -144,12 +128,12 @@ export type { GatewayModelProviderCredentials } from "./rules/gateway-config-wir
 export type {
   GatewayScopePermissions,
   GatewayPermissionScope,
-} from "./services/virtual-key-authorization.service.ts";
+} from "./features/virtual-key/services/virtual-key-authorization.service.ts";
 export type { GatewayConfigAssembly } from "./rules/gateway-config-wire.rules.ts";
-export type { GatewayVirtualKeyCrypto } from "./services/virtual-key-crypto.service.ts";
-export type { GatewaySpanIngestion } from "./services/gateway-realtime-session.service.ts";
-export type { GatewaySpendConfirmation } from "./services/gateway-realtime-session.service.ts";
-export type { GatewaySpendRating } from "./services/model-catalog-gateway-spend-rating.service.ts";
+export type { GatewayVirtualKeyCrypto } from "./features/virtual-key/services/virtual-key-crypto.service.ts";
+export type { GatewaySpanIngestion } from "./features/realtime-session/services/gateway-realtime-settlement-span.service.ts";
+export type { GatewaySpendConfirmation } from "./features/realtime-session/services/gateway-realtime-session.service.ts";
+export type { GatewaySpendRating } from "./features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 
 // The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
 export {
@@ -175,4 +159,4 @@ export type {
   TraceDestinationKeyRow,
   TraceDestinationProjectRow,
 } from "./repositories/gateway-trace-destination-report.repository.ts";
-export type { BudgetChangeEventDedupeService } from "./services/gateway-budget-change-dedupe.service.ts";
+export type { BudgetChangeEventDedupeService } from "./features/budget/services/gateway-budget-change-dedupe.service.ts";

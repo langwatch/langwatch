@@ -209,7 +209,6 @@ describe("the dataset limits an application answers", () => {
         expect(read.records).toHaveLength(2);
         expect(read.totalRows).toBe(5);
       });
-
     });
 
     describe("when every row is asked for, as a download does", () => {
@@ -272,7 +271,9 @@ describe("the dataset limits an application answers", () => {
         const { app, dataset } = await datasetOf({ rows: 6, rowBytes: 1000, limits });
         const lookup = { projectId: "project-1", slugOrId: dataset.id };
 
-        const refusal = await app.listRecords({ ...lookup, page: 1, limit: 6 }).catch((error) => error);
+        const refusal = await app
+          .listRecords({ ...lookup, page: 1, limit: 6 })
+          .catch((error) => error);
 
         expect(refusal).toMatchObject({
           code: "dataset_page_too_large",

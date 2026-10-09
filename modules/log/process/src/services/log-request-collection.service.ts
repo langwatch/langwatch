@@ -6,9 +6,9 @@ import type {
   LogRequestCollectionResult,
 } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
+import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
-  NON_BILLABLE_ATTR,
   type LogRecordReceivedEventData,
   type LogTraceContribution,
   type TraceApi,

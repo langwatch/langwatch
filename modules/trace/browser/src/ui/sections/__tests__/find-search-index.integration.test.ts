@@ -7,7 +7,7 @@ import {
   MIN_QUERY_LENGTH,
   useTraceSearchIndex,
   type TraceSearchItem,
-} from "../../../behavior/find-search-index.ts";
+} from "../../../features/find/behavior/find-search-index.ts";
 
 const traces: TraceSearchItem[] = [
   {

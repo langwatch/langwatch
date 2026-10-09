@@ -20,10 +20,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
+import type { OrganizationCreationNotice } from "../services/organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../services/organization-seat-license.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -49,15 +49,15 @@ const seats: OrganizationSeatLicense = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
 };
-const sessions: OrganizationSessionRevocation = {
-  revokeAllBrowserSessions: vi.fn(),
+const seatNotices: OrganizationSeatRevocationNotice = {
+  memberDisabled: vi.fn(),
 };
 const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),
 };
-const prompts: OrganizationPromptSeed = {
-  seedTagsForOrganization: vi.fn(),
-  reportCompensationFailure: vi.fn(),
+const creations: OrganizationCreationNotice = {
+  created: vi.fn(),
+  reportError: vi.fn(),
 };
 
 describe.skipIf(!DB_URL)(
@@ -71,14 +71,15 @@ describe.skipIf(!DB_URL)(
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const memberships = OrganizationMembershipService.create({
+      workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
       repository: PrismaOrganizationMembershipRepository.create({
         database: prisma,
         cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: recordingGrantsWriter,
       }),
-      prompts,
+      creations,
       seats,
-      sessions,
+      seatNotices,
       grantCache,
       testArrivals: { standingFor: async () => ({ testing: false }) as const },
       ceiling: { assertWithinCaller: async () => {} },

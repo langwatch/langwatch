@@ -5,7 +5,7 @@ Feature: Coding-agent session read service
     @unit
     Scenario: a completed GitHub installation backfills recent session branches
       Given a project with recent coding-agent sessions
-      When the setup transport starts Coding Agent's mapping backfill after recording the installation
+      When Coding Agent's mapping backfill runs for the organization GitHub connected
       Then Coding Agent reads its existing session rows including repository and branch facts
       And it requests bounded GitHub branch mapping without delaying the installation response
 

@@ -28,14 +28,23 @@ function valueImports(relative: string): string[] {
 }
 
 /**
- * One shared reason: no `apiKey:*` permission exists — a personal key
- * belongs to its owner, and the application proves membership and
- * ownership itself. Every procedure states the opt-out with organization id allowed.
+ * No `apiKey:*` permission exists: a personal key belongs to its owner, and
+ * the application proves membership and ownership itself.
  */
 const OWN_KEYS = {
   kind: "no-permission",
   reason:
     "personal API keys are the caller's own; the application proves organization membership and ownership itself",
+};
+
+const KEY_ASSIGNMENT = {
+  kind: "no-permission",
+  reason:
+    "any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading",
+};
+
+const MEMBER_ONLY = {
+  organizationId: "the application refuses a caller who is not a member of this organization",
 };
 
 /** @scenario "The API-key transport moves without changing who may call it" */
@@ -49,39 +58,15 @@ it("binds every declared procedure once and preserves its access declaration", (
       declarations[index],
     ]),
   ).toEqual([
-    [
-      "myBindings",
-      "query",
-      { ...OWN_KEYS, allow: { organizationId: "listing caller's own role bindings" } },
-    ],
-    [
-      "nameById",
-      "query",
-      { ...OWN_KEYS, allow: { organizationId: "naming an API key the caller can already see" } },
-    ],
-    ["list", "query", { ...OWN_KEYS, allow: { organizationId: "listing API keys" } }],
-    [
-      "create",
-      "mutation",
-      { ...OWN_KEYS, allow: { organizationId: "creating API key for user's own org" } },
-    ],
-    ["update", "mutation", { ...OWN_KEYS, allow: { organizationId: "updating API key" } }],
-    ["revoke", "mutation", { ...OWN_KEYS, allow: { organizationId: "revoking API key" } }],
-    [
-      "orgProjects",
-      "query",
-      { ...OWN_KEYS, allow: { organizationId: "listing org projects for permission picker" } },
-    ],
-    [
-      "orgTeams",
-      "query",
-      { ...OWN_KEYS, allow: { organizationId: "listing org teams for scope picker" } },
-    ],
-    [
-      "orgMembers",
-      "query",
-      { ...OWN_KEYS, allow: { organizationId: "listing org members for key assignment" } },
-    ],
+    ["myBindings", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["nameById", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["list", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["create", "mutation", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["update", "mutation", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["revoke", "mutation", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["orgProjects", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
+    ["orgTeams", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
+    ["orgMembers", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
   ]);
 });
 

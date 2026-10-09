@@ -15,7 +15,7 @@ Feature: An administrator changing someone's email ends that person's sessions
   #
   #   * SCIM — an identity provider replaces (PUT) or patches (PATCH) the
   #     `userName`, which is the email.
-  #   * The Ops backoffice — an operator edits the user directly.
+  #   * The Ops admin console — an operator edits the user directly.
   #
   # Both call the User service to write, then the Auth service to revoke. That
   # is a cross-feature orchestration living at the transport rather than inside
@@ -32,7 +32,7 @@ Feature: An administrator changing someone's email ends that person's sessions
     @unit
     Scenario: An operator changing a user's email revokes their browser sessions
       Given a member with a live browser session
-      When an operator changes their email in the backoffice
+      When an operator changes their email in the admin console
       Then the profile is written first
       And every browser session for that member is revoked afterwards
 
@@ -53,7 +53,7 @@ Feature: An administrator changing someone's email ends that person's sessions
     is visible in the failure the caller receives.
 
     @unit
-    Scenario: A failed revocation still leaves the new backoffice email in place
+    Scenario: A failed revocation still leaves the new admin email in place
       Given an operator has changed a member's email
       When revoking their browser sessions fails
       Then the caller is told the operation failed

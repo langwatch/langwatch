@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthSessionRepository } from "../../repositories/memory/memory.auth-session.repository.ts";
@@ -19,12 +19,11 @@ function priorSessions({
 } = {}) {
   const memory = MemoryAuthDatabase.create();
   if (expires) {
-    memory.sessions.set("session-1", {
+    memory.db.Session.push({
       id: "session-1",
       userId: "user-1",
       sessionToken: "tok",
-      impersonation: null,
-      expires,
+      expires: toDate(expires),
     });
   }
 

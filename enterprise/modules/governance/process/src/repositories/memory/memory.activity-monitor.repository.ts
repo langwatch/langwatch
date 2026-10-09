@@ -2,64 +2,62 @@
 
 import type {
   ActivityEventDetailRow,
-  ActivityMonitorSummary,
   IngestionSourceHealthRow,
   RecentAnomalyRow,
-  SourceHealthMetrics,
-  SpendByDepartmentRow,
-  SpendByTeamRow,
-  SpendByUserRow,
-  SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
+import { toEpochMs } from "@langwatch/time";
 
-import type { ActivityMonitorRepository } from "../activity-monitor.repository.ts";
+import type {
+  DepartmentDirectory,
+  SourceTeam,
+} from "../../features/cost/rules/activity-monitor-spend.rules.ts";
+import type {
+  ActivityMonitorRepository,
+  AnomalyBreakdown,
+  SourceEventWindows,
+} from "../activity-monitor.repository.ts";
 
 type SourceDataCoverage = Awaited<ReturnType<ActivityMonitorRepository["sourceDataCoverage"]>>;
 
-/** One organization's dashboard, as the ClickHouse and Prisma reads would answer it. */
+/** One organization's own activity-monitor state; trace spend is TraceApi's, not seeded here. */
 export interface ActivityMonitorSnapshot {
-  summary: ActivityMonitorSummary;
-  spendByUser: SpendByUserRow[];
-  spendByTeam: SpendByTeamRow[];
-  spendByDepartment: SpendByDepartmentRow[];
-  spendOverTime: SpendOverTimeResult;
+  anomalyBreakdown: AnomalyBreakdown;
   recentAnomalies: RecentAnomalyRow[];
-  ingestionSourcesHealth: IngestionSourceHealthRow[];
-  eventsBySource: Record<string, ActivityEventDetailRow[]>;
-  metricsBySource: Record<string, SourceHealthMetrics>;
+  departmentDirectory: DepartmentDirectory;
+  teamBySource: Record<string, SourceTeam>;
+  activeSources: Omit<IngestionSourceHealthRow, "eventsLast24h">[];
+  loggedAndPulledCountsBySource: Record<string, number>;
+  pulledEventsBySource: Record<string, ActivityEventDetailRow[]>;
+  loggedAndPulledWindowsBySource: Record<string, SourceEventWindows[]>;
   coverageBySource: Record<string, SourceDataCoverage>;
 }
 
-const EMPTY_SNAPSHOT: ActivityMonitorSnapshot = {
-  summary: {
-    spentThisWindowUsd: 0,
-    windowOverPreviousPct: 0,
-    hasPriorBaseline: false,
-    activeUsersThisWindow: 0,
-    newUsersThisWindow: 0,
-    openAnomalyCount: 0,
+function emptySnapshot(): ActivityMonitorSnapshot {
+  return {
     anomalyBreakdown: { critical: 0, warning: 0, info: 0 },
-  },
-  spendByUser: [],
-  spendByTeam: [],
-  spendByDepartment: [],
-  spendOverTime: { buckets: [] },
-  recentAnomalies: [],
-  ingestionSourcesHealth: [],
-  eventsBySource: {},
-  metricsBySource: {},
-  coverageBySource: {},
-};
+    recentAnomalies: [],
+    departmentDirectory: {
+      projectDepartmentById: new Map(),
+      userDepartmentByEmail: new Map(),
+      userTeamDepartmentByEmail: new Map(),
+      activeDepartmentNames: new Map(),
+    },
+    teamBySource: {},
+    activeSources: [],
+    loggedAndPulledCountsBySource: {},
+    pulledEventsBySource: {},
+    loggedAndPulledWindowsBySource: {},
+    coverageBySource: {},
+  };
+}
 
 /**
- * The activity-monitor twin: an organization with no activity reads as the empty
- * dashboard; a test seeds snapshots through `create` and reads them back paged
- * and limited the way `PrismaActivityMonitorRepository` pages its rows.
+ * The activity-monitor twin: an organization with no state reads as empty; a test seeds
+ * snapshots through `create`, keyed by organization id.
  */
 export class MemoryActivityMonitorRepository implements ActivityMonitorRepository {
   private readonly snapshots = new Map<string, Partial<ActivityMonitorSnapshot>>();
 
-  /** `seed` is what each organization's dashboard answers, keyed by organization id. */
   static create({
     seed = {},
   }: {
@@ -73,7 +71,7 @@ export class MemoryActivityMonitorRepository implements ActivityMonitorRepositor
   }
 
   private of(organizationId: string): ActivityMonitorSnapshot {
-    return { ...EMPTY_SNAPSHOT, ...this.snapshots.get(organizationId) };
+    return { ...emptySnapshot(), ...this.snapshots.get(organizationId) };
   }
 
   async sourceDataCoverage(input: {
@@ -90,74 +88,63 @@ export class MemoryActivityMonitorRepository implements ActivityMonitorRepositor
     );
   }
 
-  async summary(input: { organizationId: string }): Promise<ActivityMonitorSummary> {
-    return this.of(input.organizationId).summary;
-  }
-
-  async spendByUser(input: {
-    organizationId: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<SpendByUserRow[]> {
-    return page(this.of(input.organizationId).spendByUser, input);
-  }
-
-  async spendByTeam(input: {
-    organizationId: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<SpendByTeamRow[]> {
-    return page(this.of(input.organizationId).spendByTeam, input);
-  }
-
-  async spendByDepartment(input: { organizationId: string }): Promise<SpendByDepartmentRow[]> {
-    return this.of(input.organizationId).spendByDepartment;
-  }
-
-  async spendOverTime(input: { organizationId: string }): Promise<SpendOverTimeResult> {
-    return this.of(input.organizationId).spendOverTime;
-  }
-
   async recentAnomalies(input: {
     organizationId: string;
     limit?: number;
   }): Promise<RecentAnomalyRow[]> {
-    return page(this.of(input.organizationId).recentAnomalies, input);
+    return this.of(input.organizationId).recentAnomalies.slice(0, input.limit ?? 50);
   }
 
-  async ingestionSourcesHealth(input: {
+  async getOpenAnomalyBreakdown(input: { organizationId: string }): Promise<AnomalyBreakdown> {
+    return this.of(input.organizationId).anomalyBreakdown;
+  }
+
+  async getDepartmentDirectory(input: { organizationId: string }): Promise<DepartmentDirectory> {
+    return this.of(input.organizationId).departmentDirectory;
+  }
+
+  async findSourceTeams(input: {
     organizationId: string;
-  }): Promise<IngestionSourceHealthRow[]> {
-    return this.of(input.organizationId).ingestionSourcesHealth;
+    sourceIds: readonly string[];
+  }): Promise<{ sourceId: string; team: SourceTeam }[]> {
+    const teams = this.of(input.organizationId).teamBySource;
+    return input.sourceIds
+      .filter((sourceId) => sourceId in teams)
+      .map((sourceId) => ({ sourceId, team: teams[sourceId] ?? null }));
   }
 
-  async eventsForSource(input: {
+  async findActiveSources(input: {
+    organizationId: string;
+  }): Promise<Omit<IngestionSourceHealthRow, "eventsLast24h">[]> {
+    return this.of(input.organizationId).activeSources;
+  }
+
+  async countLoggedAndPulledEventsBySource(input: {
+    organizationId: string;
+    sourceIds: readonly string[];
+  }): Promise<{ sourceId: string; count: number }[]> {
+    const counts = this.of(input.organizationId).loggedAndPulledCountsBySource;
+    return input.sourceIds
+      .filter((sourceId) => counts[sourceId] !== undefined)
+      .map((sourceId) => ({ sourceId, count: counts[sourceId]! }));
+  }
+
+  async findPulledEventsForSource(input: {
     organizationId: string;
     sourceId: string;
-    limit?: number;
-    beforeIso?: string;
+    beforeMs: number;
+    limit: number;
   }): Promise<ActivityEventDetailRow[]> {
-    const events = this.of(input.organizationId).eventsBySource[input.sourceId] ?? [];
-    const before = input.beforeIso;
-    return page(before ? events.filter((e) => e.eventTimestampIso < before) : events, input);
+    const events = this.of(input.organizationId).pulledEventsBySource[input.sourceId] ?? [];
+    return events
+      .filter((e) => toEpochMs(e.eventTimestampIso) < input.beforeMs)
+      .slice(0, input.limit);
   }
 
-  async sourceHealthMetrics(input: {
+  async findLoggedAndPulledEventWindows(input: {
     organizationId: string;
     sourceId: string;
-  }): Promise<SourceHealthMetrics> {
-    return (
-      this.of(input.organizationId).metricsBySource[input.sourceId] ?? {
-        events24h: 0,
-        events7d: 0,
-        events30d: 0,
-        lastSuccessIso: null,
-      }
-    );
+  }): Promise<SourceEventWindows[]> {
+    return this.of(input.organizationId).loggedAndPulledWindowsBySource[input.sourceId] ?? [];
   }
-}
-
-function page<Row>(rows: Row[], input: { limit?: number; offset?: number }): Row[] {
-  const offset = input.offset ?? 0;
-  return rows.slice(offset, input.limit === undefined ? undefined : offset + input.limit);
 }

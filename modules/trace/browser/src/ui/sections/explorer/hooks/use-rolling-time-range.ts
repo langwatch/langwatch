@@ -2,8 +2,8 @@ import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
 import { useEffect } from "react";
 
 import { useFilterStore } from "../../../../behavior/explorer.store.ts";
-import { getPresetById } from "../../../../behavior/time-range-presets.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { getPresetById } from "../../../../features/explorer/behavior/time-range-presets.ts";
 
 // Each tick rolls the live time range forward, which invalidates every
 // query that includes timeRange in its input (discover, list, newCount,

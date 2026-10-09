@@ -6,9 +6,12 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
@@ -19,9 +22,9 @@ import {
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { buildQueryReference } from "../../rules/query-reference.rules.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { mountQueryDoor, type QueryTenant } from "./query-door.harness.ts";
 
@@ -623,6 +626,26 @@ async function seedTenant({
 }
 
 // ---------------------------------------------------------------------------
+
+/** A bindable value per parameter type the published statements declare. */
+const SAMPLE_BY_TYPE: Record<string, string | number> = {
+  UInt32: 30,
+  String: "",
+  "DateTime64(3)": "1970-01-01 00:00:00.000",
+};
+
+/** Binds every declared parameter of a published statement to a sample of its type. */
+function sampleParameters(
+  declared: readonly { name: string; type: string }[],
+): Record<string, string | number> {
+  return Object.fromEntries(
+    declared.map((parameter) => {
+      const sample = SAMPLE_BY_TYPE[parameter.type];
+      if (sample === undefined) throw new Error(`no sample for ${parameter.type}`);
+      return [parameter.name, sample];
+    }),
+  );
+}
 
 describe("given the /api/v1/query REST door and a seed with known answers", () => {
   let harness: LangWatchQLClickHouseHarness;
@@ -1454,6 +1477,46 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
         for (const secret of secrets) {
           expect(answer.text, `a response carried ${secret}`).not.toContain(secret);
         }
+      }
+    });
+  });
+
+  describe("when every LangWatchQL statement the query reference publishes is sent", () => {
+    /** @scenario "Every published statement runs against the real catalog" */
+    it("answers rows for each one with its parameters bound", async () => {
+      const protections = {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
+        canSeeCosts: true,
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+      };
+      const reference = buildQueryReference({
+        protections,
+        lwqlEnabled: true,
+        database,
+        schema: service.describeSchema({ protections }),
+        limits: {
+          maxStatementLength: MAX_LWQL_LENGTH,
+          maxRowsReturned: 10_000,
+          maxResultBytes: 8_000_000,
+          maxExecutionTimeSeconds: 10,
+        },
+        traceFilterExamples: [],
+      });
+      const published = reference.examples.filter((example) => example.language === "lwql");
+      expect(published.length).toBeGreaterThan(0);
+
+      for (const example of published) {
+        const parameters = sampleParameters(example.parameters);
+        const answer = await post({
+          sql: example.text,
+          ...(example.parameters.length > 0 ? { parameters } : {}),
+        });
+
+        expect(answer.status, `${example.id}: ${answer.text}`).toBe(200);
+        const body = json(answer);
+        expect(body.error, `${example.id}: ${answer.text}`).toBeUndefined();
+        expect(Array.isArray(body.rows), `${example.id} answered no rows array`).toBe(true);
       }
     });
   });

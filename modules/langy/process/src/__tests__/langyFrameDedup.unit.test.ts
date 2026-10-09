@@ -1,9 +1,9 @@
-import { type LangyFrameDedupRedis } from "@langwatch/langy-process";
 /**
  * The frameNonce dedup is the relay's intra-turn replay guard.
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { type LangyFrameDedupRedis } from "../repositories/redis/redis.langy-frame-dedup.repository.ts";
 import { LangyFrameDedupRedisRepository } from "../repositories/redis/redis.langy-frame-dedup.repository.ts";
 
 function fakeRedis(): LangyFrameDedupRedis & {

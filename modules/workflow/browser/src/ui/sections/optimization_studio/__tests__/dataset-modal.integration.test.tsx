@@ -2,10 +2,7 @@ import {
   UiCapabilityContextProvider,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
-import {
-  uiDeclarations,
-  type UiDatasetEditorTableProps,
-} from "@langwatch/browser-host/declarations";
+import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 /**
  * @vitest-environment jsdom
@@ -13,7 +10,14 @@ import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
  * Workflow dataset dialog (picker/editor on entry-point node).
  * Uses real store; mocks tRPC transport and drawer registry.
  */
-import { DatasetPickerListToken, type DatasetPickerListProps } from "@langwatch/dataset-contract";
+import {
+  AddOrEditDatasetRoutedDrawerToken,
+  DatasetEditorTableToken,
+  DatasetPickerListToken,
+  UploadCsvDrawerToken,
+  type DatasetEditorTableProps,
+  type DatasetPickerListProps,
+} from "@langwatch/dataset-client";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -44,15 +48,17 @@ const datasetLends = uiDeclarations([
   {
     name: "dataset",
     installation: {
-      capabilities: {
-        datasetEditorTable: {
+      capabilities: {},
+      lends: [
+        {
+          token: DatasetEditorTableToken,
           load: async () => ({
             default: ({
               title,
               headerActions,
               inMemoryDataset,
               onUpdateDataset,
-            }: UiDatasetEditorTableProps) => (
+            }: DatasetEditorTableProps) => (
               <div data-testid="dataset-editor-table">
                 {title}
                 {headerActions}
@@ -74,8 +80,6 @@ const datasetLends = uiDeclarations([
             ),
           }),
         },
-      },
-      lends: [
         {
           token: DatasetPickerListToken,
           load: async () => ({
@@ -121,7 +125,8 @@ function renderWithLends(ui: ReactElement) {
   );
 }
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
     closeDrawer: vi.fn(),
@@ -154,7 +159,8 @@ vi.mock("../../../../behavior/workflow-api.ts", () => ({
     useUtils: () => ({}),
   },
 }));
-vi.mock("@langwatch/dataset-client", () => ({
+vi.mock("@langwatch/dataset-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   datasetClient: {
     useUtils: () => ({}),
     dataset: {
@@ -276,14 +282,15 @@ describe("Workflow dataset dialog", () => {
   });
 
   describe("when uploading a CSV", () => {
-    it("opens dataset's upload drawer by name and binds what it creates", async () => {
+    /** @scenario The studio opens dataset's upload drawer by its client token */
+    it("opens dataset's upload drawer by token and binds what it creates", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
       renderWithLends(<DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />);
 
       await user.click(screen.getByTestId("upload-csv-dataset"));
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("uploadCSV", {
+      expect(mockOpenDrawer).toHaveBeenCalledWith(UploadCsvDrawerToken, {
         enableDirectUpload: false,
         onSuccess: expect.any(Function),
       });
@@ -357,6 +364,7 @@ describe("Workflow dataset dialog", () => {
   });
 
   describe("when editing a draft dataset", () => {
+    /** @scenario The studio renders dataset's editor table through its client token */
     /** @scenario Editing a draft dataset keeps it in the workflow */
     it("writes cell edits into the workflow DSL and offers saving as a real dataset", async () => {
       const draft: Entry["dataset"] = {
@@ -397,7 +405,7 @@ describe("Workflow dataset dialog", () => {
       expect(screen.getByTestId("save-draft-as-dataset")).toBeInTheDocument();
       await user.click(screen.getByTestId("save-draft-as-dataset"));
       expect(mockOpenDrawer).toHaveBeenCalledWith(
-        "addOrEditDataset",
+        AddOrEditDatasetRoutedDrawerToken,
         expect.objectContaining({
           datasetToSave: expect.objectContaining({ name: "Draft Dataset" }),
         }),

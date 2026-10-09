@@ -3,7 +3,7 @@ import { Temporal } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TriggerSettlementPersistenceService } from "../trigger-settlement-persistence.service.ts";
+import { TriggerSettlementPersistenceService } from "../../features/settlement/services/trigger-settlement-persistence.service.ts";
 
 const trigger: TriggerSummary = {
   id: "trigger-1",

@@ -82,7 +82,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-feature-flag.ts", () => ({
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
@@ -224,7 +224,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
 import { MemoryRouter } from "react-router";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

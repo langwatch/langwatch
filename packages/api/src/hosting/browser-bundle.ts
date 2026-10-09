@@ -31,6 +31,13 @@ const NO_STORE_CACHE = "no-store, max-age=0";
 // the new chunk hashes; a cached shell would reload into hashes that are gone.
 const HTML_REVALIDATE_CACHE = "no-cache";
 
+/**
+ * What /index.html answers when no build is on disk: a development api still renders the
+ * shell's public config, which the dev UI server lifts (specs/ui/dev-public-config.feature).
+ */
+const BARE_SHELL = "<!doctype html><html><head></head><body></body></html>";
+const BARE_SHELL_PATH = "/index.html";
+
 /** Where the bundle's content-hashed assets live, and are cached forever. */
 const ASSET_PREFIX = "/assets/";
 
@@ -134,7 +141,7 @@ export class BrowserBundle {
     const file = path.join(dist, relative);
 
     if (path.extname(file) === ".html" && !pathname.startsWith(ASSET_PREFIX)) {
-      const shell = await this.shell(file, request);
+      const shell = await this.shell(file, request, pathname === BARE_SHELL_PATH);
 
       if (shell) return shell;
     } else {
@@ -184,7 +191,11 @@ export class BrowserBundle {
   }
 
   /** The shell, with this deployment's configuration for whoever is asking. */
-  private async shell(file: string, request: Request): Promise<Response | undefined> {
+  private async shell(
+    file: string,
+    request: Request,
+    bareFallback = false,
+  ): Promise<Response | undefined> {
     let html: string;
 
     try {
@@ -198,8 +209,9 @@ export class BrowserBundle {
         fs.closeSync(descriptor);
       }
     } catch {
-      // Not on disk, which is this path's ordinary "try the next answer".
-      return void 0;
+      // Not on disk: the next answer, unless this is /index.html with no build to serve.
+      if (!bareFallback) return void 0;
+      html = BARE_SHELL;
     }
 
     const caller = await this.sessionReader.read(request);

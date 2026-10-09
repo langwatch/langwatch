@@ -10,6 +10,7 @@ import {
   permissionResource,
 } from "@langwatch/authorization";
 
+import { OrgExclusivePermissionScopeError } from "./authz.errors.ts";
 import type { AuthzScopeRef, CollectedGrants, GrantAudience, GrantScopeTier } from "./authz.ts";
 
 /** One link of a scope chain: a binding scope that can grant at the scope. */
@@ -108,4 +109,24 @@ export function bindingScopeCanGrantPermission({
   if (scopes.includes("platform")) return false;
   if (scopeType === "ORGANIZATION") return true;
   return scopes.includes("team") || scopes.includes("project");
+}
+
+/**
+ * Refuses a role whose permissions an organization binding grants but a
+ * `scopeType` binding cannot. A legacy `ops:*` entry is inert at every tier
+ * (the platform fence), so it refuses nothing.
+ */
+export function assertBindingScopeCanGrantPermissions({
+  scopeType,
+  permissions,
+}: {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  permissions: readonly string[];
+}): void {
+  const exclusive = permissions.find(
+    (permission) =>
+      bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }) &&
+      !bindingScopeCanGrantPermission({ scopeType, permission }),
+  );
+  if (exclusive) throw new OrgExclusivePermissionScopeError(exclusive, scopeType);
 }

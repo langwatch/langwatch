@@ -1,6 +1,6 @@
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
-import type { MediaPartData } from "../trace-media-part.collector.ts";
+import type { MediaPartData } from "../features/content/trace-media-part.collector.ts";
 
 // One renderable unit; tool calls and results pair into one part. Every
 // surface flattens and renders through ConversationThread.

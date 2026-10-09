@@ -7,7 +7,7 @@ import {
   sortedDomains,
   type SelfHostedInstance,
 } from "../../model/self-hosted-instance.ts";
-import { EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
+import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 
 const COLUMN_COUNT = 8;

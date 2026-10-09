@@ -15,7 +15,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
 
 const BROWSER_TEST_SCRIPT = "test:browser";
-/** Mirrors BROWSER_TEST_GLOB in @langwatch/test-harness. */
+/** Mirrors BROWSER_TEST_GLOB in @langwatch/vitest-config. */
 const BROWSER_TEST_SUFFIX = ".browser.test.";
 
 /**

@@ -1,30 +1,19 @@
 import { defineTrpcContract } from "@langwatch/module";
 
-import {
-  createAgentCommandSchema,
-  updateAgentCommandSchema,
-  httpAgentTestInputSchema,
-} from "./agent.commands.ts";
+import { createAgentCommandSchema, updateAgentCommandSchema } from "./agent.commands.ts";
 import {
   agentCascadeArchiveSchema,
-  agentCopyCreatedSchema,
   agentCopySchema,
   agentHistoryEntrySchema,
   agentPushToCopiesSchema,
   agentSyncFromSourceSchema,
-  agentTestRunResultSchema,
-  agentTestTurnResultSchema,
-  relatedAgentEntitiesSchema,
   agentWithLegacyCopyCountSchema,
-  httpProxyResultSchema,
 } from "./agent.queries.ts";
 import {
   agentApiAgentInputSchema,
   agentApiAgentReferenceInputSchema,
-  agentApiCopyRequestSchema,
   agentApiProjectInputSchema,
   agentApiPushToCopiesInputSchema,
-  agentApiTestTurnInputSchema,
 } from "./agent.schemas.ts";
 import { agentSchema, agentWithFieldsSchema } from "./agent.ts";
 
@@ -45,10 +34,6 @@ export const agentTrpc = defineTrpcContract("agents")
   .withInput(updateAgentCommandSchema)
   .withOutput(agentWithFieldsSchema)
 
-  .query("getRelatedEntities")
-  .withInput(agentApiAgentInputSchema)
-  .withOutput(relatedAgentEntitiesSchema)
-
   .mutation("cascadeArchive")
   .withInput(agentApiAgentInputSchema)
   .withOutput(agentCascadeArchiveSchema)
@@ -60,10 +45,6 @@ export const agentTrpc = defineTrpcContract("agents")
   .query("getCopies")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentCopySchema.array())
-
-  .mutation("copy")
-  .withInput(agentApiCopyRequestSchema)
-  .withOutput(agentCopyCreatedSchema)
 
   .mutation("pushToCopies")
   .withInput(agentApiPushToCopiesInputSchema)
@@ -77,17 +58,4 @@ export const agentTrpc = defineTrpcContract("agents")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentHistoryEntrySchema.array())
 
-  .mutation("testTurn")
-  .withInput(agentApiTestTurnInputSchema)
-  .withOutput(agentTestTurnResultSchema)
-
-  .mutation("testRun")
-  .withInput(agentApiAgentReferenceInputSchema)
-  .withOutput(agentTestRunResultSchema)
-  .build();
-
-export const httpProxyTrpc = defineTrpcContract("httpProxy")
-  .mutation("execute")
-  .withInput(httpAgentTestInputSchema)
-  .withOutput(httpProxyResultSchema)
   .build();

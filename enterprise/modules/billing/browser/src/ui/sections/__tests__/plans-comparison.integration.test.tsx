@@ -5,7 +5,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BillingPricingService } from "../../../model/billing-pricing.service.ts";
@@ -88,6 +88,25 @@ describe("PlansComparisonPage", () => {
         expect(isMarkedCurrent("growth")).toBe(true);
         expect(isMarkedCurrent("free")).toBe(false);
         expect(isMarkedCurrent("enterprise")).toBe(false);
+      });
+    });
+
+    describe("when the currency is switched from EUR to USD", () => {
+      it("shows the custom retention price in the selected currency", () => {
+        renderPlans({ activePlan: { type: "GROWTH_SEAT_EUR_MONTHLY", free: false } });
+
+        expect(
+          within(column("growth")).getByText("30 days retention (+ custom at \u20AC3/GB)"),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId("currency-toggle"));
+
+        expect(
+          within(column("growth")).getByText("30 days retention (+ custom at $4/GB)"),
+        ).toBeInTheDocument();
+        expect(
+          within(column("growth")).queryByText("30 days retention (+ custom at \u20AC3/GB)"),
+        ).not.toBeInTheDocument();
       });
     });
   });

@@ -1,7 +1,7 @@
 /**
- * The `dataRetention.*` wire, pinned: every procedure name, its kind, and the
- * access the server binds to it. A rename here is a cache-key change in every
- * browser that calls it, and a loosened access decision is a widened surface.
+ * The `dataRetention.*` wire, pinned: every procedure name, kind and access. A rename is a
+ * cache-key change in every browser; a loosened access decision is a widened surface.
+ * Spec: modules/data-retention/specs/data-retention-scope-writes.feature
  */
 
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { dataRetentionTrpcTransport } from "../data-retention.trpc.ts";
 
-type DeclaredAccess = AuthzPermission | { kind: string; enforces?: Record<string, string> };
+type DeclaredAccess = AuthzPermission | { kind: string };
 
 /** Mounts the declaration and records the access each procedure asked for. */
 function declaredAccess(): DeclaredAccess[] {
@@ -49,9 +49,9 @@ describe("the data retention tRPC declaration", () => {
 
       expect(table).toEqual([
         ["getRules", "query", "permission:project:view"],
-        ["setForScope", "mutation", "service-authorized"],
-        ["previewScopeRemoval", "query", "service-authorized"],
-        ["removeForScope", "mutation", "service-authorized"],
+        ["setForScope", "mutation", "permission-by-input"],
+        ["previewScopeRemoval", "query", "permission-by-input"],
+        ["removeForScope", "mutation", "permission-by-input"],
         ["triggerRetroactiveUpdate", "mutation", "permission:project:update"],
         ["getMutationProgress", "query", "permission:traces:view"],
         ["killMutation", "mutation", "permission:project:update"],
@@ -59,12 +59,21 @@ describe("the data retention tRPC declaration", () => {
       ]);
     });
 
-    it("records that the scope-targeted procedures do not act on the project id they carry", () => {
-      const scopeTargeted = declaredAccess().filter((access) => typeof access !== "string");
+    /** @scenario "Each scope procedure declares the target's permission at the door" */
+    it("asks each scope write's permission on its target, chosen by the scope type", () => {
+      const scopeWrites = declaredAccess().filter((access) => typeof access !== "string");
 
-      expect(scopeTargeted).toHaveLength(3);
-      for (const access of scopeTargeted) {
-        expect(Object.keys(access.enforces ?? {})).toEqual(["projectId"]);
+      expect(scopeWrites).toHaveLength(3);
+      for (const access of scopeWrites) {
+        expect(access).toMatchObject({
+          kind: "permission-by-input",
+          field: "scope.scopeType",
+          map: {
+            ORGANIZATION: { permission: "organization:manage", field: "scope.scopeId" },
+            TEAM: { permission: "team:manage", field: "scope.scopeId" },
+            PROJECT: { permission: "project:update", field: "scope.scopeId" },
+          },
+        });
       }
     });
   });

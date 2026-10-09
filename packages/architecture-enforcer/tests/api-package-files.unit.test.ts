@@ -19,6 +19,7 @@ const TARGET_FILES = new Set([
   "dates.ts",
   "errors.ts",
   "handler-arguments.ts",
+  "json-text-field.ts",
   "ports.ts",
   "schema.ts",
   "websocket.ts",
@@ -27,6 +28,7 @@ const TARGET_FILES = new Set([
   "raw-socket.ts",
   "access/index.ts",
   "access/access.ts",
+  "access/decision-record.ts",
   "access/declaration.ts",
   "access/declared-middleware.ts",
   "access/input-permission.ts",
@@ -60,6 +62,7 @@ const TARGET_FILES = new Set([
   "rest/host.ts",
   "rest/idempotency.ts",
   "rest/key-credential.ts",
+  "rest/legacy-error.ts",
   "rest/openapi.ts",
   "rest/request.ts",
   "rest/response.ts",
@@ -80,7 +83,6 @@ const TARGET_FILES = new Set([
   "web/index.ts",
   "web/module-api.ts",
   "web/trpc-query-key.ts",
-  "web/use-invalidate-procedure.ts",
 ]);
 
 function sourceFiles(directory: string): string[] {

@@ -9,6 +9,41 @@ import type { Instant } from "@langwatch/time";
 import type { z } from "zod";
 
 import type {
+  ArchiveGatewayBudgetInput,
+  CreateGatewayBudgetInput,
+  GatewayBudgetChangeInput,
+  GatewayBudgetCheckInput,
+  GatewayBudgetCheckResult,
+  GatewayBudgetDebitRow,
+  GatewayBudgetDetail,
+  GatewayBudgetListWithHealth,
+  GatewayBudgetPageWithHealth,
+  GatewayBudgetResolutionTarget,
+  GatewayBudgetResource,
+  GatewayBudgetScopeTarget,
+  GatewayResolvedBudget,
+  ResetGatewayBudgetInput,
+  UpdateGatewayBudgetInput,
+  GatewayApplicableBudget,
+  GatewayVirtualKeyDirectBudget,
+  GatewayBudgetHealth,
+  GatewayBudgetScopeReachResult,
+} from "./features/budget/gateway.budget.ts";
+import type {
+  GatewayPrincipalDailySpend,
+  GatewayPrincipalModelSpend,
+  GatewayPrincipalSpendSummary,
+  GatewayPrincipalSpendWindow,
+} from "./features/spend/gateway-principal-spend.ts";
+import type {
+  GatewayPricedSpend,
+  GatewayPricedSpendResult,
+  SpendEventRow,
+  SpendEventStatus,
+  SpendFilters,
+  SpendUsage,
+} from "./features/spend/gateway-spend.schemas.ts";
+import type {
   ArchiveGatewayCacheRuleInput,
   CreateGatewayCacheRuleInput,
   GatewayCacheRuleResource,
@@ -29,41 +64,9 @@ import type {
   GatewayVirtualKeyCaller,
   gatewayRequestCredentialSchema,
 } from "./gateway-platform.schemas.ts";
-import type {
-  GatewayPrincipalDailySpend,
-  GatewayPrincipalModelSpend,
-  GatewayPrincipalSpendSummary,
-  GatewayPrincipalSpendWindow,
-} from "./gateway-principal-spend.ts";
-import type {
-  GatewayPricedSpend,
-  GatewayPricedSpendResult,
-  SpendFilters,
-  SpendUsage,
-} from "./gateway-spend.schemas.ts";
-import type {
-  ArchiveGatewayBudgetInput,
-  CreateGatewayBudgetInput,
-  GatewayBudgetChangeInput,
-  GatewayBudgetCheckInput,
-  GatewayBudgetCheckResult,
-  GatewayBudgetDebitRow,
-  GatewayBudgetDetail,
-  GatewayBudgetListWithHealth,
-  GatewayBudgetPageWithHealth,
-  GatewayBudgetResolutionTarget,
-  GatewayBudgetResource,
-  GatewayBudgetScopeTarget,
-  GatewayResolvedBudget,
-  ResetGatewayBudgetInput,
-  UpdateGatewayBudgetInput,
-  GatewayApplicableBudget,
-  GatewayVirtualKeyDirectBudget,
-  GatewayBudgetHealth,
-  GatewayBudgetScopeReachResult,
-} from "./gateway.budget.ts";
 import type { GatewayDeploymentAddresses } from "./gateway.config.ts";
 import type {
+  GatewayPersonalBudget,
   GatewaySpendEventPage,
   GatewayUsageSummary,
   GatewayVirtualKeyUsageSummary,
@@ -375,17 +378,27 @@ export type GatewayRealtimeReservation = {
   model: string;
   traceId?: string;
   requestedModel?: string;
+  kind?: string;
+  metering?: GatewayRealtimeMetering;
+  transcriptionModel?: string;
+  endUserId?: string;
+  credentialExpiresAt?: Instant;
 };
+
+/** Who measures a session's usage: the caller reporting it, or the gateway observing it. */
+export type GatewayRealtimeMetering = "client" | "gateway";
 
 export type GatewayRealtimeReservationResult =
   | { ok: true }
   | { ok: false; reason: "session_limit"; open: number; limit: number }
   | { ok: false; reason: "unavailable" };
 
+/** What the mint learned after booking: either field alone, or both. */
 export type GatewayRealtimeCorrelation = {
   sessionId: string;
   projectId: string;
-  vendorConversationId: string;
+  vendorConversationId?: string;
+  credentialExpiresAt?: Instant;
 };
 
 export type GatewayRealtimeRelease = {
@@ -402,10 +415,38 @@ export type GatewayRealtimeUsageReport = {
   sessionId: string;
   projectId: string;
   virtualKeyId: string;
-  usage: SpendUsage;
+  /** Absent only on a bare close. */
+  usage?: SpendUsage;
+  /** Names one report. Absent means `usage` is the session total and closes it. */
+  reportKey?: string;
+  /** Prices this report under another catalog id than the session's. */
+  model?: string;
+  /** Prices this report under the session's transcription model, unless `model` names one. */
+  pricedAs?: "transcription";
+  /** Closes the session after recording. */
+  final?: boolean;
+  durationMs?: number;
+  source?: GatewayRealtimeMetering;
 };
 
-export type GatewayRealtimeUsageOutcome = "already_closed" | "closed" | "not_found" | "unavailable";
+/** Whether a blocking budget on the key's chain is at or past its limit. */
+export type GatewayRealtimeBudgetVerdict = {
+  exceeded: boolean;
+  scope?: string;
+  budgetId?: string;
+  /** The budgets could not be read in time, so `exceeded` is not a finding. */
+  unknown?: true;
+};
+
+/** What one usage report did, and where the session's money stands after it. */
+export type GatewayRealtimeUsageReceipt = {
+  status: "recorded" | "duplicate" | "closed" | "already_closed";
+  costNanoUsd: number;
+  sessionCostNanoUsd: number;
+  budget: GatewayRealtimeBudgetVerdict;
+};
+
+export type GatewayRealtimeUsageOutcome = GatewayRealtimeUsageReceipt | "not_found" | "unavailable";
 
 /** Spend of one request type across tenants, in an optional epoch-millisecond window. */
 export type GatewaySpendByRequestTypeQuery = {
@@ -413,6 +454,30 @@ export type GatewaySpendByRequestTypeQuery = {
   requestType: string;
   fromMs?: number;
   toMs?: number;
+};
+
+/** One page of these tenants' confirmed rows of one request type, oldest change first. */
+export type GatewayConfirmedSpendQuery = {
+  tenantIds: readonly string[];
+  requestType: string;
+  cursor?: string | null;
+  limit: number;
+};
+
+/** One confirmed ledger row, as much of it as a copy of its spend needs. */
+export type GatewayConfirmedSpendRow = {
+  /** The project the row was written under. */
+  tenantId: string;
+  requestId: string;
+  /** Integer nano USD, the row's customer price. */
+  costNanoUsd: number;
+  /** Epoch milliseconds. */
+  occurredAt: number;
+};
+
+export type GatewayConfirmedSpendPage = {
+  rows: GatewayConfirmedSpendRow[];
+  nextCursor: string | null;
 };
 
 /** One page of a project's spend-event ledger, newest first. */
@@ -423,6 +488,29 @@ export type GatewaySpendEventsPageQuery = {
   filters?: SpendFilters;
   cursor?: { occurredAtMs: number; gatewayRequestId: string };
   limit?: number;
+};
+
+/** One page of spend events across project tenants in the given statuses, newest first. */
+export type GatewaySpendEventsAcrossTenantsQuery = {
+  tenantIds: readonly string[];
+  statuses: readonly SpendEventStatus[];
+  fromMs?: number;
+  toMs?: number;
+  cursor?: string | null;
+  limit: number;
+};
+
+/** A page of spend rows and the opaque cursor of the next, null on the last. */
+export type GatewaySpendEventsAcrossTenantsPage = {
+  rows: SpendEventRow[];
+  nextCursor: string | null;
+};
+
+/** One request's spend row in any of these tenants, in one of these statuses. */
+export type GatewaySpendEventAcrossTenantsQuery = {
+  tenantIds: readonly string[];
+  gatewayRequestId: string;
+  statuses: readonly SpendEventStatus[];
 };
 
 export interface GatewayInternalProtocol {
@@ -818,6 +906,14 @@ export interface GatewayApi extends GatewayInternalProtocol {
     /** Adds up to three top models to each personal budget. */
     includeTopModels?: boolean;
   }): Promise<GatewayBudgetOverviewForUser>;
+  /**
+   * The /me budget banner: the gateway's own check at a projected cost of zero on the
+   * caller's personal key, so the banner and the command line's pre-check agree.
+   */
+  getPersonalBudget(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<GatewayPersonalBudget>;
   spendByVirtualKey(input: {
     organizationId: string;
     virtualKeyIds: readonly string[];
@@ -874,11 +970,30 @@ export interface GatewayApi extends GatewayInternalProtocol {
   sumSpendNanoUsdByRequestType(input: GatewaySpendByRequestTypeQuery): Promise<number>;
 
   /**
+   * The confirmed rows `sumSpendNanoUsdByRequestType` sums, one page at a time, for a copy that
+   * needs each request (ADR-174 decision 17). An empty page where there is no spend source.
+   */
+  listConfirmedSpendByRequestType(
+    input: GatewayConfirmedSpendQuery,
+  ): Promise<GatewayConfirmedSpendPage>;
+
+  /**
    * One page of the spend-event ledger for a project, newest first, with
    * virtual-key names resolved. With no ClickHouse spend source the page is
    * empty and `clickHouseDisabled`, so a door renders disabled rather than zero.
    */
   listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage>;
+  /**
+   * Spend events across these tenants in these statuses, newest first by occurrence
+   * then request id; an empty page where this deployment has no spend source.
+   */
+  listSpendEventsAcrossTenants(
+    input: GatewaySpendEventsAcrossTenantsQuery,
+  ): Promise<GatewaySpendEventsAcrossTenantsPage>;
+  /** One request's spend row across these tenants, null when none holds it. */
+  findSpendEventAcrossTenants(
+    input: GatewaySpendEventAcrossTenantsQuery,
+  ): Promise<SpendEventRow | null>;
   /**
    * The metered lane per UTC day across these tenants' ledgers, inclusive days,
    * oldest first; none for no tenants or no ledger. Main's governance

@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-  "files": ["./src/auth.ts", "./src/auth.web.ts"],
+  "files": ["./src/auth.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -43,6 +43,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/client/tsconfig.build.json"
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"

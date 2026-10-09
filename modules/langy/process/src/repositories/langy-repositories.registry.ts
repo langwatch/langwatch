@@ -21,7 +21,6 @@ import type {
 import type { LangyLocalPresenceRepository } from "./langy-local-presence.repository.ts";
 import type { LangyMessageRepository } from "./langy-message.repository.ts";
 import type { LangyRateLimitRepository } from "./langy-rate-limit.repository.ts";
-import type { LangySessionKeyReapRepository } from "./langy-session-key-reap.repository.ts";
 import type { LangySessionKeyRepository } from "./langy-session-key.repository.ts";
 import type { LangyTokenBufferRepository } from "./langy-token-buffer.repository.ts";
 import type { LangyTurnAdmissionRepository } from "./langy-turn-admission.repository.ts";
@@ -35,8 +34,6 @@ import { MemoryLangyRepositories } from "./memory/memory.langy.repositories.ts";
  * shared folder, token stream) Redis holds in a deployment.
  */
 export interface LangyRepositories extends LangyDatabaseRepositories {
-  /** The fleet-wide sweep's one write over elapsed session keys. */
-  readonly sessionKeyReap: LangySessionKeyReapRepository;
   readonly turnAccess: LangyTurnAccessRepository;
   readonly turnHandoff: LangyTurnHandoffRepository;
   readonly frameDedup: LangyFrameDedupRepository;

@@ -97,6 +97,10 @@ export class MemorySuiteRepository extends SuiteRepository {
       .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
   }
 
+  async findProjectIdsHoldingSuites(): Promise<string[]> {
+    return [...new Set([...this.database.plans.values()].map((plan) => plan.projectId))].toSorted();
+  }
+
   async resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]> {
     const plan = this.database.plans.get(input.id);
     if (!plan || plan.projectId !== input.projectId || plan.archivedAt !== null) {

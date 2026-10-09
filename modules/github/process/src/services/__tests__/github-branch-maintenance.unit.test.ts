@@ -2,15 +2,16 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
+import { MemoryGithubApiAdapter } from "../../channels/memory/memory.github-api.channel.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubBranchCheckRow,
   NullGithubPullRequestsRepository,
 } from "../../repositories/github-pull-requests.repository.ts";
+import { githubHostOf } from "../../rules/github-host.rules.ts";
 import { GithubAppTokenService } from "../../services/github-app-token.service.ts";
 import { GithubBranchMaintenanceService } from "../github-branch-maintenance.service.ts";
 import { GithubBranchMappingService } from "../github-branch-mapping.service.ts";
-import { GithubHostService } from "../github-host.service.ts";
 import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
 
 const NOW = Date.UTC(2026, 5, 1);
@@ -48,8 +49,7 @@ class MaintenanceRepository extends NullGithubPullRequestsRepository {
  */
 function service(repository: MaintenanceRepository) {
   const appTokens = GithubAppTokenService.create({
-    appId: "app",
-    privateKey: "test-key",
+    api: MemoryGithubApiAdapter.create(),
     tokenCache: unansweredRedisRepositories().tokenCache,
   });
   const access = GithubInstallationAccessService.create(
@@ -63,7 +63,7 @@ function service(repository: MaintenanceRepository) {
       repository,
       installations: access,
       appTokens,
-      host: GithubHostService.create(),
+      host: githubHostOf(),
       now: () => NOW,
     }),
     now: () => NOW,

@@ -1,13 +1,14 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- * @see enterprise/modules/nurturing/specs/nurturing.feature
- */
 import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * @see enterprise/modules/nurturing/specs/nurturing.feature
+ */
+import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { PostHogChannel } from "../../channels/posthog.channel.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
@@ -45,9 +46,11 @@ function customerIo(status = 200) {
     return new Response(null, { status });
   });
   const service = NurturingService.create({
-    config: { customerIoApiKey: "key", customerIoRegion: "us" },
-    fetchFn,
-    errorReporter: { capture: (error) => reported.push(error) },
+    channel: HttpCustomerIoChannel.create({
+      config: { customerIoApiKey: "key", customerIoRegion: "us" },
+      fetchFn,
+      errorReporter: { capture: (error) => reported.push(error) },
+    }),
   });
   return { service, sent, reported };
 }
@@ -430,6 +433,7 @@ describe("NurturingDeliveryService", () => {
           throw new Error("bad PostHog configuration");
         }
         groupIdentify(): void {}
+        identify(): void {}
       }
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
@@ -534,6 +538,7 @@ describe("NurturingDeliveryService", () => {
           throw new Error("bad PostHog configuration");
         }
         groupIdentify(): void {}
+        identify(): void {}
       }
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
@@ -558,13 +563,15 @@ describe("NurturingDeliveryService", () => {
       const sent: string[] = [];
       const reported: Error[] = [];
       const service = NurturingService.create({
-        config: { customerIoApiKey: "key", customerIoRegion: "us" },
-        fetchFn: async (url) => {
-          const path = new URL(url instanceof Request ? url.url : url).pathname;
-          sent.push(path);
-          return new Response(null, { status: path === "/v1/track" ? 500 : 200 });
-        },
-        errorReporter: { capture: (error) => reported.push(error) },
+        channel: HttpCustomerIoChannel.create({
+          config: { customerIoApiKey: "key", customerIoRegion: "us" },
+          fetchFn: async (url) => {
+            const path = new URL(url instanceof Request ? url.url : url).pathname;
+            sent.push(path);
+            return new Response(null, { status: path === "/v1/track" ? 500 : 200 });
+          },
+          errorReporter: { capture: (error) => reported.push(error) },
+        }),
       });
       const delivery = NurturingDeliveryService.create({
         claims: claims(),

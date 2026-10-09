@@ -43,18 +43,166 @@ const NAMES_TABLE_BY_BINDING = new RegExp(
 );
 const READING_VERBS = new Set(["from", "join"]);
 
-type Access = { module: string; table: string; file: string; line: number; write: boolean };
+export type Access = { module: string; table: string; file: string; line: number; write: boolean };
 type ScanRoot = { module: string; directory: string };
 
 const ALLOWED =
   "Write a ClickHouse table from one module's repositories only, and read it elsewhere through that module's api. See ADR-134.";
+
+/** A table no module writes, recorded with who does and why (Alex, 2026-10-06, Q207). */
+export type OwnershipRecord = {
+  table: string;
+  owner: "framework" | "legacy";
+  writer: string;
+  reason: string;
+};
+
+/** A foreign read inside one statement, which an `*Api` call cannot express (Q207). */
+export type NamedException = { reader: string; table: string; file: string; reason: string };
+
+/** A table its writing module shares for reading with named modules; writes stay its own (EF-5). */
+export type SharedTable = {
+  table: string;
+  owner: string;
+  readers: readonly string[];
+  reason: string;
+};
+
+export type DeclaredOwnership = {
+  records: readonly OwnershipRecord[];
+  exceptions: readonly NamedException[];
+  shared: readonly SharedTable[];
+};
+
+const LEGACY = "no writer on this release";
+const SUBQUERY =
+  "a WHERE-clause subquery inside trace's one statement; an *Api call can only return an unbounded id list";
+
+export const DECLARED_OWNERSHIP: DeclaredOwnership = {
+  records: [
+    {
+      table: "event_log",
+      owner: "framework",
+      writer: "packages/eventing",
+      reason:
+        "the event store appends every pipeline's events; modules reach it through eventing (§7)",
+    },
+    {
+      table: "stored_log_records",
+      owner: "legacy",
+      writer: LEGACY,
+      reason:
+        "predates log_records; only a release still rolling out writes it, trace reads it as a fallback",
+    },
+    {
+      table: "stored_metric_records",
+      owner: "legacy",
+      writer: LEGACY,
+      reason: "predates metric_records; kept for the LWQL legacy view, nothing writes it",
+    },
+    {
+      table: "stored_objects",
+      owner: "legacy",
+      writer: LEGACY,
+      reason: "read-only legacy index of externalised content (ADR-158); stored-object reads it",
+    },
+    {
+      table: "automation_audit",
+      owner: "legacy",
+      writer: LEGACY,
+      reason: "retired: its writer is gone (ADR-052, 2026-07 amendment); kept, never dropped",
+    },
+    {
+      table: "langy_messages",
+      owner: "legacy",
+      writer: LEGACY,
+      reason: "Langy conversation content (migration 00036), still read; no module writes it here",
+    },
+  ],
+  exceptions: [
+    {
+      reader: "trace",
+      table: "instant_eval_judgments",
+      file: "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts",
+      reason: SUBQUERY,
+    },
+    {
+      reader: "trace",
+      table: "simulation_runs",
+      file: "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts",
+      reason: SUBQUERY,
+    },
+    {
+      reader: "evaluation",
+      table: "trace_summaries",
+      file: "modules/evaluation/process/src/repositories/clickhouse/monitor-performance.repository.ts",
+      reason:
+        "a JOIN inside evaluation's one statement; an *Api call can only return an unbounded id list",
+    },
+  ],
+  shared: [
+    {
+      table: "trace_analytics",
+      owner: "trace",
+      readers: ["analytics"],
+      reason: "trace folds it from its facts for analytics' dashboards to read (EF-5, 2026-10-07)",
+    },
+    {
+      table: "trace_analytics_rollup",
+      owner: "trace",
+      readers: ["analytics"],
+      reason: "trace appends it per span for analytics' dashboards to read (EF-5, 2026-10-07)",
+    },
+    {
+      table: "trace_summaries",
+      owner: "trace",
+      readers: ["analytics"],
+      reason:
+        "analytics' custom-graph aggregations select over trace's summaries (EF-5, 2026-10-07)",
+    },
+    {
+      table: "stored_spans",
+      owner: "trace",
+      readers: ["analytics"],
+      reason: "analytics' span-level aggregations select over trace's spans (EF-5, 2026-10-07)",
+    },
+    {
+      table: "evaluation_runs",
+      owner: "evaluation",
+      readers: ["analytics", "trace"],
+      reason:
+        "analytics' evaluation metrics and trace's evaluation joins and facets select over evaluation's runs (EF-5; R40, 2026-10-07)",
+    },
+    {
+      table: "gateway_spend",
+      owner: "gateway",
+      readers: ["billing"],
+      reason:
+        "billing sums a connected customer's confirmed spend per request type for its statement and term cap (round 37 D5, EF-5)",
+    },
+    {
+      table: "log_records",
+      owner: "log",
+      readers: ["trace"],
+      reason:
+        "trace's log read and session groups select over log's records, never a copy (R40, 2026-10-07)",
+    },
+    {
+      table: "instant_eval_runs",
+      owner: "instant-eval",
+      readers: ["trace"],
+      reason:
+        "trace dates the runs an Explorer eval chip claims from instant-eval's runs, not an InstantEvalApi call (R40; round 47, 2026-10-08)",
+    },
+  ],
+};
 
 function issue(file: string, message: string, line?: number): ArchitectureViolation {
   return { policy: "clickhouse-table-ownership", file, line, message, allowed: ALLOWED };
 }
 
 /** The `+goose Up` half of a migration, with its SQL comments removed. */
-function upStatements(text: string): string {
+export function upStatements(text: string): string {
   const down = text.indexOf(GOOSE_DOWN);
 
   return (down < 0 ? text : text.slice(0, down)).replace(SQL_COMMENT, "");
@@ -342,7 +490,21 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
   const value = property.initializer;
   if (ts.isStringLiteralLike(value)) return value.text;
 
+  if (ts.isTemplateExpression(value)) return qualifiedConstant(reader, value);
+
   return ts.isIdentifier(value) ? reader.constant(value.text) : void 0;
+}
+
+/** `${database}.${CONSTANT}`: the table is the declared constant after the database dot. */
+function qualifiedConstant(reader: Reader, template: ts.TemplateExpression): string | undefined {
+  const spans = template.templateSpans;
+  const last = spans[spans.length - 1];
+  if (!last || spans.length < 2 || last.literal.text !== "") return void 0;
+
+  if (!ts.isIdentifier(last.expression)) return void 0;
+
+  const before = spans[spans.length - 2]?.literal.text;
+  return before === "." ? reader.constant(last.expression.text) : void 0;
 }
 
 function readFile({
@@ -389,7 +551,7 @@ function readFile({
 }
 
 /** Every module access to a live ClickHouse table, in a stable file order. */
-function collectAccess(
+export function collectAccess(
   root: string,
   catalogue: readonly FeatureCatalogueEntry[],
   tables: ReadonlyMap<string, string>,
@@ -460,74 +622,293 @@ function owners(access: readonly Access[]): Map<string, Access[]> {
   return writers;
 }
 
+type Feeds = ReadonlyMap<string, readonly string[]>;
+
+/** A recorded table no migration creates, or a module writing one. */
+function recordFindings({
+  tables,
+  writers,
+  records,
+  root,
+}: {
+  tables: ReadonlyMap<string, string>;
+  writers: ReadonlyMap<string, Access[]>;
+  records: readonly OwnershipRecord[];
+  root: string;
+}): Finding[] {
+  return records.flatMap((record): Finding[] => {
+    if (!tables.has(record.table)) {
+      return [
+        {
+          key: `record|${record.table}`,
+          file: join(root, MIGRATIONS),
+          message: `Table ${record.table} is recorded as ${record.owner} owned but no migration creates it. Delete the record.`,
+        },
+      ];
+    }
+
+    return (writers.get(record.table) ?? []).map((writer) => ({
+      key: `${writer.module}|${record.table}`,
+      file: writer.file,
+      line: writer.line,
+      message: `${writer.module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`,
+    }));
+  });
+}
+
+function isExcepted({
+  entry,
+  exceptions,
+  root,
+}: {
+  entry: Access;
+  exceptions: readonly NamedException[];
+  root: string;
+}): boolean {
+  const file = relative(root, entry.file);
+
+  return exceptions.some(
+    (item) => item.reader === entry.module && item.table === entry.table && item.file === file,
+  );
+}
+
+/** A named exception the tree no longer needs is deleted, so the list cannot widen silently. */
+function staleExceptions({
+  access,
+  exceptions,
+  root,
+}: {
+  access: readonly Access[];
+  exceptions: readonly NamedException[];
+  root: string;
+}): Finding[] {
+  return exceptions
+    .filter((item) => !access.some((entry) => isExcepted({ entry, exceptions: [item], root })))
+    .map((item) => ({
+      key: `exception|${item.reader}|${item.table}|${item.file}`,
+      file: join(root, item.file),
+      message: `The named exception for ${item.reader} reading ${item.table} in ${item.file} matches no read. Delete it.`,
+    }));
+}
+
+/** A read its owner declared shared with the reading module. */
+function isSharedRead({
+  entry,
+  owner,
+  shared,
+}: {
+  entry: Access;
+  owner: string;
+  shared: readonly SharedTable[];
+}): boolean {
+  return (
+    !entry.write &&
+    shared.some(
+      (item) =>
+        item.table === entry.table && item.owner === owner && item.readers.includes(entry.module),
+    )
+  );
+}
+
+/** A shared table its declared owner does not own, or a named reader that no longer reads it. */
+function staleShared({
+  access,
+  tables,
+  writers,
+  feeds,
+  shared,
+  root,
+}: {
+  access: readonly Access[];
+  tables: ReadonlyMap<string, string>;
+  writers: ReadonlyMap<string, Access[]>;
+  feeds: Feeds;
+  shared: readonly SharedTable[];
+  root: string;
+}): Finding[] {
+  return shared.flatMap((item): Finding[] => {
+    const owner = tables.has(item.table) ? ownerOf({ table: item.table, writers, feeds }) : void 0;
+
+    if (owner?.module !== item.owner) {
+      return [
+        {
+          key: `shared|${item.table}`,
+          file: join(root, MIGRATIONS),
+          message: `Table ${item.table} is declared shared by ${item.owner}, which does not own it. Fix or delete the declaration.`,
+        },
+      ];
+    }
+
+    return item.readers
+      .filter(
+        (reader) => !access.some((entry) => entry.module === reader && entry.table === item.table),
+      )
+      .map((reader) => ({
+        key: `shared|${item.table}|${reader}`,
+        file: owner.file,
+        message: `Table ${item.table} is shared with ${reader}, which no longer reads it. Delete the reader.`,
+      }));
+  });
+}
+
+type TableContext = {
+  access: readonly Access[];
+  writers: ReadonlyMap<string, Access[]>;
+  feeds: Feeds;
+  root: string;
+  exceptions: readonly NamedException[];
+  shared: readonly SharedTable[];
+  findings: Map<string, Finding>;
+};
+
+/** One module-owned table: no owner, a second writer, or a foreign reader. */
+function addTableFindings({
+  table,
+  migration,
+  context,
+}: {
+  table: string;
+  migration: string;
+  context: TableContext;
+}): void {
+  const { access, writers, feeds, root, exceptions, shared, findings } = context;
+  const owner = ownerOf({ table, writers, feeds });
+
+  if (!owner) {
+    findings.set(`${UNOWNED}|${table}`, {
+      key: `${UNOWNED}|${table}`,
+      file: join(root, migration),
+      message: `Table ${table} has no module owner.`,
+    });
+
+    return;
+  }
+
+  for (const extra of (writers.get(table) ?? []).slice(1)) {
+    const key = `${extra.module}|${table}`;
+
+    findings.set(key, {
+      key,
+      file: extra.file,
+      line: extra.line,
+      message: `Table ${table} is written by ${extra.module} and ${owner.module} (${relative(root, owner.file)}). Keep a single module owner.`,
+    });
+  }
+
+  for (const entry of access.filter((item) => item.table === table)) {
+    const key = `${entry.module}|${table}`;
+    if (entry.module === owner.module || findings.has(key)) continue;
+    if (isExcepted({ entry, exceptions, root })) continue;
+    if (isSharedRead({ entry, owner: owner.module, shared })) continue;
+
+    findings.set(key, {
+      key,
+      file: entry.file,
+      line: entry.line,
+      message: `${entry.module} reads ${table}, owned by ${owner.module}.`,
+    });
+  }
+}
+
 function collectFindings({
   access,
   tables,
   feeds,
   root,
+  declared,
 }: {
   access: readonly Access[];
   tables: ReadonlyMap<string, string>;
-  feeds: ReadonlyMap<string, readonly string[]>;
+  feeds: Feeds;
   root: string;
+  declared: DeclaredOwnership;
 }): Finding[] {
   const writers = owners(access);
+  const recorded = new Set(declared.records.map((record) => record.table));
   const findings = new Map<string, Finding>();
+  const { exceptions, shared } = declared;
+  const context = { access, writers, feeds, root, exceptions, shared, findings };
 
   for (const [table, migration] of [...tables].toSorted(([a], [b]) => a.localeCompare(b))) {
-    const modules = writers.get(table) ?? [];
-    const owner = ownerOf({ table, writers, feeds });
-
-    if (!owner) {
-      findings.set(`${UNOWNED}|${table}`, {
-        key: `${UNOWNED}|${table}`,
-        file: join(root, migration),
-        message: `Table ${table} has no module owner.`,
-      });
-
-      continue;
-    }
-
-    for (const extra of modules.slice(1)) {
-      const key = `${extra.module}|${table}`;
-
-      findings.set(key, {
-        key,
-        file: extra.file,
-        line: extra.line,
-        message: `Table ${table} is written by ${extra.module} and ${owner.module} (${relative(root, owner.file)}). Keep a single module owner.`,
-      });
-    }
-
-    for (const entry of access.filter((item) => item.table === table)) {
-      const key = `${entry.module}|${table}`;
-      if (entry.module === owner.module || findings.has(key)) continue;
-
-      findings.set(key, {
-        key,
-        file: entry.file,
-        line: entry.line,
-        message: `${entry.module} reads ${table}, owned by ${owner.module}.`,
-      });
-    }
+    if (!recorded.has(table)) addTableFindings({ table, migration, context });
   }
 
-  return [...findings.values()];
+  return [
+    ...findings.values(),
+    ...recordFindings({ tables, writers, records: declared.records, root }),
+    ...staleExceptions({ access, exceptions, root }),
+    ...staleShared({ access, tables, writers, feeds, shared, root }),
+  ];
 }
 
-/** Every finding this tree carries, keyed for the baseline. */
+/** One read of the tree: the table list, every access and the view feeds. */
+export type ClickhouseScan = {
+  tables: ReadonlyMap<string, string>;
+  access: readonly Access[];
+  feeds: Feeds;
+};
+
+export function clickhouseScanAt(
+  root: string,
+  catalogue: readonly FeatureCatalogueEntry[],
+): ClickhouseScan {
+  const tables = clickhouseTables(root);
+
+  return {
+    tables,
+    access: collectAccess(root, catalogue, tables),
+    feeds: clickhouseViewFeeds(root),
+  };
+}
+
+const scans = new WeakMap<WorkspaceSnapshot, ClickhouseScan>();
+
+/** The scan once per snapshot: this policy and `migration-owners` share it in one run. */
+export function clickhouseScanOf(snapshot: WorkspaceSnapshot): ClickhouseScan {
+  const cached = scans.get(snapshot);
+  if (cached) return cached;
+  const scan = clickhouseScanAt(snapshot.root, snapshot.catalogue);
+  scans.set(snapshot, scan);
+
+  return scan;
+}
+
+/** A framework table is its writing package's; every legacy table is one owner, `legacy`. */
+function recordedOwner(record: OwnershipRecord): string {
+  return record.owner === "framework" ? record.writer : "legacy";
+}
+
+/** Each table's owner: its writing module, its view source's, or its record (D3). */
+export function clickhouseTableOwners({
+  scan,
+  declared = DECLARED_OWNERSHIP,
+}: {
+  scan: ClickhouseScan;
+  declared?: DeclaredOwnership;
+}): Map<string, string> {
+  const writers = owners(scan.access);
+  const result = new Map<string, string>();
+
+  for (const table of scan.tables.keys()) {
+    const record = declared.records.find((item) => item.table === table);
+    const owner = record
+      ? recordedOwner(record)
+      : ownerOf({ table, writers, feeds: scan.feeds })?.module;
+    if (owner) result.set(table, owner);
+  }
+
+  return result;
+}
+
+const NOTHING_DECLARED: DeclaredOwnership = { records: [], exceptions: [], shared: [] };
+
+/** Every finding under a root; fixtures pass declarations, the registry the ruled ones. */
 export function collectClickhouseOwnershipFindings(
   root: string,
   catalogue: readonly FeatureCatalogueEntry[],
+  declared: DeclaredOwnership = NOTHING_DECLARED,
 ): Finding[] {
-  const tables = clickhouseTables(root);
-
-  return collectFindings({
-    access: collectAccess(root, catalogue, tables),
-    tables,
-    feeds: clickhouseViewFeeds(root),
-    root,
-  });
+  return collectFindings({ ...clickhouseScanAt(root, catalogue), root, declared });
 }
 
 /** A foreign reader, a second writer or an ownerless table is a violation. */
@@ -543,7 +924,13 @@ export function lintClickhouseTableOwnershipAt({
   );
 }
 
-/** The registry entry: the same check, reading the catalogue off a snapshot. */
+/** The registry entry. The records describe this schema; a schema-less workspace has none. */
 export function lintClickhouseTableOwnership(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
-  return lintClickhouseTableOwnershipAt({ root: snapshot.root, catalogue: snapshot.catalogue });
+  const { root } = snapshot;
+  const scan = clickhouseScanOf(snapshot);
+  const declared = scan.tables.size === 0 ? NOTHING_DECLARED : DECLARED_OWNERSHIP;
+
+  return collectFindings({ ...scan, root, declared }).map((finding) =>
+    issue(finding.file, finding.message, finding.line),
+  );
 }

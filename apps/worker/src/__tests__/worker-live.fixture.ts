@@ -8,6 +8,7 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { processConfig, Server } from "@langwatch/process";
 
 import { processModules } from "../process-modules.generated.ts";
+import { upgradedLiveDatabase } from "./live-upgrade.fixture.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
@@ -61,12 +62,14 @@ export async function bootLiveWorker({
 }: { environment?: Readonly<Record<string, string>> } = {}) {
   if (!databaseUrl || !redisUrl)
     throw new Error("the live worker needs the test Postgres and Redis");
+  const clickHouseUrl = await migratedClickHouse();
+  await upgradedLiveDatabase({ databaseUrl, redisUrl, clickHouseUrl });
   const server = await Server.create("langwatch-worker")
     .withEnvironment({
       ...SYNTHETIC_ENVIRONMENT,
       DATABASE_URL: databaseUrl,
       REDIS_URL: redisUrl,
-      CLICKHOUSE_URL: await migratedClickHouse(),
+      CLICKHOUSE_URL: clickHouseUrl,
       ...environment,
     })
     .withConfig(processConfig(processModules, "worker"))

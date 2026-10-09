@@ -45,6 +45,11 @@ export class CachedIdentityLatchService {
     },
   ) {}
 
+  /** The fleet-level short-circuit the storage adapter asks: has anyone finalized at all. */
+  anyoneGate(): () => Promise<boolean> {
+    return () => this.hasAnyoneFinalized();
+  }
+
   /** The fork as `IdentityEmailService` takes it: one closure, per user. */
   gate(): IdentityUserGate {
     return ({ userId }) => this.isLatched({ userId });

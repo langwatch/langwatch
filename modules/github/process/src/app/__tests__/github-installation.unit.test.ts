@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { bootInstalledProcess } from "@langwatch/process";
@@ -35,7 +34,6 @@ function memberSource() {
     tier: stores.tier,
     order: [...stores.order, "eventing"],
     read: (name: string) => (name === "eventing" ? eventing : stores.read(name)),
-    close: async () => void 0,
   };
 }
 
@@ -50,7 +48,7 @@ async function bootGithub() {
     role: "api",
     modules: [githubProcessModule],
     config: { github: { appId: undefined, host: undefined, appSlug: undefined } },
-    members: memberSource(),
+    stores: memberSource(),
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     peers: [
       testPeer({ token: OrganizationApi, instance: createApiFixture<OrganizationApi>() }),
@@ -58,7 +56,6 @@ async function bootGithub() {
       testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
       testPeer({ token: AuthApi, instance: createApiFixture<AuthApi>() }),
       testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>() }),
-      testPeer({ token: CodingAgentApi, instance: createApiFixture<CodingAgentApi>() }),
     ],
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },

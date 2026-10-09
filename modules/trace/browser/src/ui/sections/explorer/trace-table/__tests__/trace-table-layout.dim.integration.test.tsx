@@ -10,15 +10,15 @@ import { act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useRefreshUIStore } from "../../../../../behavior/refresh-ui.store.ts";
+import { useRefreshUIStore } from "../../../../../features/explorer/behavior/refresh-ui.store.ts";
 import { TraceTableLayout } from "../trace-table-layout.tsx";
 
-vi.mock("../../hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ totalHits: 0, itemNoun: "traces", instantEval: null, summary: "" }),
 }));
 vi.mock("../column-education-dialog.tsx", () => ({ ColumnEducationDialog: () => null }));
 vi.mock("../../traces-page/refresh-progress-bar.tsx", () => ({ RefreshProgressBar: () => null }));
-vi.mock("../../hooks/use-trace-new-count.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-new-count.ts", () => ({
   useTraceNewCount: () => ({ count: 0, acknowledge: vi.fn() }),
 }));
 

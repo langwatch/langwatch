@@ -3,7 +3,7 @@ import type { AuthApi, CliTokenRecordEntry } from "@langwatch/auth-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { DefaultGovernanceCliSessionInventoryService } from "../cli-session-inventory.service.ts";
+import { DefaultGovernanceCliSessionInventoryService } from "../../features/cli/services/cli-session-inventory.service.ts";
 
 const records: CliTokenRecordEntry[] = [
   {
@@ -45,6 +45,35 @@ function inventory(
 }
 
 describe("the governance CLI session inventory", () => {
+  /** @scenario "User sees only their own credentials on the devices tab (never other users')" */
+  it("lists only the sessions of the person asking, never another user's", async () => {
+    const ben: CliTokenRecordEntry[] = [
+      {
+        tokenKey: "lwcli:access:ben",
+        organizationId: "org",
+        cliApiKeyId: "ak_ben_login",
+        issuedAtMs: 500,
+        expiresAtMs: 600,
+        clientInfo: { hostname: "bens-laptop", platform: "linux", sessionStartedAtMs: 400 },
+      },
+    ];
+    const byUser: Record<string, CliTokenRecordEntry[]> = { jane: records, ben };
+    const findCliTokenRecordsForUser = vi.fn<AuthApi["findCliTokenRecordsForUser"]>(
+      async ({ userId }) => byUser[userId] ?? [],
+    );
+    const service = DefaultGovernanceCliSessionInventoryService.create({
+      auth: createApiFixture<AuthApi>({ findCliTokenRecordsForUser }),
+      loginKeys: createApiFixture<ApiKeyApi>({}),
+    });
+
+    const sessions = await service.listForUser({ userId: "jane" });
+
+    expect(sessions.map((session) => session.cliApiKeyId)).toEqual(["ak_login"]);
+    expect(sessions.flatMap((session) => session.tokenKeys)).not.toContain("lwcli:access:ben");
+    expect(findCliTokenRecordsForUser).toHaveBeenCalledTimes(1);
+    expect(findCliTokenRecordsForUser).toHaveBeenCalledWith({ userId: "jane" });
+  });
+
   it("groups rotated tokens into one device session", async () => {
     const { service, findCliTokenRecordsForUser } = inventory();
 

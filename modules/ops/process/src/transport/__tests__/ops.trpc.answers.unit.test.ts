@@ -7,7 +7,7 @@
 import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import type { TrpcContract } from "@langwatch/module";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
-import type { OpsCapability } from "@langwatch/ops-process";
+import type { OpsCapability } from "../../app/ops.app.ts";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -21,8 +21,8 @@ import type { OpsReplayRunner } from "../../app/ops.app.ts";
 import { opsDashboardTrpcTransport } from "../ops-dashboard.trpc.ts";
 import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
 import { opsOperatorFact } from "../ops-operator.trpc.ts";
-import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
+import { opsUpgradeTrpcTransport } from "../ops-upgrade.trpc.ts";
 import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
 const OPERATOR: OpsOperator = { id: "user_alex", email: OPS_STAFF_ADDRESS };
@@ -143,7 +143,7 @@ describe("the ops surface's declared answers", () => {
         unblockQueueGroup: async () => ({ wasBlocked: true }),
       });
       const eventLog = mount(opsEventLogTrpcTransport, { dismissAnomaly: async () => true });
-      const platform = mount(opsPlatformTrpcTransport);
+      const upgrade = mount(opsUpgradeTrpcTransport);
 
       await expect(
         queues.operator.unblockGroup({ queueName: "traces", groupId: "g-1" }),
@@ -151,15 +151,15 @@ describe("the ops surface's declared answers", () => {
       await expect(
         eventLog.operator.dismissAnomaly({ tenantId: "project_a", kind: "rate_breaker" }),
       ).resolves.toEqual({ dismissed: true });
-      await expect(platform.operator.runSystemMigrationPass()).resolves.toEqual({ started: true });
+      await expect(upgrade.operator.runSystemMigrationPass()).resolves.toEqual({ started: true });
       await expect(
-        platform.operator.enrollMigrationTenant({
+        upgrade.operator.enrollMigrationTenant({
           organizationId: "org_acme",
           migrationName: "authz-team-user-backfill",
         }),
       ).resolves.toEqual({ enrolled: true });
       await expect(
-        platform.operator.withdrawMigrationTenant({
+        upgrade.operator.withdrawMigrationTenant({
           organizationId: "org_acme",
           migrationName: "authz-team-user-backfill",
         }),

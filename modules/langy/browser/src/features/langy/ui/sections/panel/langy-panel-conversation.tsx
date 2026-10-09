@@ -253,7 +253,12 @@ export function LangyColumnError({
 export interface LangyColumnState {
   showCardGallery: boolean;
   /** No model resolves, or a dead codex session is being signed in again. */
-  modelSetup: { reconnectCodex: boolean; onComplete: () => void } | null;
+  modelSetup: {
+    reconnectCodex: boolean;
+    /** The question waiting on a model, shown so the customer sees it was kept. */
+    queuedPrompt: string | null;
+    onComplete: () => void;
+  } | null;
   /** A conversation we could not READ is not one with nothing in it: ahead of the empty state. */
   blockingHistoryError: LangyErrorPresentation | null;
   onHistoryErrorAction: (kind: ErrorAction) => void;
@@ -328,13 +333,24 @@ export function LangyConversationBody({
 /** The inline model setup; the provider grid's own description is its only subtitle. */
 function LangyModelSetup({
   reconnectCodex,
+  queuedPrompt,
   onComplete,
 }: {
   reconnectCodex: boolean;
+  queuedPrompt: string | null;
   onComplete: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     <VStack align="stretch" gap={2} paddingX="18px" paddingTop="18px">
+      {queuedPrompt ? (
+        <VStack align="stretch" gap={1} paddingBottom={2}>
+          <QueuedPrompt prompt={queuedPrompt} reduceMotion={reduceMotion} />
+          <Text alignSelf="flex-end" textStyle="xs" color="fg.muted">
+            Langy sends this once a model is set up.
+          </Text>
+        </VStack>
+      ) : null}
       <Text fontSize="sm" fontWeight="semibold">
         {reconnectCodex ? "Sign in to Codex again" : "Langy needs a model to get started"}
       </Text>
@@ -351,7 +367,7 @@ type MessageContentProps = ComponentProps<typeof MessageContent>;
 /** What every message in the transcript shares; the per-message gates are derived from it. */
 export type LangyMessageContext = Omit<
   MessageContentProps,
-  "message" | "isStreaming" | "interrupted" | "showFeedback" | "isFeedbackPinned"
+  "message" | "isStreaming" | "interrupted" | "isLatest" | "showFeedback" | "isFeedbackPinned"
 > & {
   /** A turn is streaming into the transcript's last assistant message. */
   displayBusy: boolean;
@@ -385,6 +401,7 @@ function LangyTranscriptMessage({
         message={message}
         isStreaming={displayBusy && lastAnswer}
         interrupted={interruptedHere && lastAnswer}
+        isLatest={isLast}
         showFeedback={feedbackAllowed && lastAnswer}
         isFeedbackPinned={pinnedFeedbackMessageId === message.id}
       />

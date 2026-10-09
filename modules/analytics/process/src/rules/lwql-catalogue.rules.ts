@@ -5,11 +5,19 @@
  */
 
 import type { AuthzPermission } from "@langwatch/authorization";
+import {
+  EVENT_TABLE_DECLARATIONS,
+  type EventTableDeclaration,
+  type EventTableExposedColumn,
+  type EventTableOmittedColumn,
+} from "@langwatch/eventing/tables";
 
+import type { DatasetOverride } from "../features/lwql-catalogue/rules/lwql-dataset-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
+import type { PrismaManifest } from "../features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
 import type { LwqlClickHouseRows } from "./lwql-columns-manifest.generated.ts";
 import type { ColumnsManifest } from "./lwql-columns-manifest.rules.ts";
 import type { LwqlPrismaRows } from "./lwql-prisma-manifest.generated.ts";
-import type { PrismaManifest } from "./lwql-prisma-schema.rules.ts";
 
 type Permissions = readonly [AuthzPermission, ...AuthzPermission[]];
 
@@ -245,3 +253,104 @@ export const LWQL_TRACES_CATALOGUE = defineTableCatalogue({
     EarliestSpanStartMs: "omit",
   },
 });
+
+/** Eventing's tables are read only by a project manager: the gate is analytics' (Q205). */
+const EVENT_TABLE_ACCESS: LwqlAccess = { allOf: ["analytics:view", "project:manage"] };
+
+type EventTableStore = EventTableDeclaration["store"];
+type EventTable = EventTableDeclaration & Readonly<{ sourceTable: LwqlSourceTable }>;
+type DeclaredEventTable = (typeof EVENT_TABLE_DECLARATIONS)[number];
+type EventTableViews<Store extends EventTableStore> = {
+  readonly [
+    D in DeclaredEventTable as D["store"] extends Store ? D["view"] : never
+  ]: LwqlTableCatalogue;
+};
+
+/** Every declaration, its source checked against the tables a catalogue may read. */
+const EVENT_TABLES: readonly EventTable[] = EVENT_TABLE_DECLARATIONS;
+
+/** A declared column as a catalogue entry: omitted, inherited, or renamed and gated. */
+function eventTableColumn({
+  column,
+}: {
+  column: EventTableExposedColumn | EventTableOmittedColumn;
+}): LwqlColumnEntry {
+  if ("omitted" in column) return "omit";
+  const { source, content } = column;
+  if (source === undefined && content === undefined) return "inherit";
+  return {
+    ...(source === undefined ? {} : { source }),
+    ...(content === undefined ? {} : { content }),
+  };
+}
+
+/** One declared event table as a catalogue table. */
+function eventTableCatalogue({ table }: { table: EventTable }): LwqlTableCatalogue {
+  return {
+    sourceTable: table.sourceTable,
+    access: EVENT_TABLE_ACCESS,
+    columns: Object.fromEntries(
+      Object.entries(table.columns).map(([name, column]) => [name, eventTableColumn({ column })]),
+    ),
+  };
+}
+
+/** The declarations of one store, keyed by view name in declaration order. */
+function eventTableViews<Store extends EventTableStore>({
+  store,
+}: {
+  store: Store;
+}): EventTableViews<Store> {
+  const tables = EVENT_TABLES.filter((table) => table.store === store);
+  return Object.fromEntries(
+    tables.map((table) => [table.view, eventTableCatalogue({ table })]),
+  ) as EventTableViews<Store>;
+}
+
+/** Only the keys a declaration states, so an absent one never shadows another override. */
+function definedOnly<T extends object>(value: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  ) as Partial<T>;
+}
+
+/** Eventing's ClickHouse tables: catalogue entries, overrides by source, join keys by view. */
+export const LWQL_CLICKHOUSE_EVENT_TABLES = {
+  tables: eventTableViews({ store: "clickhouse" }),
+  overrides: Object.fromEntries(
+    EVENT_TABLES.filter((table) => table.store === "clickhouse").map((table) => [
+      table.sourceTable,
+      definedOnly({
+        description: table.description,
+        grain: table.grain,
+        timeColumn: table.timeColumn,
+        dedup:
+          table.dedupVersionColumn === undefined
+            ? undefined
+            : { versionColumn: table.dedupVersionColumn },
+      }),
+    ]),
+  ) satisfies Record<string, Partial<DatasetOverride>>,
+  joinKeys: Object.fromEntries(
+    EVENT_TABLES.map((table) => [table.view, table.joinKeys]),
+  ) satisfies Record<string, readonly string[] | undefined>,
+};
+
+/** Eventing's PostgreSQL tables: catalogue entries and model overrides by source model. */
+export const LWQL_POSTGRES_EVENT_TABLES = {
+  tables: eventTableViews({ store: "postgres" }),
+  overrides: Object.fromEntries(
+    EVENT_TABLES.filter((table) => table.store === "postgres").map((table) => {
+      if (table.dedupVersionColumn !== undefined) {
+        throw new Error(`lwql cannot dedup the PostgreSQL event table "${table.view}"`);
+      }
+      const override: PostgresDatasetOverride = definedOnly({
+        description: table.description,
+        grain: table.grain,
+        timeColumn: table.timeColumn,
+        joinKeys: table.joinKeys,
+      });
+      return [table.sourceTable, override];
+    }),
+  ) satisfies Record<string, PostgresDatasetOverride>,
+};

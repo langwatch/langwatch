@@ -11,8 +11,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { useFilterStore, useViewStore } from "../../../../../behavior/explorer.store.ts";
 import { INITIAL_TIME_RANGE } from "../../../../../behavior/query.slice.ts";
-import { getPresetById } from "../../../../../behavior/time-range-presets.ts";
 import { ACTIVE_LENS_KEY } from "../../../../../behavior/view.slice.ts";
+import { getPresetById } from "../../../../../features/explorer/behavior/time-range-presets.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
 const renderURLSync = () => renderHook(() => useURLSync(), { wrapper: BrowserRouter });

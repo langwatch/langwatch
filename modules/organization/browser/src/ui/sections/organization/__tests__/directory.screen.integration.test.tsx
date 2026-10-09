@@ -4,7 +4,7 @@
  * @see specs/identity/directory-administration.feature
  */
 import "@testing-library/jest-dom/vitest";
-import type { UiDirectorySummaryProps } from "@langwatch/browser-host/declarations";
+import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +18,18 @@ const state = vi.hoisted(() => ({
   departments: [] as { id: string; name: string }[],
   twoStepShow: false,
   extraGroups: [] as unknown[],
+}));
+
+vi.mock("../../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: () => ({
+    data: {
+      sam: { source: "domain", domain: "acme.com", automatic: true },
+      ana: { source: "unknown" },
+    },
+    isError: false,
+    error: null,
+    refetch: () => Promise.resolve([]),
+  }),
 }));
 
 vi.mock("../../../../behavior/organization-api.ts", () => {
@@ -56,10 +68,6 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       invite("ian", "PENDING"),
       invite("old", "ACCEPTED"),
     ],
-    "organization.getMemberProvenance": {
-      sam: { source: "domain", domain: "acme.com", automatic: true },
-      ana: { source: "unknown" },
-    },
     "plan.getActivePlan": { type: "ENTERPRISE", free: false, maxMembers: 100 },
     "departments.assignments": { users: [], teams: [], projects: [] },
     "limits.getUsage": { membersCount: 2, membersLiteCount: 0 },
@@ -142,7 +150,7 @@ vi.mock("../../../../behavior/use-required-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "ana" } } }),
 }));
 
-function StatusBand({ organizationId, canReadMembership }: UiDirectorySummaryProps) {
+function StatusBand({ organizationId, canReadMembership }: DirectorySummaryProps) {
   return (
     <div data-testid="directory-status-band">
       {organizationId}:{String(canReadMembership)}

@@ -39,7 +39,12 @@ export const datasetDeletedSchema = z.object({ success: z.literal(true) }).stric
 export const datasetTrpc = defineTrpcContract("dataset")
   /** Creates a dataset, or replaces an existing one's columns and entries. */
   .mutation("upsert")
-  .withInput(datasetApiUpsertBaseInputSchema.and(datasetApiUpsertTargetInputSchema))
+  .withInput(
+    z.object({
+      ...datasetApiUpsertBaseInputSchema.shape,
+      ...datasetApiUpsertTargetInputSchema.shape,
+    }),
+  )
   .withOutput(datasetWireSchema)
 
   /** The slug a proposed name would get, and whether it is available. */

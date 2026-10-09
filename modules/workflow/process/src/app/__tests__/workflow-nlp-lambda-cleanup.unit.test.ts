@@ -8,16 +8,14 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
 import { NLP_LAMBDA_CLEANUP_PROCESS_NAME } from "../../eventing/workflow-nlp-lambda-cleanup.process.ts";
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import { WorkflowModule } from "../workflow.app.ts";
@@ -72,30 +70,30 @@ const fleet = {
 
 /** The app over the memory registry, naming the fleet secret only when one is given. */
 async function appWith(fleetSecret?: string): Promise<WorkflowModule> {
+  const config = {
+    nlpServiceUrl: undefined,
+    stagingThresholdBytes: undefined,
+    stagingTtlSeconds: 600,
+    relayTurnCeilingMs: undefined,
+    publicBaseUrl: "https://app.test",
+    nlpCodeBlockTimeoutSeconds: void 0,
+  };
+  const secrets = new ScopedSecrets(async (handle, build) =>
+    build(handle === WorkflowModule.secrets.nlpLambdaFleet ? fleetSecret : undefined),
+  );
   return WorkflowModule.create({
     dependencies: {
-      evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
-      experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
-      monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
     },
-    config: {
-      nlpServiceUrl: undefined,
-      stagingThresholdBytes: undefined,
-      stagingTtlSeconds: 600,
-      relayTurnCeilingMs: undefined,
-      publicBaseUrl: "https://app.test",
-      nlpCodeBlockTimeoutSeconds: void 0,
-    },
+    config,
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: new ScopedSecrets(async (handle, build) =>
-      build(handle === WorkflowModule.secrets.nlpLambdaFleet ? fleetSecret : undefined),
-    ),
+    secrets,
+    channels: await HttpWorkflowChannels.create({ config, secrets }),
     repositories: MemoryWorkflowRepositories.create(),
   });
 }

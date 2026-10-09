@@ -1,11 +1,11 @@
 import { promptClient } from "@langwatch/prompt-client";
 import { useCallback } from "react";
 
+import { useDraggableTabsBrowserStore } from "../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { usePromptConfigContext } from "../model/prompt-config-context.ts";
 import { usePromptHost } from "../model/prompt-host.ts";
 import type { WireVersionedPrompt } from "../model/wire-versioned-prompt.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 type UseRenamePromptHandleOptions = {
   promptId: string;

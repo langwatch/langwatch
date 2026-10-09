@@ -2,6 +2,7 @@
  * @vitest-environment node
  * @see specs/auth/sign-up-restriction.feature
  */
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -42,9 +43,16 @@ describe("SignUpPolicyService", () => {
           reads++;
           return accounts > 0;
         },
-        isOperator: async ({ userId }) => {
+      }),
+      authorization: createApiFixture<AuthzApi>({
+        can: async ({ principal, permission, scope }) => {
           reads++;
-          return operators.has(userId);
+          return (
+            permission === "ops:manage" &&
+            scope.type === "platform" &&
+            principal.type === "user" &&
+            operators.has(principal.id)
+          );
         },
       }),
       findProvenAddresses: async ({ userId }) => {

@@ -7,7 +7,7 @@
 import type { CallRecord } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { VoiceCallRunService } from "../voice-call-run.service.ts";
+import { VoiceCallRunService } from "../../features/voice/services/voice-call-run.service.ts";
 
 const mockFindById = vi.fn();
 const mockStartRun = vi.fn().mockResolvedValue(undefined);

@@ -11,7 +11,7 @@ import {
   reportUrl,
   usageEvent,
   usageResultSchema,
-} from "../anthropic-admin-report.rules.ts";
+} from "../../features/ingestion-pull/rules/anthropic-admin-report.rules.ts";
 
 const usageConfig = anthropicAdminPullConfigSchema.parse({
   adapter: "anthropic_admin",

@@ -4,11 +4,37 @@
  * runs, their live stream, cancellation, Results and configuration history.
  */
 
+import {
+  agentApiAgentReferenceInputSchema,
+  agentApiTestTurnInputSchema,
+  agentTestRunResultSchema,
+  agentTestTurnResultSchema,
+  httpAgentTestInputSchema,
+  httpProxyResultSchema,
+} from "@langwatch/agent-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import { runNoteSchema } from "./features/run/run-note.ts";
+import {
+  SIMULATION_RUN_EVENT_TYPES,
+  SIMULATION_SET_EVENT_TYPES,
+} from "./features/simulation/simulation-event.constants.ts";
+import {
+  simulationTargetSchema,
+  simulationAllSuitesRunDataSchema,
+  simulationBatchHistorySchema,
+  simulationBatchRunCountSchema,
+  simulationBatchRunDataSchema,
+  simulationExternalSetSummarySchema,
+  simulationLastResultSummarySchema,
+  simulationRunDataSchema,
+  simulationRunFreshnessSchema,
+  simulationScenarioSetRunDataSchema,
+  simulationSetDataSchema,
+  simulationStreamFrameSchema,
+} from "./features/simulation/simulation.ts";
 import { MAX_ATOM_PAGE } from "./result-atoms.ts";
-import { runNoteSchema } from "./run-note.ts";
 import {
   runParameterValuesSchema,
   scenarioParameterDefinitionsSchema,
@@ -28,24 +54,6 @@ import {
 } from "./scenario.responses.ts";
 import { scenarioSchema } from "./scenario.ts";
 import { scenarioVersionDetailSchema } from "./scenario.version.ts";
-import {
-  SIMULATION_RUN_EVENT_TYPES,
-  SIMULATION_SET_EVENT_TYPES,
-} from "./simulation-event.constants.ts";
-import {
-  simulationTargetSchema,
-  simulationAllSuitesRunDataSchema,
-  simulationBatchHistorySchema,
-  simulationBatchRunCountSchema,
-  simulationBatchRunDataSchema,
-  simulationExternalSetSummarySchema,
-  simulationLastResultSummarySchema,
-  simulationRunDataSchema,
-  simulationRunFreshnessSchema,
-  simulationScenarioSetRunDataSchema,
-  simulationSetDataSchema,
-  simulationStreamFrameSchema,
-} from "./simulation.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 import {
@@ -471,4 +479,19 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .mutation("finishVoiceSession")
   .withInput(voiceSessionFinishInputSchema)
   .withOutput(voiceSessionFinishResultSchema)
+
+  /** Main's `agents.testTurn`: one turn to an agent from its Test panel. */
+  .mutation("testAgentTurn")
+  .withInput(agentApiTestTurnInputSchema)
+  .withOutput(agentTestTurnResultSchema)
+
+  /** Main's `agents.testRun`: a scripted test run of an agent, answering its run ids. */
+  .mutation("testAgentRun")
+  .withInput(agentApiAgentReferenceInputSchema)
+  .withOutput(agentTestRunResultSchema)
+
+  /** Main's `httpProxy.execute`: one HTTP agent call from its editor or a studio node. */
+  .mutation("testHttpAgent")
+  .withInput(httpAgentTestInputSchema)
+  .withOutput(httpProxyResultSchema)
   .build();

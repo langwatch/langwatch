@@ -17,14 +17,22 @@ import {
   type SsoAuthenticationActivityApi,
   type SsoMigrationAccountLinkDecision,
   type SsoMigrationCallbackApi,
+  identifierProviderFor,
+  type IdentityLedgerApi,
+  type LinkProposalReason,
 } from "@langwatch/identity-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { fromDate } from "@langwatch/time";
+import { fromDate, nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
 
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type {
+  BetterAuthHookUser,
+  BetterAuthHooksRepository,
+} from "../../repositories/better-auth-hooks.repository.ts";
+import { assertedAddressOf, linkVerdictFor } from "../../rules/link-evidence.rules.ts";
 import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
 import type {
   AcceptedCallbackAccount,
@@ -38,6 +46,8 @@ export type BetterAuthHookCollaborators = Readonly<{
   federation: BetterAuthFederation;
   /** A pending invite at a domain-matched organization wins over the default membership. */
   invites: Pick<OrganizationApi, "applyPendingInvite">;
+  /** The organization an SSO domain names, and the membership an auto-join writes there. */
+  organizations: SsoDomainOrganizations;
   announcements: BetterAuthAnnouncements;
   /** The grant ledger an auto-joined membership is written through. */
   authzGrants: AuthzGrantsService;
@@ -47,7 +57,18 @@ export type BetterAuthHookCollaborators = Readonly<{
   ssoActivity: SsoAuthenticationActivityApi;
   /** Which of a cutover's two connections this callback belongs to. */
   ssoMigration: SsoMigrationCallbackApi;
+  /** Where a refused link leaves a proposal an administrator resolves (ADR-117 §3). */
+  linkProposals: LinkProposals;
 }>;
+
+/** Organization reads and writes the hooks make through organization's own Api. */
+export type SsoDomainOrganizations = Pick<
+  OrganizationApi,
+  "findBySsoDomain" | "createSsoDomainMembership" | "countMembershipsForUser"
+>;
+
+/** The one identity ledger write the account hook makes: a link proposal. */
+export type LinkProposals = Pick<IdentityLedgerApi, "proposeLink">;
 
 /** Whether the installation admits a new account for an address. */
 export type SignUpPolicy = Pick<OrganizationApi, "checkSignUp">;
@@ -184,12 +205,10 @@ const announceSsoAutoJoin = ({
  * MEMBER membership plus the organization- scoped grant beside it.
  */
 const joinSsoOrganization = async ({
-  repo,
   collaborators,
   user,
   org,
 }: {
-  repo: BetterAuthHooksRepository;
   collaborators: BetterAuthHookCollaborators;
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
@@ -209,11 +228,11 @@ const joinSsoOrganization = async ({
   // The membership row is not a grant fact and keeps its imperative
   // write; the organization-scoped grant that comes with it is a ledger
   // command, emitted once the membership exists (ADR-092).
-  const outcome = await repo.createOrganizationMembership({
+  const outcome = await collaborators.organizations.createSsoDomainMembership({
     userId: user.id,
     organizationId: org.id,
   });
-  if (outcome === "already-exists") {
+  if (outcome === "already-present") {
     logger.info(
       { userId: user.id, organizationId: org.id },
       "Auto-add SSO membership was already present (P2002) — treating as success",
@@ -244,11 +263,9 @@ const joinSsoOrganization = async ({
  * access via a re-assertable ledger command (ADR-092 delivery-plan PR 2).
  */
 export const afterUserCreate = async ({
-  repo,
   user,
   collaborators,
 }: {
-  repo: BetterAuthHooksRepository;
   user: { id: string; email: string; name: string; emailVerified: boolean };
   collaborators: BetterAuthHookCollaborators;
 }): Promise<void> => {
@@ -283,12 +300,10 @@ export const afterUserCreate = async ({
   }
 
   try {
-    const org = await repo
-      .getOrganizationBySsoDomain({ domain })
-      .catch(skipOn("organization_not_found"));
+    const org = await collaborators.organizations.findBySsoDomain({ domain });
     if (!org) return;
 
-    await joinSsoOrganization({ repo, collaborators, user, org });
+    await joinSsoOrganization({ collaborators, user, org });
   } catch (err) {
     logger.error(
       { err, userId: user.id, domain },
@@ -377,16 +392,95 @@ async function refuseWrongProvider({
   });
 }
 
+/** ADR-117 §3's evidence rule: asked before the `ssoDomain` rules, being none of them. */
+async function refuseLinkOnInsufficientEvidence({
+  repo,
+  linkProposals,
+  user,
+  account,
+}: {
+  repo: BetterAuthHooksRepository;
+  linkProposals: LinkProposals;
+  user: BetterAuthHookUser;
+  account: { providerId: string; accountId: string; idToken?: string | null };
+}): Promise<void> {
+  const address = assertedAddressOf({ idToken: account.idToken });
+  // A provider that asserted nothing gave no evidence either way: the link proceeds as before.
+  if (!address.asserted) return;
+  const verdict = linkVerdictFor({
+    address,
+    holdsVerifiedEmail: user.emailVerified,
+    attachedAccounts: await repo.countAccountsForUser({ userId: user.id }),
+  });
+  if (!verdict.refused) return;
+  await recordLinkProposal({
+    linkProposals,
+    userId: user.id,
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    value: address.email,
+    reason: verdict.reason,
+  });
+  logger.warn(
+    { userId: user.id, providerId: account.providerId, reason: verdict.reason },
+    "Refused a sign-in link on insufficient evidence; a proposal was recorded for an administrator",
+  );
+  // APIError so better-auth carries the code into the callback redirect.
+  throw APIError.from("FORBIDDEN", { code: "LINK_NEEDS_APPROVAL", message: "LINK_NEEDS_APPROVAL" });
+}
+
+/** Best-effort: the refusal stands alone, so a failed proposal write never becomes a link. */
+async function recordLinkProposal({
+  linkProposals,
+  userId,
+  providerId,
+  providerAccountId,
+  value,
+  reason,
+}: {
+  linkProposals: LinkProposals;
+  userId: string;
+  providerId: string;
+  providerAccountId: string;
+  value: string;
+  reason: LinkProposalReason;
+}): Promise<void> {
+  try {
+    await linkProposals.proposeLink({
+      tenantId: userId,
+      userId,
+      commandId: generate("idcmd").toString(),
+      proposalId: generate("idlink").toString(),
+      connectionId: null,
+      provider: identifierProviderFor(providerId),
+      providerAccountId,
+      value,
+      reason,
+      occurredAtMs: nowInstant().epochMilliseconds,
+      actor: { type: "system", id: null },
+    });
+  } catch (error) {
+    logger.error(
+      { userId, providerId, reason, error },
+      "Refused a sign-in link but could not record the proposal an administrator would resolve",
+    );
+  }
+}
+
 /**
  * Called before a new Account row is created. Ports the provider-linking and
  * pendingSsoSetup logic from the NextAuth signIn callback.
  */
 export function createBeforeAccountCreateHook({
   repo,
+  organizations,
   federation,
   findGoverningConnections,
+  linkProposals,
 }: {
   repo: BetterAuthHooksRepository;
+  linkProposals: LinkProposals;
+  organizations: Pick<SsoDomainOrganizations, "findBySsoDomain">;
   federation: BetterAuthFederation;
   findGoverningConnections: FindGoverningConnections;
 }): NonNullable<
@@ -409,6 +503,8 @@ export function createBeforeAccountCreateHook({
         message: "USER_DEACTIVATED",
       });
     }
+
+    await refuseLinkOnInsufficientEvidence({ repo, linkProposals, user, account });
 
     // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
     // off (site #4, mirroring `afterUserCreate`).
@@ -433,9 +529,7 @@ export function createBeforeAccountCreateHook({
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
 
-    const org = await repo
-      .getOrganizationBySsoDomain({ domain })
-      .catch(skipOn("organization_not_found"));
+    const org = await organizations.findBySsoDomain({ domain });
     if (!org) return;
 
     const matchesSso = isSsoProviderMatch(org, {
@@ -566,9 +660,7 @@ export const afterAccountCreate = async ({
     // `ssoDomain` branch below would reconcile away the other side's account.
     if (migration.kind !== "not_migrating") return;
 
-    const org = await repo
-      .getOrganizationBySsoDomain({ domain })
-      .catch(skipOn("organization_not_found"));
+    const org = await collaborators.organizations.findBySsoDomain({ domain });
     if (!org) return;
 
     const matchesSso = isSsoProviderMatch(org, {
@@ -609,6 +701,7 @@ export const afterAccountUpdate = async ({
   // Outside the try below: a refusal its catch swallowed would admit the sign-in it stops.
   await refuseNativeProviderOnSignIn({
     repo,
+    organizations: collaborators.organizations,
     account,
     federation: collaborators.federation,
     findGoverningConnections,
@@ -631,9 +724,7 @@ export const afterAccountUpdate = async ({
     if (migration.kind !== "not_migrating") return;
     if (!user.pendingSsoSetup) return;
 
-    const org = await repo
-      .getOrganizationBySsoDomain({ domain })
-      .catch(skipOn("organization_not_found"));
+    const org = await collaborators.organizations.findBySsoDomain({ domain });
     if (!org) return;
 
     const matchesSso = isSsoProviderMatch(org, {
@@ -667,11 +758,13 @@ export const afterAccountUpdate = async ({
  */
 async function refuseNativeProviderOnSignIn({
   repo,
+  organizations,
   account,
   federation,
   findGoverningConnections,
 }: {
   repo: BetterAuthHooksRepository;
+  organizations: Pick<SsoDomainOrganizations, "findBySsoDomain">;
   account: { userId: string; providerId: string; accountId: string };
   federation: BetterAuthFederation;
   findGoverningConnections: FindGoverningConnections;
@@ -688,9 +781,7 @@ async function refuseNativeProviderOnSignIn({
 
   await bounceNativeProviderToConnection({ email: user.email, account, findGoverningConnections });
 
-  const org = await repo
-    .getOrganizationBySsoDomain({ domain })
-    .catch(skipOn("organization_not_found"));
+  const org = await organizations.findBySsoDomain({ domain });
   // A provider the organization pinned is its own front door, whatever kind it is.
   if (!org?.ssoProvider || isSsoProviderMatch(org, account)) return;
 
@@ -864,11 +955,13 @@ async function callbackAccountFor({
  */
 export const afterSessionCreate = async ({
   repo,
+  organizations,
   userId,
   isImpersonationSession = false,
   announcements,
 }: {
   repo: BetterAuthHooksRepository;
+  organizations: Pick<SsoDomainOrganizations, "countMembershipsForUser">;
   userId: string;
   isImpersonationSession?: boolean;
   announcements: BetterAuthAnnouncements;
@@ -883,8 +976,8 @@ export const afterSessionCreate = async ({
   }
 
   // Nurturing hooks: fire-and-forget, must never block the response.
-  void repo
-    .countOrgMembershipsForUser({ userId })
+  void organizations
+    .countMembershipsForUser({ userId })
     .then((count) => {
       // Main sent nothing for a person still onboarding, so no ghost person is made.
       if (count > 0) announcements.sessionNurturing({ userId });

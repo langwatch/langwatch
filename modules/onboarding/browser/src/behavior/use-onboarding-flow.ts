@@ -3,6 +3,7 @@ import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { useMemo, useState } from "react";
 
+import { useOnboardingHost } from "../model/onboarding-host.ts";
 import { readAttribution } from "./attribution.ts";
 import { getOnboardingFlowConfig } from "./onboarding-flow.ts";
 import {
@@ -15,8 +16,15 @@ import {
   type SolutionType,
   type UsageStyle,
 } from "./types.ts";
-import { useFeatureFlag } from "./use-feature-flag.ts";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
+
+/** Keeps pending state to hold the first screen until the governance flag resolves. */
+function useFeatureFlag(
+  flag: string,
+  _targets?: { projectId?: string | null; organizationId?: string | null },
+): { enabled: boolean; isLoading: boolean } {
+  return useOnboardingHost().featureFlag(flag);
+}
 
 function isBasicInfoComplete({
   usageStyle,

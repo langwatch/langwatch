@@ -99,3 +99,29 @@ describe("given a finalized user on the identity branch", () => {
     });
   });
 });
+
+describe("given a finalized user listing their accounts", () => {
+  beforeEach(() => {
+    logged.error.mockClear();
+  });
+
+  describe("when better-auth asks for them sorted", () => {
+    /** @scenario "A sorted account read on the identity branch is refused and logged" */
+    it("refuses the read and logs the refusal at error", async () => {
+      const stack = identityStack();
+      stack.gate.open = () => true;
+      await signUp(stack.auth, EMAIL);
+      const context = await stack.auth.$context;
+
+      await expect(
+        context.adapter.findMany({
+          model: "account",
+          where: [{ field: "userId", value: String(stack.db.user?.[0]?.id) }],
+          sortBy: { field: "createdAt", direction: "asc" },
+        }),
+      ).rejects.toMatchObject({ body: { code: "identity_unsupported_storage_query" } });
+
+      expect(logged.error).toHaveBeenCalledTimes(1);
+    });
+  });
+});

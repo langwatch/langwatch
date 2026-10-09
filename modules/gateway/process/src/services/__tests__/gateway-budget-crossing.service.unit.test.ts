@@ -10,12 +10,12 @@ import type {
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { GatewayBudgetCrossingService } from "../../features/budget/services/gateway-budget-crossing.service.ts";
 import type {
   BudgetSpendTarget,
   ScopeSpend,
 } from "../../repositories/gateway-budget-spend.repository.ts";
 import type { BucketBoundaryRow } from "../../repositories/gateway-budget.repository.ts";
-import { GatewayBudgetCrossingService } from "../gateway-budget-crossing.service.ts";
 
 const NOW = Temporal.Instant.from("2026-09-15T12:00:00Z");
 const MONTH_START = Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds;

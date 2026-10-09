@@ -1,8 +1,8 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AutomationProjectDirectory } from "../../services/automation.service.ts";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { AutomationDispatchError } from "../../services/automation-graph-activity.service.ts";
+import { AutomationDispatchError } from "../../features/graph-alert/services/automation-graph-activity.service.ts";
 import { AutomationLogger } from "../../services/automation.service.ts";
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { Temporal, toDate } from "@langwatch/time";
@@ -142,8 +142,8 @@ export const customGraphRow = {
 };
 
 /** One recorded timeseries answer, above any threshold the fixtures set. */
-export function breachingAnalytics(): AnalyticsService {
-  return createApiFixture<AnalyticsService>({
+export function breachingAnalytics(): AnalyticsApi {
+  return createApiFixture<AnalyticsApi>({
     getTimeseries: async () => ({
       previousPeriod: [],
       currentPeriod: [

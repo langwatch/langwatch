@@ -1,8 +1,9 @@
 import { Badge, Box, Card, HStack, Text } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
 import { replayStateColor } from "../elements/replay-state-badge.tsx";
 
 export interface ReplayHistoryEntryView {

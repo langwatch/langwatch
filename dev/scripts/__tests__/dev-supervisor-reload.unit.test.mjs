@@ -16,8 +16,11 @@ const SUPERVISOR = path.resolve(
   "../dev-supervisor.mjs",
 );
 
-/** A child that logs START, then READY after `bootMs`, or exits 1 while `crash` exists. */
-function startSupervised({ bootMs }) {
+/**
+ * A child that logs START, then READY after `bootMs`, or exits 1 while `crash`
+ * exists; while `crash-after` exists it exits 1 just after saying it is ready.
+ */
+function startSupervised({ bootMs, env = {} }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dev-supervisor-reload-"));
   fs.mkdirSync(path.join(dir, "src"));
   fs.writeFileSync(
@@ -26,7 +29,11 @@ function startSupervised({ bootMs }) {
 const log = (e) => fs.appendFileSync("events.log", e + "\\n");
 log("START");
 if (fs.existsSync("crash")) { process.exit(1); }
-setTimeout(() => { log("READY"); console.log("backend ready"); }, ${bootMs});
+setTimeout(() => {
+  log("READY");
+  console.log("backend ready");
+  if (fs.existsSync("crash-after")) setTimeout(() => process.exit(1), 50);
+}, ${bootMs});
 setInterval(() => {}, 1000);
 `,
   );
@@ -41,8 +48,8 @@ setInterval(() => {}, 1000);
         LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "50",
         LANGWATCH_DEV_GRACE_MS: "500",
         LANGWATCH_DEV_READY_PATTERN: "backend ready",
-        LANGWATCH_DEV_HOLD_MARKER: path.join(dir, "no-marker"),
         LANGWATCH_DEV_CRASH_LOG: path.join(dir, "crash.log"),
+        ...env,
       },
       stdio: ["ignore", "ignore", "pipe"],
     },
@@ -69,6 +76,19 @@ async function until(check, ms = 5000) {
   while (!check() && Date.now() < deadline) await sleep(25);
   assert.ok(check(), "timed out waiting");
 }
+
+void describe("an in-process child that crashes after booting", () => {
+  /** @scenario "An in-process api lane that crashes after booting is started again" */
+  void it("is started again without waiting for a change", async () => {
+    const run = startSupervised({ bootMs: 50, env: { LANGWATCH_DEV_RELOAD: "module" } });
+    fs.writeFileSync(path.join(run.dir, "crash-after"), "");
+    await until(() => run.stderr().includes("after booting; starting it again"));
+    fs.rmSync(path.join(run.dir, "crash-after"));
+    await until(() => run.events().filter((event) => event === "START").length >= 2);
+    assert.equal(run.closed(), false);
+    await run.stop();
+  });
+});
 
 void describe("a watched child that crashes", () => {
   /** @scenario "A crashed boot waits for the next change instead of ending the lane" */

@@ -17,13 +17,13 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
-import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
-} from "../../services/langwatch-ql-postgres-mapping.service.ts";
-import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
+} from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
+import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

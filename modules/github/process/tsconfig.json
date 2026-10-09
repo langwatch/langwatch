@@ -28,9 +28,6 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../coding-agent/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
@@ -65,6 +62,9 @@
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"

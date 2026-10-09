@@ -46,9 +46,6 @@
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
-    },
-    {
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {
@@ -124,9 +121,6 @@
       "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
-      "path": "../../platform-health/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
@@ -167,6 +161,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { typedValueToText } from "../trace-collector-common.ts";
+import { typedValueToText } from "../features/ingest/trace-collector-common.ts";
 import type { TypedValueJson } from "../trace-format.schemas.ts";
 
 const JSON_CASES: readonly [

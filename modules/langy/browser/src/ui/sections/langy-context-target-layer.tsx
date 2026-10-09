@@ -3,16 +3,16 @@ import { Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { useLangyStore } from "../../behavior/langy.store.ts";
+
+// Stylesheet shared with `useLangyContextTarget`; a copy exists beside that hook.
+import "../../features/context-target/behavior/langy-context-target.css";
 import {
   absorbContextTarget,
   releaseContextTarget,
   useLangyContextTargetStore,
-} from "../../behavior/langy-context-target.store.ts";
-
-// Stylesheet shared with `useLangyContextTarget`; a copy exists beside that hook.
-import "../../behavior/langy-context-target.css";
-import { useLangyStore } from "../../behavior/langy.store.ts";
-import { useLangyContextArming } from "../../behavior/use-langy-context-arming.ts";
+} from "../../features/context-target/behavior/langy-context-target.store.ts";
+import { useLangyContextArming } from "../../features/context-target/behavior/use-langy-context-arming.ts";
 
 /**
  * The one moving part behind "point at things and add them to Langy". Mounted once,

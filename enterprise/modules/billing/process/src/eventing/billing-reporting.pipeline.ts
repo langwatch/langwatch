@@ -3,6 +3,10 @@ import {
   type ReportUsageForMonthCommandData,
 } from "@langwatch/enterprise-billing-contract";
 import {
+  monthCountedEventDataSchema,
+  USAGE_MONTH_COUNTED_EVENT_TYPE,
+} from "@langwatch/entitlement-contract";
+import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -11,10 +15,6 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import {
-  monthCountedEventDataSchema,
-  USAGE_MONTH_COUNTED_EVENT_TYPE,
-} from "@langwatch/usage-contract";
 
 import type { BillingModule } from "../app/billing.app.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";

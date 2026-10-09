@@ -50,10 +50,11 @@ async function requestIncrease(input: {
       baseUrl: input.publicBaseUrl,
     }),
   });
-  const requester = await app.createCredentialUser({
+  const requester = await app.registerCredentialAccount({
     name: "Jane Developer",
     email: "jane@acme.test",
-    passwordHash: "hashed:first",
+    password: "first",
+    addressConfirmed: false,
   });
 
   const outcome = app.requestBudgetIncrease({

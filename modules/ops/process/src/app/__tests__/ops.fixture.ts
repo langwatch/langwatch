@@ -16,10 +16,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
+import type { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
 import { AdminAccessService } from "../../services/admin-access.service.ts";
-import type { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
   OpsModule,
   type OpsAppInfrastructure,
@@ -113,7 +113,6 @@ export function createOpsTestInfrastructure(
         withdraw: async () => {},
         startPass: async () => {},
       }),
-    bugReportRateLimiter: { consume: async () => ({ allowed: true }) },
     bugReportNotifier: { notify: async () => {} },
     explainClients: { findClient: () => null },
     findOpsApiKey: () => null,
@@ -125,7 +124,8 @@ export function createOpsTestInfrastructure(
 }
 
 export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
-  const repositories = options.repositories ?? MemoryOpsRepositories.create();
+  const repositories =
+    options.repositories ?? MemoryOpsRepositories.create({ eventing: { definitions: [] } });
 
   const app = OpsModule.fromInfrastructure({
     infrastructure: createOpsTestInfrastructure(options.members, options.capability),

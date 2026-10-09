@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/prisma-client",
+  "langwatch": { "group": "data" },
   "version": "0.1.0",
   "private": true,
   "description": "Explicitly configured Prisma/Postgres construction and lifecycle services, the tenancy query guards every process composes its client with, plus the canonical LangWatch schema, migrations, and generated client.",
@@ -37,7 +38,6 @@
     "db:seed": "pnpm --filter @langwatch/tasks task storage-seed"
   },
   "dependencies": {
-    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@prisma/adapter-pg": "7.10.0",

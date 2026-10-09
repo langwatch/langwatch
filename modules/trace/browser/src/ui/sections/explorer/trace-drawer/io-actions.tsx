@@ -4,8 +4,11 @@ import { LuLanguages, LuLightbulb, LuMessageSquare, LuPlay } from "react-icons/l
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { type TraceAnchor, useAnchoredAnnotations } from "../hooks/use-anchored-annotations.ts";
-import type { useTextTranslation } from "../hooks/use-text-translation.ts";
+import {
+  type TraceAnchor,
+  useAnchoredAnnotations,
+} from "../../../../features/annotation/behavior/use-anchored-annotations.ts";
+import type { useTextTranslation } from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
 import { FieldCommentButton } from "./anchored-comments/field-comment-button.tsx";
 import {
   PlaygroundButton,

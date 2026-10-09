@@ -5,7 +5,8 @@
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
-import type { DashboardWidgetDefinition } from "../../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDefinition } from "@langwatch/analytics-contract/dashboard-widget-definition";
+
 import { CATALOGUE_WIDGETS, type QuestionType } from "../catalogue/index.ts";
 
 export type WidgetShape = "tile" | "line" | "bars";

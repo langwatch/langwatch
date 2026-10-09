@@ -1,6 +1,11 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
+import type { UiDeclarations } from "@langwatch/browser-host/declarations";
+import { useLentHooks } from "@langwatch/browser-host/lent";
 import { useActiveScope, useSession } from "@langwatch/browser-host/session";
+import {
+  FirstTouchAttributionToken,
+  type FirstTouchAttribution,
+} from "@langwatch/onboarding-client";
 import { useEffect, useRef } from "react";
 
 const SIGNED_IN_STORAGE_KEY = "lw_posthog.signed_in";
@@ -63,7 +68,7 @@ export function useAnalyticsIdentity(): void {
   const analytics = useUiAnalytics();
   const session = useSession();
   const scope = useActiveScope();
-  const attribution = useUiDeclarations().declared("firstTouchAttribution")[0]?.capability;
+  const attribution = useLentHooks(FirstTouchAttributionToken);
   const previousUserId = useRef<string | null>(null);
 
   const userId = session.user?.id ?? null;
@@ -88,4 +93,18 @@ export function useAnalyticsIdentity(): void {
   }, [analytics, userId, organizationId, organizationName]);
 
   useEffect(() => () => analytics.reset(), [analytics]);
+}
+
+function isAttribution(value: unknown): value is FirstTouchAttribution {
+  return typeof value === "object" && value !== null && "useCapture" in value;
+}
+
+/** Onboarding's lent first-touch attribution, read outside render; none without onboarding. */
+export function lentFirstTouchAttribution(
+  declarations: UiDeclarations,
+): FirstTouchAttribution | undefined {
+  const lend = declarations.lent(FirstTouchAttributionToken)[0]?.lend;
+  return lend !== undefined && "value" in lend && isAttribution(lend.value)
+    ? lend.value
+    : undefined;
 }

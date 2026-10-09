@@ -1,24 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
   NurturingMilestonesRepository,
-  NurturingOrganizationState,
+  NurturingOrganizationCounts,
 } from "../nurturing-milestones.repository.ts";
 
-/** The Postgres twin's semantics over two maps. */
+/** The Postgres twin's semantics over nurturing's own organizations. */
 export class MemoryNurturingMilestonesRepository implements NurturingMilestonesRepository {
-  readonly #projects = new Map<string, string>();
-  readonly #organizations = new Map<string, NurturingOrganizationState>();
+  readonly #organizations = new Map<string, NurturingOrganizationCounts>();
 
   static create(): MemoryNurturingMilestonesRepository {
     return new MemoryNurturingMilestonesRepository();
   }
 
-  async recordProject({
-    projectId,
+  async recordOrganization({
     organizationId,
     adminUserId,
     seeded,
-  }: Parameters<NurturingMilestonesRepository["recordProject"]>[0]): Promise<void> {
+  }: Parameters<NurturingMilestonesRepository["recordOrganization"]>[0]): Promise<void> {
     const known = this.#organizations.get(organizationId);
     this.#organizations.set(
       organizationId,
@@ -26,26 +24,25 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
         ? { ...known, adminUserId: adminUserId ?? known.adminUserId }
         : { organizationId, adminUserId, seeded, evaluationCount: 0, simulationRunCount: 0 },
     );
-    this.#projects.set(projectId, organizationId);
   }
 
   async countEvaluation({
-    projectId,
-  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    const organization = this.#organizations.get(this.#projects.get(projectId) ?? "");
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    const organization = this.#organizations.get(organizationId);
     if (!organization) return [];
     const counted = { ...organization, evaluationCount: organization.evaluationCount + 1 };
-    this.#organizations.set(organization.organizationId, counted);
+    this.#organizations.set(organizationId, counted);
     return [counted];
   }
 
   async countSimulationRun({
-    projectId,
-  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    const organization = this.#organizations.get(this.#projects.get(projectId) ?? "");
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    const organization = this.#organizations.get(organizationId);
     if (!organization) return [];
     const counted = { ...organization, simulationRunCount: organization.simulationRunCount + 1 };
-    this.#organizations.set(organization.organizationId, counted);
+    this.#organizations.set(organizationId, counted);
     return [counted];
   }
 }

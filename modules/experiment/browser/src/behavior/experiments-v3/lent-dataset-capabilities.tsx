@@ -6,7 +6,7 @@ import {
   DatasetRecordSyncToken,
   type AddOrEditDatasetDrawerProps,
   type DatasetRecordSyncProps,
-} from "@langwatch/dataset-contract";
+} from "@langwatch/dataset-client";
 
 /** Dataset's create-or-edit drawer, rendered as dataset lends it. */
 export function AddOrEditDatasetDrawer(props: AddOrEditDatasetDrawerProps) {

@@ -11,14 +11,14 @@ import {
 import { openAiApiKey } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 
-import { openAiChatChannels } from "../channels/openai-chat-channels.registry.ts";
-import { traceCollectorChannels } from "../channels/trace-collector-channels.registry.ts";
+import type { SampleAgentsChannels } from "../channels/sample-agents.channels.ts";
 import { HotelBotService } from "../services/hotel-bot.service.ts";
 
 type SampleAgentsSetup = FeatureSetup<
   typeof SampleAgentsModule.dependencies,
+  SampleAgentsServerConfig,
   never,
-  SampleAgentsServerConfig
+  SampleAgentsChannels
 >;
 
 /** The demo agents behind the sample project; each run lands as traces in the caller's project. */
@@ -35,14 +35,11 @@ export class SampleAgentsModule implements SampleAgentsApiContract {
     this.#hotelBot = hotelBot;
   }
 
-  static async create({ config, secrets }: SampleAgentsSetup): Promise<SampleAgentsModule> {
-    const chat = await secrets.into(SampleAgentsModule.secrets.openAi, (apiKey) =>
-      openAiChatChannels.live.create({ apiKey }),
-    );
+  static async create({ channels }: SampleAgentsSetup): Promise<SampleAgentsModule> {
     return new SampleAgentsModule(
       HotelBotService.create({
-        chat,
-        collector: traceCollectorChannels.live.create({ baseUrl: config.publicBaseUrl }),
+        chat: channels.chat,
+        collector: channels.collector,
         logger: createLogger("langwatch:sample-agents"),
         random: Math.random,
         nowMs: () => nowInstant().epochMilliseconds,

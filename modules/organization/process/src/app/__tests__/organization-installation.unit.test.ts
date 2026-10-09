@@ -1,15 +1,14 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
-import type { ShareApi } from "@langwatch/share-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -38,12 +37,11 @@ function process(role: "api" | "worker") {
     .provide({
       "api-key": createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),
+      billing: createApiFixture<BillingApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
       identity: createApiFixture<IdentityApi>(),
       notification: createApiFixture<NotificationService>(),
-      project: createApiFixture<ProjectApi>(),
       role: createApiFixture<RoleApi>(),
-      share: createApiFixture<ShareApi>(),
       user: createApiFixture<UserApi>(),
     });
 }

@@ -2,12 +2,6 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CodingAgentSessionLookupInput,
-  type TranscriptLogRecord,
-  buildCodingAgentTranscript,
-  contentAttrKeys,
-  type LogContentKey,
-  logContentKeys,
-  shouldFilterCodingAgentSpan,
   CodingAgentApi as CodingAgentApiToken,
   type CodingAgentPullRequestUsageRead,
   type CodingAgentViewer,
@@ -16,7 +10,6 @@ import {
   type CodingAgentPersonalPullRequestUsage,
   type CodingAgentPersonalPullRequestUsageInput,
   type CodingAgentPullRequestDetail,
-  type CodingAgentPullRequestMappingBackfillInput,
   type CodingAgentPullRequestUsage,
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
@@ -25,7 +18,6 @@ import {
   type CodingAgentSessionListRow,
   type CodingAgentSessionsListInput,
   type CodingAgentSessionCursor,
-  type CodingAgentSpanFilterInput,
   type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
@@ -34,7 +26,6 @@ import {
   type CodingAgentTranscript,
   codingAgentTranscriptSchema,
   type ContributeSpanFactsCommandData,
-  type CodingAgentReceivedSpan,
   type CodingAgentSessionEventsPage,
   type CodingAgentSessionEventsPageInput,
 } from "@langwatch/coding-agent-contract";
@@ -46,7 +37,11 @@ import { ValidationError } from "@langwatch/handled-error";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { type SpanDetail, TraceApi } from "@langwatch/trace-contract";
+import {
+  TraceApi,
+  type TraceSessionGroupsInput,
+  type TracesSessionsPage,
+} from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -63,7 +58,6 @@ import {
   encodeSessionCursor,
   readSessionCursor,
 } from "../rules/coding-agent-session-cursor.rules.ts";
-import { liftSpanContribution } from "../rules/coding-agent-span-facts.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockService } from "../services/coding-agent-clock.service.ts";
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
@@ -74,6 +68,7 @@ import { CodingAgentReceivedFactsService } from "../services/coding-agent-receiv
 import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
 import { CodingAgentScopePermissionsService } from "../services/coding-agent-scope-permissions.service.ts";
 import type { CodingAgentScopeCaller } from "../services/coding-agent-scope-permissions.service.ts";
+import { CodingAgentSessionGroupsReadService } from "../services/coding-agent-session-groups-read.service.ts";
 import { CodingAgentViewerVisibilityService } from "../services/coding-agent-viewer-visibility.service.ts";
 import type { CodingAgentViewerVisibilityReader } from "../services/coding-agent-viewer-visibility.service.ts";
 import {
@@ -87,18 +82,18 @@ import { ModelCatalogCostEstimatorService } from "../services/model-catalog-cost
  * read, which of those they may also price, and how each is named. Derived
  * from the service's own input rather than restated, so the two cannot drift.
  */
-export type CodingAgentCallerScope = Pick<
+type CodingAgentCallerScope = Pick<
   CodingAgentPersonalPullRequestUsageInput,
   "permittedProjectIds" | "costProjectIds" | "projects"
 >;
 
 /** Who a cross-project read is answered for. */
-export interface CodingAgentCaller {
+interface CodingAgentCaller {
   readonly id: string;
 }
 
 /** One pull request, addressed the way both doors address it. */
-export interface CodingAgentPullRequestRef {
+interface CodingAgentPullRequestRef {
   projectId: string;
   repositoryHost: string;
   repositoryFullName: string;
@@ -106,7 +101,7 @@ export interface CodingAgentPullRequestRef {
 }
 
 /** The scope reads the module answers through its project and authorization peers. */
-export interface CodingAgentScopeReads {
+interface CodingAgentScopeReads {
   /**
    * The organization a project belongs to, or undefined for an orphan project.
    * Derived here rather than taken from the client, so a caller cannot ask
@@ -135,19 +130,14 @@ type CodingAgentDependencies = {
   auditLog: typeof AuditLogApi;
   governance: typeof GovernanceRestApi;
 };
-type CodingAgentSetup = FeatureSetup<
-  CodingAgentDependencies,
-  never,
-  undefined,
-  CodingAgentRepositories
->;
+type CodingAgentSetup = FeatureSetup<CodingAgentDependencies, undefined, CodingAgentRepositories>;
 
 export class CodingAgentModule implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
     github: GithubApi,
-    /** Claude-call classification the session fold prices cache writes by. */
+    /** Claude-call classification the session fold prices cache writes by; Sessions lens pages. */
     traces: TraceApi,
     /** Owns the platform default retention a session's rows are stamped with, read lazily. */
     retention: DataRetentionApi,
@@ -207,6 +197,7 @@ export class CodingAgentModule implements CodingAgentApi {
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,
       github: dependencies.github,
+      installationBackfill: service,
       receivedFacts: CodingAgentReceivedFactsService.create({
         traces: dependencies.traces,
         commands,
@@ -218,6 +209,11 @@ export class CodingAgentModule implements CodingAgentApi {
       traces: dependencies.traces,
       scope,
       visibility: CodingAgentViewerVisibilityService.create({ traces: dependencies.traces }),
+      sessionGroups: CodingAgentSessionGroupsReadService.create({
+        traces: dependencies.traces,
+        sessions: service,
+        findOrganizationForProject: (projectId) => scope.findOrganizationForProject(projectId),
+      }),
       auditLog: dependencies.auditLog,
       processing,
       commands,
@@ -229,6 +225,7 @@ export class CodingAgentModule implements CodingAgentApi {
   readonly #traces: TraceApi;
   readonly #scope: CodingAgentScopeReads;
   readonly #visibility: CodingAgentViewerVisibilityReader;
+  readonly #sessionGroups: CodingAgentSessionGroupsReadService;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #processing: CodingAgentProcessingPipeline;
   readonly #commands: CodingAgentCommandDispatcherService;
@@ -239,6 +236,7 @@ export class CodingAgentModule implements CodingAgentApi {
     traces,
     scope,
     visibility,
+    sessionGroups,
     auditLog,
     processing,
     commands,
@@ -248,6 +246,7 @@ export class CodingAgentModule implements CodingAgentApi {
     traces: TraceApi;
     scope: CodingAgentScopeReads;
     visibility: CodingAgentViewerVisibilityReader;
+    sessionGroups: CodingAgentSessionGroupsReadService;
     auditLog: Pick<AuditLogApi, "record">;
     processing: CodingAgentProcessingPipeline;
     commands: CodingAgentCommandDispatcherService;
@@ -257,6 +256,7 @@ export class CodingAgentModule implements CodingAgentApi {
     this.#traces = traces;
     this.#scope = scope;
     this.#visibility = visibility;
+    this.#sessionGroups = sessionGroups;
     this.#auditLog = auditLog;
     this.#processing = processing;
     this.#commands = commands;
@@ -274,33 +274,6 @@ export class CodingAgentModule implements CodingAgentApi {
 
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void> {
     return this.#commands.contributeSpanFacts(data);
-  }
-
-  contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void> {
-    return this.contributeSpanFacts(liftSpanContribution(input));
-  }
-
-  /** Pure derivation, no session store read: which log fields an event name captures. */
-  logContentKeys(eventName: string): readonly LogContentKey[] {
-    return logContentKeys(eventName);
-  }
-
-  /** Pure derivation, no session store read: which attribute keys an event name captures. */
-  contentAttrKeys(eventName: string): readonly string[] {
-    return contentAttrKeys(eventName);
-  }
-
-  /** Pure derivation, no session store read: whether a span is coding-agent noise. */
-  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean {
-    return shouldFilterCodingAgentSpan(input);
-  }
-
-  /** Pure derivation, no session store read: folds spans and logs into a transcript. */
-  buildTranscript(input: {
-    spans: SpanDetail[];
-    logs: TranscriptLogRecord[];
-  }): CodingAgentTranscript {
-    return buildCodingAgentTranscript(input);
   }
 
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null> {
@@ -322,6 +295,13 @@ export class CodingAgentModule implements CodingAgentApi {
     viewerUserId: string;
   }): Promise<CodingAgentTranscript> {
     return codingAgentTranscriptSchema.parse(await this.#traces.readCodingAgentTranscript(input));
+  }
+
+  /** Port of main's `traces.sessions`: trace reads the page for the viewer, this enriches it. */
+  readSessionGroupsForViewer(
+    input: TraceSessionGroupsInput & { viewerUserId: string },
+  ): Promise<TracesSessionsPage> {
+    return this.#sessionGroups.readForViewer(input);
   }
 
   linkTraceSessionsToPullRequests(
@@ -376,15 +356,6 @@ export class CodingAgentModule implements CodingAgentApi {
   /** The project's recent sessions in a window, newest first. */
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {
     return this.#codingAgents.listRecent(input);
-  }
-
-  /**
-   * The installation follow-up: the branches this organization's own sessions
-   * already named, mapped against the connection just made. Fire-and-forget at
-   * its caller, and fail-open — the branch recheck rebuilds the same mapping.
-   */
-  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void> {
-    return this.#codingAgents.backfillPullRequestMappings(input);
   }
 
   /**

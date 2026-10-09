@@ -1,4 +1,4 @@
-import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import {
   formatCost,
   formatDuration,
@@ -18,7 +18,10 @@ import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
 
-import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store.ts";
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
+import { useTimeFormatStore } from "../../../../../../../features/explorer/behavior/time-format.store.ts";
+import { useOpenTraceDrawer } from "../../../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts";
 import { formatISOTimestamp } from "../../../../../../../model/display-formatters.ts";
 import { truncateText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import {
@@ -29,11 +32,8 @@ import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-c
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { DensityTokens } from "../../../../hooks/use-density-tokens.ts";
-import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer.ts";
 import { TraceIdPeek } from "../../../../trace-id-peek.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import { useRelativeTime } from "../../../../utils/use-relative-time.ts";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 import {
   ROW_STYLES,
   type RowStyle,

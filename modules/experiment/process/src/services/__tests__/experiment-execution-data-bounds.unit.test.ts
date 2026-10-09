@@ -136,7 +136,11 @@ const loadSaved = ({
   ExperimentExecutionDataService.create().loadExecutionData({
     projectId: PROJECT_ID,
     dataset: byReference
-      ? { type: "saved", datasetId: DATASET_ID, columns: [{ id: "row", name: "row", type: "number" }] }
+      ? {
+          type: "saved",
+          datasetId: DATASET_ID,
+          columns: [{ id: "row", name: "row", type: "number" }],
+        }
       : { type: "inline", columns: [] },
     targets: [],
     evaluators: [],

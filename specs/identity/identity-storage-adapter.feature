@@ -578,12 +578,6 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then better-auth's storage is the identity adapter rather than the stock engine
     And the account ceremonies it binds are the bridge ceremonies
 
-  @unit
-  Scenario: An API process with no event stack names the branch it did not compose
-    Given an API process that registered no identity pipeline
-    When it composes better-auth
-    Then better-auth's storage is the stock engine
-    And the absence is reported once, naming what a user delete, an account write and an account delete no longer do
   # ---------------------------------------------------------------------------
   # Transactions - what the adapter can promise, and what it must not
   # ---------------------------------------------------------------------------
@@ -618,9 +612,11 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
   # instead: a command is atomic at its append, and replaying it is
   # idempotent.
 
-  @unit
+  # Today the storage better-auth is composed with is the stock Prisma engine, declared
+  # `transaction: true` in the auth module; the identity adapter declares none yet.
+  @integration
   Scenario: The adapter declares native transaction support
-    Given the identity storage adapter
+    Given the storage better-auth is composed with
     When a plugin asks whether it supports native transactions
     Then it says yes
     # `resolveUser` is refused outright otherwise, and with it every single
@@ -629,13 +625,13 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   @integration
   Scenario: Work inside a transaction commits together
-    Given a transaction against the identity storage adapter
+    Given a transaction against the storage better-auth is composed with
     When two Postgres-backed writes are made inside it and the callback returns
     Then both writes are visible afterwards
 
   @integration
   Scenario: Work inside a transaction rolls back together
-    Given a transaction against the identity storage adapter
+    Given a transaction against the storage better-auth is composed with
     When a Postgres-backed write is made inside it and the callback then throws
     Then that write is not visible afterwards
     And the error reaches the caller unchanged
@@ -661,7 +657,9 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     # Regression: single sign-on shipped with `resolveUser` configured and an
     # adapter that declared no transaction, so this had never once succeeded.
 
-  @unit
+  # Alex 2026-10-06: never built. Needs the identity branch composed on better-auth, which
+  # no process does today, so there is no fact to append inside a transaction.
+  @unit @unimplemented
   Scenario: The transaction does not claim to span the event store
     Given a transaction against the identity storage adapter
     When a fact is appended on the identity branch inside it and the callback then throws
@@ -671,3 +669,110 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     # will eventually read "native transaction support" as a promise it
     # cannot keep. The branches are in different databases. What keeps this
     # sound is that the append is atomic and idempotent on its own.
+
+  # Parity with main's storage adapter: the transaction, the connection issuer
+  # translation both ways, the passkey guard's storage and the logged refusal.
+  @unit
+  Scenario: The identity adapter runs a transaction over the rebound legacy engine
+    Given better-auth composed with the identity storage adapter
+    When better-auth runs work inside the adapter's transaction
+    Then one Postgres transaction is opened
+    And the work runs against the legacy engine bound to it
+
+  @unit
+  Scenario: A connection account is found by its real issuer beside its connection id
+    Given a user "olga" whose identifier backfill has not finalized
+    And "olga" holds an account on a single sign-on connection
+    When better-auth looks the account up by the connection id, the real issuer and the subject
+    Then the account row is returned
+
+  @unit
+  Scenario: A built-in provider beside a foreign issuer stays unanswered
+    Given a user "olga" whose identifier backfill has not finalized
+    And "olga" holds a GitHub account
+    When better-auth looks it up by "github" beside an issuer no provider id encodes
+    Then no row is returned
+
+  @unit
+  Scenario: A backfilled connection account is found by the issuer its connection registered
+    Given a single sign-on connection that registered its identity provider's issuer
+    And an account on it whose stored issuer is the synthetic one the backfill wrote
+    When better-auth looks the account up by the real issuer and the subject alone
+    Then the lookup asks for the connection's id and the subject, and the row is returned
+
+  @unit
+  Scenario: A connection account without an issuer is served the issuer its connection registered
+    Given a single sign-on connection that registered its identity provider's issuer
+    And an account on it with no stored issuer
+    When better-auth reads the account through the legacy branch
+    Then the row carries the registered issuer, not a synthetic one
+
+  @integration @unimplemented
+  Scenario: An issuer more than one connection registers resolves to no connection
+    Given two connections that register the same issuer
+    When the legacy branch translates that issuer alone
+    Then it answers no connection and logs a warning
+
+  @integration @unimplemented
+  Scenario: Removing a user's last way in is refused inside one serializable transaction
+    Given a user whose only way in is one passkey
+    When two removals of their passkeys race
+    Then at most one is deleted and the other answers that it would strand the user
+
+  @unit
+  Scenario: A sorted account read on the identity branch is refused and logged
+    Given a finalized user "sam" on the identity branch
+    When better-auth lists the user's accounts with a sort
+    Then the read is refused
+    And the refusal is logged at error
+
+  # ── The two Postgres repositories behind the identity branch ───────────
+
+  @integration
+  Scenario: Only a live identifier assembles into an account row
+    Given a user with a verified google identifier holding a credential row
+    And a detached github identifier on the same user
+    When the user's account rows are read
+    Then only the google account is returned, carrying its credential's secrets
+
+  @integration
+  Scenario: A live identifier without a credential row still answers, its secrets absent
+    Given a user with an attached email identifier and no credential row
+    When the user's account rows are read
+    Then the account is returned with no password and the mailbox as its account id
+
+  @integration
+  Scenario: An account lookup by a provider subject nothing live holds is refused as not found
+    Given a user whose github identifier is detached
+    When the account is looked up by "github" and its subject
+    Then the lookup throws identifier-not-found
+
+  @integration
+  Scenario: A resolution is finalized only when the user's own backfill row says finalized
+    Given three users holding a verified address, one finalized, one held and one with no backfill row
+    When each is resolved by that address
+    Then only the finalized user's resolution reports finalized
+
+  @integration
+  Scenario: An attached address resolves nobody
+    Given a user whose only identifier for an address is still ATTACHED
+    When the address is resolved
+    Then the resolution throws identifier-not-found
+
+  @integration
+  Scenario: The earliest attached identifier answers a resolution
+    Given two users holding the same verified address, attached a day apart
+    When the address is resolved
+    Then the user attached first answers
+
+  @integration
+  Scenario: A resolution records when the identifier last answered
+    Given a user with a verified google identifier that has never answered
+    When the user is resolved by "google" and the subject
+    Then the identifier's last-used time is recorded
+
+  @integration
+  Scenario: An issuer-subject resolution hands back the row's own provider id
+    Given a user with an identifier under a connection's issuer and provider id "auth0"
+    When the user is resolved by that issuer and the subject
+    Then the resolution names provider id "auth0"

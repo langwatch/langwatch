@@ -4,7 +4,7 @@ The Python verifier, held to the sender's own arithmetic.
 The cases are not written here. They are read from
 ``specs/webhooks/signature-vectors.json``, which is generated from the
 server's signing code by
-``apps/worker/src/tasks/webhook-signature-vectors.entrypoint.ts`` and asserted
+``modules/webhook/process/src/tasks/webhook-signature-vectors.task.ts`` and asserted
 against that code by a suite on the platform side. Three implementations
 agreeing with their own local idea of the algorithm is not agreement, so
 this suite and the TypeScript one read the SAME file and neither can be

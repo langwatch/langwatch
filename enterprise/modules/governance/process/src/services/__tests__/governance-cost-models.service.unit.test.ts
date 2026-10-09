@@ -5,13 +5,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { GovernanceCostBreakdownService } from "../../features/cost/services/governance-cost-breakdown.service.ts";
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
 import { MemoryDiscoveredPersonRepository } from "../../repositories/memory/memory.discovered-person.repository.ts";
 import {
   type MemoryGovernanceCostCell,
   MemoryGovernanceCostRollupRepository,
 } from "../../repositories/memory/memory.governance-cost-rollup.repository.ts";
-import { GovernanceCostBreakdownService } from "../governance-cost-breakdown.service.ts";
 
 const NOW = Temporal.Instant.from("2026-09-25T12:00:00Z");
 const TENANT = "governance-project";

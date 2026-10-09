@@ -2,7 +2,7 @@
  * The Web Push service worker's handlers over a fake worker scope.
  * Spec: specs/langy/langy-notifications.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
 import {
   handleNotificationClick,
@@ -11,7 +11,7 @@ import {
   PUSH_SHOWS_MESSAGE,
   type PushWindowClient,
   type PushWorkerScope,
-} from "../push-service-worker.ts";
+} from "../push/push-service-worker.ts";
 
 const ORIGIN = "https://app.acme.test";
 const PAYLOAD = {
@@ -32,7 +32,11 @@ function tab({
   handled?: boolean;
 } = {}) {
   const received: unknown[] = [];
-  const client: PushWindowClient & { received: unknown[] } = {
+  const client: PushWindowClient & {
+    received: unknown[];
+    focus: Mock<PushWindowClient["focus"]>;
+    navigate: Mock<NonNullable<PushWindowClient["navigate"]>>;
+  } = {
     url: `${ORIGIN}/acme`,
     focused,
     visibilityState,
@@ -41,8 +45,8 @@ function tab({
       received.push(message);
       port?.postMessage({ handled });
     },
-    focus: vi.fn(async () => client),
-    navigate: vi.fn(async () => client),
+    focus: vi.fn<PushWindowClient["focus"]>(async () => client),
+    navigate: vi.fn<NonNullable<PushWindowClient["navigate"]>>(async () => client),
   };
   return client;
 }

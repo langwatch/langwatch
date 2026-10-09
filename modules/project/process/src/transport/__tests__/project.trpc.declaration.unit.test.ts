@@ -36,11 +36,9 @@ describe("the project tRPC declarations", () => {
       expect(Object.keys(projectTrpc.members).toSorted()).toEqual([
         "archiveById",
         "create",
-        "getFieldRedactionStatus",
         "getHasFirstMessage",
         "getLegacyKeyStatus",
         "revokeProjectApiKey",
-        "triggerTopicClustering",
         "update",
       ]);
     });
@@ -68,9 +66,7 @@ describe("the project tRPC declarations", () => {
         getLegacyKeyStatus: "query",
         revokeProjectApiKey: "mutation",
         update: "mutation",
-        getFieldRedactionStatus: "query",
         archiveById: "mutation",
-        triggerTopicClustering: "mutation",
       });
     });
 
@@ -96,9 +92,7 @@ describe("the project tRPC declarations", () => {
         "project.getLegacyKeyStatus": { kind: "permission", permission: "project:manage" },
         "project.revokeProjectApiKey": { kind: "permission", permission: "project:manage" },
         "project.update": { kind: "permission", permission: "project:update" },
-        "project.getFieldRedactionStatus": { kind: "permission", permission: "project:view" },
         "project.archiveById": { kind: "permission", permission: "project:delete" },
-        "project.triggerTopicClustering": { kind: "permission", permission: "project:update" },
       });
     });
   });

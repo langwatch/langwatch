@@ -329,19 +329,50 @@ var Prereqs = []Prereq{{
 		Install:            "brew install " + DefaultRedisFormula,
 	}},
 }, {
+	Key:         "observability",
+	Name:        "Observability tools",
+	Summary:     "Grafana, Prometheus and Loki for the native telemetry tier",
+	Requirement: PrereqRecommended,
+	After:       []string{"brew"},
+	DarwinOnly:  true,
+	Detail: "On macOS haven runs the telemetry stack as host processes, not a\n" +
+		"    container. Without these `haven up` still serves the app, with no local\n" +
+		"    Grafana, metrics or logs. Alloy is a pinned download (native-binaries).",
+	Candidates: []Candidate{{
+		Key:      "observability",
+		Label:    "grafana + prometheus + loki",
+		Binaries: []string{"grafana", "prometheus", "loki"},
+		Install:  "brew install grafana prometheus loki",
+	}},
+}, {
+	// Not a brew formula: haven pins and checksums these releases itself
+	// (adapters/pinnedrelease); fetching here keeps the first `up` fast.
+	Key:         "native-binaries",
+	Name:        "ClickHouse, Tempo and Alloy",
+	Summary:     "the pinned ClickHouse server, Tempo, Alloy and Pyroscope the native tier runs",
+	Requirement: PrereqRecommended,
+	DarwinOnly:  true,
+	Detail: "`haven up` downloads them on first use, which stalls that first run\n" +
+		"    for a few hundred MB. Fetching them here verifies each sha256 and\n" +
+		"    leaves nothing for `up` to wait on.",
+	Candidates: []Candidate{{
+		Key:     "native-binaries",
+		Label:   "pinned ClickHouse " + ClickHouseNativeVersion + " + Tempo " + TempoNativeVersion + " + Alloy " + AlloyNativeVersion + " + Pyroscope " + PyroscopeNativeVersion,
+		Install: "download the pinned ClickHouse, Tempo, Alloy and Pyroscope releases",
+	}},
+}, {
 	Key:         "runtime",
 	Name:        "Container runtime",
-	Summary:     "runs the observability stack and the sandboxed langy tiers — pick one",
+	Summary:     "optional on macOS: the container fallback, haven play and sandboxed langy — pick one",
 	Requirement: PrereqOptional,
 	After:       []string{"brew"},
 	DarwinOnly:  true,
 	Detail: "Nothing in the day-to-day loop needs one, and answering \"none\" is a\n" +
-		"    supported answer rather than a refusal: ClickHouse and the telemetry\n" +
-		"    stack then run natively and langy on the host tier, all from one\n" +
-		"    setting instead of three environment variables.\n" +
-		"    A runtime buys you the managed ClickHouse container, langy's sandboxed\n" +
-		"    worker tier, and traces — which the native telemetry tier cannot carry,\n" +
-		"    because Grafana ships no macOS build of Tempo.\n" +
+		"    supported answer rather than a refusal: on macOS ClickHouse and the\n" +
+		"    telemetry stack (traces included) run natively either way, and langy\n" +
+		"    on the host tier. A runtime buys you the container fallback\n" +
+		"    (HAVEN_CH_RUNTIME, LANGWATCH_HAVEN_OBS_TIER), `haven play` and\n" +
+		"    langy's sandboxed worker tier.\n" +
 		"    haven's own stack is built on colima: its ceiling is explicit and\n" +
 		"    per-profile, and it needs no license. Docker Desktop works too.",
 	Candidates: []Candidate{{

@@ -5,21 +5,21 @@ import { useMemo, useRef } from "react";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import type { LangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
 import { resolveLangyActivityOwnership } from "../../../../model/langy-activity-ownership.ts";
-import { langyChoicesTimeline } from "../../../../model/langy-choices-timeline.ts";
-import { latestCodeAccessCallId } from "../../../../model/langy-code-access-tool.ts";
 import { langyPlan } from "../../../../model/langy-plan.ts";
+import { latestCodeAccessCallId } from "../../../tools/model/langy-code-access-tool.ts";
 import {
   questionToolCallIdsIn,
   questionWaitCardParts,
-} from "../../../../model/langy-question-tool.ts";
+} from "../../../tools/model/langy-question-tool.ts";
+import { langyChoicesTimeline } from "../../../transcript/model/langy-choices-timeline.ts";
 import {
   currentTurnAssistant,
   hasTokens,
   langyTurnActivityKey,
   runningTool,
   settledTool,
-} from "../../../../model/langy-thinking-line.ts";
-import { deriveWaveActivity } from "../../../../model/langy-wave-motion.ts";
+} from "../../../transcript/model/langy-thinking-line.ts";
+import { deriveWaveActivity } from "../../../transcript/model/langy-wave-activity.ts";
 import { toEngineMessage } from "../../model/langy-engine-parts.ts";
 import type { LangyMessagesResult } from "../data/use-langy-messages.ts";
 import {

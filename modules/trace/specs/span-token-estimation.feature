@@ -82,3 +82,15 @@ Feature: Estimating token counts for LLM spans that arrived without them
     Given no local table and a remote fetch that fails
     When a span's text is counted
     Then the count is absent rather than an error, and the span is left unestimated
+
+  @unit
+  Scenario: DISABLE_TOKENIZATION stops every count
+    Given a process with DISABLE_TOKENIZATION set to "true"
+    When a span's text is counted
+    Then the count is absent and no encoding table is loaded
+
+  @unit
+  Scenario: The two kill switches are read at main's spellings and default off
+    Given a deployment that sets DISABLE_TOKENIZATION or LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER
+    When the process resolves its configuration
+    Then each is on only when set to "true", and both are off when unset

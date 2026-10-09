@@ -78,7 +78,7 @@ const GLOBAL_MODELS = [
   // Cluster-wide operator rows; one row per flag key and no tenant column.
   "FeatureFlag",
   // Issue reports sent by customers' coding agents (`langwatch report`). A
-  // global support inbox read from the admin backoffice; `linkedProjectId` is
+  // global support inbox read from the admin console; `linkedProjectId` is
   // informational only, so there is no tenancy column to constrain on.
   "BugReport",
   // The sign-in attempt lock is keyed by a normalized identifier hash and

@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  ClickHouseQueryClient,
-  routingDriver,
-  type ClickHouseConnection,
-  type RoutableStatementClient,
-} from "@langwatch/clickhouse-client";
 import { BILLING_REPORT_COMMAND_TYPES } from "@langwatch/enterprise-billing-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -19,45 +13,7 @@ import { BillingErrorReporterService } from "../../../services/billing-error-rep
 import type { UsageReportingService } from "../../../services/usage-reporting.service.ts";
 import { LiveBillingRepositories } from "../live.billing.repositories.ts";
 
-const WINDOW = {
-  startDate: "2026-09-01 00:00:00.000",
-  endDate: "2026-10-01 00:00:00.000",
-};
-
 describe("LiveBillingRepositories", () => {
-  describe("given a worker composing the month's total over its own tenant-keyed ClickHouse client", () => {
-    /** @scenario "The worker reads the month's total by organization, not by tenant" */
-    it("resolves the client for the organization and never for a project", async () => {
-      const resolved: string[] = [];
-      const vendor = createApiFixture<RoutableStatementClient>({
-        query: async () => ({
-          json: async () => [{ total: "7", projectId: "project_1" }],
-          stream: async function* () {},
-        }),
-      });
-      const connection = createApiFixture<ClickHouseConnection<RoutableStatementClient>>({
-        resolveOrganization: (organizationId) => {
-          resolved.push(organizationId);
-          return vendor;
-        },
-      });
-      const { billableEvents } = LiveBillingRepositories.create({
-        prisma: prismaDouble(),
-        clickhouse: new ClickHouseQueryClient({ driver: routingDriver(connection) }),
-        redis: memoryRedisDouble(),
-      });
-
-      await expect(billableEvents.findTotal({ organizationId: "org_1", ...WINDOW })).resolves.toBe(
-        7,
-      );
-      await expect(
-        billableEvents.findByProject({ organizationId: "org_1", ...WINDOW }),
-      ).resolves.toEqual([{ projectId: "project_1", count: 7 }]);
-
-      expect(resolved).toEqual(["org_1", "org_1"]);
-    });
-  });
-
   describe("given a worker holding one Prisma client and the queue's one Redis", () => {
     /** @scenario "The worker builds the monthly roll-up from its own client" */
     it("reads the organization and the checkpoint through that client and caches through that Redis", async () => {

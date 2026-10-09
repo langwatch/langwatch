@@ -5,6 +5,7 @@ export { ScopedSecrets, SecretsResolver } from "./resolver.ts";
 export { Secret, SecretFamilyHandle, SecretHandle, type SecretSchema } from "./secret.ts";
 export {
   credentialsSecret,
+  credentialsSecretPrevious,
   gatewayInternalSecret,
   internalSlackSignupsWebhook,
   nlpInternalSecret,
@@ -15,7 +16,7 @@ export {
   virtualKeyPepper,
 } from "./shared-secrets.ts";
 export {
-  AbsentSecretError,
+  SecretNotSetError as AbsentSecretError,
   OnePasswordInProductionError,
   OnePasswordUnavailableError,
   SealedSecretsError,

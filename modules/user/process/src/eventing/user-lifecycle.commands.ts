@@ -2,21 +2,29 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
   USER_AGGREGATE_TYPE,
+  USER_CREATED_EVENT_TYPE,
   USER_DEACTIVATED_EVENT_TYPE,
+  USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_REACTIVATED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
 } from "@langwatch/user-contract";
 
 import {
+  RECORD_USER_CREATED_COMMAND_TYPE,
   RECORD_USER_DEACTIVATED_COMMAND_TYPE,
+  RECORD_USER_ERASED_COMMAND_TYPE,
   RECORD_USER_REACTIVATED_COMMAND_TYPE,
   RECORD_USER_REGISTERED_COMMAND_TYPE,
+  type RecordUserCreatedCommandData,
+  recordUserCreatedCommandDataSchema,
   type RecordUserLifecycleCommandData,
   recordUserLifecycleCommandDataSchema,
   type RecordUserRegisteredCommandData,
   recordUserRegisteredCommandDataSchema,
+  type UserCreatedEvent,
   type UserDeactivatedEvent,
+  type UserErasedEvent,
   type UserReactivatedEvent,
   type UserRegisteredEvent,
 } from "./user-lifecycle.events.ts";
@@ -132,6 +140,76 @@ export class RecordUserRegisteredCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordUserRegisteredCommandData): string {
+    return payload.userId;
+  }
+
+  static getSpanAttributes = spanAttributes;
+}
+
+/** Records that an account exists, however it was minted; once per user, however redelivered. */
+export class RecordUserCreatedCommand implements CommandHandler<
+  Command<RecordUserCreatedCommandData>,
+  UserCreatedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_USER_CREATED_COMMAND_TYPE,
+    recordUserCreatedCommandDataSchema,
+    "Record that a user account was created",
+  );
+
+  async handle(command: Command<RecordUserCreatedCommandData>): Promise<UserCreatedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<UserCreatedEvent>({
+        aggregateType: USER_AGGREGATE_TYPE,
+        aggregateId: data.userId,
+        tenantId: createTenantId(command.tenantId),
+        type: USER_CREATED_EVENT_TYPE,
+        version: USER_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.userId}:created`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordUserCreatedCommandData): string {
+    return payload.userId;
+  }
+
+  static getSpanAttributes = spanAttributes;
+}
+
+/** Records that an account was erased on request; once per user, so a retried erasure adds none. */
+export class RecordUserErasedCommand implements CommandHandler<
+  Command<RecordUserLifecycleCommandData>,
+  UserErasedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_USER_ERASED_COMMAND_TYPE,
+    recordUserLifecycleCommandDataSchema,
+    "Record that a user account was erased",
+  );
+
+  async handle(command: Command<RecordUserLifecycleCommandData>): Promise<UserErasedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<UserErasedEvent>({
+        aggregateType: USER_AGGREGATE_TYPE,
+        aggregateId: data.userId,
+        tenantId: createTenantId(command.tenantId),
+        type: USER_ERASED_EVENT_TYPE,
+        version: USER_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.userId}:erased`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordUserLifecycleCommandData): string {
     return payload.userId;
   }
 

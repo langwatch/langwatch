@@ -42,6 +42,8 @@ export const STABLE_AUTH_ERRORS = [
   "OAuthAccountNotLinked",
   "DIFFERENT_EMAIL_NOT_ALLOWED",
   "SSO_PROVIDER_NOT_ALLOWED",
+  // Stable: what has to change is an administrator's decision, not the attempt.
+  "LINK_NEEDS_APPROVAL",
   // Stable only as a fallback: the bounce leaves before any timer, and reaches the card only
   // when the refusal named no connection the page will dial.
   "SSO_REQUIRED_BY_ORGANIZATION",

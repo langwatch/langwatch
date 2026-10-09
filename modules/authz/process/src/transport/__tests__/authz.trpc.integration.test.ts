@@ -9,11 +9,11 @@ import {
   type AuthzApi,
   AuthzScopeNotFoundError,
   type AuthzScopeRef,
-  type AuthzService,
 } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";
+import type { AuthzService } from "../../services/authz.service.ts";
 import { authzTrpc, authzTrpcTransport } from "../authz.trpc.ts";
 
 const USER_ID = "user_1";

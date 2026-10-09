@@ -19,8 +19,8 @@ import { z, type ZodTypeAny } from "zod";
 /** The Slack fields without the save-time refinement: a persist reads, it does not refuse. */
 const slackStoredFieldsSchema = z.object(slackActionParamsSchema.shape);
 
+import { AutomationSlackSecretsService } from "#features/slack/services/automation-slack-secrets.service";
 import type { TriggerSecretSeal } from "#repositories/trigger.repository";
-import { AutomationSlackSecretsService } from "#services/automation-slack-secrets.service";
 import {
   AutomationWebhookSecretsService,
   type AutomationWebhookProvider,

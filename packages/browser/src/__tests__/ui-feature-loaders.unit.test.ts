@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveUiPageLoader, type UiPageLoader } from "../page/ui-page-loaders";
 import { mergeUiPageLoaders } from "../ui-feature-loaders";
-import { resolveUiPageLoader, type UiPageLoader } from "../ui-page-loaders";
 
 function aLoader(): UiPageLoader {
   return async () => ({ default: () => null });

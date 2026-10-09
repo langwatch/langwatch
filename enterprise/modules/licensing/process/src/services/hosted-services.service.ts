@@ -14,7 +14,10 @@ import {
   type HostedClassifyAnswer,
   type HostedUsageAnswer,
 } from "@langwatch/enterprise-licensing-contract";
-import type { InstantEvalJudgement, InstantEvalQuestion } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalJudgement,
+  InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {

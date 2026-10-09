@@ -1,6 +1,6 @@
+import { type AuthzApi, AuthzScopeNotFoundError } from "@langwatch/authz-contract";
 import type { HostedCaller } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi, GatewayBudgetWithSeats } from "@langwatch/gateway-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import { CONTRACT_BUDGET_EXTERNAL_ID } from "./contract-budget-store.service.ts";
@@ -12,34 +12,34 @@ type UsageGateway = Pick<
 
 /**
  * The budgets that apply to the calling key, with live spend when readable, as main's
- * `PrismaHostedUsageReader` read them: the project's team from its owner, the key's principal
+ * `PrismaHostedUsageReader` read them: the project's team from authz's scope, the key's principal
  * and the budgets themselves from the gateway.
  */
 export class HostedUsageReaderService implements HostedUsageReader {
   static create({
     gateway,
-    projects,
+    scopes,
   }: {
     gateway: UsageGateway;
-    projects: Pick<ProjectApi, "findById">;
+    scopes: Pick<AuthzApi, "getScope">;
   }): HostedUsageReaderService {
-    return new HostedUsageReaderService(gateway, projects);
+    return new HostedUsageReaderService(gateway, scopes);
   }
 
   private constructor(
     private readonly gateway: UsageGateway,
-    private readonly projects: Pick<ProjectApi, "findById">,
+    private readonly scopes: Pick<AuthzApi, "getScope">,
   ) {}
 
   async read(caller: HostedCaller): ReturnType<HostedUsageReader["read"]> {
-    const [project, key] = await Promise.all([
-      caller.projectId ? this.projects.findById(caller.projectId) : null,
+    const [teamId, key] = await Promise.all([
+      caller.projectId ? this.#teamOf(caller.projectId) : null,
       this.gateway.findVirtualKeyById(caller.virtualKeyId, caller.organizationId),
     ]);
     const applicable = await this.gateway.resolveApplicableBudgets({
       organizationId: caller.organizationId,
       virtualKeyId: caller.virtualKeyId,
-      teamId: project?.teamId ?? null,
+      teamId,
       projectId: caller.projectId,
       principalUserId: key?.principalUserId ?? null,
     });
@@ -55,6 +55,17 @@ export class HostedUsageReaderService implements HostedUsageReader {
         .filter((budget) => applicableIds.has(budget.id))
         .map((budget) => usageOf({ budget, spendAvailable })),
     };
+  }
+
+  /** A project authz does not know resolves no team, as a missing project did. */
+  async #teamOf(projectId: string): Promise<string | null> {
+    try {
+      const scope = await this.scopes.getScope({ projectId });
+      return scope.type === "project" ? scope.teamId : null;
+    } catch (error) {
+      if (error instanceof AuthzScopeNotFoundError) return null;
+      throw error;
+    }
   }
 }
 

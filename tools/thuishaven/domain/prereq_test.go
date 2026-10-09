@@ -277,7 +277,7 @@ func TestEveryCandidateIsProbeable(t *testing.T) {
 				// than by looking for a binary.
 				continue
 			}
-			if len(c.Binaries) == 0 && c.Formula == "" && p.Key != "portless" && p.Key != "somaxconn" {
+			if len(c.Binaries) == 0 && c.Formula == "" && p.Key != "portless" && p.Key != "somaxconn" && p.Key != "native-binaries" {
 				t.Errorf("%s/%s has no binary and no formula to probe — it can never report installed", p.Key, c.Key)
 			}
 		}

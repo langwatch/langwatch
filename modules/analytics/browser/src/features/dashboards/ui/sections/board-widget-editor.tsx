@@ -7,9 +7,9 @@
 import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
 import { useState } from "react";
 
-import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
-import { DashboardWidgetEditDrawer } from "../../../../ui/sections/dashboard-widget-edit-drawer.tsx";
-import { SandboxedChartFrame } from "../../../../ui/sections/sandboxed-chart-frame.tsx";
+import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-draft.ts";
+import { DashboardWidgetEditDrawer } from "../../../dashboard-widget/ui/sections/dashboard-widget-edit-drawer.tsx";
+import { SandboxedChartFrame } from "../../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { useBoardWidgetEditor } from "../../behavior/use-board-widget-editor.ts";
 import type { WidgetAsk } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";

@@ -32,35 +32,26 @@ Feature: Collaborative presence
     Then the removal is refused as not mine to make
     And that member stays present to everyone watching
 
-  # Project and organization own the presence settings; presence learns them only from their
-  # facts (rulings 2026-10-05, "Presence"), so it holds no peer to ask.
+  # Project and organization own the presence settings; presence reads their rows through
+  # declared Postgres shares (round 46 E1, R40), so it holds no peer and keeps no copy.
   @unit
   Scenario: Presence keeps no project or user peer
     When a process installs presence
     Then presence names no peer it depends on
-    And it decides whether a project is enabled from its own fold of the settings facts
+    And it decides whether a project is enabled by reading the owners' rows, not a fold of their facts
+
+  # Over memory stores the owners' rows are a memory twin a test hands in (record §7).
+  @unit
+  Scenario: Over memory stores presence answers from a twin of the owners' rows
+    Given a process boots presence over memory stores with no rows handed in
+    When a browser session sends a heartbeat for a project
+    Then presence answers that the project is not enabled
+    And the session is not listed
 
   @unit
-  Scenario: Presence folds the presence-setting facts project and organization append
-    Given project has appended that a project was created
-    And project has appended that the project's own presence setting is on
-    When organization appends that the project's organization switched presence off
-    Then presence's settings subscribers fold each fact
-    And presence answers that the project is not enabled
-
-  @unit
-  Scenario: A heartbeat counts once presence has folded the project's creation
-    Given a worker installs presence beside project's pipeline
-    And project appends that a project was created
-    When a browser session sends a heartbeat for that project
-    Then the session is listed as present
-
-  # Presence folds project's and organization's presence-setting facts into its own durable keys
-  # (rulings 2026-10-05, "Presence flag"); answering from that fold, switching off is eventual.
-  @unit
-  Scenario Outline: A project is enabled only when its folded setting and its organization's are both on
-    Given presence has folded the project's presence setting as "<project>"
-    And it has folded the project's organization's presence setting as "<organization>"
+  Scenario Outline: A project is enabled only when its own setting and its organization's are both on
+    Given project holds the project's presence setting as "<project>"
+    And organization holds the project's organization's presence setting as "<organization>"
     When presence decides whether the project is enabled
     Then it answers "<enabled>"
 
@@ -72,36 +63,44 @@ Feature: Collaborative presence
       | off     | off          | no      |
 
   @unit
-  Scenario: A project presence has folded no fact for is not enabled
-    Given presence has folded nothing about a project
+  Scenario: A project its owner does not hold is not enabled
+    Given project holds no project with that id
     When presence decides whether the project is enabled
     Then it answers that the project is not enabled
 
   @unit
-  Scenario: A created project with no recorded settings is enabled, as the stored defaults are
-    Given presence has folded a project's creation
-    And it has folded no presence setting for the project or its organization
+  Scenario: A project whose team its owner does not hold is not enabled
+    Given project holds the project in a team organization does not hold
     When presence decides whether the project is enabled
-    Then it answers that the project is enabled
+    Then it answers that the project is not enabled
+
+  # Heartbeats are frequent, so presence keeps each answer in process for 30 s; the fold it
+  # replaced was eventual too (coordinator, E1-presence attempt 2).
+  @unit
+  Scenario: A settings toggle may lag up to 30 seconds, and the next request after that sees it
+    Given presence answered that a project is enabled
+    When organization switches the project's organization's presence setting off
+    Then within 30 seconds of that answer presence may still answer that the project is enabled
+    And after 30 seconds the next request answers that the project is not enabled
+    And a heartbeat for the project then stores no session
 
   @unit
-  Scenario: A presence setting older than the one folded does not overwrite it
-    Given presence has folded a project's setting as off and its organization's as off
-    When an older setting arrives turning each of them on
-    Then presence still answers that the project is not enabled
-
-  @unit
-  Scenario: Folding the same presence-setting fact twice changes nothing
-    Given presence has folded a project's setting as off
-    When the same fact is delivered again
-    Then presence still answers that the project is not enabled
+  Scenario: Within the window presence reads the owners' rows once per project
+    Given presence answered whether a project is enabled
+    When further requests for the project arrive within 30 seconds
+    Then presence answers them without reading the owners' rows again
 
   @integration
-  Scenario: Folded presence settings are durable and outlive every session
-    Given presence folds a project's and an organization's setting into Redis
-    When the keys are inspected
-    Then neither key carries an expiry
-    And presence answers from them after a fresh repository reads them
+  Scenario: Presence reads the settings from project's and organization's rows
+    Given a project stored by project with presence off, in a team under an organization with presence on
+    When presence reads the project's settings
+    Then it holds the project's setting as off and the organization's as on
+
+  @integration
+  Scenario: A project id its owner does not hold reads as unknown
+    Given no project with that id in project's table
+    When presence reads the project's settings
+    Then the project is unknown
 
   # The presenter is the existing session-person fact the door binds, with image (rulings
   # 2026-10-05, "Presence presenter"); presence keeps no user peer.

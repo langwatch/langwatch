@@ -22,11 +22,11 @@ Feature: The agent module installs with the modules it needs
 
     @unit
     Scenario: A copied workflow agent points at the graph the workflow module copied
-      Given an agent service composed with the workflow module as its peer
+      Given the workflow module owns the agent copy door
       And a workflow agent pointing at a Studio graph
       When the agent is copied to another project
-      Then the workflow module is asked to copy the graph into that project
-      And the copied agent points at the graph the workflow module returned
+      Then the workflow module copies the graph into that project
+      And asks the agent module to create the copy pointing at the copied graph
       And the source agent is unchanged
 
     # The boot statement used to carry a standing list of adapters no package

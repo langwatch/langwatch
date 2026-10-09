@@ -1,4 +1,3 @@
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, toDate } from "@langwatch/time";
 import {
@@ -60,8 +59,6 @@ function linkedWorkflow({ withVersion }: { withVersion: boolean }): WorkflowWith
   };
 }
 
-const monitors = createApiFixture<MonitorApi>();
-
 const replication = {
   workflowId: "workflow_1",
   sourceProjectId: "project_source",
@@ -75,7 +72,6 @@ describe("EvaluatorLinkedRowsService", () => {
       const listSummaries = vi.fn(async () => [{ id: "workflow_1", name: "Judge" }]);
       const rows = EvaluatorLinkedRowsService.create({
         workflows: createApiFixture<WorkflowApi>({ listSummaries }),
-        monitors,
       });
 
       await expect(
@@ -90,7 +86,6 @@ describe("EvaluatorLinkedRowsService", () => {
     it("answers null for an archived or missing workflow", async () => {
       const rows = EvaluatorLinkedRowsService.create({
         workflows: createApiFixture<WorkflowApi>({ listSummaries: async () => [] }),
-        monitors,
       });
 
       await expect(
@@ -106,7 +101,6 @@ describe("EvaluatorLinkedRowsService", () => {
           listSummaries: async () => [{ id: "workflow_1", name: "Judge" }],
           getById: async () => linkedWorkflow({ withVersion: false }),
         }),
-        monitors,
       });
 
       await expect(rows.replicateEvaluatorWorkflow(replication)).rejects.toMatchObject({
@@ -126,7 +120,6 @@ describe("EvaluatorLinkedRowsService", () => {
           },
           deleteUncommitted,
         }),
-        monitors,
       });
 
       await expect(rows.replicateEvaluatorWorkflow(replication)).rejects.toThrow("save failed");
@@ -134,28 +127,6 @@ describe("EvaluatorLinkedRowsService", () => {
         workflowId: "workflow_copy",
         projectId: "project_target",
       });
-    });
-  });
-
-  describe("when an archived evaluator's monitors are removed", () => {
-    it("deletes each monitor that runs it, through monitor", async () => {
-      const remove = vi.fn(async () => ({ success: true as const }));
-      const rows = EvaluatorLinkedRowsService.create({
-        workflows: createApiFixture<WorkflowApi>(),
-        monitors: createApiFixture<MonitorApi>({
-          findByEvaluator: async () => [
-            { id: "monitor_1", name: "Guard" },
-            { id: "monitor_2", name: "Tone" },
-          ],
-          delete: remove,
-        }),
-      });
-
-      await expect(
-        rows.deleteMonitorsUsingEvaluator({ evaluatorId: "evaluator_1", projectId: "project_1" }),
-      ).resolves.toEqual({ count: 2 });
-      expect(remove).toHaveBeenCalledWith({ id: "monitor_1", projectId: "project_1" });
-      expect(remove).toHaveBeenCalledWith({ id: "monitor_2", projectId: "project_1" });
     });
   });
 });

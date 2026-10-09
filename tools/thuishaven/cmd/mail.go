@@ -213,9 +213,9 @@ func (c mailClient) getHTML(ctx context.Context, id string) (string, error) {
 }
 
 // mailUsage is printed on a missing or unknown subcommand.
-const mailUsage = "usage: haven mail <address|list [--to] [--subject]|get <id> [--html]|wait [--to] [--subject] [--timeout]|clear> [--json]"
+const mailUsage = "usage: haven mail <address|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--timeout]|delete <id>|clear> [--json]"
 
-// runMail is `haven mail <address|list|get|wait|clear>`.
+// runMail is `haven mail <address|list|get|links|wait|delete|clear>`.
 func runMail(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(mailUsage)
@@ -257,8 +257,12 @@ func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error
 		return cmd.list(ctx, inv)
 	case "get":
 		return cmd.get(ctx, inv)
+	case "links":
+		return cmd.links(ctx, inv)
 	case "wait":
 		return cmd.wait(ctx, inv)
+	case "delete":
+		return cmd.delete(ctx, inv)
 	case "clear":
 		return cmd.clear(ctx)
 	default:
@@ -321,6 +325,41 @@ func (cmd mailCommand) wait(ctx context.Context, inv invocation) error {
 		return fmt.Errorf("no message matched within %s", timeout)
 	}
 	return cmd.printMessage(msg)
+}
+
+// links prints the links found in one message, one per line.
+func (cmd mailCommand) links(ctx context.Context, inv invocation) error {
+	if len(inv.args) < 2 {
+		return errors.New("usage: haven mail links <id>")
+	}
+	msg, err := cmd.client.get(ctx, inv.args[1])
+	if err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(append([]string{}, msg.Links...))
+	}
+	for _, link := range msg.Links {
+		fmt.Println(link)
+	}
+	return nil
+}
+
+// delete removes one message from the inbox.
+func (cmd mailCommand) delete(ctx context.Context, inv invocation) error {
+	if len(inv.args) < 2 {
+		return errors.New("usage: haven mail delete <id>")
+	}
+	id := inv.args[1]
+	notFound := fmt.Errorf("message %q is not in this stack's inbox", id)
+	if err := cmd.client.do(ctx, mailRequest{method: http.MethodDelete, path: "/api/messages/" + url.PathEscape(id), notFound: notFound}); err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(map[string]bool{"deleted": true})
+	}
+	fmt.Println("message deleted")
+	return nil
 }
 
 func (cmd mailCommand) clear(ctx context.Context) error {

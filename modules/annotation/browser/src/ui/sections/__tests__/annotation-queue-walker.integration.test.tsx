@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
- * The reviewer's queue walk: the bar, the sitting's session count, the end of
- * the queue, and an item whose trace is gone. The conversation and Edit trace
- * are trace's, lent through its declaration, so they stand in here.
+ * The queue walk: bar, session count, end of queue, gone trace, and its unanswered-read states.
  * @see modules/annotation/specs/annotation-queue-workflow.feature
+ * Spec: specs/ui/shared-scope-host.feature
  */
 
 import { defineSlice } from "@langwatch/browser-host/global-store";
@@ -47,6 +46,8 @@ type Step = {
   nextItemId: string | null;
   queueFinished: boolean;
   queueLoading: boolean;
+  queueFailed: boolean;
+  scopeUnavailable: boolean;
   stepIsStale: boolean;
 };
 
@@ -124,6 +125,8 @@ function stepAt(position: number, overrides: Partial<Step> = {}): Step {
     nextItemId: position < 3 ? `item-${position + 1}` : null,
     queueFinished: false,
     queueLoading: false,
+    queueFailed: false,
+    scopeUnavailable: false,
     stepIsStale: false,
     ...overrides,
   };
@@ -490,6 +493,37 @@ describe("given a reviewer walking their annotation queue", () => {
       renderWalker();
 
       expect(screen.getByText("All tasks complete")).toBeTruthy();
+    });
+  });
+
+  describe("given the queue has not answered successfully", () => {
+    const unanswered = { item: null, position: 0, total: 0, queueFinished: true };
+
+    /** @scenario "Annotation queue completion requires a successful read" */
+    it("shows a loading state while the active scope is still resolving", () => {
+      mocks.state.step = stepAt(1, { ...unanswered, queueLoading: true });
+      renderWalker({ scopeStatus: "loading" });
+
+      expect(screen.getByText("Loading your queue")).toBeTruthy();
+      expect(screen.queryByText("All tasks complete")).toBeNull();
+    });
+
+    /** @scenario "Annotation queue completion requires a successful read" */
+    it("shows an error state when the queue query fails", () => {
+      mocks.state.step = stepAt(1, { ...unanswered, queueFailed: true });
+      renderWalker();
+
+      expect(screen.getByText("Couldn't load your queue")).toBeTruthy();
+      expect(screen.queryByText("All tasks complete")).toBeNull();
+    });
+
+    /** @scenario "Annotation queue completion requires a successful read" */
+    it("shows an unavailable state when the active scope is unavailable", () => {
+      mocks.state.step = stepAt(1, { ...unanswered, scopeUnavailable: true });
+      renderWalker({ project: undefined, scopeStatus: "unavailable" });
+
+      expect(screen.getByText("This project is not available")).toBeTruthy();
+      expect(screen.queryByText("All tasks complete")).toBeNull();
     });
   });
 });

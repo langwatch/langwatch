@@ -41,7 +41,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => harness.router,
 }));
 
-const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/use-drawer");
+const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/drawer");
 
 /** What the address bar holds for the drawer, as the browser would show it. */
 function drawerInUrl(): Record<string, string> {

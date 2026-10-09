@@ -4,7 +4,6 @@ Feature: Trace rollups and span storage fold idempotently
   subscriber must only ever act on the origin it was built to guard.
 
   # trace-rollup.projection.ts, span-storage.projection.ts,
-  # custom-evaluation-sync.subscriber.ts, origin-guarded.subscriber.ts,
   # trace-attribute-cap.rules.ts, trace-payload-cap.rules.ts,
   # trace-retention-floor.service.ts
 

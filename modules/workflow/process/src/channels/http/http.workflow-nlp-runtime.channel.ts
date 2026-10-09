@@ -2,7 +2,6 @@
  * The NLP engine, reached over HTTP.
  */
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
 
 import {
   type WorkflowNlpRuntime,
@@ -24,7 +23,7 @@ import {
  * by the call site so every span downstream (nlpgo + gateway) inherits a
  * consistent attribution. See specs/nlp-go/telemetry.feature.
  */
-export type NlpOrigin = "workflow" | "playground" | "evaluation" | "scenario" | "topic_clustering";
+type NlpOrigin = "workflow" | "playground" | "evaluation" | "scenario" | "topic_clustering";
 
 /** The staging policy an ARN target falls back to when composition named none. */
 const DEFAULT_INVOKE_STAGING_CONFIG: NlpInvokeStagingConfig = {
@@ -65,7 +64,7 @@ function nlpProxyBaseUrl(input: { baseUrl: string }): string {
 }
 
 /** One request to the engine, as this adapter shapes it. */
-export type NlpDispatchRequest = Readonly<{
+type NlpDispatchRequest = Readonly<{
   path: string;
   body: unknown;
   origin: NlpOrigin;
@@ -247,9 +246,3 @@ export class UnconfiguredWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime
     return Promise.reject(new Error(this.reason));
   }
 }
-
-/** The event a keep-alive probe sends, for a host that builds one itself. */
-export const NLP_KEEP_ALIVE_EVENT: StudioClientEvent = {
-  type: "is_alive",
-  payload: {},
-};

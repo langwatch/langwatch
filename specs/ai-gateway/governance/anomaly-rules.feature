@@ -246,3 +246,86 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     Then each severity section is wrapped in <section role="region">
       with an accessible name like "Critical anomaly rules (3)"
     And the inline composer's form fields all have <label> associations
+
+  Rule: A rule can deliver its alerts to a registered webhook endpoint (ADR-167)
+    Request delivery Q1 to Q3 (rulings 2026-10-05). A destination `{ type: "webhook_endpoint",
+    endpointId }` names one of the organisation's webhook endpoints. Governance records a deliver
+    intent per alert and endpoint in its own outbox; the intent asks the webhook module for
+    delivery under a key derived from the alert, so a retried intent delivers once. Inline
+    `{ type: "webhook", url, sharedSecret }` destinations keep delivering as before until the plan
+    gate (an organisation without webhook endpoints, or not entitled to them) is ruled.
+
+    @unit
+    Scenario: A rule delivering to a webhook endpoint records one deliver intent per alert
+      Given an active spend_spike rule whose destination is a webhook endpoint
+      When the rule fires an alert
+      Then one deliver intent is recorded for that endpoint, keyed by the alert and the endpoint
+      And nothing is posted inline
+
+    @unit
+    Scenario: A deliver intent asks the webhook module once per alert, however often it runs
+      Given a recorded deliver intent for an alert
+      When the intent runs twice
+      Then each run requests delivery of a "governance.anomaly_alert.triggered" message
+      And both requests carry the same idempotency key, so the webhook module delivers once
+
+    @unit
+    Scenario: An inline webhook destination keeps delivering as before
+      Given an active rule whose destination is an inline webhook URL with a shared secret
+      When the rule fires an alert
+      Then the alert is posted to the URL signed "sha256=" as before
+      And no deliver intent is recorded
+
+    @integration
+    Scenario: The rule form lists and saves one of the organisation's webhook endpoints
+      Given an organisation with two webhook endpoints
+      When an admin picks one for a rule's destination and saves
+      Then the rule's destination names that endpoint by id
+
+    @integration
+    Scenario: The rule form keeps an inline webhook destination readable
+      Given a rule whose destination is an inline webhook URL
+      When an admin opens it in the rule form
+      Then the form shows the URL the alerts post to
+      And saving without picking an endpoint keeps the inline destination
+
+    @integration
+    Scenario: Without webhook endpoint read access the rule form shows a no-permission notice
+      Given an admin who can manage anomaly rules but lacks "webhookEndpoints:view"
+      When they open the rule form
+      Then the destination field shows a no-permission notice naming "webhookEndpoints:view"
+      And no webhook endpoints are requested
+
+    @integration @unimplemented
+    Scenario: Inline destinations are migrated to legacy-scheme webhook endpoints
+      Given a rule with an inline webhook destination
+      When the governance migration step runs, once or more than once
+      Then one webhook endpoint on the legacy scheme exists for that URL and secret
+      And the rule's destination names that endpoint
+
+    @integration @unimplemented
+    Scenario: An organisation that cannot hold webhook endpoints never loses an alert silently
+      Given an organisation with anomaly rules but no webhook endpoints entitlement
+      When an inline destination would be migrated
+      Then its alerts keep reaching their receiver, or the admin is told before they stop
+
+@unit @anomaly-rules @migration
+Scenario: The destination migration run twice creates each endpoint once
+  Given rules with inline webhook destinations in two organisations
+  When the anomaly webhook destination migration runs twice
+  Then each inline destination became one legacy-scheme endpoint signed with the rule's secret
+  And each rule now names its endpoints, so the second run creates nothing
+
+@unit @anomaly-rules @migration
+Scenario: A dry run of the destination migration counts and changes nothing
+  Given rules with inline webhook destinations in two organisations
+  When the anomaly webhook destination migration runs as a dry run
+  Then it reports the rules and endpoints it would move
+  And no endpoint is created and no rule is rewritten
+
+@unit @anomaly-rules @migration
+Scenario: The destination migration resumes after its checkpoint
+  Given the migration saved the first organisation as its checkpoint
+  When the migration runs again from that checkpoint
+  Then only the organisations after it are migrated
+  And each completed page is saved as the next checkpoint

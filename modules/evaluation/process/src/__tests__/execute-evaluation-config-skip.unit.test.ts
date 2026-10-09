@@ -13,7 +13,7 @@ import type { EvaluationProcessingEvent } from "@langwatch/evaluation-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
+import { EvaluationExecutionIntentService } from "../features/execution/services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,
   buildExecutionDeps,

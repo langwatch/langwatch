@@ -165,3 +165,41 @@ describe("given the memory identity repositories", () => {
     });
   });
 });
+
+describe("given the memory identity repositories' reopen sweep", () => {
+  describe("when it runs over finalized users", () => {
+    it("reopens only an unproven account, writes nothing on a dry run, and finds nothing twice", async () => {
+      const { store, repositories } = scenario();
+      seedUser(store, "user_confirmed", "kim@acme.com");
+      store.users.set("user_unproven", {
+        id: "user_unproven",
+        email: "sam@acme.com",
+        emailVerified: false,
+        createdAtMs: 1_700_000_000_000,
+        userHashKey: null,
+        payload: {},
+      });
+      store.users.set("user_signed_in", {
+        id: "user_signed_in",
+        email: "lee@acme.com",
+        emailVerified: false,
+        lastLoginAtMs: 1_700_000_000_000,
+        createdAtMs: 1_700_000_000_000,
+        userHashKey: null,
+        payload: {},
+      });
+      for (const userId of ["user_confirmed", "user_unproven", "user_signed_in"]) {
+        await repositories.latch.recordFinalized({ userId, report: null });
+      }
+
+      expect(await repositories.migration.reopenUnprovenAccounts({ dryRun: true })).toBe(1);
+      expect(await repositories.latch.isFinalized({ userId: "user_unproven" })).toBe(true);
+      expect(await repositories.migration.reopenUnprovenAccounts({ dryRun: false })).toBe(1);
+
+      expect(await repositories.latch.isFinalized({ userId: "user_unproven" })).toBe(false);
+      expect(await repositories.latch.isFinalized({ userId: "user_confirmed" })).toBe(true);
+      expect(await repositories.latch.isFinalized({ userId: "user_signed_in" })).toBe(true);
+      expect(await repositories.migration.reopenUnprovenAccounts({ dryRun: false })).toBe(0);
+    });
+  });
+});

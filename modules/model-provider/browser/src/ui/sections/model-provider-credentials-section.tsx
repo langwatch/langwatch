@@ -1,7 +1,7 @@
 import { Lent } from "@langwatch/browser-host/lent";
 import { Box, Field, Input, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { ManagedModelProviderAlertToken } from "@langwatch/enterprise-managed-provider-contract";
+import { ManagedModelProviderAlertToken } from "@langwatch/enterprise-managed-provider-client";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import type React from "react";
 import { useEffect } from "react";

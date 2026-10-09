@@ -19,7 +19,7 @@ import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fa
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimUserRecord } from "../../repositories/scim.repository.ts";
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
@@ -68,15 +68,8 @@ function world() {
   const writer = new GrantsFake();
   const organization = new OrganizationAdministrationFake();
   const departments = {
-    departmentResolveByNameOrCreate: vi.fn(async () => ({
-      id: "department-1",
-      organizationId: ACME,
-      name: "Engineering",
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-    departmentAssignUser: vi.fn(async () => undefined),
-  } satisfies ScimDepartmentAssignment;
+    recordCostCenterChanged: vi.fn(async () => undefined),
+  } satisfies ScimCostCenterFacts;
   const users = {
     findById: vi.fn(async ({ id }) => store.users.get(id) ?? null),
     findByEmail: vi.fn(
@@ -97,7 +90,7 @@ function world() {
     prisma: store,
     writer,
     users,
-    governance: departments,
+    costCenterFacts: departments,
     organization,
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
@@ -191,7 +184,7 @@ function expectNoAccessWritten({ writer, departments }: World) {
   expect(writer.createBinding).not.toHaveBeenCalled();
   expect(writer.applyMemberBindings).not.toHaveBeenCalled();
   expect(writer.createGrant).not.toHaveBeenCalled();
-  expect(departments.departmentAssignUser).not.toHaveBeenCalled();
+  expect(departments.recordCostCenterChanged).not.toHaveBeenCalled();
 }
 
 async function refusalOf(work: Promise<unknown>): Promise<ScimProtocolError> {
@@ -314,7 +307,7 @@ describe("a directory creating a person who is inactive", () => {
       await deactivate({ service: w.service, id: created.id });
       const membershipsBefore = w.membershipsIn(ACME);
       const grantsBefore = w.writer.attachBindings.mock.calls.length;
-      const seatsBefore = w.departments.departmentAssignUser.mock.calls.length;
+      const seatsBefore = w.departments.recordCostCenterChanged.mock.calls.length;
 
       const again = await push({
         service: w.service,
@@ -330,7 +323,7 @@ describe("a directory creating a person who is inactive", () => {
       ]);
       expect(w.membershipsIn(ACME)).toEqual(membershipsBefore);
       expect(w.writer.attachBindings.mock.calls).toHaveLength(grantsBefore);
-      expect(w.departments.departmentAssignUser.mock.calls).toHaveLength(seatsBefore);
+      expect(w.departments.recordCostCenterChanged.mock.calls).toHaveLength(seatsBefore);
     });
   });
 });
@@ -403,8 +396,8 @@ describe("a directory push that arrives for a person", () => {
       // The directory already decided: the only things asked are who holds the
       // address and to mint the account; no administrator or department check.
       expect(w.users.findByEmail).toHaveBeenCalledTimes(1);
-      expect(w.organization.assertRemovalKeepsAnAdministrator).not.toHaveBeenCalled();
-      expect(w.departments.departmentResolveByNameOrCreate).not.toHaveBeenCalled();
+      expect(w.organization.findActiveOrganizationAdministrators).not.toHaveBeenCalled();
+      expect(w.departments.recordCostCenterChanged).not.toHaveBeenCalled();
     });
   });
 

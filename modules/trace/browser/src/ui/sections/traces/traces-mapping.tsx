@@ -16,6 +16,7 @@ import {
   useTracesWithSpansByThreadIds,
   useFormattedSpansDigest,
 } from "../../../behavior/reads/use-trace-mapping-reads.ts";
+import { useAnnotationsByTraceIds } from "../../../behavior/use-annotations-by-trace-ids.ts";
 import {
   availableExpansionsFor,
   datasetEntriesFor,
@@ -29,7 +30,6 @@ import {
   type WorkflowMappingTarget,
   withExpansion,
 } from "../../../model/traces/mapping/traces-mapping.ts";
-import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids.ts";
 import { useProjectEventTypes } from "../use-project-event-types.ts";
 import { useProjectSpanNames } from "../use-project-span-names.ts";
 import { type ProjectKeyNames, TracesMappingRow } from "./traces-mapping-row.tsx";

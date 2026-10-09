@@ -5,12 +5,15 @@
  */
 
 import { defineTrpcContract } from "@langwatch/module";
+import { traceFilterInputSchema } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import { TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES } from "./topic-clustering.constants.ts";
 import {
   topicClusteringRunHistoryEntrySchema,
   topicClusteringStatusSchema,
+  namedTopicCountsSchema,
+  topicClusteringTriggerResultSchema,
   topicSchema,
 } from "./topic.ts";
 
@@ -22,6 +25,11 @@ export const topicTrpc = defineTrpcContract("topics")
   .withInput(topicProjectScopeSchema)
   .withOutput(topicSchema.array())
 
+  /** Moved from `traces.getTopicCounts`: trace counts the buckets, topic names them. */
+  .query("getTopicCounts")
+  .withInput(traceFilterInputSchema)
+  .withOutput(namedTopicCountsSchema)
+
   .query("getClusteringStatus", { invalidatedBy: TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES })
   .withInput(topicProjectScopeSchema)
   .withOutput(topicClusteringStatusSchema)
@@ -29,4 +37,8 @@ export const topicTrpc = defineTrpcContract("topics")
   .query("getClusteringRunHistory", { invalidatedBy: TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES })
   .withInput(topicProjectScopeSchema)
   .withOutput(topicClusteringRunHistoryEntrySchema.array())
+
+  .mutation("triggerTopicClustering")
+  .withInput(topicProjectScopeSchema)
+  .withOutput(topicClusteringTriggerResultSchema)
   .build();

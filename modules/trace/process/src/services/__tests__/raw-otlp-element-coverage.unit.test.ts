@@ -1,7 +1,10 @@
-import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contract";
+import type {
+  CanonicalAttributes,
+  CanonicalEvent,
+  ExtractorContext,
+} from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
-import type { ExtractorContext } from "../../rules/canonical-attributes.rules.ts";
 import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import codexBSpan from "./fixtures/codex-b.session-task-turn.json";
 import geminiBSpan from "./fixtures/gemini-b.llm-call.json";

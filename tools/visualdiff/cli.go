@@ -22,7 +22,7 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
                  [-no-fail-fast] [-resume RUNID] [-no-publish] [-include-done]
                  [-rebase-main] [-force] [-max-load N] [-pages N] [-max-consecutive-errors N]
-                 [-batch-size N]
+                 [-batch-size N] [-shard i/n] [-deadline DUR]
 
   visualdiff flow ID | route PATH [-edition E] [-candidate REF] [-force] [-dev-ui] [-dry-run] [-root DIR]
   visualdiff down [-root DIR]
@@ -32,6 +32,7 @@ const usage = `visualdiff — render every route and every flow on two refs and 
   visualdiff coverage [-base REF] [-candidate REF] [-config FILE] [-root DIR]
   visualdiff gc [-kept] [-no-haven] [-root DIR]
   visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF] [-root DIR]
+  visualdiff merge -run-dir DIR -shards N [-base REF] [-candidate REF]
   visualdiff batches [-dir OUT] [-wait] [-after N] [-timeout DUR]
   visualdiff batch-review BATCH-DIR
 
@@ -75,6 +76,15 @@ A route with no finding and a flow judged works are recorded in
 git diff since that commit is empty over its module (from the screens its
 web module declares), the shell packages and apps/ui, and a flow's steps are
 unchanged. -include-done, -routes and -flows walk everything named.
+
+-shard i/n runs every n-th route and flow from the i-th, so n machines
+together render everything once; the first shard alone records coverage.
+-deadline DUR stops capturing that long after the run started, writes the
+report of what it captured and marks the run partial (summary.txt, the PR
+comment). merge combines the shards' run directories, each one downloaded to
+<run-dir>/shards/<name>, into one report, summary.txt and findings.jsonl in
+<run-dir>, for publish; a shard that left no report makes the merge partial.
+It exits like run: 0, 1, or 2 when a shard broke or none left a report.
 
 flow ID and route PATH are the fix loop: they boot the candidate as a kept
 stack under .visualdiff/loop, or reuse it (its worktree follows the
@@ -129,6 +139,8 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return gcCommand(ctx, args[1:], streams)
 	case "publish":
 		return publishCommand(ctx, args[1:], streams)
+	case "merge":
+		return mergeCommand(args[1:], streams)
 	case "check":
 		return checkCommand(ctx, args[1:], streams)
 	case "batch-review":
@@ -199,7 +211,7 @@ func (parsed *runFlags) publish(ctx context.Context, result Result, streams Stre
 	_, err := Publish(ctx, PublishRequest{
 		Run: execRunner, Root: options.Root, RunDir: result.Plan.RunDir, BaseRef: options.BaseRef,
 		CandidateRef: options.CandidateRef, Rows: result.Rows, Findings: result.Findings,
-		Config: parsed.config.Publish, Stderr: streams.Err,
+		Config: parsed.config.Publish, Stderr: streams.Err, Partial: nonEmpty(result.Partial),
 	})
 	if err != nil {
 		fmt.Fprintln(streams.Err, err)
@@ -231,6 +243,7 @@ type runFlagValues struct {
 	flowList, routeList, editionList, resume   string
 	noHaven, noBaseline, noFailFast, noPublish bool
 	includeDone                                bool
+	shard                                      string
 }
 
 // declareStacks declares the refs, the stacks and how they boot.
@@ -271,6 +284,7 @@ func (values *runFlagValues) declareCapture(flags *flag.FlagSet) {
 	flags.BoolVar(&values.noBaseline, "no-baseline", false, "render the base every time and cache nothing")
 	flags.BoolVar(&options.RefreshBaseline, "refresh-baseline", false, "render the base and replace its cached baseline")
 	flags.BoolVar(&values.noFailFast, "no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
+	flags.BoolVar(&options.Judge, "judge", false, "ask Haiku whether each flagged screen pair is a real regression (needs ANTHROPIC_API_KEY); verdict.md shows its findings and cost")
 	flags.BoolVar(&options.Fast, "fast", false, "render on a lean Chromium for a quick look; never caches a baseline or publishes to the pull request")
 	flags.BoolVar(&values.noPublish, "no-publish", false, "do not show the run's screens on the branch's pull request")
 	flags.BoolVar(&options.DevUI, "dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI")
@@ -278,6 +292,8 @@ func (values *runFlagValues) declareCapture(flags *flag.FlagSet) {
 	flags.IntVar(&options.Pages, "pages", 0, "pages each side captures on at once (default half the CPUs, fewer under load)")
 	flags.IntVar(&options.MaxConsecutiveErrors, "max-consecutive-errors", DefaultMaxConsecutiveErrors, "stop after this many captures in a row that are harness or stack errors on one side (0 never stops)")
 	flags.IntVar(&options.BatchSize, "batch-size", DefaultBatchSize, "seal a review batch every this many routes or flows (0 never does)")
+	flags.StringVar(&values.shard, "shard", "", "run only shard i of n (i/n): every n-th route and flow, from the i-th")
+	flags.DurationVar(&options.Deadline, "deadline", 0, "stop capturing this long after the run started and report what was captured, marked partial; 0 never does")
 }
 
 // resolve turns the parsed values into the run's options and configuration.
@@ -298,7 +314,13 @@ func (values *runFlagValues) resolve(flags *flag.FlagSet) (*runFlags, error) {
 	if err != nil {
 		return nil, err
 	}
+	shard, err := ParseShard(values.shard)
+	if err != nil {
+		return nil, err
+	}
+	config = shard.Apply(config)
 	options := values.options
+	options.Shard = shard
 	options.ColorScheme, options.Root, options.Viewport, options.Editions = scheme, absoluteRoot, parsedViewport, editions
 	options.UseHaven = havenSelected(havenOnPath(), values.noHaven)
 	options.Baseline = !values.noBaseline && !options.Fast

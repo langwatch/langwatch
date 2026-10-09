@@ -2,7 +2,7 @@
 /** Port of main's governanceCostRollup fold tests. Specs: governance-cost-rollup.feature, governance-cost-restatement-markers.feature */
 import { describe, expect, it } from "vitest";
 
-import { governanceCostRollupTotals } from "../../rules/governance-cost-rollup-cell.rules.ts";
+import { governanceCostRollupTotals } from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
 import {
   DAY_START_MS,
   HOUR_MS,

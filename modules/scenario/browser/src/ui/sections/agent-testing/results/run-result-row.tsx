@@ -24,10 +24,13 @@ import {
 } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label.tsx";
 import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";
+import { RUN_AGAIN_LABEL } from "../run-plan-results/run-plan-detail-header.tsx";
+import {
+  canRunAgain,
+  RUN_AGAIN_FROM_CODE_REASON,
+} from "../run-plan-results/use-run-plan-run-dialog.ts";
 import { callerLabel, runCallerKind } from "./caller-display.ts";
-import { RUN_AGAIN_LABEL } from "./run-plan-detail-header.tsx";
 import type { RunResultsTableProps } from "./run-results-table.tsx";
-import { canRunAgain, RUN_AGAIN_FROM_CODE_REASON } from "./use-run-plan-run-dialog.ts";
 
 export type RunResultRowProps = Pick<
   RunResultsTableProps,

@@ -13,7 +13,9 @@ import {
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
+  PERSONAL_TEAM_CREATED_EVENT_TYPE,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  personalTeamCreatedEventDataSchema,
   personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
@@ -28,6 +30,9 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
+import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
+import { PersonalProjectService } from "../../services/personal-project.service.ts";
 import { ProjectCreatedNoticeService } from "../../services/project-created-notice.service.ts";
 import {
   RecordProjectCreatedCommand,
@@ -144,7 +149,15 @@ describe("project's lifecycle pipeline", () => {
   });
 
   it("hosts no reaction on its own events", () => {
-    const definition = buildProjectLifecyclePipeline({ recordProjectCreated: async () => void 0 });
+    const definition = buildProjectLifecyclePipeline({
+      recordProjectCreated: async () => void 0,
+      personalProjects: {
+        create: async () => "project_personal",
+        archive: async () => {},
+        revive: async () => {},
+        setFeatures: async () => {},
+      },
+    });
 
     expect(definition.eventSubscribers.size).toBe(0);
   });
@@ -161,6 +174,11 @@ function organizationStandIn() {
         ...EventSchema.shape,
         type: z.literal(PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE),
         data: personalWorkspaceProvisionedEventDataSchema,
+      }),
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(PERSONAL_TEAM_CREATED_EVENT_TYPE),
+        data: personalTeamCreatedEventDataSchema,
       }),
     ])
     .build();
@@ -196,7 +214,15 @@ describe("given organization records a newly created personal workspace", () => 
     const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
     const organization = eventing.register(organizationStandIn());
     const lifecycle = eventing.register(
-      buildProjectLifecyclePipeline({ recordProjectCreated: (input) => notice.record(input) }),
+      buildProjectLifecyclePipeline({
+        recordProjectCreated: (input) => notice.record(input),
+        personalProjects: {
+          create: async () => "project_personal",
+          archive: async () => {},
+          revive: async () => {},
+          setFeatures: async () => {},
+        },
+      }),
     );
     notice.connect({
       recordProjectCreated: lifecycle.commands.recordProjectCreated,
@@ -204,6 +230,8 @@ describe("given organization records a newly created personal workspace", () => 
       recordPresenceSettingChanged: lifecycle.commands.recordPresenceSettingChanged,
       recordProjectMoved: lifecycle.commands.recordProjectMoved,
       recordProjectArchived: lifecycle.commands.recordProjectArchived,
+      recordProjectDepartmentAssigned: lifecycle.commands.recordProjectDepartmentAssigned,
+      recordProjectTraceSharingDisabled: lifecycle.commands.recordProjectTraceSharingDisabled,
     });
     eventing.register(createdListener(heard));
 
@@ -240,5 +268,55 @@ describe("given organization records a newly created personal workspace", () => 
       ),
     );
     await eventing.close();
+  });
+});
+
+describe("given organization records a personal team's creation twice under two project ids", () => {
+  /** @scenario "A second personal-team fact for a team records only the team's existing project as created" */
+  it("creates one project and records only that real row as created", async () => {
+    const memory = MemoryProjectDatabase.create();
+    const recorded = vi.fn(async (_input: { projectId: string; organizationId: string }) => void 0);
+    const personalProjects = PersonalProjectService.create({
+      projects: MemoryProjectRepository.create({ memory }),
+    });
+    const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
+    const organization = eventing.register(organizationStandIn());
+    eventing.register(
+      buildProjectLifecyclePipeline({ recordProjectCreated: recorded, personalProjects }),
+    );
+    const fact = (id: string, projectId: string, at: number) => ({
+      id,
+      aggregateId: "org_acme",
+      aggregateType: "organization" as const,
+      tenantId: createTenantId("org_acme"),
+      type: PERSONAL_TEAM_CREATED_EVENT_TYPE,
+      version: "2026-10-08",
+      createdAt: at,
+      occurredAt: at,
+      data: {
+        tenantId: "org_acme",
+        organizationId: "org_acme",
+        userId: "user_1",
+        teamId: "team_personal",
+        projectId,
+        projectSlug: `personal-${projectId}`,
+        occurredAt: at,
+      },
+    });
+
+    await organization.service.storeEvents([fact("event-first", "project_real", 1)], {
+      tenantId: createTenantId("org_acme"),
+    });
+    await vi.waitFor(() => expect(recorded).toHaveBeenCalledTimes(1));
+    await organization.service.storeEvents([fact("event-second", "project_phantom", 2)], {
+      tenantId: createTenantId("org_acme"),
+    });
+    await vi.waitFor(() => expect(recorded).toHaveBeenCalledTimes(2));
+    await eventing.close();
+
+    expect(memory.findProject("project_phantom")).toBeUndefined();
+    expect(new Set(recorded.mock.calls.map(([input]) => input.projectId))).toEqual(
+      new Set(["project_real"]),
+    );
   });
 });

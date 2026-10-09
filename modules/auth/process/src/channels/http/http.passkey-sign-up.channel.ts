@@ -44,6 +44,14 @@ export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
 /** The installation restricts who may create an account, and this address is not admitted. */
 export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
 
+/** Main's code for an address that must use its organization's sign-in method. */
+export const PASSKEY_SIGNUP_NOT_LOCAL = "REGISTRATION_NOT_ALLOWED";
+
+/** Whether a proven address still enrols a passkey here, rather than at its organization's door. */
+export interface PasskeySignUpEligibility {
+  enrolsLocally(input: { email: string; method: "passkey" }): Promise<boolean>;
+}
+
 /** Who the ceremony's request is signed in as, if anyone. */
 export type PasskeyCeremonyCaller =
   | { signedIn: true; user: { id: string; email: string } }
@@ -126,7 +134,7 @@ async function refuseIfRegistered({
   users: PasskeySignUpDirectory;
   email: string;
 }): Promise<void> {
-  // Case-insensitive for the same reason `user.register` is: rows written
+  // Case-insensitive for the same reason `auth.register` is: rows written
   // before addresses were stored lowercased may carry capitals, and a
   // case-twin beside one is two Users answering for one person.
   const existing = await users.findByEmail({ email: candidateEmail });
@@ -135,6 +143,22 @@ async function refuseIfRegistered({
   throw new APIError("BAD_REQUEST", {
     code: PASSKEY_SIGNUP_EMAIL_TAKEN,
     message: "That email already has an account. Log in with it instead.",
+  });
+}
+
+/** Asked before the proof is read, so an address that left local sign-up spends nothing. */
+async function refuseIfNotLocal({
+  eligibility,
+  email,
+}: {
+  eligibility: PasskeySignUpEligibility;
+  email: string;
+}): Promise<void> {
+  if (await eligibility.enrolsLocally({ email, method: "passkey" })) return;
+
+  throw new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_NOT_LOCAL,
+    message: "This address must use its organization's sign-in method.",
   });
 }
 
@@ -163,6 +187,7 @@ async function resolveUser({
   users,
   verification,
   policy,
+  eligibility,
   context,
 }: {
   ctx: GenericEndpointContext;
@@ -170,9 +195,11 @@ async function resolveUser({
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
   policy: PasskeySignUpPolicy;
+  eligibility: PasskeySignUpEligibility;
   context?: string | null | undefined;
 }): Promise<{ id: string; name: string; displayName: string }> {
   const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
+  await refuseIfNotLocal({ eligibility, email: resolvedEmail });
   if (!(await verification.validateAddressProof({ token: addressProof, email: resolvedEmail }))) {
     throw verificationRequired();
   }
@@ -197,12 +224,14 @@ function createAfterVerification({
   users,
   verification,
   policy,
+  eligibility,
   sessionOf,
 }: {
   announcements: BetterAuthAnnouncements;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
   policy: PasskeySignUpPolicy;
+  eligibility: PasskeySignUpEligibility;
   sessionOf: PasskeyCeremonySession;
 }): (params: {
   ctx: GenericEndpointContext;
@@ -224,6 +253,7 @@ function createAfterVerification({
       return { userId: caller.user.id, name: caller.user.email };
     }
     const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
+    await refuseIfNotLocal({ eligibility, email: resolvedEmail });
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. The unique index on the
     // address is the real backstop; this is the one that answers in words.
@@ -259,6 +289,7 @@ export function passkeySignUpRegistration(options: {
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
   policy: PasskeySignUpPolicy;
+  eligibility: PasskeySignUpEligibility;
   sessionOf?: PasskeyCeremonySession;
 }): {
   requireSession: boolean;
@@ -280,6 +311,7 @@ export function passkeySignUpRegistration(options: {
         users: options.users,
         verification: options.verification,
         policy: options.policy,
+        eligibility: options.eligibility,
         handleSecret: options.handleSecret,
       }),
     afterVerification: createAfterVerification({

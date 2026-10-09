@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
+import { AutomationSlackSecretsService } from "../../features/slack/services/automation-slack-secrets.service.ts";
 import { readableSlackActionParams } from "../../rules/automation-slack-read.rules.ts";
-import { AutomationSlackSecretsService } from "../automation-slack-secrets.service.ts";
 
 // Built at runtime so no fixture reads as a real credential.
 const BOT_TOKEN = ["xoxb", "fake", "token"].join("-");

@@ -214,6 +214,43 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  describe("when a storage migration pages the project's datasets", () => {
+    /** @scenario "A storage migration pages one project's datasets by id, archived ones included" */
+    it("answers id-ordered pages after the cursor, archived included, never another project's", async () => {
+      const datasets = backend.datasets();
+      const add = (name: string, projectId = backend.mine()) =>
+        datasets.create({ projectId, name, slug: name, columnTypes: columns });
+      const kept = await add("inventory-kept");
+      const archived = await add("inventory-archived");
+      await datasets.archive({
+        id: archived.id,
+        projectId: backend.mine(),
+        slug: "inventory-archived-gone",
+        archivedAt: nowInstant(),
+      });
+      await add("inventory-theirs", backend.theirs());
+      const ids = [kept.id, archived.id].toSorted();
+
+      const first = await backend
+        .datasets()
+        .findStoragePage({ projectId: backend.mine(), limit: 1 });
+      const second = await datasets.findStoragePage({
+        projectId: backend.mine(),
+        afterId: first[0]?.id,
+        limit: 5,
+      });
+
+      expect([...first, ...second].map((entry) => entry.id)).toEqual(ids);
+      expect(first[0]).toEqual({
+        id: ids[0],
+        projectId: backend.mine(),
+        contentLayout: "postgres",
+        status: "ready",
+        chunkCount: null,
+      });
+    });
+  });
+
   describe("when a record is created under its own identifier", () => {
     /** @scenario "A record identifier is not treated as a column" */
     it("keeps the identifier beside the entry, never inside it", async () => {

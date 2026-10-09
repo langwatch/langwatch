@@ -52,9 +52,6 @@ type VersionRow = Omit<WorkflowVersion, "dsl"> & { dsl?: unknown };
 
 const updateCountSchema = z.object({ count: z.number() });
 
-const workflowFieldSourceRowsSchema = z.array(
-  z.object({ id: z.string(), currentVersion: z.object({ dsl: z.unknown() }).nullish() }),
-);
 const workflowSummaryRowsSchema = z.array(z.object({ id: z.string(), name: z.string() }));
 const workflowIdRowSchema = z.object({ id: z.string() });
 const workflowProjectIdRowsSchema = z.array(z.object({ projectId: z.string() }));
@@ -83,19 +80,6 @@ const mapVersion = (row: unknown, includeDsl = true): WorkflowVersion => {
 };
 
 export class PrismaWorkflowRepository extends WorkflowRepository {
-  async findFieldSources(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<{ id: string; dsl: unknown }[]> {
-    const rows = await this.database.workflow.findMany({
-      where: { id: { in: input.workflowIds }, projectId: input.projectId, archivedAt: null },
-      select: { id: true, currentVersion: { select: { dsl: true } } },
-    });
-    const sources = workflowFieldSourceRowsSchema.parse(rows);
-
-    return sources.map(({ id, currentVersion }) => ({ id, dsl: currentVersion?.dsl }));
-  }
-
   async findSummaries(input: {
     projectId: string;
     workflowIds: string[];

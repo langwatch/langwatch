@@ -5,6 +5,7 @@
  */
 
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
 import {
   presenceAcknowledgedSchema,
@@ -56,5 +57,10 @@ export const presenceTrpc = defineTrpcContract("presence")
   /** The same at project level, with the project's read hints too. */
   .subscription("onProjectReadHints")
   .withInput(projectReadHintsInputSchema)
+  .withOutput(readHintSchema)
+
+  /** The upgrade runner's hints, on the platform scope no tenant shares; operators only. */
+  .subscription("onUpgradeReadHints")
+  .withInput(z.void())
   .withOutput(readHintSchema)
   .build();

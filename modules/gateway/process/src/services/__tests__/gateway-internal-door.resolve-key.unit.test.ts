@@ -3,8 +3,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { VirtualKeyCryptoService } from "../../features/virtual-key/services/virtual-key-crypto.service.ts";
 import { GatewayInternalDoorService } from "../gateway-internal-door.service.ts";
-import { VirtualKeyCryptoService } from "../virtual-key-crypto.service.ts";
 
 const AT = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
 

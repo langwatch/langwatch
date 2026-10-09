@@ -86,7 +86,7 @@ describe("GrantDialog", () => {
       const props = renderDialog({ editing: grantRow({}) });
 
       const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).getByText("Sam on Team · Platform")).toBeInTheDocument();
+      expect(within(dialog).getByText("Sam on Team Platform")).toBeInTheDocument();
       expect(within(dialog).queryByLabelText("Who")).not.toBeInTheDocument();
       fireEvent.change(within(dialog).getByLabelText("Role"), { target: { value: "member" } });
       fireEvent.click(within(dialog).getByTestId("grant-submit"));

@@ -6,7 +6,7 @@
 
 import { ScenarioArchiveDialog } from "../../../elements/scenario-archive-dialog.tsx";
 import { RunDialog } from "../run/run-dialog.tsx";
-import { SuiteNameDialog } from "./suite-name-dialog.tsx";
+import { SuiteNameDialog } from "../suite-rail/suite-name-dialog.tsx";
 import type { TestCasesTabModel } from "./use-test-cases-tab.ts";
 
 export function TestCasesDialogs({ model }: { model: TestCasesTabModel }) {

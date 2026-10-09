@@ -10,8 +10,8 @@ import {
   type FacetValueState,
   type Section,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
-import { NONE_TOGGLE_VALUE } from "../../../../behavior/facet-constants.ts";
-import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
+import type { NumericMode } from "../../../../features/explorer/behavior/numeric-mode.store.ts";
+import { NONE_TOGGLE_VALUE } from "../../../../features/facet/behavior/facet-constants.ts";
 import { AttributesSection } from "./attributes-section.tsx";
 import { EvaluatorDrilldown } from "./evaluator-drilldown.tsx";
 import { EventDrilldown } from "./event-drilldown.tsx";

@@ -8,7 +8,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { SchedulerAuditRepository } from "../../repositories/ops-audit.repository.ts";
 import { SchedulerOpsService } from "../scheduler-ops.service.ts";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
@@ -38,7 +37,7 @@ type AuditEntry = {
   slot: string | null;
 };
 
-class RecordingAudit extends SchedulerAuditRepository {
+class RecordingAudit {
   readonly entries: AuditEntry[] = [];
   failing = false;
 

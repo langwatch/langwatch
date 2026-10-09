@@ -76,7 +76,6 @@ describe("secret app installation", () => {
       secretProcessModule.install({
         resources,
         config: undefined,
-        members: {},
         repositorySelection: {
           tier: "live",
           members: { prisma: prismaDouble(), redis: redisDouble() },

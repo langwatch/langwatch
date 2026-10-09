@@ -15,5 +15,4 @@ export {
   mcpAuthorizationCodeRecordSchema,
   type McpAuthorizationCodeRecord,
 } from "./mcp-authorize.schemas.ts";
-
-export { hostedMcpConfig, type HostedMcpServerConfig } from "./mcp-authorize.schemas.ts";
+export * from "./hosted-mcp.config.ts";

@@ -251,6 +251,18 @@ Feature: One workspace for every JavaScript project in the repo
     # point is that a lane never serves a bundle older than the source it was
     # built from, and never pays for a build it does not need.
 
+  @unit
+  Scenario: A fresh worktree prepares its databases without a manual bundle build
+    Given a worktree that has installed but never built the TypeScript SDK
+    When its databases are prepared, by haven or by `pnpm start:prepare:db`
+    Then the SDK is built first, without being asked for
+    And a worktree whose SDK bundle is newer than its sources builds nothing
+    And `pnpm task`, `pnpm prisma:migrate` and `pnpm clickhouse:migrate` do the same
+    # The migration tasks load the observability package, which resolves the
+    # published SDK from its built dist; a fresh worktree failed there with
+    # ERR_MODULE_NOT_FOUND. The root script and dev-stack.sh ensure it first;
+    # the production image runs the api script and never builds.
+
   @unimplemented
   Scenario: Building a project builds what it depends on first
     Given a project that depends on another project in the repo

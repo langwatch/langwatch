@@ -1,10 +1,10 @@
 import type { InstrumentationScope, SpanResourceInfoDto } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
+import { useIsReadOnlyTrace } from "../../../../behavior/explorer/context/trace-viewer-context.tsx";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
 interface TraceResourcesResult {
   rootSpanId: string | null;

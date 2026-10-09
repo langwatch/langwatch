@@ -8,7 +8,7 @@
 
     langwatch.agent.serve()
 
-See ADR-128 and `specs/python-sdk/agent-decorator.feature`.
+See `dev/docs/adr/128-connected-agents.md` and `specs/python-sdk/agent-decorator.feature`.
 """
 
 from .client import AgentClient, default_client, serve

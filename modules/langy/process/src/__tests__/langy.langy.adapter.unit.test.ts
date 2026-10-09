@@ -18,10 +18,6 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { LangyRelayConnection } from "@langwatch/langy-contract";
-import type {
-  LangyConversationCommands,
-  LangyTurnTechnicalMembers,
-} from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -42,6 +38,8 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyModule } from "../app/langy.app.ts";
+import { MemoryLangyChannels } from "../channels/memory/memory.langy.channels.ts";
+import type { LangyTurnTechnicalMembers } from "../features/turn/services/langy-turn.service.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
@@ -49,6 +47,7 @@ import { PrismaLangyRepositories } from "../repositories/prisma/prisma.langy.rep
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import type { LangyEventingMembers } from "../services/langy-postgres.service.ts";
 import { LangyPostgresService } from "../services/langy-postgres.service.ts";
+import type { LangyConversationCommands } from "../services/langy.service.ts";
 import { LangyService } from "../services/langy.service.ts";
 
 function commands(): LangyConversationCommands {
@@ -341,6 +340,7 @@ async function createApp(): Promise<LangyModule> {
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,
     repositories: MemoryLangyRepositories.create(),
+    channels: MemoryLangyChannels.create(),
   });
   connectProducer(app);
   return app;
@@ -366,6 +366,7 @@ function testPresence(): PresenceApi {
     events: async function* () {},
     cursors: async function* () {},
     readHints: async function* () {},
+    upgradeReadHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };

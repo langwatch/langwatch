@@ -18,7 +18,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([promptProcessModule])
     .withStores(memoryStores())
-    .withMembers({ publicBaseUrl: void 0 })
+    .withConfig({ prompt: { publicBaseUrl: undefined } })
     .provide({
       project: createApiFixture<ProjectApi>({}),
       authz: createApiFixture<AuthzApi>({}),

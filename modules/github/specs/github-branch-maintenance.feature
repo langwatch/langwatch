@@ -86,7 +86,8 @@ Feature: GitHub branch linkage maintenance
     Then it prunes stale branch bookkeeping
     And it reaps the outbox rows of the branch recheck process from that process store
 
-  @unit
+  # Gap: nothing in modules/github/process/src reports absent GitHub App credentials by name yet.
+  @unit @unimplemented
   Scenario: A worker without GitHub App credentials names the missing capability
     Given a worker graph composed without GitHub App credentials
     When the graph is composed

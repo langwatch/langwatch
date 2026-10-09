@@ -5,13 +5,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { AUDIT_OVERRIDES } from "../lwql-audit-overrides.rules.ts";
+import { AUDIT_OVERRIDES } from "../../features/lwql-catalogue/rules/lwql-clickhouse-overrides.rules.ts";
+import { EXPERIMENTS_OVERRIDES } from "../../features/lwql-catalogue/rules/lwql-experiments-overrides.rules.ts";
+import { GATEWAY_OVERRIDES } from "../../features/lwql-catalogue/rules/lwql-gateway-overrides.rules.ts";
+import { GOVERNANCE_OVERRIDES } from "../../features/lwql-catalogue/rules/lwql-governance-overrides.rules.ts";
+import { METRICS_OVERRIDES } from "../../features/lwql-catalogue/rules/lwql-metrics-overrides.rules.ts";
 import type { LwqlCatalogue } from "../lwql-catalogue.rules.ts";
 import columnsManifest from "../lwql-columns-manifest.generated.json" with { type: "json" };
-import { EXPERIMENTS_OVERRIDES } from "../lwql-experiments-overrides.rules.ts";
-import { GATEWAY_OVERRIDES } from "../lwql-gateway-overrides.rules.ts";
-import { GOVERNANCE_OVERRIDES } from "../lwql-governance-overrides.rules.ts";
-import { METRICS_OVERRIDES } from "../lwql-metrics-overrides.rules.ts";
 import { LWQL_CLICKHOUSE_CATALOGUE } from "../lwql-view-catalog.rules.ts";
 
 const ALL_OVERRIDES = {

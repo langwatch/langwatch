@@ -4,7 +4,7 @@ import {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
-import { SENDER_NAME_BY_COMMAND } from "./sso-connection-ledger.store.ts";
+import { SENDER_NAME_BY_COMMAND } from "../features/sso-connection/eventing/sso-connection-ledger.store.ts";
 
 /** One pipeline command's sender, or that this process registered none for it. */
 export type IdentityPipelineCommand =

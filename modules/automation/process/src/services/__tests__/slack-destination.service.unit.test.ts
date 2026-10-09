@@ -3,7 +3,7 @@ import type { SlackConnectionSecret } from "@langwatch/slack-contract";
 import { describe, expect, it } from "vitest";
 
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
-import { SlackDestinationService } from "../slack-destination.service.ts";
+import { SlackDestinationService } from "../../features/slack/services/slack-destination.service.ts";
 
 const PROJECT = "project-1";
 const crypto = {

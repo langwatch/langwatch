@@ -3,6 +3,7 @@ import { ResourceScope } from "@langwatch/process";
 import { SecretsChain, SecretsResolver, type ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
+import { MemoryManagedProviderChannels } from "../../channels/memory/memory.managed-provider.channels.ts";
 import { ManagedProviderModule } from "../managed-provider.app.ts";
 
 const DEPLOYMENT = {
@@ -29,6 +30,7 @@ function install(environment: Record<string, string | undefined>) {
     resources: new ResourceScope(),
     secrets: secretsFrom(environment),
     dependencies: {},
+    channels: MemoryManagedProviderChannels.create(),
   });
 }
 

@@ -4,6 +4,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
@@ -50,6 +51,7 @@ async function harness(flagAnswer: boolean) {
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
     repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {

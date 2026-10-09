@@ -2,11 +2,11 @@
 import {
   Config,
   type ConfigOf,
+  gatewayAddressOf,
   gatewayLegacyUrl,
   gatewayPublicUrl,
   isSaas,
 } from "@langwatch/config";
-import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
 
 /** Where issued personal keys send traffic. */
 export const enterpriseGatewayConfig = Config.define(() => ({
@@ -25,9 +25,9 @@ export function enterpriseGatewayBaseUrl({
   config: EnterpriseGatewayConfig | undefined;
   isSaas: boolean;
 }): string {
-  return resolveGatewayBaseUrl({
-    LW_GATEWAY_PUBLIC_URL: config?.gatewayPublicUrl,
-    LW_GATEWAY_BASE_URL: config?.gatewayLegacyUrl,
-    IS_SAAS: isSaas,
+  return gatewayAddressOf({
+    publicUrl: config?.gatewayPublicUrl,
+    legacyUrl: config?.gatewayLegacyUrl,
+    isSaas,
   });
 }

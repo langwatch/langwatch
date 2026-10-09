@@ -9,8 +9,8 @@ import { createContext, useContext, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createUiModuleHostStack } from "../ui-module-hosts.tsx";
-import { UiChunkLoadFailure } from "../ui-page-fallbacks.tsx";
+import { createUiModuleHostStack } from "../module/ui-module-hosts.tsx";
+import { UiChunkLoadFailure } from "../page/ui-page-fallbacks.tsx";
 
 const ProbeHost = createContext<string | null>(null);
 

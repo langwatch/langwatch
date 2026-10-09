@@ -4,76 +4,6 @@
  * shapes the operations themselves take.
  */
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { z } from "zod";
-
-const batchTargetSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  type: z.enum(["prompt", "agent", "evaluator", "workflow", "custom"]).optional(),
-  prompt_id: z.string().optional().nullable(),
-  prompt_version: z.number().optional().nullable(),
-  agent_id: z.string().optional().nullable(),
-  evaluator_id: z.string().optional().nullable(),
-  model: z.string().optional().nullable(),
-  metadata: z
-    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-    .optional()
-    .nullable(),
-});
-
-// Copy of experiment-contract's eSBatchEvaluationRESTParamsSchema; keep in step.
-const batchEvaluationRESTParamsSchema = z.object({
-  experiment_id: z.string().optional().nullable(),
-  experiment_slug: z.string().optional().nullable(),
-  run_id: z.string(),
-  workflow_id: z.string().optional().nullable(),
-  workflow_version_id: z.string().optional().nullable(),
-  name: z.string().optional().nullable(),
-  progress: z.number().optional().nullable(),
-  total: z.number().optional().nullable(),
-  targets: z.array(batchTargetSchema).optional().nullable(),
-  dataset: z
-    .array(
-      z.object({
-        index: z.number(),
-        target_id: z.string().optional().nullable(),
-        entry: z.record(z.string(), z.unknown()),
-        predicted: z.record(z.string(), z.unknown()).optional().nullable(),
-        cost: z.number().optional().nullable(),
-        duration: z.number().optional().nullable(),
-        error: z.string().optional().nullable(),
-        trace_id: z.string().optional().nullable(),
-      }),
-    )
-    .optional(),
-  evaluations: z
-    .array(
-      z.object({
-        evaluator: z.string(),
-        name: z.string().optional().nullable(),
-        target_id: z.string().optional().nullable(),
-        status: z.enum(["processed", "skipped", "error"]),
-        index: z.number(),
-        duration: z.number().optional().nullable(),
-        inputs: z.record(z.string(), z.unknown()).optional().nullable(),
-        score: z.number().optional().nullable(),
-        label: z.string().optional().nullable(),
-        passed: z.boolean().optional().nullable(),
-        details: z.string().optional().nullable(),
-        cost: z.number().optional().nullable(),
-      }),
-    )
-    .optional(),
-  timestamps: z
-    .object({
-      created_at: z.number().optional().nullable(),
-      finished_at: z.number().optional().nullable(),
-      stopped_at: z.number().optional().nullable(),
-    })
-    .optional(),
-});
-
-type ESBatchEvaluationRESTParams = z.infer<typeof batchEvaluationRESTParamsSchema>;
 
 /**
  * What the evaluator runtime is handed. Two arms: a built-in evaluator takes
@@ -117,7 +47,12 @@ export type RunEvaluatorInput = Readonly<{
   workflowId?: string | null;
   /** Aborts the downstream judge once the caller's deadline passes or its answer is moot. */
   signal?: AbortSignal | undefined;
+  /** Set only on a guardrail check: which part of the call it judges (ADR-174 decision 16). */
+  guardrailDirection?: GuardrailCheckDirection | undefined;
 }>;
+
+/** The part of a gateway call a guardrail check judges, as the data plane names it. */
+export type GuardrailCheckDirection = "request" | "response" | "stream_chunk";
 
 /** One guardrail's evaluator run, bounded by the caller's signal and its own deadline. */
 export type GuardrailCheckInput = Readonly<{
@@ -125,6 +60,7 @@ export type GuardrailCheckInput = Readonly<{
   evaluatorType: string;
   settings: Record<string, unknown>;
   data: Readonly<{ input: string; output: string }>;
+  direction: GuardrailCheckDirection;
   /** The guardrail, and the monitor its cost is recorded against. */
   guardrail: Readonly<{ id: string; name: string; monitorId: string }>;
   signal?: AbortSignal | undefined;
@@ -170,10 +106,4 @@ export type DatasetEvaluationRow = Readonly<{
   evaluation: string;
   datasetSlug: string;
   datasetId: string;
-}>;
-
-/** What the SDK's batch result log reports, for one project. */
-export type LogBatchEvaluationInput = Readonly<{
-  projectId: string;
-  params: ESBatchEvaluationRESTParams;
 }>;

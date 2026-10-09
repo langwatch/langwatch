@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 /**
- * The backoffice licenses list: what an operator reads off a row unopened.
+ * The admin console licenses list: what an operator reads off a row unopened.
  * Spec: specs/self-hosting/connected-services/license-registry.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
@@ -64,7 +64,7 @@ function renderTable(licenses: License[]) {
 
 describe("LicensesTable", () => {
   describe("given licenses in the registry that are active, revoked and expired", () => {
-    /** @scenario The backoffice lists licenses with their state */
+    /** @scenario The admin console lists licenses with their state */
     it("shows the customer, seats, term, status, services and the instance", () => {
       renderTable([
         license({}),
@@ -91,7 +91,7 @@ describe("LicensesTable", () => {
   });
 
   describe("given a license whose install has synced", () => {
-    /** @scenario The backoffice lists licenses with their state */
+    /** @scenario The admin console lists licenses with their state */
     it("shows when it last did and the seats it reported", () => {
       renderTable([
         license({

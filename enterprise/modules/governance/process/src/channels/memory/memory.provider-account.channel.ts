@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { credentialsOf } from "../../rules/ingestion-credentials.rules.ts";
+import { credentialsOf } from "../../features/ingestion-pull/rules/ingestion-credentials.rules.ts";
 import { ProviderAccountChannel } from "../provider-account.channel.ts";
 
 /**

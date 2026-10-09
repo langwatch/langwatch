@@ -17,6 +17,23 @@ const calls = vi.hoisted(() => ({
   navigate: vi.fn(),
 }));
 
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    evaluators: {
+      getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      listByWorkflow: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/monitor-client", () => ({
+  monitorClient: {
+    monitors: {
+      getAllForProject: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
 vi.mock("../../../behavior/workflow-api.ts", () => {
   const idle = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
   return {

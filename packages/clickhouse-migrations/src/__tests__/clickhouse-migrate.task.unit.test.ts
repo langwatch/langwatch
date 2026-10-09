@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => ({
-  reconcileTTL: vi.fn(async () => undefined),
+  reconcileTTL: vi.fn(async (_options: { managedTables?: readonly string[] }) => undefined),
   runMigrations: vi.fn(async () => undefined),
   waitForClickHouse: vi.fn(async () => undefined),
 }));
@@ -143,7 +143,26 @@ describe("clickhouse-migrate task", () => {
       clusterName: "main",
       coldStorageEnabled: true,
       hotDayOverrides: { CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS: "30" },
+      managedTables: [],
       verbose: true,
+    });
+  });
+
+  describe("when the task is created with a managed table list", () => {
+    /** @scenario "The migrate task passes the list it was created with to every endpoint" */
+    it("hands that list to the reconciler for the shared and a private endpoint", async () => {
+      await ClickHouseMigrateTask.create({
+        source: {
+          CLICKHOUSE_URL: "http://shared:8123",
+          CLICKHOUSE_URL__primary__org_1: "http://private:8123",
+        },
+        managedTables: ["stored_spans", "trace_summaries"],
+      }).execute();
+
+      expect(stubs.reconcileTTL).toHaveBeenCalledTimes(2);
+      for (const [options] of stubs.reconcileTTL.mock.calls) {
+        expect(options.managedTables).toEqual(["stored_spans", "trace_summaries"]);
+      }
     });
   });
 

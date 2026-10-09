@@ -22,19 +22,21 @@ export const PROMPT_TEST_PROJECT = "project_authorized";
 export const PROMPT_TEST_ORGANIZATION = "org_1";
 
 /** The real application over a scripted engine, so the family's own operations run. */
-export function buildPromptApp(prompts: PromptService): PromptModule {
+export function buildPromptApp(
+  prompts: PromptService,
+  permissions: AuthzApi = createApiFixture<AuthzApi>(),
+): PromptModule {
   return PromptModule.createWithPrompts(
     {
       dependencies: {
         projects: createApiFixture<ProjectApi>(),
-        permissions: createApiFixture<AuthzApi>(),
+        permissions,
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
       },
-      members: { publicBaseUrl: "https://app.langwatch.test" },
       repositories: { rateLimits: MemoryPromptRateLimitRepository.create() },
-      config: undefined,
+      config: { publicBaseUrl: "https://app.langwatch.test" },
       resources: { own: () => {}, ownService: () => {} },
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     },

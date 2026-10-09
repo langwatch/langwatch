@@ -45,12 +45,6 @@ Feature: The interactive process enforces the plan's monthly allowance at its in
       Then each of its projects is counted on that project's own endpoint
       And the volume is measured against the paid plan's allowance, not the free one
 
-    @unit
-    Scenario: A team that resolves to no organization is not metered against nobody's plan
-      Given a team no organization owns
-      When the allowance is checked for it
-      Then the check refuses to answer rather than metering the traffic against nobody's plan
-
   Rule: A refusal at one door is a refusal at both
 
     @integration

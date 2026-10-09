@@ -3,12 +3,12 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs } from "@langwatch/time";
 import { LuGitCompare } from "react-icons/lu";
 
+import { useTraceEditOverlay } from "../../../../../behavior/explorer/use-trace-edit-overlay.ts";
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
-import type { TraceOverlayView } from "../../../../../behavior/trace-edit.store.ts";
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import type { TraceOverlayView } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
+import { useTraceEditStore } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { formatAbsoluteTime } from "../../../../../model/display-formatters.ts";
 import { SegmentedToggle } from "../../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
-import { useTraceEditOverlay } from "../../hooks/use-trace-edit-overlay.ts";
 import { TraceEditDiffDialog } from "../trace-edit-diff-dialog.tsx";
 
 const VIEW_OPTIONS = [

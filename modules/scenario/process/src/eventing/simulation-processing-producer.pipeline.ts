@@ -10,9 +10,9 @@ import type {
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
+import { SimulationService as SimulationServiceClass } from "../features/simulation/services/simulation.service.ts";
 import { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
 import { NullSimulationRepository } from "../repositories/simulation.repository.ts";
-import { SimulationService as SimulationServiceClass } from "../services/simulation.service.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
 import { QueueRunCommand } from "./queue-run.commands.ts";
@@ -222,14 +222,6 @@ function buildSimulationProcessingProducerPipeline(input: {
     snapshotUpdateBroadcast: {
       broadcastUpdate: () =>
         Promise.reject(producerOnly(processName, "broadcast a simulation update")),
-    },
-    suiteRunSync: {
-      recordSuiteRunItemStarted: () =>
-        Promise.reject(producerOnly(processName, "record a suite run item start")),
-      completeSuiteRunItem: () =>
-        Promise.reject(producerOnly(processName, "complete a suite run item")),
-      regradeSuiteRunItem: () =>
-        Promise.reject(producerOnly(processName, "regrade a suite run item")),
     },
     traceMetricsSync: {
       computeRunMetrics: () =>

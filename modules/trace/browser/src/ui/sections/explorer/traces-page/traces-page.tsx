@@ -6,10 +6,18 @@ import { useFilterStore, useSelectionStore } from "../../../../behavior/explorer
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { useExplorerLangyActions } from "../../../../behavior/langy/use-explorer-langy-actions.ts";
 import { SELECT_ALL_MATCHING_CAP } from "../../../../behavior/selection.slice.ts";
-import { useDismissTraceDrawer, useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
+import { useTraceListExport } from "../../../../features/explorer/behavior/use-trace-list-export.ts";
+import { useTraceListQuery } from "../../../../features/explorer/behavior/use-trace-list-query.ts";
+import { useLensFilterDirtySync } from "../../../../features/facet/behavior/use-lens-filter-dirty-sync.ts";
+import { useLensSync } from "../../../../features/facet/behavior/use-lens-sync.ts";
+import { useInstantEvalRunWatch } from "../../../../features/instant-eval/behavior/use-instant-eval-run-watch.ts";
 import { ExportProgress } from "../../../elements/explorer/export-progress.tsx";
 import { SidebarResizeHandle } from "../../../elements/explorer/filter-sidebar/sidebar-resize-handle.tsx";
 import { SampleDataBanner } from "../../../elements/explorer/onboarding/sample-data-banner.tsx";
@@ -19,16 +27,9 @@ import { FindBar } from "../../trace-find-bar.tsx";
 import { DensityProvider } from "../density-provider.tsx";
 import { ExportConfigDialog } from "../export-config-dialog.tsx";
 import { FilterSidebar } from "../filter-sidebar/filter-sidebar.tsx";
-import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
-import { useInstantEvalRunWatch } from "../hooks/use-instant-eval-run-watch.ts";
-import { useLensFilterDirtySync } from "../hooks/use-lens-filter-dirty-sync.ts";
-import { useLensSync } from "../hooks/use-lens-sync.ts";
 import { useResetSelectionOnViewChange } from "../hooks/use-reset-selection-on-view-change.ts";
 import { useRollingTimeRange } from "../hooks/use-rolling-time-range.ts";
-import { useTraceDrawerUrlHydrator } from "../hooks/use-trace-drawer-url-hydrator.ts";
 import { useTraceFreshness } from "../hooks/use-trace-freshness.ts";
-import { useTraceListExport } from "../hooks/use-trace-list-export.ts";
-import { useTraceListQuery } from "../hooks/use-trace-list-query.ts";
 import { useURLSync } from "../hooks/use-url-sync.ts";
 import { InstantEvalProgressBanner } from "../instant-eval-progress-banner.tsx";
 import { useFirstTraceSpotlightTrigger } from "../onboarding/hooks/use-first-trace-spotlight-trigger.ts";
@@ -37,10 +38,8 @@ import { SpotlightOverlay } from "../onboarding/spotlights/spotlight-overlay.tsx
 import { SearchBar } from "../search-bar/search-bar.tsx";
 import { BulkActionBar } from "../toolbar/bulk-action-bar.tsx";
 import { Toolbar } from "../toolbar/toolbar.tsx";
-import { TraceV2DrawerShell } from "../trace-drawer/index.ts";
 import { TraceTable } from "../trace-table/trace-table.tsx";
 import { EmptyResultsPane } from "./empty-results-pane.tsx";
-import { ExplorerLangyActions } from "./explorer-langy-actions.tsx";
 import { IntegratePane } from "./integrate-pane.tsx";
 import { PageKeyboardShortcuts } from "./page-keyboard-shortcuts.tsx";
 import { useDebouncedFilterCommit } from "./use-debounced-filter-commit.ts";
@@ -52,6 +51,20 @@ import {
   useSidebarShortcut,
 } from "./use-keyboard-shortcuts.ts";
 import { useTracesPageTitle } from "./use-page-title.ts";
+
+/**
+ * Publishes the Explorer's actions for as long as the page is open, through
+ * the host the application mounted — the page never reaches the agent itself.
+ * @see specs/langy/langy-trace-explorer-actions.feature
+ */
+export const ExplorerLangyActions: React.FC = () => {
+  const host = useOptionalTraceHost();
+  const handlers = useExplorerLangyActions();
+
+  useEffect(() => host?.registerLangyActions(handlers), [host, handlers]);
+
+  return null;
+};
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_MAX = 640;
@@ -82,11 +95,6 @@ export const TracesPage: React.FC = () => {
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
   useLensSync();
-  // URL → drawer store sync so a deep link / browser-back still opens
-  // the drawer. The actual mount decision is in this component (see
-  // `traceDrawerMounted` below), so the click → render path doesn't
-  // wait for React Router to commit the URL change.
-  useTraceDrawerUrlHydrator();
   useSidebarShortcut();
   useFindShortcut();
   useShortcutsHelpShortcut();
@@ -216,7 +224,6 @@ export const TracesPage: React.FC = () => {
           </HStack>
           <ExplorerLangyActions />
           <PageKeyboardShortcuts />
-          <TraceDrawerMount />
         </VStack>
         {/* Phase 2 spotlight tour overlay — floats above the page,
             non-modal. Activated by the "Show me around" toolbar button
@@ -247,16 +254,6 @@ const PaneFader: React.FC<{
     {children}
   </motion.div>
 );
-
-/**
- * Optimistic drawer mount. Reads `traceId` straight from the drawer store so a click →
- * store-update → render lands in the same frame.
- */
-const TraceDrawerMount: React.FC = () => {
-  const hasTrace = useTraceDrawer((s) => !!s.traceId);
-  if (!hasTrace) return null;
-  return <TraceV2DrawerShell />;
-};
 
 const FilterAside: React.FC<{
   dimmed?: boolean;

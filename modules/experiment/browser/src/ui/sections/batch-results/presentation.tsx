@@ -1,10 +1,9 @@
 import { isImageAttachmentRef } from "@langwatch/dataset-contract";
 import { Box } from "@langwatch/design-system/primitives";
-import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
+import { format, formatDistanceToNow, nowInstant, readableDate } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { readableDate } from "../../../model/display-formatters.ts";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 
 export type BatchCellFailure = {

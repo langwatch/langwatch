@@ -9,13 +9,14 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
@@ -34,6 +35,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
       signUpMode: "open",
@@ -42,10 +44,11 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
     },
     repositories,
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: createApiFixture<UserApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
-      identity: createApiFixture<IdentityApi>(),
+      identity: createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -56,14 +59,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      prisma: createApiFixture<PrismaClient>(),
-      redis: createApiFixture(),
-      identityEmails: void 0,
-      invites: null,
-      processName: "langwatch-api",
-    },
+    channels: MemoryAuthChannels.create(),
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });

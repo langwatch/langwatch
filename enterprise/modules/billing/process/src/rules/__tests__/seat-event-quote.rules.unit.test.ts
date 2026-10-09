@@ -4,14 +4,13 @@ import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
  * resemble it: money figures come off the invoice deterministically, apply
  * at the instant priced, and an expired quote is refused, never repriced.
  */
-import type Stripe from "stripe";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   QUOTE_VALIDITY_SECONDS,
   quotedAmounts,
   resolveProrationDate,
-  seatChangeParams,
+  seatChange,
 } from "../seat-event-quote.rules.ts";
 
 afterEach(() => {
@@ -21,14 +20,14 @@ afterEach(() => {
 describe("quotedAmounts", () => {
   describe("when the change costs the customer money", () => {
     it("reports the amount actually due and the credit that covered the rest", () => {
-      expect(quotedAmounts({ total: 5000, amount_due: 3000 } as Stripe.Invoice)).toEqual({
+      expect(quotedAmounts({ total: 5000, amountDue: 3000 })).toEqual({
         prorationCents: 3000,
         creditAppliedCents: 2000,
       });
     });
 
     it("reports no credit applied on a clean account", () => {
-      expect(quotedAmounts({ total: 5000, amount_due: 5000 } as Stripe.Invoice)).toEqual({
+      expect(quotedAmounts({ total: 5000, amountDue: 5000 })).toEqual({
         prorationCents: 5000,
         creditAppliedCents: 0,
       });
@@ -37,7 +36,7 @@ describe("quotedAmounts", () => {
 
   describe("when the change credits the customer", () => {
     it("reports the signed total and draws no credit down", () => {
-      expect(quotedAmounts({ total: -2500, amount_due: 0 } as Stripe.Invoice)).toEqual({
+      expect(quotedAmounts({ total: -2500, amountDue: 0 })).toEqual({
         prorationCents: -2500,
         creditAppliedCents: 0,
       });
@@ -45,34 +44,34 @@ describe("quotedAmounts", () => {
   });
 });
 
-describe("seatChangeParams", () => {
-  const seatItem = { id: "si_1" } as Stripe.SubscriptionItem;
+describe("seatChange", () => {
+  const seatItem = { id: "si_1" };
 
   it("prices the change at the quoted instant and invoices it immediately", () => {
     expect(
-      seatChangeParams({
-        stripeSubscription: { canceled_at: null } as Stripe.Subscription,
+      seatChange({
+        subscription: { canceledAt: null },
         seatItem,
         quantity: 7,
         prorationDate: 1_700_000_000,
       }),
     ).toEqual({
       items: [{ id: "si_1", quantity: 7 }],
-      proration_behavior: "always_invoice",
-      proration_date: 1_700_000_000,
+      prorationBehavior: "always_invoice",
+      prorationDate: 1_700_000_000,
     });
   });
 
   describe("when the subscription was set to cancel", () => {
     it("also lifts the cancellation, so the seats bought are actually billed", () => {
-      const params = seatChangeParams({
-        stripeSubscription: { canceled_at: 1_699_000_000 } as Stripe.Subscription,
+      const change = seatChange({
+        subscription: { canceledAt: 1_699_000_000 },
         seatItem,
         quantity: 2,
         prorationDate: 1_700_000_000,
       });
 
-      expect(params.cancel_at_period_end).toBe(false);
+      expect(change.cancelAtPeriodEnd).toBe(false);
     });
   });
 });

@@ -19,7 +19,7 @@ import { defineTrpcContract, SCHEMA_HASH_HEADER, schemaHashesOf } from "@langwat
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createUiQueryClient } from "../query-client.ts";
+import { createUiQueryClient } from "../wire/query-client.ts";
 
 const memberSchema = z.object({ id: z.string() });
 const organizationTrpc = defineTrpcContract("organization")

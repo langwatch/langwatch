@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant } from "@langwatch/time";
 
 import type {
   GdprOrganizationRow,
@@ -7,6 +8,7 @@ import type {
   GdprUser,
   GdprUserDataEraseRepository,
 } from "../user-data-erase.repository.ts";
+import { PrismaUserLifecycleOutboxStore } from "./prisma.user-lifecycle-outbox.store.ts";
 
 /**
  * Exactly the model delegate methods this task calls, picked from the real `PrismaClient`
@@ -61,7 +63,11 @@ type GdprUserDataEraseDatabase = {
 
 /** The erasure's queries over the raw `GdprUserDataEraseDatabase` delegates. */
 export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepository {
-  private constructor(private readonly database: GdprUserDataEraseDatabase) {}
+  readonly #facts: PrismaUserLifecycleOutboxStore;
+
+  private constructor(private readonly database: GdprUserDataEraseDatabase) {
+    this.#facts = PrismaUserLifecycleOutboxStore.create({ database });
+  }
 
   static create({
     database,
@@ -286,6 +292,14 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
         await tx.account.deleteMany({ where: { userId } });
         await tx.session.deleteMany({ where: { userId } });
         await tx.user.delete({ where: { id: userId } });
+        // Committed with the erase, so a rolled-back erase records no erased fact.
+        const occurredAt = nowInstant().epochMilliseconds;
+        await this.#facts.append({
+          userId,
+          transaction: tx,
+          now: occurredAt,
+          intents: [{ type: "recordErased", data: { tenantId: userId, userId, occurredAt } }],
+        });
       },
       { timeout: 120_000, maxWait: 30_000 },
     );

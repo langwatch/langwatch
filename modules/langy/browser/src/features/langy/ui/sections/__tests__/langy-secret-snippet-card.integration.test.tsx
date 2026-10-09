@@ -34,12 +34,12 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
 }));
 
 import { useLangySecretRevealStore } from "../../../../../behavior/langy-secret-reveal.store.ts";
-import type { LangySecretSnippetCall } from "../../../../../model/langy-secret-snippet-tool.ts";
+import type { LangySecretSnippetCall } from "../../../../tools/model/langy-secret-snippet-tool.ts";
 import {
   LANGY_SECRET_GONE_LINE,
   LANGY_SECRET_SHOWN_ONCE_LINE,
   LangySecretSnippetCard,
-} from "../../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
+} from "../../../../tools/ui/sections/langy-secret-snippet-card.tsx";
 
 const SECRET = "vk-lw-01HZX9NABCDEFGHJKMNPQRSTVW";
 const TEMPLATE =

@@ -8,8 +8,8 @@ import {
   useDraft,
   useFurthestWizardStep,
   useWizardStep,
+  useAutomationStore,
 } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
 import { CLIENT_PROVIDERS } from "./client-providers.ts";
 import { DeliveryStep } from "./delivery-step.tsx";
 import { ReviewStep } from "./review-step.tsx";

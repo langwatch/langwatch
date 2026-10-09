@@ -1380,6 +1380,17 @@ model IssuedLicense {
   @@index([seatsRaisedFrom])
 }
 
+/// The licence an organization activated and its dates, owned by licensing
+/// (round 37 D6). A row whose key is null is a cleared licence. An organization
+/// with no row is read from its Organization columns until the copy step runs.
+model OrganizationLicense {
+  organizationId String    @id
+  licenseKey     String?   @db.Text
+  expiresAt      DateTime?
+  validatedAt    DateTime?
+  updatedAt      DateTime  @default(now()) @updatedAt
+}
+
 /// A short code a fresh install pastes instead of a license blob (ADR-139,
 /// section 5). Redeeming it mints the license the code describes and returns
 /// it signed, which is what identifies a new customer without anybody emailing
@@ -1723,6 +1734,28 @@ model ScimSyncState {
   @@index([organizationId])
   @@index([state])
   @@index([connectionId])
+}
+
+/// SCIM's own copy of an organization's SSO connections: a peer fold over
+/// identity's connection facts (ARCHITECTURE §9), folded with identity-contract's
+/// reducer, one row per connection. SCIM reads this instead of asking identity.
+/// Rebuilt from identity's event log by a projection replay, so no relation:
+/// a foreign key would make a replay depend on state the log does not carry.
+model ScimSsoConnectionView {
+  /// The aggregate: identity's connection id.
+  id                String   @id
+  organizationId    String
+  /// The connection as the reducer folded it (SsoConnectionState + LastEventOccurredAt).
+  folded            Json
+  /// The event ids of the last delivery folded in, so a redelivery folds once.
+  appliedEventIds   String[] @default([])
+  /// A row of another version reads as undecodable and is re-folded from the log.
+  projectionVersion String
+  /// Event-derived, so a replayed row equals the row it rebuilds.
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, createdAt])
 }
 
 enum PlanTypes {
@@ -2410,7 +2443,6 @@ model SlackIntegration {
   updatedById         String
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @default(now()) @updatedAt
-  claims              SlackConnectionClaim[]
 
   @@unique([organizationId, scopeType, scopeId, secretFingerprint])
   @@index([scopeType, scopeId])
@@ -2419,9 +2451,9 @@ model SlackIntegration {
 /// An automation holding a Slack connection in use (ARCHITECTURE.md §3, the
 /// claims ruling): a claimed connection is never deleted. `projectId` is the
 /// claimant's project; `organizationId` is the connection's tenancy anchor.
+/// No foreign key: slack's service refuses to delete a claimed connection.
 model SlackConnectionClaim {
   connectionId   String
-  connection     SlackIntegration @relation(fields: [connectionId], references: [id], onDelete: Restrict)
   claimantId     String
   claimantLabel  String
   organizationId String
@@ -2474,6 +2506,10 @@ model WebhookEndpoint {
   sqsAccessKeyId              String?
   sqsSecretAccessKeyEncrypted String?
   secretEncrypted             String
+  /// How deliveries are formatted and signed. Null: the batch envelope signed
+  /// `t=,v1=`. `legacy_sha256`: one raw message per POST signed `sha256=`, kept
+  /// only for endpoints migrated from governance anomaly destinations.
+  signatureScheme             String?
   /// The secret this endpoint signed with before the last roll. Deliveries
   /// carry a second `v1=` computed from it until it expires, so a receiver
   /// swaps secrets on its own schedule instead of dropping deliveries in the
@@ -3527,6 +3563,64 @@ model DataPrivacyPolicy {
   @@index([scopeType, scopeId])
 }
 
+// Data privacy's fold of where each project sits, from project's lifecycle facts (record §5;
+// Alex, 2026-10-06). Each column group keeps its newest fact; no relation to Project.
+model DataPrivacyProjectScope {
+  projectId            String    @id
+  organizationId       String
+  teamId               String?
+  isPersonal           Boolean?
+  departmentId         String?
+  teamRecordedAt       DateTime?
+  departmentRecordedAt DateTime?
+  archivedAt           DateTime?
+  updatedAt            DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId])
+}
+
+// Data retention's copy of where each project sits, a peer fold over project's lifecycle facts
+// (Alex, 2026-10-06, Q151 Q1); updatedAt is the newest fact's time. No relation to Project.
+model DataRetentionProjectScope {
+  projectId      String    @id
+  organizationId String
+  teamId         String?
+  teamRecordedAt DateTime?
+  archivedAt     DateTime?
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId])
+  @@index([teamId])
+}
+
+// The Instant Evals judge's copy of each project's organization, folded from project's
+// lw.project.created (ADR-174 decision 13). No relation to Project.
+model InstantEvalJudgeProject {
+  projectId      String   @id
+  organizationId String
+  createdAt      DateTime
+}
+
+// The judge's copy of whether an organization is usage-billed, folded from billing's event or
+// the catch-up. The newest occurredAt wins; a real fact wins a tie (ADR-174 decision 17).
+model InstantEvalJudgeUsageBilling {
+  organizationId String   @id
+  usageBilled    Boolean
+  occurredAt     DateTime
+  fromCatchUp    Boolean
+}
+
+// The judge's own spend, one row per request, never rewritten. The organization's total is
+// the sum of its rows; the key's leading organizationId serves that sum (ADR-174 decision 13).
+model InstantEvalJudgeSpend {
+  organizationId String
+  requestId      String
+  spendNanoUsd   BigInt
+  occurredAt     DateTime
+
+  @@id([organizationId, requestId])
+}
+
 enum CustomLLMModelCostScopeType {
   ORGANIZATION
   TEAM
@@ -3666,6 +3760,9 @@ model AuditLog {
   targetId   String?
   before     Json?
   after      Json?
+
+  /// A producer's outbox key: a redelivered audit intent finds its row here (Alex, audit R2).
+  idempotencyKey String? @unique
 
   @@index([createdAt])
   @@index([userId])
@@ -4189,7 +4286,7 @@ model RoleBinding {
   updatedAt DateTime @default(now()) @updatedAt
 
   // No uniqueness: the same principal, role and scope may be bound twice
-  // (20261002120011_role_name_live_unique_bindings_not_unique).
+  // (20261006170512_role_name_live_unique_bindings_not_unique).
   @@index([organizationId])
   @@index([userId])
   @@index([groupId])
@@ -4329,7 +4426,7 @@ model Role {
   updatedAt      DateTime  @default(now()) @updatedAt
   // A delete marks the row and frees the name. A name is unique among live
   // roles only: a partial unique index WHERE "deletedAt" IS NULL, raw SQL in
-  // 20261002120011_role_name_live_unique_bindings_not_unique.
+  // 20261006170512_role_name_live_unique_bindings_not_unique.
   deletedAt      DateTime?
 
   @@index([organizationId])
@@ -4408,9 +4505,9 @@ model ApiKey {
   // inside a transaction and this repo has no non-transactional setup, so it
   // could not be built CONCURRENTLY — and a plain CREATE INDEX takes a SHARE
   // lock that blocks WRITES on this table for the whole build. ApiKey is on
-  // the authorization hot path (`ApiKeyService.markUsed` fires a
-  // fire-and-forget `update({ lastUsedAt })` after every authorized request,
-  // including trace ingest, and `create` runs on every Langy session-key
+  // the authorization hot path (`ApiKeyService.markUsed` writes `lastUsedAt`
+  // at most once per key per minute per process, on requests including trace
+  // ingest, and `create` runs on every Langy session-key
   // mint), so that lock is a deploy-time stall on customer traffic. Paying it
   // to speed up an HOURLY background sweep is the wrong trade, and telling
   // each operator to pre-build the index by hand is not an upgrade-safe
@@ -6259,6 +6356,34 @@ model GatewayRealtimeSession {
   // what the two are compared against when they disagree.
   vendorCostRaw Json?
 
+  // What the session is and so how it is priced: "realtime", "live",
+  // "convai", "tts_socket" or "stt_socket". NULL on a row an older gateway
+  // booked, which settles the way it did before the column existed.
+  kind String?
+
+  // Who measures the usage: "client" (the caller reports it) or "gateway"
+  // (the gateway relayed or observed the socket and reports every response).
+  metering String?
+
+  // When the minted credential stops opening a socket. With the mint time it
+  // bounds how long an unreported call can have run.
+  credentialExpiresAt DateTime?
+
+  // The catalog id that prices input transcription usage, when the session
+  // declared one.
+  transcriptionModel String?
+
+  // The end user the mint was attributed to. Every spend record of the
+  // session carries it, so a per-end-user budget is debited by voice usage.
+  endUserId String?
+
+  // The usage reports recorded while the session ran. Each one is its own
+  // spend record, so these three are a running total for reads and never the
+  // source the ledger is debited from.
+  lastReportAt        DateTime?
+  reportedCostNanoUsd BigInt    @default(0)
+  reportCount         Int       @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -6272,6 +6397,32 @@ model GatewayRealtimeSession {
   @@index([virtualKeyId, status, mintedAt])
   // The fallback match, and the expiry sweep.
   @@index([projectId, status, mintedAt])
+  // The settlement sweep: metered sessions past the window, across tenants.
+  @@index([status, metering, mintedAt])
+}
+
+// One usage report of a realtime voice session: a model response, a
+// transcription item, the closing report or the estimate for a session that
+// never reported. Each row is one spend record, `<sessionId>.<reportKey>`,
+// and the unique key is what makes a redelivered report count once.
+model GatewayRealtimeSessionReport {
+  id        String @id @default(nanoid())
+  sessionId String
+  reportKey String
+  projectId String
+
+  // The catalog id this report was priced under: the session's own model, or
+  // the transcription model for a transcription item.
+  model String
+
+  // The quantities as rated, in the spend usage vocabulary.
+  usage       Json
+  costNanoUsd BigInt
+
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, reportKey])
+  @@index([projectId])
 }
 
 // One record per (migration, tenant) for the in-place system migrations
@@ -6822,41 +6973,4 @@ model WebPushVapidKey {
   /// The private key, base64url, encrypted with the process encryption key.
   privateKeyEncrypted String
   createdAt           DateTime @default(now())
-}
-
-/// The upgrade ledger (packages/upgrade): runner-owned infrastructure beside _prisma_migrations,
-/// created by the runner with CREATE TABLE IF NOT EXISTS before any step. @@ignore keeps it out
-/// of the client, so no module can claim it; the model exists so `prisma migrate dev` sees no drift.
-model LangwatchUpgradeRun {
-  id         String    @id
-  kind       String
-  release    String?
-  startedAt  DateTime  @map("started_at")
-  finishedAt DateTime? @map("finished_at")
-  outcome    String?
-  plan       Json?
-  report     Json?
-
-  @@map("_langwatch_upgrade_run")
-  @@ignore
-}
-
-/// One row per step of every kind the upgrade ledger knows; see LangwatchUpgradeRun.
-model LangwatchUpgradeStep {
-  id         String    @id
-  kind       String
-  release    String?
-  mode       String
-  status     String
-  inferred   Boolean   @default(false)
-  attempt    Int       @default(0)
-  lastError  String?   @map("last_error")
-  report     Json?
-  runId      String?   @map("run_id")
-  startedAt  DateTime? @map("started_at")
-  finishedAt DateTime? @map("finished_at")
-  updatedAt  DateTime  @map("updated_at")
-
-  @@map("_langwatch_upgrade_step")
-  @@ignore
 }

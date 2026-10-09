@@ -11,16 +11,17 @@ import type { PresenceApi } from "@langwatch/presence-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentModule } from "../../app/experiment.app.ts";
+import { ExperimentWorkbenchPresenceUpdatesService } from "../../features/workbench/services/experiment-workbench-presence-updates.service.ts";
 import type { ExperimentDspyRetentionRepository } from "../../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentDspyRepository } from "../../repositories/experiment-dspy.repository.ts";
 import type { ExperimentRunRepository } from "../../repositories/experiment-run.repository.ts";
 import type { ExperimentRepository } from "../../repositories/experiment.repository.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
-import { ExperimentWorkbenchPresenceUpdatesService } from "../../services/experiment-workbench-presence-updates.service.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
 import { mountExperimentRest, PROJECT_ID } from "./experiment-rest.harness.ts";
 
@@ -53,6 +54,7 @@ function createOverRest() {
       workflows: createApiFixture<WorkflowApi>(),
       dataset: createApiFixture<DatasetApi>(),
     },
+    traces: createApiFixture<TraceApi>(),
     updates: ExperimentWorkbenchPresenceUpdatesService.create({
       presence: createApiFixture<PresenceApi>({ publishProjectEvent }),
       logger: createTestLogger().logger,

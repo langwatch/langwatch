@@ -1,31 +1,34 @@
 import {
   CustomerCreationRaceError,
+  OrganizationNotFoundError,
   UserEmailRequiredError,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type Stripe from "stripe";
+
+import type { StripeCustomersChannel } from "../channels/stripe-customers.channel.ts";
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 
 const logger = createLogger("langwatch:billing:customerService");
 
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
-/**
- * The two organization reads billing does, named.
- */
+/** The checkout's read of organization's shared table, and the one claim billing writes there. */
 type BillingProfileSource = Pick<
-  OrganizationService,
-  "getBillingProfile" | "claimBillingCustomerId"
+  BillingAccountFactsRepository,
+  "findBillingProfile" | "claimStripeCustomerId"
 >;
 
 export class CustomerService {
   private constructor(
-    private readonly stripe: Stripe,
+    private readonly customers: StripeCustomersChannel,
     private readonly organizations: BillingProfileSource,
   ) {}
 
-  static create(options: { stripe: Stripe; organizations: BillingProfileSource }): CustomerService {
-    return new CustomerService(options.stripe, options.organizations);
+  static create(options: {
+    customers: StripeCustomersChannel;
+    organizations: BillingProfileSource;
+  }): CustomerService {
+    return new CustomerService(options.customers, options.organizations);
   }
 
   async getOrCreateCustomerId(params: {
@@ -33,26 +36,25 @@ export class CustomerService {
     organizationId: string;
   }): Promise<string> {
     const { user, organizationId } = params;
-    const organization = await this.organizations.getBillingProfile({
-      organizationId,
-    });
+    const organization = await this.organizations.findBillingProfile(organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
 
-    if (organization.billingCustomerId) {
-      return organization.billingCustomerId;
+    if (organization.stripeCustomerId) {
+      return organization.stripeCustomerId;
     }
 
     if (!user.email) {
       throw new UserEmailRequiredError();
     }
 
-    const customer = await this.stripe.customers.create({
+    const customer = await this.customers.createCustomer({
       email: user.email,
       name: organization.name,
     });
 
-    const claimed = await this.organizations.claimBillingCustomerId({
+    const claimed = await this.organizations.claimStripeCustomerId({
       organizationId,
-      billingCustomerId: customer.id,
+      stripeCustomerId: customer.id,
     });
 
     if (!claimed) {
@@ -65,7 +67,7 @@ export class CustomerService {
         "[billing] Stripe customer race detected, cleaning up orphan",
       );
       try {
-        await this.stripe.customers.del(customer.id);
+        await this.customers.deleteCustomer({ customerId: customer.id });
       } catch (error) {
         logger.warn(
           {
@@ -77,14 +79,12 @@ export class CustomerService {
         );
       }
 
-      const refreshed = await this.organizations.getBillingProfile({
-        organizationId,
-      });
-      if (!refreshed.billingCustomerId) {
+      const refreshed = await this.organizations.findBillingProfile(organizationId);
+      if (!refreshed?.stripeCustomerId) {
         throw new CustomerCreationRaceError();
       }
 
-      return refreshed.billingCustomerId;
+      return refreshed.stripeCustomerId;
     }
 
     return customer.id;

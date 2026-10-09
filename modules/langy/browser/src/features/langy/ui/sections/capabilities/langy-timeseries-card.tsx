@@ -24,8 +24,8 @@ import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { api } from "../../../../../behavior/langy-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import type { CapabilityCardInput } from "../../../../../model/langy-capability-registry.ts";
 import { formatMoneyShort, Money } from "../../../../../ui/elements/langy-money.tsx";
-import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry.ts";
 import { LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 interface TimeseriesPoint {

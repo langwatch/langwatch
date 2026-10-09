@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  * @see specs/scenarios/scenario-run-parameters.feature
+ * @see modules/suite/specs/suite-service.feature
  */
 import {
   bindRestMiddleware,
@@ -89,7 +90,8 @@ function buildApi(run: (...args: never[]) => unknown) {
   };
 }
 
-const runResult: SuiteRunResult = {
+const runResult: SuiteRunResult & { planSlug: string } = {
+  planSlug: "nightly",
   batchRunId: "batch_1",
   setId: "set_1",
   jobCount: 3,
@@ -111,6 +113,21 @@ describe("POST /api/suites/:id/run", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body).toMatchObject({ scheduled: true, batchRunId: "batch_1", jobCount: 3 });
+    });
+  });
+
+  describe("when a suite run is answered", () => {
+    /** @scenario "A suite run answers with the slug of the plan it ran" */
+    it("carries the plan slug in the response body", async () => {
+      const run = vi.fn().mockResolvedValue(runResult);
+      const api = buildApi(run);
+
+      const response = await api.fetch("/api/suites/suite_1/run", {
+        idempotencyKey: "request_1",
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ planSlug: "nightly" });
     });
   });
 

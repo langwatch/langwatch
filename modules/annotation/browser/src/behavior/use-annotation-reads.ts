@@ -1,5 +1,7 @@
 /** The reads the annotation screens share, one hook per procedure. */
 
+import { useMemo } from "react";
+
 import type { AnnotationPeriodMoment } from "../model/annotation-period.ts";
 import { annotationApi } from "./annotation-api.ts";
 
@@ -70,15 +72,61 @@ export function useAllAnnotations({
   projectId,
   startDate,
   endDate,
+  enabled = true,
 }: {
   projectId: string | undefined;
   startDate: AnnotationPeriodMoment;
   endDate: AnnotationPeriodMoment;
+  enabled?: boolean;
 }) {
   return annotationApi.annotation.getAll.useQuery(
     { projectId: projectId ?? "", startDate, endDate },
-    { enabled: !!projectId },
+    { enabled: enabled && !!projectId },
   );
+}
+
+/** Trace ids per request: queries travel as GET, so a long id list must split. */
+const TRACE_ID_CHUNK = 50;
+
+/** Everything said about a set of traces, anchored comments included, in URL-safe chunks. */
+export function useAnnotationsByTraceIds({
+  projectId,
+  traceIds,
+  enabled,
+}: {
+  projectId: string | undefined;
+  traceIds: readonly string[];
+  enabled: boolean;
+}) {
+  const chunks = useMemo(() => {
+    const unique = [...new Set(traceIds)].toSorted();
+    const out: string[][] = [];
+    for (let at = 0; at < unique.length; at += TRACE_ID_CHUNK) {
+      out.push(unique.slice(at, at + TRACE_ID_CHUNK));
+    }
+    return out;
+  }, [traceIds]);
+
+  const results = annotationApi.useQueries((t) =>
+    chunks.map((ids) =>
+      t.annotation.getByTraceIds(
+        { projectId: projectId ?? "", traceIds: ids, anchor: "all" },
+        { enabled: enabled && !!projectId },
+      ),
+    ),
+  );
+
+  // useQueries answers a new array every render; the data changes only with a chunk or an answer.
+  const answeredAt = results.map((result) => result.dataUpdatedAt).join(",");
+  const flattened = results.flatMap((result) => result.data ?? []);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- keyed on what the answers are
+  const data = useMemo(() => flattened, [chunks, answeredAt]);
+
+  return {
+    data,
+    isLoading: enabled && results.some((result) => result.isLoading),
+    isError: results.some((result) => result.isError),
+  };
 }
 
 /** The traces behind a set of annotations. */

@@ -169,9 +169,9 @@ describe("DatasetFileReaderService", () => {
       it("refuses it as an unsupported format", async () => {
         const file = pieces("[{");
 
-        await expect(
-          rowsOf(reader(), { bytes: file.body, format: "json" }),
-        ).rejects.toMatchObject({ kind: "unsupported_format" });
+        await expect(rowsOf(reader(), { bytes: file.body, format: "json" })).rejects.toMatchObject({
+          kind: "unsupported_format",
+        });
       });
     });
   });

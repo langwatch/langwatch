@@ -1,7 +1,7 @@
 import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { ACTIVATION_CODE_STATUS_COLORS, type ActivationCode } from "../../model/activation-code.ts";
-import { EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
+import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 
 const COLUMN_COUNT = 8;
 

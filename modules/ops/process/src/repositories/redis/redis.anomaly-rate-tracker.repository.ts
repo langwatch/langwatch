@@ -1,9 +1,7 @@
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
 import { AnomalyRateTrackerRepository } from "../anomaly.repository.ts";
 
 const logger = createLogger("langwatch:observability:tenantRateTracker");
@@ -20,7 +18,6 @@ export class RedisAnomalyRateTrackerRepository extends AnomalyRateTrackerReposit
   private constructor(
     private readonly redis: IORedis | Cluster,
     private readonly now: () => number,
-    private readonly featureFlags: FeatureFlagApi | undefined,
   ) {
     super();
   }
@@ -28,21 +25,12 @@ export class RedisAnomalyRateTrackerRepository extends AnomalyRateTrackerReposit
   static create(options: {
     redis: IORedis | Cluster;
     now?: (() => number) | undefined;
-    featureFlags?: FeatureFlagApi | undefined;
   }): RedisAnomalyRateTrackerRepository {
-    return new RedisAnomalyRateTrackerRepository(
-      options.redis,
-      options.now ?? Date.now,
-      options.featureFlags,
-    );
+    return new RedisAnomalyRateTrackerRepository(options.redis, options.now ?? Date.now);
   }
 
   async record(tenantId: string, count = 1): Promise<void> {
     if (!tenantId) {
-      return;
-    }
-
-    if (await this.isKilledForTenant(tenantId)) {
       return;
     }
 
@@ -171,26 +159,6 @@ export class RedisAnomalyRateTrackerRepository extends AnomalyRateTrackerReposit
         },
         "TenantRateTracker.setCachedBaseline failed (non-fatal)",
       );
-    }
-  }
-
-  /**
-   * The same per-tenant switch the detector reads, resolved on the hot path so
-   * a killed tenant costs no Redis write. A `system` target carries no
-   * identity, so a rule naming one project would match nobody here too.
-   */
-  private async isKilledForTenant(tenantId: string): Promise<boolean> {
-    if (!this.featureFlags) {
-      return false;
-    }
-
-    try {
-      return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
-        kind: "project",
-        projectId: tenantId,
-      });
-    } catch {
-      return false;
     }
   }
 

@@ -1,11 +1,8 @@
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 /**
  * @vitest-environment node
  * Trace application rules: full resolution on content-consuming reads,
@@ -20,7 +17,8 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
+import type { TraceSpanCostSuggestion } from "../../features/span/services/span-cost-suggestion.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
@@ -123,6 +121,7 @@ function harness(
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
+        findTraceCosts: async () => [],
       },
       read: read as TraceLegacyRead,
       spans: spans as TracesSpanReader,
@@ -135,15 +134,13 @@ function harness(
       editOverlay: {} as TraceEditOverlayStore,
       changeTraceName: async () => undefined,
     },
-    topics: {} as TopicApi,
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no read in this suite subscribes");
       },
       cleanupTenantEmitter: () => undefined,
     },
-    evaluations: {} as EvaluationApi,
-    codingAgents: {} as CodingAgentApi,
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,

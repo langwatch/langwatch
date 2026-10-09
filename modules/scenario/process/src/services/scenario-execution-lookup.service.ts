@@ -11,13 +11,8 @@ import {
   parseCallerVoiceConfig,
   type CallerVoiceConfig,
 } from "@langwatch/scenario-contract";
-import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
 import type { ScenarioService } from "./scenario.service.ts";
-
-export type RunSuite =
-  | { found: true; suite: Suite }
-  | { found: false; reason: "not_a_suite_set" | "suite_missing" };
 
 type FetchProjectResult =
   | { success: true; data: { id: string } }
@@ -27,7 +22,6 @@ export class ScenarioExecutionLookupService {
   static create(options: {
     scenarios: ScenarioService;
     projects: ProjectApi;
-    suites: SuiteApi;
     modelProviders: ModelProviderApi;
   }): ScenarioExecutionLookupService {
     return new ScenarioExecutionLookupService(options);
@@ -37,7 +31,6 @@ export class ScenarioExecutionLookupService {
     private readonly options: {
       scenarios: ScenarioService;
       projects: ProjectApi;
-      suites: SuiteApi;
       modelProviders: ModelProviderApi;
     },
   ) {}
@@ -116,17 +109,6 @@ export class ScenarioExecutionLookupService {
     }
 
     return { success: true, data: { id: project.id } };
-  }
-
-  async getRunSuite({ setId, projectId }: { setId: string; projectId: string }): Promise<RunSuite> {
-    const suiteId = extractSuiteId(setId);
-    if (!suiteId) {
-      return { found: false, reason: "not_a_suite_set" };
-    }
-
-    const [suite] = await this.options.suites.listByIds({ ids: [suiteId], projectId });
-
-    return suite ? { found: true, suite } : { found: false, reason: "suite_missing" };
   }
 
   async resolveModel({

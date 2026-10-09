@@ -166,6 +166,25 @@ Feature: The local development topology
     And the go lane keeps only the gateway and the NLP engine, so load on a simulator cannot starve them
     And no "idp", "mail", "storage", "voice", "llm" or "analytics" lane is planned
 
+  # A trial (one-dev-server step 6): one Go process for the data plane and the
+  # simulators. The split stays the default.
+  @unit
+  Scenario: One Go process hosts the data plane and the simulators when asked
+    Given a checkout whose dev build links the simulators
+    And LANGWATCH_GO_ONE_PROCESS is 1
+    When haven plans a stack selecting the data plane, every simulator and Langy
+    Then the "go" lane hosts aigateway, nlpgo, idpsim, mailsim, storagesim, voicesim, llmsim and analyticssim, each on its own address variable
+    And no "sims" lane is planned
+    And with the variable unset the "go" and "sims" lanes are planned as before
+    And Langy keeps a lane of its own either way
+
+  @unit
+  Scenario: Services sharing one Go process keep their own telemetry identity
+    Given the gateway and the NLP engine each set up tracing in one process
+    When a span starts under a context naming one of them
+    Then it is recorded by that service's provider, with that service's resource
+    And a process running one service installs its provider as the global, as before
+
   # --- Restarting a lane ---
 
   @unit

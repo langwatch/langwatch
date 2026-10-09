@@ -308,31 +308,60 @@ export function basePathOf<Api>(declaration: RestTransportDeclaration<Api>): str
   }
 }
 
+/** The version segment of a dated address: a real date, `latest` or `preview`. */
+export const VERSION_NAMESPACE = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+
+/**
+ * A family claiming no prefix: a literal one, or a dated one whose every route shares
+ * another module's namespace (ARCHITECTURE.md §8, R10).
+ */
+export function claimsNoPrefix<Api>(declaration: RestTransportDeclaration<Api>): boolean {
+  if (declaration.addressing === "literal") return true;
+
+  return (
+    declaration.addressing === "dated" &&
+    declaration.routes.length > 0 &&
+    declaration.routes.every((route) => route.sharedPath !== void 0)
+  );
+}
+
+/** What one route of a family claiming no prefix answers at, any version and v1 twin included. */
+export function routeScopesOf<Api>({
+  route,
+  declaration,
+}: {
+  route: RestTransportRoute<unknown>;
+  declaration: RestTransportDeclaration<Api>;
+}): string[] {
+  const basePath = basePathOf(declaration);
+  const suffix = route.path === "/" ? "" : route.path;
+  const paths =
+    declaration.addressing === "dated"
+      ? [basePath + suffix, basePath + VERSION_NAMESPACE + suffix]
+      : [route.path];
+
+  return paths.flatMap((path) => {
+    const alias = declaration.v1Twin ? canonicalV1Path(path) : null;
+
+    return alias ? [path, alias] : [path];
+  });
+}
+
 /**
  * Where the family's own middleware applies. A family owning a prefix claims
- * it whole; a literal family claims exactly the addresses it declares, because
- * a wildcard would run ahead of a sibling family sharing the prefix.
+ * it whole; a family claiming no prefix claims exactly the addresses it declares,
+ * because a wildcard would run ahead of a sibling family sharing the prefix.
  */
 export function middlewareScopesOf<Api>(declaration: RestTransportDeclaration<Api>): string[] {
   const basePath = basePathOf(declaration);
 
-  if (declaration.addressing !== "literal") {
+  if (!claimsNoPrefix(declaration)) {
     const aliasPath = declaration.v1Twin ? canonicalV1Path(basePath) : null;
 
     return aliasPath ? [`${basePath}/*`, `${aliasPath}/*`] : [`${basePath}/*`];
   }
 
-  const scopes = new Set<string>();
-
-  for (const route of declaration.routes) {
-    scopes.add(route.path);
-
-    const alias = declaration.v1Twin ? canonicalV1Path(route.path) : null;
-
-    if (alias) scopes.add(alias);
-  }
-
-  return [...scopes];
+  return [...new Set(declaration.routes.flatMap((route) => routeScopesOf({ route, declaration })))];
 }
 
 /**

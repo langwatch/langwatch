@@ -92,7 +92,6 @@ async function hostedFamily(
   const state = await licensingProcessModule.install({
     resources,
     config: { ...TEST_LICENSING_CONFIG, isSaas: true },
-    members: {},
     repositorySelection: { tier: "memory", members: {} },
     role: "api",
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

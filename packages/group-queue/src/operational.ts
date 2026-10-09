@@ -23,7 +23,7 @@ export {
 } from "./blobKeys.ts";
 export { BLOB_SWEEP_LUA, BLOB_SWEEP_OUTCOMES, type BlobSweepOutcome } from "./blobSweepLua.ts";
 export type { BlobSweepReport, BlobSweepTally } from "./blobSweeper.ts";
-export { BlobSweeper, BlobSweeper as GroupQueueBlobSweeper } from "./blobSweeper.ts";
+export { BlobSweeper } from "./blobSweeper.ts";
 export { CachedLuaScript, isNoScriptResult } from "./cachedLuaScript.ts";
 export {
   DISCARD_FROM_DLQ_LUA,
@@ -53,6 +53,13 @@ export {
   PayloadTooLargeError,
   splitEnvelope,
 } from "./jobEnvelope.ts";
+export {
+  MemoryQueueDrainAudit,
+  type QueueDrainAudit,
+  type QueueDrainBlocker,
+  type QueueDrainRedis,
+  RedisQueueDrainAudit,
+} from "./drainAudit.ts";
 export { RedisJobBlobStore } from "./redisJobBlobStore.ts";
 export {
   GROUP_QUEUE_REGISTRY_KEY,
@@ -71,11 +78,10 @@ export {
   TransientBlobStoreError,
 } from "./tieredBlobStore.ts";
 
-// The stranded-group reaper: main's `scripts/ops/reap-stranded-group-keys.sh`
-// as a task, one-shot and dry-run by default.
+// The stranded-group reaper: main's `scripts/ops/reap-stranded-group-keys.sh`,
+// run by ops on a schedule and from the Queue screen.
 export {
   DEFAULT_GROUP_QUEUE_KEY_PREFIX,
-  GroupQueueReapStrandedGroupsTask,
   reapStrandedGroups,
   type ReapStrandedGroupsReport,
   type StrandedGroup,

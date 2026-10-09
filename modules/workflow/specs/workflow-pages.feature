@@ -1,6 +1,6 @@
 # Implementation:
 #   modules/workflow/browser/src/workflow.web.ts
-#   packages/browser/src/ui-module-screens.ts
+#   packages/browser/src/module/ui-module-screens.ts
 #   modules/workflow/browser/src/ui/sections/workflow-drag-preview.tsx
 
 Feature: Workflow pages are guarded as they were on main
@@ -20,3 +20,10 @@ Feature: Workflow pages are guarded as they were on main
     When the canvas renders before any palette node is picked up
     Then the drag preview renders nothing
     And the Studio does not fall back to the error screen
+
+  @integration
+  Scenario: The archive dialog names the evaluators the workflow backs
+    Given a workflow two evaluators reference, one of them another workflow's
+    When the reader opens the delete dialog
+    Then it names the workflow's own evaluator and its monitor before the confirmation
+    And it reads the evaluators by workflow rather than every evaluator in the project

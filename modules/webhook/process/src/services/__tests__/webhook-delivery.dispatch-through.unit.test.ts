@@ -5,11 +5,23 @@
 import { describe, expect, it } from "vitest";
 
 import { MemorySqsWebhookDestinationChannel } from "../../channels/memory/memory.sqs-webhook-destination.channel.ts";
-import { MemoryWebhookDispatchChannel } from "../../channels/memory/memory.webhook-dispatch.channel.ts";
 import type { SqsWebhookSender } from "../../channels/webhook-destination.channel.ts";
 import type { WebhookDestinationConfig } from "../../rules/webhook-destination.rules.ts";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 import { WebhookDestinationDispatchService } from "../webhook-destination-dispatch.service.ts";
+import type { WebhookSendInput } from "../webhook-egress.service.ts";
+
+/** Stands in for the egress: keeps every send it was handed and answers 200. */
+function recordingEgress() {
+  const sent: WebhookSendInput[] = [];
+  return {
+    sent,
+    send: async (input: WebhookSendInput) => {
+      sent.push(input);
+      return { status: 200, body: "", eventId: input.eventId ?? `memory-dispatch-${sent.length}` };
+    },
+  };
+}
 
 const BODY = JSON.stringify({ batch: [{ id: "evt_1", type: "gateway.request.completed" }] });
 
@@ -38,7 +50,7 @@ function request(destination: WebhookDestinationConfig) {
 function dispatchWith(sqs: SqsWebhookSender) {
   return WebhookDeliveryService.dispatchThrough({
     destinations: WebhookDestinationDispatchService.create({
-      egress: MemoryWebhookDispatchChannel.create(),
+      egress: recordingEgress(),
       allowInsecureLocal: false,
       sqs,
     }),
@@ -98,7 +110,7 @@ describe("WebhookDeliveryService.dispatchThrough", () => {
     /** @scenario A queue endpoint delivers to its queue through the process's AWS transport */
     it("still sends through the egress and never touches the queue", async () => {
       const sqs = MemorySqsWebhookDestinationChannel.create();
-      const egress = MemoryWebhookDispatchChannel.create();
+      const egress = recordingEgress();
       const dispatch = WebhookDeliveryService.dispatchThrough({
         destinations: WebhookDestinationDispatchService.create({
           egress,

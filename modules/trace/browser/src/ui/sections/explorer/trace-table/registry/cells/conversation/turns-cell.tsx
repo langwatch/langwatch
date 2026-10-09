@@ -1,7 +1,7 @@
 import { Text } from "@langwatch/design-system/primitives";
 
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 import type { CellDef } from "../../types.ts";
 
 /**

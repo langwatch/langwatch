@@ -1,12 +1,13 @@
 import { MODEL_TIERS, tierTargetSuggestionSchema } from "@langwatch/model-provider-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Every served `routingPolicy.*` procedure, declared once, at main's wire names and caps. */
+/** Every served `routingPolicy.*` procedure, declared once, at main's wire names and caps; `personalContext` was `user.personalContext`. */
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { enterpriseGatewayWriteAcknowledgedSchema } from "./enterprise-gateway.api.ts";
 import {
   listRoutingPoliciesInputSchema,
+  personalContextSchema,
   routingPolicySchema,
   routingPolicyScopeEntrySchema,
 } from "./routing-policy.ts";
@@ -41,6 +42,10 @@ export const routingPolicyTrpc = defineTrpcContract("routingPolicy")
     }),
   )
   .withOutput(tierTargetSuggestionSchema.array())
+
+  .query("personalContext")
+  .withInput(z.object({ organizationId: z.string() }))
+  .withOutput(personalContextSchema)
 
   .mutation("create")
   .withInput(

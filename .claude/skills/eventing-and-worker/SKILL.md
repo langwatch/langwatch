@@ -1,6 +1,6 @@
 ---
 name: eventing-and-worker
-description: "Event-sourced work on a module's pipeline: definePipeline, commands and events, projections (fold/map), subscribers, peer subscribers (withPeerSubscriber), scheduled process managers (.schedule({ everyMs }).onWake), intents and the outbox, background and periodic work, the worker role vs api vs tasks, at-least-once delivery and per-aggregate ordering, fact events, read hints and projection cursors (event id = k-sortable cursor), one-shot tasks. Use when someone says 'add a projection', 'add a subscriber', 'react to another module's event', 'scheduled job', 'cron', 'background job', 'periodic sweep', 'process manager', 'idempotent', 'retry', 'dead letter', 'worker', 'why did the worker not run it', 'tenant purge', 'projection cursor', or opens modules/*/process/src/eventing/."
+description: "Event-sourced work on a module's pipeline: definePipeline, commands and events, projections (fold/map), subscribers, peer subscribers (withPeerSubscriber), scheduled process managers (.schedule({ everyMs }).onWake), intents and the outbox, background and periodic work, the worker role vs api vs tasks, at-least-once delivery and per-aggregate ordering, fact events, read hints and projection cursors (event id = k-sortable cursor), one-shot tasks, and renaming or reshaping a stored event type with .withUpcasts (read-time upcast, drain, `upcast:<pipeline>:<stored type>` steps). Use when someone says 'rename an event', 'rename the event type', 'rename the aggregate', 'rename the pipeline', 'change the event payload', 'upcast', 'withUpcasts', 'drain', 'add a projection', 'add a subscriber', 'react to another module's event', 'scheduled job', 'cron', 'background job', 'periodic sweep', 'process manager', 'idempotent', 'retry', 'dead letter', 'worker', 'why did the worker not run it', 'tenant purge', 'projection cursor', or opens modules/*/process/src/eventing/."
 user-invocable: true
 ---
 
@@ -86,6 +86,32 @@ For a plain subscriber on the module's own events see
 see `modules/authz/process/src/eventing/authz-grant.pipeline.ts` (`.withClickHouseMapProjection`,
 `.withProjectionSubscriber`); the framework specs are in `packages/eventing/specs/`.
 
+## Peer projections: folding or mapping a peer's events into your own state
+
+When the state is yours but the facts are a peer's (analytics hosting trace's span projections),
+declare a peer projection on your own pipeline. The owner changes nothing and never learns of you;
+your one edge is its contract (§9, §5: the cycle is cut from the reactor's side).
+
+```ts
+const spanReceived = [{ type: SPAN_RECEIVED, data: spanReceivedDataSchema }] as const; // owner contract
+definePipeline({ name: "analytics", aggregate })
+  .withEvents([])
+  .withPeerFoldProjection({ events: spanReceived, fold: myFold }) // fold over PeerEvent<typeof spanReceived>
+  .withPeerMapProjection({ events: spanReceived, map: myMap });
+```
+
+- Lane `<your pipeline>.<projection name>` on the global registry. Each event's data is parsed with
+  the schema you named; a fold or map consuming a type it did not name is refused at build.
+- Ordering is per source aggregate (the owner's `aggregateType:aggregateId`, or your `key` /
+  `groupKeyFn`); dedupe by event id needs a store with `getWithApplied`, as for a local fold.
+- Out-of-order and store-miss re-folds, and map idempotency-key dedupe, read the owner's event log
+  through the owner pipeline's upcasts. `replayProjectionsOf` lists the lane under the owner's
+  aggregate type, paused as `global/projection|handler/<lane>`, so an operator replay rebuilds it.
+- Routing refuses to start when no registered pipeline declares a consumed type, or the types span
+  several owners: declare one peer projection per owner, and install the owner in the same process.
+- Your store is yours; never read the owner's projection tables. Spec:
+  `packages/eventing/specs/peer-projection.feature`.
+
 ## Reads, hints and cursors (the pipeline's side)
 
 - A contract names what makes a read stale: `.query(name, { invalidatedBy: [EVENT_TYPE] })`. One
@@ -108,27 +134,77 @@ see `modules/authz/process/src/eventing/authz-grant.pipeline.ts` (`.withClickHou
 Consumers register drain-first, so shutdown drains the worker before the api closes. A stack missing the
 worker serves pages and silently processes no jobs.
 
-## One-shot work: tasks
+## One-shot work: steps and tasks
 
-A migration, backfill or repair that runs before serve is a `Task` (`@langwatch/task`), never a loop:
-`modules/automation/process/src/tasks/report-schedule-backfill.task.ts` (`name`, `description`, `run()`).
-Run by the `tasks` app. Recurring work is a scheduled process manager instead.
+A backfill or data move is a migration step declared with `.withMigrations` (`defineMigrationStep`,
+the `migration-data-step` skill): the ledger records it, the Upgrades page shows it, a rollback
+reopens it. A `Task` (`@langwatch/task`) is for work an operator invokes by name:
+`modules/automation/process/src/tasks/report-schedule-backfill.task.ts` (`name`, `description`,
+`run()`), run by the `tasks` app. Recurring work is a scheduled process manager instead.
+
+## Upcasts: renaming or reshaping a stored event type
+
+Record: ARCHITECTURE.md §9; rulings rounds 15 and 16. Stored events are never rewritten first. The
+owning pipeline declares the old shape after `.withEvents`, and every read (queued-job parse,
+event-store read, replay) sees only the current type. Exemplar:
+`modules/entitlement/process/src/eventing/usage.pipeline.ts`.
+
+```ts
+definePipeline({ name: "entitlement", aggregate: defineAggregate({ type: "entitlement_usage" }) })
+  .withEvents([monthCountedEventSchema])
+  .withUpcasts({
+    events: [
+      {
+        from: { type: "lw.usage.month_counted", aggregateType: "usage_organization" },
+        to: "lw.entitlement.month_counted",
+        data: (stored) =>
+          typeof stored === "object" && stored !== null ? { ...stored, unit: "traces" } : stored,
+      },
+    ],
+    drain: { pipeline: "usage" },
+  });
+```
+
+| Change                               | Declare                                                        |
+| ------------------------------------ | -------------------------------------------------------------- |
+| Event type renamed                   | `{ from: { type: old }, to: new }`                             |
+| Aggregate type renamed with it       | add `aggregateType: old` to `from`                             |
+| Payload reshaped                     | `data`, a pure transform; the current schema parses its result |
+| Schema version pinned                | `version`                                                      |
+| Pipeline renamed (queue keys change) | `drain: { pipeline: old, jobNames? }`, for one release only    |
+| A new field with a default           | nothing: give the schema a `.default()`                        |
+
+- **Refused at build**: `to` not in `.withEvents`, `from.type` still declared as current, two upcasts
+  from one type (`assertUpcastsDeclarable`). A transform that throws refuses that event by name.
+- **Ledger**: each entry is an `event-upcast` background step, id `upcast:<pipeline>:<stored type>`,
+  pending while stored events still need it, done when none do; ops reads them through
+  `EventUpcastReader`. You write no step for it.
+- **Rewrite at the floor**: the optional rewrite copies corrected events into `event_log`; a renamed
+  aggregate's originals are deleted only by a contract step once the floor passes the release that
+  added the upcast. The rewrite step is `@unimplemented` today
+  (`packages/eventing/specs/event-upcast.feature`); declare the upcast and leave the log alone.
+- **Drain life**: remove a `drain` one release after it shipped. The lint that names older drains is
+  ruled (round 16) and not landed; check it by hand in review.
+- **Test**: `packages/eventing/src/upcast/__tests__/eventUpcast.unit.test.ts` is the pattern: append a
+  stored old-type event to the memory store, read it back as the new type, replay it, drain a job.
 
 ## Traps
 
-| Trap                                                                   | Instead                                   |
-| ---------------------------------------------------------------------- | ----------------------------------------- |
-| a reactor, or a subscriber that writes another module's rows           | peer subscriber writing your own rows     |
-| `setInterval` or a cron route for a sweep                              | scheduled process manager                 |
-| a reverse `*Api` read to learn "did it happen"                         | subscribe to the owner's fact             |
-| a handler that is not safe to run twice                                | key the write on the event or intent id   |
-| renaming an event, aggregate or pipeline string born before this drive | leave it; new ones may change             |
-| a projection touching another module's table                           | the owner exposes an event or `*Api` read |
-| polling a run's status from the UI on a timer                          | read hints plus the fold                  |
-| a PostHog or Customer.io call, channel or key outside nurturing        | record a fact; nurturing subscribes       |
+| Trap                                                            | Instead                                   |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| a reactor, or a subscriber that writes another module's rows    | peer subscriber writing your own rows     |
+| `setInterval` or a cron route for a sweep                       | scheduled process manager                 |
+| a reverse `*Api` read to learn "did it happen"                  | subscribe to the owner's fact             |
+| a handler that is not safe to run twice                         | key the write on the event or intent id   |
+| renaming an event, aggregate or pipeline by editing the string  | `.withUpcasts` (Upcasts, above)           |
+| a projection touching another module's table                    | the owner exposes an event or `*Api` read |
+| polling a run's status from the UI on a timer                   | read hints plus the fold                  |
+| a PostHog or Customer.io call, channel or key outside nurturing | record a fact; nurturing subscribes       |
 
 ## Tests
 
 Pipelines are tested over memory twins and the event store memory tier; redelivery gets its own test
 (`eventing/__tests__/trace-alert-trigger-match.subscriber.redelivery.test.ts` delivers twice and asserts one
 effect). Worker installation: `app/__tests__/automation-worker-installation.unit.test.ts`. See `testing`.
+After adding a pipeline, subscriber, process manager or task, run `pnpm generate:readmes`: the Workers
+section of the module's `process/README.md` is the review artefact (`readmes` skill).

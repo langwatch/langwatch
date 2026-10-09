@@ -13,14 +13,19 @@ import {
   backendHalfOf,
   BACKEND_HALF_SERVICE,
   BACKEND_READY_MSG,
+  disposeGeneration,
   drainBackend,
+  listenersAddedSince,
+  snapshotListeners,
   startBackend,
+  type AddedListener,
   type BackendHalves,
+  type ListenerSnapshot,
 } from "./backend.process.ts";
 import {
   createReloadTrigger,
-  holdRemainingMs,
   invalidateModules,
+  recycleReason,
   staleModuleIds,
 } from "./backend.reload.ts";
 
@@ -39,20 +44,33 @@ const WORKER_ENTRY = fileURLToPath(import.meta.resolve("@langwatch/worker"));
 const WATCH_ROOTS = ["apps/api/src", "apps/worker/src", "packages", "modules", "enterprise"];
 const IGNORED_PATH = /(^|\/)(node_modules|dist|\.git|__tests__)(\/|$)/;
 const CODE_FILE = /\.[cm]?[jt]sx?$/;
+/** Non-zero, so dev-supervisor's restart-after-ready starts a fresh process (EX_TEMPFAIL). */
+const RECYCLE_EXIT_CODE = 75;
 
 const write = (line: string): void => void process.stderr.write(line);
-const envMs = ({ name, fallback }: { name: string; fallback: number }): number => {
+const envPositive = ({ name, fallback }: { name: string; fallback: number }): number => {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 };
-const isWatching = !["0", "false", "off"].includes(
-  (process.env.LANGWATCH_DEV_WATCH ?? "").trim().toLowerCase(),
-);
+// LANGWATCH_DEV_RELOAD=process hands every reload to the supervisor's whole-process restart.
+const isWatching =
+  !["0", "false", "off"].includes((process.env.LANGWATCH_DEV_WATCH ?? "").trim().toLowerCase()) &&
+  process.env.LANGWATCH_DEV_RELOAD?.trim() !== "process";
+// Only the api lane's supervisor (LANGWATCH_DEV_RELOAD=module) restarts a host that exits
+// after ready.
+const isRecycleArmed = process.env.LANGWATCH_DEV_RELOAD?.trim() === "module";
+const recycleLimits = {
+  maxGenerations: envPositive({ name: "LANGWATCH_DEV_RECYCLE_GENERATIONS", fallback: 50 }),
+  maxRssMiB: envPositive({ name: "LANGWATCH_DEV_RECYCLE_RSS_MIB", fallback: 4_096 }),
+};
+const rssMiB = (): number => Math.round(process.memoryUsage.rss() / 1_048_576);
 
 let ui: ViteDevServer | undefined;
 let backendVite: ViteDevServer | undefined;
 let runner: ModuleRunner | undefined;
 let halves: BackendHalves | undefined;
+/** The process listeners present when the serving generation booted. */
+let listenersAtBoot: ListenerSnapshot = new Map();
 let generation = 0;
 /** The last link or boot failed: the next code change retries, loaded or not. */
 let isRetryOwed = false;
@@ -96,6 +114,13 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
+/** Hands over to a fresh process: the supervisor restarts a host exiting non-zero after ready. */
+function recycle(reason: string): void {
+  const record = { level: "info", msg: "backend recycling", reason, generation, rssMiB: rssMiB() };
+  process.stdout.write(`${JSON.stringify(record)}\n`);
+  void stop(RECYCLE_EXIT_CODE);
+}
+
 /** The boot guard's crash hook: drain the backend, close both Vite servers, exit non-zero. */
 export function stopAfterCrash(): void {
   void stop(1);
@@ -131,6 +156,42 @@ function startBackendVite(): Promise<ViteDevServer> {
   });
 }
 
+/** Why to recycle, not re-link; armed once a generation was ready under a restarting supervisor. */
+function boundReached(): string | undefined {
+  if (!isRecycleArmed || generation === 0) return undefined;
+  return recycleReason({ generation, rssMiB: rssMiB(), limits: recycleLimits });
+}
+
+/**
+ * Drains the old generation and answers the listeners it took off, or undefined
+ * when its drain failed and the host is recycling: its stores may still hold
+ * connections, and a fresh process is the only sure close.
+ */
+async function disposeOld({
+  old,
+  added,
+}: {
+  old: BackendHalves;
+  added: readonly AddedListener[];
+}): Promise<number | undefined> {
+  try {
+    return await disposeGeneration({ halves: old, emitter: process, added });
+  } catch (error) {
+    write(
+      processFailureLine({ service: APP_SERVICE, event: "drain failed", error, level: "warn" }),
+    );
+    const reason = recycleReason({
+      generation,
+      rssMiB: rssMiB(),
+      isDrainFailed: true,
+      limits: recycleLimits,
+    });
+    if (!isRecycleArmed || !reason) return 0;
+    recycle(reason);
+    return undefined;
+  }
+}
+
 /**
  * Link the new generation first; only if it links, drain the old one (worker,
  * then api) and boot the new. A failed link keeps the old generation serving,
@@ -142,6 +203,10 @@ async function reload(files: string[]): Promise<void> {
   const modules = runner.evaluatedModules;
   const stale = staleModuleIds({ modules, files });
   if (halves && !isRetryOwed && stale.size === 0) return;
+  const bounded = boundReached();
+  if (bounded) return recycle(bounded);
+  // Taken before the link, so listeners the new modules attach while evaluating stay theirs.
+  const added = listenersAddedSince({ emitter: process, before: listenersAtBoot });
   invalidateModules({ modules, ids: stale });
   const known = new Set(modules.idToModuleMap.keys());
   let worker: typeof WorkerMain;
@@ -161,17 +226,17 @@ async function reload(files: string[]): Promise<void> {
     return;
   }
   const drainedAt = Date.now();
+  let listenersRemoved = 0;
   if (halves) {
     const old = halves;
     halves = undefined;
-    await drainBackend(old).catch((error: unknown) => {
-      write(
-        processFailureLine({ service: APP_SERVICE, event: "drain failed", error, level: "warn" }),
-      );
-    });
+    const removed = await disposeOld({ old, added });
+    if (removed === undefined) return;
+    listenersRemoved = removed;
   }
   const drainMs = Date.now() - drainedAt;
   if (stopping) return;
+  listenersAtBoot = snapshotListeners(process);
   try {
     halves = await startBackend({ startWorker: worker.startWorker, startApi: api.startApi });
   } catch (error) {
@@ -196,8 +261,9 @@ async function reload(files: string[]): Promise<void> {
     changedFiles: files.length,
     files: files.slice(0, 10).map((file) => path.relative(REPO_ROOT, file)),
     drainMs,
+    listenersRemoved,
     readyMs: Date.now() - startedAt,
-    rssMiB: Math.round(process.memoryUsage.rss() / 1_048_576),
+    rssMiB: rssMiB(),
   };
   process.stdout.write(`${JSON.stringify(record)}\n`);
 }
@@ -233,11 +299,12 @@ function watchBackend({ onFile }: { onFile: (file: string) => void }): void {
   }
 }
 
-/** Starts the UI, then the first backend generation, then the watch. */
-export async function bootApp(): Promise<void> {
-  // The HMR gate marker resolves against cwd (apps/ui/vite/havenHmrGate.ts).
-  process.chdir(UI_ROOT);
-  ui = await startUi();
+/** Starts the UI (not in the api lane), then the first backend generation, then the watch. */
+export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
+  if (withUi) {
+    process.chdir(UI_ROOT);
+    ui = await startUi();
+  }
   backendVite = await startBackendVite();
   const ssr = backendVite.environments.ssr;
   runner = createServerModuleRunner(ssr, { hmr: false });
@@ -247,12 +314,9 @@ export async function bootApp(): Promise<void> {
   };
   await run([]);
   if (!isWatching) return;
-  const marker =
-    process.env.LANGWATCH_DEV_HOLD_MARKER?.trim() || path.join(UI_ROOT, ".haven-hmr-gate");
   const trigger = createReloadTrigger({
-    quietMs: envMs({ name: "LANGWATCH_DEV_WATCH_DEBOUNCE_MS", fallback: 2_000 }),
-    maxWaitMs: envMs({ name: "LANGWATCH_DEV_WATCH_MAX_WAIT_MS", fallback: 30_000 }),
-    holdMs: () => holdRemainingMs({ marker }),
+    quietMs: envPositive({ name: "LANGWATCH_DEV_WATCH_DEBOUNCE_MS", fallback: 2_000 }),
+    maxWaitMs: envPositive({ name: "LANGWATCH_DEV_WATCH_MAX_WAIT_MS", fallback: 30_000 }),
     run,
   });
   watchBackend({

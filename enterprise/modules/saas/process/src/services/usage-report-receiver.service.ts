@@ -3,6 +3,7 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   UsageReportRateLimitedError,
   type IncomingUsageReportRequest,
+  type SaasServerConfig,
   type UsageReportReceipt,
 } from "@langwatch/enterprise-saas-contract";
 import type { Logger } from "@langwatch/observability";
@@ -23,6 +24,10 @@ import {
 import type { LangWatchCloudService } from "./langwatch-cloud.service.ts";
 
 type UsageReportRecorder = Pick<LicensingApi, "recordUsageReport">;
+type ReleaseConfig = Pick<
+  SaasServerConfig,
+  "latestRelease" | "latestReleaseCommit" | "releaseFloor"
+>;
 
 /**
  * The anonymous daily report a self-hosted install posts. It lands in the
@@ -35,6 +40,7 @@ export class UsageReportReceiverService {
   readonly #registry: UsageReportRecorder;
   readonly #analytics: ProductAnalyticsChannel;
   readonly #logger: Logger;
+  readonly #receipt: UsageReportReceipt;
 
   private constructor(parts: {
     cloud: LangWatchCloudService;
@@ -42,12 +48,14 @@ export class UsageReportReceiverService {
     registry: UsageReportRecorder;
     analytics: ProductAnalyticsChannel;
     logger: Logger;
+    release: ReleaseConfig;
   }) {
     this.#cloud = parts.cloud;
     this.#rateLimits = parts.rateLimits;
     this.#registry = parts.registry;
     this.#analytics = parts.analytics;
     this.#logger = parts.logger;
+    this.#receipt = receiptOf(parts.release);
   }
 
   static create(parts: {
@@ -56,6 +64,7 @@ export class UsageReportReceiverService {
     registry: UsageReportRecorder;
     analytics: ProductAnalyticsChannel;
     logger: Logger;
+    release: ReleaseConfig;
   }): UsageReportReceiverService {
     return new UsageReportReceiverService(parts);
   }
@@ -83,7 +92,7 @@ export class UsageReportReceiverService {
       properties: { ...properties, unknown_fields: unknownFields },
     });
 
-    return { message: "Event captured" };
+    return this.#receipt;
   }
 
   async #admit(key: string, limit: { requests: number; seconds: number }): Promise<void> {
@@ -108,4 +117,19 @@ export class UsageReportReceiverService {
       );
     }
   }
+}
+
+/** The latest release travels with its commit, so two builds of one release name are told apart. */
+function receiptOf({
+  latestRelease,
+  latestReleaseCommit,
+  releaseFloor,
+}: ReleaseConfig): UsageReportReceipt {
+  return {
+    message: "Event captured",
+    ...(latestRelease && {
+      latest_release: { release: latestRelease, commit: latestReleaseCommit ?? null },
+    }),
+    ...(releaseFloor && { floor: releaseFloor }),
+  };
 }

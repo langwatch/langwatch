@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { PlanLimitNotifierInput } from "@langwatch/enterprise-billing-contract";
-import type { PeerSubscriberDefinition } from "@langwatch/eventing";
 import {
   limitReachedEventDataSchema,
   USAGE_LIMIT_REACHED_EVENT_TYPE,
-} from "@langwatch/usage-contract";
+} from "@langwatch/entitlement-contract";
+import type { PeerSubscriberDefinition } from "@langwatch/eventing";
 
 export const BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME = "usageLimitReached";
 

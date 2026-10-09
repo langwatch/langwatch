@@ -100,7 +100,9 @@ describe("given the dataset bounds derivation", () => {
     });
 
     it("never goes below the default or above the ceiling", () => {
-      expect(effectiveDatasetAttachmentMaxBytes(1 * MiB)).toBe(DATASET_ATTACHMENT_DEFAULT_MAX_BYTES);
+      expect(effectiveDatasetAttachmentMaxBytes(1 * MiB)).toBe(
+        DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
+      );
       expect(effectiveDatasetAttachmentMaxBytes(50 * MiB)).toBe(50 * MiB);
       expect(effectiveDatasetAttachmentMaxBytes(10_000 * MiB)).toBe(
         DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,

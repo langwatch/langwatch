@@ -13,18 +13,18 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
-import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
-import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
+import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
-} from "../ingestion-source-secret.service.ts";
+} from "../../features/ingestion-source/services/ingestion-source-secret.service.ts";
 import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-} from "../ingestion-source.service.ts";
-import { IngestionSourceService } from "../ingestion-source.service.ts";
-import { PullDestinationService } from "../pull-destination.service.ts";
+} from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
+import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
 
 const ORG = "org-1";
 const SUBSCRIPTION = "aaaaaaaa-0000-4000-8000-000000000001";

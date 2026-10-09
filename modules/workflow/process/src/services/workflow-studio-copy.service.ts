@@ -14,7 +14,7 @@ import {
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import { cloneDslForCopy } from "../rules/workflow-copy-version.rules.ts";
 
-export type WorkflowStudioCopyServiceOptions = {
+type WorkflowStudioCopyServiceOptions = {
   datasets: DatasetApi;
   rows: WorkflowRowRepository;
 };

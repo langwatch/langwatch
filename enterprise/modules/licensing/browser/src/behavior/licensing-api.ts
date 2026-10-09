@@ -8,7 +8,8 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { licenseTrpc } from "@langwatch/enterprise-licensing-contract";
 import type { TimeInput } from "@langwatch/time";
 
-import type { PlanType } from "../model/plan-form-defaults.ts";
+/** The plan a minted key carries; the mint form picks one. */
+export type PlanType = "PRO" | "ENTERPRISE" | "CUSTOM";
 
 /** The plan template a minted key carries, as the generator form fills it in. */
 export type LicenseMintInput = {

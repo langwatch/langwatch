@@ -5,9 +5,9 @@ import {
   type IngestSourceBilling,
   type IngestSourceKey,
   TraceIngestSourceBillingRepository,
-} from "../trace-ingest-source-billing.repository.ts";
+} from "../../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
 
-export type PrismaTraceIngestSourceBillingDatabase = PrismaModelClient<"TraceIngestSourceBilling">;
+type PrismaTraceIngestSourceBillingDatabase = PrismaModelClient<"TraceIngestSourceBilling">;
 
 /** Prisma's unique-constraint failure, read off the code so it survives a client boundary. */
 function isUniqueConstraintViolation(error: unknown): boolean {

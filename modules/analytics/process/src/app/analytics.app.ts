@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * The analytics feature's application: what both doors call, holding every service and
  * port as the one typed thing a transport is given. A caller is always an argument,
@@ -14,7 +13,6 @@ import {
   type AnalyticsFilterOption,
   type AnalyticsMetricSource,
   type AnalyticsReadInput,
-  type AnalyticsService,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
@@ -59,6 +57,19 @@ import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
+import type { AnalyticsChannels } from "../channels/analytics.channels.ts";
+import { lwqlHydrationKeyCap } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import { statementMightCallEvalFunction } from "../features/app-functions/rules/langwatch-ql-eval-function-catalog.rules.ts";
+import { LangWatchQLHydrationComputeService } from "../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
+import {
+  LangWatchQLHydrationReadService,
+  type LangWatchQLThreadTraceReadInput,
+  type LangWatchQLTraceReadInput,
+  type LangWatchQLTraceSource,
+} from "../features/hydration/services/langwatch-ql-hydration-read.service.ts";
+import { LangWatchQLHydrationService } from "../features/hydration/services/langwatch-ql-hydration.service.ts";
+import { LangWatchQLProductionProvisioningService } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type {
   AnalyticsRepositories,
@@ -77,10 +88,7 @@ import {
 } from "../rules/analytics-filter-catalogue.rules.ts";
 import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.ts";
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
-import { lwqlHydrationKeyCap } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
-import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
-import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
@@ -94,16 +102,7 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
-import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
-import {
-  LangWatchQLHydrationReadService,
-  type LangWatchQLThreadTraceReadInput,
-  type LangWatchQLTraceReadInput,
-  type LangWatchQLTraceSource,
-} from "../services/langwatch-ql-hydration-read.service.ts";
-import { LangWatchQLHydrationService } from "../services/langwatch-ql-hydration.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
-import { LangWatchQLProductionProvisioningService } from "../services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
@@ -129,7 +128,7 @@ const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripw
  * as the one method it calls, since which fields exist and what a stored filter means
  * is the host's catalogue, not Analytics' own.
  */
-export type AnalyticsFilterOptionsLookup = Readonly<{
+type AnalyticsFilterOptionsLookup = Readonly<{
   getFilterOptions(
     input: Readonly<{
       projectId: string;
@@ -145,7 +144,7 @@ export type AnalyticsFilterOptionsLookup = Readonly<{
 }>;
 
 /** What one filter picker is asking for, before the narrowing rule is applied. */
-export type AnalyticsFilterOptionsRequest = Readonly<{
+type AnalyticsFilterOptionsRequest = Readonly<{
   projectId: string;
   field: string;
   startDate: number;
@@ -158,11 +157,13 @@ export type AnalyticsFilterOptionsRequest = Readonly<{
 }>;
 
 /** What the process composes this feature's application from. */
-export interface AnalyticsAppDependencies {
-  analytics: AnalyticsService;
+interface AnalyticsAppDependencies {
+  analytics: AnalyticsServiceClass;
   /** The host's filter catalogue; see {@link AnalyticsFilterOptionsLookup}. */
   filterOptions: AnalyticsFilterOptionsLookup;
   langWatchQL: LangWatchQLService;
+  /** One hydration stage, shared by the synchronous query and a run's text pages. */
+  hydration: LangWatchQLHydrationService;
   /** The Workbench's rollout gate and its two independent protection sources. */
   featureFlags: FeatureFlagApi;
   authz: AuthzApi;
@@ -182,12 +183,6 @@ export interface AnalyticsAppDependencies {
   /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
   lwqlKeyMap: LwqlKeyMapService;
 }
-
-export type AnalyticsInfrastructure = Readonly<{
-  resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient | null>) | null;
-  clickhouseEnabled?: boolean;
-  defaultRetentionDays?: () => number;
-}>;
 
 /** The peer modules the Workbench's access rules read, resolved through their own tokens. */
 type AnalyticsDependencies = Readonly<{
@@ -270,9 +265,9 @@ function lwqlProvisioningOperations({
 
 type AnalyticsSetup = FeatureSetup<
   AnalyticsDependencies,
-  never,
   AnalyticsServerConfig,
-  AnalyticsRepositories
+  AnalyticsRepositories,
+  AnalyticsChannels
 >;
 
 /**
@@ -388,14 +383,25 @@ export class AnalyticsModule
               }),
           )
         : LWQL_UNAVAILABLE;
+    const hydration = LangWatchQLHydrationService.create({
+      reads: LangWatchQLHydrationReadService.create({
+        traces: new TraceApiHydrationSource(setup.dependencies.traces),
+      }),
+      compute: LangWatchQLHydrationComputeService.create({ renderer: setup.dependencies.traces }),
+      // The page is a pass: the statement re-validated, then read inside its wrapper.
+      runner: { executeLangWatchQLPass: (input) => app.executeLangWatchQLPass(input) },
+    });
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
+      hydration,
+      judging: setup.channels.judge,
     });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
-    return new AnalyticsModule(
+    const app = new AnalyticsModule(
       {
         analytics,
+        hydration,
         filterOptions: FilterService.create({
           repository: FilterOptionsClickHouseRepository.create({ resolveClient }),
         }),
@@ -423,6 +429,8 @@ export class AnalyticsModule
       },
       setup.config.publicBaseUrl,
     );
+
+    return app;
   }
 
   #dependencies: AnalyticsAppDependencies;
@@ -443,14 +451,7 @@ export class AnalyticsModule
     });
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
-    this.#hydration = LangWatchQLHydrationService.create({
-      reads: LangWatchQLHydrationReadService.create({
-        traces: new TraceApiHydrationSource(dependencies.traces),
-      }),
-      compute: LangWatchQLHydrationComputeService.create({ renderer: dependencies.traces }),
-      // The page is a pass: the statement re-validated, then read inside its wrapper.
-      runner: { executeLangWatchQLPass: (input) => this.executeLangWatchQLPass(input) },
-    });
+    this.#hydration = dependencies.hydration;
   }
 
   /** Who owns the LangWatchQL access model now; the reconvergence watch probes this. */
@@ -582,9 +583,11 @@ export class AnalyticsModule
    * windows first. An empty scope still runs, and reads zero rows.
    */
   async runLangWatchQLForKey(
-    input: Readonly<{ reach: LangWatchQLKeyReach } & LangWatchQLStatementRequest>,
+    input: Readonly<
+      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLStatementRequest
+    >,
   ): Promise<LangWatchQLQueryResult> {
-    const { reach, sql, parameters, timeWindow, granularitySeconds } = input;
+    const { reach, sql, parameters, timeWindow, granularitySeconds, signal } = input;
     const { projects, protections } = await this.#queryScope.resolve({ reach });
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
@@ -597,6 +600,7 @@ export class AnalyticsModule
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+      ...(signal ? { signal } : {}),
       isInstantEvalsEnabled:
         statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
     });

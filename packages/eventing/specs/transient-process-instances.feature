@@ -90,6 +90,34 @@ Feature: Transient process evolutions cost no durable row
       When the same event is handled at two different wall clocks
       Then both handlings mint identical message keys
 
+  Rule: A caller's transaction carries the intents it appends (Alex, audit R1, 2026-10-06)
+    A request-path producer appends an intent inside its own domain transaction, so the intent
+    commits or rolls back with the change it describes. Without a transaction the append is the
+    transient path above, unchanged.
+
+    @integration
+    Scenario: Intents appended inside a caller's transaction commit with it
+      Given a caller's open Postgres transaction
+      When it appends an intent to its outbox through that transaction and commits
+      Then the outbox holds the intent, pending
+
+    @integration
+    Scenario: Intents appended inside a rolled-back transaction leave no outbox row
+      Given a caller's Postgres transaction that appended an intent to its outbox
+      When the transaction rolls back
+      Then the outbox holds no row for that intent
+
+    @integration
+    Scenario: A transaction that is not a Prisma transaction is refused
+      When a caller appends an intent through a value that is not a Prisma transaction
+      Then the append fails and writes nothing
+
+    @unit
+    Scenario: The in-memory store appends a caller's intents at once
+      Given the in-memory process store
+      When a caller appends an intent with a transaction
+      Then the outbox holds the intent, pending
+
   Rule: A transient process cannot be scheduled
 
     # A schedule is armed by writing a wake onto the instance row a transient

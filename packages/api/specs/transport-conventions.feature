@@ -164,7 +164,7 @@ Feature: The REST runtime renders what a transport may not hand-roll
 
     @unit
     Scenario: A 5xx the class does not declare the caller's stays masked
-      Given a HandledError declaring a platform fault at 503, a HandledError at 503 declaring no fault, or a plain thrown Error
+      Given a HandledError declaring a platform fault at 503 outside the transient allowlist (transient-refusals.feature), a HandledError at 503 declaring no fault, or a plain thrown Error
       When the REST boundary renders it
       Then the answer is the opaque internal_error body at the error's status, with no meta
 
@@ -254,6 +254,22 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then the handler is handed the body as sent
       And a route that declares a refusal for a media type it never named, or names a media type with parameters or a wildcard, refuses to build
 
+  Rule: A JSON body that names its media type is read only under it (Alex, G3b)
+
+    @integration
+    Scenario: A JSON body sent under another media type than its route names is refused before it is parsed
+      Given a route that parses a JSON body and names the media type it reads
+      When it is called with a body under another media type, or with no Content-Type at all
+      Then it is refused with 415 and the code unsupported_media_type, and the handler is not reached
+      And a body under the named type, with parameters or in another letter case, is parsed and reaches the handler
+
+    @integration
+    Scenario: A JSON body route that keeps main's 400 declares it, and names only a JSON media type
+      Given a route that parses a JSON body and declares an unmatched media type a malformed request
+      When it is called with a body under another media type
+      Then it is refused with 400 and the code malformed_request, and the handler is not reached
+      And a route that names a media type the JSON parser cannot read refuses to build
+
   Rule: A JSON body may be an array, handed under the field its route names (Alex, 2026-10-05, E1)
 
     @integration
@@ -270,3 +286,36 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Given a route that declares an array body
       When it names no field, or a field its path or query already declares
       Then the declaration is refused where it is written, naming the route or the field
+
+  Rule: A route that publishes main's flat error body also sends main's root error (Alex, 2026-10-06, night)
+
+    @integration
+    Scenario: A handled refusal at a status published flat carries its code as the root error
+      Given a route that publishes main's flat { error, message } body at 422
+      When its handler throws a handled error at 422
+      Then the body is the canonical envelope with a root error equal to the handled error's code
+      And the body satisfies the schema the route publishes for 422
+
+    @integration
+    Scenario: A sentence refusal at a status published flat carries its sentence as the root error
+      Given a route that publishes main's flat body at 404
+      When its handler throws an HTTP error carrying a sentence at 404
+      Then the body is the canonical envelope with a root error equal to that sentence
+
+    @integration
+    Scenario: A masked 5xx published flat carries main's internal error sentence
+      Given a route that publishes main's flat body at 500
+      When its handler throws an unexpected error
+      Then the body is the masked envelope with the root error "Internal server error"
+
+    @integration
+    Scenario: A refusal raised at the door on a route published flat carries the root error
+      Given a route that publishes main's flat body at 401
+      When the door refuses the credential
+      Then the 401 body carries the refusal's root error beside the envelope
+
+    @integration
+    Scenario: A refusal at a status not published flat stays the canonical envelope alone
+      Given a route that publishes the canonical envelope at 409 and nothing at 403
+      When it refuses at 409 or at 403
+      Then the body carries no root error

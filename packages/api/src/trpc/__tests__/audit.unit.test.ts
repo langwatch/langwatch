@@ -349,7 +349,7 @@ describe("redactAuditArgs", () => {
             url: "https://api.example.com/chat",
             templateVariables: { token: "tok-live-1" },
           },
-          action: "httpProxy.execute",
+          action: "scenarios.testHttpAgent",
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("tok-live-1");

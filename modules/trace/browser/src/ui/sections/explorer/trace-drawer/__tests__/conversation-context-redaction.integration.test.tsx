@@ -11,7 +11,7 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
     selector({ viewMode: "summary" }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
@@ -84,7 +84,7 @@ const turnsState = {
 
 // The panel-level translate toggle dispatches through tRPC; these tests pin
 // redaction rendering, so stub it to an identity passthrough.
-vi.mock("../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -93,7 +93,7 @@ vi.mock("../../hooks/use-text-translation.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-conversation-context.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
   useConversationContext: () => turnsState,
 }));
 

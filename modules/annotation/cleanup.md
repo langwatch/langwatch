@@ -74,12 +74,6 @@ annotation diagnostics; the full UI project still has unrelated errors.
       and working-tree changes.
 - [ ] Boot the complete product and perform annotation API/visual comparisons.
 
-`dev/scripts/commit-annotation-cleanup.sh` validates the recorded annotation
-snapshot by default. Its `--commit "message"` mode commits that exact feature
-slice and its annotation-specific process wiring. Shared framework changes remain
-outside this snapshot for their owning commit batches. The helper was tested in
-a throwaway repository; it preserves unrelated staged and unstaged changes.
-
 ## External blockers
 
 The last real API boot stopped in the separate stored-object composition:

@@ -4,7 +4,8 @@ import {
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import type { DashboardApi, DashboardServerConfig } from "@langwatch/dashboard-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
@@ -26,7 +27,11 @@ import {
 } from "./transport/saved-workbench-chart.rest.ts";
 import { savedWorkbenchChartTrpcTransport } from "./transport/saved-workbench-chart.trpc.ts";
 
-export const dashboardProcessModule = defineProcessModule("dashboard")
+export const dashboardProcessModule: PublishedProcessModule<
+  "dashboard",
+  DashboardApi,
+  DashboardServerConfig
+> = defineProcessModule("dashboard")
   .withRepositories(dashboardRepositories)
   .withApi(DashboardModule)
   .withTransports(

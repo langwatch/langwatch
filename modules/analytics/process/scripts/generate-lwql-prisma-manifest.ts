@@ -6,8 +6,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { parsePrismaSchema } from "../src/features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
 import { renderPrismaRows } from "../src/rules/lwql-catalogue.rules.ts";
-import { parsePrismaSchema } from "../src/rules/lwql-prisma-schema.rules.ts";
 
 const SCHEMA_PATH = fileURLToPath(
   new URL("../../../../packages/prisma-client/prisma/schema.prisma", import.meta.url),

@@ -50,7 +50,7 @@ vi.mock("../../explorer/trace-drawer/conversation-view/conversation-view.tsx", (
   },
 }));
 
-vi.mock("../../explorer/hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({
     data: mocks.state.turns,
     isLoading: mocks.state.turnsLoading,
@@ -58,7 +58,7 @@ vi.mock("../../explorer/hooks/use-conversation-turns.ts", () => ({
   }),
 }));
 
-vi.mock("../../explorer/hooks/use-drawer-project-id.ts", () => ({
+vi.mock("../../../../features/trace-drawer/behavior/use-drawer-project-id.ts", () => ({
   useDrawerProjectId: () => "project-1",
 }));
 
@@ -66,7 +66,8 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: { traces: { getById: { useQuery: () => ({ data: mocks.state.trace }) } } },
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: mocks.openDrawer }),
 }));
 

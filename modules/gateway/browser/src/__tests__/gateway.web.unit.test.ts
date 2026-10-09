@@ -20,4 +20,13 @@ describe("the gateway browser declaration", () => {
 
     expect(typeof (loaded as { default?: unknown }).default).toBe("function");
   });
+
+  it("claims the gateway slice and projects what the shell's deployment reads", () => {
+    const claim = gatewayWeb.installation.config;
+
+    expect(Object.keys(claim?.slices ?? {})).toEqual(["gateway"]);
+    expect(
+      claim?.project({ gateway: { gatewayBaseUrl: "https://gateway.test" } } as never),
+    ).toEqual({ gatewayBaseUrl: "https://gateway.test" });
+  });
 });

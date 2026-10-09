@@ -5,10 +5,10 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { AgentListingRequestCommand } from "../../features/agents/rules/agent-listing-request.rules.ts";
+import type { AgentsListingSummary } from "../../features/agents/rules/agents-listing-outcome.rules.ts";
+import { GovernanceAgentSyncService } from "../../features/agents/services/governance-agent-sync.service.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
-import type { AgentListingRequestCommand } from "../../rules/agent-listing-request.rules.ts";
-import type { AgentsListingSummary } from "../../rules/agents-listing-outcome.rules.ts";
-import { GovernanceAgentSyncService } from "../governance-agent-sync.service.ts";
 
 type SourceType = Parameters<MemoryIngestionSourceRepository["create"]>[0]["sourceType"];
 

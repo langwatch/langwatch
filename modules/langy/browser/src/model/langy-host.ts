@@ -68,9 +68,6 @@ export abstract class LangyHostApi {
    */
   abstract isDemoProject(): boolean;
 
-  /** Tri-state: `undefined` while the answer is still arriving. */
-  abstract featureFlag(flag: string): boolean | undefined;
-
   abstract route(): LangyRouteReading;
 
   /** MERGES into the query, so the dock can set one key without owning the rest. */

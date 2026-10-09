@@ -24,23 +24,23 @@ import {
   type CapabilityCommand,
   commandOfToolCall,
 } from "../../../../model/langy-capability-digest.ts";
-import { isCodeAccessToolPart } from "../../../../model/langy-code-access-tool.ts";
-import { isNotificationToolPart } from "../../../../model/langy-notifications.ts";
-import { isPlanToolPart } from "../../../../model/langy-plan.ts";
-import {
-  isQuestionToolPart,
-  questionToolCardParts,
-} from "../../../../model/langy-question-tool.ts";
-import { isSayToolPart } from "../../../../model/langy-say-tool.ts";
-import { isSecretSnippetToolPart } from "../../../../model/langy-secret-snippet-tool.ts";
-import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
-import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import {
   type CapabilityProgress,
   isProposalOutput,
   resolveCapability,
   resolveCapabilityProgress,
-} from "../../model/capabilities/capability-registry.ts";
+} from "../../../../model/langy-capability-registry.ts";
+import { isNotificationToolPart } from "../../../../model/langy-notifications.ts";
+import { isPlanToolPart } from "../../../../model/langy-plan.ts";
+import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
+import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
+import { isCodeAccessToolPart } from "../../../tools/model/langy-code-access-tool.ts";
+import {
+  isQuestionToolPart,
+  questionToolCardParts,
+} from "../../../tools/model/langy-question-tool.ts";
+import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
+import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,

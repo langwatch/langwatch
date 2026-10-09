@@ -160,6 +160,13 @@ const VALUE_SETS = {
     "--set",
     "app.extraEnvs[0].value=json",
   ],
+  // An optional variable no other set renders: the previous key of a rotation.
+  rotation: [
+    "--set",
+    "autogen.enabled=true",
+    "--set",
+    `app.credentialsEncryptionKey.previous.value=${"0".repeat(64)}`,
+  ],
 };
 
 /** What is wrong with one values set, as one message per problem. */

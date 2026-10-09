@@ -1,4 +1,3 @@
-import { Config, type ConfigOf } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
@@ -39,10 +38,3 @@ export interface DemoDataApi {
 }
 
 export const DemoDataApi = moduleApi<DemoDataApi>()("demo-data");
-
-/** Main's gate: the comma-separated organizations the seeding may touch; absent everywhere but the demo instance. */
-export const demoDataConfig = Config.define((c) => ({
-  demoOrgIds: c.env("DEMO_ORG_IDS", z.string().optional()),
-}));
-
-export type DemoDataConfig = ConfigOf<typeof demoDataConfig>;

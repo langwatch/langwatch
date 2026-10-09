@@ -8,7 +8,7 @@ import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 

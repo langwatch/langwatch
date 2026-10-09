@@ -11,7 +11,7 @@ like a slow boot are covered by the `haven` skill's `troubleshooting.md`.
 | `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA, :5560)             |
 | `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560)  |
 | `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers          |
-| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills, run before serve   |
+| `apps/tasks`          | `@langwatch/tasks`        | `pnpm task upgrade` and one-shot tasks, before serve  |
 | `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                       |
 | `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                        |
 | `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561) |
@@ -210,6 +210,24 @@ or plain `pnpm`. Preparing a fresh worktree (`pnpm start:prepare:files`, then
 `mail` builds from it when another worktree already made them from the same
 inputs. Don't set `NX_CACHE_DIRECTORY`: it makes the cache per worktree again.
 Why and how the cache stays trustworthy: ADR-150.
+
+## Migrations and the upgrade gate
+
+The api and worker never migrate. They read the upgrade ledger at boot and refuse by name
+(`refuses to serve: the installation is behind this image`) while a blocking step of the checkout is
+not done. haven runs the preparation once per `up`, before the lanes; outside haven run it yourself
+after pulling new migrations:
+
+```bash
+pnpm start:prepare:db                                  # upgrade, then the system-migrations pass
+pnpm --filter @langwatch/tasks task upgrade status     # what the ledger says
+pnpm --filter @langwatch/tasks task upgrade plan       # what an upgrade would apply
+```
+
+`pnpm prisma:migrate` and `pnpm clickhouse:migrate` still exist but bypass the ledger, so the gate
+keeps refusing until `upgrade` records them. ClickHouse is required: a stack without it refuses to
+serve. Live api and worker suites run `upgrade` once per test process on the test stores
+(`specs/upgrade/live-test-fixtures.feature`). Writing a migration: the `migration` skill.
 
 ## Compose presets
 

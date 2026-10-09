@@ -37,23 +37,27 @@ import {
 } from "../../../../model/agent-testing/run/parameter-rows.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips.tsx";
-import { applyConfigurationTo } from "./apply-configuration.ts";
-import { type CompareRow, compareRowParameters, type ParameterDefaults } from "./compare-rows.ts";
-import type { ParameterFieldError } from "./parameter-suggestions.ts";
-import type { PromptEntry } from "./prompt-picker.tsx";
-import { normaliseRunScope, type RunScope } from "./run-configuration.ts";
-import type { RunDialogMode, RunDialogSubject, RunTarget } from "./run-dialog-types.ts";
-import { type ScopeScenario, scenariosInScope } from "./run-scope-section.tsx";
-import type { RunDialogAgent } from "./run-target-picker.tsx";
+import {
+  type CompareRow,
+  compareRowParameters,
+  type ParameterDefaults,
+} from "../run-compare/compare-rows.ts";
+import { useCompareRows } from "../run-compare/use-compare-rows.ts";
+import { useRunEvaluators } from "../run-evaluators/use-run-evaluators.ts";
+import type { ParameterFieldError } from "../run-parameters/parameter-suggestions.ts";
 import {
   lineWithoutUndeclared,
   undeclaredNamesOnLine,
   undeclaredNamesOnRows,
   undeclaredParameterMessage,
-} from "./undeclared-parameters.ts";
-import { useCompareRows } from "./use-compare-rows.ts";
+} from "../run-parameters/undeclared-parameters.ts";
+import { applyConfigurationTo } from "./apply-configuration.ts";
+import type { PromptEntry } from "./prompt-picker.tsx";
+import { normaliseRunScope, type RunScope } from "./run-configuration.ts";
+import type { RunDialogMode, RunDialogSubject, RunTarget } from "./run-dialog-types.ts";
+import { type ScopeScenario, scenariosInScope } from "./run-scope-section.tsx";
+import type { RunDialogAgent } from "./run-target-picker.tsx";
 import { useRunConfigurationHistory } from "./use-run-configuration-history.ts";
-import { useRunEvaluators } from "./use-run-evaluators.ts";
 import { useRunHistorySeed } from "./use-run-history-seed.ts";
 import { buildTargetLabels, scopeLabelOf, useRunName } from "./use-run-name.ts";
 import { type RunPlanFields, useRunPlanFields } from "./use-run-plan-fields.ts";

@@ -24,7 +24,16 @@
   ],
   "references": [
     {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
       "path": "../ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../secrets/tsconfig.build.json"
     }
   ]
 }

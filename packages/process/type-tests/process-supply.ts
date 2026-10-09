@@ -9,19 +9,23 @@ import type { SupplyModule } from "../src/process-supply.types.ts";
 import {
   clock,
   clockModule,
+  clockRepositories,
   ClockApp,
   connections,
   connectionsModule,
   configModule,
   facilities,
+  memoryRepositoryModule,
   facilityModule,
   licenseConsumerModule,
   licenseSource,
-  memoryRepositoryModule,
   peerModule,
   project,
   projectModule,
   repositoryModule,
+  scoringModule,
+  verdictModule,
+  verdicts,
   type ProjectApi,
 } from "../tests/process-supply.fixtures.ts";
 
@@ -86,8 +90,7 @@ void all.boot();
 const ready = all
   .withConfig({ "api-key": { pepper: "test" } })
   .provide({ project })
-  .withRelational(facilities.relational)
-  .withKeyvalue(facilities.keyvalue)
+  .withMembers({ relational: facilities.relational, keyvalue: facilities.keyvalue })
   .withClock(clock)
   .withSecrets(facilities.secrets)
   .withEncryption(facilities.encryption)
@@ -107,7 +110,9 @@ void wrongFacility.boot();
 
 const repositoryOnly = createApp({ role: "api" }).withModules([repositoryModule]);
 expectTypeOf<MissingNames<typeof repositoryOnly>>().toEqualTypeOf<"relational" | "clock">();
-const repositorySupplied = repositoryOnly.withRelational(facilities.relational).withClock(clock);
+const repositorySupplied = repositoryOnly
+  .withMembers({ relational: facilities.relational })
+  .withClock(clock);
 expectTypeOf<MissingNames<typeof repositorySupplied>>().toEqualTypeOf<never>();
 void (() => repositorySupplied.boot());
 const memoryRepositoryOnly = createApp({ role: "api" }).withModules([memoryRepositoryModule]);
@@ -128,15 +133,27 @@ void missingCustomMember.withMembers({ connections: { primary: () => 42 } });
 // @ts-expect-error a custom member name must be declared by an installed module
 void missingCustomMember.withMembers({ connection: connections });
 
-const missingSupplyToken = createApp({ role: "api" }).withModules([licenseConsumerModule]);
-expectTypeOf<MissingNames<typeof missingSupplyToken>>().toEqualTypeOf<"peer.licenseSource">();
-// @ts-expect-error the named external supply is required
-void missingSupplyToken.boot();
-const suppliedTokenReady = missingSupplyToken.provide({ licenseSource });
-expectTypeOf<MissingNames<typeof suppliedTokenReady>>().toEqualTypeOf<never>();
-void (() => suppliedTokenReady.boot());
-// @ts-expect-error a supplied token keeps its declared API type
-void missingSupplyToken.provide({ licenseSource: { resolve: () => 42 } });
+const missingUnservedPeer = createApp({ role: "api" }).withModules([licenseConsumerModule]);
+expectTypeOf<MissingNames<typeof missingUnservedPeer>>().toEqualTypeOf<"peer.licensing">();
+// @ts-expect-error a peer no installed module serves is required
+void missingUnservedPeer.boot();
+const suppliedPeerReady = missingUnservedPeer.provide({ licensing: licenseSource });
+expectTypeOf<MissingNames<typeof suppliedPeerReady>>().toEqualTypeOf<never>();
+void (() => suppliedPeerReady.boot());
+// @ts-expect-error a provided peer keeps its declared API type
+void missingUnservedPeer.provide({ licensing: { resolve: () => 42 } });
+
+const missingBound = createApp({ role: "api" }).withModules([scoringModule]);
+expectTypeOf<MissingNames<typeof missingBound>>().toEqualTypeOf<"peer.instant-eval">();
+// @ts-expect-error a token a channel binds is a peer the process must supply
+void missingBound.boot();
+const standingInForBound = missingBound.provide({ "instant-eval": verdicts });
+expectTypeOf<MissingNames<typeof standingInForBound>>().toEqualTypeOf<never>();
+void (() => standingInForBound.boot());
+const installedBoundOwner = missingBound.withModules([verdictModule]);
+expectTypeOf<MissingNames<typeof installedBoundOwner>>().toEqualTypeOf<never>();
+// @ts-expect-error a stand-in for a bound token keeps its declared API type
+void missingBound.provide({ "instant-eval": { judge: () => 42 } });
 
 expectTypeOf(packageEntry.createApp).toEqualTypeOf(createApp);
 expectTypeOf(packageEntry.createApp).toEqualTypeOf(supplyEntry.createApp);
@@ -147,6 +164,7 @@ const overwritten = createApp({ role: "api" })
 expectTypeOf<MissingNames<typeof overwritten>>().toEqualTypeOf<"clock">();
 
 const withTransport = defineProcessModule("annotation")
+  .withRepositories(clockRepositories)
   .withApi(ClockApp)
   .withTransports({ protocol: "rest", router: () => ({}) });
 const transportClock = createApp({ role: "api" }).withModules([withTransport]);
@@ -305,13 +323,6 @@ function installDependenciesErased(module: DependenciesErasedModule) {
   return createApp({ role: "api" }).withModules([module]);
 }
 void installDependenciesErased;
-
-type MembersEvidenceErasedModule = Omit<typeof clockModule, "members">;
-function installMembersEvidenceErased(module: MembersEvidenceErasedModule) {
-  // @ts-expect-error member evidence must survive until the module tuple is accepted
-  return createApp({ role: "api" }).withModules([module]);
-}
-void installMembersEvidenceErased;
 
 const indexedPeers: Record<string, ProjectApi> = {};
 // @ts-expect-error an index signature does not prove the project key exists

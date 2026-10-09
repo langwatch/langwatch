@@ -6,6 +6,7 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
@@ -39,35 +40,39 @@ import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/eval
 import { ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  buildEvaluatorWorkflowArchiveCascadePipeline,
+  type EvaluatorWorkflowArchiveCascadePipeline,
+} from "../eventing/evaluator-workflow-archive-cascade.pipeline.ts";
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
+import { EvaluatorCreationCapService } from "../services/evaluator-creation-cap.service.ts";
+import {
+  EvaluatorDeletionFactsService,
+  type EvaluatorLifecycleSenders,
+} from "../services/evaluator-deletion-facts.service.ts";
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
+import { EvaluatorWorkflowArchiveService } from "../services/evaluator-workflow-archive.service.ts";
+import { EvaluatorWorkflowPublicationService } from "../services/evaluator-workflow-publication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
+import type { EvaluatorBrowserApi } from "../transport/evaluator.trpc.ts";
 
-/** The workflow and monitor rows an evaluator is entangled with, read through their owners. */
+/** The workflow rows an evaluator is entangled with, read through their owner. */
 export interface EvaluatorGraph {
   /** The evaluator's linked workflow, scoped to the project and not archived. */
   findLinkedWorkflow: (
     input: Readonly<{ workflowId: string; projectId: string }>,
   ) => Promise<{ id: string; name: string } | null>;
-  /** The monitors in the project that run this evaluator. */
-  findMonitorsUsingEvaluator(
-    input: Readonly<{ evaluatorId: string; projectId: string }>,
-  ): Promise<{ id: string; name: string }[]>;
-  /** Hard-deletes those monitors, and answers how many went. */
-  deleteMonitorsUsingEvaluator(
-    input: Readonly<{ evaluatorId: string; projectId: string }>,
-  ): Promise<{ count: number }>;
   /** Archives the evaluator's linked workflow. */
   archiveLinkedWorkflow(
     input: Readonly<{ workflowId: string; projectId: string }>,
@@ -89,7 +94,6 @@ export interface EvaluatorGraph {
 
 type EvaluatorSetup = FeatureSetup<
   typeof EvaluatorModule.dependencies,
-  never,
   EvaluatorServerConfig,
   EvaluatorRepositories
 >;
@@ -100,10 +104,14 @@ type EvaluatorAppParts = Readonly<{
   modelProviders: ModelProviderApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
+  deletionFacts: EvaluatorDeletionFactsService;
+  publications: EvaluatorWorkflowPublicationService;
+  /** The cloud Free cap on custom evaluators. */
+  creationCaps: EvaluatorCreationCapService;
   publicBaseUrl: string | undefined;
 }>;
 
-export class EvaluatorModule implements EvaluatorApi {
+export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   static readonly contract = EvaluatorApi;
   static readonly config = evaluatorConfig;
   static readonly dependencies = {
@@ -117,42 +125,70 @@ export class EvaluatorModule implements EvaluatorApi {
     workflows: WorkflowApi,
     /** Resolves the project's default and embeddings models. */
     modelProviders: ModelProviderApi,
-    /** The monitors that run an evaluator, read and removed with its cascade. */
-    monitors: MonitorApi,
+    /** The project's organization and its projects, which the evaluator cap counts across. */
+    projects: ProjectApi,
+    /** The plan whose cloud Free evaluator cap a create is checked against. */
+    plans: EntitlementApi,
   };
 
   static create(setup: EvaluatorSetup): EvaluatorModule {
-    const graph = EvaluatorLinkedRowsService.create({
-      workflows: setup.dependencies.workflows,
-      monitors: setup.dependencies.monitors,
-    });
+    const graph = EvaluatorLinkedRowsService.create({ workflows: setup.dependencies.workflows });
 
     return EvaluatorModule.createWithGraph(setup, graph);
   }
 
   /**
    * Split from {@link create} so a test can substitute a recording double for
-   * the workflow/monitor graph without a real database — the graph interface
+   * the workflow graph without a real database — the graph interface
    * is this module's own seam, not a process member.
    */
   static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorModule {
     const { dependencies, repositories, config } = setup;
+    const evaluators = EvaluatorRuntimeService.create({
+      repository: repositories.evaluators,
+      workflows: dependencies.workflows,
+      history: EvaluatorHistoryService.create({
+        auditLog: dependencies.auditLog,
+        users: dependencies.users,
+      }),
+      codeExecution: EvaluatorCodeExecutionService.withoutNlpRuntime(),
+      generateId: (kind: string) => generate(kind).toString(),
+    });
+
+    const creationCaps = EvaluatorCreationCapService.create({
+      plans: dependencies.plans,
+      projects: dependencies.projects,
+      evaluators: repositories.evaluators,
+    });
 
     return new EvaluatorModule({
-      evaluators: EvaluatorRuntimeService.create({
-        repository: repositories.evaluators,
-        workflows: dependencies.workflows,
-        history: EvaluatorHistoryService.create({
-          auditLog: dependencies.auditLog,
-          users: dependencies.users,
-        }),
-        codeExecution: EvaluatorCodeExecutionService.withoutNlpRuntime(),
-        generateId: (kind: string) => generate(kind).toString(),
-      }),
+      evaluators,
+      creationCaps,
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
+      deletionFacts: EvaluatorDeletionFactsService.create(),
+      publications: EvaluatorWorkflowPublicationService.create({
+        workflows: dependencies.workflows,
+        evaluators,
+        creationCaps,
+      }),
       publicBaseUrl: config.publicBaseUrl,
+    });
+  }
+
+  /** evaluator_lifecycle's senders, once the pipeline registers in this process. */
+  connectLifecycle(senders: EvaluatorLifecycleSenders): void {
+    this.#dependencies.deletionFacts.connect(senders);
+  }
+
+  /** Archives the evaluators a workflow backed once workflow records the archive (§9). */
+  workflowArchiveCascadePipeline(): EvaluatorWorkflowArchiveCascadePipeline {
+    return buildEvaluatorWorkflowArchiveCascadePipeline({
+      evaluators: EvaluatorWorkflowArchiveService.create({
+        evaluators: this.#dependencies.evaluators,
+        deletionFacts: this.#dependencies.deletionFacts,
+      }),
     });
   }
 
@@ -160,6 +196,25 @@ export class EvaluatorModule implements EvaluatorApi {
 
   private constructor(dependencies: EvaluatorAppParts) {
     this.#dependencies = dependencies;
+  }
+
+  /** This module's own application, which the browser door reads through. */
+  evaluators(): EvaluatorApi {
+    return this;
+  }
+
+  /** Publishes a workflow as an evaluator, creating or renaming the evaluator that wraps it. */
+  toggleSaveAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    isEvaluator: boolean;
+  }): Promise<void> {
+    return this.#dependencies.publications.toggleSaveAsEvaluator(input);
+  }
+
+  /** Clears a workflow's evaluator flag and archives the evaluator that wrapped it. */
+  disableAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void> {
+    return this.#dependencies.publications.disableAsEvaluator(input);
   }
 
   /** Runs a code evaluator's program in the process's own code sandbox. */
@@ -266,7 +321,7 @@ export class EvaluatorModule implements EvaluatorApi {
     return this.#dependencies.evaluators.getWorkflowFields(input);
   }
 
-  /** The workflow and monitors a cascade archive would take with the evaluator. */
+  /** The workflow a cascade archive would take with the evaluator. */
   async getRelatedEntities(input: {
     id: string;
     projectId: string;
@@ -278,12 +333,8 @@ export class EvaluatorModule implements EvaluatorApi {
           projectId: input.projectId,
         })
       : null;
-    const monitors = await this.#dependencies.graph.findMonitorsUsingEvaluator({
-      evaluatorId: input.id,
-      projectId: input.projectId,
-    });
 
-    return { workflow, monitors };
+    return { workflow };
   }
 
   /**
@@ -316,10 +367,16 @@ export class EvaluatorModule implements EvaluatorApi {
   // ── Writes ────────────────────────────────────────────────────────────────
 
   /**
-   * Creates an evaluator, refusing a code evaluator that carries no program and
-   * a workflow that already answers for one.
+   * Creates an evaluator within the plan's evaluator cap, refusing a code evaluator
+   * with no program and a workflow that already answers for one.
    */
   async create(input: EvaluatorCreateInput): Promise<Evaluator> {
+    await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
+    return this.#createGuarded(input);
+  }
+
+  /** The create guards without the plan's cap, which a copy asks for itself. */
+  async #createGuarded(input: EvaluatorCreateInput): Promise<Evaluator> {
     if (input.type === "code") assertCodeEvaluatorConfig(input.id, input.config);
 
     if (input.workflowId) {
@@ -350,6 +407,7 @@ export class EvaluatorModule implements EvaluatorApi {
     config: EvaluatorConfig;
     id?: string;
   }): Promise<Evaluator> {
+    await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     const [resolvedDefault, resolvedEmbedding] = await Promise.all([
       this.#dependencies.modelProviders.resolveModelForFeature({
         projectId: input.projectId,
@@ -391,16 +449,11 @@ export class EvaluatorModule implements EvaluatorApi {
   }
 
   /**
-   * Archives the evaluator and everything that only exists to run it: the
-   * monitors go (hard, they are configuration), the linked workflow is archived
-   * beside the evaluator.
+   * Archives the evaluator and its linked workflow, then records `lw.evaluator.deleted`:
+   * monitor removes the monitors that ran it from its own side, after a lag (R7).
    */
   async cascadeArchive(input: { id: string; projectId: string }): Promise<EvaluatorCascadeArchive> {
     const evaluator = await this.#dependencies.evaluators.getById(input);
-    const deletedMonitors = await this.#dependencies.graph.deleteMonitorsUsingEvaluator({
-      evaluatorId: input.id,
-      projectId: input.projectId,
-    });
     const archivedEvaluator = await this.#dependencies.evaluators.archive(input);
     const archivedWorkflow = evaluator.workflowId
       ? await this.#dependencies.graph.archiveLinkedWorkflow({
@@ -408,12 +461,12 @@ export class EvaluatorModule implements EvaluatorApi {
           projectId: input.projectId,
         })
       : null;
+    await this.#dependencies.deletionFacts.recordEvaluatorDeleted({
+      projectId: input.projectId,
+      evaluatorId: input.id,
+    });
 
-    return {
-      evaluator: archivedEvaluator,
-      archivedWorkflow,
-      deletedMonitorsCount: deletedMonitors.count,
-    };
+    return { evaluator: archivedEvaluator, archivedWorkflow };
   }
 
   /** Replicates the evaluator, and the workflow backing it, into another project. */
@@ -423,6 +476,7 @@ export class EvaluatorModule implements EvaluatorApi {
     sourceProjectId: string;
     newEvaluatorId: string;
     actorId: string;
+    shouldCheckEvaluatorCap?: boolean;
   }): Promise<Evaluator> {
     const permitted = await this.#dependencies.permissions.hasPermission({
       userId: input.actorId,
@@ -431,6 +485,12 @@ export class EvaluatorModule implements EvaluatorApi {
     });
 
     if (!permitted) throw new EvaluatorSourcePermissionDeniedError(input.sourceProjectId);
+    if (input.shouldCheckEvaluatorCap !== false) {
+      await this.#dependencies.creationCaps.assertCreationAllowed({
+        projectId: input.projectId,
+        operatorId: input.actorId,
+      });
+    }
 
     return EvaluatorReplicationService.create({
       replicateEvaluatorWorkflow: (replication) =>
@@ -441,7 +501,10 @@ export class EvaluatorModule implements EvaluatorApi {
       deleteReplicatedWorkflow: (replication) =>
         this.#dependencies.graph.deleteReplicatedWorkflow(replication),
     }).copyToProject({
-      evaluators: this,
+      evaluators: {
+        findById: (lookup) => this.findById(lookup),
+        create: (copy) => this.#createGuarded(copy),
+      },
       evaluatorId: input.evaluatorId,
       sourceProjectId: input.sourceProjectId,
       targetProjectId: input.projectId,

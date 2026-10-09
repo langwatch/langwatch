@@ -1,5 +1,6 @@
 /** Test host and harness for public annotation surfaces. */
 
+import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
@@ -12,16 +13,21 @@ import {
   type AnnotationHostUser,
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
+  type AnnotationTraceFilters,
 } from "./model/annotation-host.ts";
 
 export type StubAnnotationHostOptions = {
   project?: AnnotationHostProject | undefined;
+  /** How the active scope reads; ready unless a test says otherwise. */
+  scopeStatus?: UiScopeStatus;
   organizationId?: string | undefined;
   currentUser?: AnnotationHostUser | undefined;
   permissions?: readonly string[];
   isLiteMember?: boolean;
   isOwnPersonalWorkspace?: boolean;
   route?: AnnotationRouteReading;
+  /** The trace filters the shell passes in; absent means the list is unfiltered. */
+  traceFilters?: AnnotationTraceFilters;
   /** The drawer the address bar has open, if any. */
   openDrawer?: string;
 };
@@ -45,6 +51,10 @@ export class StubAnnotationHost extends AnnotationHostApi {
     return "project" in this.options
       ? this.options.project
       : { id: "proj-1", slug: "test-project", name: "Test Project" };
+  }
+
+  scopeStatus(): UiScopeStatus {
+    return this.options.scopeStatus ?? "ready";
   }
 
   organizationId(): string | undefined {
@@ -73,6 +83,10 @@ export class StubAnnotationHost extends AnnotationHostApi {
 
   route(): AnnotationRouteReading {
     return this.options.route ?? { params: {}, query: {} };
+  }
+
+  traceFilters(): AnnotationTraceFilters | undefined {
+    return this.options.traceFilters;
   }
 
   setQuery(next: Readonly<Record<string, string | undefined>>): void {

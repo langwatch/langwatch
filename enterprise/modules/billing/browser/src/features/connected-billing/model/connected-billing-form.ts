@@ -1,5 +1,5 @@
+import type { LicenseBillingSectionProps } from "@langwatch/enterprise-billing-client";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { UiLicenseBillingSectionProps } from "@langwatch/browser-host/declarations";
 /**
  * The contract an operator onboards or renews a connected customer on
  * (ADR-156 section 7), starting from what the account already says and
@@ -49,7 +49,7 @@ export function billingFormFrom({
   license,
 }: {
   account: ConnectedBillingAccountView | null;
-  license: UiLicenseBillingSectionProps;
+  license: LicenseBillingSectionProps;
 }): BillingForm {
   return {
     billingEmail: account?.billingEmail ?? license.email,
@@ -88,7 +88,7 @@ export function onboardPayload({
   license,
 }: {
   form: BillingForm;
-  license: UiLicenseBillingSectionProps;
+  license: LicenseBillingSectionProps;
 }): ConnectedOnboardRequest {
   const bankTransfer =
     form.bankTransferType === ""

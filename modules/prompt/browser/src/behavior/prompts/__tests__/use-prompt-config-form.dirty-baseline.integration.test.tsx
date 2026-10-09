@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 
-vi.mock("../../use-model-limits.ts", () => ({
+vi.mock("../../../features/model-selection/behavior/use-model-limits.ts", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 

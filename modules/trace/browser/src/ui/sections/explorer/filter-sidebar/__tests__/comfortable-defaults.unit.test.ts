@@ -6,12 +6,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_DENSITY } from "../../../../../behavior/density.store.ts";
+import { DEFAULT_DENSITY } from "../../../../../features/explorer/behavior/density.store.ts";
 import {
   COMFORTABLE_DEFAULT_SECTIONS,
   EVENT_ATTRIBUTES_SECTION_KEY,
   SPAN_ATTRIBUTES_SECTION_KEY,
-} from "../../../../../behavior/facet-constants.ts";
+} from "../../../../../features/facet/behavior/facet-constants.ts";
 
 describe("comfortable density defaults", () => {
   it("is the density a fresh profile starts on", () => {

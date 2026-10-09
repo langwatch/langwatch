@@ -19,7 +19,7 @@ const CUSTOMER = { id: "user_customer", email: "admin@acme.example" };
 
 /** Billing as the mount reaches it: records who it was asked as, and refuses everybody. */
 function mounted() {
-  const askedAs: (BillingStaff | null)[] = [];
+  const askedAs: BillingStaff[] = [];
   const billing = createApiFixture<BillingApi>({
     getConnectedBillingOverview: async (_input, by) => {
       askedAs.push(by);

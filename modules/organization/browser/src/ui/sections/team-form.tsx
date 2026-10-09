@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { CreateProjectDrawerToken } from "@langwatch/organization-contract";
+import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {

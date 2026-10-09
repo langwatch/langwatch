@@ -44,6 +44,8 @@ type SummaryInputs struct {
 	Editions     []Edition
 	Rows         []Row
 	Coverage     *Coverage
+	// Partial says why the run captured less than it planned; empty when it did not.
+	Partial []string
 }
 
 // RenderSummary is the triage text: counts by class and edition, coverage,
@@ -58,6 +60,9 @@ func RenderSummary(inputs SummaryInputs) string {
 	}
 	fmt.Fprintf(&out, "visualdiff %s vs %s: %d screens, %d findings\n",
 		inputs.BaseRef, inputs.CandidateRef, len(inputs.Rows), len(findings)+uncovered)
+	for _, reason := range inputs.Partial {
+		fmt.Fprintf(&out, "PARTIAL RUN, not every screen was captured: %s\n", reason)
+	}
 	fmt.Fprintln(&out, RenderingOnly)
 	if inputs.Coverage != nil {
 		fmt.Fprintln(&out, inputs.Coverage.Line())

@@ -104,7 +104,7 @@ export interface IdentityResolution {
  * issuer lookup must carry it: the account read is keyed on better-auth's
  * verbatim provider id, which the caller asking by issuer cannot know.
  */
-export interface IdentityIssuerResolution extends IdentityResolution {
+interface IdentityIssuerResolution extends IdentityResolution {
   providerId: string;
 }
 

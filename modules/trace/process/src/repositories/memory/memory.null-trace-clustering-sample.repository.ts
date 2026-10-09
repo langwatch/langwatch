@@ -2,7 +2,7 @@ import {
   type TraceClusteringSampleCounts,
   TraceClusteringSampleRepository,
   type TraceClusteringSampleRow,
-} from "../trace-clustering-sample.repository.ts";
+} from "../../features/topic/repositories/trace-clustering-sample.repository.ts";
 
 /** The memory tier folds no summary projection, so clustering finds nothing to read. */
 export class MemoryNullTraceClusteringSampleRepository extends TraceClusteringSampleRepository {

@@ -11,16 +11,12 @@ export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof data
   defineTrpcRouter(DatasetApi, datasetTrpc)
     .procedure("upsert")
     .withPermission("datasets:manage")
-    // Borrowing the experiment's name when the caller named one is the
-    // application's rule, not this transport's: the REST patch fills the same
-    // hole from the dataset it is replacing, and one upsert decides both.
     .handle(async ({ app, input }) =>
       app.upsertDataset({
         projectId: input.projectId,
-        name: "name" in input ? input.name : undefined,
-        experimentId: "experimentId" in input ? input.experimentId : undefined,
+        name: input.name,
         columnTypes: input.columnTypes,
-        datasetId: "datasetId" in input ? input.datasetId : undefined,
+        datasetId: input.datasetId,
         datasetRecords: input.datasetRecords,
       }),
     )

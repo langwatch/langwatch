@@ -14,19 +14,19 @@ import type {
   GovernanceObjectStorageCredentials,
   GovernanceObjectStore,
 } from "../../channels/object-store.channel.ts";
+import { NO_SUPPRESSION } from "../../features/identity/rules/erasure-suppression.rules.ts";
+import type { PulledUsageRateInput } from "../../features/ingestion-pull/rules/pulled-usage-rate.rules.ts";
+import { silentIngestionPullDiagnostics } from "../../features/ingestion-pull/services/ingestion-pull-log.service.ts";
+import type { PulledUsageEntitlements } from "../../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
+import { IngestionPullWorkerService } from "../../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
+import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../features/ingestion-pull/services/pulled-usage-record.service.ts";
+import { PullerRegistryService } from "../../features/ingestion-pull/services/puller-registry.service.ts";
 import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSink,
 } from "../../repositories/governance.repositories.ts";
 import type { IngestionPullSourceReader } from "../../repositories/ingestion-source.repository.ts";
-import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
-import type { PulledUsageRateInput } from "../../rules/pulled-usage-rate.rules.ts";
-import { silentIngestionPullDiagnostics } from "../../services/ingestion-pull-log.service.ts";
-import type { PulledUsageEntitlements } from "../../services/ingestion-pull-worker.service.ts";
-import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker.service.ts";
-import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
-import { PullerRegistryService } from "../../services/puller-registry.service.ts";
 
 export class TestHttp implements GovernanceHttpClient {
   constructor(

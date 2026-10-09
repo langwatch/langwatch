@@ -1,4 +1,3 @@
-import { uiTokens } from "@langwatch/module";
 /**
  * The four paths a guided onboarding can set up, shared by process and browser.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
@@ -75,6 +74,3 @@ export type GuidedOnboardingOfferProps = {
   space: GuidedSpace;
   spaceInUse?: boolean | null;
 };
-
-export const GuidedOnboardingOfferToken =
-  uiTokens("onboarding").component<GuidedOnboardingOfferProps>("guidedOnboardingOffer");

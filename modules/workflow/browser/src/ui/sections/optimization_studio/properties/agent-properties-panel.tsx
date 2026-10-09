@@ -4,7 +4,6 @@ import {
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
-import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
 import {
   Badge,
   Box,
@@ -17,6 +16,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { PromptNodeOutput } from "@langwatch/prompt-client";
 import type {
   HttpAuth,
   HttpComponentConfig,
@@ -117,7 +117,14 @@ function buildHttpConfig({
  * Renders agent configuration inline (HTTP tabs or code editor),
  * matching the pattern used by EvaluatorPropertiesPanel.
  */
-const CODE_OUTPUT_TYPES: UiNodeOutput["type"][] = ["str", "float", "bool", "dict", "list", "image"];
+const CODE_OUTPUT_TYPES: PromptNodeOutput["type"][] = [
+  "str",
+  "float",
+  "bool",
+  "dict",
+  "list",
+  "image",
+];
 
 export function AgentPropertiesPanel({ node }: { node: Node<AgentComponent> }) {
   const agentRef = node.data.agent;
@@ -306,9 +313,9 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     type: input.type,
   }));
 
-  const outputs: UiNodeOutput[] = (node.data.outputs ?? []).map((output) => ({
+  const outputs: PromptNodeOutput[] = (node.data.outputs ?? []).map((output) => ({
     identifier: output.identifier,
-    type: output.type as UiNodeOutput["type"],
+    type: output.type as PromptNodeOutput["type"],
   }));
 
   const handleInputsChange = useCallback(
@@ -321,7 +328,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   );
 
   const handleOutputsChange = useCallback(
-    (newOutputs: UiNodeOutput[]) => {
+    (newOutputs: PromptNodeOutput[]) => {
       const mapped: DslField[] = newOutputs.map((o) => ({
         identifier: o.identifier,
         type: o.type as DslField["type"],

@@ -30,6 +30,7 @@ export { InMemoryProcessStore } from "./stores/inMemoryProcessStore.ts";
 export { deriveInboxKey } from "./stores/inboxKey.ts";
 export type {
   AppendIntentsResult,
+  CallerTransaction,
   CommitResult,
   DueWake,
   FailedOutboxAttempt,

@@ -28,11 +28,11 @@ import {
   mapThrownErrorEvent,
   type ResultMapperConfig,
 } from "../eventing/experiment-result-mapping.process.ts";
+import { ExperimentRunSandboxKeyService } from "../features/run/services/experiment-run-sandbox-key.service.ts";
 import { targetReadsExternalAttachments } from "../rules/experiment-attachment-input.rules.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
-import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 
 const sandboxKey = ExperimentRunSandboxKeyService.create();
 

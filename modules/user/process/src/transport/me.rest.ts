@@ -1,52 +1,13 @@
 /**
- * `/api/me` — the personal developer surface a project API key reads: spend,
- * usage, model breakdown, and the project's identity. Whether a key may
- * answer for a PERSON is the application's question — the credential's class is half of it.
+ * `/api/me` — the personal developer surface a project API key reads. User serves the
+ * project's identity; governance serves `/usage` at this path (its me-usage.rest.ts).
  */
-import {
-  baseResponses,
-  defineRestMiddleware,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
-import {
-  mePersonalCredentialSchema,
-  meProjectResponseSchema,
-  meUsageQuerySchema,
-  meUsageResponseSchema,
-  UserApi,
-} from "@langwatch/user-contract";
-
-/** The credential the mounting process resolved, whole rather than in pieces. */
-export const mePersonalCredential = defineRestMiddleware(
-  "mePersonalCredential",
-  mePersonalCredentialSchema,
-);
+import { baseResponses, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { meProjectResponseSchema, UserApi } from "@langwatch/user-contract";
 
 export const meRest = defineRestRouter(UserApi)
   .withNamespace("me")
   .withVersion(MANAGEMENT_API_VERSION)
-
-  .get("/usage", "getApiMeUsage")
-  .withQuery(meUsageQuerySchema)
-  .withPermission("project:view")
-  .withMiddleware(mePersonalCredential)
-  .withOutput(meUsageResponseSchema)
-  .withDocs({
-    description:
-      "Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.",
-    tags: ["Me"],
-    responses: { ...baseResponses },
-  })
-  .handle(({ app, input, scope }, credential) =>
-    app.getPersonalUsage({
-      projectId: scope.id,
-      credential,
-      ...(input.windowStartMs !== undefined && input.windowEndMs !== undefined
-        ? { window: { startMs: input.windowStartMs, endMs: input.windowEndMs } }
-        : {}),
-    }),
-  )
 
   .get("/project", "getApiMeProject")
   .withPermission("project:view")

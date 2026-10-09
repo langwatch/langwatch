@@ -1,5 +1,6 @@
 import { trace } from "@opentelemetry/api";
 
+import type { AppErrorCode } from "./app-codes.ts";
 import type {
   HandledErrorFault,
   SerializedHandledError,
@@ -30,15 +31,26 @@ export interface HerrEnvelope {
   reasons?: HerrEnvelope[];
 }
 
+/** Where to read a trace: the trace view and its log lines, each optional. */
+export interface TraceLinks {
+  traceUrl?: string;
+  logsUrl?: string;
+}
+
 /**
- * Pluggable trace-URL source for {@link HandledError.serialize}. The package is env-agnostic so
- * it can be shared by the app, MCP server and CLI; the app wires its Grafana link builder in
- * via {@link setTraceUrlProvider} at module load. Defaults to no trace URLs.
+ * Pluggable trace-link source for {@link HandledError.serialize} and REST error bodies. The
+ * package is env-agnostic; the process that owns Node installs its Grafana link builder via
+ * {@link setTraceUrlProvider} at boot. Defaults to no links.
  */
-export type TraceUrlProvider = (traceId: string | undefined) => string | undefined;
+export type TraceUrlProvider = (traceId: string | undefined) => TraceLinks | undefined;
 
 export function setTraceUrlProvider(provider: TraceUrlProvider): void {
   HandledError.configureTraceUrlProvider(provider);
+}
+
+/** The installed provider's links for a trace id; empty with no provider or no trace. */
+export function traceLinksFor(traceId: string | undefined): TraceLinks {
+  return HandledError.traceLinks(traceId);
 }
 
 /** One runtime constructor shared by every copy of this package in a realm. */
@@ -102,7 +114,7 @@ abstract class HandledErrorRuntime extends Error {
   serialize(): SerializedHandledError {
     // traceId is the real trace id for handled errors, so it links straight to
     // the trace when a trace URL provider is wired (the app uses Grafana).
-    const traceUrl = HandledErrorRuntime.#traceUrlProvider(this.traceId);
+    const { traceUrl, logsUrl } = HandledErrorRuntime.traceLinks(this.traceId);
     return {
       code: this.code,
       // Deprecated back-compat alias — see SerializedHandledError.kind.
@@ -111,6 +123,7 @@ abstract class HandledErrorRuntime extends Error {
       traceId: this.traceId,
       spanId: this.spanId,
       ...(traceUrl ? { traceUrl } : {}),
+      ...(logsUrl ? { logsUrl } : {}),
       httpStatus: this.httpStatus,
       fault: this.fault,
       retryable: this.retryable,
@@ -135,6 +148,11 @@ abstract class HandledErrorRuntime extends Error {
   /** @internal Realm-wide configuration behind {@link setTraceUrlProvider}. */
   static configureTraceUrlProvider(provider: TraceUrlProvider): void {
     HandledErrorRuntime.#traceUrlProvider = provider;
+  }
+
+  /** @internal Read side of {@link setTraceUrlProvider}; see {@link traceLinksFor}. */
+  static traceLinks(traceId: string | undefined): TraceLinks {
+    return HandledErrorRuntime.#traceUrlProvider(traceId) ?? {};
   }
 
   /**
@@ -371,4 +389,22 @@ export function activeTraceContext(): { traceId?: string; spanId?: string } {
   const ctx = trace.getActiveSpan()?.spanContext();
 
   return { traceId: ctx?.traceId, spanId: ctx?.spanId };
+}
+
+/**
+ * The 503 refusals that keep their body through the 5xx mask: the caller waits and retries,
+ * and the code says why (rulings 2026-10-06, round 9, CH-1). Any other undeclared 5xx stays masked.
+ */
+export const TRANSIENT_REFUSAL_CODES = [
+  "clickhouse_overloaded",
+  "service_unavailable",
+] as const satisfies readonly AppErrorCode[];
+
+const TRANSIENT_REFUSAL_STATUS = 503;
+
+const TRANSIENT_CODES: ReadonlySet<string> = new Set(TRANSIENT_REFUSAL_CODES);
+
+/** True for a handled error answering one of {@link TRANSIENT_REFUSAL_CODES} at 503. */
+export function isTransientRefusal(error: Pick<HandledError, "code" | "httpStatus">): boolean {
+  return error.httpStatus === TRANSIENT_REFUSAL_STATUS && TRANSIENT_CODES.has(error.code);
 }

@@ -5,8 +5,8 @@ import {
   createInitState,
   createTestSpan,
 } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
-import { SpanCostService } from "../span-cost.service.ts";
-import { TraceModelCostService } from "../trace-model-cost.service.ts";
+import { SpanCostService } from "../../features/span/services/span-cost.service.ts";
+import { TraceModelCostService } from "../../features/derivation/services/trace-model-cost.service.ts";
 
 const service = SpanCostService.create({
   modelCosts: TraceModelCostService.create(),

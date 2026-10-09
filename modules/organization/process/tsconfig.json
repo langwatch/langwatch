@@ -30,6 +30,9 @@
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
@@ -88,9 +91,6 @@
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../share/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

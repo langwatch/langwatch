@@ -42,3 +42,12 @@ GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"
 - Caps: `LLMSIM_MAX_CALLS` (default 500) and `LLMSIM_MAX_BODY_BYTES` (default 262144 per
   recorded request; larger bodies keep a size and a head).
 - A load run should hit the loopback port; the sims lane keeps it off the gateway's process.
+
+## From a terminal or agent
+
+`--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
+
+```
+haven llm info | calls | call <id> | clear
+haven llm set [--error <0|4xx|5xx>] [--seed <value|random>]    # only the flags given change
+```

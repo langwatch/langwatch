@@ -26,6 +26,7 @@ import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useMemberDisableAction } from "../../behavior/use-member-disable-action.ts";
+import { useMemberProvenance } from "../../behavior/use-member-provenance.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
 import { useTwoStepRequirement } from "../../behavior/use-two-step-requirement.ts";
@@ -92,10 +93,7 @@ function PersonDetail({
     { organizationId, userId },
     { enabled: canManage },
   );
-  const provenance = api.organization.getMemberProvenance.useQuery(
-    { organizationId },
-    { enabled: canManage },
-  );
+  const provenance = useMemberProvenance({ organizationId, enabled: canManage });
   const twoStep = useTwoStepRequirement({ organizationId, canManage });
 
   if (!canManage) {

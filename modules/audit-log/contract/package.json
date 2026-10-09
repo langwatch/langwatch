@@ -27,5 +27,6 @@
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "callable": false
 }

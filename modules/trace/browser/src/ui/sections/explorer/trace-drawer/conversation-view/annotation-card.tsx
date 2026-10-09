@@ -1,8 +1,8 @@
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
+import { useJumpToAnnotationAnchor } from "../../../../../features/annotation/behavior/use-jump-to-annotation-anchor.ts";
 import { AnnotationCard as PackageAnnotationCard } from "../../../../blocks/explorer/trace-drawer/annotation-card.tsx";
 import { PersonAvatar } from "../../../person-avatar.tsx";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import { useJumpToAnnotationAnchor } from "../../hooks/use-jump-to-annotation-anchor.ts";
 
 interface AnnotationCardProps {
   annotation: AnnotationByTrace;

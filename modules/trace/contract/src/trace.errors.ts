@@ -1,7 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-import type { AiActionErrorDetails } from "./trace-ai-query.ts";
-import { FILTER_TOO_COMPLEX_MESSAGE } from "./trace-query-analysis.ts";
+import type { AiActionErrorDetails } from "./features/query/trace-ai-query.ts";
+import { FILTER_TOO_COMPLEX_MESSAGE } from "./features/query/trace-query-analysis.ts";
 
 /** The configured model provider did not produce a usable trace query. */
 export class AiQueryProviderError extends HandledError {
@@ -170,6 +170,34 @@ export class TraceIdsTooManyError extends HandledError {
       },
     );
     this.name = "TraceIdsTooManyError";
+  }
+}
+
+/**
+ * A trace page above the plan's bound, named by its registry key. Refused
+ * rather than clamped, so a caller learns its plan's page size instead of
+ * silently receiving fewer rows than it asked for.
+ */
+export class TracePageSizeTooLargeError extends HandledError {
+  declare readonly code: "trace_page_size_too_large";
+
+  constructor({
+    maxPageSize,
+    bound,
+  }: {
+    maxPageSize: number;
+    bound: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
+  }) {
+    super(
+      "trace_page_size_too_large",
+      `At most ${maxPageSize} traces can be read in one page under this plan. Ask for a smaller pageSize and page forward with scrollId.`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { maxPageSize, bound },
+      },
+    );
+    this.name = "TracePageSizeTooLargeError";
   }
 }
 

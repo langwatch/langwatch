@@ -61,3 +61,15 @@ Feature: The store-containment lint rule
     Given a service unit test that value-imports a Redis client
     When the store-containment rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: A client package naming a store is reported
+    Given a module's client package
+    When it value-imports a Redis client or names Prisma
+    Then the rule reports it as it would in any module package
+
+  @unit
+  Scenario: A named exception names only the stores it lists, in its one file
+    Given the named exception for Better Auth's storage adapter lists Prisma and Redis
+    When its file imports Prisma, Redis or ClickHouse, and another file imports Redis
+    Then only the ClickHouse import and the other file's import are reported

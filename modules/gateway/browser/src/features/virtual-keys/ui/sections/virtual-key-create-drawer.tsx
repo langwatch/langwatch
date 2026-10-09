@@ -243,7 +243,7 @@ export function VirtualKeyCreateDrawer({
   );
   // Lazily provisions the caller's personal workspace, so Personal
   // ownership works even for users who predate personal workspaces.
-  const personalContextQuery = api.user.personalContext.useQuery(
+  const personalContextQuery = api.routingPolicy.personalContext.useQuery(
     { organizationId },
     { enabled: open && !!organizationId && ownership.kind === "PERSONAL" },
   );
