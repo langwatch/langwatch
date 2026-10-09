@@ -305,6 +305,17 @@ Rule: Free text matches span names as well as captured I/O
     When the same term is searched through the legacy messages list search
     Then that trace is in the results
 
+  # Reaching span names must not make the search read every trace's captured
+  # text into memory at once: a project whose traces carry large inputs and
+  # outputs still gets its answer.
+  @regression @integration
+  Scenario: The legacy messages list search completes when traces carry large captured input and output
+    Given the project's traces carry large captured input and output
+    And one of them has a span named "Codex.Exec" and no occurrence of "codex" in its input or output
+    When "codex" is searched through the legacy messages list search
+    Then the search completes
+    And that trace is the only result
+
   # Ranking is deliberately unchanged. Neither free-text path scores results:
   # they are boolean SQL filters and the list stays ordered newest-first, so
   # "prioritising" a span-name match means including it in the match set at
