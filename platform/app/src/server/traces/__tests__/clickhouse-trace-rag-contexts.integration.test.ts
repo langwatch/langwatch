@@ -18,12 +18,13 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { RAGSpan, Span } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import { SpanStorageClickHouseRepository } from "../repositories/span-storage.clickhouse.repository";
 
 const tenantId = `test-rag-contexts-${nanoid()}`;
 const now = Date.now();
@@ -265,8 +266,11 @@ describe("RAG contexts read path (integration)", () => {
         clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
       });
 
-      const repo = new SpanStorageClickHouseRepository(ch);
-      const spans = await repo.getSpansByTraceId(tenantId, traceId);
+      const repo = spanStorageRepositoryFor(async () => ch);
+      const spans = await repo.getSpansByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId,
+      });
 
       const ragSpan = findRagSpan(spans);
       expect(ragSpan.contexts).toEqual(ragChunks);

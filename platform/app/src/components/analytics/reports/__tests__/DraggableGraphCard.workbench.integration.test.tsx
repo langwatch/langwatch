@@ -182,7 +182,7 @@ describe("a dashboard grid card", () => {
       renderCard({ kind: "builder" });
 
       expect(
-        screen.getByRole("button", { name: /Add alert/ }),
+        screen.getByRole("button", { name: /Add automation/ }),
       ).toBeInTheDocument();
     });
 
@@ -209,7 +209,7 @@ describe("a dashboard grid card", () => {
       renderCard({ kind: WORKBENCH_SQL_CHART_KIND });
 
       expect(
-        screen.queryByRole("button", { name: /Add alert/ }),
+        screen.queryByRole("button", { name: /Add automation/ }),
       ).not.toBeInTheDocument();
     });
 
@@ -306,7 +306,7 @@ describe("a dashboard grid card", () => {
       );
 
       expect(
-        screen.queryByRole("button", { name: /Add alert/ }),
+        screen.queryByRole("button", { name: /Add automation/ }),
       ).not.toBeInTheDocument();
     });
   });

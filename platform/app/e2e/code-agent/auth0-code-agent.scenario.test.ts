@@ -31,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { directExecuteSyncTransport } from "~/server/scenarios/execution/serialized-adapters/execute-sync-transport";
 import { SerializedCodeAgentAdapter } from "../../src/server/scenarios/execution/serialized-adapters/code-agent.adapter";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -175,7 +176,9 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
           AUTH0_API_URL: apiUrl,
         },
       },
-      nlpServiceUrl: NLP_SERVICE_URL,
+      transport: directExecuteSyncTransport({
+        nlpServiceUrl: NLP_SERVICE_URL,
+      }),
       projectApiKey: "test-api-key",
     });
 

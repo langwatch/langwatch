@@ -5,7 +5,7 @@ import type { SsoVerificationCeremonyMethod } from "./connection";
  * and what it offers them to prove a domain with (D05 tiers 2 and 3).
  *
  * Pure and total, like the sign-in router next door: every branch a reviewer
- * might look for is here, decided from four facts, and a test enumerates the
+ * might look for is here, decided from the context below, and a test enumerates the
  * whole table without a stub in sight. The surfaces call this and render the
  * answer; the guards refuse the same things independently, because a surface
  * is a courtesy and a guard is the rule.
@@ -23,26 +23,32 @@ export type SsoDeployment = "hosted" | "self-hosted";
  * What the installation and the organization actually are, at the moment the
  * setup surface is opened.
  *
- * `licensed` is the licence gate ADR-027 froze AT STARTUP, not a live read.
- * That is the whole of why `licenseActivatedSinceStart` exists as a separate
- * fact: a licence activated while the installation is running is genuine and
- * still does not change what this process federates, so the honest answer is
- * "restart", not "yes".
+ * `licensed` is the licence gate ADR-027 memoizes per process, not a live read.
+ * That is why `licenseActivationPending` exists as a separate fact: a licence
+ * activated on another replica is genuine and reaches this process's gate
+ * within the gate's deny TTL, so the answer is "within a minute", not "no
+ * licence".
  */
 export interface SsoSelfServeContext {
   deployment: SsoDeployment;
-  /** Whether the installation held a genuine licence when it started. */
+  /** Whether the licence gate allows single sign-on in this process. */
   licensed: boolean;
   /** Whether a genuine licence has been activated since it started. */
-  licenseActivatedSinceStart: boolean;
+  licenseActivationPending: boolean;
   /** Hosted only: whether this organization is opted in to self-serve. */
   optedIn: boolean;
+  /** Self-hosted only: whether the installation holds exactly one
+   *  organization. */
+  singleOrganization: boolean;
+  /** Whether the person asking is a platform operator (ADMIN_EMAILS). Only
+   *  asked where it changes the answer. */
+  actorIsPlatformOperator: boolean;
 }
 
 /** Why setup is not available, in the vocabulary the error codes use. */
 export type SsoSelfServeRefusal =
   | "license_required"
-  | "license_restart_required"
+  | "license_activation_pending"
   | "not_opted_in";
 
 export type SsoSelfServeAvailability =
@@ -51,7 +57,7 @@ export type SsoSelfServeAvailability =
       /** How this organization proves a domain it claims. */
       proof: SsoVerificationCeremonyMethod;
       /**
-       * Whether a claim waits for a LangWatch operator BY TIER — false
+       * Whether a claim waits for a LangWatch operator BY TIER. False
        * everywhere now, because a licence decides a self-hosted claim and a
        * published record decides a hosted one.
        *
@@ -69,8 +75,10 @@ export type SsoSelfServeAvailability =
 /**
  * The whole table:
  *
- *   self-hosted, licensed at startup     → published proof, nothing queued
- *   self-hosted, licensed since startup  → refuse, and say a restart is why
+ *   self-hosted, licensed, one organization     → the licence proves it
+ *   self-hosted, licensed, operator asking      → the licence proves it
+ *   self-hosted, licensed, several organizations → published proof
+ *   self-hosted, licence just activated → refuse, and say it arrives within a minute
  *   self-hosted, never licensed          → refuse, and say a licence is why
  *   hosted, opted in                     → published record decides it
  *   hosted, not opted in                 → refuse, and offer a conversation
@@ -84,16 +92,23 @@ export function ssoSelfServeAvailability(
 ): SsoSelfServeAvailability {
   if (context.deployment === "self-hosted") {
     if (context.licensed) {
+      // The operator of an installation already decides who has an account
+      // on it, so a DNS record proves nothing they could not do anyway. With
+      // several organizations on one installation, an organization
+      // administrator is not that operator, and proves the domain the way a
+      // hosted customer does.
+      const licenseProves =
+        context.singleOrganization || context.actorIsPlatformOperator;
       return {
         available: true,
-        proof: "dns-txt",
+        proof: licenseProves ? "license-token" : "dns-txt",
         claimWaitsForReview: false,
       };
     }
     return {
       available: false,
-      refusal: context.licenseActivatedSinceStart
-        ? "license_restart_required"
+      refusal: context.licenseActivationPending
+        ? "license_activation_pending"
         : "license_required",
     };
   }

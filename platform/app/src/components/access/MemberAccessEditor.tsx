@@ -321,6 +321,14 @@ function useMemberAccessEditor({
   };
 }
 
+/** The set with `id` flipped in or out, as a new set so React sees a change. */
+function toggled(prev: Set<string>, id: string): Set<string> {
+  const next = new Set(prev);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
 /**
  * The assignments held directly by this member, and the row that adds one.
  *
@@ -393,12 +401,7 @@ function DirectAssignments({
                 !mirrorsTheSeat(b)
               }
               onToggleRemoval={() =>
-                setPendingBindingRemovals((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(b.id)) next.delete(b.id);
-                  else next.add(b.id);
-                  return next;
-                })
+                setPendingBindingRemovals((prev) => toggled(prev, b.id))
               }
             />
           ))}
@@ -441,14 +444,23 @@ function DirectAssignments({
         </VStack>
       )}
 
-      <BindingInputRow
-        ref={bindingInputRef}
-        organizationId={organizationId}
-        onAdd={stageAddition}
-        onReadyChange={setHasDraftBinding}
-        organizationRole={pendingRole}
-        buttonLabel={ROLE_ASSIGNMENT_WORDS.create}
-      />
+      {/* A Developer seat (ADR-143) can be given no shared access at all, so
+          there is no row to add: the seat is the whole answer. */}
+      {pendingRole === OrganizationUserRole.DEVELOPER ? (
+        <Text fontSize="xs" color="fg.muted" data-testid="developer-no-access">
+          A Developer seat works in its own project only. Move them to a Member
+          seat to give them access to a team or project.
+        </Text>
+      ) : (
+        <BindingInputRow
+          ref={bindingInputRef}
+          organizationId={organizationId}
+          onAdd={stageAddition}
+          onReadyChange={setHasDraftBinding}
+          organizationRole={pendingRole}
+          buttonLabel={ROLE_ASSIGNMENT_WORDS.create}
+        />
+      )}
     </Box>
   );
 }
@@ -858,6 +870,12 @@ function useSeatConstrainedStaging({
   // organization row has no lite equivalent and is dropped, and rows made
   // identical by the correction collapse to one.
   useEffect(() => {
+    // A Developer seat (ADR-143) holds nothing shared: every staged row goes,
+    // the way the save deletes every stored one.
+    if (pendingRole === OrganizationUserRole.DEVELOPER) {
+      setPendingBindingAdditions([]);
+      return;
+    }
     if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
     setPendingBindingAdditions((prev) => {
       const seen = new Set<string>();

@@ -14,6 +14,7 @@
  * named.
  */
 import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz";
+import { HandledError } from "@langwatch/handled-error";
 import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -194,6 +195,9 @@ describe("checkDeclaredPermission", () => {
       const params = paramsFor({ projectId: "proj-1" });
       (params.ctx as { app?: unknown }).app = {
         permissions: { getDecision },
+        authorization: {
+          authorize: vi.fn().mockResolvedValue({ grants: [] }),
+        },
       };
 
       await checkDeclaredPermission({ permission: "traces:view" })(
@@ -557,6 +561,313 @@ describe("declaredServiceAuthorization", () => {
     expect(authzDeclarationOf(middleware)).toMatchObject({
       kind: "service-authorized",
       permissions: ["traces:view"],
+    });
+  });
+});
+
+describe("ADR-144: the proof a trace route carries", () => {
+  const SEALED = { sealed: "proof", grants: [] };
+  const appWith = (authorize = vi.fn().mockResolvedValue(SEALED)) => ({
+    permissions: {
+      getDecision: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+    },
+    authorization: { authorize },
+  });
+
+  describe("given a procedure checked under a permission a store reads under", () => {
+    describe("when the check admits the caller", () => {
+      it("mints the proof for the project and names the route as its purpose", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "traces:view" })({
+          ...params,
+          path: "tracesV2.list",
+        } as any);
+
+        expect(app.authorization.authorize).toHaveBeenCalledWith({
+          actor: { type: "user", id: "alice" },
+          principal: { type: "user", id: "alice" },
+          permission: "traces:view",
+          scope: { projectId: "proj-1" },
+          purpose: { kind: "route", route: "tracesV2.list" },
+        });
+        expect((params.ctx as { authorization?: unknown }).authorization).toBe(
+          SEALED,
+        );
+        expect(params.next).toHaveBeenCalled();
+      });
+
+      it("refuses the request when the door disagrees with the check, rather than reading wider", async () => {
+        const app = appWith(
+          vi.fn().mockRejectedValue(new Error("not granted")),
+        );
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await expect(
+          checkDeclaredPermission({ permission: "traces:view" })(params as any),
+        ).rejects.toThrow("not granted");
+        expect(params.next).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a procedure checked under a permission no store reads under", () => {
+    describe("when the check admits the caller", () => {
+      it("mints nothing", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "project:manage" })(
+          params as any,
+        );
+
+        expect(app.authorization.authorize).not.toHaveBeenCalled();
+        expect(
+          (params.ctx as { authorization?: unknown }).authorization,
+        ).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a procedure checked under analytics view", () => {
+    describe("when the check admits the caller", () => {
+      it("mints nothing, since no analytics read applies a proof", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "analytics:view" })(
+          params as any,
+        );
+
+        expect(app.authorization.authorize).not.toHaveBeenCalled();
+        expect(
+          (params.ctx as { authorization?: unknown }).authorization,
+        ).toBeUndefined();
+        expect(params.next).toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+describe("ADR-144: an aggregate read is audited at the door", () => {
+  const SHARED_PROOF = {
+    scope: { organizationId: "org-1" },
+    grants: [
+      { kind: "own", projectId: "proj-1" },
+      { kind: "shared", projectId: "proj-member" },
+    ],
+  };
+  const setup = ({
+    proof = SHARED_PROOF,
+    kind = "aggregate",
+    record = vi.fn().mockResolvedValue(undefined),
+  }: {
+    proof?: unknown;
+    kind?: string;
+    record?: ReturnType<typeof vi.fn>;
+  } = {}) => {
+    const kindOf = vi.fn().mockResolvedValue(kind);
+    const params = paramsFor({ projectId: "proj-1" });
+    Object.assign(params.ctx, {
+      app: {
+        permissions: {
+          getDecision: vi
+            .fn()
+            .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+        },
+        authorization: { authorize: vi.fn().mockResolvedValue(proof) },
+        aggregateReadAudit: { recordAggregateRead: record },
+      },
+      projectKinds: { kindOf, kindsOf: vi.fn() },
+    });
+    const run = () =>
+      checkDeclaredPermission({ permission: "traces:view" })(params as any);
+    return { params, kindOf, record, run };
+  };
+
+  describe("when the proof reads shared grants on an aggregate", () => {
+    it("records the read for the caller and the aggregate", async () => {
+      const { record, run } = setup();
+
+      await run();
+
+      expect(record).toHaveBeenCalledWith({
+        actorUserId: "alice",
+        organizationId: "org-1",
+        aggregateProjectId: "proj-1",
+      });
+    });
+  });
+
+  describe("when recording the read fails", () => {
+    it("lets the read go on", async () => {
+      const { params, run } = setup({
+        record: vi.fn().mockRejectedValue(new Error("audit store down")),
+      });
+
+      await run();
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the proof reads no shared grant", () => {
+    it("neither reads the kind nor records anything", async () => {
+      const { kindOf, record, run } = setup({
+        proof: { scope: { organizationId: "org-1" }, grants: [] },
+      });
+
+      await run();
+
+      expect(kindOf).not.toHaveBeenCalled();
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project reading shared grants is not an aggregate", () => {
+    it("records nothing", async () => {
+      const { record, run } = setup({ kind: "application" });
+
+      await run();
+
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("ADR-144: a write under an aggregate is refused at the door", () => {
+  const setup = ({
+    kind = "aggregate",
+    type = "mutation",
+  }: {
+    kind?: string;
+    type?: "query" | "mutation";
+  } = {}) => {
+    const params = paramsFor({ projectId: "proj-1" });
+    Object.assign(params.ctx, {
+      app: {
+        permissions: {
+          getDecision: vi
+            .fn()
+            .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+        },
+        authorization: { authorize: vi.fn() },
+      },
+      projectKinds: {
+        kindOf: vi.fn().mockResolvedValue(kind),
+        kindsOf: vi.fn(),
+      },
+    });
+    const run = (
+      permission: Parameters<typeof checkDeclaredPermission>[0]["permission"],
+    ) => checkDeclaredPermission({ permission })({ ...params, type } as any);
+    return { params, run };
+  };
+
+  describe("when a mutation writes data under an aggregate", () => {
+    it("refuses with the read-only code before the handler runs", async () => {
+      const { params, run } = setup();
+
+      const refusal = await rejection(() => run("workflows:create"));
+
+      expect(HandledError.isHandled(refusal) && refusal.code).toBe(
+        "aggregate_project_is_read_only",
+      );
+      expect(params.next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a mutation manages the aggregate itself", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup();
+
+      await run("project:update");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when a query is declared under a write permission on an aggregate", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup({ type: "query" });
+
+      await run("workflows:create");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the mutation writes under any other kind of project", () => {
+    it("lets it through", async () => {
+      const { params, run } = setup({ kind: "application" });
+
+      await run("workflows:create");
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when a mutation is declared with any of several permissions", () => {
+    const setupAny = ({ kind = "aggregate" }: { kind?: string } = {}) => {
+      const params = paramsFor({ projectId: "proj-1" });
+      Object.assign(params.ctx, {
+        app: {
+          permissions: {
+            getProjectAnyDecision: vi.fn().mockResolvedValue({
+              permitted: true,
+              organizationRole: "ADMIN",
+            }),
+          },
+        },
+        projectKinds: {
+          kindOf: vi.fn().mockResolvedValue(kind),
+          kindsOf: vi.fn(),
+        },
+      });
+      const run = (
+        permissions: Parameters<typeof checkDeclaredPermissionAny>[0],
+      ) =>
+        checkDeclaredPermissionAny(permissions)({
+          ...params,
+          type: "mutation",
+        } as any);
+      return { params, run };
+    };
+
+    it("refuses it on an aggregate when any of them writes", async () => {
+      const { params, run } = setupAny();
+
+      const refusal = await rejection(() =>
+        run(["traces:view", "workflows:create"]),
+      );
+
+      expect(HandledError.isHandled(refusal) && refusal.code).toBe(
+        "aggregate_project_is_read_only",
+      );
+      expect(params.next).not.toHaveBeenCalled();
+    });
+
+    it("lets it through on an aggregate when every one of them reads", async () => {
+      const { params, run } = setupAny();
+
+      await run(["traces:view", "scenarios:view"]);
+
+      expect(params.next).toHaveBeenCalled();
+    });
+
+    it("lets it through on any other kind of project", async () => {
+      const { params, run } = setupAny({ kind: "application" });
+
+      await run(["traces:view", "workflows:create"]);
+
+      expect(params.next).toHaveBeenCalled();
     });
   });
 });

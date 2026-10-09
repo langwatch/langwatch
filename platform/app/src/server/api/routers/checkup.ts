@@ -51,11 +51,12 @@ export const checkupRouter = createTRPCRouter({
   run: protectedProcedure
     .input(runInput)
     .permission("organization:manage")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       if (env.IS_SAAS) return { deployment: "saas" as const };
       const result = await checkupFor({
         prisma,
         organizationId: input.organizationId,
+        actorUserId: ctx.session.user.id,
       }).explicit({
         ...(input.checks ? { checks: input.checks } : {}),
         ...(input.scenarioRunPlanId

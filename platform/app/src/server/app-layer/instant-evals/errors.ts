@@ -58,6 +58,45 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
 }
 
 /**
+ * The organization's own switch was thrown for an organization the popover does
+ * not offer it to: an enterprise plan, or a self-hosted install. A customer
+ * state and a 403; the plan or the deployment is what says no, and a word with
+ * us is the remedy.
+ *
+ * `meta.deployment` says which, because the two read differently: an
+ * enterprise plan is switched on by us, and a self-hosted install gets
+ * Instant Evals from its license, or from its operator's release flag when it
+ * judges with its own key.
+ *
+ * @see ./opt-in.ts
+ */
+export class InstantEvalOptInNotOfferedError extends HandledError {
+  declare readonly code: "instant_eval_opt_in_not_offered";
+
+  constructor({
+    deployment,
+  }: {
+    readonly deployment: "enterprise" | "self_hosted";
+  }) {
+    super(
+      "instant_eval_opt_in_not_offered",
+      deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        // Named consumer: the registry's describe, which words the refusal for
+        // the deployment the reader is on.
+        meta: { deployment },
+        ...remediation("instant_eval_opt_in_not_offered"),
+      },
+    );
+    this.name = "InstantEvalOptInNotOfferedError";
+  }
+}
+
+/**
  * The statement's questions alone fill the judge's state, leaving no room for
  * any text to judge.
  *

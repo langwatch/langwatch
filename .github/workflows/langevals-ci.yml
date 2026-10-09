@@ -50,6 +50,8 @@ jobs:
           filters: |
             relevant:
               - 'services/langevals/**'
+              - 'platform/app/src/server/modelProviders/llmModels*.json'
+              - 'infra/docker/Dockerfile.langevals'
               - '.github/workflows/langevals-ci.yml'
 
   lint:

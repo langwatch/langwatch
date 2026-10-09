@@ -3,11 +3,10 @@ import { FACET_REGISTRY } from "../../facet-registry";
 import { translateFilterToClickHouse } from "../../filter-to-clickhouse/ast";
 import { SEARCH_FIELDS } from "../../query-language/metadata";
 
-const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 const translate = (query: string) =>
-  translateFilterToClickHouse(query, TENANT, TIME_RANGE);
+  translateFilterToClickHouse(query, TIME_RANGE);
 
 /**
  * `evaluatorLabel` is wired the same way as `evaluatorVerdict`: a categorical

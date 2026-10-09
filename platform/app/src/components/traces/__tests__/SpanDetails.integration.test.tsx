@@ -16,14 +16,16 @@ import type { Project } from "~/generated/prisma/client";
 import type { Span } from "../../../server/tracer/types";
 import { SpanDetails } from "../SpanDetails";
 
-const mockBuildUrl = vi.fn((spanId: string, action?: string) => {
-  const url = new URL("http://localhost/test-project/prompts");
-  url.searchParams.set("promptPlaygroundSpanId", spanId);
-  if (action) {
-    url.searchParams.set("action", action);
-  }
-  return url;
-});
+const mockBuildUrl = vi.fn(
+  ({ spanId, action }: { spanId: string; action?: string }) => {
+    const url = new URL("http://localhost/test-project/prompts");
+    url.searchParams.set("promptPlaygroundSpanId", spanId);
+    if (action) {
+      url.searchParams.set("action", action);
+    }
+    return url;
+  },
+);
 
 vi.mock(
   "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground",
@@ -169,7 +171,7 @@ describe("<SpanDetails/>", () => {
         </TestWrapper>,
       );
 
-      expect(mockBuildUrl).toHaveBeenCalledWith("span-123");
+      expect(mockBuildUrl).toHaveBeenCalledWith({ spanId: "span-123" });
     });
   });
 

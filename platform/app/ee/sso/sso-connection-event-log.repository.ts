@@ -32,9 +32,10 @@
 
 import { SSO_CONNECTION_AGGREGATE_TYPE } from "@ee/event-sourcing/pipelines/sso-connections/schemas/constants";
 import type { SsoConnectionEvent } from "@ee/event-sourcing/pipelines/sso-connections/schemas/events";
-import type {
-  SsoConnectionEventType,
-  SsoConnectionSource,
+import {
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
+  type SsoConnectionEventType,
+  type SsoConnectionSource,
 } from "@langwatch/identity";
 import { resolveEventStore } from "~/server/app-layer/identity/ledger";
 import { createTenantId } from "~/server/event-sourcing";
@@ -66,6 +67,9 @@ export interface SsoConnectionHistoryEntry {
   policy: string | null;
   /** The name a `connection_renamed` fact gives the connection. */
   name: string | null;
+  /** The issuer a `connection_idp_updated` fact sets. Public: it is the
+   *  address the provider identifies itself by, shown on the card. */
+  issuer: string | null;
   /** Free text an actor gave: a claim's rejection note, an attestation's
    *  note, or a suspend/teardown reason. Never a secret - these are the
    *  same words the connection's own projection already carries back to
@@ -94,6 +98,7 @@ interface SsoConnectionPayloadShape {
   route?: unknown;
   policy?: unknown;
   name?: unknown;
+  idp?: { issuer?: unknown };
   note?: unknown;
   reason?: unknown;
   replacesConnectionId?: unknown;
@@ -154,6 +159,10 @@ function toHistoryEntry(event: SsoConnectionEvent): SsoConnectionHistoryEntry {
     route: text(data.route),
     policy: text(data.policy),
     name: text(data.name),
+    issuer:
+      event.type === CONNECTION_IDP_UPDATED_EVENT_TYPE
+        ? text(data.idp?.issuer)
+        : null,
     note: text(data.note) ?? text(data.reason),
     replacesConnectionId: text(data.replacesConnectionId),
   };

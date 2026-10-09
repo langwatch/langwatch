@@ -13,6 +13,11 @@ import {
 } from "../errors";
 import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
+import {
+  type AndChain,
+  andChainOf,
+  translateEvaluationScope,
+} from "./evaluation-scope";
 import type { ResolvedInstantEvalRun } from "./instant-eval-field";
 import { boundedSubquery } from "./subqueries";
 import {
@@ -69,10 +74,9 @@ export function normalizeQuery(s: string): string {
  */
 export function translateFilterToClickHouse(
   queryText: string,
-  tenantId: string,
   timeRange: { from: number; to: number },
 ): { sql: string; params: Record<string, unknown> } | null {
-  return translateFilterWithEvalRuns({ queryText, tenantId, timeRange });
+  return translateFilterWithEvalRuns({ queryText, timeRange });
 }
 
 /**
@@ -81,30 +85,34 @@ export function translateFilterToClickHouse(
  */
 export function translateFilterWithEvalRuns({
   queryText,
-  tenantId,
   timeRange,
   evalRuns,
 }: {
   queryText: string;
-  tenantId: string;
   timeRange: { from: number; to: number };
   /** The Instant Eval runs registered for the query's `eval` chips. */
   evalRuns?: readonly ResolvedInstantEvalRun[];
 }): { sql: string; params: Record<string, unknown> } | null {
+  // The compiled fragment names no tenant: every subquery carries a tenant
+  // marker the authorized reader expands into the proof's fence (ADR-144
+  // block C), so the statement it lands in decides who is in scope.
   const ctx: TranslationContext = {
     paramCounter: 0,
     nodeCount: 0,
     params: {
-      tenantId,
       timeFrom: timeRange.from,
       timeTo: timeRange.to,
     },
-    tenantId,
     timeRange,
     ...(evalRuns ? { evalRuns } : {}),
   };
 
-  const sql = translateFilterAst({ queryText, ctx, translateTag });
+  const sql = translateFilterAst({
+    queryText,
+    ctx,
+    translateTag,
+    bindEvaluations: true,
+  });
   if (sql === null) return null;
   return { sql, params: ctx.params };
 }
@@ -122,10 +130,17 @@ export function translateFilterAst({
   queryText,
   ctx,
   translateTag: translateTagWith,
+  bindEvaluations = false,
 }: {
   readonly queryText: string;
   readonly ctx: TranslationContext;
   readonly translateTag: FilterTagTranslator;
+  /**
+   * Compile an evaluator and the result conditions beside it as one
+   * evaluation (see `evaluation-scope.ts`). Only the `trace_summaries` dialect
+   * has the evaluator fields.
+   */
+  readonly bindEvaluations?: boolean;
 }): string | null {
   const trimmed = normalizeQuery(queryText);
   if (!trimmed) return null;
@@ -144,6 +159,7 @@ export function translateFilterAst({
     negated: false,
     ctx,
     translateTag: translateTagWith,
+    bindEvaluations,
   });
 
   if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
@@ -332,16 +348,27 @@ function translateNode({
   negated,
   ctx,
   translateTag: translateTagWith,
+  bindEvaluations,
 }: {
   node: LiqeQuery;
   negated: boolean;
   ctx: TranslationContext;
   translateTag: FilterTagTranslator;
+  bindEvaluations: boolean;
 }): string {
   ctx.nodeCount++;
   if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
     throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
+
+  const walk = (next: LiqeQuery, nextNegated: boolean): string =>
+    translateNode({
+      node: next,
+      negated: nextNegated,
+      ctx,
+      translateTag: translateTagWith,
+      bindEvaluations,
+    });
 
   switch (node.type) {
     case "EmptyExpression":
@@ -352,13 +379,9 @@ function translateNode({
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
-      const branch = (side: LiqeQuery): string =>
-        translateNode({
-          node: side,
-          negated,
-          ctx,
-          translateTag: translateTagWith,
-        });
+      const chain = bindEvaluations && !negated ? andChainOf(logExpr) : null;
+      if (chain) return translateAndChain({ chain, ctx, walk });
+      const branch = (side: LiqeQuery): string => walk(side, negated);
       const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
       return `(${branch(logExpr.left)} ${op} ${branch(logExpr.right)})`;
     }
@@ -366,22 +389,12 @@ function translateNode({
     case "UnaryOperator": {
       const unary = node as UnaryOperatorToken;
       const isNeg = unary.operator === "NOT" || unary.operator === "-";
-      return translateNode({
-        node: unary.operand,
-        negated: negated !== isNeg,
-        ctx,
-        translateTag: translateTagWith,
-      });
+      return walk(unary.operand, negated !== isNeg);
     }
 
     case "ParenthesizedExpression": {
       const paren = node as ParenthesizedExpressionToken;
-      return `(${translateNode({
-        node: paren.expression,
-        negated,
-        ctx,
-        translateTag: translateTagWith,
-      })})`;
+      return `(${walk(paren.expression, negated)})`;
     }
 
     default:
@@ -389,6 +402,36 @@ function translateNode({
         `Unsupported query syntax: ${(node as { type: string }).type}`,
       );
   }
+}
+
+/**
+ * An AND chain read once from its top: the bound evaluator group, if any, as
+ * one condition, ANDed with the chain's other operands walked as usual. The
+ * operands are folded left, the shape the parser gave the chain.
+ */
+function translateAndChain({
+  chain,
+  ctx,
+  walk,
+}: {
+  chain: AndChain;
+  ctx: TranslationContext;
+  walk: (next: LiqeQuery, negated: boolean) => string;
+}): string {
+  // The chain's own node is already counted; its nested AND nodes and the
+  // bound group are not walked, so they are counted here to keep the ceiling
+  // where the tag-by-tag walk had it.
+  ctx.nodeCount += chain.nodeCount - 1;
+  if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
+    throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
+  }
+  const parts = [
+    ...(chain.scope ? [translateEvaluationScope(chain.scope, ctx)] : []),
+    ...chain.rest.map((operand) => walk(operand, false)),
+  ];
+  const [first = "1 = 1", ...others] = parts;
+  if (others.length === 0) return `(${first})`;
+  return others.reduce((acc, part) => `(${acc} AND ${part})`, first);
 }
 
 function translateTag(

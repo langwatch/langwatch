@@ -26,6 +26,7 @@ import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-t
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
+  holdsOrganizationBinding,
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
@@ -35,7 +36,13 @@ import { isCustomRole } from "../../../api/enterprise";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import { sessionRevocation } from "../../identity/runtime";
 import {
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+  NON_DESTINATION_PROJECT_KINDS,
+  projectKindsHiddenFrom,
+} from "../../projects/project-kinds";
+import {
   CannotRemoveSelfAsLastAdminError,
+  DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
   TeamMembershipNotFoundError,
@@ -326,6 +333,48 @@ async function planUserScopeBinding({
   };
 }
 
+/** The reason stamped on every row a move to the Developer seat deletes. */
+const DEVELOPER_SEAT_REVOKE_REASON = "seat changed to Developer";
+
+/**
+ * The member's PROJECT-scoped rows on shared projects: a project that is not
+ * personal, on a team that is not personal. The personal project is never in
+ * the set, whatever rows it carries.
+ */
+async function sharedProjectBindingIds({
+  tx,
+  organizationId,
+  userId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+}): Promise<string[]> {
+  const projectRows = await new GrantsAccessListingRepository(
+    tx,
+  ).findBindingRows({
+    organizationId,
+    where: {
+      principalType: "USER",
+      principalId: userId,
+      scopeType: RoleBindingScopeType.PROJECT,
+    },
+  });
+  if (projectRows.length === 0) return [];
+  const sharedProjects = await tx.project.findMany({
+    where: {
+      id: { in: projectRows.map((row) => row.scopeId) },
+      isPersonal: false,
+      team: { organizationId, isPersonal: false },
+    },
+    select: { id: true },
+  });
+  const sharedProjectIds = new Set(sharedProjects.map((p) => p.id));
+  return projectRows
+    .filter((row) => sharedProjectIds.has(row.scopeId))
+    .map((row) => row.id);
+}
+
 /**
  * What a scope-binding correction resolves to once the transaction has read
  * the rows: the ids that collapse away, and either the role change on the row
@@ -335,6 +384,12 @@ async function planUserScopeBinding({
  */
 type ScopeBindingPlan = {
   revokeIds: string[];
+  /**
+   * Why the rows in `revokeIds` go. Recorded on the ledger fact, and from
+   * there on the customer's audit page, so a deletion the seat decided is
+   * readable as one. Plans that collapse duplicate rows carry none.
+   */
+  revokeReason?: string;
   change?: {
     bindingId: string;
     role: TeamUserRole;
@@ -342,6 +397,23 @@ type ScopeBindingPlan = {
   };
   attach?: LedgerBindingAttach;
 };
+
+/**
+ * Revocations grouped by the reason they carry, so a seat-decided deletion is
+ * recorded as one and a duplicate collapse stays unlabelled.
+ */
+function revokesByReason(
+  plans: ScopeBindingPlan[],
+): Map<string | undefined, string[]> {
+  const grouped = new Map<string | undefined, string[]>();
+  for (const plan of plans) {
+    if (plan.revokeIds.length === 0) continue;
+    const ids = grouped.get(plan.revokeReason) ?? [];
+    ids.push(...plan.revokeIds);
+    grouped.set(plan.revokeReason, ids);
+  }
+  return grouped;
+}
 
 /**
  * Emit a batch of plans, revocations first: a crash mid-batch leaves the
@@ -360,12 +432,12 @@ async function emitScopeBindingPlans({
   plans: ScopeBindingPlan[];
   actor: LedgerActor;
 }): Promise<void> {
-  const revokeIds = plans.flatMap((plan) => plan.revokeIds);
-  if (revokeIds.length > 0) {
+  for (const [reason, bindingIds] of revokesByReason(plans)) {
     await writer.revokeBindings({
       organizationId,
-      bindingIds: revokeIds,
+      bindingIds,
       actor,
+      ...(reason ? { reason } : {}),
     });
   }
   for (const plan of plans) {
@@ -495,8 +567,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return this.prisma.project.findMany({
       // Named projects reach a customer — the plan-limit alert email lists
       // them per project. The governance project's usage stays in the
-      // org-level total rather than becoming a line that reveals it.
-      where: { team: { organizationId }, kind: { not: "internal_governance" } },
+      // org-level total rather than becoming a line that reveals it, and an
+      // aggregate holds no usage of its own (ADR-144), so it has no line.
+      where: {
+        team: { organizationId },
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
+      },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
@@ -803,7 +879,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }): Promise<FullyLoadedOrganization[]> {
     const { userId, isDemo, demoProjectId } = params;
 
-    return this.prisma.organization.findMany({
+    const organizations = (await this.prisma.organization.findMany({
       where: {
         OR: [
           ...(isDemo
@@ -852,13 +928,28 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
                 // It exists only as a routing/tenancy artifact for IngestionSource
                 // data; never user-visible. See specs/ai-gateway/governance/
                 // architecture-invariants.feature + ui-contract.feature.
-                kind: { not: "internal_governance" },
+                kind: { not: INTERNAL_GOVERNANCE_PROJECT_KIND },
               },
             },
           },
         },
       },
-    }) as Promise<FullyLoadedOrganization[]>;
+    })) as FullyLoadedOrganization[];
+
+    // ADR-144 decision 5: an aggregate reads other people's personal
+    // projects, so it is in the switcher of an organisation admin and nobody
+    // else, whichever team it sits on. The role differs per organisation, and
+    // `members` above is already narrowed to this user, so the filter is
+    // applied here rather than in the one cross-organisation query.
+    for (const organization of organizations) {
+      const hidden = projectKindsHiddenFrom(organization.members[0]?.role);
+      for (const team of organization.teams) {
+        team.projects = team.projects.filter(
+          (project) => !hidden.includes(project.kind),
+        );
+      }
+    }
+    return organizations;
   }
 
   async getOrganizationWithMembers(params: {
@@ -1188,8 +1279,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         data: { role },
       });
 
-      // Keep the ORGANIZATION-scoped grant in sync (skip EXTERNAL)
-      if (role !== OrganizationUserRole.EXTERNAL) {
+      // Keep the ORGANIZATION-scoped grant in sync. The seats that carry
+      // none (Lite Member: access comes from their teams; Developer: personal
+      // team only, ADR-143) revoke it instead.
+      if (holdsOrganizationBinding(role)) {
         plans.push(
           await planUserScopeBinding({
             tx,
@@ -1202,7 +1295,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }),
         );
       } else {
-        // EXTERNAL (Lite Member) users have no org-level grant
         const orgRows = await new GrantsAccessListingRepository(
           tx,
         ).findBindingRows({
@@ -1214,7 +1306,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             scopeId: organizationId,
           },
         });
-        plans.push({ revokeIds: orgRows.map((row) => row.id) });
+        plans.push({
+          revokeIds: orgRows.map((row) => row.id),
+          revokeReason:
+            role === OrganizationUserRole.DEVELOPER
+              ? DEVELOPER_SEAT_REVOKE_REASON
+              : undefined,
+        });
       }
 
       // Shared teams only, matching what the router resolved before it computed
@@ -1262,9 +1360,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             teamRole: teamRoleUpdate.role as TeamRoleValue,
           })
         ) {
-          throw new LiteMemberViewerOnlyError(
-            await teamNameFor({ tx, teamId }),
-          );
+          const teamName = await teamNameFor({ tx, teamId });
+          if (role === OrganizationUserRole.DEVELOPER) {
+            throw new DeveloperSeatNoSharedAccessError(teamName);
+          }
+          throw new LiteMemberViewerOnlyError(teamName);
         }
 
         const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
@@ -1353,6 +1453,46 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               : (teamRoleUpdate.customRoleId ?? null),
           }),
         );
+      }
+
+      // ADR-143: a Developer holds nothing shared. Every row on a shared team
+      // (the set read above) and every row on a shared project goes, and each
+      // deletion is recorded with the seat as its reason. The personal team
+      // and personal project are never in either set, so the workspace that
+      // is only theirs is untouched, with its traces and keys.
+      if (role === OrganizationUserRole.DEVELOPER) {
+        // The team loop above reports a team the correction leaves without an
+        // admin; these rows never went through it, so the same question is
+        // asked here for every ADMIN row that is about to go. Reported, not
+        // refused: the decision was about one person's seat, and every shared
+        // team is still administered through an ORGANIZATION-scoped ADMIN.
+        for (const row of currentMemberships) {
+          if (row.role !== TeamUserRole.ADMIN) continue;
+          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+            tx,
+            organizationId,
+            teamId: row.scopeId,
+            userId,
+          });
+          if (adminsAfter.size > 0) continue;
+          teamsLeftWithoutAdmin.push({
+            id: row.scopeId,
+            name:
+              (await teamNameFor({ tx, teamId: row.scopeId })) ?? row.scopeId,
+          });
+        }
+        const sharedProjectRowIds = await sharedProjectBindingIds({
+          tx,
+          organizationId,
+          userId,
+        });
+        plans.push({
+          revokeIds: [
+            ...currentMemberships.map((row) => row.id),
+            ...sharedProjectRowIds,
+          ],
+          revokeReason: DEVELOPER_SEAT_REVOKE_REASON,
+        });
       }
 
       // The seat correction reaches everything the seat caps, and a member
@@ -1485,6 +1625,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
           throw new LiteMemberViewerOnlyError(team.name);
         }
+        if (orgMembership?.role === OrganizationUserRole.DEVELOPER) {
+          throw new DeveloperSeatNoSharedAccessError(team.name);
+        }
 
         const [targetUserBinding] = await new GrantsAccessListingRepository(
           tx,
@@ -1558,6 +1701,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         });
 
+        if (orgMembership?.role === OrganizationUserRole.DEVELOPER) {
+          throw new DeveloperSeatNoSharedAccessError(team.name);
+        }
         if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
           if (
             !isTeamRoleAllowedForOrganizationRole({

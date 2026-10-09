@@ -45,8 +45,13 @@ export async function assertMemberTypeLimitNotExceeded(
   licenseRepo: ILicenseEnforcementRepository,
   limits: MemberTypeLimits,
 ): Promise<void> {
-  // No limit check needed if type unchanged or limits overridden
-  if (changeType === "no-change" || limits.overrideAddingLimitations) {
+  // No limit check needed if type unchanged or limits overridden. A move
+  // onto a Developer seat enters a pool the plan does not meter (ADR-143).
+  if (
+    changeType === "no-change" ||
+    changeType === "to-developer" ||
+    limits.overrideAddingLimitations
+  ) {
     return;
   }
 

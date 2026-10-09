@@ -26,7 +26,9 @@ import {
 } from "~/optimization_studio/types/events";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -166,6 +168,14 @@ secured
           { status: 403 },
         );
       }
+
+      // ADR-144 decision 8: nothing is written under an aggregate's tenant.
+      // The tRPC door refuses it for mutations; this route checks its own
+      // permission, so it asks the guard itself.
+      await assertProjectAcceptsWrites({
+        kinds: getApp().projectKinds,
+        projectId,
+      });
 
       let message: StudioClientEvent;
       try {

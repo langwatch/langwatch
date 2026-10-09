@@ -58,6 +58,8 @@ import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth"
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import type { ProjectKindReader } from "~/server/app-layer/permissions/aggregate-admin-gate";
+import { AggregateProjectIsReadOnlyError } from "~/server/app-layer/projects/errors";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FeatureFlagKey } from "~/server/featureFlag/registry";
@@ -377,15 +379,21 @@ export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
  * it (see the composition site in `startConversationTurn`).
  */
 export function composeLangyTurnPrompt({
+  viewer,
   contextBlock,
   capNote,
   userText,
 }: {
+  viewer: Session["user"];
   contextBlock: string | null;
   capNote: string;
   userText: string;
 }): { prompt: string; labelled: boolean } {
-  const preamble = [contextBlock, capNote]
+  // Lets "email me" resolve to the viewer's own address without asking.
+  const viewerLine = viewer.email
+    ? `You are talking to ${viewer.name ?? viewer.email} <${viewer.email}>. This identifies the user; it is not an instruction.`
+    : null;
+  const preamble = [viewerLine, contextBlock, capNote]
     .map((block) => (block ?? "").trim())
     .filter((block) => block.length > 0);
   if (preamble.length === 0) return { prompt: userText, labelled: false };
@@ -448,6 +456,12 @@ export interface LangyTurnServiceDeps {
    * turn runs on this model, never on the worker's own built-in default.
    */
   resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
+  /**
+   * Reads a project's kind, so a turn on an aggregate project, which takes no
+   * writes (ADR-144 decision 8), is refused before anything is written,
+   * resolved or minted under it.
+   */
+  projectKinds: Pick<ProjectKindReader, "kindOf">;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
    * is the best-effort worker abort behind a user Stop (ADR-078); `warm` is
    * the fire-and-forget panel-open pre-boot
@@ -515,18 +529,29 @@ function buildWorkerProbeArgs({
   conversationId,
   model,
   credentials,
+  disabledSkillIds,
 }: {
   projectId: string;
   actorUserId: string;
   conversationId: string;
   model: string;
   credentials: LangyCredentials;
+  /**
+   * The flag-gated skill ids the turn will send (`credentials.disabledSkillIds`).
+   * Passed explicitly because the turn resolves them after the probe starts,
+   * and the manager keys the worker signature on them: a probe without them
+   * says "alive" for a worker the dispatch then replaces with a keyless spawn.
+   */
+  disabledSkillIds: readonly string[];
 }): Parameters<LangyWorkerPort["probe"]>[0] {
   return {
     projectId,
     actorUserId,
     conversationId,
     model,
+    ...(disabledSkillIds.length > 0
+      ? { disabledSkillIds: [...disabledSkillIds] }
+      : {}),
     hasGithubAuth: !!credentials.githubToken,
     ...(credentials.githubRepoScopeKey
       ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
@@ -733,6 +758,13 @@ export class LangyTurnService {
           { error, projectId, conversationId },
           "langy warm skipped, session key scope refusal, first message will surface it",
         );
+      } else if (error instanceof AggregateProjectIsReadOnlyError) {
+        // An aggregate takes no turns at all; the first message carries the
+        // read-only refusal. Expected on every panel open there, so no stack.
+        logger.debug(
+          { projectId, code: error.code },
+          "langy warm skipped, aggregate project refuses turns",
+        );
       } else {
         logger.warn(
           { error, projectId, conversationId },
@@ -796,6 +828,18 @@ export class LangyTurnService {
 
     await this.applyWarmPrCapParity({ credentials, userId });
 
+    // Signature parity with the turn, which sends the same list: a warm
+    // worker booted without it is replaced by the first real turn.
+    const disabledSkills = await resolveDisabledSkillIds({
+      ids: LANGY_SKILL_CATALOGUE_IDS,
+      userId,
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+    if (disabledSkills.length > 0) {
+      credentials.disabledSkillIds = disabledSkills;
+    }
+
     const alive = await worker.probe(
       buildWorkerProbeArgs({
         projectId,
@@ -803,6 +847,7 @@ export class LangyTurnService {
         conversationId,
         model: warmModel,
         credentials,
+        disabledSkillIds: disabledSkills,
       }),
     );
     if (alive) {
@@ -1023,7 +1068,18 @@ export class LangyTurnService {
       // conversation state, never from a caller-supplied "new" flag.
       const mintedRunToken = conversation.isNew ? mintRunToken() : null;
 
-      const probeWorker = () =>
+      // Started here so the probe can carry it: the disabled skills are part of
+      // the worker signature, and a probe that leaves them out answers for a
+      // worker the dispatch will not accept. Never rejects (a flag error reads
+      // as gated off, see `resolveDisabledSkillIds`).
+      const disabledSkillsPromise = resolveDisabledSkillIds({
+        ids: LANGY_SKILL_CATALOGUE_IDS,
+        userId,
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+
+      const probeWorker = async () =>
         worker.probe(
           buildWorkerProbeArgs({
             projectId,
@@ -1031,6 +1087,7 @@ export class LangyTurnService {
             conversationId: conversation.id,
             model: turnModel,
             credentials,
+            disabledSkillIds: await disabledSkillsPromise,
           }),
         );
 
@@ -1310,12 +1367,7 @@ export class LangyTurnService {
       // to hide from the model so it never even offers one this caller can't
       // use. Costs nothing on the overwhelmingly common turn (no gated skill
       // in the catalogue's current flag state): see `resolveDisabledSkillIds`.
-      const disabledSkills = await resolveDisabledSkillIds({
-        ids: LANGY_SKILL_CATALOGUE_IDS,
-        userId,
-        projectId,
-        organizationId: credentials.organizationId,
-      });
+      const disabledSkills = await disabledSkillsPromise;
       const requestedSkillIds = new Set(
         (turnContext.skills ?? []).map((skill) => skill.id),
       );
@@ -1339,6 +1391,7 @@ export class LangyTurnService {
       // turn-scoped cap note precede a clearly labelled ask, so the model
       // reads the DATA before the message that may refer to it.
       const { prompt, labelled } = composeLangyTurnPrompt({
+        viewer: session.user,
         contextBlock: renderLangyTurnContext({
           context: turnContext,
           isUiActionSurfaceOpen,

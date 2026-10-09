@@ -143,8 +143,10 @@ const traceColumnDefs = {
   cost: traceCol.accessor("totalCost", {
     id: "cost",
     header: "Cost",
-    size: 90,
-    minSize: 80,
+    // Fits the longest cost a trace can show, an estimated sub-cent one
+    // such as `~$0.000036`, on one line.
+    size: 105,
+    minSize: 95,
     meta: num,
   }),
   contextSize: traceCol.accessor((row) => row.contextSizeTokens ?? 0, {
@@ -348,8 +350,8 @@ const conversationColumnDefs: Record<
   cost: convCol.accessor("totalCost", {
     id: "cost",
     header: "Cost",
-    size: 80,
-    minSize: 70,
+    size: 95,
+    minSize: 85,
     meta: num,
   }),
   tokens: convCol.accessor("totalTokens", {
@@ -515,6 +517,25 @@ export function getTraceColumnDef(
 ): ColumnDef<TraceListItem, unknown> | undefined {
   return traceColumnDefsByString[id];
 }
+
+/**
+ * The member project a row was listed from (ADR-144). Kept out of
+ * `traceColumnDefs` on purpose: it means something only on an aggregate
+ * project, so no lens or column picker offers it, and `useTraceLensColumns`
+ * puts it first on an aggregate's table and nowhere else.
+ */
+export const MEMBER_PROJECT_COLUMN_ID = "project";
+
+export const memberProjectColumnDef = traceCol.accessor(
+  (row) => row.projectId ?? "",
+  {
+    id: MEMBER_PROJECT_COLUMN_ID,
+    header: "Project",
+    size: 180,
+    minSize: 120,
+    enableSorting: false,
+  },
+) as ColumnDef<TraceListItem, unknown>;
 
 export function buildConversationColumns(
   ids: string[],

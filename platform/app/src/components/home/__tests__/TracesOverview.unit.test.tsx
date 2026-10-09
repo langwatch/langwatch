@@ -6,9 +6,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const currentProject = { slug: "my-project", kind: "application" };
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: { slug: "my-project" },
+    project: currentProject,
     hasPermission: () => true,
   }),
 }));

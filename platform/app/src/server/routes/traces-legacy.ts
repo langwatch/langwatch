@@ -13,7 +13,11 @@ import type { AuthzPermission as Permission } from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import {
+  getAllForProjectInput,
+  MAX_TRACE_LIST_PAGE_SIZE,
+  publicTraceSearchPageSizeInput,
+} from "~/server/api/routers/traces.schemas";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
@@ -24,6 +28,7 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { legacyFiltersKeyedRefusal } from "~/server/filters/assertLegacyFiltersKeyed";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import type { Span, Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
@@ -235,6 +240,7 @@ const paramsSchema = getAllForProjectInput
         message: "Invalid date format for endDate",
       }),
     ]),
+    pageSize: publicTraceSearchPageSizeInput,
     scrollId: z.string().optional().nullable(),
     format: z.enum(["digest", "json"]).optional(),
     llmMode: z.boolean().optional().default(false),
@@ -261,13 +267,18 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
     const validationError = fromZodError(error as ZodError);
     return c.json({ error: validationError.message }, 400);
   }
+  const unkeyed = legacyFiltersKeyedRefusal(params.filters);
+  if (unkeyed) return c.json({ error: unkeyed }, 400);
 
   const format = params.format ?? (params.llmMode ? "digest" : "json");
 
   c.header("Deprecation", "true");
   c.header("Link", `</api/traces/search>; rel="successor-version"`);
 
-  const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+  const pageSize = Math.min(
+    params.pageSize ?? MAX_TRACE_LIST_PAGE_SIZE,
+    MAX_TRACE_LIST_PAGE_SIZE,
+  );
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });

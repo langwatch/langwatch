@@ -36,6 +36,9 @@ describe("TriggerFireHistoryService", () => {
     repo = {
       findAllStatsForProject: vi.fn().mockResolvedValue(stats),
       findAllRecentByTriggerId: vi.fn().mockResolvedValue(fires),
+      findPageByTriggerId: vi
+        .fn()
+        .mockResolvedValue({ fires, nextCursor: null }),
       findAllRecentForProject: vi.fn().mockResolvedValue(fires),
     };
     service = new TriggerFireHistoryService(repo);

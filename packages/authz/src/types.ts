@@ -4,6 +4,7 @@
  * package (and the app's collector) can name them without importing the walk.
  */
 import type { ShareableResourceKind } from "./registry";
+import type { PROJECT_READER_ROLE_KEY } from "./roles";
 import type {
   CallerKind,
   PrincipalKind,
@@ -85,8 +86,13 @@ export type ResourceGrant = {
 /** Role keys currently enforced by organization, team, and project grants. */
 export type BindingRoleKey = "admin" | "member" | "viewer" | `custom:${string}`;
 
+/** ADR-144: the role a SHARED grant carries - one project reading another.
+ *  Never a legacy binding role, so it stays out of `BindingRoleKey` and the
+ *  compat `RoleBinding` head never sees it. */
+export type SharedRoleKey = typeof PROJECT_READER_ROLE_KEY;
+
 export type CollectedBinding = {
-  roleKey: BindingRoleKey;
+  roleKey: BindingRoleKey | SharedRoleKey;
   scopeType: RoleBindingScopeType;
   scopeId: string;
   /** Present when the binding arrived via a group membership. */
@@ -100,8 +106,12 @@ export type CollectedBinding = {
 export type CollectedGrants = {
   principal: AuthzPrincipalRef;
   organizationId: string;
-  /** Null for api-key principals and for users with no OrganizationUser row. */
-  organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | null;
+  /**
+   * Null for api-key principals and for users with no OrganizationUser row.
+   * DEVELOPER (ADR-143) is a seat that holds its personal team and nothing
+   * shared; `bindingGrants` caps it the way it caps EXTERNAL.
+   */
+  organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER" | null;
   /**
    * True when a user principal holds an ACTIVE OrganizationUser row. A row
    * an admin disabled to free its seat is not one: see `membershipDisabled`.
@@ -125,6 +135,8 @@ export type AuthzDenialReason =
   | "membership-disabled"
   | "no-binding"
   | "lite-member-restricted"
+  /** A Developer seat (ADR-143) asked for something outside its personal team. */
+  | "developer-restricted"
   | "owner-ceiling";
 
 export type AuthzGrantVia =

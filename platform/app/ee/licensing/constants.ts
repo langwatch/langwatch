@@ -111,13 +111,13 @@ export const FREE_PLAN: PlanInfo = {
 };
 
 /**
- * * Embedded production public key used when no env var is configured.
- * * Enables license verification out-of-the-box; override via env for rotation.
+ * Embedded production public key used when no env var is configured.
+ * Enables license verification out of the box; override via env for rotation.
  * DO NOT REPLACE WITH A PLACEHOLDER, LEAVE IT AS IS.
  */
-// gitleaks:allow — public keys
+// gitleaks:allow (public keys)
 
-export const PLACEHOLDER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+export const EMBEDDED_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvyNNiu5B0lretFaxowsu
 fM907tHWnBITXVDfnpPAwUgzrODdjfTt73XW1S+EDd8AM0FzOpx0YolXipS4+SNK
 axSXwNO0S0XjJGLW7wz9Nv8/PP9V23LtiLQQOj8eGol/texr5pIZy2CRjVeEYcBZ
@@ -131,8 +131,9 @@ iQIDAQAB
  * PUBLIC_KEY: RSA public key for license signature verification.
  * This key is used to verify that licenses are signed by LangWatch.
  *
- * Set via LANGWATCH_LICENSE_PUBLIC_KEY environment variable in production.
- * Falls back to placeholder (which will fail validation) if not set.
+ * LANGWATCH_LICENSE_PUBLIC_KEY overrides it, for key rotation or for a
+ * signing key other than LangWatch's. Unset, it is the embedded production
+ * key, so licenses signed by LangWatch verify out of the box.
  */
 export const PUBLIC_KEY =
-  process.env.LANGWATCH_LICENSE_PUBLIC_KEY ?? PLACEHOLDER_PUBLIC_KEY;
+  process.env.LANGWATCH_LICENSE_PUBLIC_KEY ?? EMBEDDED_PUBLIC_KEY;
