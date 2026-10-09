@@ -4,11 +4,12 @@
  *
  * The search ORs three text matches on the trace row with a match on the
  * names of the trace's spans. Written as a correlated EXISTS, the span-name
- * branch turns the whole search into a join whose filter runs after it, so
- * every trace in the window is carried through the join with its captured
- * input and output attached and memory grows with the window. Written as a
- * set of matching trace ids, the search stays a predicate on trace_summaries
- * and memory stays level however much text the window holds.
+ * branch turns the whole search into a join whose filter runs after it. The
+ * traces then travel through the join in blocks sized by row count (up to
+ * `max_block_size`, 65k rows by default) with their captured input and output
+ * attached, so one block of large traces is hundreds of megabytes. Written as
+ * a set of matching trace ids, the search stays a predicate on
+ * trace_summaries, evaluated as the rows are read in blocks sized by bytes.
  *
  * These tests pin both halves: the search still returns exactly the traces it
  * should, and under a memory budget the correlated shape cannot fit in, it
@@ -26,7 +27,10 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
-import { ClickHouseTraceService } from "../clickhouse-trace.service";
+import {
+  ClickHouseTraceService,
+  isClickHouseMemoryLimitError,
+} from "../clickhouse-trace.service";
 import type { GetAllTracesForProjectInput } from "../types";
 import { openProtections } from "./open-protections";
 
@@ -36,11 +40,13 @@ const now = Date.now();
 const TERM = "codex";
 
 // Heavy in bytes, modest in rows: what separates the two shapes is how much
-// captured text sits in the window, not how many traces. Around 57 MiB here,
-// inserted in small batches so seeding stays light on the container.
+// captured text one block of traces holds. Around 57 MiB in all here, well
+// inside one block by row count, inserted in small batches so seeding stays
+// light on the container.
 const TRACE_COUNT = 3000;
 const CAPTURED_TEXT_SIZE = 10_000;
 const INSERT_BATCH = 100;
+const occurredAtFor = (index: number) => new Date(now - index);
 
 // The one trace the term can find, and only through a child span's name.
 const MATCHING_TRACE_INDEX = 2321;
@@ -48,8 +54,7 @@ const traceIdFor = (index: number) => `${tenantId}-trace-${index}`;
 
 // Between what the two shapes need. Measured on ClickHouse 25.10 with this
 // seed: the service's queries peak near 40 MiB, the correlated shape does not
-// fit in 150 MB. On larger seeds the set shape levelled off near 85 MiB while
-// the correlated shape kept growing with the text in the window.
+// fit in 150 MB.
 const MEMORY_CAP = "100000000"; // 100 MB
 
 const WINDOW = { startDate: now - 60 * 60_000, endDate: now + 60_000 };
@@ -61,7 +66,7 @@ function capturedText(seed: number): string {
 }
 
 function traceRow(index: number) {
-  const at = new Date(now - index);
+  const at = occurredAtFor(index);
   return {
     ProjectionId: `proj-${index}`,
     TenantId: tenantId,
@@ -96,7 +101,7 @@ function spanRow({
   spanName: string;
   parentSpanId?: string | null;
 }) {
-  const at = new Date(now - index);
+  const at = occurredAtFor(index);
   return {
     ProjectionId: `proj-span-${index}-${spanName}`,
     TenantId: tenantId,
@@ -221,8 +226,10 @@ const FORMER_CORRELATED_COUNT_SQL = `
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  // Merging rows this heavy takes memory of its own while the suite seeds and
-  // measures, so merges on the table stay stopped for the life of the suite.
+  // Merging rows this heavy takes several hundred megabytes in a 1 GiB
+  // container, enough to fail the seed or the suites after it. Merges on the
+  // table stay stopped for the life of the suite; integration files run one
+  // at a time, so no other suite sees the table in that state.
   await ch.command({ query: "SYSTEM STOP MERGES trace_summaries" });
 
   for (let start = 0; start < TRACE_COUNT; start += INSERT_BATCH) {
@@ -258,9 +265,12 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.command({ query: "SYSTEM START MERGES trace_summaries" });
+    // A lightweight delete only marks the rows as gone. An ALTER ... DELETE
+    // would rewrite every part, reading the heavy columns to do it, and that
+    // rewrite alone takes several hundred megabytes in the container.
     for (const table of ["trace_summaries", "stored_spans"]) {
-      await ch.exec({
-        query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
+      await ch.command({
+        query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId },
       });
     }
@@ -310,7 +320,7 @@ describe("legacy free-text search memory (integration)", () => {
               clickhouse_settings: { max_memory_usage: MEMORY_CAP },
             })
             .then((r) => r.json()),
-        ).rejects.toThrow(/memory limit exceeded/i);
+        ).rejects.toSatisfy(isClickHouseMemoryLimitError);
       });
     });
   });
