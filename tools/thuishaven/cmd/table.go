@@ -603,6 +603,7 @@ var baseTable = []commandSpec{
 			{long: "--list", summary: "report what is installed and what is missing; change nothing"},
 			{long: "--yes", summary: "install what haven needs without asking (leaves the optional ones alone)"},
 			{long: "--reset-skips", summary: "forget every never-ask-again, so the next run offers them all"},
+			{long: "--build", summary: "build the consoles and go-install haven quietly, one progress line per step (what make haven install runs first)"},
 		},
 		run: runInstall,
 	},

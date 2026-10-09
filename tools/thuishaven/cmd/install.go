@@ -33,6 +33,9 @@ import (
 //	haven install redis        installs exactly what is named, skips and all
 
 func runInstall(ctx context.Context, d deps, inv invocation) error {
+	if inv.has("--build") {
+		return runInstallBuild(ctx, d)
+	}
 	if isDone, err := resetSkipsFirst(d, inv); isDone || err != nil {
 		return err
 	}
