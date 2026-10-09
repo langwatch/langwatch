@@ -79,7 +79,7 @@ interface ProjectSectionProps {
  */
 function InsightsMenuLink({ showExpanded, project, pathname }: ProjectSectionProps) {
   const host = useNavigationHost();
-  const { enabled, isLoading } = host.featureFlag("release_insights");
+  const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
   if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
   return (
     <PageMenuLink

@@ -10,9 +10,11 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLentOperations } from "@langwatch/browser-host/lent";
-import { INSIGHTS_FLAG } from "@langwatch/insight-contract";
-import { type LangyAsk, type LangyAskRequest, LangyAskToken } from "@langwatch/langy-contract";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { type LangyAsk, LangyAskToken } from "@langwatch/langy-client";
+import type { LangyAskRequest } from "@langwatch/langy-contract";
 import { type ReactNode, useMemo } from "react";
 
 import {
@@ -27,6 +29,7 @@ class CapabilityInsightHost extends InsightHostApi {
   constructor(
     private readonly deps: {
       project: InsightHostProject | undefined;
+      enabled: boolean | undefined;
       session: UiSession;
       route: UiRoute;
       navigation: UiNavigation;
@@ -42,7 +45,7 @@ class CapabilityInsightHost extends InsightHostApi {
   }
 
   isEnabled(): boolean | undefined {
-    return this.deps.session.featureFlag(INSIGHTS_FLAG);
+    return this.deps.enabled;
   }
 
   hasPermission(permission: string): boolean {
@@ -79,6 +82,8 @@ class CapabilityInsightHost extends InsightHostApi {
 export default function InsightHostMount({ children }: { children?: ReactNode }) {
   const { session, route, navigation, feedback } = useUiCapabilities();
   const langy = useLentOperations(LangyAskToken);
+  // Read as a primitive: the flags service hands a new object on every render.
+  const enabled = useUiFlags().flag(FrontendFlags.release_insights);
   const scopeProject = session.snapshot().scope.project;
   const projectId = scopeProject?.id;
   const projectSlug = scopeProject?.slug;
@@ -90,13 +95,14 @@ export default function InsightHostMount({ children }: { children?: ReactNode })
           projectId !== void 0 && projectSlug !== void 0
             ? { id: projectId, slug: projectSlug }
             : void 0,
+        enabled,
         session,
         route,
         navigation,
         feedback,
         langy,
       }),
-    [projectId, projectSlug, session, route, navigation, feedback, langy],
+    [projectId, projectSlug, enabled, session, route, navigation, feedback, langy],
   );
   return <InsightHostProvider value={host}>{children}</InsightHostProvider>;
 }

@@ -1,6 +1,8 @@
 -- The insights inbox (modules/insight): one row per insight, and one row per insight and
 -- reader for that reader's own seen, done and kept state. Both are read models folded from
 -- the `insight` aggregate's events, rebuildable by replaying the event log.
+-- Re-runnable on purpose: this folder was first keyed 20261009120000, so a database that
+-- applied it under that key applies it again under this one, and every statement is a no-op.
 CREATE TABLE IF NOT EXISTS "InsightProjection" (
   "id" TEXT NOT NULL,
   "projectId" TEXT NOT NULL,

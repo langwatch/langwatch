@@ -5,12 +5,8 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import {
-  INSIGHTS_FLAG,
-  InsightsBellToken,
-  InsightsNavCountToken,
-  insightTrpc,
-} from "@langwatch/insight-contract";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { InsightsBellToken, InsightsNavCountToken, insightTrpc } from "@langwatch/insight-contract";
 import { LangyAnswerActionToken } from "@langwatch/langy-contract";
 
 import { insightApi } from "./behavior/insight-api.ts";
@@ -26,7 +22,7 @@ export const insightWeb = defineBrowserModule("insight")
       path: "/:project/insights",
       within: "project",
       label: "Insights",
-      flags: [INSIGHTS_FLAG],
+      flags: [FrontendFlags.release_insights],
       requires: "analytics:view",
       load: () => import("./ui/sections/insights.screen.tsx"),
     },

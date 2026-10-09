@@ -9738,9 +9738,15 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/insight-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../../langy/client
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract

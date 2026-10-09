@@ -23,7 +23,9 @@
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/insight-contract": "workspace:*",
+    "@langwatch/langy-client": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:"

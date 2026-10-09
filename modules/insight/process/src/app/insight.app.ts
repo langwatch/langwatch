@@ -23,12 +23,7 @@ import { InsightCommandsService } from "../services/insight-commands.service.ts"
 import { InsightRolloutService } from "../services/insight-rollout.service.ts";
 import { InsightService } from "../services/insight.service.ts";
 
-type InsightSetup = FeatureSetup<
-  typeof InsightModule.dependencies,
-  never,
-  undefined,
-  InsightRepositories
->;
+type InsightSetup = FeatureSetup<typeof InsightModule.dependencies, undefined, InsightRepositories>;
 
 type ReaderScope = { projectId: string; insightId: string; userId: string };
 
