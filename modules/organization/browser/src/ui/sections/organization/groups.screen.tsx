@@ -34,6 +34,7 @@ import {
 } from "../../../behavior/organization-feedback.ts";
 import { useActivePlan } from "../../../behavior/use-active-plan.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useOrganizationHost } from "../../../model/organization-host.ts";
 import { CreateGroupDialog } from "../../../ui/sections/create-group-dialog.tsx";
 import { GroupDetailDialog } from "../../../ui/sections/group-detail-dialog.tsx";
 import {
@@ -47,7 +48,8 @@ type Group = RouterOutputs["group"]["listAll"][number];
 export default function GroupsScreen() {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useOrganizationHost();
   const { isEnterprise } = useActivePlan();
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [creating, setCreating] = useState(false);
@@ -69,7 +71,7 @@ export default function GroupsScreen() {
     { enabled: !!organization && isEnterprise },
   );
 
-  const canManage = hasPermission("organization:manage");
+  const canManage = host.hasPermission("organization:manage");
 
   if (!organization) return null;
 

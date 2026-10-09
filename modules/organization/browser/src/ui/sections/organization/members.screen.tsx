@@ -127,10 +127,9 @@ function usePeopleListState({
   activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
-  const { hasPermission } = useOrganizationTeamProject();
-  const canManage = hasPermission("organization:manage");
-
   const host = useOrganizationHost();
+  const canManage = host.hasPermission("organization:manage");
+
   const governanceEnabled = host.isFeatureEnabled(FrontendFlags.release_ui_ai_governance_enabled);
   const department = useDepartmentColumn(organization.id, governanceEnabled);
   const showDepartment = department.show && canManage;

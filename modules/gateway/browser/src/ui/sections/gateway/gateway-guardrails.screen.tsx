@@ -63,16 +63,16 @@ const FAILURE_LABEL: Record<GatewayGuardrailFailureMode, string> = {
 
 function GuardrailsPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const projectId = project?.id ?? "";
-  const canManage = hasPermission("gatewayGuardrails:manage");
+  const canManage = host.hasPermission("gatewayGuardrails:manage");
 
   const listQuery = api.gatewayGuardrails.list.useQuery(
     { projectId },
     { enabled: !!projectId, refetchOnWindowFocus: false },
   );
   const utils = api.useUtils();
-  const host = useGatewayHost();
   const guardrailEvaluators = useGuardrailEvaluators({ projectId });
   const evaluatorById = useMemo(() => {
     const map = new Map<string, GuardrailEvaluator>();

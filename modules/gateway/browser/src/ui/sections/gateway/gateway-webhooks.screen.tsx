@@ -36,6 +36,7 @@ import { WebhookDestinationCell } from "../../../features/webhooks/ui/elements/w
 import { WebhookDeliveriesDrawer } from "../../../features/webhooks/ui/sections/webhook-deliveries-drawer.tsx";
 import { WebhookEndpointDrawer } from "../../../features/webhooks/ui/sections/webhook-endpoint-drawer.tsx";
 import { WebhookSecretDialog } from "../../../features/webhooks/ui/sections/webhook-secret-dialog.tsx";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
@@ -551,7 +552,8 @@ function WebhooksManager({
 }
 
 export default function WebhooksSettingsPage() {
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const { webhookEndpointsEnabled, isLoading: isPlanLoading } = useActivePlan();
   const webhooksEnabled = webhookEndpointsEnabled;
 
@@ -581,7 +583,7 @@ export default function WebhooksSettingsPage() {
       <WebhooksManager
         organizationId={organization?.id ?? ""}
         enabled={!!organization}
-        canManage={hasPermission("webhookEndpoints:manage")}
+        canManage={host.hasPermission("webhookEndpoints:manage")}
       />
     </AiGatewayLayout>
   );
