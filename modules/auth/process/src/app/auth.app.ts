@@ -514,6 +514,7 @@ export class AuthModule implements AuthApiContract {
         activity: repositories.sessions,
         now,
       }),
+      operators: dependencies.authz,
       now,
     });
 
