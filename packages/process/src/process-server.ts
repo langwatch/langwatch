@@ -35,9 +35,9 @@ import { projectPublicConfig } from "./transport/bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./transport/config-owner.ts";
 import { processSurface } from "./transport/process-surface.ts";
 
-/** What `run` may be handed: a booted worker also pauses its work and lists its steps. */
+/** What `run` may be handed: a booted worker also lists its steps. */
 type RunnableApplication = ServedApplication &
-  Partial<Pick<BootedApplication, "holdWork" | "migrationSteps" | "role">>;
+  Partial<Pick<BootedApplication, "migrationSteps" | "role">>;
 
 type ParsedConfig = Readonly<Record<string, unknown>>;
 
@@ -77,7 +77,6 @@ export class ProcessServer implements ProcessBoot {
   private readonly resolver: SecretsResolver;
   private readonly settings: z.infer<typeof processSettings>;
   private upgradeGate: UpgradeGate | undefined;
-  private running: RunnableApplication | undefined;
 
   private constructor(deps: {
     server: Server;
@@ -231,11 +230,10 @@ export class ProcessServer implements ProcessBoot {
     return this.server.serve(application);
   }
   run(application: RunnableApplication): Promise<void> {
-    this.running = application;
     return this.server.run(this.withBackgroundSteps(application));
   }
 
-  /** The serving gate (D5), hosted before boot's components; a lapse turns readiness off. */
+  /** The serving gate (D5), hosted before boot's components. */
   hostUpgradeGate({
     role,
     gate,
@@ -246,17 +244,12 @@ export class ProcessServer implements ProcessBoot {
     logger: ServerLogger;
   }): void {
     this.upgradeGate = gate;
-    const onServingChange = async (serving: boolean) => {
-      this.server.recheckReadiness();
-      await this.running?.holdWork?.(!serving);
-    };
     this.server.with(
       upgradeGateComponent({
         server: this.server.name,
         role,
         gate,
         logger,
-        onServingChange,
         onHolding: (holding) => this.server.holdForUpgrade(holding),
       }),
     );

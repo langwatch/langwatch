@@ -7,8 +7,6 @@ import { describe, expect, it } from "vitest";
 
 import { type UpgradeGate, upgradeGateComponent } from "../migration/upgrade-gate.ts";
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 function component({ gate, role = "api" }: { gate: UpgradeGate; role?: "api" | "worker" }) {
   const { logger, lines } = createTestLogger();
   const hosted = upgradeGateComponent({
@@ -16,7 +14,6 @@ function component({ gate, role = "api" }: { gate: UpgradeGate; role?: "api" | "
     role,
     gate,
     logger,
-    pollEveryMs: 10,
   });
   return { hosted, lines };
 }
@@ -56,40 +53,6 @@ describe("the upgrade gate's console lines", () => {
       expect(refused?.msg).toContain("DATABASE_URL");
       expect(refused).toMatchObject({ next: expect.stringContaining("DATABASE_URL") });
       expect(JSON.stringify(lines)).not.toContain("hunter2");
-    });
-  });
-
-  describe("given an admitted worker whose roster entry lapses and is written again", () => {
-    /** @scenario "A lapsed roster entry is logged with what to check, and the recovery says how long serving stopped" */
-    it("says readiness answers 503 and what it waits on, then how long serving stopped", async () => {
-      const state = { serving: true };
-      const { hosted, lines } = component({
-        role: "worker",
-        gate: {
-          admit: async () => ({ admitted: true }),
-          release: async () => undefined,
-          serving: () => state.serving,
-        },
-      });
-      await hosted.start?.();
-      state.serving = false;
-      await wait(60);
-      state.serving = true;
-      await wait(60);
-      await hosted.stop?.();
-      const lapsed = lines.findLine("error", "stopped serving");
-      expect(lapsed?.msg).toContain("readiness answers 503");
-      expect(lapsed?.msg).toContain("the worker takes no new jobs (in-flight ones finish)");
-      expect(lines.findLine("info", "serves again")?.msg).toContain(
-        "the worker takes new jobs again",
-      );
-      expect(lapsed).toMatchObject({
-        phase: "roster",
-        waitingOn: expect.stringContaining("roster write"),
-      });
-      expect(lines.findLine("info", "serves again")).toMatchObject({
-        stoppedForMs: expect.any(Number),
-      });
     });
   });
 });

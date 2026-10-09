@@ -90,7 +90,8 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   step of their image is not `done` or `not-needed`, or their release is below the floor. ClickHouse
   steps always count: an install with a database and no ClickHouse refuses, naming `CLICKHOUSE_URL`
   (round 20; `NO_CLICKHOUSE_REFUSAL`). Admitted, each writes a
-  roster entry, refreshed every 15 s, stale after 60 s; a process whose own row lapses stops serving.
+  roster entry, refreshed every 15 s, stale after 10 min. A roster blip never takes a process out
+  of service: once admitted it serves until stopped.
 - Background steps run on the worker after the last release. A step with `needsOldWritersGone`
   waits until the serving roster says every live process declares it. A rollback is seen from the serving roster and
   reopens level-triggered background steps, so a re-upgrade re-runs them.
@@ -117,7 +118,6 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | Re-runnable migration policy and the runner's auto-resolve                 | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
 | No new foreign key or `@relation` (W-01)                                   | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
 | Projection replay steps and peer projections                               | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
-| A lapsed roster entry: `/readyz` 503, background steps and consumers pause | landed (`packages/process/src/migration/upgrade-gate.ts`, `pauseConsumers` in `packages/process/src/module-eventing.ts`)        |
 
 ## Wrong first moves
 
@@ -171,5 +171,4 @@ migrations it applies before the api and worker serve, and ends with "first run 
 phase logs its start and its end with its time; each blocking step is named before it runs and timed
 after. A runner waiting for the lease names the holder every 30 s. The task's last line names the UI's
 address from `BASE_HOST` and `pnpm task upgrade status`. A serving process logs its ledger check and
-the time it took; a lapsed roster entry says readiness answers 503 and names the roster write it waits on (the worker's
-background steps pause too); recovery says how long serving stopped.
+the time it took.

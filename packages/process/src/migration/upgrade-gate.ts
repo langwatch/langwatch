@@ -24,21 +24,15 @@ export type UpgradeGateBackgroundSteps = Readonly<{
 export type UpgradeGate = Readonly<{
   admit: () => Promise<UpgradeGateVerdict>;
   release: () => Promise<void>;
-  /** False once its roster entry lapsed, true after a good write (round 22); absent: true. */
-  serving?: () => boolean;
   backgroundSteps?: UpgradeGateBackgroundSteps;
 }>;
 
 /** What an operator reads on the gate's lines: the phase, what it waits on, what to do next. */
 const GATE_PHASE = "upgrade-gate";
 const LEDGER = "the upgrade ledger (DATABASE_URL)";
-const ROSTER_WAIT = "a roster write to the upgrade ledger (DATABASE_URL)";
 const LEDGER_UNREADABLE_NEXT =
   "check DATABASE_URL reaches Postgres and `pnpm task upgrade status` answers, then start this process again";
 const REFUSED_NEXT = "do what the refusal names, then start this process again";
-
-/** How often an admitted gate is asked whether it still serves. */
-export const UPGRADE_GATE_SERVING_POLL_MS = 1_000;
 
 export class UpgradeGateRefusedError extends Error {
   readonly code = "upgrade_gate_refused";
@@ -70,29 +64,23 @@ export function assertGatedRole(role: string): asserts role is UpgradeGatedRole 
 
 /**
  * Hosted by the preamble: starts after boot and before the application runtime, stops after it.
- * A refusal, or an unanswering gate, throws; once admitted, a lapse fails readiness and
- * `onServingChange` hears each turn (round 22). `onHolding` holds the upgrading page (Q-U4).
+ * A refusal, or an unanswering gate, throws; once admitted it serves until stopped: a roster
+ * blip never takes it out of service (2026-10-09). `onHolding` holds the upgrading page (Q-U4).
  */
 export function upgradeGateComponent({
   server,
   role,
   gate,
   logger,
-  onServingChange,
   onHolding,
-  pollEveryMs = UPGRADE_GATE_SERVING_POLL_MS,
 }: {
   server: string;
   role: UpgradeGatedRole;
   gate: UpgradeGate;
   logger: ServerLogger;
-  onServingChange?: (serving: boolean) => void | Promise<void>;
   onHolding?: (holding: UpgradeHolding | undefined) => Promise<void>;
-  pollEveryMs?: number;
 }): ServerComponent {
   let admitted = false;
-  let poll: ReturnType<typeof setInterval> | undefined;
-  const watch = servingWatcher({ server, role, gate, logger, onServingChange });
   const refuse = (refusal: string, next: string): never => {
     const error = new UpgradeGateRefusedError({ server, role, refusal: redactUrls(refusal) });
     logger.error(
@@ -138,63 +126,10 @@ export function upgradeGateComponent({
         },
         `${server} (${role}): the installation is current for this image; serving (checked in ${elapsedMs} ms)`,
       );
-      if (gate.serving) {
-        poll = setInterval(watch, pollEveryMs);
-        poll.unref?.();
-      }
-    },
-    ready: async () => {
-      if (admitted && gate.serving?.() === false) {
-        throw new Error(`${server} (${role}) stopped serving: its serving roster entry lapsed`);
-      }
     },
     stop: async () => {
-      clearInterval(poll);
       if (admitted) await gate.release();
     },
-  };
-}
-
-/** Asked on every poll: reports and hands on each turn of `serving`, never the same twice. */
-function servingWatcher({
-  server,
-  role,
-  gate,
-  logger,
-  onServingChange,
-}: {
-  server: string;
-  role: UpgradeGatedRole;
-  gate: UpgradeGate;
-  logger: ServerLogger;
-  onServingChange?: (serving: boolean) => void | Promise<void>;
-}): () => void {
-  let serving = true;
-  let stoppedAt = 0;
-  const pauses = role === "worker" ? "; the worker takes no new jobs (in-flight ones finish)" : "";
-  const resumes = role === "worker" ? "; the worker takes new jobs again" : "";
-  return () => {
-    const now = gate.serving?.() ?? true;
-    if (now === serving) return;
-    serving = now;
-    const phase = "roster";
-    if (now) {
-      const stoppedForMs = Math.round(performance.now() - stoppedAt);
-      logger.info(
-        { role, phase, waitingOn: "nothing", stoppedForMs, next: "nothing to do: it serves" },
-        `${server} (${role}) serves again: its roster entry was written after ${stoppedForMs} ms${resumes}`,
-      );
-    } else {
-      stoppedAt = performance.now();
-      logger.error(
-        { role, phase, waitingOn: ROSTER_WAIT, next: LEDGER_UNREADABLE_NEXT },
-        `${server} (${role}) stopped serving: its serving roster entry lapsed; readiness answers 503 ` +
-          `until a roster write succeeds${pauses}`,
-      );
-    }
-    void Promise.resolve(onServingChange?.(now)).catch((error: unknown) =>
-      logger.error({ role, error }, `${server}: a serving change was not applied`),
-    );
   };
 }
 

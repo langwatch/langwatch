@@ -335,7 +335,7 @@ export class Server {
       .end(ready ? "ready" : `${this.name} is not ready`);
   }
 
-  /** Latches once passed until `recheckReadiness`; one check in flight however many probes ask. */
+  /** Latches once passed; one check in flight however many probes ask. */
   private checkReadiness(): Promise<boolean> {
     if (this.draining || !this.started) return Promise.resolve(false);
     if (Atomics.load(this.readiness, 0) === 1) return Promise.resolve(true);
@@ -358,12 +358,6 @@ export class Server {
         this.readinessCheck = undefined;
       });
     return this.readinessCheck;
-  }
-
-  /** Drops the readiness latch so the next probe asks every component again (round 22). */
-  recheckReadiness(): void {
-    if (this.draining) return;
-    Atomics.store(this.readiness, 0, 0);
   }
 
   /** A draining door takes no new work and is no longer ready, on and off the loop. */
