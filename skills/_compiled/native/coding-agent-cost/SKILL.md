@@ -175,9 +175,9 @@ Applies to subscription users. Claude Code already gives their main conversation
 
 ### 7. Sessions that should have been split
 
-**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the one-hour rate.
+**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the user's cache write rate: 2x base price with the one-hour cache, 1.25x with the five-minute one.
 
-**Saving:** rebuild tokens x 1.9 x base price is the upper bound (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
+**Saving:** rebuild tokens x (write multiplier - read multiplier) x base price is the upper bound: 1.9 with the one-hour cache, 1.15 with the five-minute one (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
 
 **Habit, not a setting:** `/compact` before a long break, `/clear` or a new session for unrelated work. Name the user's own sessions that did this.
 

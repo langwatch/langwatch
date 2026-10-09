@@ -19,12 +19,10 @@ function costSkill(): string {
   return renderSkill(skill!);
 }
 
-/** The paragraphs that start with the bold "Saving:" label. */
 function savingParagraphs(rendered: string): string[] {
   return rendered.split("\n\n").filter((p) => p.startsWith("**Saving:**"));
 }
 
-/** The body of every ```sql fence. */
 function sqlBlocks(rendered: string): string[] {
   return [...rendered.matchAll(/```sql\n([\s\S]*?)```/g)].map((m) => m[1]!);
 }
@@ -40,8 +38,7 @@ describe("the coding-agent-cost skill", () => {
         path.join(skillsRoot, "_compiled", "native", "coding-agent-cost", "SKILL.md"),
         "utf8",
       );
-      expect(compiled).toContain("# Cut Your Coding Agent's Cost and Context");
-      expect(compiled).toContain('"promptCacheTtl": "1h"');
+      expect(compiled).toBe(costSkill());
     });
   });
 
@@ -59,7 +56,8 @@ describe("the coding-agent-cost skill", () => {
     /** @scenario "Every expected saving says whether it was measured or estimated" */
     it("labels every saving as measured or estimated", () => {
       const savings = savingParagraphs(costSkill());
-      expect(savings.length).toBeGreaterThanOrEqual(6);
+      // Check 6 keeps a default and prices nothing, so six of the seven checks carry a saving.
+      expect(savings).toHaveLength(6);
       for (const paragraph of savings) {
         expect(paragraph, paragraph.slice(0, 80)).toMatch(/\b(measured|estimated)\b/i);
       }

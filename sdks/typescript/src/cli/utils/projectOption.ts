@@ -15,10 +15,6 @@ import type { Command } from "commander";
 export const PROJECT_FLAG_HELP =
   "Project to run against, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
 
-/**
- * Help for `--project` on `query run`, where the flag narrows rather than picks: without it the
- * statement reads every project the login can read.
- */
 export const QUERY_PROJECT_FLAG_HELP =
   "Read only this project, by id or slug. Without it the statement covers every project your login can read; `langwatch projects list` shows which ones";
 

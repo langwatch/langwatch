@@ -25,7 +25,7 @@ These are manual experiments: you run them on your machine, and LangWatch record
      --settings '{"autoCompactWindow": 150000}' > arm-b-run-1.json
    ```
 
-4. Give each run its own directory, so the runs do not read each other's cache.
+4. Give each run its own directory with a fresh checkout at the same commit, so the runs do not read each other's cache and no run starts from an earlier run's changes.
 5. Alternate the arms (A, B, A, B) instead of running all of one first.
 6. Run each arm at least three times. Agent behaviour varies: in one of our pilots the same prompt took 19 API calls in one run and 150 in another.
 7. Compare cost, cache reads, model calls and the task check. The JSON result has `total_cost_usd` and `usage`, and each run shows up as a session in the [sessions list](/coding-agents/sessions) with its cost, model calls, peak context and compactions.

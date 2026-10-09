@@ -17288,7 +17288,7 @@ With one run per layout, this is a diagnosis, not proof. Agent behaviour varies 
 4. Let both open a pull request and go through the same review bot or reviewer.
 5. Compare the two sessions in LangWatch (queries below), and note anything unrelated to the change that cost either run time, so you can subtract it.
 6. Grade the defects. Count review threads, then have one reviewer read both diffs without knowing which is which and rate every defect as severe (wrong behaviour on a main path) or minor. Run the feature yourself.
-7. Repeat with at least three runs per side before you decide. Use the same prompt each time.
+7. Repeat with at least three runs per side before you decide. Use the same prompt each time, and start every run in a fresh worktree at the same commit of its branch, with its own pull request branch, so no run starts from an earlier run's code.
 
 ## Read the numbers in LangWatch
 
@@ -17300,6 +17300,8 @@ langwatch query run "SELECT GitBranch, count() AS sessions, sum(ModelCalls) AS m
   FROM langwatch.coding_sessions
   WHERE GitBranch IN ('before-branch', 'after-branch') GROUP BY GitBranch"
 ```
+
+This reads every project your login can read and every session ever recorded on those branches. Pass `--project <project>` to both commands, and if the branch names were used before, add a time filter: on `StartedAt` for sessions, and `AND TimeUnixMs >= now() - INTERVAL 7 DAY` for events.
 
 For the feedback loop, compare tool durations per branch:
 
@@ -17542,7 +17544,7 @@ These are manual experiments: you run them on your machine, and LangWatch record
      --settings '{"autoCompactWindow": 150000}' > arm-b-run-1.json
    ```
 
-4. Give each run its own directory, so the runs do not read each other's cache.
+4. Give each run its own directory with a fresh checkout at the same commit, so the runs do not read each other's cache and no run starts from an earlier run's changes.
 5. Alternate the arms (A, B, A, B) instead of running all of one first.
 6. Run each arm at least three times. Agent behaviour varies: in one of our pilots the same prompt took 19 API calls in one run and 150 in another.
 7. Compare cost, cache reads, model calls and the task check. The JSON result has `total_cost_usd` and `usage`, and each run shows up as a session in the [sessions list](/coding-agents/sessions) with its cost, model calls, peak context and compactions.
@@ -19447,9 +19449,9 @@ Applies to subscription users. Claude Code already gives their main conversation
 
 ### 7. Sessions that should have been split
 
-**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the one-hour rate.
+**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the user's cache write rate: 2x base price with the one-hour cache, 1.25x with the five-minute one.
 
-**Saving:** rebuild tokens x 1.9 x base price is the upper bound (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
+**Saving:** rebuild tokens x (write multiplier - read multiplier) x base price is the upper bound: 1.9 with the one-hour cache, 1.15 with the five-minute one (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
 
 **Habit, not a setting:** `/compact` before a long break, `/clear` or a new session for unrelated work. Name the user's own sessions that did this.
 
@@ -55620,9 +55622,9 @@ Applies to subscription users. Claude Code already gives their main conversation
 
 ### 7. Sessions that should have been split
 
-**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the one-hour rate.
+**Fires when** a main-thread call after more than 60 minutes idle rewrites more than half of a context over 20k tokens. Use check 5's query with `gap > 3600`. The cache is gone after an hour on any plan, so the whole context is written again at the user's cache write rate: 2x base price with the one-hour cache, 1.25x with the five-minute one.
 
-**Saving:** rebuild tokens x 1.9 x base price is the upper bound (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
+**Saving:** rebuild tokens x (write multiplier - read multiplier) x base price is the upper bound: 1.9 with the one-hour cache, 1.15 with the five-minute one (a fresh session still writes a small prefix). Estimated median 5% of spend where it fires (93% of organisations).
 
 **Habit, not a setting:** `/compact` before a long break, `/clear` or a new session for unrelated work. Name the user's own sessions that did this.
 
