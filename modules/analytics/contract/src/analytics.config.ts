@@ -16,6 +16,11 @@ export const analyticsServerConfig = Config.define((c) => ({
     accessModelMode: c.env("LWQL_ACCESS_MODEL_MODE", z.string().optional()),
     sqlSingleNode: c.env("LWQL_ACCESS_MODEL_SQL_SINGLE_NODE", z.string().optional()),
   },
+  /** Heavy analytics reads one tenant may run at once per process; blank or invalid reads 4 (specs/analytics/clickhouse-memory-safety.feature). */
+  tenantAnalyticsConcurrency: c.env(
+    "CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY",
+    z.coerce.number().int().positive().catch(4),
+  ),
   /** The shared deployment origin a saved chart's platform link is built on. */
   publicBaseUrl,
 }));

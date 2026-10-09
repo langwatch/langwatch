@@ -76,3 +76,20 @@ export function withGroupedPipeline(input: CustomGraphInput): CustomGraphInput {
     ),
   };
 }
+
+/**
+ * Whether the graph leaves the previous period out of its query. Summary, pie and donut
+ * charts always compare; every other type only when the author turned `includePrevious` on.
+ */
+export function shouldSkipPreviousPeriod({
+  graphType,
+  includePrevious,
+}: {
+  graphType: CustomGraphInput["graphType"];
+  includePrevious: CustomGraphInput["includePrevious"];
+}): boolean {
+  if (graphType === "summary" || graphType === "pie" || graphType === "donnut") {
+    return false;
+  }
+  return !includePrevious;
+}

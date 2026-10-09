@@ -1,10 +1,16 @@
 import {
+  ConcurrencyLimiter,
+  type LimiterStats,
+  StatementWait,
+  statementRefusal,
+} from "@langwatch/limiter";
+
+import {
   ClickHouseClientFactory,
   type ClickHouseClientCreationInput,
   type ClickHouseCloseableClient,
 } from "./connection.ts";
 import type { AbortSignalLike } from "./query.ts";
-import { ConcurrencyLimiter, QueueFullError, type LimiterStats } from "./rateLimit.ts";
 import {
   checkStatementTenantScope,
   describeTenantScopeViolation,
@@ -17,10 +23,6 @@ import {
 } from "./vendorClient.ts";
 
 declare const performance: { now(): number };
-declare const AbortController: new () => { abort(): void; signal: AbortSignalLike };
-declare const AbortSignal: { any(signals: AbortSignalLike[]): AbortSignalLike };
-declare function setTimeout(callback: () => void, milliseconds: number): { unref?(): void };
-declare function clearTimeout(timer: { unref?(): void }): void;
 
 export const DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS = 30_000;
 export const DEFAULT_CLICKHOUSE_IDLE_SOCKET_TTL_MS = 1_500;
@@ -392,28 +394,17 @@ export class ClickHouseStatementAdmission {
     startedAt: number;
   }): unknown {
     const { instance, telemetry, overloadErrorFactory, logger } = this.options;
-    if (error instanceof QueueFullError) {
-      telemetry.incrementStatementsShed({ instance, operation });
-      logger?.warn(
-        { instance, operation, maxQueued: error.maxQueued },
-        "Refused a ClickHouse statement: concurrency wait queue full",
-      );
-      return overloadErrorFactory.create({ cause: error });
-    }
-    if (timedOut) {
-      telemetry.incrementStatementsShed({ instance, operation });
-      logger?.warn(
-        {
-          instance,
-          operation,
-          waitedMs: Math.round(performance.now() - startedAt),
-          timeoutMs: this.timeoutMs,
-        },
-        "Refused a ClickHouse statement: waited too long for a slot",
-      );
-      return overloadErrorFactory.create({ cause: error });
-    }
-    return error;
+    return statementRefusal({
+      error,
+      timedOut,
+      startedAt,
+      timeoutMs: this.timeoutMs,
+      subject: "a ClickHouse statement",
+      logFields: { instance, operation },
+      logger,
+      onShed: () => telemetry.incrementStatementsShed({ instance, operation }),
+      createOverload: (input) => overloadErrorFactory.create(input),
+    });
   }
 }
 
@@ -460,50 +451,6 @@ function statementLane({
     running: 0,
     cap: maxQueued === null ? null : new ConcurrencyLimiter({ maxConcurrent: capMax, maxQueued }),
   };
-}
-
-/**
- * One statement's wait bound, armed lazily and at most once across the cap and the total. A
- * plain timer, cleared at admission, so the unsaturated path allocates nothing and a test can
- * fake it. `hasTimedOut` is true only when this timer fired, never for the caller's own abort.
- */
-class StatementWait {
-  private composed: AbortSignalLike | undefined;
-  private timer: { unref?(): void } | undefined;
-  private fired = false;
-  private readonly callerSignal: AbortSignalLike | undefined;
-  private readonly timeoutMs: number;
-
-  constructor({ signal, timeoutMs }: { signal: AbortSignalLike | undefined; timeoutMs: number }) {
-    this.callerSignal = signal;
-    this.timeoutMs = timeoutMs;
-  }
-
-  get signal(): AbortSignalLike | undefined {
-    return this.composed ?? this.callerSignal;
-  }
-
-  armIf(isFull: boolean): void {
-    if (!isFull || this.timer !== undefined) return;
-    const controller = new AbortController();
-    this.composed =
-      this.callerSignal === undefined
-        ? controller.signal
-        : AbortSignal.any([this.callerSignal, controller.signal]);
-    this.timer = setTimeout(() => {
-      this.fired = true;
-      controller.abort();
-    }, this.timeoutMs);
-    this.timer.unref?.();
-  }
-
-  hasTimedOut(): boolean {
-    return this.fired;
-  }
-
-  dispose(): void {
-    if (this.timer !== undefined) clearTimeout(this.timer);
-  }
 }
 
 const STATEMENT_METHODS: readonly ClickHouseStatementOperation[] = [

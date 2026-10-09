@@ -197,6 +197,7 @@ const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
  * `metadata.span_type` has no slim column — see ADR-034, Read routing.
  */
 const SLIM_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
+  "error.has_error",
   "topics.topics",
   "traces.trace_name",
   "metadata.user_id",

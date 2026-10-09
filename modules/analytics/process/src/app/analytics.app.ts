@@ -51,7 +51,9 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import type { FeatureSetup } from "@langwatch/process";
+import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
@@ -126,6 +128,15 @@ import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /** ADR-034: runs the legacy read beside the routed one and logs a divergence. */
 const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripwire";
+
+/** Waiting analytics reads per tenant; only a tenant flooding the process is refused. */
+const TENANT_ANALYTICS_MAX_QUEUED = 64;
+
+/** Under the 100s proxy cut: 45s here, 20s for a process slot, 30s on the wire. */
+const TENANT_ANALYTICS_WAIT_TIMEOUT_MS = 45_000;
+
+/** The label the tenant gate's gauges, wait histogram and shed counter carry. */
+const TENANT_ANALYTICS_METRICS_INSTANCE = "tenant-analytics";
 
 /**
  * The filter-value read this feature makes on the host's filter registry — declared
@@ -351,6 +362,14 @@ export class AnalyticsModule
       repository: setup.repositories.analytics,
       evaluationRepository: evaluations.open({
         defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+      }),
+      tenantLimiter: new InProcessTenantStatementLimiter({
+        maxConcurrent: setup.config.tenantAnalyticsConcurrency,
+        maxQueued: TENANT_ANALYTICS_MAX_QUEUED,
+        waitTimeoutMs: TENANT_ANALYTICS_WAIT_TIMEOUT_MS,
+        metricsInstance: TENANT_ANALYTICS_METRICS_INSTANCE,
+        telemetry: new StatementBoundTelemetry(),
+        overloadErrorFactory: new OverloadedRefusal(),
       }),
       tripwire: LoggingAnalyticsTripwireService.create({
         isEnabled: (projectId) =>

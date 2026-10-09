@@ -158,3 +158,24 @@ export function appendMetadataValueFilterClauses({
     Object.assign(params, condition.params);
   }
 }
+
+/** The columns of a deduped slim read: `OccurredAt` plus every `<alias>.<Column>` the expressions mention, minus the dedup keys. */
+export function referencedAliasColumns({
+  alias,
+  expressions,
+  keyColumns,
+}: {
+  alias: string;
+  expressions: readonly string[];
+  keyColumns: readonly string[];
+}): string[] {
+  const columns = new Set<string>(["OccurredAt"]);
+  const pattern = new RegExp(`\\b${alias}\\.([A-Za-z_][A-Za-z0-9_]*)`, "g");
+  for (const expression of expressions) {
+    for (const match of expression.matchAll(pattern)) {
+      if (match[1]) columns.add(match[1]);
+    }
+  }
+  for (const key of keyColumns) columns.delete(key);
+  return Array.from(columns);
+}

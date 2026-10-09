@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/clickhouse-client",
-  "langwatch": { "group": "data" },
   "version": "0.1.0",
   "private": true,
   "description": "The shared ClickHouse client contract: fail-closed tenant routing and scope guarding, bounded concurrency with shedding, retries and backoff, tracing and vendor logging policy, resilience over the vendor client, and fleet-aware connection-pool sizing - composed by a client class that states its order.",
@@ -28,6 +27,7 @@
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/limiter": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*"
@@ -38,5 +38,8 @@
     "nanoid": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "data"
   }
 }

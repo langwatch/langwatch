@@ -1388,6 +1388,11 @@ and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic de
 tiered blob store and imports no module contract; `ClickHouseMigrateTask` takes the managed-table list
 through its constructor from apps/tasks, and its data-retention dependency goes.
 
+**Concurrency limiting is a store-neutral service** (Alex, 2026-10-09, LIMITER-SERVICE):
+`@langwatch/limiter` holds the bounded limiter, the statement wait bound and the
+`TenantStatementLimiter` service with its `InProcessTenantStatementLimiter` implementation;
+clickhouse-client imports it and holds no limiter of its own.
+
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path. Two named, linted exceptions hold raw
 clients, each with its written reason: Better Auth's storage adapter and ops' event replay; ops'

@@ -22,6 +22,36 @@ const storedSpansSelectLists = (sql: string): string[][] =>
     (columns ?? "").split(",").map((column) => column.trim()),
   );
 
+/** Split a SQL list on its top-level commas (not those inside parentheses). */
+const splitTopLevel = (list: string): string[] => {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of list) {
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+    if (char === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+};
+
+/**
+ * The columns each latest-version (`argMax`) trace_summaries dedup carries
+ * beyond its keys, in order: the elements of its `tuple(...) AS __latest_row`.
+ */
+const latestTraceRowColumns = (sql: string): string[][] =>
+  Array.from(
+    sql.matchAll(
+      /tuple\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\) AS __latest_row\s+FROM trace_summaries/g,
+    ),
+  ).map(([, columns]) => splitTopLevel(columns ?? ""));
+
 describe("aggregation-builder", () => {
   beforeEach(() => {
     resetParamCounter();
@@ -48,7 +78,8 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("SELECT");
       expect(result.sql).toContain("FROM trace_summaries");
       expect(result.sql).not.toContain("LIMIT 1 BY");
-      expect(result.sql).toContain("max(UpdatedAt)");
+      expect(result.sql).toContain("argMax(__latest_row, __version)");
+      expect(result.sql).not.toContain("(TenantId, TraceId, UpdatedAt) IN");
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");
@@ -818,7 +849,7 @@ describe("aggregation-builder", () => {
           series: [errorSeries({ values: ["true"] })],
         });
 
-        expect(result.sql).toMatch(/SELECT [^\n]*ContainsErrorStatus[^\n]*FROM trace_summaries/);
+        expect(latestTraceRowColumns(result.sql)[0]).toContain("ContainsErrorStatus");
       });
 
       it("parameterizes a span filter and scopes it to its own series", () => {
@@ -1718,23 +1749,22 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe(projectId);
     });
 
-    it("joins a column-pruned stored_spans subquery", () => {
+    it("joins a stored_spans subquery narrowed to the rag.contexts value", () => {
       const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
-      // The stored_spans join is a column-pruned subquery (identity columns +
-      // the SpanAttributes the ARRAY JOIN reads), not the raw table with its
-      // full analytics column set.
-      expect(result.sql).toMatch(/JOIN \(SELECT [^)]*FROM stored_spans/);
       expect(result.sql).not.toContain("JOIN stored_spans ");
       expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/);
 
-      // Assert the exact list, not `toContain("SpanAttributes")`: the outer ARRAY JOIN and the
-      // rag.contexts predicate also name SpanAttributes on `ss`, so a substring check would pass
-      // even if the subquery selected too much, missing a regression that widens the list.
-      expect(storedSpansSelectLists(result.sql)).toEqual([
-        ["TenantId", "TraceId", "SpanId", "SpanAttributes"],
-        ["TenantId", "TraceId", "SpanId", "SpanAttributes"],
-      ]);
+      // The JOIN's right side is hashed into memory: it carries the one
+      // attribute the ARRAY JOIN reads, never the whole SpanAttributes map
+      // (every span's inputs, outputs and prompts in range).
+      expect(result.sql.match(/JOIN \(SELECT ([\s\S]+?) FROM stored_spans/)?.[1]).toBe(
+        "TenantId, TraceId, SpanId, map('langwatch.rag.contexts', SpanAttributes['langwatch.rag.contexts']) AS SpanAttributes",
+      );
+      // ...and only for the spans that have one.
+      expect(result.sql).toMatch(
+        /FROM stored_spans WHERE TenantId = \{tenantId:String\}[^\n]*?AND SpanAttributes\['langwatch\.rag\.contexts'\] != ''/,
+      );
     });
 
     it("prunes the stored_spans join to the StartTime partition window", () => {
@@ -1743,24 +1773,23 @@ describe("aggregation-builder", () => {
       // stored_spans is partitioned by toYearWeek(StartTime); without a
       // StartTime bound the join scans every weekly partition (incl. cold S3).
       // The bound is pushed into the pruned subquery (partition prune before
-      // the join) rather than left on the outer ss alias, for both the top-10
-      // and the total-count parts.
+      // the join) rather than left on the outer ss alias.
       expect(result.sql).not.toContain("ss.StartTime");
       expect(
         result.sql.match(/StartTime >= \{startDate:DateTime64\(3\)\} - INTERVAL 2 DAY/g) ?? [],
-      ).toHaveLength(2);
+      ).toHaveLength(1);
       expect(
         result.sql.match(/StartTime < \{endDate:DateTime64\(3\)\} \+ INTERVAL 2 DAY/g) ?? [],
-      ).toHaveLength(2);
+      ).toHaveLength(1);
     });
 
-    it("includes query for total unique documents", () => {
+    it("counts the distinct documents in the same statement as the top 10", () => {
       const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
-      // Query has two parts separated by semicolon
-      expect(result.sql).toContain(";");
-      expect(result.sql).toContain("uniq(");
-      expect(result.sql).toContain("AS total");
+      // One scan and one join serve both figures: the total is the number of
+      // document groups, counted before the LIMIT.
+      expect(result.sql).not.toContain(";");
+      expect(result.sql).toContain("count() OVER () AS total");
     });
 
     it("includes filters when provided", () => {
@@ -1784,9 +1813,7 @@ describe("aggregation-builder", () => {
       // The document payload comes from the stored_spans ARRAY JOIN, so the
       // deduped trace_summaries subquery only needs identity/date columns and
       // must not materialise the wide Attributes map.
-      expect(result.sql).toContain(
-        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt FROM trace_summaries",
-      );
+      expect(latestTraceRowColumns(result.sql)).toEqual([["OccurredAt"]]);
     });
 
     it("adds filter-referenced columns to the deduped read so filtered queries stay valid", () => {
@@ -1801,9 +1828,7 @@ describe("aggregation-builder", () => {
 
       // TopicId is referenced by the filter WHERE, so the deduped subquery must
       // also select it (otherwise ClickHouse would reject ts.TopicId).
-      expect(result.sql).toContain(
-        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt, TopicId FROM trace_summaries",
-      );
+      expect(latestTraceRowColumns(result.sql)).toEqual([["OccurredAt", "TopicId"]]);
       expect(result.sql).toContain("ts.TopicId IN");
     });
   });
@@ -1900,9 +1925,7 @@ describe("aggregation-builder", () => {
 
       // Feedback payload comes from the stored_spans Events arrays, so the
       // deduped trace_summaries subquery only needs identity/date columns.
-      expect(result.sql).toContain(
-        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt FROM trace_summaries",
-      );
+      expect(latestTraceRowColumns(result.sql)).toEqual([["OccurredAt"]]);
     });
 
     it("adds a filter-referenced Attributes read to the deduped subquery", () => {

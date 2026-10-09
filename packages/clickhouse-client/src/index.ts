@@ -97,8 +97,6 @@ export {
   poolSizingFromEnv,
   resolvePoolSize,
 } from "./pool.ts";
-export type { ConcurrencyLimiterOptions, LimiterStats } from "./rateLimit.ts";
-export { AcquireAbortedError, ConcurrencyLimiter, QueueFullError } from "./rateLimit.ts";
 export type { BackoffInput, TransientClassificationInput } from "./resilience.ts";
 export {
   isTransientClickHouseError,

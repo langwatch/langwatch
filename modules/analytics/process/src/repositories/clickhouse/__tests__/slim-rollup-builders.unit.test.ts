@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../../rules/trace-signal.rules.ts";
+import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
 
@@ -121,10 +122,20 @@ describe("buildSlimTimeseriesQuery", () => {
     filters: { "metadata.user_id": ["alice"] },
   });
 
-  it("emits the deduped FROM trace_analytics IN-tuple pattern", () => {
-    expect(sql).toContain("FROM trace_analytics");
-    expect(sql).toContain("(TenantId, TraceId, UpdatedAt) IN (");
+  /** @scenario Dashboard panels dedup traces with a collapse that can spill to disk */
+  it("dedups trace_analytics to the latest version with the spillable argMax collapse", () => {
+    expect(sql).toContain("FROM trace_analytics AS ta");
+    expect(sql).toContain("argMax(__latest_row, __version)");
     expect(sql).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+    expect(sql).not.toContain("(TenantId, TraceId, UpdatedAt) IN (");
+  });
+
+  it("carries only the columns the query reads, never the Attributes map", () => {
+    const latestRow = sql.match(/tuple\(([\s\S]+?)\) AS __latest_row/)?.[1];
+    expect(latestRow).toContain("ta.OccurredAt");
+    expect(latestRow).toContain("ta.TotalDurationMs");
+    expect(latestRow).not.toMatch(/(?<!\[')ta\.Attributes(?!\[)/);
+    expect(sql).not.toMatch(/SELECT\s+\*/);
   });
 
   it("filters on TenantId first", () => {
@@ -159,8 +170,10 @@ describe("buildSlimTimeseriesQuery", () => {
     expect(sql).toContain("OccurredAt >= {previousStart:DateTime64(3)}");
   });
 
-  it("uses quantileExact for percentile aggregations on slim", () => {
-    expect(sql).toContain("quantileExact(0.95)(ta.TotalDurationMs)");
+  /** @scenario Dashboard percentiles use a bounded-memory estimator */
+  it("uses quantileTDigest for percentile aggregations on slim", () => {
+    expect(sql).toContain("quantileTDigest(0.95)(ta.TotalDurationMs)");
+    expect(sql).not.toContain("quantileExact");
   });
 
   describe("when the query leaves out trace origins", () => {
@@ -233,5 +246,22 @@ describe("buildSlimTimeseriesQuery", () => {
         k.startsWith("slim_user_") && Array.isArray(v) && (v as string[]).includes("alice"),
     );
     expect(userParam).toBeDefined();
+  });
+});
+
+describe("buildEvalSlimTimeseriesQuery percentiles", () => {
+  describe("when serving a percentile of evaluation_score", () => {
+    const { sql } = buildEvalSlimTimeseriesQuery({
+      projectId: "tenant-eval-slim",
+      ...baseDates,
+      series: [{ metric: "evaluations.evaluation_score", aggregation: "p90" }],
+      timeScale: 60,
+    });
+
+    /** @scenario Dashboard percentiles use a bounded-memory estimator */
+    it("uses the bounded-memory t-digest estimator", () => {
+      expect(sql).toContain("quantileTDigest(0.9)(");
+      expect(sql).not.toContain("quantileExact");
+    });
   });
 });

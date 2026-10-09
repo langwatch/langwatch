@@ -119,6 +119,8 @@ export const timeseriesInputSchema = z.object({
   groupByKey: z.optional(z.string()),
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
   timeZone: z.string(),
+  /** Leave the previous period out of the scan; `previousPeriod` then comes back empty. */
+  shouldSkipPreviousPeriod: z.optional(z.boolean()),
 });
 
 export type TimeseriesInput = z.infer<typeof timeseriesInputSchema>;

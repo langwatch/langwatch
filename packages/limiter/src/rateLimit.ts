@@ -4,7 +4,15 @@
  * queue sheds when full, since unbounded hides overload instead of preventing it.
  */
 
-import type { AbortSignalLike } from "./query.ts";
+/**
+ * The part of `AbortSignal` this package uses, declared structurally so a real `AbortSignal`
+ * satisfies it without the DOM or Node lib, keeping the package usable from any host.
+ */
+export interface AbortSignalLike {
+  readonly aborted: boolean;
+  addEventListener(type: "abort", listener: () => void, options?: { once?: boolean }): void;
+  removeEventListener(type: "abort", listener: () => void): void;
+}
 
 /** Raised when the wait queue is full. Shed load rather than grow it. */
 export class QueueFullError extends Error {

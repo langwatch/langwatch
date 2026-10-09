@@ -64,6 +64,9 @@
       "path": "../../instant-eval/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/limiter/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {

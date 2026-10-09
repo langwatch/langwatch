@@ -53,6 +53,7 @@ export const analyticsTimeseriesInputSchema = z
     groupByKey: z.string().optional(),
     timeScale: z.union([z.literal("full"), z.number().int()]).optional(),
     timeZone: z.string(),
+    shouldSkipPreviousPeriod: z.boolean().optional(),
   })
   .strict();
 

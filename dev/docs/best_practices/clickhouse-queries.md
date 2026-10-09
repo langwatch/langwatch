@@ -80,6 +80,47 @@ LIMIT 1
 
 **Important:** Use table aliases (`t.`, `s.`) in the WHERE clause. Some column projections (e.g. `toString(UpdatedAt) AS UpdatedAt` in `RUN_COLUMNS`) create aliases that shadow the raw column. Without table aliases, ClickHouse may resolve `UpdatedAt` to the `String` alias instead of the `DateTime64` column, causing type mismatch errors.
 
+### Whole-range aggregates: argMax collapse
+
+The IN-tuple form builds a hash set with one entry per key that passes the inner scope. A set cannot spill to disk. That is fine for a list page, which reads a few hundred keys, and wrong for an analytics panel, which aggregates over every trace in a 30-day range (60 days with the previous period). On a project with tens of millions of traces the set alone passes the per-query memory cap and the query fails with `MEMORY_LIMIT_EXCEEDED`.
+
+For a query that aggregates over every key in a range, read the table once and collapse each key to its newest row with `argMax`. The per-key state lives in an aggregation hash table, which `max_bytes_before_external_group_by` spills to disk, so a bigger range is slower instead of failing.
+
+```sql
+SELECT ...
+FROM (
+  SELECT TenantId, TraceId,
+         argMax(__latest_row, __version) AS __latest,
+         tupleElement(__latest, 1) AS OccurredAt,
+         tupleElement(__latest, 2) AS TotalCost
+  FROM (
+    SELECT TenantId, TraceId, UpdatedAt AS __version,
+           tuple(OccurredAt, TotalCost) AS __latest_row
+    FROM trace_analytics
+    WHERE TenantId = {tenantId:String}
+      AND OccurredAt >= {start:DateTime64(3)} AND OccurredAt < {end:DateTime64(3)}
+  )
+  GROUP BY TenantId, TraceId
+) ta
+WHERE ...
+```
+
+Rules for this form:
+
+- **Use `latestVersionSubquery`** (`src/server/analytics/clickhouse/latest-version-dedup.ts`). It emits the shape above.
+- **Carry the row as a tuple.** `argMax` on a `Nullable` column skips NULLs and returns an older version's value. `argMax(tuple(x), v).1` keeps the NULL.
+- **Rename inside the inner subquery.** An outer `argMax(OccurredAt, UpdatedAt) AS OccurredAt` shadows the column the WHERE filters on and fails with `ILLEGAL_AGGREGATION`. The `__latest_row` / `__version` names avoid it.
+- **Carry only narrow columns.** The newest row is buffered per key. Never carry a whole `Map`: narrow it to the keys the query reads (`narrowMapColumnProjection` in `field-mappings.ts`), or keep the IN-tuple form.
+- **Evaluate predicates on the newest version.** A predicate that must hold for the newest row (a filter, a has-signal check) is carried as a boolean column and checked in the outer WHERE, the same place the IN-tuple form checked it.
+
+The two forms pick the same row. They differ only on two versions tied on `UpdatedAt`: the collapse keeps one, the IN-tuple form keeps both.
+
+The same reasoning applies to the rest of a whole-range query. Prefer aggregations, which spill, over `DISTINCT`, window functions and hash joins, which hold their whole input in memory. Prefer `quantileTDigest` over `quantileExact` for percentiles over a range.
+
+When a whole-range query cannot avoid a join whose hash side has one row per trace, return `join_algorithm: "grace_hash"` with a `max_bytes_in_join` budget and a lower `max_threads` in the builder's `settings` (see `SPAN_MODEL_PARTITION_SETTINGS`). The join then spills, and the merge of spilled aggregations, which takes memory per thread, stays bounded.
+
+Analytics panel reads also run through the analytics module's `TenantStatementLimiter` service (`packages/limiter/src/tenantStatementLimit.ts`; the in-process implementation is built in `modules/analytics/process/src/app/analytics.app.ts`), which lets one project run `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` (default 4) of them at once per process, so a dashboard load queues its panels instead of running all of them together.
+
 ## Version Columns per Table
 
 | Table             | Engine                          | Version Column | Dedup Key                         |
@@ -337,6 +378,7 @@ When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service h
 
 - **`ORDER BY <version_col> DESC LIMIT 1`** against any `ReplacingMergeTree` table — replace with the IN-tuple dedup pattern above. Do not let "but it's a single-row lookup" rationalise it through.
 - **`LIMIT 1 BY <key>`** with any heavy column in the SELECT — replace with the IN-tuple form.
+- **An IN-tuple dedup in a query that aggregates over a whole date range** (an analytics panel, a usage total). Its set grows with the key count and cannot spill. Use the argMax collapse from "Whole-range aggregates".
 - **`max(<column>)` used as a pagination cursor** instead of `argMax(<column>, UpdatedAt)` — pagination cursors derived from non-version columns can read stale values.
 - **Missing partition predicate** when a date range is available — every weekly-partitioned table (`trace_summaries`, `simulation_runs`, `stored_spans`, `evaluation_runs`, ...) needs a WHERE on its partition column to enable pruning.
 - **Heavy columns in dedup subqueries** — anything like `Messages.Content`, `Inputs`, `Details`, `ComputedInput`, `SpanAttributes`, `Examples`, `LlmCalls` belongs only in the outer SELECT, never in the dedup subquery.

@@ -4,19 +4,12 @@
  * a class in `client.ts` — this module keeps only the shared vocabulary.
  */
 
+import type { AbortSignalLike } from "@langwatch/limiter";
+
 /** Whether a statement reads or writes, which several policies branch on. */
 export type QueryKind = "read" | "write";
 
-/**
- * The part of `AbortSignal` this package uses, declared structurally so a
- * real `AbortSignal` satisfies it without reaching for the DOM or Node lib —
- * keeps the package buildable without `@types/node`, usable from any host.
- */
-export interface AbortSignalLike {
-  readonly aborted: boolean;
-  addEventListener(type: "abort", listener: () => void, options?: { once?: boolean }): void;
-  removeEventListener(type: "abort", listener: () => void): void;
-}
+export type { AbortSignalLike };
 
 export interface QueryRequest {
   /**

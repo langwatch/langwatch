@@ -1,3 +1,4 @@
+import { AcquireAbortedError, QueueFullError, type LimiterStats } from "@langwatch/limiter";
 /**
  * The client-side statement bound: how many statements reach ClickHouse at
  * once, what happens to the surplus, and who may stop waiting. A deferrable
@@ -18,7 +19,6 @@ import {
   type ClickHouseStatementOperation,
   type ClickHouseVendorClient,
 } from "../managed-client.ts";
-import { AcquireAbortedError, QueueFullError, type LimiterStats } from "../rateLimit.ts";
 
 class OverloadedError extends Error {
   constructor(readonly cause: unknown) {

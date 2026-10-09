@@ -1,8 +1,8 @@
+import { ConcurrencyLimiter } from "@langwatch/limiter";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
 import type { QueryRequest } from "../query.ts";
-import { ConcurrencyLimiter } from "../rateLimit.ts";
 import { RetryPolicy } from "../retry.ts";
 import { TenantGuard, TenantScopeError } from "../tenantGuard.ts";
 import { QueryTracer } from "../tracing.ts";
