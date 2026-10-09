@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import { licenseRegistryTrpcTransport, operatorFact } from "../license-registry.trpc.ts";
 import { selfHostedInstancesTrpcTransport } from "../self-hosted-instance.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type Context = { actor: { type: "user"; id: string } | null; operator: OpsOperator | null };
 
@@ -30,6 +31,7 @@ function members(): TrpcRuntimeMembers<Context> {
     identity: { caller: (ctx) => ({ actor: ctx.actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted: false, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
