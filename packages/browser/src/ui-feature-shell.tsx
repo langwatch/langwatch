@@ -85,6 +85,8 @@ export type UiFeatureShellInstall = {
    * and the open drawer alike: a drawer reads the same `*HostApi` its screens do.
    */
   moduleHosts?: ComponentType<{ children?: ReactNode }>;
+  /** Drawn once beside the open drawer, so it reads the capabilities a screen does. */
+  footer?: ComponentType;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
   /** The watch the supplied transport's fetch reports session versions to (ADR-170). */
@@ -238,11 +240,17 @@ function refetchOnNewerSession({
   };
 }
 
+/** What a composition with no footer draws there: nothing. */
+function UiNoFooter() {
+  return null;
+}
+
 export function createUiFeatureShell({
   apis,
   capabilities,
   drawers = {},
   moduleHosts: ModuleHosts = UiNoModuleHosts,
+  footer: Footer = UiNoFooter,
   transport,
   sessionVersions,
   queryStore,
@@ -363,6 +371,7 @@ export function createUiFeatureShell({
               <ModuleHosts>
                 {children}
                 <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
+                <Footer />
               </ModuleHosts>
             </UiApiWaitingGate>
           </UiScopeHostProvider>

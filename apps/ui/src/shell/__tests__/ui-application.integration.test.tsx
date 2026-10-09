@@ -32,7 +32,6 @@ const providers: UiApplicationInstall["providers"] = {
   graphicsQuality: PassThrough,
   commandBar: PassThrough,
   toaster: () => null,
-  footer: () => null,
   usePublicAppConfig: () => ({ data: publicAppConfig }),
   isDevelopment: false,
 };

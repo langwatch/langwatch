@@ -43,6 +43,12 @@ export class UiCapabilityUnavailableError extends Error {
   }
 }
 
+/** The hosted support chat; absent where the deployment ships none. */
+export abstract class UiSupportChat {
+  /** Re-asserts the closed bubble; leaves a conversation the reader opened alone. */
+  abstract hide(): void;
+}
+
 /** Sets the browser tab's title, and hands back the way to put it back. */
 export abstract class UiDocumentTitle {
   abstract set(title: string): () => void;
@@ -367,6 +373,8 @@ export type UiCapabilities = {
    */
   scope?: UiScope;
   session: UiSession;
+  /** The support chat the composition installed. Absent reads as no chat. */
+  supportChat?: UiSupportChat;
   /** The trace filters the reader applied. Absent reads as unfiltered. */
   traceFilters?: UiTraceFilters;
 };
@@ -426,6 +434,7 @@ export function resolveUiCapabilities({
     rpc: install.rpc ?? rpc ?? UNAVAILABLE_UI_RPC,
     scope: install.scope ?? scope ?? UNAVAILABLE_UI_SCOPE,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
+    supportChat: install.supportChat,
     traceFilters: install.traceFilters ?? traceFilters,
   };
 }
@@ -552,6 +561,11 @@ export function useUiScope(): UiScope {
 /** Where this reader could replicate a thing to; absent where no lender is installed. */
 export function useUiCopyTargets(): UiCopyTargets {
   return useOptionalUiCapabilities()?.copyTargets ?? ABSENT_UI_COPY_TARGETS;
+}
+
+/** The support chat, or undefined where this deployment installed none. */
+export function useUiSupportChat(): UiSupportChat | undefined {
+  return useOptionalUiCapabilities()?.supportChat;
 }
 
 /** The trace filters this reader applied; undefined where no lender is installed. */

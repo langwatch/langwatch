@@ -70,6 +70,8 @@ export type UiFeatureInstall = {
   routes?: Readonly<Record<UiWebRouteParent, readonly RouteObject[]>>;
   /** Every installed module's declared host mounts, in install order. */
   hosts?: readonly UiModuleHostMount[];
+  /** Drawn once inside the capabilities, beside the open drawer; saas's analytics block. */
+  footer?: ComponentType;
 };
 
 /** One feature package's whole contribution to the browser application. */

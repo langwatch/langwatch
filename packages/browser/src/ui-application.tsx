@@ -88,6 +88,7 @@ export function createUiApplication({
           ...(features.sessionVersions ? { sessionVersions: features.sessionVersions } : {}),
           ...(features.session ? { session: features.session } : {}),
           ...(features.hostServices ? { hostServices: features.hostServices } : {}),
+          ...(features.footer ? { footer: features.footer } : {}),
         }),
         pageErrorFallback: pages.errorFallback,
       }),

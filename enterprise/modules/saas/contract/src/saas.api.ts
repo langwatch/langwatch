@@ -51,7 +51,7 @@ export const saasBrowserUserSchema = z.object({
   id: z.string(),
   email: z.string().nullish(),
   name: z.string().nullish(),
-  impersonator: z.string().nullish(),
+  impersonator: z.object({ id: z.string() }).nullish(),
 });
 
 export const saasBrowserScopeSchema = z.object({
@@ -61,10 +61,6 @@ export const saasBrowserScopeSchema = z.object({
 
 export type SaasBrowserUser = z.infer<typeof saasBrowserUserSchema>;
 export type SaasBrowserScope = z.infer<typeof saasBrowserScopeSchema>;
-
-export abstract class SaasBrowserService {
-  abstract updateLastLogin(): void;
-}
 
 /** What a browser is told: which product it is looking at. */
 export const saasWebConfigSchema = z.strictObject({
