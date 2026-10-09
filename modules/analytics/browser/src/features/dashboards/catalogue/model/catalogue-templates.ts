@@ -703,6 +703,18 @@ function focusTemplates({ byAgentKind, ...base }: AuthoredTemplate): CatalogueTe
 
 const REQUIREMENTS = new Map(DATA_REQUIREMENTS.map((need) => [need.key, need] as const));
 const WIDGET_NEEDS = new Map(CATALOGUE_WIDGETS.map(({ id, requirements }) => [id, requirements]));
+const WIDGET_TITLES = new Map(CATALOGUE_WIDGETS.map(({ id, title }) => [id, title] as const));
+
+/** What a member can send or turn on to meet one requirement, sorted; none if traces do. */
+function settableNames(alternatives: readonly string[]): string[] {
+  if (alternatives.includes("traces")) return [];
+  return alternatives
+    .flatMap((key) => {
+      const need = REQUIREMENTS.get(key);
+      return need && need.kind !== "feature" ? [need.name] : [];
+    })
+    .toSorted();
+}
 
 /**
  * What the board's widgets need that a member can send or turn on, each one's alternatives
@@ -712,12 +724,8 @@ const WIDGET_NEEDS = new Map(CATALOGUE_WIDGETS.map(({ id, requirements }) => [id
 export function templateSetupNeeds(widgets: readonly string[]): string[] {
   const needs = widgets.flatMap((id) =>
     (WIDGET_NEEDS.get(id) ?? []).flatMap((alternatives) => {
-      if (alternatives.includes("traces")) return [];
-      const settable = alternatives.flatMap((key) => {
-        const need = REQUIREMENTS.get(key);
-        return need && need.kind !== "feature" ? [need.name] : [];
-      });
-      return settable.length > 0 ? [settable.toSorted()] : [];
+      const settable = settableNames(alternatives);
+      return settable.length > 0 ? [settable] : [];
     }),
   );
   const kept: string[][] = [];
@@ -727,6 +735,24 @@ export function templateSetupNeeds(widgets: readonly string[]): string[] {
   return kept.map((need) => need.join(" or "));
 }
 
+/** A widget of the board and the data it waits for, as a sentence names it. */
+export interface WidgetGap {
+  readonly widget: string;
+  readonly gap: string;
+}
+
+/** The widgets that wait for data the member can send or turn on, each with its needs. */
+export function templateWidgetGaps(widgets: readonly string[]): WidgetGap[] {
+  return widgets.flatMap((id) => {
+    const needs = (WIDGET_NEEDS.get(id) ?? [])
+      .map((alternatives) => settableNames(alternatives).join(" or "))
+      .filter(Boolean);
+    return needs.length > 0
+      ? [{ widget: WIDGET_TITLES.get(id) ?? id, gap: needs.join(" and ") }]
+      : [];
+  });
+}
+
 /** Whether meeting `narrower` already meets `need`: each of its alternatives is one of need's. */
 const isWithin = ({ narrower, need }: { narrower: readonly string[]; need: readonly string[] }) =>
   narrower.every((name) => need.includes(name));
@@ -734,7 +760,12 @@ const isWithin = ({ narrower, need }: { narrower: readonly string[]; need: reado
 /** The report's last ask: find what the board needs that is not set up yet, and offer help. */
 function setupCheckFor(widgets: readonly string[]): string {
   const needs = templateSetupNeeds(widgets);
-  const listed = needs.length > 0 ? ` It needs: ${needs.join("; ")}.` : "";
+  const gaps = templateWidgetGaps(widgets);
+  const waiting =
+    gaps.length > 0
+      ? ` These widgets wait for data: ${gaps.map(({ widget, gap }) => `"${widget}" needs ${gap}`).join("; ")}.`
+      : "";
+  const listed = needs.length > 0 ? ` It needs: ${needs.join("; ")}.${waiting}` : "";
   return [
     `Then check what this dashboard needs that my project has not set up yet.${listed}`,
     "Also look for fields its queries read that my traces lack, such as cost, user id or",
