@@ -242,6 +242,13 @@ function RunsTable({
   );
 }
 
+/** An old serving process by role, release (else image) and when it was last seen. */
+function waitingWriterLabel(writer: UpgradeStepView["waitingOn"][number]): string {
+  const name = writer.release ?? writer.image;
+  if (!writer.lastSeenAt) return `${writer.role} (${name})`;
+  return `${writer.role} (${name}, last seen ${readableDate(writer.lastSeenAt).toLocaleString()})`;
+}
+
 function PendingSteps({
   group,
   steps,
@@ -264,6 +271,7 @@ function PendingSteps({
           <Table.ColumnHeader>Progress</Table.ColumnHeader>
           <Table.ColumnHeader>Waiting on</Table.ColumnHeader>
           <Table.ColumnHeader>Release</Table.ColumnHeader>
+          <Table.ColumnHeader>Finish by</Table.ColumnHeader>
           <Table.ColumnHeader>Last error</Table.ColumnHeader>
           <Table.ColumnHeader />
         </Table.Row>
@@ -285,12 +293,9 @@ function PendingSteps({
             <Table.Cell>
               {step.progress && `${Math.floor((step.progress.done / step.progress.total) * 100)}%`}
             </Table.Cell>
-            <Table.Cell>
-              {step.waitingOn
-                .map((writer) => `${writer.role} (${writer.release ?? writer.image})`)
-                .join(", ")}
-            </Table.Cell>
+            <Table.Cell>{step.waitingOn.map(waitingWriterLabel).join(", ")}</Table.Cell>
             <Table.Cell fontFamily="mono">{step.release ?? "Unreleased"}</Table.Cell>
+            <Table.Cell fontFamily="mono">{step.finishBy}</Table.Cell>
             <Table.Cell>{step.lastError}</Table.Cell>
             <Table.Cell textAlign="end">
               {onRetryStep && step.status === "failed" && (

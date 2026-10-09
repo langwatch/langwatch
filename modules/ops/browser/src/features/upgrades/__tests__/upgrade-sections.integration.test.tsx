@@ -53,6 +53,7 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     statusLabel: "Done",
     owner: "ops",
     description: null,
+    finishBy: null,
     recorded: true,
     inferred: false,
     attempt: 1,
@@ -336,6 +337,46 @@ describe("UpgradesOverview", () => {
 
       const row = screen.getByTestId("upgrade-background-step-ops:backfill-names");
       expect(row).toHaveTextContent("worker (3.20.1), api (img-dev)");
+    });
+
+    /** @scenario "The background step list shows each step's state, progress and deadline" */
+    it("shows each step's status, progress and finish-by release, and who a waiting step waits on", () => {
+      const replaying = { ...running, progress: { done: 63, total: 100 }, finishBy: "3.24.0" };
+      const waiting = stepWith({
+        id: "ops:fill-owner",
+        mode: "background",
+        status: "pending",
+        statusLabel: "Waiting",
+        finishBy: "3.24.0",
+        waitingOn: [
+          {
+            role: "worker",
+            image: "img-3.20.1",
+            release: "3.20.1",
+            lastSeenAt: "2026-10-09T10:00:00.000Z",
+          },
+        ],
+      });
+      const failedBy = { ...failed, finishBy: "3.24.0" };
+      renderOverview({ status: finishing, backgroundSteps: [failedBy, replaying, waiting] });
+
+      const rows = [
+        { id: "ops:backfill-names", label: "Running" },
+        { id: "ops:fill-owner", label: "Waiting" },
+        { id: "ops:backfill-owner", label: "Failed" },
+      ];
+      for (const { id, label } of rows) {
+        const row = screen.getByTestId(`upgrade-background-step-${id}`);
+        expect(row).toHaveTextContent(id);
+        expect(row).toHaveTextContent(label);
+        expect(row).toHaveTextContent("3.24.0");
+      }
+      expect(screen.getByTestId("upgrade-background-step-ops:backfill-names")).toHaveTextContent(
+        "63%",
+      );
+      expect(screen.getByTestId("upgrade-background-step-ops:fill-owner")).toHaveTextContent(
+        "worker (3.20.1, last seen",
+      );
     });
 
     it("shows a skeleton while the background steps load", () => {

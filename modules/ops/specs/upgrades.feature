@@ -139,7 +139,7 @@ Feature: Ops shows an installation's release upgrades, read-only
 
   # --- Background steps and their Retry (Alex, 2026-10-09, UPGRADE-CONSOLE D6) ---
 
-  @unimplemented
+  @integration
   Scenario: The background step list shows each step's state, progress and deadline
     Given a background step at 63 percent, one waiting on old writers and one failed
     When an operator opens "Finishing in background"
@@ -209,7 +209,7 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then the preview is refused as "target_not_in_image"
     And it shows the command that runs "upgrade plan --to 3.24.0" from the 3.24.0 image
 
-  @unimplemented
+  @unit
   Scenario: An installation below the floor previews as refused with the LTS to upgrade to first
     Given an installation on 3.18.0 below the floor 3.20.1
     When an operator previews an upgrade to the image's release
