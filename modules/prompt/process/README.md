@@ -6,7 +6,7 @@ The server half of [prompt](../README.md). Prompts: versioned prompt configurati
 
 ## Installation
 
-`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withTransportFacts(…)`, `src/prompt.module.ts:15`.
+`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withMigrations(…).withTransportFacts(…)`, `src/prompt.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
