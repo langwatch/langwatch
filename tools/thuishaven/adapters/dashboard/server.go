@@ -86,6 +86,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/stacks/{slug}/orb", s.handleOrbFacts)
 	mux.HandleFunc("POST /api/stacks/{slug}/orb/feedback", s.handleOrbFeedback)
 	mux.HandleFunc("POST /api/stacks/{slug}/orb/page", s.handleOrbPage)
+	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb", s.handleOrbPreflight)
 	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb/", s.handleOrbPreflight)
 	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
 	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)

@@ -89,8 +89,10 @@ func TestOrbFeedbackFromAnotherOriginIsRefused(t *testing.T) {
 
 func TestOrbPreflightAnswersOnlyTheAppOrigin(t *testing.T) {
 	server, _ := orbServer(t)
-	if rec := (orbCall{http.MethodOptions, "/api/stacks/feat-x/orb/page", orbAppOrigin, ""}).on(server); rec.Code != http.StatusNoContent {
-		t.Fatalf("app origin preflight: %d", rec.Code)
+	for _, path := range []string{"/api/stacks/feat-x/orb/page", "/api/stacks/feat-x/orb"} {
+		if rec := (orbCall{http.MethodOptions, path, orbAppOrigin, ""}).on(server); rec.Code != http.StatusNoContent {
+			t.Fatalf("app origin preflight %s: %d", path, rec.Code)
+		}
 	}
 	if rec := (orbCall{http.MethodOptions, "/api/stacks/feat-x/orb/page", "https://evil.example", ""}).on(server); rec.Code != http.StatusForbidden {
 		t.Fatalf("foreign preflight: %d", rec.Code)
