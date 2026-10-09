@@ -140,19 +140,24 @@ function assertionBody({
 }
 
 /**
- * A SAML Response whose single Assertion is signed by `identity`, base64 as a
- * browser posts it. Sign with another identity than the connection's, or edit
- * the result with `tamperWithAssertion`, to get an assertion it must refuse.
+ * A SAML Response signed by `identity`, base64 as posted. Sign with another identity, or
+ * edit it with `tamperWithAssertion`, to get one it must refuse. `clockSkewSeconds` runs the
+ * provider's clock ahead of `now` (negative: behind); `unsigned` omits the Signature.
  */
 export function signSamlResponse({
   identity,
   claims,
-  now = nowInstant(),
+  now: ourNow = nowInstant(),
+  clockSkewSeconds = 0,
+  unsigned = false,
 }: {
   identity: SigningIdentity;
   claims: SamlAssertionClaims;
   now?: Instant;
+  clockSkewSeconds?: number;
+  unsigned?: boolean;
 }): string {
+  const now = ourNow.add({ seconds: clockSkewSeconds });
   const issueInstant = now.toString();
   const expiry = now.add({ minutes: 5 }).toString();
   const assertionId = claims.assertionId ?? `_${randomUUID()}`;
@@ -160,8 +165,8 @@ export function signSamlResponse({
   const body = assertionBody({ claims, issueInstant, issuedAt: now, expiry });
 
   // The digest covers the assertion as it stands without its own Signature.
-  const unsigned = `${assertionOpen}${body.replace("@@SIGNATURE@@", "")}</saml:Assertion>`;
-  const digest = createHash("sha256").update(unsigned).digest("base64");
+  const withoutSignature = `${assertionOpen}${body.replace("@@SIGNATURE@@", "")}</saml:Assertion>`;
+  const digest = createHash("sha256").update(withoutSignature).digest("base64");
   const signedInfo =
     `<ds:SignedInfo xmlns:ds="${NS_DSIG}"><ds:CanonicalizationMethod Algorithm="${ALG_C14N}"></ds:CanonicalizationMethod>` +
     `<ds:SignatureMethod Algorithm="${ALG_RSA_SHA256}"></ds:SignatureMethod>` +
@@ -178,7 +183,7 @@ export function signSamlResponse({
     `<samlp:Response xmlns:samlp="${NS_PROTOCOL}" Destination="${escapeAttribute(claims.recipient)}" ID="_${randomUUID()}"${claims.inResponseTo ? ` InResponseTo="${escapeAttribute(claims.inResponseTo)}"` : ""} IssueInstant="${issueInstant}" Version="2.0">` +
     `<saml:Issuer xmlns:saml="${NS_ASSERTION}">${escapeText(claims.issuer)}</saml:Issuer>` +
     `<samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"></samlp:StatusCode></samlp:Status>` +
-    `${assertionOpen}${body.replace("@@SIGNATURE@@", signature)}</saml:Assertion></samlp:Response>`;
+    `${assertionOpen}${body.replace("@@SIGNATURE@@", unsigned ? "" : signature)}</saml:Assertion></samlp:Response>`;
   return Buffer.from(response, "utf8").toString("base64");
 }
 
