@@ -32,6 +32,7 @@ type savedTenant struct {
 	LastProvisioning *ProvisioningOutcome `json:"lastProvisioning,omitempty"`
 	SamlpSubjects    bool                 `json:"samlpSubjects"`
 	Events           []Event              `json:"events,omitempty"`
+	LegacyProvider   LegacyProvider       `json:"legacyProvider,omitempty"`
 }
 
 type stateStore struct {
@@ -120,7 +121,8 @@ func restoreTenant(raw json.RawMessage, id int, baseURL string) (*Tenant, error)
 		users: saved.Users, groups: saved.Groups, apps: saved.Applications,
 		provisioning: saved.Provisioning, lastProvisioning: saved.LastProvisioning,
 		samlpSubjects: saved.SamlpSubjects, events: saved.Events,
-		codes: map[string]*authCode{}, grants: map[string]*accessGrant{},
+		legacyProvider: saved.LegacyProvider,
+		codes:          map[string]*authCode{}, grants: map[string]*accessGrant{},
 	}, nil
 }
 
@@ -133,6 +135,7 @@ func (t *Tenant) snapshotState() (json.RawMessage, error) {
 		Users: t.users, Groups: t.groups, Applications: t.apps,
 		Provisioning: t.provisioning, LastProvisioning: t.lastProvisioning,
 		SamlpSubjects: t.samlpSubjects, Events: t.events,
+		LegacyProvider: t.legacyProvider,
 	})
 }
 

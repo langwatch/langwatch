@@ -110,6 +110,11 @@ func (s *Server) routeProtocols(mux *http.ServeMux) {
 	mux.HandleFunc("GET /t/{tenant}/oauth/authorize", s.handleAuthorize)
 	mux.HandleFunc("POST /t/{tenant}/oauth/token", s.handleToken)
 	mux.HandleFunc("GET /t/{tenant}/oauth/userinfo", s.handleUserinfo)
+	// Legacy provider providers (legacy.go): discovery under each issuer shape.
+	mux.HandleFunc("GET /t/{tenant}/oauth2/default/.well-known/openid-configuration", s.handleLegacyDiscovery)
+	mux.HandleFunc("GET /t/{tenant}/oidc/2/.well-known/openid-configuration", s.handleLegacyDiscovery)
+	mux.HandleFunc("GET /t/{tenant}/{pool}/.well-known/openid-configuration", s.handleLegacyDiscovery)
+	mux.HandleFunc("GET /.well-known/openid-configuration", s.handleAuth0RootDiscovery)
 
 	// SAML, per tenant. SSO accepts both the redirect (GET) and POST bindings.
 	mux.HandleFunc("GET /t/{tenant}/saml/metadata", s.handleSAMLMetadata)
@@ -133,6 +138,11 @@ func (s *Server) routeControl(mux *http.ServeMux) {
 	mux.HandleFunc("GET /control/t/{tenant}/activity", s.handleControlActivity)
 	mux.HandleFunc("POST /control/t/{tenant}/apps", s.handleControlRegisterApp)
 	mux.HandleFunc("POST /control/t/{tenant}/config", s.handleControlConfig)
+	// Legacy SSO (legacy.go, webhook.go): provider, one-shot token breaks, env lines, Auth0 webhook.
+	mux.HandleFunc("POST /control/t/{tenant}/legacy-provider", s.handleControlLegacyProvider)
+	mux.HandleFunc("POST /control/t/{tenant}/tamper", s.handleControlTamper)
+	mux.HandleFunc("GET /control/t/{tenant}/legacy-env", s.handleControlLegacyEnv)
+	mux.HandleFunc("POST /control/t/{tenant}/auth0-webhook", s.handleControlAuth0Webhook)
 	mux.HandleFunc("PUT /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)
 	mux.HandleFunc("DELETE /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-push", s.handleControlSCIMPush)
@@ -142,6 +152,7 @@ func (s *Server) routeControl(mux *http.ServeMux) {
 	mux.HandleFunc("POST /control/t/{tenant}/churn", s.handleControlChurn)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-sync", s.handleControlSCIMSync)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-pull", s.handleControlSCIMPull)
+	mux.HandleFunc("POST /control/t/{tenant}/scim-event", s.handleControlSCIMEvent)
 	mux.HandleFunc("PUT /control/dns/txt", s.handleControlDNS)
 	mux.HandleFunc("DELETE /control/dns/txt", s.handleControlDNS)
 	mux.HandleFunc("PUT /control/verification", s.handleControlVerification)

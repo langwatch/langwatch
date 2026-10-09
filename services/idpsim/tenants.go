@@ -101,6 +101,10 @@ type Tenant struct {
 	// (samlp|idpsim-t<n>|<user id>) so the app's SAML-brokered-login handling
 	// can be exercised over plain OIDC, the way Auth0 delivers it.
 	samlpSubjects bool
+	// provider, tamper and lastNonce drive the legacy provider shapes (legacy.go).
+	legacyProvider LegacyProvider
+	tamper         TamperMode
+	lastNonce      string
 }
 
 // SetSamlpSubjects toggles Auth0-style SAML-brokered subject minting.
