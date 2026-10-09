@@ -4,6 +4,7 @@
 package orbstore
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,8 +19,17 @@ import (
 // MaxFeedback bounds the store: adding past it drops the oldest items.
 const MaxFeedback = 200
 
+// MaxImageBytes bounds one decoded capture the orb sends with a note.
+const MaxImageBytes = 2 << 20
+
+// pngDataURL is the one image form the orb sends.
+const pngDataURL = "data:image/png;base64,"
+
 // ErrNotFound is a feedback id the store does not hold.
 var ErrNotFound = errors.New("no such feedback")
+
+// ErrBadImage is a capture that is not a PNG data URL within MaxImageBytes.
+var ErrBadImage = errors.New("image must be a PNG data URL of at most 2 MiB")
 
 var idPattern = regexp.MustCompile(`^[0-9a-z]+$`)
 
@@ -73,6 +83,8 @@ type Report struct {
 	Viewport Box     `json:"viewport"`
 	Target   *Target `json:"target,omitempty"`
 	Region   *Box    `json:"region,omitempty"`
+	// Image is the capture as the orb sends it; Add moves it to a PNG file beside the note.
+	Image string `json:"image,omitempty"`
 	Page
 }
 
@@ -81,6 +93,8 @@ type Feedback struct {
 	ID         string `json:"id"`
 	ReceivedAt string `json:"receivedAt"`
 	ResolvedAt string `json:"resolvedAt,omitempty"`
+	// Screenshot is the path of the capture's PNG, empty when the note came without one.
+	Screenshot string `json:"screenshot,omitempty"`
 	Report
 }
 
@@ -99,10 +113,21 @@ func (s Store) feedbackDir() string { return filepath.Join(s.dir, "feedback") }
 // The id is the receive time in base 36, padded so file order is arrival order.
 func (s Store) Add(r Report, now time.Time) (Feedback, error) {
 	id := strconv.FormatInt(now.UnixNano(), 36)
+	png, err := decodePNG(r.Image)
+	if err != nil {
+		return Feedback{}, err
+	}
+	r.Image = ""
 	item := Feedback{
 		ID:         strings.Repeat("0", max(0, 13-len(id))) + id,
 		ReceivedAt: now.UTC().Format(time.RFC3339Nano),
 		Report:     r,
+	}
+	if png != nil {
+		item.Screenshot = s.screenshotPath(item.ID)
+		if err := writeFile(item.Screenshot, png); err != nil {
+			return Feedback{}, err
+		}
 	}
 	if err := s.write(item); err != nil {
 		return Feedback{}, err
@@ -181,6 +206,26 @@ func (s Store) ids() ([]string, error) {
 	return ids, nil
 }
 
+func (s Store) screenshotPath(id string) string {
+	return filepath.Join(s.feedbackDir(), id+".png")
+}
+
+// decodePNG answers the capture's bytes, nil for no capture, or ErrBadImage.
+func decodePNG(dataURL string) ([]byte, error) {
+	if dataURL == "" {
+		return nil, nil
+	}
+	encoded, ok := strings.CutPrefix(dataURL, pngDataURL)
+	if !ok || base64.StdEncoding.DecodedLen(len(encoded)) > MaxImageBytes+3 {
+		return nil, ErrBadImage
+	}
+	png, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(png) > MaxImageBytes || !strings.HasPrefix(string(png), "\x89PNG") {
+		return nil, ErrBadImage
+	}
+	return png, nil
+}
+
 func (s Store) write(item Feedback) error {
 	return writeJSON(filepath.Join(s.feedbackDir(), item.ID+".json"), item)
 }
@@ -194,17 +239,25 @@ func (s Store) prune() error {
 		if err := os.Remove(filepath.Join(s.feedbackDir(), id+".json")); err != nil {
 			return err
 		}
+		if err := os.Remove(s.screenshotPath(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
 	}
 	return nil
 }
 
-// writeJSON replaces path whole, so a reader never sees half a file.
+// writeJSON writes v as indented JSON through writeFile.
 func writeJSON(path string, v any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
+		return err
+	}
+	return writeFile(path, data)
+}
+
+// writeFile replaces path whole, so a reader never sees half a file.
+func writeFile(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	tmp := path + ".tmp"

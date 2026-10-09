@@ -55,6 +55,38 @@ Feature: Haven dev orb
     Then haven stores it with the region's box and the note
 
   @integration
+  Scenario: the orb sits clear of Langy's launcher
+    Given Langy's launcher sits in the bottom-right corner
+    When the orb renders
+    Then it sits centred above the launcher, smaller, in the same round surface family
+
+  @integration
+  Scenario: the element picker labels what it would pick
+    Given the reader chose "Pick element"
+    When the pointer rests on an element with a test id
+    Then a soft highlight outlines it with a label naming its component, test id and size
+    And Escape cancels the pick without touching the page
+
+  @integration
+  Scenario: a capture of the selection travels with the note
+    Given the reader picked an element and the orb captured an image of it
+    When the reader sends the feedback
+    Then the note carries the capture as a PNG
+
+  @unit
+  Scenario: haven stores the capture beside the note
+    Given a note arrives with a PNG capture
+    Then haven stores the PNG beside the note and names its path
+    And refuses a capture that is not a PNG
+
+  @integration
+  Scenario: the panel says plainly when haven does not answer
+    Given haven does not answer the orb
+    When the reader opens the orb
+    Then the panel says so in one line with a retry
+    And retrying asks haven again
+
+  @integration
   Scenario: network capture never records bodies or headers
     Given the page sends a request with a body, an authorization header and a query token
     Then the captured entry holds only its method, its URL without the query, its status and its duration

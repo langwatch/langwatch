@@ -1,13 +1,6 @@
-import type { Box } from "./feedback";
+import { z } from "zod";
 
-const place = ({ element, box }: { element: HTMLElement; box: Box }) => {
-  Object.assign(element.style, {
-    left: `${box.x}px`,
-    top: `${box.y}px`,
-    width: `${box.width}px`,
-    height: `${box.height}px`,
-  });
-};
+import type { Box } from "./feedback";
 
 const boxOf = ({ element }: { element: Element }): Box => {
   const { x, y, width, height } = element.getBoundingClientRect();
@@ -19,20 +12,49 @@ const swallow = (event: Event) => {
   event.stopPropagation();
 };
 
-/** Hover highlights an element, a click picks it, Escape cancels; the page never sees them. */
+const SWALLOWED = ["pointerdown", "mousedown", "pointerup", "mouseup", "click"] as const;
+
+const fiberSchema = z.object({ type: z.unknown(), return: z.unknown() });
+
+/** The nearest named React component that rendered the element, read from its dev fiber. */
+export function componentOf({ element }: { element: Element }): string | undefined {
+  const key = Object.keys(element).find((name) => name.startsWith("__reactFiber$"));
+  let fiber: unknown = key ? Reflect.get(element, key) : undefined;
+  for (let depth = 0; depth < 30; depth += 1) {
+    const parsed = fiberSchema.safeParse(fiber);
+    if (!parsed.success) return undefined;
+    const { type } = parsed.data;
+    if (typeof type === "function" && /^[A-Z]/u.test(type.name)) return type.name;
+    fiber = parsed.data.return;
+  }
+  return undefined;
+}
+
+/** What the picker's label names: the component, the nearest test id and the size. */
+export type Hovered = { box: Box; tag: string; component?: string; testId?: string };
+
+const hoveredOf = ({ element }: { element: Element }): Hovered => {
+  const testId = element.closest("[data-testid]")?.getAttribute("data-testid") ?? undefined;
+  return {
+    box: boxOf({ element }),
+    tag: element.tagName.toLowerCase(),
+    component: componentOf({ element }),
+    ...(testId ? { testId } : {}),
+  };
+};
+
+/** Hover reports the element under the pointer, a click locks it and Escape cancels; the page
+ * sees none of it. */
 export function pickElement({
   host,
-  layer,
   isOwn,
+  onHover,
 }: {
   host: Window;
-  layer: HTMLElement;
   isOwn: (element: Element) => boolean;
+  onHover: (hovered: Hovered) => void;
 }): Promise<Element | undefined> {
   const doc = host.document;
-  const highlight = doc.createElement("div");
-  highlight.className = "highlight";
-  layer.append(highlight);
   const controller = new AbortController();
   const listen = { capture: true, signal: controller.signal };
   const under = (event: MouseEvent) => {
@@ -42,28 +64,18 @@ export function pickElement({
   return new Promise((resolve) => {
     const finish = (element: Element | undefined) => {
       controller.abort();
-      highlight.remove();
       resolve(element);
     };
     doc.addEventListener(
       "mousemove",
       (event) => {
         const element = under(event);
-        if (element) place({ element: highlight, box: boxOf({ element }) });
+        if (element) onHover(hoveredOf({ element }));
       },
       listen,
     );
-    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup"] as const) {
-      doc.addEventListener(type, swallow, listen);
-    }
-    doc.addEventListener(
-      "click",
-      (event) => {
-        swallow(event);
-        finish(under(event));
-      },
-      listen,
-    );
+    for (const type of SWALLOWED) doc.addEventListener(type, swallow, listen);
+    doc.addEventListener("click", (event) => finish(under(event)), listen);
     doc.addEventListener("keydown", (event) => event.key === "Escape" && finish(undefined), listen);
   });
 }
@@ -71,36 +83,30 @@ export function pickElement({
 /** A drag draws a rectangle of the viewport; Escape or a bare click cancels. */
 export function selectRegion({
   host,
-  layer,
+  onDraw,
 }: {
   host: Window;
-  layer: HTMLElement;
+  onDraw: (box: Box) => void;
 }): Promise<Box | undefined> {
   const doc = host.document;
-  const sheet = doc.createElement("div");
-  sheet.className = "sheet";
-  const outline = doc.createElement("div");
-  outline.className = "highlight";
-  sheet.append(outline);
-  layer.append(sheet);
   const controller = new AbortController();
-  const { signal } = controller;
+  const listen = { capture: true, signal: controller.signal };
   let start: { x: number; y: number } | undefined;
   let box: Box | undefined;
   return new Promise((resolve) => {
     const finish = (result: Box | undefined) => {
       controller.abort();
-      sheet.remove();
       resolve(result);
     };
-    sheet.addEventListener(
+    for (const type of SWALLOWED) doc.addEventListener(type, swallow, listen);
+    doc.addEventListener(
       "pointerdown",
       (event) => {
         start = { x: event.clientX, y: event.clientY };
       },
-      { signal },
+      listen,
     );
-    sheet.addEventListener(
+    doc.addEventListener(
       "pointermove",
       (event) => {
         if (!start) return;
@@ -110,20 +116,15 @@ export function selectRegion({
           width: Math.abs(event.clientX - start.x),
           height: Math.abs(event.clientY - start.y),
         };
-        place({ element: outline, box });
+        onDraw(box);
       },
-      { signal },
+      listen,
     );
-    sheet.addEventListener(
+    doc.addEventListener(
       "pointerup",
-      () => finish(box && box.width > 2 && box.height > 2 ? box : undefined),
-      {
-        signal,
-      },
+      () => finish(box && box.width > 4 && box.height > 4 ? box : undefined),
+      listen,
     );
-    doc.addEventListener("keydown", (event) => event.key === "Escape" && finish(undefined), {
-      capture: true,
-      signal,
-    });
+    doc.addEventListener("keydown", (event) => event.key === "Escape" && finish(undefined), listen);
   });
 }

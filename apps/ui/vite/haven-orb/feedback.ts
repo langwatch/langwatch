@@ -31,6 +31,8 @@ export const feedbackSchema = z.object({
   viewport: boxSchema,
   target: targetSchema.optional(),
   region: boxSchema.optional(),
+  /** A PNG data URL of the element or region; haven stores it beside the note. */
+  image: z.string().startsWith("data:image/png;base64,").optional(),
 });
 export type Feedback = z.infer<typeof feedbackSchema>;
 
@@ -95,11 +97,13 @@ export function buildFeedback({
   subject,
   buffer,
   host,
+  image,
 }: {
   note: string;
   subject: Subject;
   buffer: PageBuffer;
   host: Window;
+  image?: string;
 }): Feedback {
   const page = snapshotPage({ buffer, href: host.location.href });
   const viewport = { x: 0, y: 0, width: host.innerWidth, height: host.innerHeight };
@@ -107,7 +111,8 @@ export function buildFeedback({
     subject.kind === "element"
       ? { target: describeTarget({ element: subject.element }) }
       : { region: subject.box };
-  return { ...page, note, route: host.location.pathname, viewport, ...pointedAt };
+  const shot = image ? { image } : {};
+  return { ...page, note, route: host.location.pathname, viewport, ...pointedAt, ...shot };
 }
 
 /** The stack home's orb routes: the app host (`app.<slug>.<domain>`) minus its first label. */

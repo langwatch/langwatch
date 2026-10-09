@@ -241,6 +241,11 @@ func (c orbCLI) printFeedback(items []orbstore.Feedback) error {
 		if _, err := fmt.Fprintf(c.out, "%s  %-8s  %s  %s\n", item.ID, orbState(*item), item.URL, note); err != nil {
 			return err
 		}
+		if item.Screenshot != "" {
+			if _, err := fmt.Fprintf(c.out, "    screenshot: %s\n", item.Screenshot); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

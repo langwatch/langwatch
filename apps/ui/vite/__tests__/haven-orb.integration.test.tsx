@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { havenOrb, havenOrbTags } from "../haven-orb";
 import { buildFeedback, feedbackSchema, havenEndpoint, postToHaven } from "../haven-orb/feedback";
+import { OrbIsland } from "../haven-orb/orb-panel";
 import { hideForSession, isHiddenForSession, setTheme } from "../haven-orb/orb-prefs";
 import {
   attachPageBuffer,
@@ -10,6 +13,7 @@ import {
   PAGE_BUFFER_LIMIT,
   type PageBuffer,
 } from "../haven-orb/page-buffer";
+import { pickElement } from "../haven-orb/pickers";
 
 const realFetch = window.fetch;
 let buffer: PageBuffer | undefined;
@@ -20,6 +24,7 @@ const attach = () => {
 };
 
 afterEach(() => {
+  cleanup();
   buffer?.detach();
   buffer = undefined;
   window.fetch = realFetch;
@@ -135,6 +140,74 @@ describe("haven dev orb", () => {
       });
       expect(feedback).toMatchObject({ note: "gap too wide", region: box });
       expect(feedback.target).toBeUndefined();
+    });
+  });
+
+  describe("given a capture", () => {
+    /** @scenario "a capture of the selection travels with the note" */
+    it("carries the PNG data URL and refuses any other image", () => {
+      const image = "data:image/png;base64,iVBORw0KGgo=";
+      const feedback = buildFeedback({
+        note: "icon blurry",
+        subject: { kind: "region", box: { x: 0, y: 0, width: 10, height: 10 } },
+        buffer: attach(),
+        host: window,
+        image,
+      });
+      expect(feedbackSchema.parse(feedback).image).toBe(image);
+      expect(feedbackSchema.validate({ ...feedback, image: "data:image/svg+xml,<svg/>" })).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("given the element picker", () => {
+    /** @scenario "the element picker labels what it would pick" */
+    it("reports the hovered element's test id and size, and Escape cancels", async () => {
+      document.body.innerHTML = `<section data-testid="traces-table"><span>row</span></section>`;
+      const span = document.querySelector("span");
+      if (!span) throw new Error("the fixture has no span");
+      document.elementFromPoint = () => span;
+      const onHover = vi.fn();
+      const picked = pickElement({ host: window, isOwn: () => false, onHover });
+      document.dispatchEvent(new MouseEvent("mousemove", { clientX: 5, clientY: 5 }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      expect(await picked).toBeUndefined();
+      expect(onHover).toHaveBeenCalledWith(
+        expect.objectContaining({ tag: "span", testId: "traces-table", box: expect.any(Object) }),
+      );
+    });
+  });
+
+  describe("given the panel", () => {
+    const mount = ({ send }: { send: typeof fetch }) => {
+      const shell = document.createElement("div");
+      document.body.append(shell);
+      const endpoint = havenEndpoint({
+        location: new URL("https://app.feat-x.langwatch.localhost/"),
+      });
+      const orb = { host: window, buffer: attach(), send, endpoint };
+      renderWithDesignSystem(<OrbIsland orb={orb} shell={shell} onHide={() => undefined} />);
+    };
+
+    /** @scenario "the panel says plainly when haven does not answer" */
+    it("shows one line with a retry that asks haven again", async () => {
+      const send = vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+      mount({ send });
+      fireEvent.click(screen.getByRole("button", { name: "Haven dev tools" }));
+      expect(await screen.findByText("Haven is not answering for this stack.")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    });
+
+    /** @scenario "the orb sits clear of Langy's launcher" */
+    it("places the orb above Langy's 46px launcher at 20px from the corner", () => {
+      mount({ send: vi.fn(async () => new Response("{}", { status: 404 })) });
+      const orb = screen.getByRole("button", { name: "Haven dev tools" });
+      const { right, bottom, width } = getComputedStyle(orb);
+      expect({ right, bottom, width }).toEqual({ right: "25px", bottom: "78px", width: "36px" });
     });
   });
 
