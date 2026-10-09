@@ -1,3 +1,6 @@
+/**
+ * @see specs/traces-v2/search.feature
+ */
 import { describe, expect, it } from "vitest";
 import type { FacetQueryContext } from "../../facet-registry";
 import { buildEventsFacetQuery } from "../events";
@@ -45,11 +48,83 @@ describe("buildEventsFacetQuery", () => {
       /** @scenario "Expanding the thumbs_up_down row shows its vote values with counts" */
       it("guards the scan with the key-discovery memory settings", () => {
         const { settings } = buildEventsFacetQuery(ctx());
-        // Same unbounded Events.Attributes flatten that tripped
-        // MEMORY_LIMIT_EXCEEDED for the key-discovery facets — the spill +
-        // cap guard is non-negotiable here.
+        // The metric-key gate is what keeps the read small; the spill and
+        // the cap stay as the backstop for a window where most spans do carry
+        // metrics.
         expect(settings?.max_bytes_before_external_group_by).toBeDefined();
         expect(settings?.max_memory_usage).toBeDefined();
+      });
+    });
+
+    describe("when the two halves of the facet are read", () => {
+      it("counts names without touching the attributes map", () => {
+        const { sql } = buildEventsFacetQuery(ctx());
+        const names = sql.slice(sql.indexOf("FROM ("), sql.indexOf("AS names"));
+        // The name counts are the part every sidebar load needs; reading the
+        // map here would put every payload value back on that path.
+        expect(names).toMatch(/arrayJoin\(`Events\.Name`\) AS name/);
+        expect(names).not.toMatch(/Events\.Attributes/);
+      });
+
+      it("reads the map only for spans whose keys hold a metric", () => {
+        const { sql } = buildEventsFacetQuery(ctx());
+        const metrics = sql.slice(
+          sql.indexOf("AS names"),
+          sql.indexOf("AS metrics"),
+        );
+        // Gated on the keys subcolumn, which reaches PREWHERE and never opens
+        // the values column, so granules with no metric-bearing span skip the
+        // values entirely.
+        // Explicit rather than left to optimize_move_to_prewhere, so the
+        // saving holds whatever the optimizer settings are.
+        expect(metrics).toMatch(
+          /PREWHERE arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
+        );
+      });
+
+      /** @scenario Event metric values follow the same trace filter as the event name counts */
+      it("scopes both halves to the filtered traces", () => {
+        const scope = "TraceId IN (SELECT TraceId FROM scoped_traces)";
+        const { sql, params } = buildEventsFacetQuery(
+          ctx({ traceScope: { sql: scope, params: { scopeParam: "x" } } }),
+        );
+        const names = sql.slice(sql.indexOf("FROM ("), sql.indexOf("AS names"));
+        const metrics = sql.slice(
+          sql.indexOf("AS names"),
+          sql.indexOf("AS metrics"),
+        );
+        // Each half reads stored_spans on its own, so a scope present in only
+        // one of them would pair filtered name counts with unfiltered buckets.
+        expect(names).toContain(scope);
+        expect(metrics).toContain(scope);
+        expect(params.scopeParam).toBe("x");
+      });
+
+      /** @scenario Event metric values follow the same trace filter as the event name counts */
+      it("keeps the caller's predicate out of PREWHERE", () => {
+        const scope = "TraceId IN (SELECT TraceId FROM scoped_traces)";
+        const { sql } = buildEventsFacetQuery(
+          ctx({ traceScope: { sql: scope, params: {} } }),
+        );
+        const metrics = sql.slice(
+          sql.indexOf("AS names"),
+          sql.indexOf("AS metrics"),
+        );
+        const prewhere = metrics.slice(
+          metrics.indexOf("PREWHERE"),
+          metrics.indexOf("WHERE {{tenantScope"),
+        );
+        // Only the metric-key gate belongs there; the tenant, time and scope
+        // predicates stay in WHERE as in every other facet builder.
+        expect(prewhere).toMatch(/`Events\.Attributes`\.keys/);
+        expect(prewhere).not.toContain("tenantScope");
+        expect(prewhere).not.toContain(scope);
+      });
+
+      it("keeps an event name with no metrics as an empty bucket list", () => {
+        const { sql, settings } = buildEventsFacetQuery(ctx());
+        expect(sql).toMatch(/LEFT JOIN/);
+        expect(settings?.join_use_nulls).toBe("0");
       });
     });
 
