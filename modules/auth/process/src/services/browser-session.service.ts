@@ -10,6 +10,7 @@ import {
   type SessionImpersonationState,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   signedInWithFor,
   signInMethodLabelFor,
@@ -52,6 +53,9 @@ interface BrowserSessionDeps {
   /** The organization's browser-session window (GAC-10), asked here because
    *  this is where a session becomes an identity and the row is already read. */
   sessionBound: SessionBoundService;
+  /** Re-asks the operator's platform grant on every impersonated read, so a revoked one lapses.
+   *  shortcut: optional until auth.app.ts passes `dependencies.authz`; then make it required. */
+  operators?: Pick<AuthzApi, "can">;
   now(): Instant;
 }
 
@@ -149,7 +153,15 @@ export class BrowserSessionService {
       now: this.deps.now(),
     });
     if (state.kind === "none") return session;
-    const { subjectUserId } = state.impersonation;
+    const { actorUserId, subjectUserId } = state.impersonation;
+    const grant = { permission: "ops:manage", scope: { type: "platform" } } as const;
+    const operators = this.deps.operators;
+    if (
+      operators &&
+      !(await operators.can({ principal: { type: "user", id: actorUserId }, ...grant }))
+    ) {
+      return session;
+    }
 
     // The subject is read fresh, never copied at start: a retired subject is not acted for.
     const { user: subject, identityEmail } = await this.person({ userId: subjectUserId });

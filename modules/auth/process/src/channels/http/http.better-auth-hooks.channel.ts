@@ -413,6 +413,7 @@ async function refuseLinkOnInsufficientEvidence({
     address,
     holdsVerifiedEmail: user.emailVerified,
     attachedAccounts: await repo.countAccountsForUser({ userId: user.id }),
+    attachedPasskeys: await repo.countPasskeysForUser({ userId: user.id }),
   });
   if (!verdict.refused) return;
   await recordLinkProposal({

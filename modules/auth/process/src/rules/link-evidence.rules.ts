@@ -42,18 +42,20 @@ export function assertedAddressOf({ idToken }: { idToken: unknown }): AssertedAd
 /**
  * A method added to an account that already signs in needs evidence on both sides: the provider
  * verified the address and the account's own address was confirmed. A provider that asserts
- * nothing, or a person with no sign-in method yet, is not judged here.
+ * nothing, or a person with no sign-in method yet (no account row and no passkey), is not judged.
  */
 export function linkVerdictFor({
   address,
   holdsVerifiedEmail,
   attachedAccounts,
+  attachedPasskeys,
 }: {
   address: AssertedAddress;
   holdsVerifiedEmail: boolean;
   attachedAccounts: number;
+  attachedPasskeys: number;
 }): LinkVerdict {
-  if (!address.asserted || attachedAccounts === 0) return ALLOWED;
+  if (!address.asserted || attachedAccounts + attachedPasskeys === 0) return ALLOWED;
   if (address.emailVerified && holdsVerifiedEmail) return ALLOWED;
   return { refused: true, reason: "unverified_orphan" };
 }

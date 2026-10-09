@@ -53,6 +53,10 @@ export class MemoryBetterAuthHooksRepository extends BetterAuthHooksRepository {
     return this.accounts().filter((row) => row.userId === userId).length;
   }
 
+  async countPasskeysForUser({ userId }: { userId: string }): Promise<number> {
+    return this.memory.db.passkey.filter((row) => row.userId === userId).length;
+  }
+
   async findFederatedAccountsForUser({
     userId,
   }: {
