@@ -39,3 +39,9 @@ Feature: The auth-header-read lint rule
     Given a module transport whose `.withPermission` names x-project-id as the header the door reads the scope from
     When the auth-header-read rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: The module that binds the door is not this rule's business
+    Given an auth module transport that reads the X-Auth-Token header
+    When the auth-header-read rule runs over it
+    Then it reports nothing, as credential-reader-owner exempts the same owners

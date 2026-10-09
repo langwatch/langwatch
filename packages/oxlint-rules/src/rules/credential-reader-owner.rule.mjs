@@ -4,7 +4,7 @@ import { defineRule } from "../define-rule.mjs";
 
 const READER =
   /^(?:\w+CredentialOfRequest|browserCallerOfRequest|principalOfCredential|extractBearer\w*)$/;
-const OWNERS = ["packages/api/", "packages/process/", "modules/auth/"];
+export const CREDENTIAL_OWNERS = ["packages/api/", "packages/process/", "modules/auth/"];
 
 function nameOf(node) {
   return node?.type === "Identifier" ? node.name : undefined;
@@ -14,7 +14,7 @@ export const credentialReaderOwnerRule = defineRule({
   name: "credential-reader-owner",
   kind: "problem",
   applies: (file) =>
-    file.isProduction && !OWNERS.some((owner) => file.workspacePath.startsWith(owner)),
+    file.isProduction && !CREDENTIAL_OWNERS.some((owner) => file.workspacePath.startsWith(owner)),
   escape: { framework: "the `@langwatch/api` door (`.withPermission`, `.withAccess`)" },
   messages: {
     credentialReader: {

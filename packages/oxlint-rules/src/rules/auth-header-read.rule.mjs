@@ -1,4 +1,5 @@
 import { defineRule } from "../define-rule.mjs";
+import { CREDENTIAL_OWNERS } from "./credential-reader-owner.rule.mjs";
 
 // Auth headers are the door's input (api-framework-bypass plan, guard 2).
 
@@ -7,6 +8,7 @@ const GOVERNED_FOLDERS = new Set(["app", "transport"]);
 
 function isGoverned(file) {
   if (!file.isProduction || !file.feature || file.role !== "process") return false;
+  if (CREDENTIAL_OWNERS.some((owner) => file.workspacePath.startsWith(owner))) return false;
   if (file.workspacePath.endsWith(".module.ts")) return true;
 
   return GOVERNED_FOLDERS.has(file.sourcePath?.split("/")[0]);
