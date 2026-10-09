@@ -14,9 +14,9 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import type { PulledUsageRateReader } from "../pulled-usage-pricing.service.ts";
-import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
+import type { PulledUsageRateReader } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../features/ingestion-pull/services/pulled-usage-record.service.ts";
 
 class FixedRateReader implements PulledUsageRateReader {
   rate(input: Parameters<PulledUsageRateReader["rate"]>[0]): {

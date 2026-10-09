@@ -10,7 +10,7 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useState } from "react";
 
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import { useTraceEditStore } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 
 /**
  * How much of a captured value the hover shows. Past this the reader is not

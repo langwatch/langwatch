@@ -31,6 +31,8 @@ const teamScopeRefSchema = z
     type: z.literal("team"),
     id: z.string(),
     organizationId: z.string(),
+    isPersonal: z.boolean().optional(),
+    name: z.string().optional(),
   })
   .strict();
 
@@ -199,7 +201,7 @@ export type AuthzDecision = z.infer<typeof authzDecisionSchema>;
 /**
  * Branded proof that the service allowed one permission at one binding tier.
  * The brand is module-private and the package exports no factory. Only the
- * concrete AuthzService implementation may construct this after authorization.
+ * authz process's AuthzService may construct this after authorization.
  */
 declare const AUTHORIZED_BRAND: unique symbol;
 export type Authorized<

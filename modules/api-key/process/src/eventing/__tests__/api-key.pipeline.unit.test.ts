@@ -4,7 +4,11 @@
  * pruned against the installing graph's store.
  */
 
-import { AGENT_SANDBOX_API_KEY_NAME, WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
+import {
+  AGENT_SANDBOX_API_KEY_NAME,
+  LANGY_SESSION_API_KEY_NAME,
+  WORKFLOW_RUN_API_KEY_NAME,
+} from "@langwatch/api-key-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 /** Spec: specs/server/declarative-process-composition.feature */
@@ -24,7 +28,7 @@ const unusedApp = createApiFixture<ApiKeyModule>();
 function installed(participation: "produce" | "consume" = "consume") {
   const repositories = MemoryApiKeyRepositories.create();
   const revokeExpiredByName = vi.spyOn(repositories.apiKeys, "revokeExpiredByName");
-  const findElapsedLoginKeys = vi.spyOn(repositories.apiKeys, "findElapsedLoginKeys");
+  const sweepElapsedLoginKeys = vi.spyOn(repositories.apiKeys, "sweepElapsedLoginKeys");
   const revoke = vi.fn(async (input: { id: string }) => ({ id: input.id }) as never);
   const app = createApiFixture<ApiKeyModule>({ revoke });
   const processStore = InMemoryProcessStore.createForTesting();
@@ -39,7 +43,7 @@ function installed(participation: "produce" | "consume" = "consume") {
     definition,
     processStore,
     revokeExpiredByName,
-    findElapsedLoginKeys,
+    sweepElapsedLoginKeys,
     revoke,
     deleteDispatchedBefore,
   };
@@ -83,25 +87,28 @@ describe("given the API-key module's eventing declaration", () => {
         {} as never,
       );
 
-      expect(revokeExpiredByName).toHaveBeenCalledTimes(2);
+      expect(revokeExpiredByName).toHaveBeenCalledTimes(3);
       expect(revokeExpiredByName.mock.calls[0]![0]).toMatchObject({
         name: AGENT_SANDBOX_API_KEY_NAME,
       });
       expect(revokeExpiredByName.mock.calls[1]![0]).toMatchObject({
         name: WORKFLOW_RUN_API_KEY_NAME,
       });
+      expect(revokeExpiredByName.mock.calls[2]![0]).toMatchObject({
+        name: LANGY_SESSION_API_KEY_NAME,
+      });
     });
 
     /** @scenario "The worker composes the CLI login-key sweep from the feature package" */
     it("revokes elapsed CLI login keys through the installing graph's own app", async () => {
-      const { definition, findElapsedLoginKeys, revoke } = installed();
+      const { definition, sweepElapsedLoginKeys, revoke } = installed();
 
       await reapIntentOf(definition, CLI_LOGIN_KEY_REAP_PROCESS_NAME)(
         { scheduledFor: 0 } as never,
         {} as never,
       );
 
-      expect(findElapsedLoginKeys).toHaveBeenCalledTimes(1);
+      expect(sweepElapsedLoginKeys).toHaveBeenCalledTimes(1);
       // A raw repository update would skip the bindings cleanup and the
       // parent cascade; going through `app.revoke` is what buys both.
       expect(revoke).not.toHaveBeenCalled(); // no elapsed keys seeded in this test

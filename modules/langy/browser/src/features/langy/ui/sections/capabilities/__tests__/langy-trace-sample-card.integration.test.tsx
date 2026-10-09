@@ -35,6 +35,10 @@ const descriptor = resolveCapability("langwatch.trace.search")!;
  * A minimal host: the deep-link chip and the row links both resolve through
  * `useRouter`, which throws outside a `LangyHostProvider`.
  */
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "project-acme", slug: "acme", name: "acme" };
@@ -51,6 +55,9 @@ class FakeLangyHost extends LangyHostApi {
   currentUser() {
     return { id: "user-1", email: "staff@langwatch.ai" };
   }
+  hasOrganizationPermission() {
+    return false;
+  }
   hasPermission() {
     return true;
   }
@@ -59,9 +66,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return false;
-  }
-  featureFlag() {
-    return true;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };

@@ -5,7 +5,8 @@
 import { EventType } from "@ag-ui/core";
 import { z } from "zod";
 
-import { runActorLabelSchema } from "../run-actor.ts";
+import { runActorLabelSchema } from "../features/run/run-actor.ts";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../features/run/scenario-run.ts";
 import { scenarioCriterionResultSchema } from "../scenario-criterion-result.ts";
 import {
   SCENARIO_EVALUATION_STATUSES,
@@ -14,7 +15,6 @@ import {
   type ScenarioEvaluationResult,
 } from "../scenario-evaluation-result.ts";
 import { scenarioMessageSchema } from "../scenario-message.schema.ts";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-run.ts";
 import { runParameterValuesSchema } from "../scenario.parameters.ts";
 
 /**

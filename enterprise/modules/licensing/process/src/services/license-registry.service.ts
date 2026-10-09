@@ -27,6 +27,8 @@ import {
   type SignedIssuedLicense,
   type ConnectService,
 } from "@langwatch/enterprise-licensing-contract";
+import { generate } from "@langwatch/ksuid";
+import { ORGANIZATION_KSUID_RESOURCE } from "@langwatch/organization-contract";
 import { licenseSeats } from "@langwatch/plans";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 
@@ -88,10 +90,10 @@ export class LicenseRegistryService {
       now: toDate(this.options.now()),
     });
 
-    // Marked before the row exists. A license is handed over once, so the row
+    // Recorded before the row exists. A license is handed over once, so the row
     // must be the last write that can fail: the other order loses the signed
     // license to a failure here and leaves a row no caller ever saw.
-    await this.options.organizations.markSelfHostedCustomer(organization.id);
+    await this.options.organizations.recordSelfHostedCustomerLicensed(organization);
     const row = await this.writer.createRow({
       licenseKey,
       organizationId: organization.id,
@@ -141,7 +143,7 @@ export class LicenseRegistryService {
     // Same order as `issue`: the row is the last write. A retry after a failure
     // here would otherwise find its own tokenHash taken and be refused as
     // already registered, with the organization never marked.
-    await this.options.organizations.markSelfHostedCustomer(organization.id);
+    await this.options.organizations.recordSelfHostedCustomerLicensed(organization);
     const row = await this.writer.createRow({
       licenseKey: input.licenseKey,
       organizationId: organization.id,
@@ -338,7 +340,7 @@ export class LicenseRegistryService {
       organizationId: organization.id,
       ...(moving ? { virtualKeyId: null } : {}),
     });
-    await this.options.organizations.markSelfHostedCustomer(organization.id);
+    await this.options.organizations.recordSelfHostedCustomerLicensed(organization);
     if (moving && row.organizationId) {
       await this.options.contractBudgets.sync({
         organizationId: row.organizationId,
@@ -385,9 +387,11 @@ export class LicenseRegistryService {
 
   private async resolveCustomer(customer: LicenseCustomer): Promise<IssuedLicenseCustomerRecord> {
     if ("newOrganizationName" in customer) {
-      return this.options.organizations.createSelfHostedCustomer({
+      // Licensing mints the id; organization creates the row from the fact (C3c, R42).
+      return {
+        id: generate(ORGANIZATION_KSUID_RESOURCE).toString(),
         name: customer.newOrganizationName,
-      });
+      };
     }
     const organization = await this.options.organizations.findById(customer.organizationId);
     if (!organization) throw new OrganizationNotFoundError();
@@ -471,6 +475,6 @@ export interface ConnectManagedKeys {
 /** The customer a license is issued to, as the organization feature answers it. */
 export interface LicenseCustomers {
   findById(id: string): Promise<{ id: string; name: string } | null>;
-  createSelfHostedCustomer(params: { name: string }): Promise<{ id: string; name: string }>;
-  markSelfHostedCustomer(id: string): Promise<void>;
+  /** Organization creates a missing row and marks it a self-hosted customer from this fact. */
+  recordSelfHostedCustomerLicensed(params: { id: string; name: string }): Promise<void>;
 }

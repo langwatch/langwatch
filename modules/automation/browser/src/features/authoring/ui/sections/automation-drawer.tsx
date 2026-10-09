@@ -74,8 +74,8 @@ import {
   useHasInvalidConditionRows,
   useSection,
   useWizardStep,
+  useAutomationStore,
 } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
 import { AutomationWizard } from "./automation-wizard.tsx";
 import { CLIENT_PROVIDERS, type NotifyPreview } from "./client-providers.ts";
 import { ConfigurationSecondaryDrawer } from "./configuration-secondary-drawer.tsx";

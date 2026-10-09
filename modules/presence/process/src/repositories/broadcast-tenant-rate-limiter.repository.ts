@@ -1,4 +1,4 @@
-export interface BucketConfig {
+interface BucketConfig {
   /** Maximum tokens (burst size). */
   capacity: number;
   /** Tokens added per second. */

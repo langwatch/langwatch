@@ -358,7 +358,7 @@ describe("the monitors REST family", () => {
 
       it("accepts them once the operator has rolled the recovery back", async () => {
         const api = mountMonitorRest({ evaluatorConfigs: topLevel });
-        api.effectiveSettings.recoveryDisabled = true;
+        api.recoverySwitch.recoveryDisabled = true;
 
         const response = await createOverTopLevelPrompt(api);
 

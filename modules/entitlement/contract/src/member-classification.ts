@@ -69,3 +69,16 @@ export function getRoleChangeType({
   if (willBe === "Developer") return "to-developer";
   return willBe === "FullMember" ? "lite-to-full" : "full-to-lite";
 }
+
+/** An organization's seats over the people holding one: members and live invitations alike. */
+export function countMemberSeats(
+  holders: readonly Readonly<{ role: OrganizationUserRole; permissions: string[] | undefined }>[],
+): Readonly<{ fullMembers: number; liteMembers: number; developers: number }> {
+  const count = (type: MemberType) =>
+    holders.filter((holder) => classifyMemberType(holder.role, holder.permissions) === type).length;
+  return {
+    fullMembers: count("FullMember"),
+    liteMembers: count("LiteMember"),
+    developers: count("Developer"),
+  };
+}

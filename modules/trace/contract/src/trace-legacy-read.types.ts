@@ -1,4 +1,4 @@
-import type { ProjectionPlan } from "./trace-projection.types.ts";
+import type { ProjectionPlan } from "./features/ingest/trace-projection.types.ts";
 
 /**
  * Analytics filter selection shape (server can't import analytics browser

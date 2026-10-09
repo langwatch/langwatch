@@ -1,6 +1,8 @@
 import { RepositoryFoldStore, type FoldProjectionStore } from "@langwatch/eventing";
 import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatch/suite-contract";
 
+import { isOpenSuiteRun } from "#rules/suite-run-open.rules";
+
 import type { SuiteRunProcessingRepository } from "../suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../suite.repositories.ts";
 import { MemorySuiteRunRepository } from "./memory.suite-run.repository.ts";
@@ -13,13 +15,17 @@ export class MemorySuiteRunProcessingRepository implements SuiteRunProcessingRep
     return new MemorySuiteRunProcessingRepository();
   }
 
+  private readonly runs = MemorySuiteRunRepository.create();
+
   private constructor() {}
 
   openRunStateFoldStore(): FoldProjectionStore<SuiteRunStateData> {
-    return new RepositoryFoldStore(
-      MemorySuiteRunRepository.create(),
-      SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-    );
+    return new RepositoryFoldStore(this.runs, SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE);
+  }
+
+  async findOpenRuns({ tenantId }: { tenantId: string }): Promise<SuiteRunStateData[]> {
+    const held = await this.runs.findForTenant(tenantId);
+    return held.map((projection) => projection.data).filter((run) => isOpenSuiteRun(run));
   }
 }
 

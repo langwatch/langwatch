@@ -67,6 +67,11 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
     );
   }
 
+  async countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
+    const projectIds = new Set(input.projectIds);
+    return this.#live().filter((row) => projectIds.has(row.projectId)).length;
+  }
+
   async findAll(input: { projectId: string }): Promise<Evaluator[]> {
     return this.#live()
       .filter((row) => row.projectId === input.projectId)

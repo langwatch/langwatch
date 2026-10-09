@@ -65,10 +65,6 @@ class GrantedSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return false;
-  }
 }
 
 function harness({ grants }: { grants: readonly string[] }) {

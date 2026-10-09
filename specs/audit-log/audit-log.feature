@@ -88,12 +88,11 @@ Feature: Unified Audit Log
       arguments, so a per-tenant reader finds the row at all
 
   @unit
-  Scenario: The trail resolves its connection when a row is written, not when it is composed
-    Given the trail was composed before the process opened its database
-    When a mutation is recorded after the connection is open
-    Then the row is written through that connection
-    And a process that opened no database names the missing collaborator instead
-      of failing the call it was recording
+  Scenario: A process that installed no audit trail says so instead of failing the call it was recording
+    Given the API process installed no audit-log module
+    When a mutation is answered
+    Then the caller gets the answer
+    And a warning names the audit-log trail and the action that went unrecorded
 
   # ──────────────────────────────────────────────────────────────────────────
   # Read path — /settings/audit-log shows merged stream
@@ -173,7 +172,7 @@ Feature: Unified Audit Log
     Then she is told what organisation-wide audit logs cover and how to obtain them
     And no table is rendered at all
 
-  @integration
+  @unit
   Scenario: Only an organization administrator may open the audit trail
     Given bob holds "organization:view" and not "organization:manage"
     When he opens `/settings/audit-log`

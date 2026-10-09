@@ -1,3 +1,4 @@
+import { identityClient } from "@langwatch/identity-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../behavior/organization-api.ts";
@@ -27,13 +28,14 @@ export function useJoinOffer({
   // Leading with an invitation and walking through an automatic door are the
   // welcome screen's alone: a dashboard has an organization in view (ADR-171 v6).
   const onboarding = currentOrganizationId === null;
-  const offer = api.joinRequests.offer.useQuery();
-  const mine = api.joinRequests.mine.useQuery();
+  const offer = identityClient.identity.joinRequests.offer.useQuery();
+  const mine = identityClient.identity.joinRequests.mine.useQuery();
   const invitations = api.invite.pendingForMe.useQuery({}, { enabled: onboarding });
-  const dismissOffer = api.joinRequests.dismissOffer.useMutation();
-  const askToJoin = api.joinRequests.request.useMutation();
+  const dismissOffer = identityClient.identity.joinRequests.dismissOffer.useMutation();
+  const askToJoin = identityClient.identity.joinRequests.request.useMutation();
   const acceptInvite = api.invite.acceptInvite.useMutation();
   const utils = api.useUtils();
+  const joinUtils = identityClient.useUtils();
   const showErrorToast = useShowErrorToast();
   // For this visit only: the invitation still stands, so nothing lasting is recorded.
   const [invitationSetAside, setInvitationSetAside] = useState(false);
@@ -51,13 +53,13 @@ export function useJoinOffer({
         { organizationId, origin },
         {
           onSuccess: () => {
-            void utils.joinRequests.mine.invalidate();
-            void utils.joinRequests.offer.invalidate();
+            void joinUtils.identity.joinRequests.mine.invalidate();
+            void joinUtils.identity.joinRequests.offer.invalidate();
           },
           onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't ask to join" }),
         },
       ),
-    [askToJoin, origin, utils, showErrorToast],
+    [askToJoin, origin, showErrorToast, joinUtils],
   );
 
   const dismiss = useCallback(
@@ -66,13 +68,13 @@ export function useJoinOffer({
         {},
         {
           onSuccess: () => {
-            void utils.joinRequests.offer.invalidate();
+            void joinUtils.identity.joinRequests.offer.invalidate();
             onDismissed?.();
           },
           onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save that" }),
         },
       ),
-    [dismissOffer, utils, showErrorToast],
+    [dismissOffer, showErrorToast, joinUtils],
   );
 
   const accept = useCallback(
@@ -84,8 +86,8 @@ export function useJoinOffer({
             void utils.organization.getAll.invalidate();
             void utils.invite.pendingForMe.invalidate();
             // Accepting withdrew any open request; the cached one must not bring the wait back.
-            void utils.joinRequests.mine.invalidate();
-            void utils.joinRequests.offer.invalidate();
+            void joinUtils.identity.joinRequests.mine.invalidate();
+            void joinUtils.identity.joinRequests.offer.invalidate();
           },
           onError: (error) => {
             showErrorToast({ error, fallbackTitle: "Couldn't accept the invitation" });
@@ -94,10 +96,13 @@ export function useJoinOffer({
           },
         },
       ),
-    [acceptInvite, utils, showErrorToast],
+    [acceptInvite, utils, showErrorToast, joinUtils],
   );
 
-  const checkAgain = useCallback(() => void utils.joinRequests.mine.invalidate(), [utils]);
+  const checkAgain = useCallback(
+    () => void joinUtils.identity.joinRequests.mine.invalidate(),
+    [joinUtils],
+  );
 
   const settled = !offer.isPending && !mine.isPending && !(onboarding && invitations.isPending);
   const view = settled
@@ -130,8 +135,9 @@ export function useJoinOffer({
  * refused admission says why and steps aside so the screen beneath is reachable.
  */
 function useAutomaticAdmission({ admit, origin }: { admit: boolean; origin: JoinOrigin }): boolean {
-  const admitAutomatically = api.joinRequests.admitAutomatically.useMutation();
+  const admitAutomatically = identityClient.identity.joinRequests.admitAutomatically.useMutation();
   const utils = api.useUtils();
+  const joinUtils = identityClient.useUtils();
   const showErrorToast = useShowErrorToast();
   const fired = useRef(false);
 
@@ -144,12 +150,12 @@ function useAutomaticAdmission({ admit, origin }: { admit: boolean; origin: Join
         onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't join just now" }),
         onSettled: () => {
           void utils.organization.getAll.invalidate();
-          void utils.joinRequests.offer.invalidate();
-          void utils.joinRequests.mine.invalidate();
+          void joinUtils.identity.joinRequests.offer.invalidate();
+          void joinUtils.identity.joinRequests.mine.invalidate();
         },
       },
     );
-  }, [admit, origin, admitAutomatically, utils, showErrorToast]);
+  }, [admit, origin, admitAutomatically, utils, showErrorToast, joinUtils]);
 
   return admit && !admitAutomatically.isError;
 }

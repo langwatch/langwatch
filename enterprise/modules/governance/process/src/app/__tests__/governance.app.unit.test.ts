@@ -28,6 +28,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { governanceProcessModule } from "../../governance.module.ts";
@@ -47,6 +48,7 @@ async function buildApp() {
     config: void 0,
     repositories,
     dependencies: {
+      webhooks: createApiFixture<WebhookApi>(),
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
       auth: createApiFixture<AuthApi>(),
@@ -89,6 +91,7 @@ async function buildCliApp() {
     config: void 0,
     repositories,
     dependencies: {
+      webhooks: createApiFixture<WebhookApi>(),
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>({ getCliAccessSession }),
@@ -279,7 +282,11 @@ describe("GovernanceModule as the module a process installs", () => {
     it("answers every capability the declarations name from the one app", async () => {
       const { app } = await buildCliApp();
 
-      expect(governanceProcessModule.transports.map((transport) => transport.protocol)).toEqual([
+      const transports = governanceProcessModule.transports;
+      if (!transports) throw new Error("the governance module declares no transports");
+
+      expect(transports.map((transport) => transport.protocol)).toEqual([
+        "rest",
         "rest",
         "rest",
         "rest",

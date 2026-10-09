@@ -10,7 +10,7 @@ import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/process";
 import { UserApi } from "@langwatch/user-contract";
 
-import { postHogChannels } from "../channels/posthog-channels.registry.ts";
+import type { NurturingChannels } from "../channels/nurturing.channels.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
@@ -19,9 +19,9 @@ import { NurturingService } from "../services/nurturing.service.ts";
 
 type NurturingSetup = FeatureSetup<
   typeof NurturingModule.dependencies,
-  never,
   NurturingServerConfig,
-  NurturingRepositories
+  NurturingRepositories,
+  NurturingChannels
 >;
 
 /** Owners tell nurturing; it names no peer, so it can never close a cycle (§9). */
@@ -39,27 +39,15 @@ export class NurturingModule implements NurturingApi {
   }
 
   static async create({
-    config,
+    channels,
     dependencies,
     repositories,
     resources,
-    secrets,
   }: NurturingSetup): Promise<NurturingModule> {
-    const customerIo = await secrets.into(nurturingSecrets.customerIoApiKey, (key) =>
-      key
-        ? NurturingService.create({
-            config: {
-              customerIoApiKey: key,
-              customerIoRegion: config.customerIoRegion,
-              customerIoBaseUrl: config.customerIoBaseUrl,
-            },
-          })
-        : void 0,
-    );
-    const { posthogKey: key, posthogHost: host } = config;
-    const posthog = key
-      ? postHogChannels.live.create({ targets: () => [{ key, ...(host ? { host } : {}) }] })
+    const customerIo = channels.customerIo
+      ? NurturingService.create({ channel: channels.customerIo })
       : void 0;
+    const { posthog } = channels;
     if (posthog) resources.own("Nurturing PostHog client", () => posthog.close());
 
     const delivery = NurturingDeliveryService.create({
@@ -70,6 +58,7 @@ export class NurturingModule implements NurturingApi {
     });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,
+      projects: repositories.projects,
       claims: repositories.claims,
     });
     return new NurturingModule(

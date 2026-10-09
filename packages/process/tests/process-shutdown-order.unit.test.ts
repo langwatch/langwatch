@@ -19,7 +19,7 @@ async function bootRuntime({
   drainFails?: boolean;
   onDrain?: () => Promise<void> | void;
 }) {
-  const feature = serverFeature<object>("jobs")
+  const feature = serverFeature("jobs")
     .withSetup(({ resources }) => {
       resources.ownService({
         name: "feature consumers",
@@ -37,9 +37,7 @@ async function bootRuntime({
     })
     .build();
 
-  return new ApplicationBuilder({ role, members: memberSourceOf({}) })
-    .withModules([feature])
-    .boot();
+  return new ApplicationBuilder({ role, stores: memberSourceOf({}) }).withModules([feature]).boot();
 }
 
 /** Hosted before the application, as the preamble hosts them, so they stop after it. */

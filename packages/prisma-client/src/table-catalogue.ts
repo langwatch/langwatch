@@ -28,6 +28,7 @@ export const prismaTableCatalogue = {
   "Team": "Team",
   "Organization": "Organization",
   "IssuedLicense": "IssuedLicense",
+  "OrganizationLicense": "OrganizationLicense",
   "ActivationCode": "ActivationCode",
   "ConnectedBillingAccount": "ConnectedBillingAccount",
   "ConnectedCreditGrant": "ConnectedCreditGrant",
@@ -38,6 +39,7 @@ export const prismaTableCatalogue = {
   "ScimUserResource": "ScimUserResource",
   "ScimDirectoryUser": "ScimDirectoryUser",
   "ScimSyncState": "ScimSyncState",
+  "ScimSsoConnectionView": "ScimSsoConnectionView",
   "Project": "Project",
   "Department": "Department",
   "DepartmentMembershipHistory": "DepartmentMembershipHistory",
@@ -90,6 +92,11 @@ export const prismaTableCatalogue = {
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
+  "DataPrivacyProjectScope": "DataPrivacyProjectScope",
+  "DataRetentionProjectScope": "DataRetentionProjectScope",
+  "InstantEvalJudgeProject": "InstantEvalJudgeProject",
+  "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
+  "InstantEvalJudgeSpend": "InstantEvalJudgeSpend",
   "CustomLLMModelCost": "CustomLLMModelCost",
   "Workflow": "Workflow",
   "WorkflowVersion": "WorkflowVersion",
@@ -154,6 +161,7 @@ export const prismaTableCatalogue = {
   "BugReport": "BugReport",
   "IdempotencyReceipt": "IdempotencyReceipt",
   "GatewayRealtimeSession": "GatewayRealtimeSession",
+  "GatewayRealtimeSessionReport": "GatewayRealtimeSessionReport",
   "SystemMigrationTenantState": "SystemMigrationTenantState",
   "SystemMigrationEnrollment": "SystemMigrationEnrollment",
   "StoredObject": "StoredObject",
@@ -672,6 +680,13 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "OrganizationLicense": [
+    "organizationId",
+    "licenseKey",
+    "expiresAt",
+    "validatedAt",
+    "updatedAt"
+  ],
   "ActivationCode": [
     "id",
     "codeHash",
@@ -801,6 +816,15 @@ export const prismaModelFieldCatalogue = {
     "occurredAt",
     "lastEventId",
     "acceptedAt",
+    "projectionVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ScimSsoConnectionView": [
+    "id",
+    "organizationId",
+    "folded",
+    "appliedEventIds",
     "projectionVersion",
     "createdAt",
     "updatedAt"
@@ -1161,12 +1185,10 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "updatedById",
     "createdAt",
-    "updatedAt",
-    "claims"
+    "updatedAt"
   ],
   "SlackConnectionClaim": [
     "connectionId",
-    "connection",
     "claimantId",
     "claimantLabel",
     "organizationId",
@@ -1186,6 +1208,8 @@ export const prismaModelFieldCatalogue = {
     "sqsAccessKeyId",
     "sqsSecretAccessKeyEncrypted",
     "secretEncrypted",
+    "signatureScheme",
+    "idempotencyKey",
     "previousSecretEncrypted",
     "previousSecretExpiresAt",
     "enabledEvents",
@@ -1639,6 +1663,42 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "DataPrivacyProjectScope": [
+    "projectId",
+    "organizationId",
+    "teamId",
+    "isPersonal",
+    "departmentId",
+    "teamRecordedAt",
+    "departmentRecordedAt",
+    "archivedAt",
+    "updatedAt"
+  ],
+  "DataRetentionProjectScope": [
+    "projectId",
+    "organizationId",
+    "teamId",
+    "teamRecordedAt",
+    "archivedAt",
+    "updatedAt"
+  ],
+  "InstantEvalJudgeProject": [
+    "projectId",
+    "organizationId",
+    "createdAt"
+  ],
+  "InstantEvalJudgeUsageBilling": [
+    "organizationId",
+    "usageBilled",
+    "occurredAt",
+    "fromCatchUp"
+  ],
+  "InstantEvalJudgeSpend": [
+    "organizationId",
+    "requestId",
+    "spendNanoUsd",
+    "occurredAt"
+  ],
   "CustomLLMModelCost": [
     "id",
     "organizationId",
@@ -1718,7 +1778,8 @@ export const prismaModelFieldCatalogue = {
     "targetKind",
     "targetId",
     "before",
-    "after"
+    "after",
+    "idempotencyKey"
   ],
   "LlmPromptConfig": [
     "id",
@@ -2146,7 +2207,8 @@ export const prismaModelFieldCatalogue = {
     "connectServices",
     "licenseTokenHash",
     "licenseInstanceId",
-    "licenseExpiresAt"
+    "licenseExpiresAt",
+    "licenseId"
   ],
   "VirtualKeyScope": [
     "id",
@@ -2639,8 +2701,26 @@ export const prismaModelFieldCatalogue = {
     "closeReason",
     "traceId",
     "vendorCostRaw",
+    "kind",
+    "metering",
+    "credentialExpiresAt",
+    "transcriptionModel",
+    "endUserId",
+    "lastReportAt",
+    "reportedCostNanoUsd",
+    "reportCount",
     "createdAt",
     "updatedAt"
+  ],
+  "GatewayRealtimeSessionReport": [
+    "id",
+    "sessionId",
+    "reportKey",
+    "projectId",
+    "model",
+    "usage",
+    "costNanoUsd",
+    "createdAt"
   ],
   "SystemMigrationTenantState": [
     "migrationName",
@@ -2958,6 +3038,7 @@ export const prismaRelationCatalogue = {
   "IssuedLicense": {
     "organization": "Organization"
   },
+  "OrganizationLicense": {},
   "ActivationCode": {},
   "ConnectedBillingAccount": {
     "organization": "Organization"
@@ -2978,6 +3059,7 @@ export const prismaRelationCatalogue = {
   },
   "ScimDirectoryUser": {},
   "ScimSyncState": {},
+  "ScimSsoConnectionView": {},
   "Project": {
     "team": "Team",
     "checks": "Monitor",
@@ -3073,12 +3155,8 @@ export const prismaRelationCatalogue = {
     "latestEvaluation": "TriggerLatestEvaluation",
     "customGraph": "CustomGraph"
   },
-  "SlackIntegration": {
-    "claims": "SlackConnectionClaim"
-  },
-  "SlackConnectionClaim": {
-    "connection": "SlackIntegration"
-  },
+  "SlackIntegration": {},
+  "SlackConnectionClaim": {},
   "WebhookEndpoint": {
     "organization": "Organization",
     "deliveries": "WebhookEndpointDelivery"
@@ -3181,6 +3259,11 @@ export const prismaRelationCatalogue = {
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
+  "DataPrivacyProjectScope": {},
+  "DataRetentionProjectScope": {},
+  "InstantEvalJudgeProject": {},
+  "InstantEvalJudgeUsageBilling": {},
+  "InstantEvalJudgeSpend": {},
   "CustomLLMModelCost": {},
   "Workflow": {
     "project": "Project",
@@ -3399,6 +3482,7 @@ export const prismaRelationCatalogue = {
   "BugReport": {},
   "IdempotencyReceipt": {},
   "GatewayRealtimeSession": {},
+  "GatewayRealtimeSessionReport": {},
   "SystemMigrationTenantState": {},
   "SystemMigrationEnrollment": {},
   "StoredObject": {},

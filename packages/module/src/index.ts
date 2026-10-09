@@ -3,8 +3,6 @@ export {
   ModuleApiToken,
   FeatureApiIdentity,
   type OperationsOnly,
-} from "./module-api-token.ts";
-export {
   type DependencyIdentity,
   type DependencyToken,
   NO_TOKENS,
@@ -12,8 +10,7 @@ export {
   type TokenIdentity,
   type TokenMap,
   tokenName,
-} from "./dependency-token.ts";
-export { supplyToken, SupplyToken, SupplyTokenIdentity } from "./supply-token.ts";
+} from "./module-api-token.ts";
 export {
   FEATURE_NAMES,
   type ModuleName,

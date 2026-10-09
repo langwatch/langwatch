@@ -2,11 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { Temporal, nowInstant } from "@langwatch/time";
 
+import type { GithubHost } from "../rules/github-host.rules.ts";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,
 } from "./github-branch-mapping.service.ts";
-import type { GithubHost } from "./github-host.service.ts";
 
 const logger = createLogger("langwatch:github:branch-demand");
 

@@ -118,9 +118,10 @@ Feature: Process outbox lease hardening
     Given an outbox worker whose drains lease nothing
     When its recovery polls keep coming back empty
     Then each empty poll doubles the interval to the next poll, up to 30 seconds
+    And the next poll is armed only once a drain settles, with the interval that drain chose
+    And a drain that fails doubles the interval as an empty poll does, never resetting it
     And a notification drains at once and returns the poll to its base interval
     And a poll that leases a message returns the poll to its base interval
-    And a poll that fails grows the interval like an empty one, never returning it to its base
     And a drain that leased a full batch drains again at once instead of waiting a poll
 
   @unit @notify-on-insert

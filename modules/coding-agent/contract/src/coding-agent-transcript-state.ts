@@ -1,8 +1,9 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 import { extractSystemText } from "./coding-agent-transcript-content.ts";
-import { parseMaybeJson, pickString } from "./coding-agent-transcript-value.ts";
+import { parseMaybeJson } from "./coding-agent-transcript-value.ts";
 import type { CodingAgentTranscript, TranscriptEntry } from "./coding-agent-transcript.ts";
+import { pickString } from "./telemetry/coding-agent-span.ts";
 
 export interface TranscriptLogRecord {
   timestampMs: number;

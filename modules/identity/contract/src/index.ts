@@ -4,6 +4,7 @@
  * just the vocabulary, shapes, reducer and refusal errors both must agree on.
  */
 export {
+  accountLivenessKey,
   type BackfillDiff,
   type BackfillIdentifierRow,
   backfillParityDiffs,
@@ -112,6 +113,7 @@ export {
   ssoConnectionFactInputSchema,
   ssoConnectionSourceSchema,
   ssoConnectionStateSchema,
+  ssoConnectionLifecycleStateSchema,
   ssoConnectionTypeSchema,
   ssoDomainProofStateSchema,
   ssoIdpMetadataSchema,
@@ -124,7 +126,7 @@ export {
   teardownRequestedPayloadSchema,
   VERIFICATION_REQUESTED_EVENT_TYPE,
   verificationRequestedPayloadSchema,
-} from "./connection.ts";
+} from "./features/sso-connection/connection.ts";
 export {
   type SsoArrivingUser,
   type SsoAssertionDecision,
@@ -135,19 +137,22 @@ export {
   NOT_A_TEST_ARRIVAL,
   type SsoTestArrivalStanding,
   ssoTestArrivalStandingSchema,
-} from "./sso-admission.ts";
+} from "./features/sso-arrival/sso-admission.ts";
 export {
   type AssertedEmailVerification,
   assertedEmailVerification,
-} from "./sso-email-verification.ts";
+} from "./features/sso-arrival/sso-email-verification.ts";
 export {
   canonicalEntraIssuer,
   entraEndpointOrigins,
   type EntraTenancy,
   entraTenancyOf,
   isEntraIssuer,
-} from "./sso-entra-issuer.ts";
-export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
+} from "./features/sso-connection/sso-entra-issuer.ts";
+export {
+  SSO_CREDENTIAL_KINDS,
+  type SsoCredentialKind,
+} from "./features/sso-connection/sso-credential.ts";
 export {
   parseSamlIdpConfig,
   type SsoIdentityProviderView,
@@ -162,12 +167,16 @@ export {
   ssoSamlIdpConfigSchema,
   type SsoSamlRegistration,
   ssoSamlRegistrationSchema,
-} from "./sso-idp-registration.ts";
+} from "./features/sso-connection/sso-idp-registration.ts";
+export {
+  idpInitiatedLanding,
+  ssoSamlIdpInitiatedSchema,
+} from "./features/sso-connection/sso-idp-initiated-landing.ts";
 export {
   isSealedProviderConfig,
   sealedProviderConfigCipher,
   type SsoProviderConfigCipher,
-} from "./sso-provider-config.ts";
+} from "./features/sso-connection/sso-provider-config.ts";
 export {
   type SsoConnectionRemoval,
   type SsoSetupCommand,
@@ -177,7 +186,7 @@ export {
   type SsoSetupGoLiveView,
   type SsoSetupRecordView,
   type SsoSetupView,
-} from "./sso-setup.ts";
+} from "./features/sso-connection/sso-setup.ts";
 export {
   type SsoMigrationAccountLinkDecision,
   type SsoMigrationAuthenticationDecision,
@@ -189,7 +198,7 @@ export {
   type SsoMigrationScimStatus,
   type SsoMigrationStragglerView,
   type SsoMigrationView,
-} from "./sso-migration.ts";
+} from "./features/sso-arrival/sso-migration.ts";
 export {
   isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,
@@ -200,7 +209,7 @@ export {
   type SsoDomainOwnershipQualification,
   ssoDomainStanding,
   ssoDomainVouchesForNewPeople,
-} from "./sso-domain-ownership.ts";
+} from "./features/sso-domain/sso-domain-ownership.ts";
 export {
   SSO_DNS_PROOF_TTL_MS,
   SSO_DNS_RECORD_NAME,
@@ -214,7 +223,7 @@ export {
   ssoDnsRecordName,
   ssoDomainRecordLocation,
   ssoVerificationFileUrl,
-} from "./sso-domain-proof.ts";
+} from "./features/sso-domain/sso-domain-proof.ts";
 export {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
@@ -291,7 +300,7 @@ export {
   WITHDRAW_DOMAIN_COMMAND_TYPE,
   type WithdrawDomainCommandData,
   withdrawDomainCommandDataSchema,
-} from "./connection-commands.ts";
+} from "./features/sso-connection/connection-commands.ts";
 export {
   IdentityCapabilityUnavailableError,
   IdentityCommandRefusedError,
@@ -385,13 +394,12 @@ export {
   breakGlassIsLive,
   type BreakGlassWarningDay,
   breakGlassWarningsDue,
-} from "./break-glass.ts";
+} from "./features/sso-arrival/break-glass.ts";
 export {
   SSO_CONNECTION_HISTORY_LIMIT,
   type OrganizationSsoConnection,
   type SsoConnectionHistoryEntryView,
-} from "./sso-connection-history.ts";
-export { type IdentityEmailResolution, IdentityEmailService } from "./identity-email.service.ts";
+} from "./features/sso-connection/sso-connection-history.ts";
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
@@ -413,7 +421,7 @@ export {
   readJoinerRole,
   resolveJoinLookup,
   seatForJoiner,
-} from "./join-matching.ts";
+} from "./features/join-request/join-matching.ts";
 export {
   DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_AUTO_JOIN_POLICY_ID,
@@ -459,7 +467,7 @@ export {
   joinWithdrawalCauseSchema,
   joinWithdrawnPayloadSchema,
   reduceJoinRequest,
-} from "./join-request.ts";
+} from "./features/join-request/join-request.ts";
 export {
   APPROVE_JOIN_COMMAND_TYPE,
   type ApproveJoinCommandData,
@@ -479,7 +487,7 @@ export {
   WITHDRAW_JOIN_COMMAND_TYPE,
   type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
-} from "./join-request-commands.ts";
+} from "./features/join-request/join-request-commands.ts";
 export {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   type AttachIdentifierCommandData,
@@ -615,7 +623,7 @@ export {
   regenerateBackupCodesCommandDataSchema,
   reduceMfaEnrollment,
   remainingBackupCodes,
-} from "./mfa.ts";
+} from "./features/mfa/mfa.ts";
 export {
   AMR_VALUES,
   type Amr,
@@ -637,7 +645,7 @@ export {
   secondFactorsIn,
   signInProvedSecondFactor,
   TOTP_AMR,
-} from "./mfa-condition.ts";
+} from "./features/mfa/mfa-condition.ts";
 export {
   deriveSessionAmr,
   localFactorsForPath,
@@ -674,7 +682,7 @@ export {
   SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
   type SignInMethodPolicyResolver,
-} from "./signin-method-policy.ts";
+} from "./features/signin/signin-method-policy.ts";
 export { reduceIdentity } from "./reduce.ts";
 
 export {
@@ -705,7 +713,7 @@ export {
   type SignInRoutingOutcome,
   type SignInRoutingReasonCode,
   type SsoConnectionRoutingState,
-} from "./signin-routing.ts";
+} from "./features/signin/signin-routing.ts";
 export {
   arrivalStateForProvider,
   IDENTIFIER_LIFECYCLE_STATES,
@@ -726,24 +734,30 @@ export {
  * pipeline name and aggregate type every event stamps. Wire schemas that
  * extend these with the eventing envelope stay in `@langwatch/identity-process`.
  */
-export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events.ts";
-export { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./join-request-events.ts";
+export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./facts.ts";
+export {
+  JOIN_REQUEST_AGGREGATE_TYPE,
+  JOIN_REQUEST_PIPELINE_NAME,
+} from "./features/join-request/join-request-events.ts";
 export {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
-} from "./sso-connection-events.ts";
-export * from "./signin-callback.errors.ts";
+} from "./features/sso-connection/sso-connection-events.ts";
+export * from "./features/signin/signin-callback.errors.ts";
 export {
   domainClaimRetryAfterSeconds,
   isClaimableSsoDomain,
   SSO_DOMAIN_CLAIM_WINDOW_MS,
   SSO_DOMAIN_CLAIMS_PER_WINDOW,
-} from "./sso-domain-claims.ts";
+} from "./features/sso-domain/sso-domain-claims.ts";
 export * from "./identity.api.ts";
 export * from "./identity-lookup.ts";
 export * from "./identity-lookup.trpc.ts";
 export * from "./account-identifiers.ts";
 export * from "./identity.trpc.ts";
+export * from "./features/join-request/join-request.responses.ts";
+export * from "./features/join-request/join-request.trpc-schemas.ts";
+export * from "./features/join-request/join-request.trpc.ts";
 export * from "./two-step-verification.ts";
 export * from "./two-step-verification.trpc.ts";
 export * from "./identity.config.ts";

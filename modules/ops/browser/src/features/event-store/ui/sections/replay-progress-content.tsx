@@ -15,13 +15,13 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
 import { useReplayStatus } from "../../behavior/use-replay-status.ts";
 import { parseActiveProjections } from "../../model/replay-presentation.ts";
 import { CowboyAnimation } from "../elements/cowboy-animation.tsx";

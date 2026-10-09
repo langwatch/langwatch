@@ -18,7 +18,7 @@ type ClickHouseDateTime = ReturnType<typeof toDate>;
  * feature package may not import a vendor SDK: the real `ClickHouseClient`,
  * the Eventing substrate's client and a fake all satisfy this instead.
  */
-export interface LangyAnalyticsClickHouseWriteClient {
+interface LangyAnalyticsClickHouseWriteClient {
   insert(input: {
     table: string;
     values: readonly Readonly<Record<string, unknown>>[];
@@ -27,7 +27,7 @@ export interface LangyAnalyticsClickHouseWriteClient {
   }): Promise<unknown>;
 }
 
-export type LangyAnalyticsClickHouseClientResolver = (
+type LangyAnalyticsClickHouseClientResolver = (
   tenantId: string,
 ) => Promise<LangyAnalyticsClickHouseWriteClient>;
 

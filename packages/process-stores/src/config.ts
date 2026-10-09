@@ -38,6 +38,8 @@ export interface ClickHouseConfig {
   readonly requestTimeoutMs?: number;
   /** Statements allowed in flight at once. Absent means the resolved pool size. */
   readonly maxConcurrentStatements?: number;
+  /** Share of those statements each of reads and inserts keeps from the other. */
+  readonly statementLaneReserveShare?: number;
   /** Settings applied to every statement, before a statement's own. */
   readonly settings?: Readonly<Record<string, string>>;
   /** How many tenant-to-organization answers the router keeps. */
@@ -164,6 +166,8 @@ export interface ProcessConfig {
   readonly processName: string;
   /** The 32-byte key stored values are encrypted under, hex-encoded. */
   readonly encryptionKey: string;
+  /** The key before a rotation, hex-encoded: stored values open under it, none is sealed. */
+  readonly previousEncryptionKey?: string;
   /** Every secret this process resolved at boot (ADR-132). */
   readonly secrets: Readonly<Record<string, string>>;
   /** The default allowance a rate-limited route counts against. */

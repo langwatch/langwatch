@@ -1,11 +1,11 @@
 /**
- * Where a judged query or run reports what it spent: one record per query and
- * one per run, on the gateway spend spine, so the same fold, the same budget
- * debits and the same monthly meter see it.
+ * Where a hosted Connect call reports what it spent: on the gateway spend spine, under the
+ * calling key, so the same fold, budget debits and monthly meter see it. Runs and judged queries
+ * record through the Instant Evals judge instead (ADR-174 decision 13).
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import type { InstantEvalPricing } from "@langwatch/instant-eval-contract";
+import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
@@ -51,11 +51,7 @@ export class InstantEvalSpendService {
     return new InstantEvalSpendService(peers, pricing);
   }
 
-  /**
-   * The dispatch is awaited and a failure is raised: for a run the caller is the finish intent,
-   * which retries onto the same request id; for a query the caller logs and moves on, because a
-   * lost ledger row is never a reason to refuse an answer already paid for.
-   */
+  /** The dispatch is awaited and a failure is raised, so the hosted caller keeps it and retries. */
   async recordSpend(record: InstantEvalSpendRecord): Promise<void> {
     const attribution = await this.peers.findSpendAttribution({ projectId: record.projectId });
     if (!attribution) {

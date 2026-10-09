@@ -9,7 +9,6 @@ import {
   type GetAgentInput,
   type AgentProjectInput,
   type AgentIdsInput,
-  type AgentCreationWindowInput,
   type ListAgentsInput,
   type ConnectedAgentsInput,
   type ConnectedAgentsEnvironmentInput,
@@ -241,6 +240,17 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
+  async updateConfigIfUnchanged(
+    input: Parameters<AgentRepository["updateConfigIfUnchanged"]>[0],
+  ): Promise<boolean> {
+    const written = await this.prisma.agent.updateMany({
+      where: { id: input.id, projectId: input.projectId, updatedAt: toDate(input.updatedAt) },
+      data: { config: configSchema.parse(input.config) },
+    });
+
+    return written.count === 1;
+  }
+
   async archive(input: GetAgentInput): Promise<Agent> {
     const row = await this.prisma.agent
       .update({
@@ -365,20 +375,6 @@ export class PrismaAgentRepository
       where: { id: input.id, projectId: input.projectId },
       data: { lastSeenAt: toDate(input.at) },
     });
-  }
-
-  async findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
-    const rows = await this.prisma.agent.findMany({
-      where: {
-        projectId: input.projectId,
-        createdAt: { gte: toDate(input.from), lte: toDate(input.to) },
-        copiedFromAgentId: input.copiedFromAgentId,
-      },
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    });
-
-    return rows.map((row) => row.id);
   }
 
   #writeError(error: unknown, input: GetAgentInput): never {

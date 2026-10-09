@@ -1,7 +1,10 @@
 import {
   auditLogHistoryEntrySchema,
+  auditLogTargetEntrySchema,
   type AuditLogEntry,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type ListAuditLogEntityHistoryInput,
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
@@ -21,6 +24,30 @@ const historySelect = {
 
 const auditLogHistoryEntriesSchema = auditLogHistoryEntrySchema.array();
 
+const targetSelect = {
+  id: true,
+  createdAt: true,
+  action: true,
+  targetId: true,
+  projectId: true,
+  userId: true,
+  metadata: true,
+} as const;
+
+const auditLogTargetEntriesSchema = auditLogTargetEntrySchema.array();
+
+/** The entry as a row; a JSON `null` is stored as JSON, not as an absent column. */
+function rowData(entry: AuditLogEntry) {
+  const json = (value: AuditLogEntry["args"]) => (value === null ? Prisma.JsonNull : value);
+  return {
+    ...entry,
+    args: json(entry.args),
+    metadata: json(entry.metadata),
+    before: json(entry.before),
+    after: json(entry.after),
+  };
+}
+
 export class PrismaAuditLogRepository
   extends PrismaRepository.for("AuditLog")
   implements AuditLogRepository
@@ -29,11 +56,7 @@ export class PrismaAuditLogRepository
 
   async create(entry: AuditLogEntry): Promise<RecordedAuditLogEntry> {
     const row = await this.prisma.auditLog.create({
-      data: {
-        ...entry,
-        args: entry.args === null ? Prisma.JsonNull : entry.args,
-        metadata: entry.metadata === null ? Prisma.JsonNull : entry.metadata,
-      },
+      data: rowData(entry),
       select: { id: true, createdAt: true },
     });
     return { id: row.id, occurredAt: row.createdAt.getTime() };
@@ -41,22 +64,16 @@ export class PrismaAuditLogRepository
 
   async createOnce({
     entry,
-    id,
+    idempotencyKey,
     occurredAt,
   }: {
     entry: AuditLogEntry;
-    id: string;
+    idempotencyKey: string;
     occurredAt: number;
   }): Promise<RecordedAuditLogEntry> {
     try {
       const row = await this.prisma.auditLog.create({
-        data: {
-          ...entry,
-          id,
-          createdAt: new Date(occurredAt),
-          args: entry.args === null ? Prisma.JsonNull : entry.args,
-          metadata: entry.metadata === null ? Prisma.JsonNull : entry.metadata,
-        },
+        data: { ...rowData(entry), idempotencyKey, createdAt: new Date(occurredAt) },
         select: { id: true, createdAt: true },
       });
       return { id: row.id, occurredAt: row.createdAt.getTime() };
@@ -65,7 +82,7 @@ export class PrismaAuditLogRepository
         throw error;
       }
       const row = await this.prisma.auditLog.findUniqueOrThrow({
-        where: { id },
+        where: { idempotencyKey },
         select: { id: true, createdAt: true },
       });
       return { id: row.id, occurredAt: row.createdAt.getTime() };
@@ -99,5 +116,16 @@ export class PrismaAuditLogRepository
     });
 
     return auditLogHistoryEntriesSchema.parse(entries);
+  }
+
+  async findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    const entries = await this.prisma.auditLog.findMany({
+      where: { targetKind: input.targetKind },
+      orderBy: { createdAt: "desc" },
+      take: input.limit,
+      select: targetSelect,
+    });
+
+    return auditLogTargetEntriesSchema.parse(entries);
   }
 }

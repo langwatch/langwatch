@@ -1,7 +1,7 @@
 import { TriggerAction } from "@langwatch/automation-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MAX_TEST_HISTORY, useAutomationStore } from "../ui/sections/automation-store.ts";
+import { MAX_TEST_HISTORY, useAutomationStore } from "../ui/sections/automation-selectors.ts";
 import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
 
 describe("automationStore", () => {

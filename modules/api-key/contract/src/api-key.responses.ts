@@ -30,7 +30,6 @@ export const apiKeyMintedSchema = z
     apiKey: z.object({ id: z.string(), name: z.string(), createdAt: z.date() }).strict(),
   })
   .strict();
-export type ApiKeyMinted = z.infer<typeof apiKeyMintedSchema>;
 
 /** What an edit answers: the row's identity and the mode it now runs under. */
 export const apiKeyUpdatedSchema = z

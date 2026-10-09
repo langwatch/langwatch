@@ -9,23 +9,28 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
   create: vi.fn(),
 }));
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:manage" ? mocks.canManage : true,
+  }),
+}));
 vi.mock(
-  "../../../../../behavior/lent-annotation-form.tsx",
+  "../../../../../features/annotation/behavior/lent-annotation-form.tsx",
   () => import("../../../__tests__/lent-annotation-form.stand-in.tsx"),
 );
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:manage" ? mocks.canManage : true,
   }),
 }));
 

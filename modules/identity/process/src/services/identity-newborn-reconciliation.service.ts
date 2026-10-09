@@ -11,14 +11,14 @@ export const IDENTITY_NEWBORN_ABANDONED_AFTER_MS = 60 * 60 * 1000;
 /** One pass's bound, so a sweep never becomes the pass that never ends. */
 const MAX_SWEPT_PER_PASS = 200;
 
-export interface IdentityNewbornReconciliationDeps {
+interface IdentityNewbornReconciliationDeps {
   /** The address lock (ADR-116 §6), for the claims whose fact never landed. */
   reservations: IdentityReservationRepository;
   now?: () => number;
   abandonedAfterMs?: number;
 }
 
-export interface IdentityNewbornSweepSummary {
+interface IdentityNewbornSweepSummary {
   /** Address locks released because no live identifier ever backed them. */
   locksReaped: number;
 }

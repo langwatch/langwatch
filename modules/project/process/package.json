@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -43,11 +42,9 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/share-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/topic-contract": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
@@ -55,6 +52,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

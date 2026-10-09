@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { isLegacyKeyRevoked } from "../../rules/legacy-project-key.rules.ts";
 import { ProjectCredentialsService } from "../project-credentials.service.ts";
 
-/**
- * The onboarding snippets are sized against the 54-byte key this adapter
- * mints, and every stored Project row carries the id shape it mints, so both
- * assertions below are about a persisted format rather than a preference.
- */
-describe("ProjectCredentialsAdapter", () => {
+describe("ProjectCredentialsService", () => {
   describe("when a project is created", () => {
     /** @scenario "A project is born with packaged credentials" */
     it("mints a project KSUID identifier", () => {
@@ -17,16 +13,17 @@ describe("ProjectCredentialsAdapter", () => {
       expect(adapter.generateProjectId()).not.toBe(adapter.generateProjectId());
     });
 
-    /** @scenario "A project is born with packaged credentials" */
-    it("mints a 54-byte sk-lw- ingestion key of alphanumeric characters only", () => {
+    /** @scenario "A new project gets no customer-facing project key" */
+    it("stores a legacy key value that never authenticates", () => {
       const key = ProjectCredentialsService.create().generateApiKey();
 
-      expect(key).toMatch(/^sk-lw-[0-9A-Za-z]{48}$/);
-      expect(key.length).toBe(54);
+      expect(key).toMatch(/^lw-revoked-\S+$/);
+      expect(key).not.toMatch(/^sk-lw-/);
+      expect(isLegacyKeyRevoked(key)).toBe(true);
     });
 
-    /** @scenario "A project is born with packaged credentials" */
-    it("mints a distinct key for every project", () => {
+    /** @scenario "A new project gets no customer-facing project key" */
+    it("stores a distinct value for every project, as the unique column needs", () => {
       const adapter = ProjectCredentialsService.create();
 
       expect(adapter.generateApiKey()).not.toBe(adapter.generateApiKey());

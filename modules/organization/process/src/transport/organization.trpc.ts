@@ -43,9 +43,8 @@ export const organizationSessionPersonFact = defineTrpcFact(
 type SessionPerson = Readonly<{ name: string | null; email: string | null }> | null;
 
 /**
- * The one opt-out this namespace makes, and the same sentence for all three
- * procedures that make it: each runs before or across membership, so there is
- * no scope to check and no permission the caller could hold.
+ * The opt-out for the procedures that run before or across membership, so
+ * there is no scope to check and no permission the caller could hold.
  */
 export const BEFORE_MEMBERSHIP = {
   reason:
@@ -134,8 +133,11 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   /** The shell's scope skeleton: what every page resolves its scope against. */
   .procedure("getScopeGraph")
+  .servesWhileUpgrading()
   .withFacts(organizationSessionPersonFact)
-  .noPermission(BEFORE_MEMBERSHIP)
+  .noPermission({
+    reason: "answers the scope skeleton of the caller's own memberships; no single scope holds it",
+  })
   .handle(({ app, actor }, person) => app.getScopeGraph(callerOf(actor, person)))
 
   .procedure("update")
@@ -199,9 +201,9 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   )
 
   /** Bounded by the organization's own membership, never a caller-supplied id list. */
-  .procedure("getMemberProvenance")
+  .procedure("getInvitedMemberIds")
   .withPermission("organization:manage")
-  .handle(({ app, input }) => app.getMemberProvenance(input))
+  .handle(({ app, input }) => app.getInvitedMemberIds(input))
 
   .procedure("updateTeamMemberRole")
   .withEntitlement("enterprise", customRoleGate)

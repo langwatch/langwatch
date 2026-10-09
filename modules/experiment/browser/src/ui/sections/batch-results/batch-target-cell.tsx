@@ -10,6 +10,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 
+import {
+  COLLAPSED_CELL_HEIGHT_PX,
+  DEFAULT_ROW_HEIGHT,
+  type RowHeight,
+} from "../../../model/batch-evaluation-results.row-height.ts";
 import { formatTargetOutput } from "../../../model/format-target-output.ts";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 import {
@@ -20,7 +25,6 @@ import {
   type RenderTracePeek,
   useEscapeKey,
 } from "./presentation.tsx";
-import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils.ts";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;

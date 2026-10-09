@@ -35,12 +35,17 @@ export {
   otlpHeadersFrom,
   otlpHeadersSecret,
   resourceAttributesFrom,
-  type MetricsMode,
   type TelemetryContext,
   type TelemetrySecret,
   type TelemetrySecrets,
   type TelemetrySettings,
 } from "./telemetry-settings.ts";
+export {
+  type ResolvedTelemetry,
+  resolveTelemetry,
+  TelemetryAliasConflictError,
+  telemetryAliases,
+} from "./telemetry-aliases.ts";
 export { processMetrics } from "./process-metrics.ts";
 
 // Every method of a service, wrapped in a span named `ClassName.methodName`,
@@ -49,4 +54,4 @@ export { processMetrics } from "./process-metrics.ts";
 // at import, and the root is asserted to load in a browser bundle without it.
 export { traced } from "../trace/traced.ts";
 
-export { processTelemetry } from "./process-telemetry.ts";
+export { loggerConfiguration, processTelemetry } from "./process-telemetry.ts";

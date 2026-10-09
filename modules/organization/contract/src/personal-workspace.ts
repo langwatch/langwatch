@@ -1,4 +1,4 @@
-import { NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 export const personalWorkspaceInputSchema = z
@@ -42,10 +42,30 @@ export const personalWorkspaceSchema = z
   .strict();
 export type PersonalWorkspace = z.infer<typeof personalWorkspaceSchema>;
 
-export const ensuredPersonalWorkspaceSchema = personalWorkspaceSchema.safeExtend({
-  created: z.boolean(),
-});
+/** Pending until project has created the personal project; wait on `lw.project.created` for it. */
+export const ensuredPersonalWorkspaceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("ready"), workspace: personalWorkspaceSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("pending"),
+      team: personalWorkspaceSchema.shape.team,
+    })
+    .strict(),
+]);
 export type EnsuredPersonalWorkspace = z.infer<typeof ensuredPersonalWorkspaceSchema>;
+
+/** A mutation that needs the personal project refuses while project is still creating it. */
+export class PersonalWorkspacePendingError extends HandledError {
+  declare readonly code: "personal_workspace_pending";
+
+  constructor() {
+    super("personal_workspace_pending", "The personal workspace is still being created", {
+      httpStatus: 409,
+      retryable: true,
+    });
+    this.name = "PersonalWorkspacePendingError";
+  }
+}
 
 export const PERSONAL_FEATURES = ["evaluations", "datasets", "annotations", "automations"] as const;
 export const personalFeatureSchema = z.enum(PERSONAL_FEATURES);
@@ -103,7 +123,7 @@ export class PersonalProjectOwnerMismatchError extends NotFoundError {
   }
 }
 
-/** A newly created personal workspace, which project records as a created project (§9). */
+/** Recorded before Round 54, when organization wrote the project; project still records them. */
 export const PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE =
   "lw.organization.personal_workspace_provisioned" as const;
 
@@ -117,4 +137,67 @@ export const personalWorkspaceProvisionedEventDataSchema = z.object({
 });
 export type PersonalWorkspaceProvisionedEventData = z.infer<
   typeof personalWorkspaceProvisionedEventDataSchema
+>;
+
+/**
+ * A personal team was created; project creates its personal project under the named id and slug,
+ * and mints its key, which never enters the event log (Round 54, O1-D1-KEY).
+ */
+export const PERSONAL_TEAM_CREATED_EVENT_TYPE = "lw.organization.personal_team_created" as const;
+
+export const personalTeamCreatedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  teamId: z.string().min(1),
+  projectId: z.string().min(1),
+  projectSlug: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalTeamCreatedEventData = z.infer<typeof personalTeamCreatedEventDataSchema>;
+
+/** A removed member's personal teams were archived; project archives their personal projects. */
+export const PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE =
+  "lw.organization.personal_workspace_archived" as const;
+
+export const personalWorkspaceArchivedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  teamIds: z.array(z.string().min(1)).min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalWorkspaceArchivedEventData = z.infer<
+  typeof personalWorkspaceArchivedEventDataSchema
+>;
+
+/** A returning member's personal team was revived; project revives its personal project. */
+export const PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE =
+  "lw.organization.personal_workspace_revived" as const;
+
+export const personalWorkspaceRevivedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  teamId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalWorkspaceRevivedEventData = z.infer<
+  typeof personalWorkspaceRevivedEventDataSchema
+>;
+
+/** The owner switched their personal workspace's features; project stores them on its project. */
+export const PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE =
+  "lw.organization.personal_workspace_features_changed" as const;
+
+export const personalWorkspaceFeaturesChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1).nullable(),
+  userId: z.string().min(1),
+  projectId: z.string().min(1),
+  features: personalFeaturesSchema,
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalWorkspaceFeaturesChangedEventData = z.infer<
+  typeof personalWorkspaceFeaturesChangedEventDataSchema
 >;

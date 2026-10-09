@@ -1,7 +1,8 @@
-import { type EvaluationApi, LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
+import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
 import { normalizePresidioMarkers } from "@langwatch/redaction";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
+import type { PresidioChannel } from "../channels/presidio.channel.ts";
 import {
   PII_ANALYSIS_TEXT_BUDGET,
   presidioEntitiesFor,
@@ -10,25 +11,23 @@ import {
 } from "../rules/pii-analysis.rules.ts";
 import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
 
-type PiiDetection = Pick<EvaluationApi, "detectPii">;
-
-/** A batch through langevals' Presidio, reached through evaluation: main's `clearPresidio`. */
+/** A batch through langevals' Presidio, reached directly (R5, Alex 2026-10-06): `clearPresidio`. */
 export class PresidioRedactionService {
   static create(input: {
-    evaluation: PiiDetection;
+    presidio: PresidioChannel;
     metrics: Pick<
       PiiAnalysisMetricsOtelService,
       "analysisCalled" | "analysisObserved" | "analysisFinished"
     >;
     timeoutMs: number;
   }): PresidioRedactionService {
-    return new PresidioRedactionService(input.evaluation, input.metrics, input.timeoutMs);
+    return new PresidioRedactionService(input.presidio, input.metrics, input.timeoutMs);
   }
 
   #configured: Promise<boolean> | undefined;
 
   private constructor(
-    private readonly evaluation: PiiDetection,
+    private readonly presidio: PresidioChannel,
     private readonly metrics: Pick<
       PiiAnalysisMetricsOtelService,
       "analysisCalled" | "analysisObserved" | "analysisFinished"
@@ -38,8 +37,8 @@ export class PresidioRedactionService {
 
   /** Asked once, with an empty batch that sends nothing; a failed answer is asked again. */
   isConfigured(): Promise<boolean> {
-    this.#configured ??= this.evaluation
-      .detectPii({ texts: [], entities: [], signal: new AbortController().signal })
+    this.#configured ??= this.presidio
+      .detect({ texts: [], entities: [], signal: new AbortController().signal })
       .then((outcome) => outcome.kind !== "not_configured")
       .catch((error: unknown) => {
         this.#configured = undefined;
@@ -97,7 +96,7 @@ export class PresidioRedactionService {
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     const startedAt = performance.now();
     try {
-      return await this.evaluation.detectPii({
+      return await this.presidio.detect({
         texts: input.texts,
         entities: presidioEntitiesFor(input.piiRedactionLevel, input.entities),
         signal: controller.signal,

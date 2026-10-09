@@ -16,12 +16,13 @@ import { gqBlobReleaseGraceTotal } from "./metrics.ts";
 import { RedisJobBlobStore } from "./redisJobBlobStore.ts";
 import {
   createTenantId,
-  type ProjectStorageDestination,
+  type MintStorageUri,
+  type ObjectStore,
   redactStorageUrisInText,
   type TenantId,
   tenantIdFromGroupId,
 } from "./storage.ts";
-import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore.ts";
+import { TieredBlobStore } from "./tieredBlobStore.ts";
 
 const logger = createLogger("langwatch:group-queue:envelope-blob-lifecycle");
 
@@ -30,10 +31,10 @@ const logger = createLogger("langwatch:group-queue:envelope-blob-lifecycle");
  * renewable leases, encode/decode/take/release — so the processor delegates
  * rather than carrying it inline. See ADR-029.
  */
-export class EnvelopeBlobLifecycle {
+export class EnvelopeBlobLifecycle<Destination = unknown> {
   private readonly blobs: RedisJobBlobStore;
   private readonly blobLeases: BlobLeases;
-  private readonly tieredBlobs: TieredBlobStore;
+  private readonly tieredBlobs: TieredBlobStore<Destination>;
   private readonly queueName: string;
   private readonly compression: "gzip" | "zstd";
   private readonly payloadCodec: "json" | "msgpack";
@@ -43,13 +44,15 @@ export class EnvelopeBlobLifecycle {
     queueName,
     objectStoreFor,
     resolveStorageDestination,
+    mintUri,
     compression = "gzip",
     payloadCodec = "json",
   }: {
     redis: IORedis | Cluster;
     queueName: string;
     objectStoreFor?: (projectId: string) => ObjectStore;
-    resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
+    resolveStorageDestination?: (projectId: string) => Promise<Destination>;
+    mintUri?: MintStorageUri<Destination>;
     compression?: "gzip" | "zstd";
     payloadCodec?: "json" | "msgpack";
   }) {
@@ -68,7 +71,7 @@ export class EnvelopeBlobLifecycle {
     }
     this.blobs = new RedisJobBlobStore({ redis, queueName });
     this.blobLeases = new BlobLeases({ redis, queueName });
-    this.tieredBlobs = new TieredBlobStore({
+    this.tieredBlobs = new TieredBlobStore<Destination>({
       redisBlobs: this.blobs,
       objectStoreFor:
         objectStoreFor ??
@@ -79,6 +82,11 @@ export class EnvelopeBlobLifecycle {
         resolveStorageDestination ??
         (async () => {
           throw new Error("No durable storage destination resolver was configured for Group Queue");
+        }),
+      mintUri:
+        mintUri ??
+        (() => {
+          throw new Error("No storage uri minter was configured for Group Queue");
         }),
       queueName,
       logger,

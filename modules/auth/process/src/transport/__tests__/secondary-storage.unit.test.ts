@@ -27,7 +27,7 @@ vi.mock("@langwatch/observability", async () => {
 
 import type * as observabilityModule from "@langwatch/observability";
 
-import { createSecondaryStorage } from "../../app/auth-composition.build.ts";
+import { LiveAuthRepositories } from "../../repositories/live/live.auth.repositories.ts";
 import { betterAuthTransportFor } from "./better-auth-transport.test-helpers.ts";
 
 function fakeRedis() {
@@ -41,8 +41,18 @@ function fakeRedis() {
   };
 }
 
+/** The live registry's choice: Redis when the process has one, drop-and-warn when it has none. */
+function createSecondaryStorage(redis: Parameters<typeof redisDouble>[0] | null) {
+  return LiveAuthRepositories.create({
+    prisma: {} as never,
+    redis: (redis === null ? null : redisDouble(redis)) as never,
+    rateLimiter: {} as never,
+    encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  }).betterAuthSecondaryStorage;
+}
+
 function storeOver(redis: ReturnType<typeof fakeRedis>) {
-  return createSecondaryStorage(redisDouble(redis));
+  return createSecondaryStorage(redis);
 }
 
 describe("better-auth secondary storage", () => {
@@ -137,13 +147,16 @@ describe("better-auth secondary storage", () => {
 
   describe("given a deployment that composed no Redis", () => {
     it("constructs no client of its own, and limits in memory instead", () => {
-      expect(betterAuthTransportFor({}, { redis: null }).options.rateLimit?.storage).toBe("memory");
+      expect(betterAuthTransportFor({}, { sharedStorage: false }).options.rateLimit?.storage).toBe(
+        "memory",
+      );
     });
 
     /** @scenario "A deployment with no Redis drops writes the same way" */
     /** @scenario "A consumer degrades when the application has no Redis" */
     it("degrades identically to a process holding no application", async () => {
-      const composed = betterAuthTransportFor({}, { redis: null }).options.secondaryStorage;
+      const composed = betterAuthTransportFor({}, { sharedStorage: false }).options
+        .secondaryStorage;
       if (!composed) throw new Error("the transport composed no secondary storage to degrade");
 
       expect(await composed.get("k")).toBeNull();

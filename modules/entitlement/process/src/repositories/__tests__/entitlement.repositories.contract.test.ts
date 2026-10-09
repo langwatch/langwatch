@@ -24,7 +24,7 @@ type UsageSeed = MemoryOrganizationUsage;
 
 type Backend = Readonly<{
   name: string;
-  create: (seeds: readonly UsageSeed[]) => EntitlementRepositories;
+  create: (seeds: readonly UsageSeed[]) => Pick<EntitlementRepositories, "membership" | "spend">;
 }>;
 
 const memoryBackend: Backend = {

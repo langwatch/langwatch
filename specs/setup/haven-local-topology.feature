@@ -115,6 +115,13 @@ Feature: The local development topology
     Then the command is refused
     And the refusal names the service it would not host
 
+  @unit
+  Scenario: A panicking service in the combined Go process stops alone
+    Given the combined Go process hosts a simulator and the gateway
+    When the simulator's service goroutine panics
+    Then the panic is logged with its stack under that service's identity
+    And the gateway keeps running
+
   # --- The lanes haven plans ---
 
   @unit
@@ -166,6 +173,33 @@ Feature: The local development topology
     And the go lane keeps only the gateway and the NLP engine, so load on a simulator cannot starve them
     And no "idp", "mail", "storage", "voice", "llm" or "analytics" lane is planned
 
+  # One Go process for the data plane and the simulators is the default
+  # (HAVEN-ONE-SWITCH); LANGWATCH_DEV_ONE_PROCESS=0 splits it, with the Node app lane.
+  @unit
+  Scenario: One Go process hosts the data plane and the simulators unless split
+    Given a checkout whose dev build links the simulators
+    And the one-process switch is on
+    When haven plans a stack selecting the data plane, every simulator and Langy
+    Then the "go" lane hosts aigateway, nlpgo, idpsim, mailsim, storagesim, voicesim, llmsim and analyticssim, each on its own address variable
+    And no "sims" lane is planned
+    And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
+    And Langy keeps a lane of its own either way
+
+  @unit
+  Scenario: Services sharing one Go process keep their own telemetry identity
+    Given the gateway and the NLP engine each set up telemetry in one process
+    When a span starts or a counter records under a context naming one of them
+    Then it is recorded by that service's provider, with that service's resource
+    And an OTel SDK error, which names no service, reaches each service's own handler
+    And a process running one service installs its provider and handler as the global, as before
+
+  @unit
+  Scenario: One Go process retires the sims log a split run left behind
+    Given an earlier split run left a sims lane capture
+    When a stack in one-process mode comes up with no sims lane
+    Then the stale sims capture is removed
+    And "haven logs <simulator>" reads the go lane's live capture instead
+
   # --- Restarting a lane ---
 
   @unit
@@ -184,6 +218,14 @@ Feature: The local development topology
     Then the command is refused with the restartable list
     And "go" is the name that bounces them
     And "idp", "mail", "storage", "voice", "llm" and "analytics" are offered only as "sims" where the sims lane hosts them
+
+  @unit
+  Scenario: Restarting the sims lane in one Go process says it restarts the go lane
+    Given a stack whose simulators run inside the go lane's process
+    When "haven restart sims" runs
+    Then the go lane's process group is bounced once
+    And the output says the go lane restarts with the simulators
+    And a stack with its own sims lane bounces only that lane, without the note
 
   # --- The api.<slug> hostname ---
 

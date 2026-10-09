@@ -7,7 +7,7 @@ import type {
   AdminOperationResult,
 } from "@langwatch/ops-contract";
 
-import { AdminBackofficeRepository } from "../instance-admin.repository.ts";
+import { InstanceAdminRepository } from "../instance-admin.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 type AdminRow = Record<string, unknown>;
@@ -16,7 +16,7 @@ type AdminRow = Record<string, unknown>;
  * The instance admin's resources in memory, answering each method in the shapes the stored
  * resources answer: a list filters by equal fields, sorts by one field and pages.
  */
-export class MemoryInstanceAdminRepository extends AdminBackofficeRepository {
+export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
   static create({ store }: { store: MemoryOpsStore }): MemoryInstanceAdminRepository {
     return new MemoryInstanceAdminRepository(store);
   }

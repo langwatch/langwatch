@@ -121,6 +121,7 @@ function compose(
   const repositories = LiveCodingAgentRepositories.create({
     clickhouse: clickhouse as never,
     redis: redis as never,
+    config: { foldCacheTtlSeconds: 300 },
   });
   const github =
     "pullRequestMapping" in options ? options.pullRequestMapping : new MappingEverything();

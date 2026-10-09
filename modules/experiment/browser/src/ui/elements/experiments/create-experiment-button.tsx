@@ -5,6 +5,8 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, ExternalLink, Plus } from "lucide-react";
 
+import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
+
 export const CreateExperimentButton = ({
   isCreating,
   onCreate,
@@ -12,9 +14,10 @@ export const CreateExperimentButton = ({
   isCreating: boolean;
   onCreate: () => void;
 }) => {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const workflowHost = useWorkflowHost();
 
-  if (!project || !hasPermission("experiments:update")) return null;
+  if (!project || !workflowHost.hasPermission("experiments:update")) return null;
 
   return (
     <Menu.Root>

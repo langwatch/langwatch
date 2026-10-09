@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 
-import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { useSelectionStore } from "../../../../behavior/explorer.store.ts";
-import { useFindStore } from "../../../../behavior/find-store.ts";
 import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { useDensityStore } from "../../../../features/explorer/behavior/density.store.ts";
+import { useFindStore } from "../../../../features/find/behavior/find-store.ts";
 
 const isTextInput = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;

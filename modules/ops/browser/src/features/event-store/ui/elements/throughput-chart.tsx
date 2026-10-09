@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
+import { readableDate } from "@langwatch/time";
 import { useMemo, useRef, useState } from "react";
 import {
   Area,
@@ -19,8 +20,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
-import { readableDate } from "../../../../model/ops-formatters.ts";
 
 const COLORS = {
   staged: { stroke: "#06b6d4", fill: "#06b6d4" },

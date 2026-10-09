@@ -30,8 +30,6 @@ describe("the projects REST declaration", () => {
           route.permission ?? route.access?.kind,
         ]),
       ).toEqual([
-        ["get", "/", "listProjects", "authenticated"],
-        ["post", "/", "createProject", "project:create"],
         ["get", "/:id", "getProject", "project:view"],
         ["patch", "/:id", "updateProject", "project:update"],
         ["delete", "/:id", "archiveProject", "project:delete"],
@@ -83,20 +81,12 @@ describe("the projects REST declaration", () => {
       }
     });
 
-    it("asks the collection routes at the credential's own scope", () => {
-      for (const route of declaration.routes.filter((r) => r.path === "/")) {
-        expect([route.operation, route.permissionTarget]).toEqual([route.operation, undefined]);
-      }
-    });
-
-    it("declares an answer for every route, and 201 for the provisioning alone", () => {
+    it("declares an answer and the default status for every route", () => {
       for (const route of declaration.routes) {
         expect([route.operation, route.output !== undefined]).toEqual([route.operation, true]);
       }
 
       expect(declaration.routes.map((route) => [route.operation, route.status])).toEqual([
-        ["listProjects", undefined],
-        ["createProject", 201],
         ["getProject", undefined],
         ["updateProject", undefined],
         ["archiveProject", undefined],
@@ -105,23 +95,11 @@ describe("the projects REST declaration", () => {
       ]);
     });
 
-    // The listing and the provisioning both ask about the KEY as well as the
-    // member it acts as; the by-id routes ask about neither.
-    it("binds the credential fact on the two collection routes alone", () => {
-      expect(
-        declaration.routes.map((route) => [
-          route.operation,
-          route.middleware?.map((fact) => fact.name) ?? [],
-        ]),
-      ).toEqual([
-        ["listProjects", ["projectRestCredential"]],
-        ["createProject", ["projectRestCredential"]],
-        ["getProject", []],
-        ["updateProject", []],
-        ["archiveProject", []],
-        ["getProjectApiKey", []],
-        ["regenerateProjectApiKey", []],
-      ]);
+    // The collection, the one place a credential fact was read, is api-key's now.
+    it("binds no credential fact on any route", () => {
+      for (const route of declaration.routes) {
+        expect([route.operation, route.middleware ?? []]).toEqual([route.operation, []]);
+      }
     });
 
     it("publishes a summary and at least one documented error for every operation", () => {

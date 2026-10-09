@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability/browser";
 import { Edit3, Languages, Lightbulb } from "lucide-react";
 
+import { useTraceHost } from "../../../../../behavior/trace-host.ts";
 import {
   isSameAnnotationTarget,
   useAnnotationDraftStore,
-} from "../../../../../behavior/annotation-draft.store.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+} from "../../../../../features/annotation/behavior/annotation-draft.store.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
@@ -62,11 +62,11 @@ export function MessageAnnotateCluster({
   /** Offered only on a side that has text to translate. */
   translation?: MessageTranslation;
 }) {
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   // A reader who may not write annotations mounts none of the machinery
   // behind those actions, which a conversation pays for on every message of
   // every turn on screen.
-  if (!hasPermission("annotations:manage")) {
+  if (!traceHost.hasPermission("annotations:manage")) {
     if (!translation) return null;
     return (
       <HoverActionCluster

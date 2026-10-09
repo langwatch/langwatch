@@ -108,7 +108,7 @@ func TestChoosingNoRuntimeRecordsItAndSettlesTheQuestion(t *testing.T) {
 	o := installOrchestrator(tools, store, &fakeProxy{})
 	var out bytes.Buffer
 
-	err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{{Key: "runtime", Candidate: "none"}})
+	_, err := o.installPrereqsTo(context.Background(), &out, []domain.Chosen{{Key: "runtime", Candidate: "none"}})
 	if err != nil {
 		t.Fatalf("installPrereqs: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestInstallingARuntimeRecordsItAsTheChoice(t *testing.T) {
 	store := &fakeStore{}
 	o := installOrchestrator(&fakeTools{}, store, &fakeProxy{})
 
-	err := o.installPrereqsTo(context.Background(), &bytes.Buffer{},
+	_, err := o.installPrereqsTo(context.Background(), &bytes.Buffer{},
 		[]domain.Chosen{{Key: "runtime", Candidate: "docker-desktop"}})
 	if err != nil {
 		t.Fatalf("installPrereqs: %v", err)

@@ -6,8 +6,8 @@
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { LWQL_ALLOWED_FUNCTION_NAMES } from "../../rules/langwatch-ql-functions.rules.ts";
-import { LWQL_POSTGRES_CATALOG } from "../../rules/lwql-postgres-view-catalog.rules.ts";
+import { LWQL_ALLOWED_FUNCTION_NAMES } from "../../features/app-functions/rules/langwatch-ql-functions.rules.ts";
+import { LWQL_POSTGRES_CATALOG } from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service.ts";
 

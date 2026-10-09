@@ -2,9 +2,17 @@
  * The providers that wrap the router, in the order they have always nested.
  */
 
+import {
+  DesignSystemProvider,
+  type DesignSystemProviderProps,
+} from "@langwatch/design-system/provider";
 import type { ComponentType, ReactNode } from "react";
 
-import { UiDesignSystemShell, type UiDesignSystemShellProps } from "./ui-design-system-shell.tsx";
+export type UiDesignSystemShellProps = DesignSystemProviderProps;
+
+export function UiDesignSystemShell(props: UiDesignSystemShellProps) {
+  return <DesignSystemProvider {...props} />;
+}
 
 /** Anything the application installs at a provider position. */
 export type UiProviderShell = ComponentType<{ children: ReactNode }>;

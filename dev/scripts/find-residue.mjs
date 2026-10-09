@@ -54,6 +54,7 @@ export const specifiersIn = (text) => {
     /\bimport\s*["']([^"']+)["']/g,
     /\bexport\s+[^;'"]*?\bfrom\s*["']([^"']+)["']/g,
     /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+    /\bnew\s+URL\s*\(\s*["']([^"']+)["']\s*,\s*import\.meta\.url\b/g,
   ];
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) found.push(match[1]);
@@ -304,32 +305,75 @@ const REFERENCING_FILE = /(?:^|\/)(?:Makefile[\w.-]*|Dockerfile[\w.-]*)$|\.(?:ya
  * Makefile target, a shell script. Nothing imports `.github/scripts/guard-*.ts`
  * — CI runs it by path — so without this every one of them reads as residue.
  */
-export const findReferencedRoots = ({ known, readFile = read }) => {
+export const findReferencedRoots = ({ known, tracked = trackedFiles(), readFile = read }) => {
   const roots = new Set();
-  const referencing = execSync("git ls-files", { encoding: "utf8", maxBuffer: 1 << 28 })
-    .trim()
-    .split("\n")
-    .filter(
-      (file) =>
-        REFERENCING_FILE.test(file) &&
-        !/(^|\/)(node_modules|dist)\//.test(file) &&
-        !/lock\.ya?ml$/.test(file),
-    );
+  const referencing = tracked.filter(
+    (file) =>
+      REFERENCING_FILE.test(file) &&
+      !/(^|\/)(node_modules|dist)\//.test(file) &&
+      !/lock\.ya?ml$/.test(file),
+  );
   for (const file of referencing) {
     const text = readFile(join(ROOT, file));
     if (!text) continue;
+    // A workflow step runs from the repository root, its file, or its `working-directory`.
+    const bases = [
+      "",
+      dirname(file),
+      ...[...text.matchAll(/working-directory:\s*["']?([\w./-]+)/g)].map((match) => match[1]),
+    ];
     for (const match of text.matchAll(/[\w@./-]+\.[cm]?[jt]sx?\b/g)) {
-      const raw = match[0].replace(/^\.\//, "");
-      if (known.has(raw)) {
-        roots.add(raw);
-        continue;
-      }
-      // A path written relative to the file that names it.
-      const relativeToFile = join(dirname(file), raw).split("\\").join("/");
-      if (known.has(relativeToFile)) roots.add(relativeToFile);
+      // `${GITHUB_WORKSPACE}/.github/x.cjs` leaves a leading slash on a repo-relative path.
+      const raw = match[0].replace(/^\.?\//, "");
+      const hit = bases
+        .map((base) => join(base, raw).split("\\").join("/"))
+        .find((path) => known.has(path));
+      if (hit) roots.add(hit);
     }
   }
   return roots;
+};
+
+const trackedFiles = () =>
+  execSync("git ls-files", { encoding: "utf8", maxBuffer: 1 << 28 })
+    .trim()
+    .split("\n");
+
+const TEST_CONFIG = /(^|\/)(vitest|playwright)[\w.-]*\.config\.[cm]?[jt]s$/;
+const VITE_CONFIG = /(^|\/)vite[\w.-]*\.config\.[cm]?[jt]s$/;
+
+const INDEX_HTML = /(^|\/)index\.html$/;
+
+/** Files an index.html `<script src>` or a config's relative path string names. */
+const pathsNamedBy = ({ file, text, known }) => {
+  const html = INDEX_HTML.test(file);
+  const pattern = html ? /<script\b[^>]*\bsrc=["']([^"']+)["']/g : /["'](\.{1,2}\/[^"'*]+)["']/g;
+  const source = html ? text : stripComments(text);
+  return [...source.matchAll(pattern)]
+    .map((match) => attemptPath({ base: join(dirname(file), match[1].replace(/^\//, "")), known }))
+    .filter(Boolean);
+};
+
+/**
+ * Files a loader is told about by path rather than by import: an index.html
+ * `<script src>`, and relative path strings in vite configs (prod roots) and
+ * vitest/playwright configs (`setupFiles`, `globalSetup`: test roots).
+ */
+export const findConfigRoots = ({ known, tracked = trackedFiles(), readFile = read }) => {
+  const roots = new Set();
+  const testRoots = new Set();
+  const naming = tracked.filter(
+    (file) =>
+      (INDEX_HTML.test(file) || TEST_CONFIG.test(file) || VITE_CONFIG.test(file)) &&
+      !/(^|\/)(node_modules|dist)\//.test(file),
+  );
+  for (const file of naming) {
+    const into = TEST_CONFIG.test(file) ? testRoots : roots;
+    for (const hit of pathsNamedBy({ file, text: readFile(join(ROOT, file)) ?? "", known })) {
+      into.add(hit);
+    }
+  }
+  return { roots, testRoots };
 };
 
 const CANDIDATE_SUFFIXES = [
@@ -396,13 +440,11 @@ const resolveWorkspacePackage = ({ specifier, workspace, known }) => {
   const pkg = workspace.byName.get(name);
   if (!pkg) return null;
   const subpath = specifier === name ? "." : `./${specifier.slice(name.length + 1)}`;
-  const declared = pkg.entries.get(subpath) ?? pkg.entries.get(".");
-  // No exports map entry: fall back to the path as written under the package.
-  const direct =
-    subpath !== "." && !pkg.entries.has(subpath)
-      ? attemptPath({ base: join(pkg.dir, subpath), known })
-      : null;
-  return direct ?? declared ?? null;
+  const hit = matchPattern({ keys: [...pkg.entries.keys()], specifier: subpath });
+  if (hit?.key === subpath) return pkg.entries.get(subpath);
+  if (hit) return attemptPath({ base: pkg.entries.get(hit.key).replaceAll("*", hit.star), known });
+  // No exports map entry: the path as written under the package, never the root entry.
+  return subpath === "." ? null : attemptPath({ base: join(pkg.dir, subpath), known });
 };
 
 /** Resolves one specifier to a repository-relative file, or null when it leaves the workspace. */
@@ -478,14 +520,16 @@ const isDeclaredRoot = (file, workspace) =>
 
 export const findGraphResidue = ({ files, workspace, graph }) => {
   const { imports, importedBy } = graph;
-  const tests = files.filter((file) => TEST.test(file));
+  const { testRoots = new Set() } = workspace;
+  const tests = [...files.filter((file) => TEST.test(file)), ...testRoots];
+  const testFiles = new Set(tests);
   const prodSeeds = files.filter((file) => !TEST.test(file) && isDeclaredRoot(file, workspace));
   const live = reachableFrom({ seeds: prodSeeds, imports });
   const underTest = reachableFrom({ seeds: tests, imports });
 
   const findings = [];
   for (const file of files) {
-    if (TEST.test(file)) continue;
+    if (testFiles.has(file)) continue;
     if (isDeclaredRoot(file, workspace)) continue;
     if (live.has(file)) continue;
     const importers = [...(importedBy.get(file) ?? [])];
@@ -1026,6 +1070,81 @@ const selfTest = () => {
     ["s/src/b.ts", "s/src/internal/a.ts"],
   );
 
+  const wildcard = {
+    byName: new Map([
+      [
+        "@x/up",
+        {
+          dir: "u",
+          entries: new Map([
+            [".", "u/src/index.ts"],
+            ["./*", "u/src/*/index.ts"],
+          ]),
+        },
+      ],
+    ]),
+  };
+  const wildcardKnown = new Set(["u/src/index.ts", "u/src/gate/index.ts"]);
+  const resolveIn = (specifier) =>
+    resolveSpecifier({ specifier, fromFile: "a.ts", workspace: wildcard, known: wildcardKnown });
+  // The bug that resolved every `@langwatch/upgrade/<x>` to the root index.
+  check(
+    "resolve: a `./*` export maps a subpath, a miss is null, not the root entry",
+    [resolveIn("@x/up"), resolveIn("@x/up/gate"), resolveIn("@x/up/ghost")],
+    ["u/src/index.ts", "u/src/gate/index.ts", null],
+  );
+
+  const configSources = {
+    "w/index.html": `<script type="module" src="/src/main.tsx"></script>`,
+    "w/vitest.config.ts": `// setupFiles: ["./ghost.ts"]\nexport default { test: { setupFiles: ["./vitest.setup.ts"] } };`,
+    "w/vite.config.ts": `const noop = path.resolve(here, "./vite/noop.cjs");`,
+    "w/vite/sw.ts": `const entry = new URL("../../p/src/sw.entry.ts", import.meta.url);`,
+    ".github/workflows/ci.yml": `run: node \${GITHUB_WORKSPACE}/.github/scripts/a.cjs\n  working-directory: tools/x\n  run: node scripts/b.ts`,
+  };
+  const configKnown = new Set([
+    "w/src/main.tsx",
+    "w/vitest.setup.ts",
+    "w/ghost.ts",
+    "w/vite/noop.cjs",
+    "w/vite/sw.ts",
+    "p/src/sw.entry.ts",
+    ".github/scripts/a.cjs",
+    "tools/x/scripts/b.ts",
+  ]);
+  const readConfig = (absolute) =>
+    configSources[relative(ROOT, absolute).split("\\").join("/")] ?? "";
+  const configRoots = findConfigRoots({
+    known: configKnown,
+    tracked: Object.keys(configSources),
+    readFile: readConfig,
+  });
+  check(
+    "config roots: an index.html `<script src>` entry is a root",
+    configRoots.roots.has("w/src/main.tsx"),
+    true,
+  );
+  check(
+    "config roots: vitest `setupFiles` are test roots, a commented path is not",
+    [...configRoots.testRoots],
+    ["w/vitest.setup.ts"],
+  );
+  check(
+    "config roots: a vite config path string and a `new URL(.., import.meta.url)` are reached",
+    [configRoots.roots.has("w/vite/noop.cjs"), specifiersIn(configSources["w/vite/sw.ts"])],
+    [true, ["../../p/src/sw.entry.ts"]],
+  );
+  check(
+    "referenced roots: a workflow path after `${GITHUB_WORKSPACE}` or under `working-directory`",
+    [
+      ...findReferencedRoots({
+        known: configKnown,
+        tracked: [".github/workflows/ci.yml"],
+        readFile: readConfig,
+      }),
+    ].toSorted(byCodeUnit),
+    [".github/scripts/a.cjs", "tools/x/scripts/b.ts"],
+  );
+
   for (const failure of failures) console.error(`self-test FAILED  ${failure}`);
   if (failures.length === 0) console.error(`self-test passed (${checks} cases)`);
   return failures.length === 0 ? 0 : 2;
@@ -1066,8 +1185,15 @@ const runDetectors = ({ only, files, workspace, graph, known }) => {
 
 const main = () => {
   const argv = process.argv.slice(2);
-  if (argv.includes("--self-test")) process.exit(selfTest());
-  if (selfTest() !== 0) process.exit(2);
+  // exitCode, not exit(): exit() drops whatever a pipe has not drained yet.
+  if (argv.includes("--self-test")) {
+    process.exitCode = selfTest();
+    return;
+  }
+  if (selfTest() !== 0) {
+    process.exitCode = 2;
+    return;
+  }
 
   const { asJson, only, target } = parseArguments(argv);
   const workspace = readWorkspace();
@@ -1075,10 +1201,14 @@ const main = () => {
   const scoped = listSourceFiles(target);
   const known = new Set(all);
 
+  const tracked = trackedFiles();
+  const configRoots = findConfigRoots({ known, tracked });
   workspace.roots = new Set([
     ...resolveRoots({ rootSpecs: workspace.rootSpecs, known }),
-    ...findReferencedRoots({ known }),
+    ...findReferencedRoots({ known, tracked }),
+    ...configRoots.roots,
   ]);
+  workspace.testRoots = configRoots.testRoots;
   const graph = buildGraph({ files: all, workspace });
 
   const inScope = new Set(scoped);
@@ -1107,7 +1237,7 @@ const main = () => {
   console.error(
     `scanned ${scoped.length} file${scoped.length === 1 ? "" : "s"}${scope} of ${all.length} tracked — ${counts}`,
   );
-  process.exit(findings.length > 0 ? 1 : 0);
+  process.exitCode = findings.length > 0 ? 1 : 0;
 };
 
 main();

@@ -1,6 +1,7 @@
 import {
   allowLoopbackVoiceProviders,
   Config,
+  foldCacheTtlSeconds,
   gatewayAddressOf,
   gatewayInternalUrl,
   gatewayLegacyUrl,
@@ -37,6 +38,7 @@ export const gatewayConfig = Config.define((c) => ({
   isSaas,
   /** Dev only: an ElevenLabs row may name a loopback stand-in. */
   allowLoopbackVoiceProviders,
+  foldCacheTtlSeconds,
 }));
 
 export type GatewayServerConfig = ConfigOf<typeof gatewayConfig>;

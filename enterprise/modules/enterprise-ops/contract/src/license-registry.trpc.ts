@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   activationCodePageSchema,
   activationCodeViewSchema,
@@ -23,9 +24,8 @@ import {
   selfHostedInstanceIdInputSchema,
   selfHostedInstancePageSchema,
 } from "@langwatch/enterprise-licensing-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The license registry surface (ADR-156), as the Backoffice reads and writes
+ * The license registry surface (ADR-156), as the admin console reads and writes
  * it: every issue path writes a row here, so a signed license is shown
  * exactly once, when it is issued or reissued, and never read back.
  */
@@ -85,7 +85,7 @@ export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .withOutput(activationCodeViewSchema)
   .build();
 
-/** The registry of self-hosted installs (ADR-156 §10), as the Backoffice
+/** The registry of self-hosted installs (ADR-156 §10), as the admin console
  * reads it. Read only: an install reported every number here. */
 
 export const selfHostedInstancesTrpc = defineTrpcContract("selfHostedInstances")

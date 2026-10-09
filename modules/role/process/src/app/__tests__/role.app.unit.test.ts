@@ -2,14 +2,12 @@ import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi, AuthzDefineRoleInput } from "@langwatch/authz-contract";
 import {
   AuthzGrantNotConfirmedError,
+  AuthzScopeNotFoundError,
   GrantExceedsCallerPermissionsError,
-} from "@langwatch/authz-contract";
-import {
-  OrganizationNotFoundForTeamError,
-  PersonalWorkspaceNotManagedHereError,
-} from "@langwatch/organization-contract";
-import {
   OrgExclusivePermissionScopeError,
+} from "@langwatch/authz-contract";
+import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
+import {
   RoleInUseError,
   RoleNotFoundError,
   RoleTeamNotFoundError,
@@ -20,7 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { MemoryRoleStore } from "../../repositories/memory/memory.role.store.ts";
-import { createRoleTestApp, testBinding, testTeam } from "./role.fixture.ts";
+import { createRoleTestApp, testBinding, testTeamScope } from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 const CALLER = { id: "user-1" };
@@ -216,7 +214,6 @@ describe("given a role that carries an organization-exclusive permission", () =>
       store.save(role({ permissions: ["organization:manage"] }));
       const { app } = createRoleTestApp({
         roles,
-        organizations: { getOrganizationIdByTeamId: async () => ORGANIZATION_ID },
         permissions: { attachBindings },
       });
 
@@ -242,7 +239,6 @@ describe("given a caller assigning a custom role above what it holds", () => {
     store.save(role());
     const { app } = createRoleTestApp({
       roles,
-      organizations: { getOrganizationIdByTeamId: async () => ORGANIZATION_ID },
       permissions: {
         listUserBindings: async () => [testBinding({ userId: "user-2", scopeId: "team-1" })],
         changeBindingRole,
@@ -270,14 +266,12 @@ describe("given a caller assigning a custom role above what it holds", () => {
 describe("given a team assignment being authorized", () => {
   describe("when the organization is resolved from the team identifier", () => {
     /** @scenario "A transport authorizes a team assignment" */
-    it("reads the organization directory, and an absent team is a refusal", async () => {
-      const getOrganizationIdByTeamId = vi.fn(async (input: { teamId: string }) => {
-        if (input.teamId !== "team-1") throw new OrganizationNotFoundForTeamError(input.teamId);
-        return ORGANIZATION_ID;
+    it("reads the team scope, and an absent team is a refusal", async () => {
+      const getScope = vi.fn(async (input: { teamId?: string }) => {
+        if (input.teamId !== "team-1") throw new AuthzScopeNotFoundError(input);
+        return testTeamScope({ organizationId: ORGANIZATION_ID });
       });
-      const { app } = createRoleTestApp({
-        organizations: { getOrganizationIdByTeamId },
-      });
+      const { app } = createRoleTestApp({ permissions: { getScope } });
 
       await expect(app.getAssignmentOrganization({ teamId: "team-1" })).resolves.toBe(
         ORGANIZATION_ID,
@@ -365,11 +359,8 @@ describe("given a team that is a member's personal workspace", () => {
     store.save(role());
     const { app } = createRoleTestApp({
       roles: MemoryRoleRepository.create({ store }),
-      organizations: {
-        getOrganizationIdByTeamId: async () => ORGANIZATION_ID,
-        getTeamById: async () => testTeam({ isPersonal: true, name: "Ada's workspace" }),
-      },
       permissions: {
+        getScope: async () => testTeamScope({ isPersonal: true, name: "Ada's workspace" }),
         attachBindings,
         listUserBindings: async () => [testBinding({ scopeId: "team-1" })],
       },

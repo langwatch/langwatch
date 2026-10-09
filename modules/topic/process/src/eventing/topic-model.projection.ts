@@ -10,8 +10,8 @@ import {
   type TopicModelEntry,
 } from "@langwatch/topic-contract";
 
-import type { TopicClusteringTopicsRecordedEvent } from "../rules/topic-clustering-events.rules.ts";
-import { TopicClusteringTopicsRecordedEventSchema } from "../rules/topic-clustering-events.rules.ts";
+import type { TopicClusteringTopicsRecordedEvent } from "./topic-clustering.events.ts";
+import { TopicClusteringTopicsRecordedEventSchema } from "./topic-clustering.events.ts";
 
 /** A projected topic with its firstRecordedAt resolved (never optional). */
 export type ProjectedTopic = Omit<TopicModelEntry, "firstRecordedAt"> & {

@@ -20,6 +20,11 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const epoch = fromDate(new Date(0));
 
 const person: UserProfile = {
@@ -70,21 +75,15 @@ function serviceOver({
     prisma: repository,
     writer,
     users,
-    governance: {
-      departmentResolveByNameOrCreate: vi.fn(async () => ({
-        id: "department-1",
-        organizationId: "org-1",
-        name: "Engineering",
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-      })),
-      departmentAssignUser: vi.fn(async () => undefined),
+    costCenterFacts: {
+      recordCostCenterChanged: vi.fn(async () => undefined),
     },
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 }
 
@@ -159,6 +158,7 @@ describe("the membership role a SCIM push writes", () => {
         userId: "user-1",
         organizationId: "org-1",
         role: "ADMIN",
+        pending: false,
       });
     });
   });

@@ -1,4 +1,5 @@
-/** Keeps posthog-js's super-property in step with the org's variant, so a
+import type { UiAnalytics } from "@langwatch/browser-host/analytics";
+/** Keeps the analytics super-property in step with the org's variant, so a
  * switch away from a variant does not carry it onto later events.
  * @see specs/analytics/posthog-guided-onboarding.feature */
 import {
@@ -6,12 +7,17 @@ import {
   ONBOARDING_EXPERIMENT_PROPERTY,
   type OnboardingVariant,
 } from "@langwatch/onboarding-contract";
-import posthog from "posthog-js";
 
-export function registerOnboardingExperiment(variant: OnboardingVariant | null | undefined): void {
+export function registerOnboardingExperiment({
+  analytics,
+  variant,
+}: {
+  analytics: UiAnalytics;
+  variant: OnboardingVariant | null | undefined;
+}): void {
   if (!variant) {
-    posthog.unregister(ONBOARDING_EXPERIMENT_PROPERTY);
+    analytics.unregister(ONBOARDING_EXPERIMENT_PROPERTY);
     return;
   }
-  posthog.register({ [ONBOARDING_EXPERIMENT_PROPERTY]: experimentVariantFor(variant) });
+  analytics.register({ [ONBOARDING_EXPERIMENT_PROPERTY]: experimentVariantFor(variant) });
 }

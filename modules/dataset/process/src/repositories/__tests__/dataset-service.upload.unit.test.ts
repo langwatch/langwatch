@@ -1,4 +1,9 @@
-import { datasetSchema, type Dataset, type DatasetRecord } from "@langwatch/dataset-contract";
+import {
+  datasetSchema,
+  type Dataset,
+  type DatasetRecord,
+  type DatasetStorageEntry,
+} from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -44,6 +49,9 @@ class Repo implements DatasetRepository {
   restore = vi.fn(async () => row());
   updateMapping = vi.fn(async () => row());
   count = vi.fn(async () => 0);
+  async findStoragePage(): Promise<DatasetStorageEntry[]> {
+    return [];
+  }
 }
 class Records implements DatasetRecordRepository {
   async count(): Promise<number> {

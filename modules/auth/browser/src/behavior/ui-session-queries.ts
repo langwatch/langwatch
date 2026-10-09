@@ -1,17 +1,16 @@
 /**
- * The two reads a session capability is built out of — cached under the
+ * The read a session capability is built out of — cached under the
  * key `trpcQueryKey` would produce for the same procedure, so this
  * package's queries and the application's own share ONE cache entry.
  */
 
 import { trpcQueryKey, type ModuleApiClient, type ModuleApiMap } from "@langwatch/api/web";
-import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 /** The untyped client every feature Provider is handed. */
 export type UiFeatureApiTransport = ModuleApiClient<ModuleApiMap>;
 
 export const UI_EFFECTIVE_PERMISSIONS_PROCEDURE = "authz.effectivePermissions";
-export const UI_FEATURE_FLAG_PROCEDURE = "featureFlag.isEnabled";
 
 /**
  * Grants refetch on focus rather than caching for the session: a role
@@ -19,11 +18,7 @@ export const UI_FEATURE_FLAG_PROCEDURE = "featureFlag.isEnabled";
  */
 const GRANTS_STALE_TIME_MS = 30_000;
 
-/** The server re-reads operator rows every few seconds; the browser holds its answer far longer. */
-const FEATURE_FLAG_STALE_TIME_MS = 5 * 60_000;
-
 export type UiEffectivePermissionsRead = { readonly permissions: readonly string[] };
-type UiFeatureFlagRead = { readonly enabled: boolean };
 
 /**
  * What the caller may do in one scope — the narrower id wins: a project
@@ -61,47 +56,5 @@ export function useUiEffectivePermissions({
       ) as Promise<UiEffectivePermissionsRead>,
     enabled: !isPublicRoute && !!userId && (!!projectId || !!organizationId),
     staleTime: GRANTS_STALE_TIME_MS,
-  });
-}
-
-/**
- * `projectId` and `organizationId` are both stated on every read — a
- * targeting rule that names a scope the read left out can never match, so
- * a missing id would turn a per-project rollout into a silent no-op.
- */
-export function useUiFeatureFlags({
-  transport,
-  flags,
-  projectId,
-  organizationId,
-  enabled,
-}: {
-  transport: UiFeatureApiTransport;
-  flags: readonly string[];
-  projectId: string | null;
-  organizationId: string | null;
-  enabled: boolean;
-}): ReadonlyMap<string, boolean> {
-  return useQueries({
-    queries: flags.map((flag) => {
-      const input = { flag, projectId, organizationId };
-      return {
-        queryKey: trpcQueryKey(UI_FEATURE_FLAG_PROCEDURE, { input, type: "query" as const }),
-        queryFn: () =>
-          transport.query(UI_FEATURE_FLAG_PROCEDURE, input) as Promise<UiFeatureFlagRead>,
-        enabled,
-        staleTime: FEATURE_FLAG_STALE_TIME_MS,
-        refetchOnWindowFocus: false,
-      };
-    }),
-    combine: (results) => {
-      const answers = new Map<string, boolean>();
-      results.forEach((result, index) => {
-        const flag = flags[index];
-        if (flag === void 0 || result.data === void 0) return;
-        answers.set(flag, result.data.enabled);
-      });
-      return answers;
-    },
   });
 }

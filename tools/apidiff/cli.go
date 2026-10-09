@@ -52,6 +52,8 @@ func (values *stringSlice) Set(value string) error {
 type probeFlags struct {
 	a             string
 	b             string
+	workerLogA    string
+	workerLogB    string
 	keys          Keys
 	timeout       time.Duration
 	settleTimeout time.Duration
@@ -139,6 +141,7 @@ usage:
                 [-scenarios GLOB] [-scenario-id PATTERN]... [-scenario-concurrency N]
                 [-scenario-shards N] [-repeat N] [-run-dir DIR] [-seed-dir DIR] [-final]
                 (without -b: run the scenarios against the one stack; PASS or FAIL)
+  apidiff -sweep-databases [-sweep-days N] [-dry-run] [-pg-url URL] [-branch-dir DIR]
   apidiff done  -run RUN -scenario ID -note TEXT [-force] | -list | -undo ID
 
 Each run instance is a haven stack under its own run-scoped slug wherever
@@ -175,6 +178,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runBootSubcommand(ctx, args[1:], out)
 	case "scenarios":
 		return runScenariosSubcommand(ctx, args[1:], out)
+	case "-sweep-databases", "sweep-databases":
+		return runSweepSubcommand(ctx, args[1:], out)
 	case "done":
 		return doneScenariosSubcommand(args[1:], out)
 	default:
@@ -218,12 +223,13 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	probe.parity = parity
 
 	// The child processes inherit this context; canceling it kills them.
-	bootCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	bootCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	parity.state.abort = cancel
 	booting := time.Now()
 	booted, err := parity.boot(bootCtx)
 	if err != nil {
-		fmt.Fprintln(out.stderr, "boot:", err)
+		fmt.Fprintln(out.stderr, "boot:", workerDeathOr(bootCtx, err))
 		return exitError
 	}
 	defer booted.Teardown()
@@ -247,7 +253,35 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 
 	probe.adoptBooted(booted, boot, out.stderr)
 	probe.onOperationDone = findingsHook(findings, boot.BranchDir, out.stderr)
-	return probePipeline(ctx, probe, out)
+	return probeUnlessWorkerDied(bootCtx, probe, out)
+}
+
+// probeUnlessWorkerDied runs the probe, failing the run when a worker death canceled it.
+func probeUnlessWorkerDied(ctx context.Context, probe *probeFlags, out streams) int {
+	code := probePipeline(ctx, probe, out)
+	if dead := workerDeath(ctx); dead != nil {
+		fmt.Fprintln(out.stderr, "apidiff:", dead)
+		return exitError
+	}
+	return code
+}
+
+// workerDeath is the worker death that canceled the run, or nil.
+func workerDeath(ctx context.Context) *workerDeathError {
+	var dead *workerDeathError
+	if errors.As(context.Cause(ctx), &dead) {
+		return dead
+	}
+	return nil
+}
+
+// workerDeathOr prefers the worker death that canceled the run over the
+// context error it left behind.
+func workerDeathOr(ctx context.Context, err error) error {
+	if dead := workerDeath(ctx); dead != nil {
+		return dead
+	}
+	return err
 }
 
 // finishParityOnly ends a -parity-only run: the inventories, then the verdict.
@@ -265,6 +299,8 @@ func (probe *probeFlags) adoptBooted(booted *Booted, boot BootConfig, stderr io.
 	probe.a = booted.A.URL
 	probe.b = booted.B.URL
 	probe.runDir = booted.WorkRoot
+	probe.workerLogA = workerLogPath(booted.WorkRoot, booted.A.Name)
+	probe.workerLogB = workerLogPath(booted.WorkRoot, booted.B.Name)
 	probe.scenarios.mailA, probe.scenarios.mailB = booted.A.MailURL, booted.B.MailURL
 	probe.activateEntitlement = booted.ActivateEntitlement
 	if boot.UseHaven {
@@ -340,6 +376,8 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")
 	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
 	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
+	flags.BoolVar(&boot.ComposePostgres, "compose-postgres", os.Getenv("CI") != "", "-no-haven: run Postgres in the compose project too, for full isolation (default on CI, which has no host Postgres); otherwise each side gets its own run-scoped database on haven's host Postgres at 127.0.0.1:5432")
+	flags.IntVar(&boot.SweepDays, "sweep-days", defaultSweepDays, "at the start of a run, drop apidiff_* databases older than this many days that no live run owns (0 = never)")
 	flags.BoolVar(&boot.DryRun, "dry-run", false, "print the plan (refs, worktree paths, slugs, commands) and start nothing")
 	noHaven := false
 	flags.BoolVar(&noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
@@ -387,13 +425,8 @@ func writeDryRunPlanOrError(boot BootConfig, out streams) int {
 // probePipeline is the shared compare flow: fetch both specs, diff them,
 // probe the operation union in lockstep, then report.
 func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
-	if probe.method != "" && !openapidiff.IsHTTPMethod(probe.method) {
-		fmt.Fprintf(out.stderr, "invalid HTTP method %q\n", probe.method)
-		return exitError
-	}
-	baseline, err := loadBaseline(probe.ledgerBaseline)
-	if err != nil {
-		fmt.Fprintln(out.stderr, err)
+	baseline, ok := probe.preflight(out.stderr)
+	if !ok {
 		return exitError
 	}
 
@@ -426,6 +459,10 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 	selected := SelectOperations(operations, probe.filter())
 	fmt.Fprintf(out.stderr, "probing %d operations (lockstep, %d modules at once)\n", len(selected), max(probe.concurrency, 1))
 	result := ProbeAll(ctx, probe.probeOptions(client, specs, out.stderr), operations)
+	if result.Fatal != "" {
+		fmt.Fprintln(out.stderr, "apidiff:", result.Fatal)
+		return exitError
+	}
 
 	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}
 	verdict.ledger = BuildScopedLedger(operations, verdict.report, probe.ledgerOptions(baseline))
@@ -433,6 +470,20 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		return code
 	}
 	return max(verdict.exitCode(out), probe.runScenarioAfterMainPass(ctx, out))
+}
+
+// preflight checks the method filter and loads the ledger baseline; false ends the run.
+func (probe *probeFlags) preflight(stderr io.Writer) (map[string]bool, bool) {
+	if probe.method != "" && !openapidiff.IsHTTPMethod(probe.method) {
+		fmt.Fprintf(stderr, "invalid HTTP method %q\n", probe.method)
+		return nil, false
+	}
+	baseline, err := loadBaseline(probe.ledgerBaseline)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return nil, false
+	}
+	return baseline, true
 }
 
 // probeOptions are the probe flags as ProbeAll takes them.
@@ -453,6 +504,8 @@ func (probe *probeFlags) probeOptions(client *http.Client, specs *fetchedSpecs, 
 		ActivateEntitlement: probe.activateEntitlement,
 		ModuleOf:            probe.moduleOf(),
 		Concurrency:         probe.concurrency,
+		WorkerLogA:          probe.workerLogA,
+		WorkerLogB:          probe.workerLogB,
 	}
 }
 

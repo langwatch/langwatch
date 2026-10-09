@@ -64,7 +64,7 @@ describe("ActivationCodesSection", () => {
     revokeOutcome = "none";
   });
 
-  describe("given an operator on the activation-code list in the backoffice", () => {
+  describe("given an operator on the activation-code list in the admin console", () => {
     describe("when the list of codes cannot be read", () => {
       /** @scenario A list of codes that cannot be read says so */
       it("names the failure instead of reading as an empty registry", () => {

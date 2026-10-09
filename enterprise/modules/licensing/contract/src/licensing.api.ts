@@ -19,13 +19,14 @@ import type {
   ActivationAnswer,
   ConnectClassifyAnswer,
   ConnectDeploymentView,
+  ConnectServiceState,
   ConnectStatus,
   InstanceIdentityView,
   LicenseRefreshOutcome,
   LicenseSyncAnswer,
 } from "./connect-install.ts";
-import type { ConnectService } from "./connect-services.ts";
 import type {
+  ConnectService,
   IssuedLicensePage,
   IssuedLicenseSource,
   IssuedLicenseView,
@@ -34,7 +35,7 @@ import type {
   SeatChangeResult,
   SignedIssuedLicense,
 } from "./issued-license.ts";
-import type { PlanInfo } from "./license-plan.ts";
+import type { PlanInfo } from "./license-constants.ts";
 import type { IssueLicenseInput } from "./license-registry.ts";
 import type {
   ConnectCredentialResolution,
@@ -184,6 +185,11 @@ export interface LicensingApi {
     organizationId: string;
     service: ConnectService;
   }): Promise<boolean>;
+  /** Whether the license names one hosted service, and whether it is still on; no network call. */
+  getConnectServiceState(input: {
+    organizationId: string;
+    service: ConnectService;
+  }): Promise<ConnectServiceState>;
   /**
    * Judges one text on LangWatch for an install that holds a license. The
    * install has no judge key of its own, so the judgement happens there and is
@@ -253,7 +259,7 @@ export interface LicensingApi {
   /**
    * Activation codes (ADR-156, section 5): the short code a fresh install
    * pastes instead of a license blob. Minting and revoking are the
-   * backoffice's; redeeming is a public route an install calls once.
+   * the admin console's; redeeming is a public route an install calls once.
    */
   issueActivationCode(input: IssueActivationCodeInput): Promise<IssuedActivationCode>;
   listActivationCodes(input: {

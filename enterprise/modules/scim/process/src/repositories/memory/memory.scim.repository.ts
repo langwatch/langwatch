@@ -26,7 +26,7 @@ type StoredToken = ScimTokenRecord & { hashedToken: string };
 type StoredRequest = ScimRequestLogEntry;
 type StoredMembership = { organizationId: string; userId: string; role: string };
 type StoredGroupMember = { groupId: string; userId: string };
-type StoredOrganization = { id: string; ssoDomain: string | null };
+type StoredOrganization = { id: string; ssoDomain: string | null; name?: string };
 type StoredDirectoryUser = { organizationId: string; connectionId: string; userId: string };
 
 const sameName = (left: string, right: string): boolean =>
@@ -93,6 +93,15 @@ export class MemoryScimRepository extends ScimRepository {
       if (organization.ssoDomain === input.domain) return { id: organization.id };
     }
     return null;
+  }
+
+  async findOrganizationNames(input: {
+    organizationIds: readonly string[];
+  }): Promise<{ id: string; name: string }[]> {
+    return input.organizationIds.flatMap((id) => {
+      const name = this.organizations.get(id)?.name;
+      return name === undefined ? [] : [{ id, name }];
+    });
   }
 
   findMembership = async (input: {
@@ -260,9 +269,14 @@ export class MemoryScimRepository extends ScimRepository {
     organizationId: string;
     userId: string;
     role: string;
+    pending?: boolean;
   }): Promise<void> => {
     if (this.#isMember(input)) throw new Error("The membership already exists");
-    this.memberships.push({ ...input });
+    this.memberships.push({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      role: input.role,
+    });
   };
 
   removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
@@ -537,6 +551,16 @@ export class MemoryScimRepository extends ScimRepository {
       .filter((token) => hashedTokens.includes(token.hashedToken))
       .slice(0, 2)
       .map(identityOf);
+  }
+
+  async replaceTokenDigest(input: {
+    tokenId: string;
+    hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
+  }): Promise<void> {
+    for (const token of this.tokens) {
+      if (token.id === input.tokenId) token.hashedToken = input.hashedToken;
+    }
   }
 
   recordTokenUse = async (input: { tokenId: string; usedAt: Instant }): Promise<void> => {

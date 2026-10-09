@@ -20,11 +20,11 @@ export abstract class UiCopyTargets {
   abstract targets(permission: string): readonly UiCopyTarget[] | undefined;
 }
 
-class AbsentUiCopyTargets extends UiCopyTargets {
+class NoUiCopyTargets extends UiCopyTargets {
   targets(): undefined {
     return void 0;
   }
 }
 
 /** A composition that installed no lender: absence stays sayable, never an empty list. */
-export const ABSENT_UI_COPY_TARGETS: UiCopyTargets = new AbsentUiCopyTargets();
+export const ABSENT_UI_COPY_TARGETS: UiCopyTargets = new NoUiCopyTargets();

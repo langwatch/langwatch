@@ -4,6 +4,7 @@
  */
 
 import {
+  authWebConfigSchema,
   PasskeyCeremoniesToken,
   SignInMethodLinkingToken,
   SsoTestSignInToken,
@@ -12,6 +13,14 @@ import {
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const authWeb = defineBrowserModule("auth")
+  // The deployment fields auth's slice answers, named as the shell's deployment reads them.
+  .withConfig({ auth: authWebConfigSchema }, ({ auth }) => ({
+    ...(auth.publicUrl ? { publicUrl: auth.publicUrl } : {}),
+    ...(auth.authProvider ? { authProvider: auth.authProvider } : {}),
+    passkeysEnabled: auth.passkeys,
+    emailPasswordEnabled: auth.emailPasswordEnabled,
+    signUpMode: auth.signUpMode,
+  }))
   .withScreens({
     // Placed by the application's route table until a top-level anchor accepts
     // declared routes; the loader is this module's either way.
@@ -42,6 +51,11 @@ export const authWeb = defineBrowserModule("auth")
     "pages/auth/join": {
       path: "/auth/join",
       load: () => import("./ui/sections/join-screen.tsx"),
+    },
+    // Lands sign-ins whose destination better-auth's callbackURL check refuses.
+    "pages/auth/resume": {
+      path: "/auth/resume",
+      load: () => import("./ui/sections/auth-resume-screen.tsx"),
     },
     "pages/auth/sso-test-complete": {
       path: "/auth/sso-test-complete",

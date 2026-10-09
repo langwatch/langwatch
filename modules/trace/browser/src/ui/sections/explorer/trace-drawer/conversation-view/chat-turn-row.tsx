@@ -16,12 +16,17 @@ import type { MediaPartData } from "@langwatch/trace-contract";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useMemo, useState } from "react";
 
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
+import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
-} from "../../../../../behavior/annotation-queue-session.store.ts";
-import { useIsScenarioRole } from "../../../../../behavior/scenario-role.store.tsx";
-import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
+} from "../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
+import { useIsScenarioRole } from "../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
+import {
+  type UseTextTranslationResult,
+  useTextTranslation,
+} from "../../../../../features/trace-drawer/behavior/use-text-translation.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
 import { formatRelativeTimeAgo } from "../../../../../model/display-formatters.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
@@ -30,15 +35,10 @@ import { Markdown } from "../../../markdown.tsx";
 import { RedactedInline } from "../../../redacted-field.tsx";
 import { TraceMediaStrip } from "../../../traces/trace-media-strip.tsx";
 import {
-  type UseTextTranslationResult,
-  useTextTranslation,
-} from "../../hooks/use-text-translation.ts";
-import {
   Bubble,
   type BubbleSide,
   truncateMarkdown,
 } from "../../trace-table/registry/addons/conversation/bubble.tsx";
-import type { TraceListItem } from "../../types/trace.ts";
 import { getRolePalette, ReasoningBlock } from "../transcript/index.ts";
 import {
   MessageAnnotateCluster,
@@ -51,7 +51,9 @@ import {
   TurnSessionCheckbox,
 } from "./turn-annotations.tsx";
 import { TurnSteps, turnHasGenieSteps } from "./turn-steps.tsx";
-import type { TurnLayout } from "./types.ts";
+
+/** Chat-turn presentation: ChatGPT-style full-width thread vs side bubbles. */
+export type TurnLayout = "thread" | "bubbles";
 
 /**
  * Human-readable wall-clock gap between two turns, e.g. "12.5s gap",

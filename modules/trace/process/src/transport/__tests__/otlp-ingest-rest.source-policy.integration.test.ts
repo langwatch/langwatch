@@ -66,7 +66,6 @@ function ingestionSourceDeployment({
       otlpCredential: async () => credential,
       otlpMarkCredentialUsed: () => undefined,
       otlpUsageLimit: usageLimit,
-      otlpReportError: () => undefined,
       otlpTraces,
     }),
   );

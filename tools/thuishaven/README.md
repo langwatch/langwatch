@@ -22,16 +22,25 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
-The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each
-serve a console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and
-`storage` run by default; `llm`, `voice` and `analytics` need `haven up +llm
-+voice +analytics`. `haven logs <name>` reads any of them.
+The eight simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
+`outbound`, `telemetry`) each serve a console at `<name>.<slug>.langwatch.localhost`.
+`mail`, `idp` and `storage` run by default; the rest need `haven up +<name>`.
+`haven logs <name>` reads any of them. `haven sims --json` is the agent's entry:
+one row per simulator with whether it runs in this stack, its console URL, the
+`haven up +<name>` it needs if off, its verbs and its skill. `telemetry` sends
+OTLP traffic:
+`haven telemetry send|load|fuzz|status|stop`.
 
 In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go`),
-every selected simulator runs in the `sims` lane: a second `service combined`
+with `LANGWATCH_DEV_ONE_PROCESS=0` every selected simulator runs in the `sims` lane: a second `service combined`
 process beside the `go` lane, which keeps only the gateway and the NLP engine. A
 simulator under load can therefore not starve the gateway. `haven restart sims`
-bounces them together and `haven logs <name>` still reads each one. Load drivers
+bounces them together and `haven logs <name>` still reads each one.
+By default, one Go process: the `go` lane
+hosts the gateway, the NLP engine and every simulator, each on its own address
+and hostname, and no `sims` lane runs. A gateway edit then restarts the
+simulators too; `LANGWATCH_DEV_ONE_PROCESS=0` splits it (and the Node app lane) for protocol load or reload-sensitive work.
+Langy always keeps its own lane. Load drivers
 hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start with
 a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,
 set to 1 by haven); each simulator's delete endpoint empties it.
@@ -76,8 +85,14 @@ portless if missing, trusts its CA, starts the proxy — every step idempotent.
 `make haven install` (optional) go-installs the binary so plain `haven ...`
 works everywhere, and then runs `haven install`, which checks the machine for
 everything else haven drives — node, pnpm, go, the brew formulae behind the
-shared Postgres and Redis, a container runtime — and offers to install what is
-missing. Nothing is installed without being ticked, and anything declined with
+shared Postgres and Redis, on macOS the native tier (Grafana, Prometheus and
+Loki from Homebrew, the pinned ClickHouse, Tempo and Alloy downloads), and an
+optional container runtime (colima only backs the container fallback, `haven
+play` and sandboxed langy; macOS needs none, so its report leaves the row off and
+`haven install runtime=colima` installs it on request) — and offers to install what is missing. With no
+terminal (`make haven install` from an agent) it runs `--yes`: no prompts, one
+line per step, already-installed rows left alone, and only a missing required
+prerequisite fails. In a terminal nothing is installed without being ticked, and anything declined with
 "never" is remembered for the machine (`haven install --reset-skips` undoes
 that). Hostname routing is opt-in — `pnpm dev` uses the plain `PORT` scheme:
 
@@ -153,7 +168,7 @@ haven git        embedded git TUI (moron) for any worktree — `haven git <slug>
 haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
                  it becomes a real cd, tab-completed
 haven shell-init emit that shell function + completion
-haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven hmr        retired no-op (reloads are debounced, ADR-168)
 haven slot       run any command under the machine-wide check slot:
                  `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
                  runs with stdio passed through, releases; `slot explain`
@@ -173,8 +188,8 @@ haven install    check this MACHINE for what haven drives but does not own —
                  portless, node, pnpm, go, the brew formulae behind the shared
                  Postgres and Redis, a container runtime, the ClickHouse
                  client, rtk — and offer to install what is missing. A terminal gets a
-                 picker (space ticks, `n` is never-ask-again, ←/→ picks between
-                 colima and Docker Desktop); a pipe or an agent gets the report
+                 picker (space ticks, `n` is never-ask-again; the runtime row
+                 is off the macOS list, install it by name); a pipe or an agent gets the report
                  and the commands. --yes installs what haven needs without
                  asking, --list only reports, --reset-skips forgets every
                  never-ask-again. Naming one installs exactly that:
@@ -276,8 +291,8 @@ the web dashboard.
 
 After updating Haven, run `haven up --force` in an existing stack to load the
 new launcher and bundled simulators. `haven restart mail` or `haven restart idp`
-bounces a child but does not replace an older launcher. `up --watch` watches
-the application's Go services; to develop the simulators with live reload,
+bounces a child but does not replace an older launcher. The application's Go services are watched by default
+(`LANGWATCH_GO_WATCH=0` or `up --watch=false` turns it off); to develop the simulators with live reload,
 use `make service-watch svc=mailsim` or `make service-watch svc=idpsim`.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
@@ -384,11 +399,24 @@ machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
 shipped preset's list is empty until they do.
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
-container and the observability stack are memory-capped (and their colima VM is
-sized at creation), and the managed Redis gets a `maxmemory` ceiling
+container and the observability stack are memory-capped (the container tier by
+cgroup, the native tier by `GOMEMLIMIT`; the colima VM is sized at creation), and the managed Redis gets a `maxmemory` ceiling
 (`HAVEN_REDIS_MAXMEMORY_MB`, default 512, `0` disables) so a leaky stack fails
 loudly instead of paging the machine. `haven status` shows each service's
 current memory use, and the hub + dashboard show each stack's RAM footprint.
+
+**Observability tier.** The observability stack is on by default. On macOS it
+runs as host processes, no VM: `brew install grafana prometheus loki`; haven
+fetches Tempo 3.1.0, Alloy 1.20.1 and Pyroscope 2.3.2 itself (the official darwin release assets,
+pinned and sha256-checked like the native ClickHouse binary, into
+`<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN`, `HAVEN_OBS_ALLOY_BIN` and
+`HAVEN_OBS_PYROSCOPE_BIN` override them). A failed recommended or optional `haven install` row is logged
+and the run carries on; only a failed required row fails it. Same ports (OTLP 4317/4318, Grafana 3000) and
+datasource uids as the container; files under `<haven home>/observability`;
+`haven logs obs` tails its per-process logs. A missing binary prints its
+install line and never fails `up`. `LANGWATCH_HAVEN_OBS_TIER=container` runs
+the `grafana/otel-lgtm` container on colima instead (the default off macOS).
+Both tiers serve profiles on Pyroscope's port 4040. See ADR-042.
 
 **Machine limits.** `haven limits` prints the ClickHouse, observability and
 Redis memory caps, the colima VM's CPUs and memory, and the unit test worker
@@ -598,8 +626,12 @@ The daemon's JSON, which the console reads:
 
 ## More of what haven does
 
-- **Managed ClickHouse.** haven runs one shared `clickhouse-server` in Docker (colima) with its data on the
-  named volume `langwatch-clickhouse-data` (off virtiofs), and
+- **Managed ClickHouse.** On macOS haven runs one shared native `clickhouse-server`: the pinned
+  upstream 25.8 LTS binary, downloaded once into `<haven home>/clickhouse-native/` and checked
+  against its sha256, with its data beside it and no VM. Elsewhere, or with
+  `HAVEN_CH_RUNTIME=container`, it runs in Docker (colima) with its data on the named volume
+  `langwatch-clickhouse-data` (off virtiofs). The two never share data: switching starts an empty
+  server and each stack re-runs its migrations. Either way haven
   gives every worktree its own database (`lw_<slug>`) on it — so migration counts
   are always this worktree's own. Light local config (memory cap, no S3 tiering,
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`
@@ -678,10 +710,19 @@ The daemon's JSON, which the console reads:
   the ui lane which port it is on (`LANGWATCH_STORYBOOK_PORT`), so opening
   `/design-system` in the app frames the Storybook the stack is already running
   instead of starting a second one.
-- **Sandboxed Langy worker (by default).** The langyagent worker runs the Langy
-  agent, so haven isolates it like production rather than letting a test model run
-  as your own user. Two env flags pick one of three tiers:
-  - _neither_ (default): the worker runs in the shared colima VM with the
+- **Langy worker isolation (sandboxed off macOS, host on macOS).** The langyagent
+  worker runs the Langy agent, so off macOS haven isolates it like production
+  rather than letting a test model run as your own user. On macOS haven wants no
+  colima: a development stack runs the worker on the host tier by default and
+  `up` prints `Langy runs unsandboxed on this machine (macOS runs langyagent on
+  the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
+  container tiers below stay as an explicit opt-in there. On the host tier haven
+  also sets `LANGY_EGRESS_REQUIRE_TLS=false` in the langyagent environment (the
+  worker reaches the manager's loopback relay over plain HTTP), and `up` builds the
+  `langy-worker` binary the host tier spawns when it is missing; if that build fails
+  Langy is off for the run and the rest of the stack still comes up. Two env flags
+  pick one of three tiers:
+  - _neither_ (default off macOS): the worker runs in the shared colima VM with the
     per-worker UID sandbox on (production-like); nothing it does can touch your
     real filesystem. haven builds `langyagent:dev` into colima on first `up`
     (minutes once; the image tag is content-addressed, so it rebuilds by itself
@@ -787,9 +828,9 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   shared `~/.nx` cache is what trusted worktrees replay (ADR-150). `destroy`
   removes that directory. `down` and `destroy` stop the worktree's Nx daemon, and
   the daemon stops any Nx daemon whose worktree has been deleted.
-- **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
-  agent edits, then fires one catch-up reload — a human's browser isn't thrashed
-  through broken intermediate states. Opt-in and always time-bounded.
+- **Debounced HMR.** The Vite plugin coalesces a burst of agent edits into one
+  catch-up reload, so a human's browser isn't thrashed through broken
+  intermediate states. `haven hmr` is a retired no-op (ADR-168, 2026-10-09).
 
 ## Optional agent hooks
 

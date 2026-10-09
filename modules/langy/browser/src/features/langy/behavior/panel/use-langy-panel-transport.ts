@@ -1,5 +1,7 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import type { LangyResourceContext } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import { type RefObject, useMemo, useRef } from "react";
@@ -11,7 +13,6 @@ import {
 } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
-import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
 import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
@@ -270,7 +271,10 @@ export function useLangyPanelTransport({
   // The rollback lever for agent-driven page control: with the flag off this page
   // ignores `ui` stream entries, so switching it off during a live turn stops the page
   // changing under the user.
-  const uiActionsFlag = useFeatureFlag("release_langy_ui_actions", { projectId, organizationId });
+  const uiActionsFlag = useFeatureFlag(FrontendFlags.release_langy_ui_actions, {
+    projectId,
+    organizationId,
+  });
   const isUiActionChannelClosedRef = useRef(false);
   isUiActionChannelClosedRef.current = !uiActionsFlag.isLoading && !uiActionsFlag.enabled;
 

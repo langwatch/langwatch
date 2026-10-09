@@ -89,21 +89,14 @@ Feature: The standalone API process has an executable start
     # a module needs ..."), and a missing peer module refuses by name
     # (declarative-process-composition.feature).
 
-  Rule: Traffic is accepted only after the readiness gate passes
+  Rule: Traffic is admitted only once the process is ready
 
-    @integration
-    Scenario: The listener stays closed until readiness has passed
-      Given a process whose readiness gate has not yet answered
-      When a caller connects to the port it was configured with
-      Then the connection is refused
-      And it is accepted once the gate has passed
-
-    @integration
-    Scenario: A failed readiness gate is a boot failure rather than a serving process
-      Given a process whose readiness gate rejects
-      When it starts
-      Then the boot fails with the dependency's own failure
-      And nothing is listening on the port it was configured with
+    @unit
+    Scenario: Readiness answers 503 until the process is ready
+      Given a process whose modules are still booting or whose opened stores do not answer
+      When the kubelet asks /readyz
+      Then it answers 503 while /healthz answers 200
+      And /readyz answers 200 once boot finished and the stores answer
 
   Rule: The executable owns its process couplings through one seam
 

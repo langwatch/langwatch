@@ -11,7 +11,7 @@ const getEvaluationInputsUseQueryMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
-    traces: {
+    evaluations: {
       getEvaluationInputs: { useQuery: getEvaluationInputsUseQueryMock },
     },
   },

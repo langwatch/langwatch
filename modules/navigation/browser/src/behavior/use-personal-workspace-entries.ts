@@ -3,11 +3,12 @@
  * `/me` reads its org off the ambient scope `OrganizationSelect` writes.
  */
 
+import { CLIENT_FLAG_STALE_TIME_MS } from "@langwatch/feature-flag-client";
+
 import type { NavigationHost } from "../model/navigation-host.ts";
 import { navigationApi } from "./navigation-api.ts";
 
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
-const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 export type PersonalWorkspaceEntry = {
   organizationId: string | null;

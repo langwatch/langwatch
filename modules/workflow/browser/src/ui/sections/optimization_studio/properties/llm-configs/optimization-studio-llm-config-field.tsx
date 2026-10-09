@@ -1,4 +1,4 @@
-import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
+import type { PromptNodeOutput } from "@langwatch/prompt-client";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
@@ -12,9 +12,9 @@ type OptimizationStudioLLMConfigFieldProps = {
   onChange: (llmConfig: LLMConfig) => void;
   showProviderKeyMessage?: boolean;
   /** Outputs configuration (for structured outputs) */
-  outputs?: UiNodeOutput[];
+  outputs?: PromptNodeOutput[];
   /** Callback when outputs change */
-  onOutputsChange?: (outputs: UiNodeOutput[]) => void;
+  onOutputsChange?: (outputs: PromptNodeOutput[]) => void;
   /** Whether to show the structured outputs section */
   showStructuredOutputs?: boolean;
 };

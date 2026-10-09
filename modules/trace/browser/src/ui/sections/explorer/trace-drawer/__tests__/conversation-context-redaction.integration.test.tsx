@@ -6,12 +6,16 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
 vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
   useTraceDrawer: (selector: (s: { viewMode: string }) => unknown) =>
     selector({ viewMode: "summary" }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
@@ -19,7 +23,6 @@ vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
-    hasPermission: () => false,
   }),
 }));
 
@@ -28,7 +31,6 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
-    hasPermission: () => false,
   }),
 }));
 
@@ -84,7 +86,7 @@ const turnsState = {
 
 // The panel-level translate toggle dispatches through tRPC; these tests pin
 // redaction rendering, so stub it to an identity passthrough.
-vi.mock("../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -93,7 +95,7 @@ vi.mock("../../hooks/use-text-translation.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-conversation-context.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
   useConversationContext: () => turnsState,
 }));
 

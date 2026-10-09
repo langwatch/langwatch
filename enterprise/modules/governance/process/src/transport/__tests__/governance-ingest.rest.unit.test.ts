@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -16,20 +17,23 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
-import type { GovernanceRateLimitRepository } from "../../repositories/governance-rate-limit.repository.ts";
-import { MemoryGovernanceRateLimitRepository } from "../../repositories/memory/memory.governance-rate-limit.repository.ts";
-import { CanonicalCostExtractorService } from "../../services/canonical-cost-extractor.service.ts";
-import { GovernanceIngestAccessService } from "../../services/governance-ingest-access.service.ts";
-import { GovernanceIngestPrincipalService } from "../../services/governance-ingest-principal.service.ts";
+import { CanonicalCostExtractorService } from "../../features/cost/services/canonical-cost-extractor.service.ts";
+import { GovernanceIngestAccessService } from "../../features/ingest/services/governance-ingest-access.service.ts";
+import { GovernanceIngestPrincipalService } from "../../features/ingest/services/governance-ingest-principal.service.ts";
 import {
   GovernanceIngestReceiverService,
   type GovernanceIngestLogCollectionChannel,
   type GovernanceIngestMetricCollectionChannel,
   type GovernanceIngestTraceCollection,
-} from "../../services/governance-ingest-receiver.service.ts";
-import { GovernanceIngestService } from "../../services/governance-ingest.service.ts";
-import type { IngestionSourceService } from "../../services/ingestion-source.service.ts";
+} from "../../features/ingest/services/governance-ingest-receiver.service.ts";
+import { GovernanceIngestService } from "../../features/ingest/services/governance-ingest.service.ts";
+import type { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import type { GovernanceRateLimitRepository } from "../../repositories/governance-rate-limit.repository.ts";
+import { MemoryGovernanceRateLimitRepository } from "../../repositories/memory/memory.governance-rate-limit.repository.ts";
 import { governanceIngestRest } from "../governance-ingest.rest.ts";
+
+const BULK_WIRE_CAP = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
+const JSON_WIRE_CAP = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 const SECRET = "lw_is_abcdef123";
 const SOURCE_ID = "src_1";
@@ -322,6 +326,26 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
+  describe("when the trace pipeline fails to take one span of a batch", () => {
+    /** @scenario "A span batch whose pipeline handoff fails is answered as retryable" */
+    it("answers a retryable 503 and records no source event, so the resend counts once", async () => {
+      const traceCollection = vi.fn<GovernanceIngestTraceCollection>().mockResolvedValue({
+        rejectedSpans: 1,
+        ingestionFailures: 1,
+      });
+      const api = mountIngest({ traceCollection });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "internal_error",
+        retryable: true,
+      });
+      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a webhook envelope arrives for a source that serves it", () => {
     it("hands ONE log record to the log pipeline and acknowledges the envelope", async () => {
       const logCollection = vi.fn().mockResolvedValue(void 0);
@@ -333,6 +357,75 @@ describe("the ingestion-source receivers", () => {
       await expect(response.json()).resolves.toMatchObject({ accepted: true, bytes: 15 });
       expect(logCollection).toHaveBeenCalledTimes(1);
       expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+    });
+  });
+
+  describe("when a body over the bulk wire cap reaches an OTLP door", () => {
+    /** @scenario "The governance OTLP doors refuse a body over the wire cap before holding it" */
+    it("refuses it as too large before the source is looked up, on every signal", async () => {
+      const oversized = "x".repeat(BULK_WIRE_CAP + 1);
+
+      for (const path of ["", "/v1/logs", "/v1/metrics"]) {
+        const api = mountIngest();
+
+        const response = await api.post(`/api/ingest/otel/${SOURCE_ID}${path}`, oversized);
+
+        expect(response.status).toBe(413);
+        await expect(response.json()).resolves.toMatchObject({ code: "payload_too_large" });
+        expect(api.findIngestionSourceByIngestSecret).not.toHaveBeenCalled();
+        expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe("when a body over the JSON wire cap reaches the webhook door", () => {
+    /** @scenario "The governance webhook door refuses a body over the JSON wire cap before holding it" */
+    it("refuses it as too large before the source is looked up", async () => {
+      const logCollection = vi.fn().mockResolvedValue(void 0);
+      const api = mountIngest({ source: { ...SOURCE, sourceType: "workato" }, logCollection });
+
+      const response = await api.post(
+        `/api/ingest/webhook/${SOURCE_ID}`,
+        "x".repeat(JSON_WIRE_CAP + 1),
+      );
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toMatchObject({ code: "payload_too_large" });
+      expect(api.findIngestionSourceByIngestSecret).not.toHaveBeenCalled();
+      expect(logCollection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe.each([
+    { door: "trace", path: `/api/ingest/otel/${SOURCE_ID}`, contentType: "application/grpc" },
+    {
+      door: "log",
+      path: `/api/ingest/otel/${SOURCE_ID}/v1/logs`,
+      contentType: "application/grpc+proto",
+    },
+    {
+      door: "metric",
+      path: `/api/ingest/otel/${SOURCE_ID}/v1/metrics`,
+      contentType: "application/grpc",
+    },
+  ])("when a gRPC-framed export reaches the $door OTLP door", ({ path, contentType }) => {
+    /** @scenario "A gRPC-framed export is refused with a clear answer" */
+    it("refuses it with 415 unsupported_media_type before the source is resolved", async () => {
+      const logCollection = vi.fn<GovernanceIngestLogCollectionChannel>();
+      const metricCollection = vi.fn<GovernanceIngestMetricCollectionChannel>();
+      const api = mountIngest({ logCollection, metricCollection });
+
+      const response = await api.post(path, "\u0000\u0000\u0000\u0000\u0000", {
+        "content-type": contentType,
+      });
+
+      expect(response.status).toBe(415);
+      expect(await response.json()).toMatchObject({ code: "unsupported_media_type" });
+      expect(api.findIngestionSourceByIngestSecret).not.toHaveBeenCalled();
+      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
+      expect(api.traceCollection).not.toHaveBeenCalled();
+      expect(logCollection).not.toHaveBeenCalled();
+      expect(metricCollection).not.toHaveBeenCalled();
     });
   });
 });

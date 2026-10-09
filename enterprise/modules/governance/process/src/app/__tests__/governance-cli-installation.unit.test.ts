@@ -25,6 +25,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import { governanceProcessModule } from "../../governance.module.ts";
@@ -75,6 +76,7 @@ async function boot(rest: RestHost) {
     .withStores(memoryStores())
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
     .provide({
+      webhook: createApiFixture<WebhookApi>(),
       agent: createApiFixture<AgentApi>(),
       project: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>({
@@ -105,7 +107,9 @@ describe("the governance installation's CLI plane", () => {
     const runtime = await boot(rest);
 
     try {
-      const mounted = governanceProcessModule.transports.includes(governanceCliRest);
+      const transports = governanceProcessModule.transports;
+      if (!transports) throw new Error("the governance module declares no transports");
+      const mounted = transports.includes(governanceCliRest);
       const routes = governanceCliRest
         .router()
         .routes.map((route) => `${route.method.toUpperCase()} ${route.path}`);

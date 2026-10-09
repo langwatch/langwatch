@@ -10,8 +10,8 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
 
 /**
  * The LangWatch worker process. Healthy once its health door answers, which
- * opens after its prepare step and composition. The launcher already migrated
- * and the api already provisioned, so the worker skips both.
+ * opens after its prepare step and composition. Its gate runs `upgrade` from
+ * the tasks app when the installation is behind, so no migration is skipped.
  */
 export async function startLangwatchWorkers(
   ctx: RuntimeContext,
@@ -47,9 +47,6 @@ export async function startLangwatchWorkers(
         // app — some shared bootstrap code reads it for log tagging.
         PORT: String(ctx.ports.langwatch),
         WORKER_METRICS_PORT: healthPort,
-        SKIP_PRISMA_MIGRATE: "true",
-        SKIP_CLICKHOUSE_MIGRATE: "true",
-        SKIP_LWQL_PROVISION: "true",
       },
     },
     paths: sp,

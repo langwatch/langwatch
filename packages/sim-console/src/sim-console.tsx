@@ -2,7 +2,15 @@ import "./sim-console.css";
 import { consoleLinks, StatusDot, Tabs, TopBar } from "@langwatch/design-system-internal";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 
-export type SimKind = "mail" | "idp" | "storage" | "llm" | "voice" | "analytics";
+export type SimKind =
+  | "mail"
+  | "idp"
+  | "storage"
+  | "llm"
+  | "voice"
+  | "analytics"
+  | "outbound"
+  | "telemetry";
 
 export type SimTab = { id: string; label: string; count?: number };
 

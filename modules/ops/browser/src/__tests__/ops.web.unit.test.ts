@@ -27,4 +27,16 @@ describe("the ops browser declaration", () => {
 
     expect(typeof (loaded as { default?: unknown }).default).toBe("function");
   });
+
+  it("claims the ops and rum slices and projects what the shell's telemetry reads", () => {
+    const claim = opsWeb.installation.config;
+
+    expect(Object.keys(claim?.slices ?? {}).toSorted()).toEqual(["ops", "rum"]);
+    expect(
+      claim?.project({
+        ops: { cloudOps: true },
+        rum: { enabled: true, sampleRatio: 0.5 },
+      } as never),
+    ).toEqual({ browserTracing: true, sampleRatio: 0.5, cloudOps: true });
+  });
 });

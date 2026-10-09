@@ -8,6 +8,8 @@ import type { SetupObservabilityOptions } from "langwatch/observability/node";
 import { configureLogger } from "../logger.ts";
 import { otlpSpanProcessors, tracesSampler } from "./otlp-traces.ts";
 import { createProcessObservability } from "./process-observability.ts";
+import { startProfiling } from "./profiling.ts";
+import { type ResolvedTelemetry, resolveTelemetry } from "./telemetry-aliases.ts";
 import {
   otlpHeadersFrom,
   otlpHeadersSecret,
@@ -21,18 +23,35 @@ export function processTelemetry(serviceName: string) {
   return ({ config, secrets, redactPaths }: TelemetryContext) =>
     secrets.into(otlpHeadersSecret, (rawHeaders) => {
       const settings = config.observability;
+      const resolved = resolveTelemetry(settings);
+      const name = resolved.serviceName ?? serviceName;
       configureLogger({
-        ...loggerConfiguration(settings, serviceName),
+        ...loggerConfiguration({ settings, resolved, serviceName: name }),
         ...(redactPaths ? { redactPaths } : {}),
       });
       const telemetry = createProcessObservability({
-        serviceName,
-        setup: telemetrySetup(settings, otlpHeadersFrom(rawHeaders)),
+        serviceName: name,
+        setup: telemetrySetup({ settings, resolved, headers: otlpHeadersFrom(rawHeaders) }),
+      });
+      for (const deprecation of resolved.deprecations) telemetry.logger.warn(deprecation);
+
+      // Pyroscope's own push, gated on its own endpoint: independent of OTLP.
+      const profiler = startProfiling({
+        serverAddress: settings.profilingServerAddress,
+        appName: serviceName,
+        environment: settings.environment,
+        resourceAttributes: settings.resourceAttributes,
       });
 
       return {
         logger: telemetry.logger,
-        component: { name: "process telemetry", stop: () => telemetry.shutdown() },
+        component: {
+          name: "process telemetry",
+          stop: async () => {
+            await telemetry.shutdown();
+            await profiler?.stop();
+          },
+        },
       };
     });
 }
@@ -41,11 +60,16 @@ export function processTelemetry(serviceName: string) {
  * LangWatch's own telemetry never rides the product's ingest: `langwatch` is
  * disabled and the collector, when there is one, takes the spans instead.
  */
-function telemetrySetup(
-  settings: TelemetrySettings,
-  headers: Readonly<Record<string, string>>,
-): SetupOptions {
-  const spanProcessors = otlpSpanProcessors({ endpoint: settings.otlpEndpoint, headers });
+function telemetrySetup({
+  settings,
+  resolved,
+  headers,
+}: {
+  settings: TelemetrySettings;
+  resolved: ResolvedTelemetry;
+  headers: Readonly<Record<string, string>>;
+}): SetupOptions {
+  const spanProcessors = otlpSpanProcessors({ endpoint: resolved.tracesEndpoint, headers });
   const sampler = tracesSampler(settings.tracesSampleRatio);
 
   return {
@@ -56,16 +80,25 @@ function telemetrySetup(
   };
 }
 
-function loggerConfiguration(settings: TelemetrySettings, serviceName: string) {
+/** The one map from the telemetry slice to a logger (ADR-175): every Node process uses it. */
+export function loggerConfiguration({
+  settings,
+  resolved,
+  serviceName,
+}: {
+  settings: TelemetrySettings;
+  resolved: ResolvedTelemetry;
+  serviceName: string;
+}) {
   return {
     serviceName,
     serviceVersion: settings.serviceVersion,
     environment: settings.environment,
     deploymentEnvironment: settings.environment,
     format: settings.logs.format,
-    level: settings.logs.level,
-    consoleLevel: settings.logs.consoleLevel,
-    otelLevel: settings.logs.otelLevel,
-    otelExportEnabled: settings.logs.otelExport,
+    level: resolved.logs.level,
+    consoleLevel: resolved.logs.consoleLevel,
+    otelLevel: resolved.logs.otelLevel,
+    otelExportEnabled: resolved.logs.otelExport,
   };
 }

@@ -142,6 +142,9 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // and per-step recording scenarios are proved by its vitest suite, which
   // lives beside it under tools/ rather than in packages/.
   "tools/visualdiff/runner/src",
+  // The fuzz browser runner (@langwatch/fuzz-runner): its vision judge's
+  // scenarios are proved by its vitest suite and by nothing else.
+  "tools/fuzz/runner/src",
   // The contributor-only backend launcher (tools/dev-runtime): the API and the
   // worker in one local process. Its boot order and its shutdown ordering —
   // drain the worker, then close the API listener — are asserted by its own
@@ -160,6 +163,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // scans this directory for `.bats` files; this is the `.test.mjs`
   // counterpart. Without it, dev-tooling scenarios could only ever be @unimplemented.
   "dev/scripts/__tests__",
+  "dev/scripts/upgrade-rehearsal/__tests__",
 ];
 
 /**
@@ -228,14 +232,18 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
   "services/mailsim",
-  // The other simulators haven runs (LLM, storage, analytics, voice) and the
-  // diff and fuzz suites: their specs/setup scenarios bind only from Go tests.
+  // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
+  // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
+  // only from Go tests.
   "services/llmsim",
   "services/storagesim",
   "services/analyticssim",
   "services/voicesim",
+  "services/outboundsim",
+  "services/telemetrysim",
   "tools/diffsuite",
   "tools/fuzz",
+  "tools/workerrun",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -250,6 +258,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  "tools/migrationorder",
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
   // describes what CI asserts about the README, and only these Go tests assert it.
   "tools/linkcheck",
@@ -270,6 +279,12 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // slugs it started (specs/tooling/apidiff-on-haven.feature) - is asserted by
   // these Go tests and by nothing else.
   "tools/apidiff",
+  // upgradelab: snapshot format, restore guards, scrub and generation (specs/upgrade/*.feature)
+  // are asserted by these Go tests only.
+  "tools/upgradelab",
+  // telemetrysim: presets, rates, fuzz replay and its control API
+  // (specs/setup/haven-telemetrysim.feature) are asserted by these Go tests only.
+  "services/telemetrysim",
   // ClickHouse serverless chart configuration rendering. Scenarios describing
   // keeper-backed replicated access storage binding through unit tests in
   // internal/render/render_test.go that verify the XML config is generated
@@ -348,7 +363,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
   "specs/ai-gateway/governance/anomaly-detection.feature",
-  "specs/ai-gateway/governance/anomaly-rules.feature",
   "specs/ai-gateway/governance/architecture-invariants.feature",
   "specs/ai-gateway/governance/birds-eye-dashboard-v2.feature",
   "specs/ai-gateway/governance/c3-alert-dispatch.feature",
@@ -419,7 +433,6 @@ const LEGACY_INERT: string[] = [
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
-  "specs/ci/migration-order.feature",
   "specs/ci/no-docker-integration-tests.feature",
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
@@ -516,9 +529,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
   "specs/licensing/license-status-ui.feature",
-  // Every scenario is parked @unimplemented: the free-plan scenario-set cap this file
-  // describes has no enforcement code on this branch.
-  "specs/licensing/sdk-scenario-set-limit.feature",
   "specs/licensing/usage-page-navigation.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",
@@ -610,8 +620,6 @@ const LEGACY_INERT: string[] = [
   "specs/skills/prompt-compiler.feature",
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
-  "modules/topic/specs/run-history.feature",
-  "modules/topic/specs/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",
   "specs/trace-drawer/eval-chips-in-header.feature",
   "specs/trace-drawer/playground-affordance.feature",
@@ -699,6 +707,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-gateway/gateway-service.feature",
   "specs/ai-gateway/governance/admin-routing-policies.feature",
   "specs/ai-gateway/governance/admin-trace-access.feature",
+  // Reason: W-11 tagged and bound the webhook_endpoint destination scenarios
+  // and retired its LEGACY_INERT entry. The fifteen untagged scenarios
+  // describe the existing rule surface and were not audited by that lane.
+  "specs/ai-gateway/governance/anomaly-rules.feature",
   "specs/ai-gateway/governance/budget-exceeded.feature",
   "specs/ai-gateway/governance/cli-login.feature",
   "specs/ai-gateway/governance/departments.feature",

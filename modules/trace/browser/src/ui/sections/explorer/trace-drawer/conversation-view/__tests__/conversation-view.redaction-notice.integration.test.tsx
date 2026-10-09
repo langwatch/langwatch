@@ -8,11 +8,11 @@ import "@testing-library/jest-dom/vitest";
 
 const turns: TraceListItem[] = [];
 
-vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: { items: turns }, isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -22,11 +22,11 @@ vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turn-events.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
@@ -41,7 +41,10 @@ vi.mock("../annotated-turn-row.tsx", () => ({
   ),
 }));
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../behavior/explorer/types/trace.ts";
 import { ConversationView } from "../conversation-view.tsx";
 
 function turn(over: Partial<TraceListItem> = {}): TraceListItem {

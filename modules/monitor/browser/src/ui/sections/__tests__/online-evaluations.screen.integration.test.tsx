@@ -52,7 +52,12 @@ vi.mock("../../../behavior/monitor-api.ts", () => {
             refetch: () => {},
           }),
         },
-        getPerformanceForProject: {
+        toggle: mutation(calls.toggle),
+        delete: mutation(calls.remove),
+        copy: mutation(vi.fn()),
+      },
+      evaluations: {
+        getMonitorPerformanceForProject: {
           useQuery: (input: unknown) => {
             calls.performanceQuery(input);
             return {
@@ -62,9 +67,6 @@ vi.mock("../../../behavior/monitor-api.ts", () => {
             };
           },
         },
-        toggle: mutation(calls.toggle),
-        delete: mutation(calls.remove),
-        copy: mutation(vi.fn()),
       },
       experiments: {
         getAllByProjectId: { useQuery: () => ({ data: state.experiments }) },

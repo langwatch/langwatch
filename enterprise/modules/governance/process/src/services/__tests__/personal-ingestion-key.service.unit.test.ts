@@ -6,16 +6,16 @@ import {
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   findPersonalWorkspaceInputSchema,
-  type OrganizationService,
+  type OrganizationApi,
 } from "@langwatch/organization-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The /me ingestion-key service over ApiKeyApi, pinned to main's ingestionKey.service.ts. */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { MemoryIngestionTemplateRepository } from "../../repositories/memory/memory.ingestion-template.repository.ts";
-import { PersonalIngestionKeyService } from "../personal-ingestion-key.service.ts";
 
 function apiKey(overrides: Partial<ApiKey>): ApiKey {
   return {
@@ -79,7 +79,7 @@ async function setup(
           return { id: `audit_${audited.length}`, occurredAt: 0 };
         }),
     },
-    organizations: createApiFixture<OrganizationService>({
+    organizations: createApiFixture<OrganizationApi>({
       getPersonalWorkspace: async (input) => {
         findPersonalWorkspaceInputSchema.parse(input);
         return {

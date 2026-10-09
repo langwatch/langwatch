@@ -7,14 +7,20 @@
  */
 
 import {
+  refusalFromStatus,
+  refusalFromThrown,
+} from "../../features/agents/rules/provider-listing.rules.ts";
+import type {
+  DiscoveredPersonRecord,
+  PeopleListing,
+} from "../../features/identity/rules/people-listing.rules.ts";
+import { peopleListed, peopleRefused } from "../../features/identity/rules/people-listing.rules.ts";
+import {
   DIRECTORY_USERS_FIRST_PAGE,
   type DirectoryUser,
   isMicrosoftGraphUrl,
   readDirectoryUserRows,
-} from "../../rules/microsoft-graph-directory.rules.ts";
-import type { DiscoveredPersonRecord, PeopleListing } from "../../rules/people-listing.rules.ts";
-import { peopleListed, peopleRefused } from "../../rules/people-listing.rules.ts";
-import { refusalFromStatus, refusalFromThrown } from "../../rules/provider-listing.rules.ts";
+} from "../../features/microsoft/rules/microsoft-graph-directory.rules.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import type {
   MicrosoftDirectoryChannel,

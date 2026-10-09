@@ -5,18 +5,19 @@ import {
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
+  type NormalizedSpan,
   type SpanReceivedEvent,
   spanReceivedEventSchema,
-  type NormalizedSpan,
+  spanStorabilityOf,
+  UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
-} from "../rules/trace-span-storage-group.rules.ts";
-import type { SpanCostService } from "../services/span-cost.service.ts";
-import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
+} from "../features/span/rules/trace-span-storage-group.rules.ts";
+import type { SpanCostService } from "../features/span/services/span-cost.service.ts";
+import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:span-storage-map");
 

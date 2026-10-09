@@ -59,6 +59,20 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return { role: row.role, disabled: row.disabledAt !== null };
   };
 
+  /** Organization's own administrator predicate (findActiveAdministratorIds there), read here. */
+  findActiveAdministratorIds = async ({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> => {
+    const rows = (await this.database.organizationUser.findMany({
+      where: { organizationId, role: "ADMIN", disabledAt: null },
+      select: { userId: true },
+      orderBy: { userId: "asc" },
+    })) as { userId: string }[];
+    return rows.map((row) => row.userId);
+  };
+
   findUserBindings = async ({
     userId,
     organizationId,
@@ -301,11 +315,11 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     teamId,
   }: {
     teamId: string;
-  }): Promise<{ organizationId: string } | null> => {
+  }): Promise<{ organizationId: string; isPersonal: boolean; name: string } | null> => {
     const team = (await this.database.team.findUnique({
       where: { id: teamId },
-      select: { organizationId: true },
-    })) as { organizationId: string } | null;
+      select: { organizationId: true, isPersonal: true, name: true },
+    })) as { organizationId: string; isPersonal: boolean; name: string } | null;
     return team ?? null;
   };
 

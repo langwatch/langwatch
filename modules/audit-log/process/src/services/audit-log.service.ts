@@ -1,6 +1,9 @@
 import {
+  findAuditLogByTargetKindInputSchema,
   recordAuditLogCommandSchema,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
   type RecordAuditLogCommand,
@@ -80,11 +83,7 @@ export class AuditLogService {
     if (key.resource !== AUDIT_KEY_RESOURCE) {
       throw new Error(`an audit idempotency key is an "${AUDIT_KEY_RESOURCE}" KSUID`);
     }
-    return this.repository.createOnce({
-      entry,
-      id: idempotencyKey,
-      occurredAt: key.date.getTime(),
-    });
+    return this.repository.createOnce({ entry, idempotencyKey, occurredAt: key.date.getTime() });
   }
 
   /** Who, what and which target stay; only secret-bearing values are replaced. */
@@ -128,6 +127,10 @@ export class AuditLogService {
 
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
     return this.repository.hasRecordedSince(input);
+  }
+
+  async findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    return this.repository.findByTargetKind(findAuditLogByTargetKindInputSchema.parse(input));
   }
 
   private static truncateString(value: string, maxLength: number): string {

@@ -12,33 +12,6 @@ Feature: Composing a process declaratively
     Given a module declares its server half with defineProcessModule
     And the process holds one infrastructure pool
 
-  @unit
-  Scenario: A module names the pool members it reads
-    Given a module that names "prefix" and "clock"
-    And a pool that supplies both
-    When the process boots
-    Then the module's app is created with those members
-
-  @unit
-  Scenario: A pool member the module named is absent at boot
-    Given a module that names "prefix" and "clock"
-    And a pool that supplies "clock" as undefined
-    When the process boots
-    Then boot refuses naming the module and the member
-    And no app is created
-
-  @unit
-  Scenario: The named members do not cover the module's interface
-    Given a module whose infrastructure interface names "prefix" and "clock"
-    When the module names only "prefix"
-    Then the declaration reports the member it has not named
-
-  @unit
-  Scenario: A pool that lacks a member an installed module names
-    Given a module whose infrastructure interface names a member the pool lacks
-    When the module list is installed
-    Then the module list does not compile
-
   @unimplemented
   Scenario: A peer module is not infrastructure
     Given a module whose app names a peer api token

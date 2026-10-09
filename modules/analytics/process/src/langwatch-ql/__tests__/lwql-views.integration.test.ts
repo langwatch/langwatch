@@ -8,19 +8,18 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { CONTENT_CATEGORIES, CONTENT_KEY_CATALOG } from "@langwatch/data-privacy-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import {
+  SHIPPED_LWQL_DEDUP,
+  LangWatchQLViewStatementsService,
+} from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import {
-  SHIPPED_LWQL_DEDUP,
-  LangWatchQLViewStatementsService,
-} from "../../services/langwatch-ql-view-statements.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
@@ -42,12 +41,14 @@ import {
   SEEDED_CONTENT,
   SEEDED_DIMENSION_ATTRIBUTE,
   seedEveryCatalogSource,
+  seedTracesOnTopics,
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "./lwql-clickhouse-harness.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
+import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
@@ -1154,4 +1155,113 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       `deduplicating costs more than reading undeduplicated. ${report}`,
     ).toBeLessThanOrEqual(measured.none!.filteredRows);
   }, 300_000);
+});
+
+describe("given an Instant Eval run's judgements over this project's traces when a caller reads the judgments view", () => {
+  const runId = "lwql-views-judged-run";
+  const at = SEED_RECENT_WEEK.from;
+  /** The run's own matched-per-question totals: a category question counts its labelled rows. */
+  const RUN_MATCHED_BY_QUESTION = { tone: 3, topic: 2 } as const;
+  const judgement = (traceId: string, questionId: string, status: string, label: string) => ({
+    TenantId: harness.tenantA.tenantId,
+    RunId: runId,
+    TraceId: traceId,
+    QuestionId: questionId,
+    Kind: "category",
+    Status: status,
+    Label: label,
+    OccurredAt: at,
+    CreatedAt: at,
+    UpdatedAt: at,
+  });
+  const traceId = (index: number) => `${harness.tenantA.tenantId}-judged-trace-${index}`;
+
+  beforeAll(async () => {
+    await seedTracesOnTopics({
+      admin: harness.admin,
+      database: facts,
+      assignments: [
+        {
+          tenantId: harness.tenantA.tenantId,
+          topicId: `${harness.tenantA.tenantId}-judged`,
+          traces: 3,
+        },
+      ],
+    });
+    await harness.admin.insert({
+      table: `${facts}.instant_eval_judgments`,
+      format: "JSONEachRow",
+      values: [
+        judgement(traceId(0), "tone", "judged", "friendly"),
+        judgement(traceId(1), "tone", "judged", "friendly"),
+        judgement(traceId(2), "tone", "judged", "curt"),
+        judgement(traceId(0), "topic", "judged", "billing"),
+        judgement(traceId(1), "topic", "judged", "billing"),
+        // A declined judgement carries no label, so the run never counted it.
+        judgement(traceId(2), "topic", "skipped", ""),
+      ],
+    });
+  });
+
+  /** @scenario "Judgements join back to traces on the trace id" */
+  it("joins each judgement to its trace on the tenant and the trace id", async () => {
+    const rows = await selectRows<{ TraceId: string; Label: string; joined: string }>(
+      tenantA,
+      `SELECT j.TraceId AS TraceId, j.Label AS Label, t.TraceId AS joined ` +
+        `FROM ${database}.judgments AS j INNER JOIN ${database}.traces AS t ` +
+        `ON t.TenantId = j.TenantId AND t.TraceId = j.TraceId ` +
+        `WHERE j.RunId = '${runId}' AND j.QuestionId = 'tone' ORDER BY j.TraceId`,
+    );
+
+    expect(rows).toEqual([
+      { TraceId: traceId(0), Label: "friendly", joined: traceId(0) },
+      { TraceId: traceId(1), Label: "friendly", joined: traceId(1) },
+      { TraceId: traceId(2), Label: "curt", joined: traceId(2) },
+    ]);
+  });
+
+  /** @scenario "Counting labels of a finished run is one grouped query" */
+  it("counts the run's labels per question in one grouped query that matches the run's totals", async () => {
+    const rows = await selectRows<{ QuestionId: string; Label: string; n: string }>(
+      tenantA,
+      `SELECT QuestionId, Label, count() AS n FROM ${database}.judgments ` +
+        `WHERE RunId = '${runId}' AND Label != '' GROUP BY QuestionId, Label ORDER BY QuestionId, Label`,
+    );
+
+    expect(rows.map((row) => [row.QuestionId, row.Label, Number(row.n)])).toEqual([
+      ["tone", "curt", 1],
+      ["tone", "friendly", 2],
+      ["topic", "billing", 2],
+    ]);
+    const totals: Record<string, number> = {};
+    for (const row of rows) totals[row.QuestionId] = (totals[row.QuestionId] ?? 0) + Number(row.n);
+    expect(totals).toEqual(RUN_MATCHED_BY_QUESTION);
+  });
+});
+
+describe("given traces assigned to topics when a caller asks for traffic by topic name", () => {
+  /** @scenario "Traffic by topic name" */
+  it("counts the caller's traces per topic name and shows no other project's topic", async () => {
+    const { tenantA: a, tenantB: b } = harness;
+    await seedTracesOnTopics({
+      admin: harness.admin,
+      database: facts,
+      assignments: [
+        { tenantId: a.tenantId, topicId: `${a.tenantId}-topic-1`, traces: 3 },
+        { tenantId: a.tenantId, topicId: `${a.tenantId}-topic-2`, traces: 2 },
+        { tenantId: b.tenantId, topicId: `${b.tenantId}-topic-1`, traces: 4 },
+      ],
+    });
+
+    const rows = await selectRows<{ TopicName: string; traces: string }>(
+      tenantA,
+      `SELECT t.TopicName AS TopicName, count() AS traces FROM ${database}.traces ` +
+        `JOIN ${database}.topics AS t ON traces.TopicId = t.TopicId GROUP BY 1 ORDER BY 1 LIMIT 50`,
+    );
+
+    expect(rows.map((row) => [row.TopicName, Number(row.traces)])).toEqual([
+      [`Topic ${a.tenantId} 1`, 3],
+      [`Topic ${a.tenantId} 2`, 2],
+    ]);
+  });
 });

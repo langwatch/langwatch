@@ -1,4 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
@@ -18,8 +17,6 @@ export const hotelBotHeadersSchema = z.object({
   "x-auth-token": z.string().optional(),
 });
 
-export type HotelBotHeaders = z.infer<typeof hotelBotHeadersSchema>;
-
 export const hotelBotRunInputSchema = z.object({ authToken: z.string().optional() });
 
 export type HotelBotRunInput = z.infer<typeof hotelBotRunInputSchema>;
@@ -31,13 +28,6 @@ export const hotelBotReplySchema = z.object({
 });
 
 export type HotelBotReply = z.infer<typeof hotelBotReplySchema>;
-
-/** Sample agents' settings: only the shared deployment origin its trace collector posts to. */
-export const sampleAgentsConfig = Config.define(() => ({
-  publicBaseUrl,
-}));
-
-export type SampleAgentsServerConfig = ConfigOf<typeof sampleAgentsConfig>;
 
 /** The demo hotel bot turns away about half its calls on purpose, so the project shows failures. */
 export class HotelBotDeclinedError extends HandledError {

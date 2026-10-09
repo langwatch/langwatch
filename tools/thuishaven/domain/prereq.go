@@ -134,6 +134,9 @@ type Prereq struct {
 	// story. Elsewhere they are reported not-applicable rather than missing,
 	// because "missing" implies haven could fix it.
 	DarwinOnly bool
+	// UnlistedOnDarwin keeps an entry off the macOS report and picker; it is
+	// installed there only when named (`haven install runtime=colima`).
+	UnlistedOnDarwin bool
 }
 
 // Manual reports whether no candidate can be installed by haven, so the only
@@ -273,8 +276,8 @@ var Prereqs = []Prereq{{
 		Install: "npm install -g " + PortlessPackage(),
 	}},
 }, {
-	// A machine setting, not a tool: haven never runs sudo, so it prints the
-	// command. Cause traced in .claude/handoffs/haven-vite-502.md.
+	// A machine setting, not a tool. Installing it runs sudo in the
+	// developer's terminal, so the password prompt is their consent.
 	Key:         "somaxconn",
 	Name:        "Accept queue",
 	Summary:     fmt.Sprintf("at least %d, so vite cold loads through the proxy do not 502", SomaxconnFloor),
@@ -287,9 +290,10 @@ var Prereqs = []Prereq{{
 	Candidates: []Candidate{{
 		Key:   "somaxconn",
 		Label: "kern.ipc.somaxconn",
-		Manual: fmt.Sprintf("vite cold loads through the proxy can 502 under bursts: "+
-			"sudo sysctl kern.ipc.somaxconn=%d (lasts until reboot; to persist, "+
-			"add kern.ipc.somaxconn=%d to /etc/sysctl.conf)", SomaxconnFloor, SomaxconnFloor),
+		// Sets it now, and replaces any older line in /etc/sysctl.conf so it survives a reboot.
+		Install: fmt.Sprintf("sudo sysctl -w kern.ipc.somaxconn=%[1]d && "+
+			"{ sudo sed -i '' '/^kern\\.ipc\\.somaxconn/d' /etc/sysctl.conf 2>/dev/null; "+
+			"echo kern.ipc.somaxconn=%[1]d | sudo tee -a /etc/sysctl.conf >/dev/null; }", SomaxconnFloor),
 	}},
 }, {
 	Key:         "postgres",
@@ -329,19 +333,51 @@ var Prereqs = []Prereq{{
 		Install:            "brew install " + DefaultRedisFormula,
 	}},
 }, {
-	Key:         "runtime",
-	Name:        "Container runtime",
-	Summary:     "runs the observability stack and the sandboxed langy tiers — pick one",
-	Requirement: PrereqOptional,
+	Key:         "observability",
+	Name:        "Observability tools",
+	Summary:     "Grafana, Prometheus and Loki for the native telemetry tier",
+	Requirement: PrereqRecommended,
 	After:       []string{"brew"},
 	DarwinOnly:  true,
+	Detail: "On macOS haven runs the telemetry stack as host processes, not a\n" +
+		"    container. Without these `haven up` still serves the app, with no local\n" +
+		"    Grafana, metrics or logs. Alloy is a pinned download (native-binaries).",
+	Candidates: []Candidate{{
+		Key:      "observability",
+		Label:    "grafana + prometheus + loki",
+		Binaries: []string{"grafana", "prometheus", "loki"},
+		Install:  "brew install grafana prometheus loki",
+	}},
+}, {
+	// Not a brew formula: haven pins and checksums these releases itself
+	// (adapters/pinnedrelease); fetching here keeps the first `up` fast.
+	Key:         "native-binaries",
+	Name:        "ClickHouse, Tempo and Alloy",
+	Summary:     "the pinned ClickHouse server, Tempo, Alloy and Pyroscope the native tier runs",
+	Requirement: PrereqRecommended,
+	DarwinOnly:  true,
+	Detail: "`haven up` downloads them on first use, which stalls that first run\n" +
+		"    for a few hundred MB. Fetching them here verifies each sha256 and\n" +
+		"    leaves nothing for `up` to wait on.",
+	Candidates: []Candidate{{
+		Key:     "native-binaries",
+		Label:   "pinned ClickHouse " + ClickHouseNativeVersion + " + Tempo " + TempoNativeVersion + " + Alloy " + AlloyNativeVersion + " + Pyroscope " + PyroscopeNativeVersion,
+		Install: "download the pinned ClickHouse, Tempo, Alloy and Pyroscope releases",
+	}},
+}, {
+	Key:              "runtime",
+	Name:             "Container runtime",
+	Summary:          "optional on macOS: the container fallback, haven play and sandboxed langy — pick one",
+	Requirement:      PrereqOptional,
+	After:            []string{"brew"},
+	DarwinOnly:       true,
+	UnlistedOnDarwin: true,
 	Detail: "Nothing in the day-to-day loop needs one, and answering \"none\" is a\n" +
-		"    supported answer rather than a refusal: ClickHouse and the telemetry\n" +
-		"    stack then run natively and langy on the host tier, all from one\n" +
-		"    setting instead of three environment variables.\n" +
-		"    A runtime buys you the managed ClickHouse container, langy's sandboxed\n" +
-		"    worker tier, and traces — which the native telemetry tier cannot carry,\n" +
-		"    because Grafana ships no macOS build of Tempo.\n" +
+		"    supported answer rather than a refusal: on macOS ClickHouse and the\n" +
+		"    telemetry stack (traces included) run natively either way, and langy\n" +
+		"    on the host tier. A runtime buys you the container fallback\n" +
+		"    (HAVEN_CH_RUNTIME, LANGWATCH_HAVEN_OBS_TIER), `haven play` and\n" +
+		"    langy's sandboxed worker tier.\n" +
 		"    haven's own stack is built on colima: its ceiling is explicit and\n" +
 		"    per-profile, and it needs no license. Docker Desktop works too.",
 	Candidates: []Candidate{{

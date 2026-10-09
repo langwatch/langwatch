@@ -61,7 +61,12 @@ function localControlConnectRest(mount: LangyControlMount) {
 
     .post(`/api/langy/control${mount}/connect/register`, "langyControlConnectRegister")
     .withCredential("session_key")
-    .withAccess(anyAuthenticated({ reason: "the session-key door names the key's holder" }))
+    .withAccess(
+      anyAuthenticated({
+        reason:
+          "a Langy session key is minted for one conversation and holds no RBAC permission; the key is the whole grant",
+      }),
+    )
     .withInput(registerFrameSchema)
     .withHeaders(z.object({ authorization: z.string() }))
     .withResponse("protocol", {

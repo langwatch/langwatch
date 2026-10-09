@@ -48,19 +48,6 @@ export const workflowOptimizationTrpcTransport: TrpcRouterDeclaration<
     return { success: true };
   })
 
-  /**
-   * Archives the evaluator this workflow was published as, so nothing keeps an
-   * evaluator pointing at a workflow that no longer offers itself.
-   */
-  .procedure("disableAsEvaluator")
-  .withPermission("workflows:update")
-  .handle(async ({ app, input }) => {
-    await app.setWorkflowFlags({ ...input, isEvaluator: false });
-    await app.unlinkEvaluatorFromWorkflow(input);
-
-    return { success: true };
-  })
-
   /** A workflow is a component or an evaluator, never both. */
   .procedure("toggleSaveAsComponent")
   .withPermission("workflows:update")
@@ -73,19 +60,6 @@ export const workflowOptimizationTrpcTransport: TrpcRouterDeclaration<
       isComponent,
       isEvaluator: isComponent ? false : input.isEvaluator,
     });
-
-    return { success: true };
-  })
-
-  /**
-   * Publishing as an evaluator creates the evaluator that wraps the workflow,
-   * or renames an existing one to match - so the evaluator picker never shows
-   * a stale name for a workflow that was renamed.
-   */
-  .procedure("toggleSaveAsEvaluator")
-  .withPermission("workflows:update")
-  .handle(async ({ app, input }) => {
-    await app.toggleSaveAsEvaluator(input);
 
     return { success: true };
   })

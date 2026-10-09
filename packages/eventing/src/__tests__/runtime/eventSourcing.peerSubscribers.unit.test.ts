@@ -233,4 +233,44 @@ describe("a peer subscriber", () => {
       expect(handle.mock.calls[0]?.[1]).not.toHaveProperty("idempotencyKey");
     });
   });
+
+  describe("given a peer subscriber declares an enqueue filter over its data", () => {
+    /** @scenario "A peer subscriber's enqueue filter declines events before a job is minted" */
+    it("stages only the events whose parsed data the filter takes, and data the schema refuses", () => {
+      const seen: unknown[] = [];
+      const definition = definePipeline({
+        name: "reactor",
+        aggregate: defineAggregate({ type: "global" }),
+      })
+        .withEvents([])
+        .withPeerSubscriber("onOwnerCreated", {
+          eventType: OWNER_CREATED,
+          data: ownerCreatedData,
+          options: {
+            delay: 2_000,
+            enqueue: {
+              filter: (data) => {
+                seen.push(data);
+                return data.ownerId.startsWith("agent-");
+              },
+            },
+          },
+          handle: async () => void 0,
+        })
+        .build();
+      const registry = new CapturingRegistry({
+        parseEvent: (value) => ownerCreatedSchema.parse(value),
+      });
+      for (const projection of definition.globalProjections ?? []) projection.register(registry);
+
+      const [lane] = registry.registered;
+      const filter = lane?.options?.enqueue?.filter;
+      const unreadable: Event = { ...created("agent-3"), data: { ownerId: 3 } };
+
+      expect(lane?.options?.delay).toBe(2_000);
+      expect([filter?.(created("agent-1")), filter?.(created("owner-2"))]).toEqual([true, false]);
+      expect(seen).toEqual([{ ownerId: "agent-1" }, { ownerId: "owner-2" }]);
+      expect(filter?.(unreadable)).toBe(true);
+    });
+  });
 });

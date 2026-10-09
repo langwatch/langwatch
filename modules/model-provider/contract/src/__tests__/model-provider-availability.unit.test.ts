@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasEnabledModelProvider } from "../model-provider-availability.ts";
+import { hasEnabledModelProvider } from "../model-provider.ts";
 
 describe("hasEnabledModelProvider", () => {
   it("answers yes when one provider is switched on", () => {

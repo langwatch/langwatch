@@ -5,7 +5,7 @@ import type { CategoryPrivacy, ContentPrivacy } from "@langwatch/trace-contract"
 import type React from "react";
 import { Eye, Lock, Slash } from "react-feather";
 
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useTraceHost } from "../../behavior/trace-host.ts";
 
 /**
  * Generic, per-category read-time privacy markers for a span's content. Every content
@@ -74,8 +74,8 @@ function markerFor(
 }
 
 const PrivacyMarker: React.FC<MarkerCopy> = ({ icon, label, tooltip }) => {
-  const { hasPermission } = useOrganizationTeamProject();
-  const canOpenSettings = hasPermission("project:view");
+  const traceHost = useTraceHost();
+  const canOpenSettings = traceHost.hasPermission("project:view");
   return (
     <Tooltip
       interactive

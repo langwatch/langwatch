@@ -26,8 +26,8 @@ import {
   ShareVisibility,
   type Team,
 } from "@langwatch/prisma-client/generated";
-import { bootInstalledProcess, processConfig, storesBackedMembers } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
+import { bootInstalledProcess, processConfig } from "@langwatch/process";
+import { memoryStores, type StoresMemberSource } from "@langwatch/process-stores";
 import { createTestLogger } from "@langwatch/test-harness";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -63,13 +63,24 @@ const bootAuthz = () =>
       owners: processConfig(authz, "api"),
       environment: { NODE_ENV: "test" },
     }),
-    members: storesBackedMembers(memoryStores(), {
-      logger: createTestLogger().logger,
-      prisma,
-      redis: memoryRedisDouble(),
-      eventing: new EventSourcing({ enabled: false, processManagerMode: "producer-only" }),
-    }),
+    stores: liveStores(),
   });
+
+/** The live tier over the test database; the memory stores answer every other name. */
+function liveStores(): StoresMemberSource {
+  const memory = memoryStores();
+  const clients: Readonly<Record<string, unknown>> = {
+    logger: createTestLogger().logger,
+    prisma,
+    redis: memoryRedisDouble(),
+    eventing: new EventSourcing({ enabled: false, processManagerMode: "producer-only" }),
+  };
+  return {
+    tier: "live",
+    order: [...memory.order, ...Object.keys(clients)],
+    read: (name) => (Object.hasOwn(clients, name) ? clients[name] : memory.read(name)),
+  };
+}
 
 describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link", () => {
   let organization: Organization;

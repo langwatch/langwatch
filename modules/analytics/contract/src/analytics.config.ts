@@ -1,11 +1,6 @@
 import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { z } from "zod";
 
-/** Analytics panel statements one project may run at once in each process, unless overridden. */
-export const DEFAULT_TENANT_ANALYTICS_CONCURRENCY = 4;
-
-const blankIsUnset = (value: unknown) => (value === "" ? undefined : value);
-
 /**
  * LangWatchQL's deployment facts (ADR-159). The connection derives from the stores'
  * ClickHouse; these only name the identity and refuse an override that disagrees with it.
@@ -21,21 +16,10 @@ export const analyticsServerConfig = Config.define((c) => ({
     accessModelMode: c.env("LWQL_ACCESS_MODEL_MODE", z.string().optional()),
     sqlSingleNode: c.env("LWQL_ACCESS_MODEL_SQL_SINGLE_NODE", z.string().optional()),
   },
-  /**
-   * Analytics panel statements one project may run at once per process; the rest wait their turn.
-   * A positive integer; blank or anything else keeps the default.
-   */
+  /** Heavy analytics reads one tenant may run at once per process; blank or invalid reads 4 (specs/analytics/clickhouse-memory-safety.feature). */
   tenantAnalyticsConcurrency: c.env(
     "CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY",
-    z.preprocess(
-      blankIsUnset,
-      z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(DEFAULT_TENANT_ANALYTICS_CONCURRENCY)
-        .catch(DEFAULT_TENANT_ANALYTICS_CONCURRENCY),
-    ),
+    z.coerce.number().int().positive().catch(4),
   ),
   /** The shared deployment origin a saved chart's platform link is built on. */
   publicBaseUrl,

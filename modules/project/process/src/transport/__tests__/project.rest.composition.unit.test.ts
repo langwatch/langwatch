@@ -4,7 +4,6 @@
  * passed while production 500'd because the proxy refuses uncomposed calls.
  * Spec: specs/projects/projects-management-door.feature
  */
-import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type {
@@ -19,10 +18,7 @@ import {
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
-import { TraceApi } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectModule } from "../../app/project.app.ts";
@@ -31,7 +27,6 @@ import { MemoryProjectStorageSettingsRepository } from "../../repositories/memor
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import { mountProjectRestApplication, ORGANIZATION_ID, USER_ID } from "./project.rest.harness.ts";
-import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
 const OTHER_ORGANIZATION_ID = "organization-other";
 const GOVERNANCE_PROJECT_ID = "project_governance";
@@ -45,18 +40,12 @@ const NOW = new Date("2026-09-01T00:00:00.000Z");
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   apis.declare(OrganizationApi);
-  apis.declare(ShareApi);
-  apis.declare(TopicApi);
   apis.declare(AuthzApi);
-  apis.declare(TraceApi);
   apis.declare(AuditLogApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
-    share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
     authorization: apis.reference(AuthzApi),
-    trace: apis.reference(TraceApi),
     auditLog: apis.reference(AuditLogApi),
   };
 }
@@ -111,14 +100,12 @@ function project(overrides: Partial<Project> = {}): Project {
   };
 }
 
-const REACHES_EVERYTHING: ApiKeyVisibleProjects = { kind: "all" };
-
 /**
  * The application exactly as `ProjectModule.create` builds it at boot, over the
  * in-memory backing of its own repository interface, seeded with one project
  * in this organization and one in another.
  */
-function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
+function application(): {
   app: ProjectModule;
   database: MemoryProjectDatabase;
 } {
@@ -143,15 +130,6 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     }),
   );
 
-  const apiKeys = Object.assign(new TestApiKeyService(), {
-    resolveVisibleProjects: vi.fn(async (): Promise<ApiKeyVisibleProjects> => REACHES_EVERYTHING),
-    create: vi.fn(async () => ({
-      token: "sk-lw-service-token",
-      apiKey: { ...MINTED_KEY_ROW },
-    })),
-    ...options.apiKeys,
-  });
-
   const teams = [team(), team({ id: "team-other", organizationId: OTHER_ORGANIZATION_ID })];
   const organizations = createApiFixture<OrganizationApi>({
     getTeam: async ({ teamId, organizationId }) => {
@@ -170,7 +148,7 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
   });
 
   const app = ProjectModule.create({
-    dependencies: { apiKeys, ...unreachablePeers(), organizations, dataPrivacy },
+    dependencies: { ...unreachablePeers(), organizations, dataPrivacy },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
       storageSettings: MemoryProjectStorageSettingsRepository.create({ memory: database }),
@@ -183,39 +161,35 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
   return { app, database };
 }
 
-/** The row the api-key boundary answers a mint with. */
-const MINTED_KEY_ROW = {
-  id: "api-key-service",
-  name: "Fresh Project Service Key",
-  description: null,
-  organizationId: ORGANIZATION_ID,
-  userId: null,
-  createdByUserId: USER_ID,
-  createdByDeviceLabel: null,
-  lookupId: "lookup-1",
-  permissionMode: "all",
-  expiresAt: null,
-  revokedAt: null,
-  lastUsedAt: null,
-  ingestSourceType: null,
-  ingestionTemplateId: null,
-  createdAt: NOW,
-  updatedAt: NOW,
-  grants: [],
-};
-
 describe("the projects REST family over the application the composition builds", () => {
-  describe("when the collection is listed", () => {
-    /** @scenario "the management door reaches the application the composition built" */
-    it("answers 200 with the organization's own projects", async () => {
+  describe("when the organization's projects are listed for the management door", () => {
+    it("answers the organization's own projects", async () => {
       const { app } = application();
-      const { send } = mountProjectRestApplication(app);
 
-      const response = await send("/api/projects");
+      const page = await app.listByOrganization({
+        organizationId: ORGANIZATION_ID,
+        page: 1,
+        limit: 50,
+      });
 
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as { data: { id: string }[] };
-      expect(body.data.map((row) => row.id)).toEqual(["project_1"]);
+      expect(page.data.map((row) => row.id)).toEqual(["project_1"]);
+    });
+
+    /** @scenario "The hidden Governance Project never appears in /api/v1/projects responses" */
+    it("carries no trace of the hidden governance project, in a row or in a count", async () => {
+      const { app } = application();
+
+      const page = await app.listByOrganization({
+        organizationId: ORGANIZATION_ID,
+        page: 1,
+        limit: 50,
+      });
+
+      const text = JSON.stringify(page);
+      expect(text).not.toContain(GOVERNANCE_PROJECT_ID);
+      expect(text).not.toContain("Governance (internal)");
+      expect(text).not.toContain("internal_governance");
+      expect(page.pagination.total).toBe(1);
     });
   });
 
@@ -258,22 +232,28 @@ describe("the projects REST family over the application the composition builds",
         recordPresenceSettingChanged: { send: async () => undefined },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
+        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectTraceSharingDisabled: { send: async () => undefined },
       });
     });
 
     /** @scenario "A project created through the REST API is recorded as created" */
-    it("records the new project on project's own pipeline", async () => {
-      const { send } = mountProjectRestApplication(app);
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: { name: "Fresh Project", teamId: "team-1", language: "python", framework: "other" },
+    it("records one provisioned through createInOrganization, as the REST door does", async () => {
+      const created = await app.createInOrganization({
+        organizationId: ORGANIZATION_ID,
+        userId: null,
+        teamId: "team-1",
+        name: "Fresh Project",
+        language: "python",
+        framework: "other",
       });
 
-      expect(response.status).toBe(201);
-      const { id } = (await response.json()) as { id: string };
       expect(recorded).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: id, projectId: id, organizationId: ORGANIZATION_ID }),
+        expect.objectContaining({
+          tenantId: created.id,
+          projectId: created.id,
+          organizationId: ORGANIZATION_ID,
+        }),
       );
     });
 
@@ -381,47 +361,24 @@ describe("the projects REST family over the application the composition builds",
     });
   });
 
-  describe("when a project is provisioned", () => {
-    /** @scenario "provisioning answers with a service key and never the base key" */
-    it("answers 201 with the minted service key and never the base key", async () => {
+  describe("when a project is provisioned into another organization's team", () => {
+    it("refuses by name and creates nothing", async () => {
       const { app } = application();
-      const { send } = mountProjectRestApplication(app);
 
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: {
-          name: "Fresh Project",
-          teamId: "team-1",
-          language: "typescript",
-          framework: "vercel-ai",
-        },
-      });
-
-      expect(response.status).toBe(201);
-      const body = (await response.json()) as Record<string, unknown>;
-      expect(body).toMatchObject({
-        name: "Fresh Project",
-        serviceApiKey: "sk-lw-service-token",
-        serviceApiKeyId: "api-key-service",
-      });
-      expect(body).not.toHaveProperty("apiKey");
-      expect(body).not.toHaveProperty("lwqlKey");
-    });
-
-    it("refuses a team that belongs to another organization", async () => {
-      const { send } = mountProjectRestApplication(application().app);
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: {
-          name: "Wrong Team",
+      await expect(
+        app.createInOrganization({
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
           teamId: "team-other",
+          name: "Wrong Team",
           language: "python",
           framework: "langchain",
-        },
-      });
-
-      expect(response.status).toBe(400);
+        }),
+      ).rejects.toMatchObject({ code: "team_not_in_organization" });
+      for (const organizationId of [ORGANIZATION_ID, OTHER_ORGANIZATION_ID]) {
+        const page = await app.listByOrganization({ organizationId, page: 1, limit: 50 });
+        expect([organizationId, page.pagination.total]).toEqual([organizationId, 1]);
+      }
     });
   });
 

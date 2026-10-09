@@ -9,26 +9,23 @@ import {
   type UsageReportReceipt,
 } from "@langwatch/enterprise-saas-contract";
 import { createLogger } from "@langwatch/observability";
-import { OpsApi } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
 
-import { productAnalyticsChannels } from "../channels/product-analytics-channels.registry.ts";
+import type { SaasChannels } from "../channels/saas.channels.ts";
 import type { SaasRepositories } from "../repositories/saas.repositories.ts";
 import { LangWatchCloudService } from "../services/langwatch-cloud.service.ts";
 import { UsageReportReceiverService } from "../services/usage-report-receiver.service.ts";
 
 type SaasSetup = FeatureSetup<
   typeof SaasModule.dependencies,
-  never,
   SaasServerConfig,
-  SaasRepositories
+  SaasRepositories,
+  SaasChannels
 >;
 
 export class SaasModule implements SaasApiContract {
   static readonly contract = SaasApi;
   static readonly dependencies = {
-    /** Where this deployment's product analytics goes. */
-    ops: OpsApi,
     /** The registry of self-hosted installs an accepted report is recorded in. */
     licensing: LicensingApi,
   };
@@ -41,12 +38,15 @@ export class SaasModule implements SaasApiContract {
     this.#usageReports = usageReports;
   }
 
-  static create({ config, dependencies, repositories, resources }: SaasSetup): SaasModule {
+  static create({
+    config,
+    dependencies,
+    repositories,
+    channels,
+    resources,
+  }: SaasSetup): SaasModule {
     const logger = createLogger("langwatch:saas");
-    const analytics = productAnalyticsChannels.live.create({
-      targets: () => dependencies.ops.findProductAnalyticsTargets(),
-      logger,
-    });
+    const { analytics } = channels;
     resources.own("LangWatch Cloud product-analytics client", () => analytics.close());
 
     return new SaasModule(
@@ -56,6 +56,7 @@ export class SaasModule implements SaasApiContract {
         registry: dependencies.licensing,
         analytics,
         logger,
+        release: config,
       }),
     );
   }

@@ -1,14 +1,18 @@
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type fastq from "fastq";
-import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
 
 import { gqJobsDispatchedTotal } from "./metrics.ts";
 import type { DispatchResult, GroupStagingScripts } from "./scripts.ts";
 
 /** Max jobs to dispatch per Lua call to bound script execution time. */
 const MAX_BATCH_SIZE = 200;
+
+/** The dedicated connection the dispatcher blocks on; an IORedis or a Cluster. */
+interface BlockingConnection {
+  brpop(key: string, timeout: number): Promise<unknown>;
+  del(key: string): Promise<number>;
+}
 
 /**
  * Dispatcher loop: waits for signals on the Redis signal list and dispatches
@@ -17,12 +21,18 @@ const MAX_BATCH_SIZE = 200;
 export class GroupQueueDispatcher {
   private shutdownRequested = false;
   private running = false;
+  private paused = false;
+  /** Ends the loop's wait for a resume; set only while the loop is paused. */
+  private wake: (() => void) | null = null;
 
   constructor(
     private readonly params: {
-      scripts: GroupStagingScripts;
+      scripts: Pick<
+        GroupStagingScripts,
+        "getSignalKey" | "getEarliestReadyScore" | "dispatchBatch"
+      >;
       processingQueue: fastq.queueAsPromised<DispatchResult, void>;
-      blockingConnection: IORedis | Cluster;
+      blockingConnection: BlockingConnection;
       queueName: string;
       globalConcurrency: number;
       activeTtlSec: number;
@@ -59,38 +69,73 @@ export class GroupQueueDispatcher {
 
   start(): void {
     this.running = true;
+    void this.run();
+  }
 
-    const run = async () => {
-      while (!this.shutdownRequested) {
-        try {
-          await this.waitForSignal();
-
-          let dispatched: number;
-          do {
-            dispatched = await this.dispatchBatch();
-            if (dispatched > 0) {
-              await new Promise((resolve) => setTimeout(resolve, 25));
-            }
-          } while (dispatched > 0 && !this.shutdownRequested);
-
-          // Drain signals that arrived during dispatch to prevent
-          // immediate re-wake from stale notifications
-          const signalKey = this.params.scripts.getSignalKey();
-          await this.params.blockingConnection.del(signalKey);
-        } catch (error) {
-          await this.handleLoopError(error);
+  private async run(): Promise<void> {
+    // A resume dispatches at once: signals that arrived while paused were drained unclaimed.
+    let dispatchNow = false;
+    while (!this.shutdownRequested) {
+      try {
+        if (this.paused) {
+          await this.untilWoken();
+          dispatchNow = true;
+          continue;
         }
+        if (!dispatchNow) await this.waitForSignal();
+        dispatchNow = false;
+        await this.dispatchUntilEmpty();
+      } catch (error) {
+        await this.handleLoopError(error);
       }
+    }
 
-      this.running = false;
-      this.params.logger.debug({ queueName: this.params.queueName }, "Dispatcher loop stopped");
-    };
+    this.running = false;
+    this.params.logger.debug({ queueName: this.params.queueName }, "Dispatcher loop stopped");
+  }
 
-    void run();
+  private async dispatchUntilEmpty(): Promise<void> {
+    let dispatched: number;
+    do {
+      dispatched = await this.dispatchBatch();
+      if (dispatched > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    } while (dispatched > 0 && !this.shutdownRequested);
+
+    // Drain signals that arrived during dispatch to prevent
+    // immediate re-wake from stale notifications
+    const signalKey = this.params.scripts.getSignalKey();
+    await this.params.blockingConnection.del(signalKey);
   }
 
   requestShutdown(): void {
     this.shutdownRequested = true;
+    this.wake?.();
+  }
+
+  /** Claims no further batch; a claim already issued still hands its jobs over. Idempotent. */
+  pause(): void {
+    if (this.paused) return;
+    this.paused = true;
+    this.params.logger.info({ queueName: this.params.queueName }, "Dispatcher paused");
+  }
+
+  /** Claims again from where the pause stopped. Idempotent. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    this.params.logger.info({ queueName: this.params.queueName }, "Dispatcher resumed");
+    this.wake?.();
+  }
+
+  private untilWoken(): Promise<void> {
+    return new Promise((resolve) => {
+      this.wake = () => {
+        this.wake = null;
+        resolve();
+      };
+    });
   }
 
   async waitUntilStopped(): Promise<void> {
@@ -128,6 +173,7 @@ export class GroupQueueDispatcher {
   }
 
   private async dispatchBatch(): Promise<number> {
+    if (this.paused) return 0;
     const availableSlots =
       this.params.globalConcurrency -
       this.params.processingQueue.length() -

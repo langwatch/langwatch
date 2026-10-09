@@ -222,3 +222,39 @@ func TestDownAndDestroyFromTheBrowser(t *testing.T) {
 		t.Errorf("unwired down: status %d, want 501", rec.Code)
 	}
 }
+
+// @scenario "A service the stack does not run is started from its row"
+func TestStartServiceFromTheBrowser(t *testing.T) {
+	var slug, service string
+	s := actionServer(Actions{StartService: func(sl, svc string) error { slug, service = sl, svc; return nil }})
+
+	if rec := post(s, "/api/stacks/portless/start-service?service=mail", ""); rec.Code != http.StatusOK || slug != "portless" || service != "mail" {
+		t.Errorf("start-service: status %d, slug %q, service %q", rec.Code, slug, service)
+	}
+	if rec := post(s, "/api/stacks/nosuch/start-service?service=mail", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stack: status %d, want 404", rec.Code)
+	}
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/start-service?service=mail", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired start-service: status %d, want 501", rec.Code)
+	}
+}
+
+// @scenario "A stack whose database is below the upgrade floor can reset its databases from the stack home"
+func TestResetDatabasesFromTheBrowser(t *testing.T) {
+	var reset string
+	s := actionServer(Actions{ResetDatabases: func(sl string) error { reset = sl; return nil }})
+
+	if rec := post(s, "/api/stacks/portless/reset-databases", `{"confirm":"portless"}`); rec.Code != http.StatusBadRequest || reset != "" {
+		t.Errorf("reset with the slug instead of the database name: status %d, reset %q", rec.Code, reset)
+	}
+	confirm := `{"confirm":"` + domain.DatabaseForSlug("portless") + `"}`
+	if rec := post(s, "/api/stacks/portless/reset-databases", confirm); rec.Code != http.StatusOK || reset != "portless" {
+		t.Errorf("reset with the database name: status %d, reset %q", rec.Code, reset)
+	}
+	if rec := post(s, "/api/stacks/nosuch/reset-databases", confirm); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stack: status %d, want 404", rec.Code)
+	}
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/reset-databases", confirm); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired reset: status %d, want 501", rec.Code)
+	}
+}

@@ -77,6 +77,7 @@ import {
 } from "../access/input-permission.ts";
 import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { registerTrpcServingWhileUpgrading } from "../route-registry.ts";
 import {
   auditScopeId,
   auditScopeIds,
@@ -492,6 +493,11 @@ export interface TrpcRouterAccess<
    */
   withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   /**
+   * Answers while the installation upgrades (UIW-TRPC-DECLARE); its access is still asked as
+   * declared. A batched call passes the holding door only when every procedure in it declares this.
+   */
+  servesWhileUpgrading(): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
    * What the module does when the door refuses a caller: handed the parsed input and the caller,
    * awaited before the refusal is answered unchanged; a hook that throws fails the call.
    */
@@ -573,6 +579,7 @@ export interface TrpcRouterImplementation<
 
 type Implementation = Readonly<{
   access: TrpcAccess;
+  servesWhileUpgrading?: true;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   audit?: TrpcAuditTarget;
@@ -600,13 +607,11 @@ function mountRouter<Api, Contract extends TrpcContract>(
         );
       }
 
+      const procedure = `${contract.namespace}.${name}`;
+      const { servesWhileUpgrading, ...declared } = implementation;
+      if (servesWhileUpgrading) registerTrpcServingWhileUpgrading(procedure);
       // An implementation carries only the marks its procedure declared, so it spreads as is.
-      record[name] = runtime.procedure({
-        procedure: `${contract.namespace}.${name}`,
-        member,
-        ...implementation,
-        app,
-      });
+      record[name] = runtime.procedure({ procedure, member, ...declared, app });
     }
 
     return runtime.router(record) as TRPCBuiltRouter<
@@ -624,6 +629,7 @@ type PermissionArgument =
 
 /** What a selected procedure has declared beside its facts, before its access. */
 type ProcedureMarks = Readonly<{
+  servesWhileUpgrading?: true;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
   audit?: TrpcAuditTarget;
@@ -707,6 +713,7 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
 
         return selected(name, facts, { ...marks, entitlement: { entitlement: named, ...options } });
       },
+      servesWhileUpgrading: () => selected(name, facts, { ...marks, servesWhileUpgrading: true }),
       mintsCredential: (permission: AuthzPermission) =>
         selected(name, facts, { ...marks, mintsCredential: permission }),
       onRefused: (hook: TrpcRefusalHook<unknown, unknown>) => {

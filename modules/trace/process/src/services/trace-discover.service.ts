@@ -15,10 +15,10 @@ import type {
   TraceListRead,
 } from "@langwatch/trace-contract";
 
-import type { FacetCatalog, FacetDefinition } from "#rules/trace-facet-registry.rules";
+import type { FacetCatalog, FacetDefinition } from "#features/facet/rules/trace-facet-registry.rules";
 
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
-import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
+import { isExpressionCategorical } from "../features/facet/rules/trace-facet-classification.rules.ts";
+import type { FacetFilterResolver } from "../features/facet/rules/trace-facet-filter.rules.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
@@ -31,8 +31,8 @@ import {
   type FacetFilters,
   type Outcome,
 } from "./trace-discover-task.service.ts";
-import { TraceFacetDescriptorService } from "./trace-facet-descriptor.service.ts";
-import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
+import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
+import type { TraceTopicNamingService } from "../features/topic/services/trace-topic-naming.service.ts";
 import { TraceTtlCacheService } from "./trace-ttl-cache.service.ts";
 
 /**

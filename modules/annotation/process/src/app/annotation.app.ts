@@ -64,8 +64,16 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile } from "@langwatch/user-contract";
 import { z } from "zod";
 
+import {
+  buildAnnotationLifecyclePipeline,
+  type AnnotationLifecyclePipeline,
+} from "#eventing/annotation-lifecycle.pipeline";
 import type { AnnotationQueueWalkScope } from "#repositories/annotation-queue-item.repository";
 import type { AnnotationRepositories } from "#repositories/annotation.repositories";
+import {
+  AnnotationFactsService,
+  type AnnotationLifecycleSenders,
+} from "#services/annotation-facts.service";
 import { AnnotationQueueService } from "#services/annotation-queue.service";
 import { AnnotationScoreService } from "#services/annotation-score.service";
 import { AnnotationService } from "#services/annotation.service";
@@ -116,6 +124,8 @@ export class AnnotationModule implements AnnotationApi {
 
   #annotations: AnnotationService;
   #scores: AnnotationScoreService;
+  #facts = AnnotationFactsService.create();
+  readonly #lifecycle = buildAnnotationLifecyclePipeline();
   #queues: AnnotationQueueService;
   #count: AnnotationRepositories["count"];
   #projects: ProjectApi;
@@ -129,8 +139,14 @@ export class AnnotationModule implements AnnotationApi {
     repositories: AnnotationRepositories,
     dependencies: AnnotationSetup["dependencies"],
   ) {
-    this.#annotations = AnnotationService.create({ repository: repositories.annotations });
-    this.#scores = AnnotationScoreService.create({ repository: repositories.scores });
+    this.#annotations = AnnotationService.create({
+      repository: repositories.annotations,
+      facts: this.#facts,
+    });
+    this.#scores = AnnotationScoreService.create({
+      repository: repositories.scores,
+      facts: this.#facts,
+    });
 
     this.#queues = AnnotationQueueService.create({
       queues: repositories.queues,
@@ -148,6 +164,16 @@ export class AnnotationModule implements AnnotationApi {
 
   static create({ repositories, dependencies }: AnnotationSetup): AnnotationModule {
     return new AnnotationModule(repositories, dependencies);
+  }
+
+  /** The annotation_lifecycle pipeline this module registers, built once with the module. */
+  lifecyclePipeline(): AnnotationLifecyclePipeline {
+    return this.#lifecycle;
+  }
+
+  /** Binds the built lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: AnnotationLifecycleSenders): void {
+    this.#facts.connect(commands);
   }
 
   create(input: CreateAnnotationInput): Promise<Annotation> {

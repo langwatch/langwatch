@@ -5,11 +5,20 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { EvaluatorSettingsFormToken, evaluatorTrpc } from "@langwatch/evaluator-contract";
+import { evaluationWebConfigSchema } from "@langwatch/evaluation-contract";
+import {
+  EvaluatorSettingsFormToken,
+  StudioEvaluatorEditorToken,
+} from "@langwatch/evaluator-client";
+import { evaluatorTrpc } from "@langwatch/evaluator-contract";
 
 import { evaluatorApi } from "./behavior/evaluator-api.ts";
 
 export const evaluatorWeb = defineBrowserModule("evaluator")
+  // Evaluator is the browser half that answers for the evaluation slice (plan decision 1).
+  .withConfig({ evaluation: evaluationWebConfigSchema }, ({ evaluation }) => ({
+    hasLangevals: evaluation.langevals,
+  }))
   .withApi(evaluatorApi, { contracts: [evaluatorTrpc] })
   .withHosts({
     requires: ["EvaluatorHostApi"],
@@ -75,14 +84,12 @@ export const evaluatorWeb = defineBrowserModule("evaluator")
       }),
     },
   })
-  /** The studio's evaluator editor and inline settings form (§3.4 rule 7). */
-  .withCapabilities({
-    studioEvaluatorEditor: {
-      load: async () => ({
-        default: (await import("./ui/sections/evaluators/lent-studio-evaluator.tsx"))
-          .LentStudioEvaluatorEditor,
-      }),
-    },
+  /** The studio's evaluator editor and inline settings form (§10.1). */
+  .lends(StudioEvaluatorEditorToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/evaluators/lent-studio-evaluator.tsx"))
+        .LentStudioEvaluatorEditor,
+    }),
   })
   .lends(EvaluatorSettingsFormToken, {
     load: async () => ({

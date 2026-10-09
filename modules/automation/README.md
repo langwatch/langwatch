@@ -1,32 +1,52 @@
-# Automation
+# automation
 
-Automation is the singular feature for trigger definitions, trigger-fire
-history, report schedules, delivery policy, and project email suppression.
-It is one module of three packages, laid out as ARCHITECTURE.md §3 describes
-(there is no `client/`: no other browser reads automation data).
+Automations: triggers and their fire history, report schedules, delivery policy and project email suppression, and the pipeline that evaluates and delivers them.
 
-- `contract/` owns portable Zod 4 schemas, trigger/provider vocabulary,
-  templating, report and graph-alert policy, the `AutomationApi` token, and the
-  tRPC and REST declarations. The contract also owns graph-alert threshold and
-  no-data policy, series-name parsing, and the canonical persisted series
-  identifiers shared by event and heartbeat dispatch.
-- `process/` owns the services, private repositories, channels (webhook, Slack,
-  mail and the other deliveries), the eventing pipeline (subscribers, process
-  managers, intents) and the tasks. Its services also own graph-trigger
-  evaluation, heartbeat candidate decisions, the reusable persist-cap runaway
-  containment policy and the retry-idempotent hourly/daily email caps.
-  Trigger, CustomGraph and TriggerSent persistence is private to the module.
-- `browser/` owns the module's screens, drawers and publications, declared with
-  `defineBrowserModule` at `./declaration` (`model/` → `behavior/` → `ui/`): the
-  authoring drawer and provider forms, graph-series presentation and display
-  action parameters, template variable catalogues, Liquid JSON substitution,
-  cadence UI, and overview presentation. `apps/ui` installs the generated
-  list; it hosts none of this itself.
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-No app holds an automation composition file. `apps/api` and `apps/worker`
-install the module's process half through the generated process-module list,
-and the role decides what runs: the api serves the routes, the worker consumes
-the pipeline (graph, settlement and settlement reads). Eventing calls the
-module's own services; delivery, Redis claims, ClickHouse counting, recipient
-auth and limit mail arrive as repositories, channels and peer `*Api` tokens the
-container builds (ARCHITECTURE.md §3.3, §5), never as a second `AutomationService`.
+## At a glance
+
+|                |                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Classification | core (`modules/catalogue.json`)                                                                                    |
+| Subjects       | automation, email-suppression, report-schedule, trigger, trigger-fire-history                                      |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                           |
+| Api token      | `AutomationApi` = `moduleApi<AutomationApi>()("automation")`, `contract/src/automation.api.ts:227` (61 operations) |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                                         |
+
+## What automation owns
+
+| Kind                           | Name                                                                                                                                                                                                                                                                                                            | Declared at                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Postgres, accessed not claimed | `CustomGraph`, `EmailSuppression`, `Project`, `Trigger`, `TriggerLatestEvaluation`, `TriggerSent`                                                                                                                                                                                                               | `process/src/repositories/prisma/prisma.custom-graph.repository.ts:12` |
+| Stores required                |                                                                                                                                                                                                                                                                                                                 | `process/src/channels/http/http.automation.channels.ts:7`              |
+| Stores required                | prisma, redis, encryption                                                                                                                                                                                                                                                                                       | `process/src/repositories/prisma/prisma.automation.repositories.ts:29` |
+| Secrets                        | `unsubscribe` (NEXTAUTH_SECRET)                                                                                                                                                                                                                                                                                 | `process/src/app/automation.app.ts:403`                                |
+| Config                         | `emailHourlyCap` (TRIGGER_EMAIL_HOURLY_CAP), `tenantDailyCap` (TRIGGER_EMAIL_TENANT_DAILY_CAP), `persistDailyCapFree` (TRIGGER_PERSIST_DAILY_CAP_FREE), `persistDailyCapPaid` (TRIGGER_PERSIST_DAILY_CAP_PAID), `persistDailyCapEnterprise` (TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE), `publicBaseUrl` (BASE_HOST) | `contract/src/automation.config.ts:11`                                 |
+
+Anything else automation needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name            | Token                 | Module                                    |
+| --------------- | --------------------- | ----------------------------------------- |
+| `analytics`     | `AnalyticsApi`        | [analytics](../analytics/README.md)       |
+| `annotations`   | `AnnotationApi`       | [annotation](../annotation/README.md)     |
+| `auditLog`      | `AuditLogApi`         | [audit-log](../audit-log/README.md)       |
+| `authorization` | `AuthzApi`            | [authz](../authz/README.md)               |
+| `datasets`      | `DatasetApi`          | [dataset](../dataset/README.md)           |
+| `entitlement`   | `EntitlementApi`      | [entitlement](../entitlement/README.md)   |
+| `evaluations`   | `EvaluationApi`       | [evaluation](../evaluation/README.md)     |
+| `evaluators`    | `EvaluatorApi`        | [evaluator](../evaluator/README.md)       |
+| `monitors`      | `MonitorApi`          | [monitor](../monitor/README.md)           |
+| `notifications` | `NotificationService` | [notification](../notification/README.md) |
+| `projects`      | `ProjectApi`          | [project](../project/README.md)           |
+| `slack`         | `SlackApi`            | [slack](../slack/README.md)               |
+| `traces`        | `TraceApi`            | [trace](../trace/README.md)               |
+| `webhooks`      | `WebhookApi`          | [webhook](../webhook/README.md)           |
+
+## Who depends on automation
+
+[dashboard](../dashboard/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md) (as a peer).
+
+<!-- readme:generated:end -->

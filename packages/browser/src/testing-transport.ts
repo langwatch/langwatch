@@ -4,7 +4,7 @@
  * feature's tRPC hooks run unmocked.
  */
 
-import { createUiFeatureApiClient, type UiFeatureApiTransport } from "./transport.ts";
+import { createUiFeatureApiClient, type UiFeatureApiTransport } from "./wire/transport.ts";
 
 /** One procedure call as the wire carried it. */
 export type UiProcedureCall = { path: string; input: unknown };

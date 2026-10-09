@@ -6,7 +6,7 @@
  */
 
 import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
-import type { UiAuthClient } from "@langwatch/auth-browser/session";
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { createUiFeatureShell } from "@langwatch/browser/feature-shell";
@@ -126,14 +126,14 @@ function mountShell({
       });
       return {
         session,
-        scope: root.scope.createBrowserUiScope({ reading: scopeReading, session }),
+        scope: root.scope.createBrowserUiScope({ reading: scopeReading }),
       };
     },
   });
 
   function Probe() {
     const { session } = useUiCapabilities();
-    const { project, organization, hasPermission } = useOrganizationTeamProject();
+    const { project, organization } = useOrganizationTeamProject();
     const userId = session.currentUser()?.id;
     const can = session.hasPermission("annotations:update");
     return (
@@ -142,7 +142,6 @@ function mountShell({
         <span data-testid="project">{project?.id ?? "none"}</span>
         <span data-testid="organization">{organization?.id ?? "none"}</span>
         <span data-testid="can">{String(can)}</span>
-        <span data-testid="legacy-can">{String(hasPermission("annotations:update"))}</span>
       </div>
     );
   }
@@ -196,7 +195,6 @@ describe("given the first user has resolved an organization and project grants",
       await waitFor(() => expect(view.getByTestId("project").textContent).toBe("none"));
       expect(view.getByTestId("organization").textContent).toBe("none");
       expect(view.getByTestId("can").textContent).toBe("false");
-      expect(view.getByTestId("legacy-can").textContent).toBe("false");
     });
   });
 });

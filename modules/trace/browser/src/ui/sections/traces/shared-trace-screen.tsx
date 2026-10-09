@@ -1,5 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import {
@@ -16,13 +16,13 @@ import {
 import { Link2Off } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { TraceViewerProvider } from "../../../behavior/explorer/context/trace-viewer-context.tsx";
+import { useTraceQueryArgs } from "../../../behavior/explorer/use-trace-query-args.ts";
 import { useSharedTraceRead } from "../../../behavior/reads/use-project-reads.ts";
 import { api, type RouterOutputs } from "../../../behavior/trace-api.ts";
 import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import { TRACE_DRAWER_NAME } from "../../../model/trace-drawer-params.ts";
-import { TraceViewerProvider } from "../../elements/explorer/context/trace-viewer-context.tsx";
 import { HandledErrorState } from "../errors/index.ts";
-import { useTraceQueryArgs } from "../explorer/hooks/use-trace-query-args.ts";
 import { TraceDrawerContent } from "../explorer/trace-drawer/trace-drawer-content.tsx";
 import { seedSharedTrace } from "./seed-shared-trace.ts";
 
@@ -31,7 +31,7 @@ const noop = () => undefined;
 
 /**
  * The span, view and tabs the reader has chosen live in the address like the drawer's
- * own, so a share page names the trace it shows; no drawer registers under that name.
+ * own, so a share page names the trace it shows; the declared drawer draws nothing here.
  */
 function useSharedTraceAddress(traceId: string): void {
   const { openDrawer } = useDrawer();

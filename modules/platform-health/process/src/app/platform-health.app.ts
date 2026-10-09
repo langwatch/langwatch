@@ -22,7 +22,7 @@ import { SuiteApi } from "@langwatch/suite-contract";
 import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { HttpSubsystemProbeChannel } from "../channels/http/http.subsystem-probe.channel.ts";
+import type { PlatformHealthChannels } from "../channels/platform-health.channels.ts";
 import { LangyCanaryService } from "../services/langy-canary.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
@@ -33,12 +33,11 @@ import {
   type SubsystemProbeCollaborators,
 } from "../services/subsystem-probe.service.ts";
 
-export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
-
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthModule.dependencies,
+  PlatformHealthServerConfig,
   never,
-  PlatformHealthServerConfig
+  PlatformHealthChannels
 >;
 
 /** The process-owned platform-health capability. */
@@ -81,7 +80,7 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
 
   static async create({
     dependencies,
-    config,
+    channels,
     secrets,
   }: PlatformHealthSetup): Promise<PlatformHealthModule> {
     const probeApiKey = await secrets.into(
@@ -92,7 +91,7 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
       BearerIdentity.create({ name: "platform-health", token }),
     );
     const collaborators: SubsystemProbeCollaborators = {
-      canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: config.publicBaseUrl ?? "" }),
+      canaries: channels.canaries,
       automation: () => ({
         findById: (input) => dependencies.automation.findById(input),
         getRecentFires: async (input) =>

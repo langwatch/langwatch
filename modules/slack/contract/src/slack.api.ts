@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/module";
 
 import type {
   SlackConnectionClaimant,
+  SlackConnectionClaimPage,
   SlackConnectionDeleted,
   SlackConnectionKind,
   SlackConnectionList,
@@ -66,6 +67,11 @@ export interface SlackApi {
     projectId: string;
     claimantId: string;
   }): Promise<void>;
+  /** Every claim in the install, a page at a time by claim id: a claimant releases stale ones. */
+  listSlackConnectionClaims(input: {
+    after?: string;
+    limit?: number;
+  }): Promise<SlackConnectionClaimPage>;
 }
 
 export const SlackApi = moduleApi<SlackApi>()("slack");

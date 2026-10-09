@@ -7,6 +7,8 @@
 import { zodErrorMessage } from "@langwatch/config";
 import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
 import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
+import { configureLogger } from "@langwatch/observability";
+import { processLoggerConfiguration } from "@langwatch/process/observability-owner";
 import {
   decodeScenarioEgressPolicy,
   SCENARIO_EGRESS_POLICY_ENV,
@@ -45,7 +47,13 @@ const environment = readScenarioChildEnvironment({
   source,
   egressPolicyKey: SCENARIO_EGRESS_POLICY_ENV,
 });
+const { configuration, deprecations } = processLoggerConfiguration({
+  environment: source,
+  serviceName: "langwatch-scenario-child",
+});
+configureLogger(configuration);
 const logger = createChildProcessLogger("langwatch:scenarios:child", source);
+for (const deprecation of deprecations) logger.warn(deprecation);
 
 /**
  * The one egress the run makes on its own account. An HTTP target is a URL the customer typed,

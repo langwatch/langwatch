@@ -7,10 +7,11 @@ import {
   strictestLockoutPolicy,
   type LockoutPolicy,
 } from "@langwatch/auth-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { SignInAttemptLockRepository } from "../repositories/sign-in-attempt-lock.repository.ts";
-import type { SignInSecuritySettingsRepository } from "../repositories/sign-in-security-settings.repository.ts";
+import { toLockoutPolicy } from "../rules/sign-in-security.rules.ts";
 
 /**
  * Locking an address after repeated failed sign-ins (GAC-09). The arithmetic
@@ -38,7 +39,11 @@ export interface SignInLockoutEvidence {
 
 interface SignInLockoutDeps {
   locks: SignInAttemptLockRepository;
-  settings: SignInSecuritySettingsRepository;
+  /** The rules organizations set, read from their owner. */
+  organizations: Pick<
+    OrganizationApi,
+    "findConfiguredSignInSecurityPolicies" | "findSignInSecurityPoliciesForUser"
+  >;
   directory: SignInLockoutDirectory;
   evidence: SignInLockoutEvidence;
   /** The address, keyed-hashed for storage. Keyed, because a bare digest of
@@ -145,9 +150,9 @@ export class SignInLockoutService {
   }
 
   private async installationPolicy(): Promise<LockoutPolicy> {
-    const configured = await this.deps.settings.findConfigured();
+    const configured = await this.deps.organizations.findConfiguredSignInSecurityPolicies();
 
-    return strictestLockoutPolicy(configured.map((rule) => rule.lockout));
+    return strictestLockoutPolicy(configured.map(toLockoutPolicy));
   }
 
   /**
@@ -158,8 +163,8 @@ export class SignInLockoutService {
   private async policyFor({ userId }: { userId: string | null }): Promise<LockoutPolicy> {
     if (userId === null) return this.installationPolicy();
 
-    const governing = await this.deps.settings.findForUser({ userId });
-    const policy = strictestLockoutPolicy(governing.map((rule) => rule.lockout));
+    const governing = await this.deps.organizations.findSignInSecurityPoliciesForUser({ userId });
+    const policy = strictestLockoutPolicy(governing.map(toLockoutPolicy));
 
     return policy.afterFailedAttempts > 0 ? policy : NO_LOCKOUT;
   }

@@ -172,6 +172,23 @@ export class PromptMessagesTooManyError extends HandledError {
 }
 
 /**
+ * A REST body named an author who does not hold the write's permission on the
+ * project, or who does not exist. Session-derived authors are never checked.
+ */
+export class PromptAuthorUnknownError extends HandledError {
+  declare readonly code: "prompt_author_unknown";
+
+  constructor(authorId: string) {
+    super(
+      "prompt_author_unknown",
+      "The author is not a user who may write prompts in this project",
+      { httpStatus: 422, fault: "customer", meta: { authorId } },
+    );
+    this.name = "PromptAuthorUnknownError";
+  }
+}
+
+/**
  * The playground door was reached without a signed-in browser session. The
  * door reads the session itself, so the refusal is its own rather than the
  * framework's.

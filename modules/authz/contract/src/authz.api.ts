@@ -9,6 +9,7 @@ import type {
   PermissionScopeArg,
   TierOfScopeArg,
 } from "@langwatch/authorization";
+import { generate } from "@langwatch/ksuid";
 import { moduleApi } from "@langwatch/module";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
@@ -143,6 +144,10 @@ export interface AuthzApi {
   ): Promise<Binding.AuthzAccessBreakdownOutput>;
   isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
   findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
+  /** User ids holding organisation role ADMIN on a seat not disabled; empty for an unknown one. */
+  findActiveOrganizationAdministrators(
+    args: Queries.AuthzFindActiveOrganizationAdministratorsInput,
+  ): Promise<Queries.AuthzActiveOrganizationAdministrators>;
   /** The caller's session version (ADR-170): 0 until first bumped; throws when unreadable. */
   getSessionVersion(input: { userId: string }): Promise<number>;
   revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;
@@ -248,3 +253,9 @@ export interface AuthzApi {
 }
 
 export const AuthzApi = moduleApi<AuthzApi>()("authz");
+
+// A binding's id is caller-minted, in the persisted format shared across processes.
+const GRANT_KSUID_RESOURCE = "rolebinding";
+
+/** The id a new role binding gets: one scheme, minted by whoever calls `attachBindings`. */
+export const newAuthzGrantId = (): string => generate(GRANT_KSUID_RESOURCE).toString();

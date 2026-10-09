@@ -4,7 +4,7 @@ import type { LangyDerivedCard } from "@langwatch/langy-contract";
 import { type RefObject, useCallback, useEffect, useState } from "react";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
-import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
+import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../tools/ui/sections/langy-code-access-card.tsx";
 import type { LangyPanelSend } from "../../../behavior/panel/use-langy-panel-send.ts";
 import type { LangyProposal, ProposalHandlers } from "../langy-proposal-card.tsx";
 

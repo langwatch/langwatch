@@ -3,8 +3,8 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./catalog/codex-restrictions.ts";
-import { codexTokenKeysSchema } from "./codex-account.ts";
 import type { CustomModelEntry } from "./custom-model.ts";
+import { codexTokenKeysSchema } from "./model-provider.ts";
 import type { ModelProviderScope } from "./model-provider.ts";
 
 export const parameterConstraintSchema = z

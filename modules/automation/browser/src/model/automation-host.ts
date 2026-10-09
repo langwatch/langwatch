@@ -85,16 +85,6 @@ export abstract class AutomationHost {
   /** Fails closed: an answer that has not arrived reads as no. */
   abstract hasPermission(permission: string): boolean;
 
-  /** Fails closed the same way. */
-  abstract isFeatureEnabled(flag: string): boolean;
-
-  /**
-   * The same flag, undecided included: `undefined` means the answer hasn't
-   * arrived. Only one surface needs that -- a `SEND_WEBHOOK` prefill must
-   * wait, not be dropped -- everything else reads `isFeatureEnabled`.
-   */
-  abstract featureFlag(flag: string): boolean | undefined;
-
   abstract route(): AutomationRouteReading;
 
   /** Replaces the whole query string; a key left out is a key removed. */

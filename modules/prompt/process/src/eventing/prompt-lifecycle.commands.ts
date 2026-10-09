@@ -18,7 +18,7 @@ export const PROMPT_LIFECYCLE_PIPELINE_NAME = "prompt_lifecycle" as const;
 export const PROMPT_AGGREGATE_TYPE = "prompt" as const;
 
 export const PROMPT_CREATED_EVENT_VERSION = "2026-09-29" as const;
-export const RECORD_PROMPT_CREATED_COMMAND_TYPE = "lw.prompt.record_created" as const;
+const RECORD_PROMPT_CREATED_COMMAND_TYPE = "lw.prompt.record_created" as const;
 
 export const promptCreatedEventSchema = z.object({
   ...EventSchema.shape,

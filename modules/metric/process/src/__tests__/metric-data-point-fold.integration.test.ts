@@ -11,16 +11,17 @@ import {
   METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
 } from "@langwatch/metric-contract";
-import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { point } from "../app/__tests__/metric.fixture.ts";
-import type { MetricClickHouseClient } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
-import { MetricDataPointClickHouseRepository } from "../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
+import {
+  ClickHouseMetricDataPointAppendRepository,
+  type MetricClickHouseClient,
+} from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { startMigratedClickHouse } from "./migrated-clickhouse.harness.ts";
 
 let ch: ClickHouseClient;
-let repo: MetricDataPointClickHouseRepository;
+let repo: ClickHouseMetricDataPointAppendRepository;
 
 /**
  * The narrow port the repository takes, over the real client. The port carries
@@ -136,9 +137,8 @@ async function readRollups(seriesId: string) {
 beforeAll(async () => {
   ch = (await startMigratedClickHouse()).client;
   const port = metricClient(ch);
-  repo = MetricDataPointClickHouseRepository.create({
+  repo = ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: async () => port,
-    resolveOrganizationClient: async () => port,
     defaultRetentionDays: 30,
   });
 }, 180_000);
@@ -351,9 +351,8 @@ describe("given a cumulative series long enough to span several rollup buckets",
         insert: async (args) => delegate.insert(args),
       };
 
-      await MetricDataPointClickHouseRepository.create({
+      await ClickHouseMetricDataPointAppendRepository.create({
         resolveClient: async () => counting,
-        resolveOrganizationClient: async () => counting,
         defaultRetentionDays: 30,
       }).recomputeAffectedRollupsMany({ points: samples(countedSeriesId) });
     }, 300_000);
@@ -556,121 +555,5 @@ describe("given one chunk carrying two series staggered in time", () => {
 
       expect(folded.reduce((total, row) => total + row.sourcePointCount, 0)).toBe(values.length);
     }
-  });
-});
-
-describe("given points ensured for the tenant's organization", () => {
-  describe("when one of an organization's points is accepted a second time", () => {
-    const dedupTenantId = `${tag}-dedup-project`;
-    const dedupOrganizationId = `${tag}-dedup-org`;
-    const DAY_MS = 24 * 60 * 60_000;
-    const ledgerPoint = (timeUnixMs: number, accepted = acceptedAt) =>
-      point({
-        tenantId: dedupTenantId,
-        organizationId: dedupOrganizationId,
-        seriesId: "8".repeat(64),
-        timeUnixMs,
-        valueDouble: 1,
-        acceptedAt: accepted,
-      });
-
-    beforeAll(async () => {
-      await repo.ensureDataPoints({
-        points: [ledgerPoint(bucket0 + 1_000), ledgerPoint(bucket0 + 2_000)],
-      });
-      // The same PointId accepted again in a later monthly partition, where
-      // the engine cannot collapse the two rows: only the query dedups them.
-      await repo.ensureDataPoints({
-        points: [ledgerPoint(bucket0 + 1_000, acceptedAt + 32 * DAY_MS)],
-      });
-    }, 30_000);
-
-    it("counts that point once", async () => {
-      const estimates = await repo.queryUsageEstimates({
-        organizationId: dedupOrganizationId,
-        tenantId: dedupTenantId,
-        from: Temporal.Instant.fromEpochMilliseconds(acceptedAt - 60 * 60_000),
-        to: Temporal.Instant.fromEpochMilliseconds(acceptedAt + 33 * DAY_MS),
-        groupBy: "organization",
-      });
-
-      expect(estimates).toHaveLength(1);
-      expect(estimates[0]).toMatchObject({
-        organizationId: dedupOrganizationId,
-        acceptedPoints: 2,
-        canonicalRetainedBytes: 4,
-        uniqueActiveSeries: 1,
-      });
-    });
-  });
-
-  describe("when usage estimates are read for a window holding them", () => {
-    it("counts each accepted point once for the organization", async () => {
-      const estimates = await repo.queryUsageEstimates({
-        organizationId,
-        tenantId,
-        from: Temporal.Instant.fromEpochMilliseconds(acceptedAt - 60 * 60_000),
-        to: Temporal.Instant.fromEpochMilliseconds(acceptedAt + 60 * 60_000),
-        groupBy: "organization",
-      });
-
-      expect(estimates).toHaveLength(1);
-      expect(estimates[0]?.organizationId).toBe(organizationId);
-      expect(estimates[0]?.acceptedPoints).toBeGreaterThan(0);
-    });
-  });
-
-  describe("when series totals are read by a point attribute one series carries", () => {
-    const labelledSeriesId = "9".repeat(64);
-    const labelled = [5, 12].map((value, index) =>
-      point({
-        tenantId,
-        organizationId,
-        seriesId: labelledSeriesId,
-        timeUnixMs: bucket0 + index * 1000,
-        metricKind: "sum",
-        aggregationTemporality: "cumulative",
-        isMonotonic: true,
-        valueDouble: value,
-        acceptedAt,
-        pointAttributesJson: JSON.stringify({ team: `alpha-${tag}` }),
-        pointAttributeKeys: ["team"],
-      }),
-    );
-
-    beforeAll(async () => {
-      await repo.upsertSeriesMany({ points: labelled });
-      await repo.recomputeAffectedRollupsMany({ points: labelled });
-    });
-
-    it("returns that series with its attributes and the sum of its rollups", async () => {
-      const totals = await repo.findSeriesTotalsByPointAttribute({
-        tenantId,
-        attributeKey: "team",
-        attributeValue: `alpha-${tag}`,
-        fromMs: bucket0 - 60 * 60_000,
-      });
-
-      expect(totals).toEqual([
-        {
-          metricName: labelled[0]!.metricName,
-          pointAttributes: { team: `alpha-${tag}` },
-          total: 12,
-        },
-      ]);
-    });
-  });
-
-  describe("when series totals are read by a point attribute nothing carries", () => {
-    it("runs against the real schema and finds no series", async () => {
-      const totals = await repo.findSeriesTotalsByPointAttribute({
-        tenantId,
-        attributeKey: `absent-${tag}`,
-        attributeValue: "x",
-        fromMs: acceptedAt - 60 * 60_000,
-      });
-
-      expect(totals).toEqual([]);
-    });
   });
 });

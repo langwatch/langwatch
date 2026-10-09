@@ -45,6 +45,7 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import type { VirtualKeyService } from "../features/virtual-key/services/virtual-key.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -53,7 +54,6 @@ import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/cl
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import type { VirtualKeyService } from "../services/virtual-key.service.ts";
 import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
 import { PostgresVirtualKeyAdapter } from "./testing.ts";

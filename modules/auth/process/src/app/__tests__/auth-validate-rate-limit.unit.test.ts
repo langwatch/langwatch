@@ -14,10 +14,12 @@ import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
 import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
@@ -50,8 +52,19 @@ function withRateLimits(
   memory: MemoryAuthRepositories,
   rateLimits: AuthRepositories["rateLimits"],
 ): AuthRepositories {
-  const { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity } = memory;
-  return { sessions, cliSessions, signUpTokens, signInLocks, signInSecurity, rateLimits };
+  return {
+    sessions: memory.sessions,
+    cliSessions: memory.cliSessions,
+    signUpTokens: memory.signUpTokens,
+    signInLocks: memory.signInLocks,
+    rateLimits,
+    betterAuthStorage: memory.betterAuthStorage,
+    betterAuthSecondaryStorage: memory.betterAuthSecondaryStorage,
+    betterAuthHooks: memory.betterAuthHooks,
+    directory: memory.directory,
+    pendingSsoSetup: memory.pendingSsoSetup,
+    sessionCache: memory.sessionCache,
+  };
 }
 
 async function appFor(
@@ -67,6 +80,7 @@ async function appFor(
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
       signUpMode: "open",
@@ -75,12 +89,13 @@ async function appFor(
     },
     repositories: withRateLimits(MemoryAuthRepositories.create(), limiter),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: {
         findResolvedToken: async () => ({ project: { slug: "acme" } }),
       } as never,
       featureFlags: {} as never,
-      identity: createApiFixture<IdentityApi>(),
+      identity: createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
@@ -91,14 +106,7 @@ async function appFor(
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
-    members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      prisma: {} as never,
-      redis: null as never,
-      identityEmails: undefined as never,
-      invites: null,
-      processName: "langwatch-api",
-    },
+    channels: MemoryAuthChannels.create(),
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });

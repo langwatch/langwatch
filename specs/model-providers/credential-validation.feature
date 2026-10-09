@@ -613,3 +613,42 @@ Feature: Credential Validation
     Given a credential whose check did not run
     When it is saved
     Then the save proceeds exactly as it did before
+
+  # ============================================================================
+  # The check asks the address the gateway will call
+  # ============================================================================
+  #
+  # For the providers whose base URL the gateway normalises (openai, custom,
+  # anthropic) a trailing "/v1" is optional at runtime: the gateway drops it
+  # and appends the full "/v1/..." path. The check appended "/models" to the
+  # URL exactly as typed, so "https://api.openai.com" was refused with a 404
+  # here and then worked. Only the gateway's address is asked: a key that
+  # answers at another address would pass the check and fail on every request.
+  #
+  # Bindings: modules/model-provider/process/src/services/__tests__/http-model-provider-credential-probe.service.unit.test.ts
+
+  @unit
+  Scenario Outline: A base URL is checked at the address the gateway will call
+    Given an "openai" provider with OPENAI_BASE_URL set to "<base URL>"
+    When the API key is validated
+    Then the first request goes to "<models URL>"
+
+    Examples:
+      | base URL                          | models URL                               |
+      | https://api.openai.com            | https://api.openai.com/v1/models         |
+      | https://api.openai.com/           | https://api.openai.com/v1/models         |
+      | https://api.openai.com/v1/        | https://api.openai.com/v1/models         |
+      | https://proxy.acme.test/openai/v1 | https://proxy.acme.test/openai/v1/models |
+
+  @unit
+  Scenario: An address the gateway will not call cannot pass the check
+    Given an "openai" provider whose endpoint lists models at "https://llm.acme.test/api/models" only
+    When the API key is validated
+    Then only the gateway's address is asked
+    And the key is not reported as verified
+
+  @unit
+  Scenario: A key the gateway address refuses is refused
+    Given an "openai" provider whose key the gateway's address refuses
+    When the API key is validated
+    Then the key is reported as invalid

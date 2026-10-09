@@ -1,28 +1,20 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
-import { z } from "zod";
 
 import type {
   RegisterConnectedAgentInput,
-  HttpAgentTestInput,
   ArchiveAgentCommand,
   CopyAgentCommand,
   CreateAgentCommand,
   UpdateAgentCommand,
 } from "./agent.commands.ts";
 import type {
-  HttpProxyResult,
   AgentReferenceState,
   AgentCopy,
   AgentHistoryEntry,
   AgentPage,
   AgentOverview,
   AgentOverviewPage,
-  RelatedAgentEntities,
-  AgentTestRunResult,
-  AgentTestTurnResult,
-  AgentCreationWindowInput,
 } from "./agent.queries.ts";
 import type * as agentQueriesModule from "./agent.queries.ts";
 import type { Agent, AgentWithFields } from "./agent.ts";
@@ -91,12 +83,6 @@ export interface AgentApi {
     agentExternalId: string;
   }): Promise<boolean>;
   touchLastSeenAt(input: { id: string; projectId: string; at: Instant }): Promise<void>;
-  /**
-   * The ids of the agents created in a window, oldest first, archived ones included: main's
-   * candidate query for the agent audit-log id backfill (scripts/backfill-agent-audit-log-ids.ts).
-   */
-  findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]>;
-  executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult>;
   listWithPresence(input: {
     projectId: string;
     page: number;
@@ -108,9 +94,6 @@ export interface AgentApi {
     projectId: string;
     actorId: string;
   }): Promise<AgentCopy[]>;
-  copyForActor(
-    input: CopyAgentCommand & { actorId: string },
-  ): Promise<agentQueriesModule.AgentCopyCreated>;
   pushToCopiesForActor(input: {
     agentId: string;
     projectId: string;
@@ -132,18 +115,13 @@ export interface AgentApi {
   create(input: CreateAgentCommand): Promise<AgentWithFields>;
   update(input: UpdateAgentCommand): Promise<AgentWithFields>;
   archive(input: ArchiveAgentCommand): Promise<Agent>;
-  relatedEntities(input: { id: string; projectId: string }): Promise<RelatedAgentEntities>;
   cascadeArchive(
     input: ArchiveAgentCommand,
   ): Promise<{ agent: Agent; archivedWorkflow: { id: string } | null }>;
   getCopies(input: { sourceAgentId: string; allowedProjectIds?: string[] }): Promise<AgentCopy[]>;
   getSourceOfCopy(input: { agentId: string; projectId: string }): Promise<Agent>;
-  copy(input: CopyAgentCommand): Promise<{
-    id: string;
-    projectId: string;
-    name: string;
-    copiedFromAgentId: string;
-  }>;
+  /** Writes the copy's row; workflow's `copyAgent` door copied a workflow agent's graph first. */
+  createCopy(input: CopyAgentCommand): Promise<agentQueriesModule.AgentCopyCreated>;
   pushToCopies(input: {
     sourceAgentId: string;
     sourceProjectId: string;
@@ -167,21 +145,6 @@ export interface AgentApi {
   getConnectedByName(input: { projectId: string; name: string }): Promise<Agent[]>;
   /** Unarchived, recently seen connected agents in these projects, newest registration first. */
   findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]>;
-  testTurn(input: {
-    id: string;
-    projectId: string;
-    message: string;
-    params?: Record<string, string | number | boolean>;
-    actorId: string;
-  }): Promise<AgentTestTurnResult>;
-  testRun(input: {
-    agentId: string;
-    projectId: string;
-    /** The person who started it; null for a key that acts as nobody. */
-    actorId: string | null;
-    /** The API key they started it with; the run's own key holds no more than it. */
-    callerApiKeyId?: string | null;
-  }): Promise<AgentTestRunResult>;
   /** The platform's own deep link to this agent's editor drawer. */
   platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string;
 }
@@ -191,15 +154,3 @@ export const AgentApi = moduleApi<AgentApi>()("agent");
 export type AgentWorkflowInput = { projectId: string; workflowId: string };
 export type AgentWorkflowConfig = { id: string; config: Record<string, unknown> };
 export type UpdateAgentWorkflowConfigInput = AgentWorkflowInput & AgentWorkflowConfig;
-
-/** Single-replica installs may relay without Redis. No payload limit means the protocol cap. */
-export const agentServerConfig = Config.define((c) => ({
-  replicaCount: c.env("LANGWATCH_APP_REPLICAS", z.coerce.number().int().positive().default(1)),
-  relayMaxPayloadMb: c.env(
-    "LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
-    z.coerce.number().positive().optional(),
-  ),
-  publicBaseUrl,
-}));
-
-export type AgentServerConfig = ConfigOf<typeof agentServerConfig>;

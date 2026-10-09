@@ -1,6 +1,6 @@
 Feature: What a process hands its modules
 
-  A process composes modules from the members it holds, the peers it hands in
+  A process composes modules from the store clients it holds, the peers it hands in
   and the repository tier it chooses in code.
 
   @unit
@@ -22,10 +22,15 @@ Feature: What a process hands its modules
     Given a caller asks for a module's memory repositories in code
     When the process boots
     Then the module's memory tier is built and no store client is asked for
-    And a module that declares no repositories has no memory tier to ask for, and says so
 
   @unit
   Scenario: A task binder is handed its module's parsed config
     Given a module that declares a config slice and builds its tasks with a binder
     When a process with the "tasks" role boots with that module's config stated
     Then the binder is handed the module's parsed config beside its app
+
+  @unit
+  Scenario: A repository tier is handed its module's parsed config
+    Given a module whose live repository tier reads a leaf of the module's config
+    When the process boots with that module's config stated
+    Then the live tier is built with the module's parsed config beside its stores

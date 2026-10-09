@@ -24,11 +24,14 @@ import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-age
 import { useCan } from "../../../../behavior/use-can.ts";
 import { AGENT_TYPE_SELECTOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
 import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
+import {
+  type SuiteNameDialogModel,
+  useSuiteNameDialog,
+} from "../suite-rail/use-suite-name-dialog.ts";
 import { useScenarioPeriod } from "../use-scenario-period.ts";
 import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
 import { type CaseOpenActions, useCaseOpenActions } from "./use-case-open-actions.ts";
 import { type CaseRunActions, useCaseRunActions } from "./use-case-run-actions.ts";
-import { type SuiteNameDialogModel, useSuiteNameDialog } from "./use-suite-name-dialog.ts";
 import { type TestCasesData, useTestCasesData } from "./use-test-cases-data.ts";
 import { type TestCasesView, useTestCasesView } from "./use-test-cases-view.ts";
 

@@ -3,7 +3,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   type TraceRateLimitDecision,
   TraceRateLimitRepository,
-} from "../trace-rate-limit.repository.ts";
+} from "../../features/ingestion/repositories/trace-rate-limit.repository.ts";
 
 /** The Redis limiter's memory twin: one fixed window per key, held in this process. */
 export class MemoryTraceRateLimitRepository extends TraceRateLimitRepository {

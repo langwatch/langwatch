@@ -15,20 +15,20 @@ import {
 } from "react-icons/lu";
 
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
-import type { EvalChipDisplay } from "../../../../model/evaluation-results.ts";
-import { getEvalChipDisplay } from "../../../../model/evaluation-results.ts";
-import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
-import { ChipBar } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
-import { useConversationAnnotations } from "../hooks/use-conversation-annotations.ts";
-import { useConversationTurns } from "../hooks/use-conversation-turns.ts";
-import { useSpanTree } from "../hooks/use-span-tree.ts";
-import type { RichEval } from "../hooks/use-trace-evaluations.ts";
+import { useConversationAnnotations } from "../../../../features/conversation/behavior/use-conversation-annotations.ts";
+import { useConversationTurns } from "../../../../features/conversation/behavior/use-conversation-turns.ts";
+import { useSpanTree } from "../../../../features/span/behavior/use-span-tree.ts";
+import type { RichEval } from "../../../../features/trace-drawer/behavior/use-trace-evaluations.ts";
 import {
   type PromptChipState,
   type SdkInfoLike,
   type TraceHeaderChipData,
   useTraceHeaderChips,
-} from "../hooks/use-trace-header-chips.ts";
+} from "../../../../features/trace-drawer/behavior/use-trace-header-chips.ts";
+import type { EvalChipDisplay } from "../../../../model/evaluation-results.ts";
+import { getEvalChipDisplay } from "../../../../model/evaluation-results.ts";
+import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
+import { ChipBar } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { TraceCommentList } from "./anchored-comments/trace-comment-list.tsx";
 import { buildScenarioChipDef } from "./scenario-chip.tsx";
 

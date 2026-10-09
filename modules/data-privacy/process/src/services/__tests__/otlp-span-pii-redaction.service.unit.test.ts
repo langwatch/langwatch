@@ -5,8 +5,9 @@ import {
 } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
+import { type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import type { PiiClearing } from "../../rules/pii-analysis.rules.ts";

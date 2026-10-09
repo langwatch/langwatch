@@ -17,18 +17,18 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import { MemoryProviderAccountChannel } from "../channels/memory/memory.provider-account.channel.ts";
-import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
-import type { GovernanceDiagnosticsSink } from "../services/governance-policy.service.ts";
+import { PullDestinationService } from "../features/ingestion-pull/services/pull-destination.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
-} from "../services/ingestion-source-secret.service.ts";
+} from "../features/ingestion-source/services/ingestion-source-secret.service.ts";
 import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-} from "../services/ingestion-source.service.ts";
-import { IngestionSourceService } from "../services/ingestion-source.service.ts";
-import { PullDestinationService } from "../services/pull-destination.service.ts";
+} from "../features/ingestion-source/services/ingestion-source.service.ts";
+import { IngestionSourceService } from "../features/ingestion-source/services/ingestion-source.service.ts";
+import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import type { GovernanceDiagnosticsSink } from "../services/governance-policy.service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;

@@ -70,7 +70,6 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
 import { SlackApi } from "@langwatch/slack-contract";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WebhookApi } from "@langwatch/webhook-contract";
@@ -79,6 +78,8 @@ import type { AutomationGraphNotifier } from "../channels/automation-graph-alert
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import type { AutomationChannels } from "../channels/automation.channels.ts";
+import { SlackWebApiDeliveryChannel } from "../channels/slack/slack.web-api-delivery.channel.ts";
 import { OutboxAutomationAuditSink } from "../eventing/automation-audit.intent.ts";
 import {
   createAutomationsPipeline,
@@ -87,6 +88,42 @@ import {
 import type { AutomationScheduledIntent } from "../eventing/graph-alert-sweep.intent.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import type { AutomationSettlementExecutor } from "../eventing/trigger-settlement.intent.ts";
+import type { AutomationDispatchError } from "../features/graph-alert/services/automation-graph-activity.service.ts";
+import { AutomationGraphAlertNotifierService } from "../features/graph-alert/services/automation-graph-alert-notifier.service.ts";
+import { GraphTriggerHeartbeatService } from "../features/graph-alert/services/graph-trigger-heartbeat.service.ts";
+import { AutomationGraphService } from "../features/graph-alert/services/trigger-graph.service.ts";
+import { ReportDispatcherService } from "../features/report/services/report-dispatcher.service.ts";
+import { ReportScheduleService } from "../features/report/services/report-schedule.service.ts";
+import { AutomationMatchRecordMetricsService } from "../features/runaway/services/automation-match-record-metrics.service.ts";
+import { AutomationNextStepService } from "../features/runaway/services/automation-next-step.service.ts";
+import { AutomationRunawayMetricsOtelService } from "../features/runaway/services/automation-runaway-metrics-otel.service.ts";
+import { AutomationRunawayUncontainedService } from "../features/runaway/services/automation-runaway-uncontained.service.ts";
+import { AutomationRunawayService } from "../features/runaway/services/automation-runaway.service.ts";
+import { AutomationEmailCapService } from "../features/runaway/services/email-cap.service.ts";
+import { PersistActionWriterService } from "../features/runaway/services/persist-action-writer.service.ts";
+import { AutomationPersistActionService } from "../features/runaway/services/persist-action.service.ts";
+import { AutomationPersistCapService } from "../features/runaway/services/persist-cap.service.ts";
+import {
+  RunawayContainmentService,
+  type AutomationRunawaySignals,
+} from "../features/runaway/services/runaway-containment.service.ts";
+import { AutomationDispatchErrorsTerminalService } from "../features/settlement/services/automation-dispatch-errors-terminal.service.ts";
+import { AutomationSettlementBreachLateService } from "../features/settlement/services/automation-settlement-breach-late.service.ts";
+import { AutomationSettlementBreachLoggedService } from "../features/settlement/services/automation-settlement-breach-logged.service.ts";
+import { AutomationSettlementLedgerService } from "../features/settlement/services/automation-settlement-ledger.service.ts";
+import { AutomationSettlementMatchConfirmationService } from "../features/settlement/services/automation-settlement-match-confirmation.service.ts";
+import { AutomationSettlementObservabilityService } from "../features/settlement/services/automation-settlement-observability.service.ts";
+import { AutomationTriggerMatchDispatcherService } from "../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
+import { AutomationSettlementDispatchService } from "../features/settlement/services/trigger-settlement-dispatch.service.ts";
+import {
+  AutomationSlackClaimReconcileService,
+  type SlackClaimReconcileCounts,
+  type SlackClaimReconcileInput,
+} from "../features/slack/services/automation-slack-claim-reconcile.service.ts";
+import { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
+import { AutomationSlackDirectoryUnavailableService } from "../features/slack/services/automation-slack-directory-unavailable.service.ts";
+import { SlackConnectionMigrationService } from "../features/slack/services/slack-connection-migration.service.ts";
+import { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
 import { SlackConnectionMigration } from "../migrations/legacy-import.slack-connection.migration.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
@@ -98,13 +135,8 @@ import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memor
 import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
 import { AutomationAuditSinkService } from "../services/automation-audit-sink.service.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
-import { AutomationDispatchErrorsTerminalService } from "../services/automation-dispatch-errors-terminal.service.ts";
 import { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../services/automation-evaluation-trigger-filter.service.ts";
-import type { AutomationDispatchError } from "../services/automation-graph-activity.service.ts";
-import { AutomationGraphAlertNotifierService } from "../services/automation-graph-alert-notifier.service.ts";
-import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
-import { AutomationNextStepService } from "../services/automation-next-step.service.ts";
 import { AutomationNotificationDeliveryUnavailableService } from "../services/automation-notification-delivery-unavailable.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
@@ -113,45 +145,19 @@ import {
   AutomationRulesService,
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
-import { AutomationRunawayMetricsOtelService } from "../services/automation-runaway-metrics-otel.service.ts";
-import { AutomationRunawayUncontainedService } from "../services/automation-runaway-uncontained.service.ts";
-import { AutomationRunawayService } from "../services/automation-runaway.service.ts";
 import { AutomationScheduledIntentsService } from "../services/automation-scheduled-intents.service.ts";
-import { AutomationSettlementBreachLateService } from "../services/automation-settlement-breach-late.service.ts";
-import { AutomationSettlementBreachLoggedService } from "../services/automation-settlement-breach-logged.service.ts";
-import { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
-import { AutomationSettlementMatchConfirmationService } from "../services/automation-settlement-match-confirmation.service.ts";
-import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
-import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
-import { AutomationSlackDirectoryUnavailableService } from "../services/automation-slack-directory-unavailable.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
 import { AutomationTestFireService } from "../services/automation-test-fire.service.ts";
 import { AutomationTraceFilterCompilerService } from "../services/automation-trace-filter-compiler.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
-import { AutomationTriggerMatchDispatcherService } from "../services/automation-trigger-match-dispatcher.service.ts";
 import {
   type AutomationWebhookStoredParams,
   AutomationWebhookSecretsService,
 } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationService, type AutomationLogger } from "../services/automation.service.ts";
 import { DatasetTraceMapperService } from "../services/dataset-trace-mapper.service.ts";
-import { AutomationEmailCapService } from "../services/email-cap.service.ts";
-import { GraphTriggerHeartbeatService } from "../services/graph-trigger-heartbeat.service.ts";
-import { PersistActionWriterService } from "../services/persist-action-writer.service.ts";
-import { AutomationPersistActionService } from "../services/persist-action.service.ts";
-import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
-import { ReportDispatcherService } from "../services/report-dispatcher.service.ts";
-import { ReportScheduleService } from "../services/report-schedule.service.ts";
-import {
-  RunawayContainmentService,
-  type AutomationRunawaySignals,
-} from "../services/runaway-containment.service.ts";
-import { SlackConnectionMigrationService } from "../services/slack-connection-migration.service.ts";
-import { SlackDestinationService } from "../services/slack-destination.service.ts";
 import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
-import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
-import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
   type UnsubscribeTokenVerifier,
@@ -274,6 +280,7 @@ type AutomationInfrastructureInput = Readonly<{
   slackConnections: AutomationSlackConnectionService;
   notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
   webhooks: Pick<WebhookApi, "sendRequest">;
+  channels?: AutomationChannels;
   traces: Pick<TraceApi, "translateTraceFilter">;
   auditLog: AuditLogApi;
   verifier: UnsubscribeTokenVerifier;
@@ -343,7 +350,12 @@ type AutomationRuntimeDependencies = Omit<
   AutomationSettlementPeer
 >;
 
-type AutomationSetup = FeatureSetup<AutomationDependencies, never, AutomationServerConfig> &
+type AutomationSetup = FeatureSetup<
+  AutomationDependencies,
+  AutomationServerConfig,
+  never,
+  AutomationChannels
+> &
   Readonly<{ repositories: AutomationRepositories }>;
 
 /** What the application is composed from, once the process has supplied it. */
@@ -411,6 +423,7 @@ export class AutomationModule implements AutomationApi {
         slackConnections,
         notifications: setup.dependencies.notifications,
         webhooks: setup.dependencies.webhooks,
+        channels: setup.channels,
         traces: setup.dependencies.traces,
         auditLog: setup.dependencies.auditLog,
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
@@ -450,6 +463,11 @@ export class AutomationModule implements AutomationApi {
           slackConnections,
         }),
       });
+      automation.#slackClaims = AutomationSlackClaimReconcileService.create({
+        slack,
+        triggers,
+        slackConnections,
+      });
       return automation;
     });
   }
@@ -471,6 +489,12 @@ export class AutomationModule implements AutomationApi {
             ? {}
             : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
           webhookTransport: input.webhooks,
+          ...(input.channels
+            ? {
+                slackWebhookClient: input.channels.slackWebhookClient,
+                slackApiTransport: input.channels.slackApiTransport,
+              }
+            : {}),
           logger,
         })
       : AutomationNotificationDeliveryUnavailableService.create();
@@ -505,7 +529,10 @@ export class AutomationModule implements AutomationApi {
       }),
       persistCaps: input.repositories.persistCaps,
       providers,
-      slackChannels: AutomationSlackDirectoryUnavailableService.create(),
+      // Main listed channels over conversations.list; only a process with no transport cannot.
+      slackChannels: input.channels
+        ? SlackWebApiDeliveryChannel.create(input.channels.slackApiTransport)
+        : AutomationSlackDirectoryUnavailableService.create(),
       traceFilters: AutomationTraceFilterCompilerService.create({ traces: input.traces, logger }),
       limits: input.repositories.callCounter,
       audit: AutomationAuditSinkService.create(input.auditLog),
@@ -769,6 +796,7 @@ export class AutomationModule implements AutomationApi {
   readonly #evaluations: AutomationEvaluationSubscriberService;
   readonly #triggerMatches: AutomationTriggerMatchDispatcherService;
   readonly #reportSchedules: ReportScheduleService;
+  #slackClaims: AutomationSlackClaimReconcileService | undefined;
   #settlement: AutomationSettlement | undefined;
   #reportDispatcher: ReportDispatcher | undefined;
   #reportInstances: Pick<ProcessStore, "findByRef"> | undefined;
@@ -820,6 +848,17 @@ export class AutomationModule implements AutomationApi {
   /** Configures every active report that has no schedule process yet (the tasks backfill). */
   reconcileReportSchedules(): Promise<{ repaired: number }> {
     return this.#reportSchedules.reconcile();
+  }
+
+  /** Claims every active Slack automation's connection, then releases what none holds. */
+  reconcileSlackClaims(input: SlackClaimReconcileInput): Promise<SlackClaimReconcileCounts> {
+    if (!this.#slackClaims) {
+      throw new Error(
+        "This AutomationModule was composed from already-built services, so it holds no Slack " +
+          "claim reconcile: compose it through AutomationModule.create to run that step.",
+      );
+    }
+    return this.#slackClaims.reconcile(input);
   }
 
   // -- reads -----------------------------------------------------------------
@@ -942,14 +981,15 @@ export class AutomationModule implements AutomationApi {
     return this.#automation.getReportSchedules(input);
   }
 
-  registeredMigrations(): readonly SystemMigration[] {
+  /** The Slack connection move, which the module declares as its tenant step. */
+  slackConnectionMigration(): SlackConnectionMigration {
     if (!this.#migration) {
       throw new Error(
         "This AutomationModule was composed from already-built services, so it holds no migration: " +
-          "compose it through AutomationModule.create to answer its registered migrations.",
+          "compose it through AutomationModule.create to declare its tenant step.",
       );
     }
-    return [this.#migration];
+    return this.#migration;
   }
 
   /** The Slack conversations a bot token can see, for the channel picker. */

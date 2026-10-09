@@ -8,8 +8,8 @@ import type {
 
 import type { EvaluationAnalyticsFoldCacheRepository } from "../repositories/evaluation-analytics-fold-cache.repository.ts";
 import type { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
-import type { EvaluationAnalyticsData } from "./evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup.projection.ts";
+import type { EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 import {
   EvaluationAnalyticsStore,
   type EvaluationAnalyticsFoldWrites,

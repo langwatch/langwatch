@@ -4,9 +4,9 @@
  * is still arriving, so nothing flashes on before the flag resolves.
  */
 
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
 /** The flag every voice surface reads. */
 export const VOICE_AGENTS_FLAG_KEY = "release_voice_agents_enabled";
@@ -17,7 +17,7 @@ export function useVoiceAgentsEnabled(): boolean {
     redirectToProjectOnboarding: false,
   });
 
-  const { enabled, isLoading } = useFeatureFlag(VOICE_AGENTS_FLAG_KEY, {
+  const { enabled, isLoading } = useFeatureFlag(FrontendFlags[VOICE_AGENTS_FLAG_KEY], {
     projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id ?? NOT_TARGETED,
     enabled: !!organization?.id,

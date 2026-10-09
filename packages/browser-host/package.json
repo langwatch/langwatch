@@ -18,10 +18,6 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./compat/next-dynamic": {
-      "types": "./dist/compat/next-dynamic.d.ts",
-      "default": "./src/compat/next-dynamic.ts"
-    },
     "./declarations": {
       "types": "./dist/declarations.d.ts",
       "default": "./src/declarations.ts"
@@ -30,29 +26,25 @@
       "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"
     },
-    "./feature-flag-overrides": {
-      "types": "./dist/feature-flag-overrides.d.ts",
-      "default": "./src/feature-flag-overrides.ts"
-    },
     "./analytics": {
-      "types": "./dist/analytics.d.ts",
-      "default": "./src/analytics.ts"
+      "types": "./dist/telemetry/analytics.d.ts",
+      "default": "./src/telemetry/analytics.ts"
     },
     "./use-router": {
       "types": "./dist/use-router.d.ts",
       "default": "./src/use-router.ts"
     },
     "./browser-notifications": {
-      "types": "./dist/browser-notifications.d.ts",
-      "default": "./src/browser-notifications.ts"
+      "types": "./dist/push/browser-notifications.d.ts",
+      "default": "./src/push/browser-notifications.ts"
     },
     "./web-push": {
-      "types": "./dist/web-push.d.ts",
-      "default": "./src/web-push.ts"
+      "types": "./dist/push/web-push.d.ts",
+      "default": "./src/push/web-push.ts"
     },
     "./push-service-worker": {
-      "types": "./dist/push-service-worker.d.ts",
-      "default": "./src/push-service-worker.ts"
+      "types": "./dist/push/push-service-worker.d.ts",
+      "default": "./src/push/push-service-worker.ts"
     },
     "./toaster": {
       "types": "./dist/toaster.d.ts",
@@ -75,32 +67,32 @@
       "default": "./src/errors.ts"
     },
     "./fetch-sse": {
-      "types": "./dist/fetch-sse.d.ts",
-      "default": "./src/fetch-sse.ts"
+      "types": "./dist/query/fetch-sse.d.ts",
+      "default": "./src/query/fetch-sse.ts"
     },
     "./cache-tiers": {
-      "types": "./dist/cache-tiers.d.ts",
-      "default": "./src/cache-tiers.ts"
+      "types": "./dist/query/cache-tiers.d.ts",
+      "default": "./src/query/cache-tiers.ts"
     },
     "./session-version": {
-      "types": "./dist/session-version.d.ts",
-      "default": "./src/session-version.ts"
+      "types": "./dist/query/session-version.d.ts",
+      "default": "./src/query/session-version.ts"
     },
     "./query-persistence": {
-      "types": "./dist/query-persistence.d.ts",
-      "default": "./src/query-persistence.ts"
+      "types": "./dist/query/query-persistence.d.ts",
+      "default": "./src/query/query-persistence.ts"
     },
     "./read-freshness": {
-      "types": "./dist/read-freshness.d.ts",
-      "default": "./src/read-freshness.ts"
+      "types": "./dist/query/read-freshness.d.ts",
+      "default": "./src/query/read-freshness.ts"
     },
     "./query-sync": {
-      "types": "./dist/query-sync.d.ts",
-      "default": "./src/query-sync.ts"
+      "types": "./dist/query/query-sync.d.ts",
+      "default": "./src/query/query-sync.ts"
     },
     "./query-retry": {
-      "types": "./dist/query-retry.d.ts",
-      "default": "./src/query-retry.ts"
+      "types": "./dist/query/query-retry.d.ts",
+      "default": "./src/query/query-retry.ts"
     },
     "./testing": {
       "types": "./dist/testing.d.ts",
@@ -110,17 +102,9 @@
       "types": "./dist/link.d.ts",
       "default": "./src/link.tsx"
     },
-    "./use-drawer": {
-      "types": "./dist/use-drawer.d.ts",
-      "default": "./src/use-drawer.ts"
-    },
     "./global-store": {
       "types": "./dist/global-store.d.ts",
       "default": "./src/global-store.ts"
-    },
-    "./upgrade-modal-store": {
-      "types": "./dist/upgrade-modal-store.d.ts",
-      "default": "./src/upgrade-modal-store.ts"
     },
     "./use-organization-team-project": {
       "types": "./dist/use-organization-team-project.d.ts",
@@ -163,20 +147,20 @@
       "default": "./src/address.ts"
     },
     "./browser-analytics": {
-      "types": "./dist/browser-analytics.d.ts",
-      "default": "./src/browser-analytics.ts"
+      "types": "./dist/telemetry/browser-analytics.d.ts",
+      "default": "./src/telemetry/browser-analytics.ts"
     },
     "./posthog": {
-      "types": "./dist/posthog.d.ts",
-      "default": "./src/posthog.ts"
+      "types": "./dist/telemetry/posthog.d.ts",
+      "default": "./src/telemetry/posthog.ts"
     },
     "./browser-tracing": {
-      "types": "./dist/browser-tracing.d.ts",
-      "default": "./src/browser-tracing.ts"
+      "types": "./dist/telemetry/browser-tracing.d.ts",
+      "default": "./src/telemetry/browser-tracing.ts"
     },
     "./navigation-tracing": {
-      "types": "./dist/navigation-tracing.d.ts",
-      "default": "./src/navigation-tracing.ts"
+      "types": "./dist/telemetry/navigation-tracing.d.ts",
+      "default": "./src/telemetry/navigation-tracing.ts"
     },
     "./feedback": {
       "types": "./dist/ui-feedback.d.ts",
@@ -187,8 +171,8 @@
       "default": "./src/lent.ts"
     },
     "./sse-subscription": {
-      "types": "./dist/sse-subscription.d.ts",
-      "default": "./src/sse-subscription.ts"
+      "types": "./dist/query/sse-subscription.d.ts",
+      "default": "./src/query/sse-subscription.ts"
     },
     "./page-visibility": {
       "types": "./dist/page-visibility.d.ts",
@@ -205,28 +189,14 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
-    "@langwatch/agent-contract": "workspace:*",
-    "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
-    "@langwatch/dashboard-contract": "workspace:*",
-    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-licensing-contract": "workspace:*",
-    "@langwatch/evaluator-contract": "workspace:*",
-    "@langwatch/experiment-contract": "workspace:*",
-    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
-    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@tanstack/react-query": "catalog:",
     "idb-keyval": "catalog:",
@@ -265,5 +235,8 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "^8.0.1"
+  },
+  "langwatch": {
+    "group": "browser"
   }
 }

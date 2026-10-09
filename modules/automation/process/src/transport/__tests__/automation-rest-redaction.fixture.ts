@@ -21,6 +21,8 @@ import { z } from "zod";
 
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
+import { AutomationSlackConnectionService } from "../../features/slack/services/automation-slack-connection.service.ts";
+import { SlackDestinationService } from "../../features/slack/services/slack-destination.service.ts";
 import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
 import { MemoryTriggerFireHistoryRepository } from "../../repositories/memory/memory.trigger-fire-history.repository.ts";
 import { AutomationProviderRegistryService } from "../../services/automation-provider-registry.service.ts";
@@ -28,8 +30,6 @@ import {
   AutomationPublicApiService,
   type AutomationPublicApiRows,
 } from "../../services/automation-public-api.service.ts";
-import { AutomationSlackConnectionService } from "../../services/automation-slack-connection.service.ts";
-import { SlackDestinationService } from "../../services/slack-destination.service.ts";
 import { TriggerFilterValidationService } from "../../services/trigger-filter-validation.service.ts";
 import { mountAutomationRest, TEST_PROJECT } from "./automation-rest.harness.ts";
 

@@ -49,7 +49,7 @@ type BranchCheckRecord = {
  * states which part of the typed `PrismaClient` linkage touches, so a wrong
  * caller is a type error at composition, not a `TypeError` on first query.
  */
-export type PrismaGithubPullRequestsDatabase = Pick<
+type PrismaGithubPullRequestsDatabase = Pick<
   PrismaClient,
   "githubPullRequest" | "githubBranchPullRequestCheck" | "$executeRaw"
 >;

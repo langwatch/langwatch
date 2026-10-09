@@ -6,11 +6,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { LWQL_SOURCE_ALIAS } from "../../rules/lwql-source-alias.rules.ts";
+import { LWQL_SOURCE_ALIAS } from "../../features/lwql-catalogue/rules/lwql-source-alias.rules.ts";
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import type { LangWatchQLViewDefinition } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   selectRows,

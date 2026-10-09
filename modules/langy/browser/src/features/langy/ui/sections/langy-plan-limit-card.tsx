@@ -5,6 +5,7 @@ import { ArrowUpRight, Crown } from "lucide-react";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { usePlanManagementUrl } from "../../../../behavior/use-plan-management-url.ts";
+import { useLangyHost } from "../../../../model/langy-host.ts";
 import { trackEvent } from "../../../../model/tracking.ts";
 import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure.ts";
@@ -14,12 +15,13 @@ import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-fa
  */
 export function LangyPlanLimitCard({ presentation }: { presentation: LangyToolErrorPresentation }) {
   const limit = presentation.limit!;
-  const { project, hasOrgPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const langyHost = useLangyHost();
   const { url, buttonLabel } = usePlanManagementUrl();
   const router = useRouter();
   const panelMode = useLangyStore((state) => state.panelMode);
   const closePanel = useLangyStore((state) => state.closePanel);
-  const canManagePlan = hasOrgPermission("organization:manage");
+  const canManagePlan = langyHost.hasOrganizationPermission("organization:manage");
 
   const upgrade = () => {
     // Same funnel event every other upgrade prompt fires, so an upgrade that

@@ -4,7 +4,7 @@ import type { IdentifierProvider } from "@langwatch/identity-contract";
 import { Instance, Ksuid } from "@langwatch/ksuid";
 
 /** The fact an identifier id is derived from. */
-export type DeriveIdentifierIdInput = {
+type DeriveIdentifierIdInput = {
   userId: string;
   provider: IdentifierProvider;
   providerAccountId: string | null;

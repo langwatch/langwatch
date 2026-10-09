@@ -35,14 +35,23 @@ import {
   type ApiKeyCallerReadInput,
   type CliKeyScopeSummary,
   type CliSessionKeyRevocation,
+  type CliSessionRevocationCause,
+  type OrganizationProvisioningRequest,
+  type ProvisionedOrganization,
 } from "@langwatch/api-key-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { credentialsSecret, Secret, sessionSecret, type ScopedSecrets } from "@langwatch/secrets";
+import { ProjectApi, type PaginatedProjects } from "@langwatch/project-contract";
+import {
+  credentialsSecret,
+  credentialsSecretPrevious,
+  Secret,
+  sessionSecret,
+  type ScopedSecrets,
+} from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
@@ -51,10 +60,19 @@ import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
+import { OrganizationProvisioningService } from "../services/organization-provisioning.service.ts";
+import {
+  ProjectProvisioningService,
+  type ProjectProvisioningRequest,
+  type ProvisionedProject,
+  type VisibleProjectsQuery,
+} from "../services/project-provisioning.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
+import type { ApiKeyOrganizationsDoorApi } from "../transport/api-key-organizations.rest.ts";
+import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
 
 /** Who performs an operation, whose membership is proved, and any operator acting as them. */
-export interface ApiKeyCaller {
+interface ApiKeyCaller {
   readonly id: string;
   readonly impersonatorId?: string | undefined;
 }
@@ -67,7 +85,7 @@ type ApiKeyDependencies = Readonly<{
 
 // Module dependencies from the process: repositories, peer APIs, the HMAC pepper's secrets.
 // This list is everything the module is built from.
-export type ApiKeySetup = Readonly<{
+type ApiKeySetup = Readonly<{
   repositories: ApiKeyRepositories;
   dependencies: Readonly<{
     authorization: AuthzApi;
@@ -80,7 +98,7 @@ export type ApiKeySetup = Readonly<{
 }>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
-export type CreateApiKeyRequest = Readonly<{
+type CreateApiKeyRequest = Readonly<{
   organizationId: string;
   name: string;
   description?: string | undefined;
@@ -92,7 +110,7 @@ export type CreateApiKeyRequest = Readonly<{
   bindings: CreateApiKeyInput["bindings"];
 }>;
 
-export type UpdateApiKeyRequest = Readonly<{
+type UpdateApiKeyRequest = Readonly<{
   organizationId: string;
   apiKeyId: string;
   name?: string | undefined;
@@ -115,25 +133,34 @@ function scopeNames(
   return names.projectName;
 }
 
-/** The first pepper the chain answers; none refuses the boot rather than hashing under "". */
-async function apiKeyPepper(secrets: ScopedSecrets): Promise<string> {
-  const { pepper, pepperFallback, pepperLastFallback } = ApiKeyModule.secrets;
+/**
+ * The first pepper the chain answers; none refuses the boot rather than hashing under "".
+ * The previous credentials secret verifies old hashes only while the pepper follows
+ * CREDENTIALS_SECRET: a dedicated API_KEY_PEPPER does not move when that secret rotates.
+ */
+async function apiKeyPeppers(
+  secrets: ScopedSecrets,
+): Promise<{ pepper: string; previousPepper: string | undefined }> {
+  const { pepper, pepperFallback, pepperLastFallback, pepperPrevious } = ApiKeyModule.secrets;
   const answered = await secrets.into(pepper, (primary) =>
     secrets.into(pepperFallback, (credentials) =>
       secrets.into(pepperLastFallback, (session) =>
-        [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
+        secrets.into(pepperPrevious, (previous) => ({
+          pepper: [primary, credentials, session].find((value) => value !== void 0 && value !== ""),
+          previousPepper: primary ? void 0 : previous || void 0,
+        })),
       ),
     ),
   );
-  if (answered === void 0) {
+  if (answered.pepper === void 0) {
     throw new ConfigParseError([
       "api-key.pepper ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set",
     ]);
   }
-  return answered;
+  return { pepper: answered.pepper, previousPepper: answered.previousPepper };
 }
 
-export class ApiKeyModule implements ApiKeyApi {
+export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrganizationsDoorApi {
   static readonly contract = ApiKeyApi;
   static readonly dependencies: ApiKeyDependencies = {
     authorization: AuthzApi,
@@ -146,10 +173,12 @@ export class ApiKeyModule implements ApiKeyApi {
     pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
     pepperFallback: credentialsSecret,
     pepperLastFallback: sessionSecret,
+    /** Verifies keys hashed before a CREDENTIALS_SECRET rotation; each re-hashes on next use. */
+    pepperPrevious: credentialsSecretPrevious,
   } as const;
 
   static async create(setup: ApiKeySetup): Promise<ApiKeyModule> {
-    const pepper = await apiKeyPepper(setup.secrets);
+    const { pepper, previousPepper } = await apiKeyPeppers(setup.secrets);
     const authorization = setup.dependencies.authorization;
     const service = ApiKeyService.create({
       repository: setup.repositories.apiKeys,
@@ -168,7 +197,7 @@ export class ApiKeyModule implements ApiKeyApi {
         deriveBindingId: (input) => authorization.deriveGrantId(input),
         diagnostics: createLogger("langwatch:api-key"),
       }),
-      tokens: ApiKeyTokenService.create(pepper),
+      tokens: ApiKeyTokenService.create(pepper, previousPepper),
     });
     const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
     const sandboxKeys = AgentSandboxKeyService.create({
@@ -179,8 +208,24 @@ export class ApiKeyModule implements ApiKeyApi {
     });
 
     const ingestionKeys = IngestionKeyMintService.create({ apiKeys: service });
+    const provisioning = ProjectProvisioningService.create({
+      apiKeys: service,
+      projects: setup.dependencies.projects,
+    });
+    const organizationProvisioning = OrganizationProvisioningService.create({
+      apiKeys: service,
+      organizations: setup.dependencies.organizations,
+    });
 
-    return new ApiKeyModule({ service, authorization, runKeys, sandboxKeys, ingestionKeys });
+    return new ApiKeyModule({
+      service,
+      authorization,
+      runKeys,
+      sandboxKeys,
+      ingestionKeys,
+      provisioning,
+      organizationProvisioning,
+    });
   }
 
   private constructor(deps: {
@@ -189,12 +234,16 @@ export class ApiKeyModule implements ApiKeyApi {
     runKeys: RunKeyMintService;
     sandboxKeys: AgentSandboxKeyService;
     ingestionKeys: IngestionKeyMintService;
+    provisioning: ProjectProvisioningService;
+    organizationProvisioning: OrganizationProvisioningService;
   }) {
     this.#service = deps.service;
     this.#authorization = deps.authorization;
     this.#runKeys = deps.runKeys;
     this.#sandboxKeys = deps.sandboxKeys;
     this.#ingestionKeys = deps.ingestionKeys;
+    this.#provisioning = deps.provisioning;
+    this.#organizationProvisioning = deps.organizationProvisioning;
   }
 
   readonly #service: ApiKeyService;
@@ -202,6 +251,8 @@ export class ApiKeyModule implements ApiKeyApi {
   readonly #runKeys: RunKeyMintService;
   readonly #sandboxKeys: AgentSandboxKeyService;
   readonly #ingestionKeys: IngestionKeyMintService;
+  readonly #provisioning: ProjectProvisioningService;
+  readonly #organizationProvisioning: OrganizationProvisioningService;
 
   /**
    * The service itself, for the one thing this application deliberately is not about: turning a
@@ -242,6 +293,18 @@ export class ApiKeyModule implements ApiKeyApi {
   async resolveVisibleProjects(input: ApiKeyVisibleProjectsInput): Promise<ApiKeyVisibleProjects> {
     return this.#service.resolveVisibleProjects(input);
   }
+
+  listVisibleProjects(input: VisibleProjectsQuery): Promise<PaginatedProjects> {
+    return this.#provisioning.listVisibleProjects(input);
+  }
+
+  provisionProject(input: ProjectProvisioningRequest): Promise<ProvisionedProject> {
+    return this.#provisioning.provisionProject(input);
+  }
+  provisionOrganization(input: OrganizationProvisioningRequest): Promise<ProvisionedOrganization> {
+    return this.#organizationProvisioning.provisionOrganization(input);
+  }
+
   markUsed(input: { id: string }): void {
     this.#service.markUsed(input);
   }
@@ -379,6 +442,7 @@ export class ApiKeyModule implements ApiKeyApi {
     apiKeyId: string;
     userId: string;
     organizationId: string;
+    cause?: CliSessionRevocationCause;
   }): Promise<CliSessionKeyRevocation> {
     return this.#service.revokeCliSessionKey(input);
   }

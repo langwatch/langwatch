@@ -2,6 +2,7 @@
  * Specs: specs/licensing/configured-license-forms.feature and
  * specs/licensing/sso-license-gating.feature
  */
+import type { EventingCommands } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -9,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createTestLicensingApp, ENTERPRISE_LICENSE_KEY } from "../../__tests__/testing.ts";
 import { ScriptedConnectHost } from "../../channels/__tests__/support/scripted-connect-fetch.ts";
+import type { LicensingCustomerPipeline } from "../../eventing/licensing-customer.pipeline.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
 import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
@@ -42,9 +44,15 @@ function activations(host: ScriptedConnectHost) {
     }));
 }
 
+/** One organization: licensing keeps the licence it stores and records the fact. */
+function organizationRow() {
+  const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org-old", null]]));
+  return { licenses };
+}
+
 async function bootWithConfiguredValue(value: string) {
   const host = connectHost();
-  const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org-old", null]]));
+  const { licenses } = organizationRow();
   const resources = new ResourceScope();
   const app = await createTestLicensingApp({
     repositories: {
@@ -77,6 +85,14 @@ async function bootWithConfiguredValue(value: string) {
     secrets: { LANGWATCH_LICENSE_KEY: value },
     resources,
   });
+  type Senders = EventingCommands<LicensingCustomerPipeline>;
+  app.connectCustomerCommands(
+    createApiFixture<Senders>({
+      recordLicenseStored: createApiFixture<Senders["recordLicenseStored"]>({
+        send: async () => undefined,
+      }),
+    }),
+  );
   const storedLicense = async () => (await licenses.getOrganizationLicense("org-old")).licenseKey;
   return { app, host, storedLicense, services: resources.sealServices() };
 }

@@ -1,7 +1,7 @@
 import { Flex, Text } from "@langwatch/design-system/primitives";
 
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import type { AddonDef } from "../../types.ts";
 
 export const ErrorDetailAddon: AddonDef<TraceListItem> = {

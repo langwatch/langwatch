@@ -24,7 +24,13 @@ import {
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
 } from "@langwatch/organization-contract";
-import type { OrganizationFounding, User } from "@langwatch/organization-contract";
+import type {
+  FullyLoadedOrganization,
+  OrganizationAdmission,
+  OrganizationFounding,
+  OrganizationWithMembersAndTheirTeams,
+  User,
+} from "@langwatch/organization-contract";
 import type {
   Organization,
   OrganizationIntent,
@@ -49,6 +55,7 @@ import {
   isLastAdmin,
 } from "../../rules/organization-membership.rules.ts";
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
+import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 import {
   customRoleFromRecord,
   organizationFromRecord,
@@ -77,13 +84,11 @@ import type {
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
-  FullyLoadedOrganization,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
-  OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
@@ -880,6 +885,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     private readonly cipher: OrganizationSettingsCipher,
   ) {}
 
+  #audit: PrismaOrganizationAuditStore | undefined;
+
+  /** Organization's audit outbox, over this repository's own client. */
+  private get audit(): PrismaOrganizationAuditStore {
+    this.#audit ??= PrismaOrganizationAuditStore.create({ database: this.prisma });
+    return this.#audit;
+  }
+
   findPersonalTeamsInScopes(params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string }[]> {
@@ -1675,27 +1688,29 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
    * the grant lands still leaves the marker. P2002 HERE is a concurrent
    * callback or a retry; any other constraint is a real failure.
    */
+  async readJoinerSeat({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<"MEMBER" | "DEVELOPER"> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { joinerRole: true },
+    });
+    return readJoinerRole(organization?.joinerRole);
+  }
+
   async createMembership(input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
-    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
-    seat?: "MEMBER" | "DEVELOPER";
+    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+    pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
-  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
-    const { organizationId, userId } = input;
-    const seat =
-      input.seat ??
-      readJoinerRole(
-        (
-          await this.prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { joinerRole: true },
-          })
-        )?.joinerRole,
-      );
+  }): Promise<OrganizationAdmission> {
+    const { organizationId, userId, seat, pending } = input;
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.organizationUser.create({
@@ -1703,13 +1718,16 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             userId,
             organizationId,
             role: seat,
-            pendingSsoGrantId: seat === "MEMBER" ? input.pendingAdmissionId : null,
+            disabledAt: pending ? new Date() : null,
+            pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : input.pendingAdmissionId,
           },
         });
         // A Developer gets no grant, so its admission is audited here (ADR-171).
         if (seat === "DEVELOPER") {
-          await tx.auditLog.create({
-            data: {
+          await this.audit.append({
+            transaction: tx,
+            fact: {
+              tenantId: organizationId,
               action: DEVELOPER_ADMISSION_AUDIT_ACTION,
               userId,
               organizationId,
@@ -1724,19 +1742,16 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           });
         }
       });
-      return { outcome: "created", seat };
+      return { outcome: "created", seat, pending };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         // The row that is there decides, not today's setting: a MEMBER row a
         // concurrent callback made still has its grant to attach.
         const existing = await this.prisma.organizationUser.findUnique({
           where: { userId_organizationId: { userId, organizationId } },
-          select: { role: true },
+          select: { role: true, disabledAt: true },
         });
-        return {
-          outcome: "already-present",
-          seat: existing?.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER",
-        };
+        return { outcome: "already-present", ...admittedSeatOf(existing) };
       }
       throw error;
     }
@@ -1745,7 +1760,32 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   /**
    * Removes a membership, and the personal workspace that came with it.
    */
-  async deleteMember(input: DeleteMemberInput): Promise<void> {
+  async createSsoDomainMembership({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<"created" | "already-present"> {
+    try {
+      await this.prisma.organizationUser.create({
+        data: { userId, organizationId, role: OrganizationUserRole.MEMBER },
+      });
+      return "created";
+    } catch (error) {
+      // P2002 is a concurrent callback or a retry; any other failure propagates.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return "already-present";
+      }
+      throw error;
+    }
+  }
+
+  async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
+    return this.prisma.organizationUser.count({ where: { userId } });
+  }
+
+  async deleteMember(input: DeleteMemberInput): Promise<string[]> {
     const { organizationId, userId, actingUserId } = input;
     const actor = ledgerActorFor({
       userId: actingUserId,
@@ -1780,11 +1820,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // write and no check can cache access the removal is about to take away. A
     // crash between the two leaves orphaned grants, which the no-member branch
     // above revokes on retry; a refusal inside the transaction revokes nothing.
-    await this.prisma.$transaction(async (tx) => {
+    const archivedTeamIds = await this.prisma.$transaction(async (tx) => {
       await this.deleteMembershipRow({ tx, organizationId, userId });
-      await this.archivePersonalWorkspaces({ tx, organizationId, userId });
+      return this.archivePersonalWorkspaces({ tx, organizationId, userId });
     });
     await revokeTheirGrants();
+    return archivedTeamIds;
   }
 
   /**
@@ -1855,8 +1896,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   /**
-   * Archives the removed member's personal team and project, on the same
-   * terms `PersonalWorkspaceService.ensure()` reactivates them.
+   * Archives the removed member's personal teams and answers their ids; project archives
+   * their personal projects on organization's fact (ruling C).
    */
   private async archivePersonalWorkspaces({
     tx,
@@ -1866,7 +1907,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     tx: Prisma.TransactionClient;
     organizationId: string;
     userId: string;
-  }): Promise<void> {
+  }): Promise<string[]> {
     const archivedAt = new Date();
     const personalTeams = await tx.team.findMany({
       where: {
@@ -1877,26 +1918,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       },
       select: { id: true },
     });
-    if (personalTeams.length === 0) return;
+    if (personalTeams.length === 0) return [];
 
     const personalTeamIds = personalTeams.map((team) => team.id);
-    // `isPersonal` on the same terms the reactivation reads it, so the two sides move the same
-    // rows. A personal team holds nothing else today (creating a project in one, or moving one
-    // into it, is refused), and the flag mirrors the team's, so this narrows nothing away; it
-    // keeps the pair symmetric if that ever slips, since archiving what the revival would not
-    // return is the failure with no way back.
-    await tx.project.updateMany({
-      where: {
-        teamId: { in: personalTeamIds },
-        isPersonal: true,
-        archivedAt: null,
-      },
-      data: { archivedAt },
-    });
     await tx.team.updateMany({
       where: { id: { in: personalTeamIds } },
       data: { archivedAt },
     });
+    return personalTeamIds;
   }
 
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {
@@ -2271,4 +2300,15 @@ function memberSummaryFromRecord(record: MemberSummaryRecord): OrganizationMembe
     createdAt: fromDate(record.createdAt),
     updatedAt: fromDate(record.updatedAt),
   };
+}
+
+/** The seat an existing row holds, as an admission answers it; a disabled Lite row is pending. */
+function admittedSeatOf(
+  row: { role: string; disabledAt: Date | null } | null,
+): Pick<OrganizationAdmission, "seat" | "pending"> {
+  if (row?.role === OrganizationUserRole.DEVELOPER) return { seat: "DEVELOPER", pending: false };
+  if (row?.role === OrganizationUserRole.EXTERNAL) {
+    return { seat: "EXTERNAL", pending: row.disabledAt !== null };
+  }
+  return { seat: "MEMBER", pending: false };
 }

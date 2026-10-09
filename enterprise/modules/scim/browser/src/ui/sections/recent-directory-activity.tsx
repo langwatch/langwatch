@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** What the directory did on one connection, newest first, read only while open (ADR-126). */
 import {
   Badge,
   Box,
@@ -11,10 +9,12 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** What the directory did on one connection, newest first, read only while open (ADR-126). */
+import { readableDate } from "@langwatch/time";
 import { ChevronRight } from "lucide-react";
 
 import { scimApi, type DirectoryActivityRow } from "../../behavior/scim-api.ts";
-import { readableDate } from "../../model/display-formatters.ts";
 
 type ConnectionScope = { organizationId: string; connectionId: string };
 

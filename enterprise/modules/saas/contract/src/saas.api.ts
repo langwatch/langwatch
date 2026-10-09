@@ -1,4 +1,3 @@
-import { Config, isSaas, type ConfigOf } from "@langwatch/config";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { moduleApi } from "@langwatch/module";
 import { USAGE_REPORT_MAX_BODY_BYTES, usageReportBodySchema } from "@langwatch/ops-contract";
@@ -18,8 +17,18 @@ export const senderAddressHeadersSchema = z.object({
   "true-client-ip": z.string().optional(),
 });
 
-/** What an accepted usage report is answered with, on either door. */
-export const usageReportReceiptSchema = z.object({ message: z.literal("Event captured") });
+/** A release as Cloud names it: the release name and the commit it was built from. */
+export const releaseIdentitySchema = z.object({
+  release: z.string(),
+  commit: z.string().nullable(),
+});
+
+/** What an accepted usage report is answered with, on either door; release fields only when configured. */
+export const usageReportReceiptSchema = z.object({
+  message: z.literal("Event captured"),
+  latest_release: releaseIdentitySchema.optional(),
+  floor: z.string().optional(),
+});
 
 export type UsageReportReceipt = z.infer<typeof usageReportReceiptSchema>;
 
@@ -63,8 +72,3 @@ export const saasWebConfigSchema = z.strictObject({
 });
 
 export type SaasWebConfig = z.infer<typeof saasWebConfigSchema>;
-
-/** Whether this deployment is LangWatch Cloud: the shared `isSaas` leaf, one claim among many. */
-export const saasConfig = Config.define(() => ({ isSaas }));
-
-export type SaasServerConfig = ConfigOf<typeof saasConfig>;

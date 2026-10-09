@@ -1,10 +1,13 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Badge, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
-import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";
+import type {
+  TraceEvalResult,
+  TraceListItem,
+} from "../../../../../../../behavior/explorer/types/trace.ts";
 import { ioPreviewWillRenderFor } from "../../addons/trace/io-preview-addon.tsx";
 import { EvalChip } from "../../shared-chips.tsx";
 import type { CellDef } from "../../types.ts";

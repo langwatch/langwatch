@@ -1,45 +1,17 @@
 /**
- * The dashboard-widget REST family's wire shapes. Bounds mirror
- * `DashboardWidgetDefinition` in `@langwatch/analytics-contract/dashboard-widget-definition`.
+ * The dashboard-widget REST family's wire shapes, built from the widget schema pieces
+ * every write surface shares, so REST accepts exactly what tRPC accepts.
  */
-import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import {
+  dashboardWidgetCodeSchema,
+  dashboardWidgetDescriptionSchema,
+  dashboardWidgetNameSchema,
+  dashboardWidgetPromptSchema,
+  dashboardWidgetQueriesSchema,
+  dashboardWidgetQuerySchema,
+  dashboardWidgetSourceSchema,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { z } from "zod";
-
-const MAX_WIDGET_NAME_LENGTH = 200;
-const MAX_CODE_LENGTH = 200_000;
-const MAX_QUERIES_PER_WIDGET = 8;
-const MAX_QUERY_NAME_LENGTH = 64;
-const QUERY_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const MAX_QUERY_SQL_LENGTH = 50_000;
-const MAX_PARAMETERS_PER_QUERY = 32;
-const MAX_PARAMETER_VALUE_LENGTH = 4_000;
-const MAX_DESCRIPTION_LENGTH = 2_000;
-const MAX_PROMPT_LENGTH = 2_000;
-
-const dashboardWidgetNameSchema = z.string().min(1).max(MAX_WIDGET_NAME_LENGTH);
-const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
-/** What the widget card's info tip says. */
-const dashboardWidgetDescriptionSchema = z.string().min(1).max(MAX_DESCRIPTION_LENGTH);
-/** What Langy is drafted with when asked about the widget. */
-const dashboardWidgetPromptSchema = z.string().min(1).max(MAX_PROMPT_LENGTH);
-
-const dashboardWidgetQueryParameterSchema = z.object({
-  name: z.string().min(1).max(MAX_QUERY_NAME_LENGTH).regex(QUERY_NAME_PATTERN),
-  type: z.enum(["string", "number", "boolean"]),
-  default: z
-    .union([z.string().max(MAX_PARAMETER_VALUE_LENGTH), z.number(), z.boolean()])
-    .optional(),
-});
-
-const dashboardWidgetQuerySchema = z.object({
-  name: z.string().min(1).max(MAX_QUERY_NAME_LENGTH).regex(QUERY_NAME_PATTERN),
-  sql: z.string().min(1).max(MAX_QUERY_SQL_LENGTH),
-  parameters: z.array(dashboardWidgetQueryParameterSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
-});
-
-const dashboardWidgetQueriesSchema = z
-  .array(dashboardWidgetQuerySchema)
-  .max(MAX_QUERIES_PER_WIDGET);
 
 export const createDashboardWidgetSchema = z.object({
   name: dashboardWidgetNameSchema,

@@ -16,14 +16,12 @@ export function createTraceAppHarness({
 } = {}): TraceModule {
   return TraceModule.fromDependencies({
     storedObjects: createApiFixture<TraceAppDependencies["storedObjects"]>({}, "storedObjects"),
-    topics: createApiFixture<TraceAppDependencies["topics"]>({}, "topics"),
     broadcast: createApiFixture<TraceAppDependencies["broadcast"]>({}, "broadcast"),
     spanCostSuggestions: createApiFixture<TraceAppDependencies["spanCostSuggestions"]>(
       {},
       "spanCostSuggestions",
     ),
-    evaluations: createApiFixture<TraceAppDependencies["evaluations"]>({}, "evaluations"),
-    codingAgents: createApiFixture<TraceAppDependencies["codingAgents"]>({}, "codingAgents"),
+    evaluationRuns: createApiFixture<TraceAppDependencies["evaluationRuns"]>({}, "evaluationRuns"),
     share: createApiFixture<TraceAppDependencies["share"]>({}, "share"),
     projects: createApiFixture<TraceAppDependencies["projects"]>({}, "projects"),
     requestBounds: createApiFixture<TraceAppDependencies["requestBounds"]>({}, "requestBounds"),

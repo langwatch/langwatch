@@ -156,29 +156,6 @@ describe("given a project that was already integrated", () => {
       projectId: TENANT_ID,
     });
   });
-
-  describe("when a clustering bootstrap is wired", () => {
-    /**
-     * Deliberately unguarded: the reconciliation path, so a project that
-     * lost its schedule gets it back on its next trace. Rate-limited, so
-     * the repeat costs at most one commit per project per claim window.
-     */
-    it("re-asserts the clustering schedule on every delivery", async () => {
-      const store = makeProjectStore({ firstMessage: true, integrated: true });
-      const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
-      const handler = createProjectMetadataHandler({
-        projects: store.projects as never,
-        milestones: milestonesOver(recordSignal),
-        bootstrapTopicClustering,
-      });
-
-      await handler(event, createContext(foldState));
-      await handler(event, createContext(foldState));
-
-      expect(bootstrapTopicClustering).toHaveBeenCalledTimes(2);
-      expect(bootstrapTopicClustering).toHaveBeenCalledWith(TENANT_ID);
-    });
-  });
 });
 
 describe("given a seeded sample trace", () => {

@@ -63,6 +63,8 @@ export interface GooseOptions {
   verbose?: boolean;
   /** `CLICKHOUSE_MIGRATE_WAIT_SECONDS`, parsed by the caller; unset waits the default. */
   waitSeconds?: number;
+  /** Stop at this goose version (`goose up-to`); unset runs `up`. */
+  upTo?: number;
 }
 
 export const GOOSE_INHERITED_VARIABLES = [
@@ -793,6 +795,33 @@ function executeGoose({
   return result.stdout ?? "";
 }
 
+/**
+ * The goose passes `migrateUp` runs: the dimension-compat replay when the
+ * server needs it, then the final pass. Without `upTo` that is `up-to 86`
+ * and `up`, exactly as before; with it, neither pass goes past `upTo`.
+ */
+export function goosePasses({
+  requiresDimensionCompat,
+  upTo,
+}: {
+  requiresDimensionCompat: boolean;
+  upTo: number | undefined;
+}): { command: string[]; allowDimensionsOutsideSortingKey: boolean }[] {
+  const compatThrough =
+    upTo === undefined
+      ? LAST_MIGRATION_NEEDING_DIMENSION_COMPAT
+      : Math.min(LAST_MIGRATION_NEEDING_DIMENSION_COMPAT, upTo);
+  return [
+    ...(requiresDimensionCompat
+      ? [{ command: ["up-to", String(compatThrough)], allowDimensionsOutsideSortingKey: true }]
+      : []),
+    {
+      command: upTo === undefined ? ["up"] : ["up-to", String(upTo)],
+      allowDimensionsOutsideSortingKey: false,
+    },
+  ];
+}
+
 export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   const config = parseConnectionUrl(options);
 
@@ -804,24 +833,26 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   // Bootstrap creates the database and goose_db_version table with correct engines
   await bootstrapDatabase(config, options.verbose);
 
-  // Run goose migrations. On a server that enforces the AggregatingMergeTree
-  // dimension check, the merged history runs first with the compatibility
-  // setting, then everything from 00087 on runs without it. On every other
-  // server this is a single pass, exactly as before.
+  // On a server that enforces the AggregatingMergeTree dimension check, the
+  // merged history runs first with the compatibility setting relaxed.
   if (config.requiresDimensionCompat) {
     logger.debug(
       { throughVersion: LAST_MIGRATION_NEEDING_DIMENSION_COMPAT },
       `This ClickHouse enforces ${AGGREGATING_DIMENSION_SETTING}; replaying the migrations that predate 00087 with it relaxed`,
     );
-    executeGoose({
-      command: ["up-to", String(LAST_MIGRATION_NEEDING_DIMENSION_COMPAT)],
+  }
+  let result = "";
+  for (const pass of goosePasses({
+    requiresDimensionCompat: config.requiresDimensionCompat === true,
+    upTo: options.upTo,
+  })) {
+    result = executeGoose({
+      command: pass.command,
       config,
       options,
-      allowDimensionsOutsideSortingKey: true,
+      allowDimensionsOutsideSortingKey: pass.allowDimensionsOutsideSortingKey,
     });
   }
-
-  const result = executeGoose({ command: ["up"], config, options });
   logger.info("ClickHouse migrations completed.");
   return result;
 }

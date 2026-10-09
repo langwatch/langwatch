@@ -19,9 +19,17 @@
       "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
+    "./observability-owner": {
+      "types": "./dist/observability-owner.d.ts",
+      "default": "./src/observability-owner.ts"
+    },
     "./nlp-internal-secret": {
       "types": "./dist/nlp-internal-secret.d.ts",
       "default": "./src/nlp-internal-secret.ts"
+    },
+    "./process-globals": {
+      "types": "./dist/process-globals.d.ts",
+      "default": "./src/process-globals.ts"
     }
   },
   "scripts": {
@@ -35,6 +43,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -51,5 +60,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

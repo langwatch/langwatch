@@ -11,7 +11,9 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -28,6 +30,7 @@ class CapabilityScimHost extends ScimHostApi {
   private readonly feedback: UiFeedback;
   private readonly uiRoute: UiRoute;
   private readonly session: UiSession;
+  private readonly flags: UiFlags;
   private readonly closeDrawer: () => void;
 
   constructor({
@@ -36,6 +39,7 @@ class CapabilityScimHost extends ScimHostApi {
     feedback,
     uiRoute,
     session,
+    flags,
     closeDrawer,
   }: {
     orgId: string | undefined;
@@ -43,6 +47,7 @@ class CapabilityScimHost extends ScimHostApi {
     feedback: UiFeedback;
     uiRoute: UiRoute;
     session: UiSession;
+    flags: UiFlags;
     closeDrawer: () => void;
   }) {
     super();
@@ -51,6 +56,7 @@ class CapabilityScimHost extends ScimHostApi {
     this.feedback = feedback;
     this.uiRoute = uiRoute;
     this.session = session;
+    this.flags = flags;
     this.closeDrawer = closeDrawer;
   }
 
@@ -71,8 +77,8 @@ class CapabilityScimHost extends ScimHostApi {
     return this.session.hasPermission(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.session.isFeatureEnabled(flag);
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
+    return this.flags.flag(flag) === true;
   }
 
   succeeded(notice: ScimSuccessNotice): void {
@@ -99,6 +105,7 @@ class CapabilityScimHost extends ScimHostApi {
  */
 export default function ScimHostMount({ children }: { children?: ReactNode }) {
   const { feedback, route, session } = useUiCapabilities();
+  const flags = useUiFlags();
   const { organizationId } = useUiScope().activeScope();
   const { appBaseUrl } = useUiDeployment();
   const { closeDrawer } = useDrawer();
@@ -111,9 +118,10 @@ export default function ScimHostMount({ children }: { children?: ReactNode }) {
         feedback,
         uiRoute: route,
         session,
+        flags,
         closeDrawer,
       }),
-    [organizationId, appBaseUrl, feedback, route, session, closeDrawer],
+    [organizationId, appBaseUrl, feedback, route, session, flags, closeDrawer],
   );
 
   return <ScimHostProvider value={host}>{children}</ScimHostProvider>;

@@ -65,9 +65,6 @@
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
-      "path": "../../experiment/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
@@ -128,16 +125,19 @@
       "path": "../../share/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
+    },
+    {
       "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../topic/contract/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../../packages/authorization/tsconfig.build.json"

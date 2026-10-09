@@ -4,7 +4,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { ManagedModelProviderAlertToken } from "@langwatch/enterprise-managed-provider-contract";
+import { ManagedModelProviderAlertToken } from "@langwatch/enterprise-managed-provider-client";
 
 export const managedProviderWeb = defineBrowserModule("managed-provider").lends(
   ManagedModelProviderAlertToken,

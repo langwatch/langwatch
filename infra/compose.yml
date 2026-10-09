@@ -1,4 +1,6 @@
 services:
+  # No migrate step: the workers run `pnpm task upgrade` until the ledger is
+  # current while the app holds (specs/upgrade/entry-points.feature).
   app:
     image: langwatch/langwatch:latest
     environment:
@@ -28,6 +30,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+    restart: unless-stopped
 
   workers:
     image: langwatch/langwatch:latest

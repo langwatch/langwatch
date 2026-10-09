@@ -78,8 +78,6 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
       priorSession: {
         useQuery: () => ({ data: undefined }),
       },
-    },
-    user: {
       register: {
         useMutation: () => ({
           mutateAsync: registerMock,

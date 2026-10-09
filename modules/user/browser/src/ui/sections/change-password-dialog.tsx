@@ -80,8 +80,8 @@ export function ChangePasswordDialog({
   const host = usePersonalWorkspaceHost();
   const isSetting = mode === "set";
   const copy = DIALOG_COPY[mode];
-  const changePassword = api.user.changePassword.useMutation();
-  const setPassword = api.user.setPassword.useMutation();
+  const changePassword = api.auth.changePassword.useMutation();
+  const setPassword = api.auth.setPassword.useMutation();
   const utils = api.useUtils();
 
   const [values, setValues] = useState<PasswordFields>(EMPTY);

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 
 import {
@@ -17,11 +17,11 @@ const LOCK_MAX_WAIT_MS = 3_000;
 
 /** The Redis tier. A Redis that cannot answer keeps every row absent, as a cold cache does. */
 export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository {
-  static create(redis: ProcessMembers["redis"]): GithubTokenCacheRedisRepository {
+  static create(redis: RedisConnection): GithubTokenCacheRedisRepository {
     return new GithubTokenCacheRedisRepository(redis);
   }
 
-  private constructor(private readonly redis: ProcessMembers["redis"]) {
+  private constructor(private readonly redis: RedisConnection) {
     super();
   }
 

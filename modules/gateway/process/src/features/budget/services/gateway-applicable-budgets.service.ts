@@ -1,0 +1,198 @@
+import {
+  type ScopeInput,
+  computeBudgetPeriodFloorMs,
+  scopeTargetKey,
+  type GatewayBudgetResolutionTarget,
+  type GatewayResolvedBudget,
+  type VirtualKeyApplicableBudgets,
+} from "@langwatch/gateway-contract";
+/**
+ * The budgets that will constrain a key, answered for a key that may not exist yet. Resolution is
+ * the same call the gateway bundle and the request-time check make, so the list cannot promise a
+ * constraint that will not be enforced. Spend comes from the rollup the budgets page reads.
+ */
+import type { ProjectApi, TraceDestinationProject } from "@langwatch/project-contract";
+
+import type {
+  BudgetSpendTarget,
+  GatewayBudgetSpendRepository,
+} from "../../../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayProviderLabelRepository } from "../../../repositories/gateway-provider-label.repository.ts";
+import type { GatewayService } from "../../../services/gateway.service.ts";
+
+type DraftVirtualKey = {
+  organizationId: string;
+  /** Null while the key is still a draft in the drawer. */
+  virtualKeyId: string | null;
+  scopes: ScopeInput[];
+  /** Explicit trace destination for org- and team-owned drafts. */
+  traceProjectId: string | null;
+  principalUserId: string | null;
+};
+
+export type ApplicableBudget = VirtualKeyApplicableBudgets[number];
+
+/**
+ * The budgets that already apply to a key, drafted or saved.
+ */
+export class GatewayApplicableBudgetsService {
+  private constructor(
+    private readonly budgetDecisions: GatewayService,
+    private readonly providerLabels: GatewayProviderLabelRepository,
+  ) {}
+
+  static create(input: {
+    budgetDecisions: GatewayService;
+    providerLabels: GatewayProviderLabelRepository;
+  }): GatewayApplicableBudgetsService {
+    return new GatewayApplicableBudgetsService(input.budgetDecisions, input.providerLabels);
+  }
+
+  async resolveApplicableBudgetsForDraftKey(
+    projects: ProjectApi,
+    draft: DraftVirtualKey,
+    chRepo?: GatewayBudgetSpendRepository,
+  ): Promise<ApplicableBudget[]> {
+    // Where this key's traces land decides whether team/project-scoped
+    // budgets reach it. An existing key's stored destination is the same
+    // pointer the materialiser follows — deciding it again here would empty
+    // the list for a key whose destination was deleted while its team/
+    // project budgets kept enforcing. A draft previews the decision the save is about to make.
+    const storedTraceProject = async () =>
+      draft.traceProjectId ? projects.findTraceDestination(draft.traceProjectId) : null;
+    const traceProject = draft.virtualKeyId
+      ? await storedTraceProject()
+      : await findTraceDestinationForDraft({ projects, draft });
+
+    return this.resolveApplicableBudgetsForTarget(
+      {
+        organizationId: draft.organizationId,
+        virtualKeyId: draft.virtualKeyId,
+        teamId: traceProject?.teamId ?? null,
+        // Passed explicitly rather than read from the key: a draft has no key
+        // row yet, and the drawer has to preview the set the key will resolve
+        // once it is saved, not the smaller set it can look up today.
+        scopedTeamIds: draft.scopes
+          .filter((scope) => scope.scopeType === "TEAM")
+          .map((scope) => scope.scopeId),
+        projectId: traceProject?.id ?? null,
+        principalUserId: draft.principalUserId,
+      },
+      chRepo,
+    );
+  }
+
+  /**
+   * The same decoration for a caller that already knows the exact resolution target and skips the
+   * draft's trace-project inference. Budget overview reads it with the user's personal workspace
+   * as the target.
+   */
+  async resolveApplicableBudgetsForTarget(
+    target: GatewayBudgetResolutionTarget,
+    chRepo?: GatewayBudgetSpendRepository,
+  ): Promise<ApplicableBudget[]> {
+    const resolved = await this.budgetDecisions.resolveApplicableBudgets(target);
+    if (resolved.length === 0) {
+      return [];
+    }
+
+    // Independent lookups on an interactive path: run them together.
+    const [spentByBudgetId, targets, providerLabels] = await Promise.all([
+      loadSpend({
+        budgetDecisions: this.budgetDecisions,
+        organizationId: target.organizationId,
+        resolved,
+        chRepo,
+      }),
+      this.budgetDecisions.resolveScopeTargets(
+        resolved.map((r) => r.budget),
+        target.organizationId,
+      ),
+      this.providerLabels.resolveProviderLabels(resolved.map((r) => r.budget)),
+    ]);
+
+    // bucketScopeId stays internal: it is where spend accrues, not the
+    // budget's target, and a UI showing "<group>:<user>" would read as one.
+    return resolved.map(({ budget }) => ({
+      id: budget.id,
+      name: budget.name,
+      scopeType: budget.scopeType,
+      scopeId: budget.scopeId,
+      scopeLabel:
+        targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ?? budget.scopeId,
+      window: budget.window,
+      limitUsd: budget.limitUsd.toFixed(6),
+      spentUsd: spentByBudgetId.get(budget.id) ?? "0",
+      onBreach: budget.onBreach,
+      timezone: budget.timezone,
+      providerKey: budget.providerKey,
+      providerLabel: budget.providerKey
+        ? (providerLabels.get(budget.providerKey) ?? budget.providerKey)
+        : null,
+      isPerMember: budget.scopeType === "GROUP",
+      managedByVirtualKeyId: budget.managedByVirtualKeyId,
+    }));
+  }
+}
+
+/**
+ * Where a draft's traces would land once it is saved: the same decision the
+ * save will make, so the list cannot preview a destination the key will not
+ * get. A draft the save would refuse has none yet.
+ */
+async function findTraceDestinationForDraft({
+  projects,
+  draft,
+}: {
+  projects: ProjectApi;
+  draft: DraftVirtualKey;
+}): Promise<TraceDestinationProject | null> {
+  const decision = await projects.resolveTraceDestination({
+    organizationId: draft.organizationId,
+    projectScopeIds: draft.scopes
+      .filter((scope) => scope.scopeType === "PROJECT")
+      .map((scope) => scope.scopeId),
+    traceProjectId: draft.traceProjectId,
+  });
+
+  return decision.outcome === "resolved" ? decision.project : null;
+}
+
+async function loadSpend({
+  budgetDecisions,
+  organizationId,
+  resolved,
+  chRepo,
+}: {
+  budgetDecisions: GatewayService;
+  organizationId: string;
+  resolved: GatewayResolvedBudget[];
+  chRepo?: GatewayBudgetSpendRepository;
+}): Promise<Map<string, string>> {
+  if (!chRepo) {
+    return new Map();
+  }
+
+  const tenantIds = await budgetDecisions.listSpendTenantIds(organizationId);
+  if (tenantIds.length === 0) {
+    return new Map();
+  }
+
+  const targets: BudgetSpendTarget[] = resolved.map((r) => ({
+    budgetId: r.budget.id,
+    scope: r.budget.scopeType,
+    scopeId: r.bucketScopeId,
+    window: r.budget.window,
+    match: "exact",
+    periodFloorMs: computeBudgetPeriodFloorMs(r.budget),
+  }));
+  try {
+    const spends = await chRepo.findSpendForTargetsAcrossTenants(tenantIds, targets);
+
+    return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
+  } catch {
+    // Spend is decoration on this list; the budgets themselves are the
+    // answer. A rollup outage must not blank the drawer.
+    return new Map();
+  }
+}

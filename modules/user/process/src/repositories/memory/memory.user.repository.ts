@@ -10,10 +10,10 @@ import {
   UserNotFoundError,
   USER_ACCOUNT_KSUID_RESOURCE,
   USER_KSUID_RESOURCE,
+  type AdoptUnconfirmedAccountOutcome,
   type CreateUserInput,
   type CreatedUser,
   type SetFirstUserPasswordResult,
-  type UpdateUserProfileInput,
   type UserAccountInfo,
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
@@ -30,8 +30,11 @@ import type {
   CreatedCredentialUser,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
+  UserCreatedRow,
+  UserStandingRow,
   UserDeactivationOutcome,
   UserRepository,
+  StoredProfileChange,
 } from "../user.repository.ts";
 import { type MemoryUserDatabase, type MemoryUserRow } from "./memory.user.database.ts";
 
@@ -73,6 +76,36 @@ export class MemoryUserRepository implements UserRepository {
     return this.#database.rows().length > 0;
   }
 
+  async findCreatedPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserCreatedRow[]> {
+    return this.#database
+      .rows()
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, createdAt: row.createdAt }));
+  }
+
+  async findStandingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserStandingRow[]> {
+    return this.#database
+      .rows()
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, deactivatedAt: row.deactivatedAt }));
+  }
+
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 
@@ -93,6 +126,7 @@ export class MemoryUserRepository implements UserRepository {
 
   async create(input: CreateUserInput): Promise<UserProfile> {
     const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
+    await this.#appendMintFacts({ row });
 
     return userProfileSchema.parse(profileOf(row));
   }
@@ -108,12 +142,15 @@ export class MemoryUserRepository implements UserRepository {
       issuer: input.issuer,
       password: input.passwordHash,
     });
+    const accountCreatedAtMs = nowInstant().epochMilliseconds;
+    await this.#appendMintFacts({
+      row,
+      ...(input.selfRegistered
+        ? { registration: { accountId, createdAtMs: accountCreatedAtMs, email: input.email } }
+        : {}),
+    });
 
-    return {
-      ...createdUserSchema.parse({ id: row.id }),
-      accountId,
-      accountCreatedAtMs: nowInstant().epochMilliseconds,
-    };
+    return { ...createdUserSchema.parse({ id: row.id }), accountId, accountCreatedAtMs };
   }
 
   async createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser> {
@@ -123,6 +160,7 @@ export class MemoryUserRepository implements UserRepository {
       emailVerified: input.emailVerified,
     });
     this.#insertCredentialAccount({ userId: row.id, issuer: input.issuer, password: null });
+    await this.#appendMintFacts({ row });
 
     return createdUserSchema.parse({ id: row.id });
   }
@@ -150,6 +188,21 @@ export class MemoryUserRepository implements UserRepository {
     });
 
     return "set";
+  }
+
+  async adoptUnconfirmed(input: { id: string }): Promise<AdoptUnconfirmedAccountOutcome> {
+    const row = this.#database.usersById([input.id])[0];
+    if (!row) return "no_account";
+    if (row.emailVerified) return "already_confirmed";
+    if (row.lastLoginAt) return "signed_in";
+
+    for (const account of this.#database.accountsOf(input.id)) {
+      this.#database.deleteAccount(account.id);
+    }
+    this.#database.deletePasskeysOf(input.id);
+    this.#database.writeUser({ ...row, emailVerified: true });
+
+    return "adopted";
   }
 
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
@@ -180,7 +233,7 @@ export class MemoryUserRepository implements UserRepository {
     });
   }
 
-  async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
+  async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
     const row = this.#require(input.id);
     const updated: MemoryUserRow = {
       ...row,
@@ -315,6 +368,26 @@ export class MemoryUserRepository implements UserRepository {
     return this.#database
       .accountsOf(userId)
       .find((account) => account.provider === CREDENTIAL_PROVIDER);
+  }
+
+  /** As the Prisma twin's transaction: the created fact, and registered for a self-sign-up. */
+  async #appendMintFacts({
+    row,
+    registration,
+  }: {
+    row: MemoryUserRow;
+    registration?: { accountId: string; createdAtMs: number; email: string };
+  }): Promise<void> {
+    const fact = { tenantId: row.id, userId: row.id, occurredAt: row.createdAt.epochMilliseconds };
+    await this.#database.appendFacts({
+      userId: row.id,
+      intents: [
+        { type: "recordCreated", data: fact },
+        ...(registration
+          ? [{ type: "recordRegistered" as const, data: { ...fact, ...registration } }]
+          : []),
+      ],
+    });
   }
 
   #insertUser(input: {

@@ -6,6 +6,7 @@ import {
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import {
   Fragment,
   memo,
@@ -19,7 +20,6 @@ import {
 } from "react";
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
-import { readableDate } from "../../../../model/coding-agent/short-date.ts";
 import {
   CLAUDE_MARK_GRADIENT,
   TERMINAL_FONT_STACK,

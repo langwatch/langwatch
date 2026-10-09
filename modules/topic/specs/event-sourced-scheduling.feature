@@ -109,6 +109,27 @@ Feature: Event-sourced topic clustering scheduling
     And re-sending the bootstrap request changes nothing
 
   @unit
+  Scenario: trace's first-trace milestone bootstraps the project's clustering schedule from topic's side
+    Given the topic_clustering_processing pipeline
+    When trace records a project's first trace as its own milestone
+    Then topic's peer subscriber requests the project's clustering bootstrap
+    And trace holds no topic peer to ask it
+
+  @unit
+  Scenario: trace's later-trace milestone re-asserts the project's clustering schedule
+    Given the topic_clustering_processing pipeline
+    When trace records a later trace on a project
+    Then topic's peer subscriber requests the project's clustering bootstrap
+    And a project that lost its schedule gets it back on its next trace
+
+  @unit
+  Scenario: a redelivered trace milestone requests the clustering bootstrap once
+    Given the topic_clustering_processing pipeline
+    When the same milestone is delivered twice, or both milestones arrive in one claim window
+    Then the bootstrap request is sent once
+    And the second delivery does not fail
+
+  @unit
   Scenario: Existing projects are backfilled on a scheduled wake
     Given eligible projects that predate process-managed scheduling
     When the clustering pipeline's hourly seed process wakes, once across the fleet

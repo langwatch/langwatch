@@ -40,15 +40,25 @@ type Config struct {
 	HeartbeatEvery time.Duration // launcher heartbeat cadence
 	DaemonArgv     []string      // how to (re)launch `haven daemon`
 	SimulatorArgv  []string      // this Haven executable plus its internal simulator command
+	GoWatchArgv    []string      // this Haven executable plus its internal Go watch command
 	// UpArgv is this Haven executable plus `up`, resolved once in the composition
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
-	UpArgv                   []string
+	UpArgv []string
+	// KeepArgv is this Haven executable plus `keep`: the stack's keeper.
+	KeepArgv                 []string
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool // daemon stops the managed CH container when the last stack is reaped
-	ShouldManagePostgres     bool // haven ensures a shared brew-services Postgres + per-slug DBs
-	ShouldManageRedis        bool // haven ensures a shared brew-services Redis is running
+	// ClickHousePostgresHost is how the managed ClickHouse reaches host Postgres
+	// (domain.ClickHouseRuntime.PostgresHost), recorded on each stack it serves.
+	ClickHousePostgresHost string
+	// ClickHouseRuntime and ObservabilityTier are the resolved selections
+	// domain.ContainerNeeds reads, so status never probes a VM nothing needs.
+	ClickHouseRuntime    domain.ClickHouseRuntime
+	ObservabilityTier    domain.ObservabilityTier
+	ShouldManagePostgres bool // haven ensures a shared brew-services Postgres + per-slug DBs
+	ShouldManageRedis    bool // haven ensures a shared brew-services Redis is running
 	// RedisDBOverride pins this worktree's Redis DB index
 	// (LANGWATCH_HAVEN_REDIS_DB). nil = unset, so a Config built without the
 	// field never pins database 0 by accident — which a plain int sentinel does
@@ -60,8 +70,8 @@ type Config struct {
 	// worktree that has to route around such a neighbor.
 	RedisDBOverride *int
 	// ShouldStartObservability makes `up` boot the LGTM stack itself. On by
-	// default: it shares ClickHouse's colima VM, so the VM is already paying for
-	// itself — opt out with LANGWATCH_HAVEN_OBS=0.
+	// default: native host processes on macOS, the container elsewhere
+	// (LANGWATCH_HAVEN_OBS_TIER pins either). Opt out with LANGWATCH_HAVEN_OBS=0.
 	ShouldStartObservability bool
 	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
 	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from
@@ -113,10 +123,18 @@ type Config struct {
 
 // PlanOptions decide which services `up` runs and how.
 type PlanOptions struct {
-	ShouldGoWatch bool // air hot-reload for the Go services instead of `go run`
+	// IsForegroundClient marks an up that stays the stack's owner after the
+	// hand-over, following its log and downing it when it goes (D7).
+	IsForegroundClient bool
+	ShouldGoWatch      bool // rebuild and swap the Go services (haven go-watch; air for langyagent); on unless LANGWATCH_GO_WATCH=0 or --watch=false
 	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
-	// lane: Vite, api and worker in one Node process (ADR-168, B1).
+	// lane: Vite, api and worker in one Node process (ADR-168, B1). On unless
+	// LANGWATCH_DEV_ONE_PROCESS=0.
 	ShouldRunOneProcess bool
+	// ShouldRunGoAsOneProcess hosts the linked simulators in the go lane, not a
+	// sims lane of their own: one Go process. Set with ShouldRunOneProcess from
+	// LANGWATCH_DEV_ONE_PROCESS (=0 splits).
+	ShouldRunGoAsOneProcess bool
 	// Selection is the worktree's sticky service choice (ADR-064): gateway,
 	// nlp, langy, idp. The three Node lanes — ui, api and workers — always run
 	// and are not selectable.
@@ -144,8 +162,12 @@ type PlanOptions struct {
 	// value is the sandboxed (production-like) default: the worker runs in colima
 	// with the per-worker UID sandbox on.
 	LangyTier domain.LangyTier
-	IsStub    bool // verification: echo servers instead of the real apps
-	RepoRoot  string
+	// DeploymentMode is the mode `up --mode` resolved (zero: none);
+	// ModeOverriddenBy the mode variables the root .env overrides.
+	DeploymentMode   domain.DeploymentMode
+	ModeOverriddenBy []string
+	IsStub           bool // verification: echo servers instead of the real apps
+	RepoRoot         string
 }
 
 // RedisDBOverrideFromEnv parses LANGWATCH_HAVEN_REDIS_DB into a Redis DB index,

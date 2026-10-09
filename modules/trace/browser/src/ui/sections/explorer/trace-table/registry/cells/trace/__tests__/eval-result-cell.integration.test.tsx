@@ -10,7 +10,7 @@ import {
   NO_TRACE_EVENTS,
   type TraceEvalResult,
   type TraceListItem,
-} from "../../../../../types/trace.ts";
+} from "../../../../../../../../behavior/explorer/types/trace.ts";
 import type { CellRenderContext } from "../../../types.ts";
 import { makeEvalCellDef } from "../eval-result-cell.tsx";
 

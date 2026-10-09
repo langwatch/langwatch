@@ -1,5 +1,5 @@
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
-import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -49,12 +49,6 @@ class FakeRepository extends EvaluationRunRepository {
   }
   async findByTraceId(): Promise<EvaluationRunData[]> {
     return this.value ? [this.value] : [];
-  }
-  async findSummariesByTraceIds(): Promise<Record<string, never>> {
-    return {};
-  }
-  async findTraceEvaluations(): Promise<Record<string, TraceEvaluationData[]>> {
-    return {};
   }
   async findInputs(): Promise<Record<string, unknown> | null> {
     return null;
@@ -164,12 +158,6 @@ describe("EvaluationService", () => {
   /** @scenario "Per-trace evaluation reads use the same capability" */
   it("owns the per-trace evaluation read vocabulary", async () => {
     const repository = new FakeRepository();
-    await expect(
-      service(repository).findTraceEvaluations({
-        tenantId: "project_1",
-        traceIds: ["trace_1"],
-      }),
-    ).resolves.toEqual({});
     await expect(
       service(repository).findInputs({
         tenantId: "project_1",

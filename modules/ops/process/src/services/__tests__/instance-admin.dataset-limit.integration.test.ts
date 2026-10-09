@@ -15,9 +15,9 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaAdminBackofficeRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
-import { AdminBackofficeService } from "../admin-backoffice.service.ts";
+import { PrismaInstanceAdminRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
 import { AdminAuditSink } from "../impersonation.service.ts";
+import { InstanceAdminService } from "../instance-admin.service.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 class SilentAudit extends AdminAuditSink {
@@ -29,7 +29,7 @@ const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 describe.skipIf(!DB_URL)("the back office's max dataset file size on Postgres", () => {
   const organizationId = `dataset-limit-${randomUUID().slice(0, 8)}`;
   let prisma: PrismaClient;
-  let service: AdminBackofficeService;
+  let service: InstanceAdminService;
 
   const operation = (
     method: AdminOperationInput["method"],
@@ -56,8 +56,12 @@ describe.skipIf(!DB_URL)("the back office's max dataset file size on Postgres", 
       logger: createLogger("langwatch:ops:test:dataset-limit"),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
-    service = AdminBackofficeService.create({
-      repository: PrismaAdminBackofficeRepository.create(prisma),
+    service = InstanceAdminService.create({
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
+      repository: PrismaInstanceAdminRepository.create(prisma),
       users: new TestUserApi(),
       audit: new SilentAudit(),
     });

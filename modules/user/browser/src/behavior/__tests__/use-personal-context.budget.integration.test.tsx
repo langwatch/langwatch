@@ -3,7 +3,7 @@
  * The personal budget chip reads the wire budget coerced at the hook boundary:
  * decimal strings become numbers and a bare "ok" carries no snapshot.
  */
-import type { UserPersonalBudget } from "@langwatch/user-contract";
+import type { GatewayPersonalBudget } from "@langwatch/gateway-contract";
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -36,8 +36,8 @@ vi.mock("../personal-workspace-session.ts", () => ({
 
 import { usePersonalContext } from "../use-personal-context.ts";
 
-function budgetFor(answer: UserPersonalBudget | undefined) {
-  answers.set("user.personalBudget", answer);
+function budgetFor(answer: GatewayPersonalBudget | undefined) {
+  answers.set("gatewayBudgets.personalBudget", answer);
   return renderHook(() => usePersonalContext()).result.current.budget;
 }
 

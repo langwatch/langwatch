@@ -6,21 +6,22 @@
 
 import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
+import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 
-import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
-import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
-import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
-import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
-import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
+import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
-} from "../services/langwatch-ql-production-provisioning.service.ts";
+} from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlSelfProvisionRequest,
-} from "../services/langwatch-ql-self-provisioning.service.ts";
+} from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
+import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
+import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
@@ -44,12 +45,22 @@ export type LwqlProvisioningDatabase = {
     fn: (tx: { $executeRawUnsafe: (statement: string) => Promise<number> }) => Promise<T>,
     options: { timeout: number; maxWait: number },
   ) => Promise<T>;
-  project: {
-    findMany: (args: {
-      select: { id: true; lwqlKey: true };
-    }) => Promise<{ id: string; lwqlKey: string }[]>;
-  };
 };
+
+/** The one project read the key-map backfill makes (PO-1). */
+export type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
+
+/** Every project's LangWatchQL key, read from the project module a page at a time. */
+async function allLwqlKeys({ projects }: { projects: LwqlProjectKeys }) {
+  const keys = [];
+  let after: string | undefined;
+  do {
+    const page = await projects.listLwqlKeys({ after, limit: PROJECT_ID_PAGE_LIMIT });
+    keys.push(...page.projects);
+    after = page.next ?? undefined;
+  } while (after !== undefined);
+  return keys;
+}
 
 async function withProvisioningRepository<T>({
   open,
@@ -102,19 +113,24 @@ async function existingKeyMapHashes({
   return hashes;
 }
 
+/** What one fill of the key map found and wrote. */
+export type LwqlProjectKeyFillReport = { inserted: number; blankKeys: number };
+
 /** Inserts only the rows the key map lacks; a blank key is reported, never written. */
 async function backfillKeyMap({
   repository,
-  database,
+  projectKeys,
   names,
   sourceDatabase,
+  dryRun,
 }: {
   repository: LangWatchQLProvisioningRepository;
-  database: LwqlProvisioningDatabase;
+  projectKeys: LwqlProjectKeys;
   names: LangWatchQLNames;
   sourceDatabase: string;
-}): Promise<void> {
-  const projects = await database.project.findMany({ select: { id: true, lwqlKey: true } });
+  dryRun: boolean;
+}): Promise<LwqlProjectKeyFillReport> {
+  const projects = await allLwqlKeys({ projects: projectKeys });
   const table = lwqlProvisioning.keyMapTableQualifiedName({ names, sourceDatabase });
   const existingHashes = await existingKeyMapHashes({ repository, table, projects });
   const plan = lwqlProvisioning.planKeyMapBackfill({ projects, existingHashes });
@@ -124,15 +140,28 @@ async function backfillKeyMap({
       "lwql key-map backfill found projects with an empty lwqlKey — these projects cannot authenticate to LangWatchQL until their key is regenerated",
     );
   }
-  if (plan.rowsToInsert.length === 0) {
-    logger.info("lwql key-map backfill: no missing rows");
-    return;
-  }
+  const report = { inserted: plan.rowsToInsert.length, blankKeys: plan.blankKeyProjectIds.length };
+  if (plan.rowsToInsert.length === 0 || dryRun) return report;
   await repository.insertKeyMapRows({ table, rows: plan.rowsToInsert });
-  logger.info(
-    { inserted: plan.rowsToInsert.length },
-    "lwql key-map backfill: inserted missing rows",
-  );
+  logger.info(report, "lwql key-map backfill: inserted missing rows");
+  return report;
+}
+
+/** The `analytics:fill-lwql-project-keys` step's body: each project's missing key-map row. */
+export function fillLwqlProjectKeys({
+  openRepository,
+  ...input
+}: {
+  openRepository: () => LangWatchQLProvisioningRepository;
+  projectKeys: LwqlProjectKeys;
+  names: LangWatchQLNames;
+  sourceDatabase: string;
+  dryRun: boolean;
+}): Promise<LwqlProjectKeyFillReport> {
+  return withProvisioningRepository({
+    open: openRepository,
+    fn: (repository) => backfillKeyMap({ repository, ...input }),
+  });
 }
 
 async function appFunctionsProvisionable(
@@ -207,17 +236,15 @@ async function withSelfProvisionLock<T>({
   );
 }
 
-/** Inventory, app-function probe, SQL-mode guard, the statements, then a non-fatal backfill. */
+/** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */
 async function convergeClickHouse({
   repository,
-  database,
   source,
   request,
   names,
   sourceDatabase,
 }: {
   repository: LangWatchQLProvisioningRepository;
-  database: LwqlProvisioningDatabase;
   source: Readonly<Record<string, string | undefined>>;
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
@@ -246,15 +273,6 @@ async function convergeClickHouse({
       "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
     );
   }
-  // Non-fatal here: the backfill converges, and project creation syncs rows inline.
-  try {
-    await backfillKeyMap({ repository, database, names, sourceDatabase });
-  } catch (error) {
-    logger.error(
-      { error: clickHouseErrorSummary(error) },
-      "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
-    );
-  }
 }
 
 /** Everything one convergence needs, from the deploy task's environment or the worker's members. */
@@ -273,13 +291,16 @@ export interface LwqlConvergencePlan {
 /**
  * Every configured boot converges the whole model, and never throws: a server refusing
  * the DDL degrades to a loud log and a fail-closed endpoint, not a crashloop (ADR-159).
+ * `failOnError` rethrows instead, so the upgrade run fails naming it (Alex, 2026-10-09).
  */
 export async function convergeLwqlAccessModel({
   database,
   plan,
+  failOnError = false,
 }: {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
+  failOnError?: boolean;
 }): Promise<void> {
   const { request, names, schema } = plan;
   try {
@@ -312,7 +333,6 @@ export async function convergeLwqlAccessModel({
           fn: (repository) =>
             convergeClickHouse({
               repository,
-              database,
               source: plan.settings,
               request,
               names,
@@ -327,6 +347,7 @@ export async function convergeLwqlAccessModel({
       { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
     );
+    if (failOnError) throw error;
   }
 }
 
@@ -343,8 +364,10 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
 async function runLwqlProvisioningTask({
   database,
   source,
+  failOnError,
 }: {
   database: LwqlProvisioningDatabase;
+  failOnError: boolean;
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
 }): Promise<void> {
@@ -363,6 +386,7 @@ async function runLwqlProvisioningTask({
 
   await convergeLwqlAccessModel({
     database,
+    failOnError,
     plan: {
       request: selfProvision,
       names: lwqlProvisioning.names({ connection: selfProvision.connection }),
@@ -387,13 +411,15 @@ async function runLwqlProvisioningTask({
  */
 export class LwqlProvisionTask extends Task {
   readonly name = "lwql-provision";
-  readonly description =
-    "Provisions LangWatchQL's ClickHouse and PostgreSQL objects and backfills the key-map table.";
+  readonly description = "Provisions LangWatchQL's ClickHouse and PostgreSQL objects.";
 
   private constructor(
-    private readonly database: () => LwqlProvisioningDatabase,
-    private readonly source: Record<string, string | undefined>,
-    private readonly skipped: boolean,
+    private readonly inputs: {
+      database: () => LwqlProvisioningDatabase;
+      source: Record<string, string | undefined>;
+      skipped: boolean;
+      failOnError: boolean;
+    },
   ) {
     super();
   }
@@ -407,20 +433,27 @@ export class LwqlProvisionTask extends Task {
     database,
     source,
     skipped = false,
+    failOnError = false,
   }: {
     database: () => LwqlProvisioningDatabase;
     /** The environment the launching process was configured with. */
     source: Record<string, string | undefined>;
     skipped?: boolean;
+    /** The upgrade's reconciler fails its run on a refusal; boot keeps the default. */
+    failOnError?: boolean;
   }): LwqlProvisionTask {
-    return new LwqlProvisionTask(database, source, skipped);
+    return new LwqlProvisionTask({ database, source, skipped, failOnError });
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    if (this.skipped) {
+    if (this.inputs.skipped) {
       logger.info("SKIP_LWQL_PROVISION=true — skipping LangWatchQL provisioning");
       return;
     }
-    await runLwqlProvisioningTask({ database: this.database(), source: this.source });
+    await runLwqlProvisioningTask({
+      database: this.inputs.database(),
+      source: this.inputs.source,
+      failOnError: this.inputs.failOnError,
+    });
   }
 }

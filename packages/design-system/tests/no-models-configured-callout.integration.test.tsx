@@ -5,7 +5,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { NoModelsConfiguredCallout } from "../src/components/no-models-configured-callout.tsx";
+import { NoModelsConfiguredCallout } from "../src/components/states/no-models-configured-callout.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

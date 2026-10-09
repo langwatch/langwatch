@@ -3,11 +3,13 @@
  * Spec: specs/data-privacy/policy-configuration.feature
  */
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
-import type { DataPrivacyProjectLineage } from "@langwatch/data-privacy-process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { DataPrivacyDirectoryReader } from "../../app/data-privacy.app.ts";
+import type {
+  DataPrivacyDirectoryReader,
+  DataPrivacyProjectLineage,
+} from "../../app/data-privacy.app.ts";
 import { DataPrivacyPermissionsService } from "../data-privacy-permissions.service.ts";
 import { DataPrivacyScopeAuthorizationService } from "../data-privacy-scope-authorization.service.ts";
 
@@ -138,7 +140,7 @@ describe("DataPrivacyScopeAuthorizationService.assertScopeBelongsToProjectOrgani
   });
 
   describe("given the scope sits in the project's own organization", () => {
-    it("accepts the target", async () => {
+    it("accepts the target and answers the organization the write lands in", async () => {
       await expect(
         service({
           scopeOrganizationId: "org-1",
@@ -147,7 +149,7 @@ describe("DataPrivacyScopeAuthorizationService.assertScopeBelongsToProjectOrgani
           projectId: "web-app",
           scope: { scopeType: "TEAM", scopeId: "team-1" },
         }),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe("org-1");
     });
   });
 });

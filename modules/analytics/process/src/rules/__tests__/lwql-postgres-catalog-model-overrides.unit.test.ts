@@ -5,17 +5,17 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
-import type { LwqlTableCatalogue } from "../lwql-catalogue.rules.ts";
 import {
   type DerivedPostgresView,
   defineCatalogModel,
-} from "../lwql-postgres-catalog-model.rules.ts";
+} from "../../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
 import {
   LWQL_POSTGRES_ALL_OVERRIDES,
   LWQL_POSTGRES_CATALOG,
   LWQL_POSTGRES_CATALOGUE,
-} from "../lwql-postgres-view-catalog.rules.ts";
+} from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
+import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
+import type { LwqlTableCatalogue } from "../lwql-catalogue.rules.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 

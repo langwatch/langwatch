@@ -32,6 +32,10 @@ import { type Instant } from "@langwatch/time";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../eventing/graph-alert-sweep.process.ts";
+import type { AutomationGraphService } from "../features/graph-alert/services/trigger-graph.service.ts";
+import type { ReportScheduleService } from "../features/report/services/report-schedule.service.ts";
+import type { AutomationPersistCapService } from "../features/runaway/services/persist-cap.service.ts";
+import type { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
 import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository.ts";
@@ -43,11 +47,7 @@ import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.ser
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationEmailSuppressionService } from "./automation-email-suppression.service.ts";
 import { AutomationFireHistoryService } from "./automation-fire-history.service.ts";
-import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationTemplateService } from "./automation-template.service.ts";
-import type { AutomationPersistCapService } from "./persist-cap.service.ts";
-import type { ReportScheduleService } from "./report-schedule.service.ts";
-import type { AutomationGraphService } from "./trigger-graph.service.ts";
 
 /** The webhook module's log of this module's webhook attempts (ADR-167). */
 type WebhookDeliveryLog = Pick<WebhookApi, "findDeliveriesBySource">;

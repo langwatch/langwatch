@@ -29,21 +29,23 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
+import { GatewayRealtimeSessionMeteringService } from "../features/realtime-session/services/gateway-realtime-session-metering.service.ts";
+import {
+  GatewayRealtimeSessionService,
+  type GatewayRealtimeSessionCollaborators,
+} from "../features/realtime-session/services/gateway-realtime-session.service.ts";
+import { GatewaySpendCommandIngestService } from "../features/spend/services/gateway-spend-command-ingest.service.ts";
+import type { GatewaySpendRating } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
+import type { VirtualKeyService } from "../features/virtual-key/services/virtual-key.service.ts";
 import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
 import type { GatewayConfigMaterialiserService } from "./gateway-config-materialisation.service.ts";
 import type { GatewayGuardrailEvaluationService } from "./gateway-guardrail-evaluation.service.ts";
 import type { GatewayJwtService } from "./gateway-jwt.service.ts";
-import {
-  GatewayRealtimeSessionService,
-  type GatewayRealtimeSessionCollaborators,
-} from "./gateway-realtime-session.service.ts";
-import { GatewaySpendCommandIngestService } from "./gateway-spend-command-ingest.service.ts";
-import type { GatewaySpendRating } from "./model-catalog-gateway-spend-rating.service.ts";
-import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();
+const realtimeSessionMetering = GatewayRealtimeSessionMeteringService.create();
 
 /** A named sender per command; undefined per name is a 503, not an assumed presence. */
 export interface GatewaySpendCommandSender {
@@ -286,7 +288,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   ): Promise<GatewayRealtimeUsageOutcome> {
     const collaborators = this.#members.realtimeSessions;
     if (!collaborators) return "unavailable" as const;
-    return realtimeSessionService.reportRealtimeSessionUsage({ collaborators, ...input });
+    return realtimeSessionMetering.reportRealtimeSessionUsage({ collaborators, ...input });
   }
 }
 

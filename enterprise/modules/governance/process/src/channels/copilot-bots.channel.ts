@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AgentListing, AgentListingRefusal } from "../rules/agent-listing.rules.ts";
+import type {
+  AgentListing,
+  AgentListingRefusal,
+} from "../features/agents/rules/agent-listing.rules.ts";
 
 /**
  * The `bot` table read, answering which of three things happened. `hasMorePages`

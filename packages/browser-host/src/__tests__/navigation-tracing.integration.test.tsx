@@ -17,7 +17,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { createMemoryRouter, Outlet, type RouteObject, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { useNavigationTracing } from "../navigation-tracing.ts";
+import { useNavigationTracing } from "../telemetry/navigation-tracing.ts";
 
 /**
  * The flag the composing application resolves and passes in. Held in a

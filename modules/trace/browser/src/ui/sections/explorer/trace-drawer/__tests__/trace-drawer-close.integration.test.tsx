@@ -31,7 +31,7 @@ vi.mock("@langwatch/scenario-client", () => ({
   },
 }));
 
-vi.mock("../../hooks/use-span-tree.ts", () => ({
+vi.mock("../../../../../features/span/behavior/use-span-tree.ts", () => ({
   useSpanTreeWithCaptured: () => ({
     captured: { data: [] },
     corrected: { data: [], isLoading: false },
@@ -39,23 +39,23 @@ vi.mock("../../hooks/use-span-tree.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-header.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-header.ts", () => ({
   useTraceHeader: () => ({ data: null, error: null }),
 }));
 
-vi.mock("../../hooks/use-conversation-context.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
   useConversationContext: () => null,
 }));
 
-vi.mock("../../hooks/use-conversation-prefetch.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-prefetch.ts", () => ({
   useConversationPrefetch: () => undefined,
 }));
 
-vi.mock("../../hooks/use-prefetch-span-detail.ts", () => ({
+vi.mock("../../../../../features/span/behavior/use-prefetch-span-detail.ts", () => ({
   usePrefetchSpanDetail: () => vi.fn(),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({
     navigateToTrace: vi.fn(),
     goBack: vi.fn(),
@@ -63,7 +63,7 @@ vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-shortcuts.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-shortcuts.ts", () => ({
   useTraceDrawerShortcuts: () => undefined,
 }));
 
@@ -71,7 +71,7 @@ vi.mock("../../hooks/use-trace-refresh.ts", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn() }),
 }));
 
-const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/use-drawer");
+const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/drawer");
 const { getTraceDrawer } = await import("../../../../../behavior/trace-drawer.ts");
 const { useTraceDrawerScaffold } = await import("../use-trace-drawer-scaffold.ts");
 

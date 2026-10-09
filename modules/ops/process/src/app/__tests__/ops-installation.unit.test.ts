@@ -12,7 +12,6 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -31,11 +30,10 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -52,22 +50,8 @@ import { MemoryOpsSnapshotRepository } from "../../repositories/memory/memory.op
 import { MemorySystemMigrationStateRepository } from "../../repositories/memory/memory.system-migration-state.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
-/** A store that holds nothing: every command is written down, a lease `SET` is granted. */
-function memberWithoutStore<Value extends object>(commands: unknown[][] = []): Value {
-  const member: Partial<Value> = {};
-  return new Proxy(member, {
-    get:
-      (_member, command) =>
-      async (...args: unknown[]) => {
-        commands.push([command, ...args]);
-        return command === "set" ? "OK" : null;
-      },
-  }) as Value;
-}
-
 function process(
   role: "api" | "worker",
-  redisCommands: unknown[][] = [],
   identity: IdentityApi = createApiFixture<IdentityApi>(),
   authz: AuthzApi = platformOperatorAuthz({ holders: { user_alex: ["ops:view", "ops:manage"] } }),
   cloud: { asked?: boolean; privateKey?: string } = {},
@@ -81,11 +65,10 @@ function process(
         build(handle.id === "LANGWATCH_LICENSE_PRIVATE_KEY" ? cloud.privateKey : void 0),
       ),
   })
-    .withModules([withMemoryRepositories(opsProcessModule)])
+    .withModules([opsProcessModule])
     .withConfig({
       ops: {
         apiKey: undefined,
-        metricsApiKey: undefined,
         clickhouseOpsUrl: undefined,
         usageStats: {
           disabled: false,
@@ -94,6 +77,11 @@ function process(
         },
         collectClickHouseBackupMetrics: true,
         productAnalytics: { key: undefined, host: undefined },
+        grafana: {
+          baseUrl: undefined,
+          tempoDatasourceUid: undefined,
+          lokiDatasourceUid: undefined,
+        },
         bugReportSlackChannel: undefined,
         cloudOps: cloud.asked ?? false,
         adminEmails: [],
@@ -104,9 +92,7 @@ function process(
         otelResourceAttributes: undefined,
       },
     })
-    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
-    .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())
-    .withKeyvalue(memberWithoutStore<RedisConnection>(redisCommands))
+    .withStores(memoryStores())
     .withEventing(
       new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
     )
@@ -132,7 +118,7 @@ function process(
       experiment: createApiFixture<ExperimentApi>(),
       prompt: createApiFixture<PromptApi>(),
       workflow: createApiFixture<WorkflowApi>(),
-      automation: createApiFixture<AutomationApi>({ registeredMigrations: () => [] }),
+      automation: createApiFixture<AutomationApi>({}),
       github: createApiFixture<GithubApi>(),
       langy: createApiFixture<LangyApi>(),
       dashboard: createApiFixture<DashboardApi>(),
@@ -150,6 +136,7 @@ function process(
 describe("ops app installation", () => {
   describe("given a process that boots the feature over memory", () => {
     /** @scenario "The deployment's operator list reaches the back office" */
+    /** @scenario "Ops boots over memory stores with only the eventing member beside them" */
     /** @scenario "The operator scope of a platform operator is platform" */
     /** @scenario "The operator scope of a user outside the operator list is none, never a refusal" */
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
@@ -190,9 +177,9 @@ describe("ops app installation", () => {
   describe("given the deployment asks for Cloud admin (LANGWATCH_CLOUD_OPS)", () => {
     /** @scenario "Asking for Cloud admin without a matching licence key refuses boot" */
     it("refuses boot with the key mismatch code when no licence private key is held", async () => {
-      await expect(
-        process("api", [], void 0, void 0, { asked: true }).boot(),
-      ).rejects.toMatchObject({ code: "cloud_ops_key_mismatch" });
+      await expect(process("api", void 0, void 0, { asked: true }).boot()).rejects.toMatchObject({
+        code: "cloud_ops_key_mismatch",
+      });
     });
 
     /** @scenario "Asking for Cloud admin without a matching licence key refuses boot" */
@@ -201,7 +188,7 @@ describe("ops app installation", () => {
       const other = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 
       await expect(
-        process("api", [], void 0, void 0, { asked: true, privateKey: other }).boot(),
+        process("api", void 0, void 0, { asked: true, privateKey: other }).boot(),
       ).rejects.toMatchObject({ code: "cloud_ops_key_mismatch" });
     });
   });
@@ -284,7 +271,7 @@ describe("ops app installation", () => {
         MemorySystemMigrationStateRepository.prototype,
         "findRecordsByStatus",
       ).mockResolvedValue([]);
-      const runtime = await process("api", [], identity, authz).boot();
+      const runtime = await process("api", identity, authz).boot();
 
       try {
         const listed = await runtime.service(OpsApi).listSystemMigrations();

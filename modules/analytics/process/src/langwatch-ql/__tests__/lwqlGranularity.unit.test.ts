@@ -489,9 +489,9 @@ describe("the day and week grains the Dashboards area offers", () => {
 
   it("accepts one day and one week beside the sub-day steps", () => {
     expect([...LWQL_ACCEPTED_GRANULARITY_STEPS]).toEqual([1, 60, 3600, 86_400, 604_800]);
-    expect(lwqlGranularityStepSchema.safeParse(86_400).success).toBe(true);
-    expect(lwqlGranularityStepSchema.safeParse(604_800).success).toBe(true);
-    expect(lwqlGranularityStepSchema.safeParse(7200).success).toBe(false);
+    expect(lwqlGranularityStepSchema.validate(86_400)).toBe(true);
+    expect(lwqlGranularityStepSchema.validate(604_800)).toBe(true);
+    expect(lwqlGranularityStepSchema.validate(7200)).toBe(false);
   });
 
   it.each([86_400, 604_800])("binds a %i-second step as asked", (step) => {

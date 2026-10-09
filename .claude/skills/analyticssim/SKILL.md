@@ -41,3 +41,17 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 - The store is a fixed ring: adding is O(1). `ANALYTICSSIM_MAX_RECORDS` (default 5000),
   `ANALYTICSSIM_MAX_RAW_BYTES` (default 65536; bigger raw bodies become a size marker).
   Benchmark: `go test -bench . -benchmem ./services/analyticssim`.
+
+## From a terminal or agent
+
+`--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
+
+```
+haven analytics status        # record count + activity (last 5 min, distinct ids, last call)
+haven analytics records [--provider] [--kind] [--event|--name] [--id] | clear
+haven analytics record <id>   # one record: facts, properties, raw call
+haven analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 1 on timeout
+```
+
+The console shows the same: an Activity panel, provider tabs, kind and search filters, and
+"Records for this id" on a record narrows the list to that distinct id.

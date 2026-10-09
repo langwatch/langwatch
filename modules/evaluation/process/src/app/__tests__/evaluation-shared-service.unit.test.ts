@@ -8,8 +8,8 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
@@ -21,9 +21,9 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { evaluationProcessModule } from "../../evaluation.module.ts";
+import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
 import { ClickHouseEvaluationRepository } from "../../repositories/clickhouse/evaluation.repository.ts";
 import { MemoryEvaluationRunRepository } from "../../repositories/memory/memory.evaluation-run.repository.ts";
-import { EvaluationExecutionService } from "../../services/evaluation-execution.service.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 const TENANT = "project-1";
@@ -66,7 +66,7 @@ function process(role: "api" | "worker") {
       evaluator: createApiFixture<EvaluatorApi>(),
       monitor: createApiFixture<MonitorApi>(),
       dataset: createApiFixture<DatasetApi>(),
-      experiment: createApiFixture<ExperimentApi>(),
+      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({

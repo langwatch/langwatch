@@ -13,13 +13,13 @@ import { MissingProviderNotice } from "../../../elements/agent-testing/run/missi
 import { RunNoteField } from "../../../elements/agent-testing/run/run-note-field.tsx";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
-import { CompareAgentsSection } from "./compare-agents-section.tsx";
+import { CompareAgentsSection } from "../run-compare/compare-agents-section.tsx";
+import { RunEvaluatorsSection } from "../run-evaluators/run-evaluators-section.tsx";
+import { ParameterRowsEditor } from "../run-parameters/parameter-rows-editor.tsx";
+import { RunParametersSection } from "../run-parameters/run-parameters-section.tsx";
 import { OfflineTargetsNotice } from "./offline-targets-notice.tsx";
-import { ParameterRowsEditor } from "./parameter-rows-editor.tsx";
-import { RunEvaluatorsSection } from "./run-evaluators-section.tsx";
 import { RunNameField } from "./run-name-field.tsx";
 import { RepeatCountSection, SimulationModelsSection } from "./run-option-sections.tsx";
-import { RunParametersSection } from "./run-parameters-section.tsx";
 import { RunScopeSection } from "./run-scope-section.tsx";
 import { TargetSection } from "./target-section.tsx";
 import type { RunDialogForm } from "./use-run-dialog-form.ts";

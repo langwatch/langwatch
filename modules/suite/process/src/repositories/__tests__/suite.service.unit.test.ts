@@ -223,6 +223,7 @@ describe("SuiteService", () => {
   });
 
   /** @scenario "Resolve a run through owning feature services" */
+  /** @scenario "A suite run answers with the slug of the plan it ran" */
   /** @scenario "Suite run succeeds when all scenarios exist" */
   /** @scenario "Suite run succeeds when prompt config exists in project" */
   it("resolves references before handing a run to the execution port", async () => {
@@ -280,13 +281,14 @@ describe("SuiteService", () => {
       execution: new Execution(),
     });
 
-    await service.run({
+    const result = await service.run({
       id: "suite_original",
       projectId: "project_1",
       organizationId: "org_1",
       idempotencyKey: "request_1",
     });
 
+    expect(result.planSlug).toBe("critical-path");
     expect(execute).toHaveBeenCalledWith(
       expect.objectContaining({
         activeScenarioIds: ["scenario_active"],

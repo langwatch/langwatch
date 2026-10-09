@@ -16,6 +16,11 @@ import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const ORGANIZATION = "org_acme";
 const CONNECTION = "ssoc_okta";
 
@@ -50,15 +55,15 @@ function directory() {
       findByEmail: vi.fn(async () => null),
       create: vi.fn(),
     } satisfies ScimUserProvisioning,
-    governance: {
-      departmentResolveByNameOrCreate: vi.fn(),
-      departmentAssignUser: vi.fn(async () => undefined),
+    costCenterFacts: {
+      recordCostCenterChanged: vi.fn(async () => undefined),
     },
     organization: new OrganizationAdministrationFake(),
     entitlements: plan,
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 
   return { store, service, plan };

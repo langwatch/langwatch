@@ -1,14 +1,16 @@
 import type { Span, Trace } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
-
 import {
-  redactSpanContent,
-  redactTraceContent,
   TEASER_ELLIPSIS,
   TEASER_FRACTION,
   TEASER_MAX_CHARS,
   TEASER_MIN_CHARS,
   teaserOf,
+} from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  redactSpanContent,
+  redactTraceContent,
 } from "../../../rules/trace-visibility-teaser.rules.ts";
 import { VisibilityWindowService } from "../../trace-visibility-window.service.ts";
 

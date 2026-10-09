@@ -7,7 +7,7 @@ import type {
   GroupQueueFailureClassifier,
   GroupQueuePolicy,
 } from "./contracts.ts";
-import type { ObjectStore, ProjectStorageDestination } from "./storage.ts";
+import type { MintStorageUri, ObjectStore } from "./storage.ts";
 
 export type GroupQueueRedis = IORedis | Cluster;
 
@@ -16,15 +16,16 @@ export type GroupQueueRedis = IORedis | Cluster;
  * a resource owner: the caller that constructs a storage client stays
  * responsible for closing it, so a shared connection isn't dropped mid-drain.
  */
-export interface GroupQueueStorage {
+export interface GroupQueueStorage<Destination = unknown> {
   objectStoreFor(projectId: string): ObjectStore;
-  resolveDestination(projectId: string): Promise<ProjectStorageDestination>;
+  resolveDestination(projectId: string): Promise<Destination>;
+  mintUri: MintStorageUri<Destination>;
 }
 
-export type GroupQueueDependenciesAdapterOptions = {
+export type GroupQueueDependenciesAdapterOptions<Destination = unknown> = {
   redis: GroupQueueRedis;
   policy?: GroupQueuePolicy;
-  storage?: GroupQueueStorage;
+  storage?: GroupQueueStorage<Destination>;
   context?: GroupQueueContext;
   activity?: GroupQueueActivity<Record<string, unknown>>;
   failures?: GroupQueueFailureClassifier;
@@ -35,14 +36,18 @@ export type GroupQueueDependenciesAdapterOptions = {
  * It does not construct or close Redis, storage, queue processors, or AWS
  * clients; those lifetimes belong to the process composition root.
  */
-export class GroupQueueDependenciesAdapter {
-  static create(options: GroupQueueDependenciesAdapterOptions): GroupQueueDependenciesAdapter {
+export class GroupQueueDependenciesAdapter<Destination = unknown> {
+  static create<Destination = unknown>(
+    options: GroupQueueDependenciesAdapterOptions<Destination>,
+  ): GroupQueueDependenciesAdapter<Destination> {
     return new GroupQueueDependenciesAdapter(options);
   }
 
-  private constructor(private readonly options: GroupQueueDependenciesAdapterOptions) {}
+  private constructor(
+    private readonly options: GroupQueueDependenciesAdapterOptions<Destination>,
+  ) {}
 
-  dependencies(): GroupQueueDependencies<Record<string, unknown>> {
+  dependencies(): GroupQueueDependencies<Record<string, unknown>, Destination> {
     const { redis, policy, context, activity, failures, storage } = this.options;
     return {
       redis,
@@ -54,6 +59,7 @@ export class GroupQueueDependenciesAdapter {
         ? {
             objectStoreFor: (projectId: string) => storage.objectStoreFor(projectId),
             resolveStorageDestination: (projectId: string) => storage.resolveDestination(projectId),
+            mintUri: storage.mintUri,
           }
         : {}),
     };

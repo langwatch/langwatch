@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
-
-import { createSpanReceivedEvent } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import {
   isStorableSpanTimeMs,
   MAX_STORABLE_SPAN_TIME_MS,
   spanStorabilityOf,
-} from "../storable-span-time.rules.ts";
+} from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { createSpanReceivedEvent } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 
 describe("isStorableSpanTimeMs", () => {
   describe("given a value that is not an epoch-ms instant at all", () => {

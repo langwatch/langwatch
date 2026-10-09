@@ -8,12 +8,18 @@
 import type {
   LangWatchQLAppFunctionCall,
   LangWatchQLAppFunctionOption,
+  LangWatchQLColumn,
   LangWatchQLJudgementAsked,
   LangWatchQLJudgementCall,
 } from "@langwatch/analytics-contract";
+import {
+  computeInstantEvalTranscriptFit,
+  type InstantEvalApi,
+  type InstantEvalTranscriptFit,
+} from "@langwatch/instant-eval-contract";
 
-import { findLangWatchQLAppFunctions } from "./langwatch-ql-app-function-catalog.rules.ts";
-import type { LangWatchQLAppFunctionDefinition } from "./langwatch-ql-app-function-shapes.rules.ts";
+import { findLangWatchQLAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import type { LangWatchQLAppFunctionDefinition } from "../features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts";
 
 /** Where a boolean call with no threshold of its own draws the line. */
 const LWQL_DEFAULT_JUDGEMENT_THRESHOLD = 0.5;
@@ -144,4 +150,69 @@ export function langWatchQLJudgementCalls(
   }
 
   return judgements;
+}
+
+/**
+ * The result's columns with every judged one typed as its eval function answers, not as the
+ * text it was read from: the verdict is what the cell holds once the query has judged.
+ */
+export function langWatchQLJudgedColumns({
+  columns,
+  appFunctions,
+}: {
+  columns: readonly LangWatchQLColumn[];
+  appFunctions: readonly LangWatchQLAppFunctionCall[];
+}): readonly LangWatchQLColumn[] {
+  const judgedTypes = new Map<string, string>();
+  for (const call of appFunctions) {
+    const [definition] = findLangWatchQLAppFunctions(call.function);
+    if (definition?.kind === "eval") judgedTypes.set(call.column, definition.returns);
+  }
+
+  return columns.map((column) => {
+    const type = judgedTypes.get(column.name);
+    return type === undefined ? column : { ...column, type };
+  });
+}
+
+/** The judged columns written over `conversation`, which a judge's budget re-renders. */
+export function pickLangWatchQLConversationJudgements(
+  calls: readonly LangWatchQLAppFunctionCall[],
+): readonly LangWatchQLAppFunctionCall[] {
+  return calls.filter(
+    (call) =>
+      call.source?.function === "conversation" &&
+      findLangWatchQLAppFunctions(call.function)[0]?.kind === "eval",
+  );
+}
+
+/**
+ * Each judged conversation column's fit under the judge's own limits (Alex, 2026-10-08, round
+ * 26 CD-4). Columns over the same conversation share one text and so one budget: their
+ * questions are asked together. A group whose questions leave no text gets none.
+ */
+export function computeLangWatchQLConversationFits({
+  calls,
+  limits,
+}: {
+  calls: readonly LangWatchQLAppFunctionCall[];
+  limits: ReturnType<InstantEvalApi["getJudgeLimits"]>;
+}): ReadonlyMap<string, InstantEvalTranscriptFit> {
+  const groups = new Map<string, LangWatchQLAppFunctionCall[]>();
+  for (const call of pickLangWatchQLConversationJudgements(calls)) {
+    const signature = JSON.stringify([call.source?.function, call.source?.options]);
+    groups.set(signature, [...(groups.get(signature) ?? []), call]);
+  }
+
+  const fits = new Map<string, InstantEvalTranscriptFit>();
+  for (const group of groups.values()) {
+    const fit = computeInstantEvalTranscriptFit({
+      judgements: langWatchQLJudgementCalls(group),
+      limits,
+    });
+    if (!fit) continue;
+    for (const call of group) fits.set(call.column, fit);
+  }
+
+  return fits;
 }

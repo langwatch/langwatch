@@ -26,6 +26,10 @@ import {
   type PersonalBudgetOverview,
   usePersonalContext,
 } from "../../../behavior/use-personal-context.ts";
+import {
+  PERSONAL_WORKSPACE_WAIT_HINT,
+  usePersonalWorkspaceWait,
+} from "../../../behavior/use-personal-workspace-wait.ts";
 import { formatRelativeTime } from "../../../model/relative-time.ts";
 import { AvatarUploadControl } from "../avatar-upload-control.tsx";
 import { BudgetOverviewList } from "../budget-overview/index.ts";
@@ -40,7 +44,7 @@ const fmtRelative = (iso: string | null): string => formatRelativeTime(iso ? toE
 export function PersonalConfigureScreen() {
   const ctx = usePersonalContext();
 
-  const personalContextQuery = api.user.personalContext.useQuery(
+  const personalContextQuery = api.routingPolicy.personalContext.useQuery(
     { organizationId: ctx.organizationId },
     { enabled: !!ctx.organizationId, refetchOnWindowFocus: false },
   );
@@ -145,6 +149,7 @@ function PersonalCredentialsSection({
     router.setQueryParam("tab", tab === "devices" ? tab : void 0, { replace: true });
 
   const utils = api.useUtils();
+  const workspaceWait = usePersonalWorkspaceWait({ organizationId });
   const issueMutation = api.personalVirtualKeys.issuePersonal.useMutation({
     onSuccess: (issued) => {
       setRevealedSecret({
@@ -160,11 +165,10 @@ function PersonalCredentialsSection({
         type: "success",
       });
     },
-    onError: (err) =>
-      showErrorToast({
-        error: err,
-        fallbackTitle: "Couldn't issue the personal key",
-      }),
+    onError: (err) => {
+      if (workspaceWait.absorb(err)) return;
+      showErrorToast({ error: err, fallbackTitle: "Couldn't issue the personal key" });
+    },
   });
 
   const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
@@ -249,12 +253,17 @@ function PersonalCredentialsSection({
                   Lowercase letters, numbers, dash, underscore. The secret is shown once on
                   creation.
                 </Text>
+                {workspaceWait.waiting && (
+                  <Text fontSize="xs" color="fg.muted" as="output" display="block">
+                    {PERSONAL_WORKSPACE_WAIT_HINT}
+                  </Text>
+                )}
                 <HStack gap={2}>
                   <Button
                     size="sm"
                     onClick={onIssue}
                     loading={issueMutation.isPending}
-                    disabled={!newKeyLabel.trim()}
+                    disabled={!newKeyLabel.trim() || workspaceWait.waiting}
                   >
                     Create key
                   </Button>

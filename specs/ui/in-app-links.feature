@@ -1,6 +1,6 @@
 # Implementation:
 #   packages/browser-host/src/link.tsx
-#   packages/design-system/src/components/section-navigation-frame.tsx
+#   packages/design-system/src/components/layout/section-navigation-frame.tsx
 #   packages/architecture-enforcer/tests/in-app-links.unit.test.ts
 
 Feature: An in-app link routes in place and never reloads the document

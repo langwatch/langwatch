@@ -32,10 +32,3 @@ Feature: The plan allowance is enforced at every door that writes trace content
     Given the team is within its monthly allowance
     When a scenario event is reported for that project
     Then the event is written
-
-  @integration
-  Scenario: A deployment that meters nothing still accepts the event
-    Given this deployment composed no plan allowance
-    When a scenario event is reported for that project
-    Then the event is written
-    And the absent meter was named once at boot rather than once per request

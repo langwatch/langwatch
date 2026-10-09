@@ -5,8 +5,8 @@
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HttpLangyWorkerChannel } from "../../../index.ts";
-import { LangyWorkerMetricsOtelService } from "../../../services/langy-worker-metrics-otel.service.ts";
+import { HttpLangyWorkerMetricsChannel } from "../http.langy-worker-metrics.channel.ts";
+import { HttpLangyWorkerChannel } from "../http.langy-worker.channel.ts";
 
 const SERIES = "langwatch_langy_dispatch_total";
 
@@ -49,7 +49,7 @@ describe("the langy dispatch series", () => {
       const worker = HttpLangyWorkerChannel.create({
         agentUrl: "http://agent",
         internalSecret: "secret",
-        metrics: LangyWorkerMetricsOtelService.create(),
+        metrics: HttpLangyWorkerMetricsChannel.create(),
       });
 
       await worker.dispatch(dispatchInput);

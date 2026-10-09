@@ -38,10 +38,6 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .withPermission("evaluations:manage")
     .handle(async ({ app, input }) => agentWithFieldsWithoutSecrets(await app.update(input)))
 
-    .procedure("getRelatedEntities")
-    .withPermission("evaluations:view")
-    .handle(({ app, input }) => app.relatedEntities(input))
-
     .procedure("cascadeArchive")
     .withPermission("evaluations:manage")
     .handle(({ app, input }) => app.cascadeArchive(input))
@@ -53,19 +49,6 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .procedure("getCopies")
     .withPermission("evaluations:view")
     .handle(({ app, input, actor }) => app.getCopiesForActor({ ...input, actorId: actor.id }))
-
-    .procedure("copy")
-    .withPermission("evaluations:manage")
-    .handle(({ app, input, actor }) =>
-      app.copyForActor({
-        sourceAgentId: input.agentId,
-        sourceProjectId: input.sourceProjectId,
-        targetProjectId: input.projectId,
-        newAgentId: input.newAgentId,
-        actorUserId: actor.id,
-        actorId: actor.id,
-      }),
-    )
 
     .procedure("pushToCopies")
     .withPermission("evaluations:manage")
@@ -79,11 +62,4 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .withPermission("evaluations:view")
     .handle(({ app, input }) => app.getHistory(input))
 
-    .procedure("testTurn")
-    .withPermission("evaluations:manage")
-    .handle(({ app, input, actor }) => app.testTurn({ ...input, actorId: actor.id }))
-
-    .procedure("testRun")
-    .withPermission("scenarios:create")
-    .handle(({ app, input, actor }) => app.testRun({ ...input, actorId: actor.id }))
     .build();

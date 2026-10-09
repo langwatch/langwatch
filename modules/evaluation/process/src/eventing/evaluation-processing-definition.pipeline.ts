@@ -21,19 +21,41 @@ import {
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  COLLECTOR_EVALUATION_RECEIVED_EVENT_TYPE,
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "@langwatch/trace-contract";
 
 import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 import type { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
-import {
-  type EvaluationAnalyticsData,
-  EvaluationAnalyticsFoldProjection,
-} from "./evaluation-analytics-fold.projection.ts";
+import { EvaluationAnalyticsFoldProjection } from "./evaluation-analytics-fold.projection.ts";
 import {
   EvaluationAnalyticsRollupMapProjection,
   type EvaluationAnalyticsRollupRow,
 } from "./evaluation-analytics-rollup.projection.ts";
+import type { EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "./evaluation-run.projection.ts";
+import {
+  type createTraceCollectorEvaluationReport,
+  traceCollectorEvaluationSchema,
+} from "./trace-collector-evaluation.subscriber.ts";
+import {
+  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+  CUSTOM_EVAL_SYNC_DELAY_MS,
+  type createTraceCustomEvaluationSync,
+  hasSyncableEvaluations,
+  traceCustomEvaluationSpanSchema,
+  traceCustomEvaluationSyncDedupId,
+} from "./trace-custom-evaluation-sync.subscriber.ts";
+import {
+  type createTraceEvaluationTrigger,
+  isDispatchableTraceSpan,
+  TRACE_EVALUATION_TRIGGER_SETTLE_MS,
+  traceEvaluationTriggerOriginSchema,
+  traceEvaluationTriggerSpanSchema,
+} from "./trace-evaluation-trigger.subscriber.ts";
 
 /**
  * Main's CIO_SYNC_DEBOUNCE_TTL_MS: an evaluation's completed and reported events tell
@@ -58,8 +80,29 @@ interface EvaluationProcessingPipelineDeps {
   executeEvaluationCommand: ExecuteEvaluationCommand;
   /** Records evaluation's lifecycle facts; absent where nothing composes a lifecycle. */
   lifecycle?: Pick<EvaluationLifecycleService, "completed">;
-  /** Each tenant's retention; a producer, which projects nothing, declares none. */
+  /** Each tenant's retention; absent where the process projects nothing. */
   retention?: RetentionPolicyResolver;
+  /** Evaluation's reactions to trace's span facts (PC-3); absent where no trace pipeline runs. */
+  traceReactions?: EvaluationTraceReactions;
+}
+
+/** The on-message trigger and the SDK- and collector-reported evaluations, as evaluation's own. */
+export interface EvaluationTraceReactions {
+  evaluationTrigger: ReturnType<typeof createTraceEvaluationTrigger>;
+  customEvaluationSync: ReturnType<typeof createTraceCustomEvaluationSync>;
+  collectorEvaluation: ReturnType<typeof createTraceCollectorEvaluationReport>;
+}
+
+/** One quiet window per trace and lane: main's evaluationTrigger dedup, split per event type. */
+function settlePerTrace(lane: string) {
+  return {
+    delay: TRACE_EVALUATION_TRIGGER_SETTLE_MS,
+    deduplication: {
+      makeId: (event: { tenantId: string; aggregateId: string }) =>
+        `subscriber:${lane}:${event.tenantId}:${String(event.aggregateId)}`,
+      ttlMs: TRACE_EVALUATION_TRIGGER_SETTLE_MS,
+    },
+  };
 }
 
 /** Tracks evaluation lifecycle (scheduled → completed) via evaluation-level aggregates. */
@@ -141,8 +184,71 @@ export class EvaluationProcessingPipelineAdapter {
       .withCommand("reportEvaluation", commands.report, {
         serializeByAggregate: true,
       });
-    const { retention } = this.deps;
-    return (retention === undefined ? pipeline : pipeline.withRetention(retention)).build();
+    const { retention, traceReactions } = this.deps;
+    const reacting =
+      traceReactions === undefined
+        ? pipeline
+        : pipeline
+            .withPeerSubscriber("traceEvaluationTrigger", {
+              eventType: SPAN_RECEIVED_EVENT_TYPE,
+              data: traceEvaluationTriggerSpanSchema,
+              options: {
+                ...settlePerTrace("traceEvaluationTrigger"),
+                enqueue: { filter: isDispatchableTraceSpan },
+              },
+              handle: (data, context) =>
+                traceReactions.evaluationTrigger({
+                  tenantId: String(context.tenantId),
+                  traceId: String(context.aggregateId),
+                  event: {
+                    type: SPAN_RECEIVED_EVENT_TYPE,
+                    occurredAt: context.occurredAt,
+                    spanAttributes: data.span.attributes,
+                  },
+                }),
+            })
+            .withPeerSubscriber("traceOriginEvaluationTrigger", {
+              eventType: ORIGIN_RESOLVED_EVENT_TYPE,
+              data: traceEvaluationTriggerOriginSchema,
+              options: settlePerTrace("traceOriginEvaluationTrigger"),
+              handle: (_data, context) =>
+                traceReactions.evaluationTrigger({
+                  tenantId: String(context.tenantId),
+                  traceId: String(context.aggregateId),
+                  event: { type: ORIGIN_RESOLVED_EVENT_TYPE, occurredAt: context.occurredAt },
+                }),
+            })
+            .withPeerSubscriber("traceCustomEvaluationSync", {
+              eventType: SPAN_RECEIVED_EVENT_TYPE,
+              data: traceCustomEvaluationSpanSchema,
+              options: {
+                delay: CUSTOM_EVAL_SYNC_DELAY_MS,
+                deduplication: {
+                  makeId: (event) =>
+                    traceCustomEvaluationSyncDedupId({
+                      tenantId: String(event.tenantId),
+                      aggregateId: String(event.aggregateId),
+                      id: event.id,
+                    }),
+                  ttlMs: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+                },
+                enqueue: { filter: hasSyncableEvaluations },
+              },
+              handle: (data, context) =>
+                traceReactions.customEvaluationSync({
+                  tenantId: String(context.tenantId),
+                  traceId: String(context.aggregateId),
+                  occurredAt: context.occurredAt,
+                  span: data.span,
+                }),
+            })
+            .withPeerSubscriber("traceCollectorEvaluation", {
+              eventType: COLLECTOR_EVALUATION_RECEIVED_EVENT_TYPE,
+              data: traceCollectorEvaluationSchema,
+              handle: (data, context) =>
+                traceReactions.collectorEvaluation({ ...data, tenantId: String(context.tenantId) }),
+            });
+    return (retention === undefined ? reacting : reacting.withRetention(retention)).build();
   }
 }
 

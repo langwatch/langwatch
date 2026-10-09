@@ -1,7 +1,8 @@
 import { Separator, VStack } from "@langwatch/design-system/primitives";
 
+import type { CreateShareLinkDraft } from "../../../model/share/create-share-link-draft.ts";
 import type { ShareLinkView } from "../../../model/share/share-link-status.ts";
-import { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-link-form.tsx";
+import { CreateShareLinkForm } from "./create-share-link-form.tsx";
 import { ShareLinksList } from "./share-links-list.tsx";
 
 /**

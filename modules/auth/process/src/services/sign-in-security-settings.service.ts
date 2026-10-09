@@ -1,6 +1,4 @@
 import {
-  NO_LOCKOUT,
-  NO_SESSION_BOUND,
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
   type SaveSignInSecurityResult,
@@ -12,10 +10,9 @@ import {
   isEnterpriseTier,
   type EntitlementApi,
 } from "@langwatch/entitlement-contract";
-import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+import { type OrganizationApi, UserNotInOrganizationError } from "@langwatch/organization-contract";
 
 import type { SignInAttemptLockRepository } from "../repositories/sign-in-attempt-lock.repository.ts";
-import type { SignInSecuritySettingsRepository } from "../repositories/sign-in-security-settings.repository.ts";
 import {
   assertSessionWindowSensible,
   willActivateSignInSecurity,
@@ -38,7 +35,8 @@ interface SignInSecuritySessionSweep {
 }
 
 interface SignInSecuritySettingsDeps {
-  settings: SignInSecuritySettingsRepository;
+  /** The four columns live on the organization; it reads and writes them. */
+  organizations: Pick<OrganizationApi, "getSignInSecurityPolicy" | "updateSignInSecurityPolicy">;
   locks: SignInAttemptLockRepository;
   members: SignInSecurityMembers;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -59,16 +57,7 @@ export class SignInSecuritySettingsService {
   private constructor(private readonly deps: SignInSecuritySettingsDeps) {}
 
   async get({ organizationId }: { organizationId: string }): Promise<SignInSecuritySettings> {
-    const [rule] = await this.deps.settings.findForOrganization({ organizationId });
-    const lockout = rule?.lockout ?? NO_LOCKOUT;
-    const bound = rule?.sessionBound ?? NO_SESSION_BOUND;
-
-    return {
-      lockoutAfterFailedAttempts: lockout.afterFailedAttempts,
-      lockoutMinutes: lockout.lockMinutes,
-      sessionIdleTimeoutMinutes: bound.idleTimeoutMinutes,
-      sessionMaxLifetimeMinutes: bound.maxLifetimeMinutes,
-    };
+    return this.deps.organizations.getSignInSecurityPolicy({ organizationId });
   }
 
   async save({
@@ -82,19 +71,7 @@ export class SignInSecuritySettingsService {
       await this.assertEntitled({ organizationId });
     }
 
-    await this.deps.settings.save({
-      organizationId,
-      rule: {
-        lockout: {
-          afterFailedAttempts: next.lockoutAfterFailedAttempts,
-          lockMinutes: next.lockoutMinutes,
-        },
-        sessionBound: {
-          idleTimeoutMinutes: next.sessionIdleTimeoutMinutes,
-          maxLifetimeMinutes: next.sessionMaxLifetimeMinutes,
-        },
-      },
-    });
+    await this.deps.organizations.updateSignInSecurityPolicy({ organizationId, policy: next });
 
     const userIds = await this.deps.members.findMemberUserIds({ organizationId });
     const sweptSessions = await this.deps.sessions.endSessionsPastWindow({ userIds });

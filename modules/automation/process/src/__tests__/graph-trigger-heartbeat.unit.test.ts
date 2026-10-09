@@ -5,14 +5,14 @@ import { type Instant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  type GraphTriggerHeartbeatDeps,
+  GraphTriggerHeartbeatService,
+} from "../features/graph-alert/services/graph-trigger-heartbeat.service.ts";
+import {
   HeartbeatTriggerRepository,
   SilentAutomationLogger,
 } from "../repositories/__tests__/support/heartbeat.fakes.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
-import {
-  type GraphTriggerHeartbeatDeps,
-  GraphTriggerHeartbeatService,
-} from "../services/graph-trigger-heartbeat.service.ts";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 const TriggerKind = { ALERT: "ALERT" } as const;

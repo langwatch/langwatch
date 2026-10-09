@@ -1,31 +1,20 @@
-/** @vitest-environment jsdom */
-
 /**
- * A failed analytics panel stays inside its own bounds: a chart panel draws the
- * compact message with a Retry, and a figure inside a tab header draws only an
- * indicator, since a tab trigger is a button and cannot hold another one.
+ * @vitest-environment jsdom
  */
-
-import { Tabs } from "@langwatch/design-system/primitives";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const queryState = vi.hoisted(() => ({
-  timeseries: {} as Record<string, unknown>,
-  documents: {} as Record<string, unknown>,
-}));
+const queryState: {
+  timeseries: Record<string, unknown>;
+  documents: Record<string, unknown>;
+} = { timeseries: {}, documents: {} };
 
-const refetches = vi.hoisted(() => ({
-  timeseries: vi.fn(),
-  documents: vi.fn(),
-  feedbacks: vi.fn(),
-}));
-
-vi.mock("@langwatch/browser-host/read-freshness", () => ({
-  useReadFreshness: () => ({ asOf: null, confirmed: true }),
-}));
+const refetchTimeseries = vi.fn();
+const refetchDocuments = vi.fn();
+const refetchFeedbacks = vi.fn();
 
 vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
@@ -35,9 +24,9 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
     },
     useUtils: () => ({
       analytics: {
-        getTimeseries: { refetch: refetches.timeseries },
-        topUsedDocuments: { refetch: refetches.documents },
-        feedbacks: { refetch: refetches.feedbacks },
+        getTimeseries: { refetch: refetchTimeseries },
+        topUsedDocuments: { refetch: refetchDocuments },
+        feedbacks: { refetch: refetchFeedbacks },
       },
     }),
   },
@@ -45,22 +34,29 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
 
 vi.mock("../../../behavior/use-filter-params.ts", () => ({
   useFilterParams: () => ({
-    filterParams: { projectId: "proj-1", startDate: 0, endDate: 1, filters: {} },
+    filterParams: {
+      projectId: "project-1",
+      startDate: 0,
+      endDate: 1,
+      filters: {},
+    },
     queryOpts: { enabled: true },
   }),
 }));
 
-import { FAILED_ACTIVE_QUERIES } from "../../../behavior/analytics-feedback.ts";
-import { renderWithAnalyticsHost } from "../../../testing.tsx";
+import { Tabs } from "@langwatch/design-system/primitives";
+
+import { FAILED_ACTIVE_QUERIES } from "../../../behavior/use-retry-failed-analytics.ts";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { CustomGraph, type CustomGraphInput } from "../custom-graph.tsx";
 import { DocumentsCountsSummary, DocumentsCountsTable } from "../documents-counts-table.tsx";
 
 afterEach(cleanup);
 
 beforeEach(() => {
-  refetches.timeseries.mockReset();
-  refetches.documents.mockReset();
-  refetches.feedbacks.mockReset();
+  refetchTimeseries.mockReset();
+  refetchDocuments.mockReset();
+  refetchFeedbacks.mockReset();
 });
 
 const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
@@ -88,7 +84,6 @@ function failedQuery() {
     data: undefined,
     error: searchTooLarge,
     isLoading: false,
-    isError: true,
     isFetching: false,
     refetch: vi.fn(),
   };
@@ -109,55 +104,57 @@ const lineGraph: CustomGraphInput = {
   timeScale: 1,
 };
 
-describe("<CustomGraph />", () => {
+function renderWithHost(ui: React.ReactElement) {
+  return render(<AnalyticsTestHarness host={new StubAnalyticsHost()}>{ui}</AnalyticsTestHarness>);
+}
+
+describe("<CustomGraph /> when its query fails", () => {
+  beforeEach(() => {
+    queryState.timeseries = failedQuery();
+  });
+
   describe("given a chart panel", () => {
-    describe("when its query fails", () => {
-      beforeEach(() => {
-        queryState.timeseries = failedQuery();
-      });
+    /** @scenario "A failed chart panel shows a compact message and a Retry" */
+    it("shows the registry headline, one line of advice and a Retry, without the tips list", () => {
+      renderWithHost(<CustomGraph input={lineGraph} />);
 
-      /** @scenario "A failed chart panel shows a compact message and a Retry" */
-      it("shows the registry headline, one line of advice and a Retry, without the tips list", () => {
-        renderWithAnalyticsHost(<CustomGraph input={lineGraph} />);
+      const alert = screen.getByRole("alert");
+      expect(within(alert).getByText("This search was too large")).toBeInTheDocument();
+      expect(
+        within(alert).getByText("Narrow the time range, add a filter, or select fewer fields."),
+      ).toBeInTheDocument();
+      expect(within(alert).getByRole("button", { name: /retry/i })).toBeInTheDocument();
+      expect(
+        screen.queryByText("Add filters to reduce the amount of data scanned"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("list")).not.toBeInTheDocument();
+      expect(screen.queryByText("query_memory_exceeded")).not.toBeInTheDocument();
+    });
 
-        const alert = screen.getByRole("alert");
-        expect(within(alert).getByText("This search was too large")).toBeInTheDocument();
-        expect(
-          within(alert).getByText("Narrow the time range, add a filter, or select fewer fields."),
-        ).toBeInTheDocument();
-        expect(within(alert).getByRole("button", { name: /retry/i })).toBeInTheDocument();
-        expect(
-          screen.queryByText("Add filters to reduce the amount of data scanned"),
-        ).not.toBeInTheDocument();
-        expect(screen.queryByRole("list")).not.toBeInTheDocument();
-        expect(screen.queryByText("query_memory_exceeded")).not.toBeInTheDocument();
-      });
+    /** @scenario "A failed chart panel shows a compact message and a Retry" */
+    it("keeps the error id reachable as a small copy action", () => {
+      renderWithHost(<CustomGraph input={lineGraph} />);
 
-      /** @scenario "A failed chart panel shows a compact message and a Retry" */
-      it("keeps the error id reachable as a small copy action", () => {
-        renderWithAnalyticsHost(<CustomGraph input={lineGraph} />);
+      const alert = screen.getByRole("alert");
+      expect(within(alert).getByText(new RegExp(TRACE_ID))).toBeInTheDocument();
+    });
 
-        const alert = screen.getByRole("alert");
-        expect(within(alert).getByTitle(`Error ID: ${TRACE_ID}`)).toBeInTheDocument();
-      });
+    /** @scenario "Retry in a panel refetches every failed analytics panel" */
+    it("refetches the failed analytics queries when Retry is clicked", async () => {
+      const user = userEvent.setup();
+      renderWithHost(<CustomGraph input={lineGraph} />);
 
-      /** @scenario "Retry in a panel refetches every failed analytics panel" */
-      it("refetches the failed analytics queries when Retry is clicked", async () => {
-        const user = userEvent.setup();
-        renderWithAnalyticsHost(<CustomGraph input={lineGraph} />);
+      await user.click(screen.getByRole("button", { name: /retry/i }));
 
-        await user.click(screen.getByRole("button", { name: /retry/i }));
-
-        for (const refetch of [refetches.timeseries, refetches.documents, refetches.feedbacks]) {
-          expect(refetch).toHaveBeenCalledExactlyOnceWith(undefined, FAILED_ACTIVE_QUERIES);
-        }
-      });
+      for (const refetch of [refetchTimeseries, refetchDocuments, refetchFeedbacks]) {
+        expect(refetch).toHaveBeenCalledExactlyOnceWith(undefined, FAILED_ACTIVE_QUERIES);
+      }
     });
   });
 
   describe("given a summary drawn inside a tab header", () => {
     function renderSummaryInTab() {
-      return renderWithAnalyticsHost(
+      return renderWithHost(
         <Tabs.Root defaultValue="llmCalls">
           <Tabs.List>
             <Tabs.Trigger value="llmCalls">
@@ -169,99 +166,89 @@ describe("<CustomGraph />", () => {
       );
     }
 
-    describe("when its query fails", () => {
-      beforeEach(() => {
-        queryState.timeseries = failedQuery();
-      });
+    /** @scenario "A failed summary in a tab header shows a compact indicator" */
+    it("shows the figure label with a compact indicator, not the panel card", () => {
+      renderSummaryInTab();
 
-      /** @scenario "A failed summary in a tab header shows a compact indicator" */
-      it("shows the figure label with a compact indicator, not the panel card", () => {
-        renderSummaryInTab();
-
-        const tab = screen.getByRole("tab");
-        expect(within(tab).getByText("LLM Calls")).toBeInTheDocument();
-        expect(within(tab).getByTestId("chart-error-indicator")).toBeInTheDocument();
-        expect(within(tab).getByText("Couldn't load")).toBeInTheDocument();
-        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-        expect(within(tab).queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
-      });
-
-      /** @scenario "A failed summary in a tab header shows a compact indicator" */
-      it("carries the registry copy for assistive technology, never the code slug", () => {
-        renderSummaryInTab();
-
-        const tab = screen.getByRole("tab");
-        expect(tab).toHaveTextContent("This search was too large");
-        expect(tab).not.toHaveTextContent("query_memory_exceeded");
-      });
+      const tab = screen.getByRole("tab");
+      expect(within(tab).getByText("LLM Calls")).toBeInTheDocument();
+      expect(within(tab).getByTestId("chart-error-indicator")).toBeInTheDocument();
+      expect(within(tab).getByText("Couldn't load")).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(within(tab).queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
     });
-  });
 
-  describe("given a summary card with several figures", () => {
-    describe("when its query fails", () => {
-      beforeEach(() => {
-        queryState.timeseries = failedQuery();
-      });
+    /** @scenario "A failed summary in a tab header shows a compact indicator" */
+    it("carries the registry copy for assistive technology, never the code slug", () => {
+      renderSummaryInTab();
 
-      /** @scenario "A failed summary card shows one compact indicator" */
-      it("shows one compact indicator for the whole row, not one per figure", () => {
-        const series = lineGraph.series[0]!;
-        renderWithAnalyticsHost(
-          <CustomGraph
-            input={{
-              ...lineGraph,
-              graphType: "summary",
-              series: [
-                series,
-                {
-                  ...series,
-                  name: "Total Cost",
-                  metric: "performance.total_cost",
-                  aggregation: "sum",
-                },
-                {
-                  ...series,
-                  name: "Tokens",
-                  metric: "performance.total_tokens",
-                  aggregation: "sum",
-                },
-              ],
-            }}
-          />,
-        );
-
-        expect(screen.getAllByTestId("chart-error-indicator")).toHaveLength(1);
-        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-      });
+      const tab = screen.getByRole("tab");
+      expect(tab).toHaveTextContent("This search was too large");
+      expect(tab).not.toHaveTextContent("query_memory_exceeded");
     });
   });
 });
 
-describe("<DocumentsCountsTable />", () => {
-  describe("when its query fails", () => {
-    beforeEach(() => {
-      queryState.documents = failedQuery();
-    });
+describe("<CustomGraph /> summary card with several figures when its query fails", () => {
+  beforeEach(() => {
+    queryState.timeseries = failedQuery();
+  });
 
-    /** @scenario "Top used documents shows the same compact error state" */
-    it("shows the compact panel message with a Retry", async () => {
-      const user = userEvent.setup();
-      renderWithAnalyticsHost(<DocumentsCountsTable />);
+  /** @scenario "A failed summary card shows one compact indicator" */
+  it("shows one compact indicator for the whole row, not one per figure", () => {
+    const series = lineGraph.series[0]!;
+    renderWithHost(
+      <CustomGraph
+        input={{
+          ...lineGraph,
+          graphType: "summary",
+          series: [
+            series,
+            {
+              ...series,
+              name: "Total Cost",
+              metric: "performance.total_cost",
+              aggregation: "sum",
+            },
+            {
+              ...series,
+              name: "Tokens",
+              metric: "performance.total_tokens",
+              aggregation: "sum",
+            },
+          ],
+        }}
+      />,
+    );
 
-      const alert = screen.getByRole("alert");
-      expect(within(alert).getByText("This search was too large")).toBeInTheDocument();
-      expect(screen.queryByText("An error occurred")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("chart-error-indicator")).toHaveLength(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
 
-      await user.click(within(alert).getByRole("button", { name: /retry/i }));
-      expect(refetches.documents).toHaveBeenCalledTimes(1);
-    });
+describe("<DocumentsCountsTable /> when its query fails", () => {
+  beforeEach(() => {
+    queryState.documents = failedQuery();
+  });
 
-    /** @scenario "Top used documents shows the same compact error state" */
-    it("shows the compact indicator in the total documents tab header", () => {
-      renderWithAnalyticsHost(<DocumentsCountsSummary />);
+  /** @scenario "Top used documents shows the same compact error state" */
+  it("shows the compact panel message with a Retry", async () => {
+    const user = userEvent.setup();
+    renderWithHost(<DocumentsCountsTable />);
 
-      expect(screen.getByTestId("chart-error-indicator")).toBeInTheDocument();
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    });
+    const alert = screen.getByRole("alert");
+    expect(within(alert).getByText("This search was too large")).toBeInTheDocument();
+    expect(screen.queryByText("An error occurred")).not.toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: /retry/i }));
+    expect(refetchDocuments).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "Top used documents shows the same compact error state" */
+  it("shows the compact indicator in the total documents tab header", () => {
+    renderWithHost(<DocumentsCountsSummary />);
+
+    expect(screen.getByTestId("chart-error-indicator")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

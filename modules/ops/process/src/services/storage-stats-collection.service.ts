@@ -3,6 +3,7 @@
  * @see specs/ops/clickhouse-storage-metrics.feature
  */
 
+import { EVENT_TABLES } from "@langwatch/eventing/server";
 import type { Logger } from "@langwatch/observability";
 import { toEpochMs } from "@langwatch/time";
 
@@ -17,16 +18,15 @@ import type {
 
 /** The tables whose footprint the size and retention alerts are built on. */
 const MONITORED_TABLES = [
-  "event_log",
+  ...EVENT_TABLES.filter(({ store }) => store === "clickhouse").map(({ table }) => table),
   "stored_spans",
   "trace_summaries",
   "llm_spans_tokens_usage",
   "evaluations",
   "events",
-  // ADR-040: offloaded evaluator inputs and other externalised content live
-  // here, so its on-disk footprint is the durable-object cost.
+  // ADR-040: externalised content lives here, so its on-disk footprint is the durable-object cost.
   "stored_objects",
-] as const;
+];
 
 /** One ClickHouse endpoint the collection measures, read through its own footprint repository. */
 export interface StorageStatsInstance {

@@ -5,12 +5,12 @@
  */
 
 import {
+  CustomGraphToken,
   FilterSidebarToken,
   SavedDashboardsToken,
   StarredDashboardsToken,
-  analyticsLwqlTrpc,
-  analyticsTrpc,
-} from "@langwatch/analytics-contract";
+} from "@langwatch/analytics-client";
+import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
 import { createElement } from "react";
@@ -97,12 +97,8 @@ export const analyticsWeb = defineBrowserModule("analytics")
     },
   })
   .withCapabilities({
-    /** A custom graph over the project's traces, lent to modules that chart it (§3.4 rule 7). */
-    customGraph: {
-      load: async () => ({
-        default: (await import("./ui/sections/custom-graph.tsx")).CustomGraph,
-      }),
-    },
+    /** The reader's applied trace filters, installed by the shell beside copy targets (§10.1). */
+    traceFilters: { load: () => import("./behavior/trace-filters-capability.ts") },
   })
   /** The saved-dashboards list, lent to navigation's sidebar on dashboards pages. */
   .lends(SavedDashboardsToken, {
@@ -122,5 +118,11 @@ export const analyticsWeb = defineBrowserModule("analytics")
   .lends(FilterSidebarToken, {
     load: async () => ({
       default: (await import("./ui/sections/filter-sidebar.tsx")).FilterSidebar,
+    }),
+  })
+  /** A custom graph over the project's traces, lent to the home that charts it (§10.1). */
+  .lends(CustomGraphToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/custom-graph.tsx")).CustomGraph,
     }),
   });

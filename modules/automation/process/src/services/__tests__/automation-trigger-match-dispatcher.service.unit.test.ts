@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AutomationTriggerMatchDispatcherService } from "../automation-trigger-match-dispatcher.service.ts";
+import { AutomationTriggerMatchDispatcherService } from "../../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
 
 const match = {
   tenantId: "project-1",

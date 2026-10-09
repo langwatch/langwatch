@@ -26,6 +26,7 @@ import {
 } from "../../model/billing-plans.ts";
 import {
   billingSeatCounts,
+  seatUsageCount,
   subscriptionChangesRequired,
   subscriptionPlanFlags,
   type SubscriptionPlanFlags,
@@ -37,6 +38,7 @@ import {
 } from "../../model/subscription-types.ts";
 import { UpdateSeatsBlock } from "../../ui/blocks/update-seats-block.tsx";
 import { UpgradePlanBlock } from "../../ui/blocks/upgrade-plan-block.tsx";
+import { SeatLimitCallout } from "../../ui/elements/seat-limit-callout.tsx";
 import { ContactSalesBlock } from "./contact-sales/index.ts";
 import { CurrentPlanBlock } from "./current-plan-block.tsx";
 import { InvoicesBlock } from "./invoices-block.tsx";
@@ -143,6 +145,11 @@ export function SubscriptionPage() {
   );
   const { organizationWithMembers, pendingInvites, users, pendingInvitesWithMemberType } =
     useSubscriptionMembers(organization?.id);
+  // Seat limit state as enforcement counts it (custom roles, open invites)
+  const usage = billingApi.limits.getUsage.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
 
   const plan = activePlan.data;
   const flags = subscriptionPlanFlags({ plan, pricingModel: organization?.pricingModel });
@@ -163,8 +170,15 @@ export function SubscriptionPage() {
   // Planned seats from the drawer plus pending invites from the database.
   const allPlannedUsers = [...plannedUsers, ...pendingInvitesWithMemberType];
   const existingCoreMembers = countFullMembers(users);
-  const seatUsageN = existingCoreMembers + countFullMembers(allPlannedUsers);
+  // Members and open invites as enforcement counts them (custom roles
+  // included) once the server answered, plus rows planned in the drawer.
+  const seatUsageN = seatUsageCount({
+    serverMembersCount: usage.data?.membersCount,
+    plannedFullMembers: countFullMembers(plannedUsers),
+    pageCount: existingCoreMembers + countFullMembers(allPlannedUsers),
+  });
   const seatUsageM = plan?.maxMembers;
+  const isOverPlanSeats = usage.data?.seatLimitInfo?.status === "exceeded";
 
   const { seatPricePerPeriodCents, periodSuffix, totalFullMembers, monthlyEquivalent } =
     useBillingPricing({
@@ -182,6 +196,7 @@ export function SubscriptionPage() {
     // Manual planned seats only: pending invites are already in maxMembers.
     newPlannedFullMembers: countFullMembers(plannedUsers),
     deletedSeatCount,
+    seatUsage: seatUsageN,
   });
 
   const priceLine = (seats: number) =>
@@ -195,6 +210,7 @@ export function SubscriptionPage() {
     setDeletedSeatCount,
     onInvitesSent: () => {
       void pendingInvites.refetch();
+      void usage.refetch();
       void organizationWithMembers.refetch();
     },
   });
@@ -218,6 +234,7 @@ export function SubscriptionPage() {
       setDeletedSeatCount(0);
       void activePlan.refetch();
       void pendingInvites.refetch();
+      void usage.refetch();
     },
     organizationWithMembers,
     activePlanType: plan?.type,
@@ -283,6 +300,7 @@ export function SubscriptionPage() {
     subscriptionChangesRequired({
       flags,
       hasSeatChanges: plannedUsers.length > 0 || deletedSeatCount > 0,
+      isOverPlanSeats,
     });
   const isSelfManagedPaidPlan = !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
 
@@ -321,6 +339,13 @@ export function SubscriptionPage() {
           // Sales has nothing to sell a customer already holding a signed
           // enterprise contract, so they get no upgrade call to action.
           contactSalesUrl={isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined}
+        />
+
+        <SeatLimitCallout
+          seatLimitInfo={usage.data?.seatLimitInfo}
+          isUpgradePlanRequired={isUpgradePlanRequired}
+          isEnterprisePlan={isEnterprisePlan}
+          onAddSeats={() => setIsDrawerOpen(true)}
         />
 
         <InvoicesBlock

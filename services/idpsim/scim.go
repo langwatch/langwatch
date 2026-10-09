@@ -62,6 +62,10 @@ func scimUserResource(u *User) map[string]any {
 	if u.ExternalID != "" {
 		resource["externalId"] = u.ExternalID
 	}
+	if ext := u.enterprise(); ext != nil {
+		resource["schemas"] = []string{scimUserSchema, scimEnterpriseSchema}
+		resource[scimEnterpriseSchema] = enterpriseExtension(*ext)
+	}
 	return resource
 }
 

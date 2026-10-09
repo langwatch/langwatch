@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,6 +42,8 @@ type PrereqTools interface {
 	Install(ctx context.Context, command string) error
 	// Sysctl reads one kernel setting (`sysctl -n name`), trimmed.
 	Sysctl(ctx context.Context, name string) (string, error)
+	// Fetch downloads a pinned release to dest and verifies its sha256.
+	Fetch(ctx context.Context, a domain.PinnedArtifact, dest string) error
 }
 
 // platform is the GOOS prerequisites are planned for: the pinned one, else
@@ -68,7 +71,11 @@ func (o *Orchestrator) CheckPrereqs(ctx context.Context) []domain.PrereqStatus {
 			found[c.Key] = o.probeCandidate(ctx, c)
 		}
 	}
-	return domain.PlanPrereqs(found, o.PrereqSkips(), o.platform())
+	report := domain.PlanPrereqs(found, o.PrereqSkips(), o.platform())
+	if o.platform() != "darwin" {
+		return report
+	}
+	return slices.DeleteFunc(report, func(st domain.PrereqStatus) bool { return st.UnlistedOnDarwin })
 }
 
 // probeCandidate answers one candidate. portless is the one entry with no
@@ -88,6 +95,9 @@ func (o *Orchestrator) probeCandidate(ctx context.Context, c domain.Candidate) d
 	}
 	if c.Key == "somaxconn" {
 		return o.probeSomaxconn(ctx)
+	}
+	if c.Key == "native-binaries" {
+		return o.probeNativeBinaries()
 	}
 	if c.FormulaIsAuthority {
 		// haven starts this one with `brew services`, so brew's answer is the
@@ -156,6 +166,41 @@ func (o *Orchestrator) probeSomaxconn(ctx context.Context) domain.Found {
 		return domain.Found{Present: true, Detail: "kern.ipc.somaxconn unreadable, not checked"}
 	}
 	return domain.Found{Present: n >= domain.SomaxconnFloor, Detail: "kern.ipc.somaxconn=" + out}
+}
+
+// nativeBinaries is the pinned ClickHouse, Tempo and Alloy for this machine, at the
+// paths `haven up` looks for them.
+func (o *Orchestrator) nativeBinaries() []domain.NativePinnedBinary {
+	return domain.NativePinnedBinaries(o.cfg.Home, o.platform(), runtime.GOARCH)
+}
+
+// probeNativeBinaries reports present once every pinned binary is on disk.
+func (o *Orchestrator) probeNativeBinaries() domain.Found {
+	all := o.nativeBinaries()
+	missing := domain.MissingPinnedBinaries(all, fileExists)
+	if len(missing) > 0 {
+		return domain.Found{}
+	}
+	detail := make([]string, 0, len(all))
+	for _, b := range all {
+		detail = append(detail, b.Name+" "+b.Version)
+	}
+	return domain.Found{Present: true, Detail: strings.Join(detail, ", ")}
+}
+
+// fetchNativeBinaries downloads and verifies whichever pinned binary is missing.
+func (o *Orchestrator) fetchNativeBinaries(ctx context.Context) error {
+	for _, b := range domain.MissingPinnedBinaries(o.nativeBinaries(), fileExists) {
+		if err := o.prereqTools().Fetch(ctx, b.Artifact, b.Dest); err != nil {
+			return fmt.Errorf("%s %s: %w", b.Name, b.Version, err)
+		}
+	}
+	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // probePortless folds the proxy's two questions — is one resolvable, and is
@@ -261,31 +306,53 @@ func (o *Orchestrator) installGolangciLint(ctx context.Context) error {
 }
 
 // InstallPrereqs installs the chosen prerequisites in dependency order,
-// narrating each one. It stops at the first failure: the entries depend on
-// each other (brew installs the formulae, node provides the npm), so
-// continuing past a failure produces a second, more confusing error about a
-// cause that is already known.
+// narrating each one. A failed REQUIRED entry stops the run: the rest are
+// installed through it (brew, node). A failed recommended or optional entry
+// is logged and the run carries on; the failures are summed up at the end
+// and do not fail the run.
 //
 // A manual entry prints its command rather than running it. If it is also
 // REQUIRED and anything is ordered after it, the run ends there: the rest are
 // installed through it, so attempting them would fail on a cause already on
 // screen and blame the wrong tool for it.
-func (o *Orchestrator) InstallPrereqs(ctx context.Context, chosen []domain.Chosen) error {
+func (o *Orchestrator) InstallPrereqs(ctx context.Context, chosen []domain.Chosen) ([]ManualStep, error) {
 	return o.installPrereqsTo(ctx, os.Stdout, chosen)
 }
 
-func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen []domain.Chosen) error {
+// ManualStep is a prerequisite haven cannot install itself: what it is for and the command to
+// run. The caller shows them, so a terminal can set them apart from the install narration.
+type ManualStep struct {
+	Name    string
+	Why     string
+	Command string
+}
+
+func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen []domain.Chosen) ([]ManualStep, error) {
 	ordered := domain.OrderPrereqs(chosen)
 	if len(ordered) == 0 {
 		fmt.Fprintln(w, "nothing selected; nothing installed.")
-		return nil
+		return nil, nil
 	}
+	var failed []string
+	var manual []ManualStep
 	for i, pick := range ordered {
-		if err := o.installPick(ctx, w, prereqPick{chosen: pick, hasMore: i < len(ordered)-1}); err != nil {
-			return err
+		step, err := o.installPick(ctx, w, prereqPick{chosen: pick, hasMore: i < len(ordered)-1})
+		if step.Command != "" {
+			manual = append(manual, step)
 		}
+		if err == nil {
+			continue
+		}
+		if p, ok := domain.LookupPrereq(pick.Key); !ok || p.Requirement == domain.PrereqRequired {
+			return manual, err
+		}
+		fmt.Fprintf(w, "✗ %v\n", err)
+		failed = append(failed, pick.Key)
 	}
-	return nil
+	if len(failed) > 0 {
+		fmt.Fprintf(w, "\nnot installed (not required, haven up still runs): %s\n", strings.Join(failed, ", "))
+	}
+	return manual, nil
 }
 
 // prereqPick is one chosen candidate and whether anything is ordered after it.
@@ -294,21 +361,21 @@ type prereqPick struct {
 	hasMore bool
 }
 
-// installPick installs, records or prints the manual command for one pick.
-func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereqPick) error {
+// installPick installs or records one pick, or returns the manual step haven cannot run.
+func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereqPick) (ManualStep, error) {
 	p, candidate, err := lookupPick(pick.chosen)
 	if err != nil {
-		return err
+		return ManualStep{}, err
 	}
 	// A declining candidate is an answer, not an install: "none, keep this
 	// machine container-free" settles the question rather than putting
 	// something on the machine.
 	if candidate.Declines {
-		return o.recordChoice(w, p, candidate)
+		return ManualStep{}, o.recordChoice(w, p, candidate)
 	}
 	command, manual := candidate.InstallOn(o.platform())
 	if command == "" {
-		fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, manual)
+		step := ManualStep{Name: p.Name, Why: p.Summary, Command: manual}
 		// Carrying on past a REQUIRED one haven cannot install is how the
 		// fresh-Mac case produced its worst message: print the Homebrew
 		// line, then run `brew install node`, then report "could not
@@ -316,11 +383,11 @@ func (o *Orchestrator) installPick(ctx context.Context, w io.Writer, pick prereq
 		// hand", which blames the wrong tool. Everything ordered after it
 		// is installed THROUGH it, so this is where the run ends.
 		if p.Requirement == domain.PrereqRequired && pick.hasMore {
-			return fmt.Errorf("%s has to be installed first — the rest are installed through it. Run the command above, then re-run `haven install`", p.Name)
+			return step, fmt.Errorf("%s has to be installed first — the rest are installed through it. Run its command, then re-run `haven install`", p.Name)
 		}
-		return nil
+		return step, nil
 	}
-	return o.installCandidate(ctx, w, prereqInstall{prereq: p, candidate: candidate, command: command})
+	return ManualStep{}, o.installCandidate(ctx, w, prereqInstall{prereq: p, candidate: candidate, command: command})
 }
 
 // lookupPick resolves a pick to its prerequisite and candidate.
@@ -406,6 +473,9 @@ func (o *Orchestrator) runPrereqInstall(ctx context.Context, p domain.Prereq, co
 	}
 	if p.Key == "golangci-lint" {
 		return o.installGolangciLint(ctx)
+	}
+	if p.Key == "native-binaries" {
+		return o.fetchNativeBinaries(ctx)
 	}
 	return o.prereqTools().Install(ctx, command)
 }
@@ -564,4 +634,7 @@ func (nullPrereqTools) Install(context.Context, string) error {
 }
 func (nullPrereqTools) Sysctl(context.Context, string) (string, error) {
 	return "", fmt.Errorf("no sysctl reader is wired in")
+}
+func (nullPrereqTools) Fetch(context.Context, domain.PinnedArtifact, string) error {
+	return fmt.Errorf("no downloader is wired in")
 }

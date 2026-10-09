@@ -21,24 +21,6 @@ Feature: Composing durable metric processing
     And it registers the same commands and projections the App registers
 
   @unit
-  Scenario: The append surface offers no read
-    Given the port durable metric processing appends through
-    When a caller looks for the usage-estimate query on it
-    Then the port does not carry one
-
-  @unit
-  Scenario: The organization-wide usage read still routes by organization
-    Given the full metric repository, composed with both clients
-    When a usage estimate is asked for without naming a tenant
-    Then the organization-keyed client answers it
-
-  @unit
-  Scenario: Both graphs append through one implementation
-    Given the full metric repository and the append-only one
-    When each is asked to store the same canonical point
-    Then the same append path runs for both
-
-  @unit
   Scenario: The metric capability is installed by the process that boots it
     Given a process that provides the data-privacy capability
     When it installs the metric feature and boots for the worker role

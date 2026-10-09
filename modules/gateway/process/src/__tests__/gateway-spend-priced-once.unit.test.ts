@@ -26,12 +26,12 @@ import {
   GatewaySpendFoldProjection,
   type GatewaySpendState,
 } from "../eventing/gateway-spend.projection.ts";
+import type { GatewaySpendRating } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
 import {
   GatewayInternalProtocolService,
   type GatewayInternalProtocolMembers,
 } from "../services/gateway-internal-protocol.service.ts";
-import type { GatewaySpendRating } from "../services/model-catalog-gateway-spend-rating.service.ts";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;

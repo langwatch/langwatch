@@ -5,7 +5,7 @@ import type {
   SsoMigrationAccountLinkDecision,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
-import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * A federated sign-in is asked of the connection it arrived through, on the
  * account hooks — the only two places a sign-in touches this process.
@@ -20,7 +20,11 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
 } from "../../channels/better-auth.channel.ts";
-import type { BetterAuthHookCollaborators } from "../../channels/http/http.better-auth-hooks.channel.ts";
+import type {
+  BetterAuthHookCollaborators,
+  SsoDomainOrganizations,
+  LinkProposals,
+} from "../../channels/http/http.better-auth-hooks.channel.ts";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -37,6 +41,7 @@ const WORKER: BetterAuthHookUser = {
   deactivatedAt: null,
   pendingSsoSetup: false,
   signupConfirmationPending: false,
+  emailVerified: true,
 };
 
 function repoFor(user: Partial<BetterAuthHookUser> | null = {}): BetterAuthHooksRepository {
@@ -44,9 +49,6 @@ function repoFor(user: Partial<BetterAuthHookUser> | null = {}): BetterAuthHooks
     getUserForHooks: async ({ userId }) => {
       if (user === null) throw new UserNotFoundError(userId);
       return { ...WORKER, ...user };
-    },
-    getOrganizationBySsoDomain: async () => {
-      throw new OrganizationNotFoundError();
     },
     findFederatedAccountsForUser: async () => [],
   });
@@ -59,12 +61,14 @@ function collaboratorsFor(
   record: SsoAuthenticationActivityApi["record"] = async () => undefined,
 ): BetterAuthHookCollaborators {
   return {
+    organizations: createApiFixture<SsoDomainOrganizations>({ findBySsoDomain: async () => null }),
     federation: createApiFixture<BetterAuthFederation>(),
     invites: createApiFixture<Pick<OrganizationApi, "applyPendingInvite">>(),
     announcements: createApiFixture<BetterAuthAnnouncements>(),
     authzGrants: createApiFixture<AuthzGrantsService>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record }),
+    linkProposals: createApiFixture<LinkProposals>(),
     ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
       decideAccountLink: async () => ({ kind: "not_migrating" }),
     }),

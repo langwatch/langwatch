@@ -12,13 +12,13 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import type { ExperimentRunBoardWriteBackService } from "../../features/run/services/experiment-run-board-write-back.service.ts";
+import type { ExperimentRunCellService } from "../../features/run/services/experiment-run-cell.service.ts";
+import { ExperimentRunCommandDispatcherService } from "../../features/run/services/experiment-run-command-dispatcher.service.ts";
 import { ClickHouseExperimentRunProcessingRepository } from "../../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentSession } from "../../repositories/clickhouse/clickhouse.experiment-session.store.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
-import type { ExperimentRunBoardWriteBackService } from "../../services/experiment-run-board-write-back.service.ts";
-import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
-import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { ExecuteExperimentCellCommand } from "../experiment-run-cell.commands.ts";
 import { completeRun, executeCell, failLostCell } from "../experiment-run-execution.intent.ts";
 import { createExperimentRunFramesSubscriber } from "../experiment-run-frames.subscriber.ts";
@@ -74,6 +74,7 @@ function build() {
         boardWriteBack: createApiFixture<ExperimentRunBoardWriteBackService>({}, "boardWriteBack"),
       }),
     },
+    traceMetricsSync: async () => undefined,
     runFrames: createExperimentRunFramesSubscriber({
       stream: MemoryExperimentRunEventStreamRepository.create(),
     }),
@@ -105,6 +106,21 @@ describe("experiment_run_processing without Redis", () => {
       expect(pipeline.commands.map((command) => command.definition.name)).toContain(
         "executeExperimentCell",
       );
+    });
+
+    /** @scenario "Result commands of a backed-up row are appended together" */
+    it("coalesces the appends of both result commands and of the result storage", () => {
+      const { pipeline } = build();
+      const batchOf = (name: string) =>
+        pipeline.commands.find((command) => command.definition.name === name)?.definition.options
+          ?.coalesceMaxBatch;
+
+      expect(batchOf("recordTargetResult")).toBeGreaterThan(1);
+      expect(batchOf("recordEvaluatorResult")).toBeGreaterThan(1);
+      expect(
+        pipeline.mapProjections.get("experimentRunResultStorage")?.definition.options
+          ?.coalesceMaxBatch,
+      ).toBeGreaterThan(1);
     });
 
     it("reads the retention default only when a row is written, never while composing", () => {

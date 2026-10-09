@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 
 import { lwqlVegaEmbedOptions } from "../../src/behavior/use-langwatch-ql-vega-view.ts";
-import { LangWatchQLVegaLiteChart } from "../../src/ui/sections/langwatch-ql-vega-lite-chart.tsx";
+import { LangWatchQLVegaLiteChart } from "../../src/features/dashboard-widget/ui/sections/langwatch-ql-vega-lite-chart.tsx";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },

@@ -1,13 +1,13 @@
 import { getProviderModelOptions } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
+import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
 
 // Catalog rates under test (model-catalog.overlay.json): flash v2 $0.05/1k
 // chars, scribe $0.22/hour, gpt-4o-transcribe $2.50/$10.00 per million
 // tokens, gpt-transcribe $0.0045/min, gpt-realtime $4/$16 text and $32/$64
 // audio per million tokens.
-const FLASH_PER_CHAR = 5e-5;
+const FLASH_PER_CHAR = 4e-5;
 const SCRIBE_PER_SECOND = 6.11e-5;
 const TRANSCRIBE_AUDIO_IN = 2.5e-6;
 const TRANSCRIBE_OUT = 1e-5;

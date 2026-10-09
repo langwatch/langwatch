@@ -42,6 +42,9 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {
@@ -51,6 +54,9 @@
       "path": "../../../packages/error-views/tsconfig.build.json"
     },
     {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -58,6 +64,9 @@
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../onboarding/client/tsconfig.build.json"
     },
     {
       "path": "../../onboarding/contract/tsconfig.build.json"

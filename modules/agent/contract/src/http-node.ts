@@ -127,7 +127,8 @@ export function readSecretReference(value: string): SecretReferenceRead {
 const LOOSE_SECRET_REFERENCE =
   /^\s*(?:(bearer|basic|token)\s+)?\{\{\s*secrets\.([A-Z][A-Z0-9_]*)\s*\}\}\s*$/i;
 
-/** A reference typed loosely ("bearer {{secrets.X}}") in the spelling `readSecretReference` reads. */
+/** A reference typed loosely ("bearer {{secrets.X}}"), in the spelling
+ * `readSecretReference` reads. */
 function inReferenceSpelling(value: string): string {
   const match = LOOSE_SECRET_REFERENCE.exec(value);
   if (!match?.[2]) return value;
@@ -477,4 +478,52 @@ export async function httpAgentConfigStoringSecrets<
     ...(headers ? { headers: storedHeaders } : {}),
     ...(storedAuth ? { auth: storedAuth } : {}),
   };
+}
+
+type HttpSecrets = Pick<HttpAgentConfig, "headers" | "auth">;
+
+function authKeepingStored(input: { stored: HttpAuth | undefined; incoming: HttpAuth }): HttpAuth {
+  const { stored, incoming } = input;
+  if (!stored) return incoming;
+  if (incoming.type === "bearer" && stored.type === "bearer" && incoming.token === "") {
+    return { ...incoming, token: stored.token };
+  }
+  if (incoming.type === "api_key" && stored.type === "api_key" && incoming.value === "") {
+    return { ...incoming, value: stored.value };
+  }
+  if (incoming.type === "basic" && stored.type === "basic" && incoming.password === "") {
+    return { ...incoming, password: stored.password };
+  }
+
+  return incoming;
+}
+
+/** A blank credential on a write means "unchanged": the stored value takes its place. */
+export function httpSecretsKeepingStored<T extends HttpSecrets>(input: {
+  stored: HttpSecrets;
+  incoming: T;
+}): T {
+  const { stored, incoming } = input;
+  const headers = incoming.headers?.map((header) =>
+    header.value === "" && isCredentialHeader(header.key)
+      ? { ...header, value: stored.headers?.find(({ key }) => key === header.key)?.value ?? "" }
+      : header,
+  );
+  const auth = incoming.auth && authKeepingStored({ stored: stored.auth, incoming: incoming.auth });
+
+  return {
+    ...incoming,
+    ...(headers ? { headers } : {}),
+    ...(auth ? { auth } : {}),
+  };
+}
+
+/** Whether a call's blank credentials would take any stored value: the destination check's half. */
+export function fillsStoredSecrets(input: { stored: HttpSecrets; incoming: HttpSecrets }): boolean {
+  const filled = httpSecretsKeepingStored(input);
+
+  return (
+    JSON.stringify({ headers: filled.headers, auth: filled.auth }) !==
+    JSON.stringify({ headers: input.incoming.headers, auth: input.incoming.auth })
+  );
 }

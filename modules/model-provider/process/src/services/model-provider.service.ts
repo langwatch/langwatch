@@ -43,22 +43,25 @@ import {
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 
+import type { ModelProviderCodexGatewayPing } from "../channels/model-provider-codex-gateway-ping.channel.ts";
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
+import type { CodexTokenRefresher } from "../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
+import { ModelProviderCodexService } from "../features/codex/services/model-provider-codex.service.ts";
+import { ModelProviderConnectionPingService } from "../features/credential-probe/services/model-provider-connection-ping.service.ts";
+import type { ModelProviderConnectionRateLimiter } from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
+import { ModelProviderDefaultsWriteService } from "../features/defaults/services/model-provider-defaults-write.service.ts";
+import { ModelProviderDefaultsService } from "../features/defaults/services/model-provider-defaults.service.ts";
+import { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
+import { ModelProviderCostsService } from "../features/model-cost/services/model-provider-costs.service.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
-import type { CodexTokenRefresher } from "./codex-oauth-model-provider-token-refresher.service.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
-import { ModelProviderCodexService } from "./model-provider-codex.service.ts";
 import { ModelProviderCommandService } from "./model-provider-command.service.ts";
-import { ModelProviderConnectionPingService } from "./model-provider-connection-ping.service.ts";
-import { ModelProviderCostsService } from "./model-provider-costs.service.ts";
-import { ModelProviderDefaultsWriteService } from "./model-provider-defaults-write.service.ts";
-import { ModelProviderDefaultsService } from "./model-provider-defaults.service.ts";
 import { ModelProviderExecutionService } from "./model-provider-execution.service.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
-import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import { ModelProviderQueryService } from "./model-provider-query.service.ts";
 import { ModelProviderResolutionService } from "./model-provider-resolution.service.ts";
 import { ModelProviderScopeService } from "./model-provider-scope.service.ts";
@@ -66,7 +69,6 @@ import { ModelProviderWriteAuthorizationService } from "./model-provider-write-a
 import type { ModelProviderIdService } from "./prefixed-model-provider-id.service.ts";
 import type { ModelProviderCatalog } from "./registry-model-provider-catalog.service.ts";
 import type { ModelTranslation } from "./vercel-ai-model-translation.service.ts";
-import type { ModelProviderConnectionRateLimiter } from "./windowed-model-provider-connection-rate-limiter.service.ts";
 
 interface ModelProviderServiceOptions {
   repository: ModelProviderRepository;
@@ -81,6 +83,8 @@ interface ModelProviderServiceOptions {
   authorization: AuthzApi;
   translation: ModelTranslation;
   connectionPing: ModelProviderConnectionPing;
+  codexGatewayPing: ModelProviderCodexGatewayPing;
+  secrets: Pick<SecretApi, "getValues">;
   ids: ModelProviderIdService;
 }
 
@@ -122,6 +126,8 @@ export class ModelProviderService {
       connectionRateLimiter: options.connectionRateLimiter,
       connectionPing: ModelProviderConnectionPingService.create({
         channel: options.connectionPing,
+        codexChannel: options.codexGatewayPing,
+        secrets: options.secrets,
         modelProviders: this,
       }),
       writeAuthorization,

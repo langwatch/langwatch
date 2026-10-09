@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -91,7 +92,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
 	}
-	if !o.sys.ProcessAlive(st.LauncherPID) {
+	if !o.launcherIsOurs(st) {
 		return nil, fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
 	}
 	targets := restartTargets(st, name)
@@ -99,6 +100,12 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 		return nil, fmt.Errorf("unknown service %q — restartable: %s", name, strings.Join(restartableNames(st), ", "))
 	}
 	var msgs []string
+	if slices.ContainsFunc(targets, isSimsTarget) {
+		if goLane, ok := o.goLaneHostingSims(st); ok {
+			targets = foldSimsIntoGoLane(targets, goLane)
+			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (one process; LANGWATCH_DEV_ONE_PROCESS=0 splits them), so the go lane restarts with them", SimsLane))
+		}
+	}
 	for _, t := range targets {
 		pids := o.sys.PIDsOnPort(t.Port)
 		if len(pids) == 0 {
@@ -116,6 +123,34 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the supervisor brings it back", t.Name, t.Port))
 	}
 	return msgs, nil
+}
+
+// goLaneHostingSims is the go lane when the process holding the simulators'
+// port also holds the go lane's: one process folded them in.
+func (o *Orchestrator) goLaneHostingSims(st domain.Stack) (restartTarget, bool) {
+	goLane, sims := restartTargets(st, GoLane), restartTargets(st, SimsLane)
+	if len(goLane) == 0 || len(sims) == 0 {
+		return restartTarget{}, false
+	}
+	goPIDs := o.sys.PIDsOnPort(goLane[0].Port)
+	for _, pid := range o.sys.PIDsOnPort(sims[0].Port) {
+		if slices.Contains(goPIDs, pid) {
+			return goLane[0], true
+		}
+	}
+	return restartTarget{}, false
+}
+
+func isSimsTarget(t restartTarget) bool { return t.Name == SimsLane }
+
+// foldSimsIntoGoLane swaps the sims target for the go lane hosting them, so
+// the shared process is bounced once whichever of the two was named.
+func foldSimsIntoGoLane(targets []restartTarget, goLane restartTarget) []restartTarget {
+	out := slices.DeleteFunc(slices.Clone(targets), isSimsTarget)
+	if !slices.ContainsFunc(out, func(t restartTarget) bool { return t.Name == GoLane }) {
+		out = append(out, goLane)
+	}
+	return out
 }
 
 // restartTargets resolves which children to bounce. Only supervised children
@@ -140,7 +175,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	inGo := map[string]bool{"gateway": !mono, "nlp": !mono}
 	inSims := map[string]bool{}
 	if !mono && goLaneHostsSimulators(st.WorktreeDir) {
-		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService} {
+		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.TelemetryService} {
 			inSims[sim] = true
 		}
 	}
@@ -216,6 +251,32 @@ func (o *Orchestrator) ResolveSelection(worktreeDir string, deltas []string) (do
 		}
 	}
 	return sel, nil
+}
+
+// ResolveMode applies `up --mode` to the sticky selection ("none" clears it),
+// persists a change only once the mode loads, and returns the mode in force
+// (specs/setup/deployment-modes.feature).
+func (o *Orchestrator) ResolveMode(worktreeDir string, sel domain.Selection, requested string) (domain.Selection, domain.DeploymentMode, error) {
+	want := sel.Mode
+	if requested == "none" {
+		want = ""
+	} else if requested != "" {
+		want = requested
+	}
+	var mode domain.DeploymentMode
+	if want != "" {
+		var err error
+		if mode, err = domain.LoadDeploymentMode(worktreeDir, want); err != nil {
+			return sel, mode, err
+		}
+	}
+	if want != sel.Mode {
+		sel.Mode = want
+		if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
+			return sel, mode, fmt.Errorf("saving the deployment mode: %w", err)
+		}
+	}
+	return sel, mode, nil
 }
 
 // restartObservability stops and re-ensures the shared LGTM stack, re-routing

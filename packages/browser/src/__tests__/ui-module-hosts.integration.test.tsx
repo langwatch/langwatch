@@ -3,14 +3,14 @@
  * Spec: specs/ui/module-host-mounting.feature, specs/navigation/chunk-load-retry.feature
  */
 import { isChunkLoadFailure } from "@langwatch/browser-host/navigation";
-import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { act, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { createContext, useContext, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createUiModuleHostStack } from "../ui-module-hosts.tsx";
-import { UiChunkLoadFailure } from "../ui-page-fallbacks.tsx";
+import { createUiModuleHostStack } from "../module/ui-module-hosts.tsx";
+import { UiChunkLoadFailure } from "../page/ui-page-fallbacks.tsx";
 
 const ProbeHost = createContext<string | null>(null);
 
@@ -26,6 +26,9 @@ function probeMount(answer: string) {
 function ProbeScreen() {
   return <span>{useContext(ProbeHost) ?? "no host"}</span>;
 }
+
+// Without this each test would also find what the tests before it rendered.
+afterEach(cleanup);
 
 describe("createUiModuleHostStack", () => {
   describe("given a module that mounts a host and a screen that reads it", () => {
@@ -188,18 +191,16 @@ describe("given a mount whose module will not load", () => {
       },
     ]);
 
-    render(
-      <DesignSystemProvider forcedTheme="light">
-        <ErrorBoundary
-          FallbackComponent={({ error }) =>
-            isChunkLoadFailure(error) ? <UiChunkLoadFailure /> : <span>other failure</span>
-          }
-        >
-          <Hosts>
-            <ProbeScreen />
-          </Hosts>
-        </ErrorBoundary>
-      </DesignSystemProvider>,
+    renderWithDesignSystem(
+      <ErrorBoundary
+        FallbackComponent={({ error }) =>
+          isChunkLoadFailure(error) ? <UiChunkLoadFailure /> : <span>other failure</span>
+        }
+      >
+        <Hosts>
+          <ProbeScreen />
+        </Hosts>
+      </ErrorBoundary>,
     );
 
     await giveUpRetrying();

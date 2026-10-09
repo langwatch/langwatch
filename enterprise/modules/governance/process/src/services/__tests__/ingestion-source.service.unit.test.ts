@@ -9,6 +9,16 @@ import { toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
+import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
+import {
+  IngestionSecretConfiguration,
+  IngestionSecretService,
+} from "../../features/ingestion-source/services/ingestion-source-secret.service.ts";
+import type {
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
@@ -16,16 +26,6 @@ import {
   type UpdateIngestionSourceRecord,
 } from "../../repositories/ingestion-source.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
-import {
-  IngestionSecretConfiguration,
-  IngestionSecretService,
-} from "../ingestion-source-secret.service.ts";
-import type {
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "../ingestion-source.service.ts";
-import { IngestionSourceService } from "../ingestion-source.service.ts";
-import { PullDestinationService } from "../pull-destination.service.ts";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
 

@@ -1,69 +1,98 @@
 import type { PrincipalRef } from "@langwatch/authorization";
-import type {
-  InstantEvalEstimateWire,
-  InstantEvalOptInAccess,
-  InstantEvalRunProgress,
-  InstantEvalRunReference,
-} from "@langwatch/instant-eval-contract";
+import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
-import type { ExportProgressEvent } from "./export-progress.trpc.ts";
-import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
+import type {
+  TraceAttributedRecency,
+  TraceAttributedSpendComparison,
+  TraceAttributedSpendSort,
+  TraceAttributedTrace,
+  TraceAttributedTraceDetail,
+  TraceAttributedValueComparison,
+  TraceAttributedValueSpend,
+  TraceAttributeMatch,
+  TraceAttributeUsageBucket,
+  TraceAttributeValueSpend,
+  TraceDailyGroupSpend,
+  TraceDailySpend,
+  TraceDailySpendGroup,
+  TraceModelRequests,
+  TraceModelSpend,
+  TraceModelSpendWindow,
+  TraceProjectValueSpend,
+  TraceSpendSummary,
+} from "./features/analytics/trace-model-spend.ts";
+import type {
+  TraceTopicClusteringCounts,
+  TraceTopicClusteringPage,
+  TraceTopicClusteringPageInput,
+} from "./features/analytics/trace-topic-clustering-read.ts";
 import type {
   ClassifyClaudeCallInput,
   ClassifyClaudeCallResult,
   CanonicalizeLogRecordInput,
   CanonicalizeLogRecordResult,
+  CanonicalizeSpanAttributesInput,
+  CanonicalizeSpanAttributesResult,
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
-} from "./trace-canonicalisation.ts";
-import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
+} from "./features/attribute/trace-canonicalisation.ts";
+import type {
+  TraceEditOverlayDto,
+  TraceEditOverlayPatch,
+} from "./features/edit-overlay/trace-edit-overlay.contract.ts";
 import type {
   EvaluationTraceReadInput,
   EvaluationTraceSpan,
   EvaluationTraceEvent,
-} from "./trace-evaluation.contract.ts";
-import type { TraceExportDownload, TraceExportDownloadInput } from "./trace-export.vocabulary.ts";
+} from "./features/evaluation/trace-evaluation.contract.ts";
+import type { ResolvedInstantEvalRun } from "./features/evaluation/trace-instant-eval-chips.ts";
+import type { ExportProgressEvent } from "./features/export/export-progress.trpc.ts";
+import type {
+  TraceExportDownload,
+  TraceExportDownloadInput,
+} from "./features/export/trace-export.vocabulary.ts";
+import type { TraceOtlpIngestApi } from "./features/ingest/otlp-ingest.rest.ts";
+import type {
+  AssignTopicCommandData,
+  RecordCapturedSpanInput,
+  RecordMetricCorrelationCommandData,
+  RecordSpanCommandData,
+} from "./features/ingest/trace-processing.commands.ts";
+import type { LogRecordReceivedEventData } from "./features/ingest/trace-processing.events.ts";
+import type { TraceSummaryData } from "./features/ingest/trace-projection.ts";
+import type {
+  DiscoverResult,
+  FacetValuesResult,
+  TraceListPage,
+} from "./features/list/trace-list-view.ts";
+import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
+import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
+import type {
+  TraceQueryClassification,
+  TraceQueryClassificationInput,
+  TraceQueryFieldCatalogueInput,
+} from "./features/query/trace-query.contract.ts";
+import type { LogTraceContribution } from "./features/span/trace-log-contribution.ts";
+import type {
+  SpanSummaryRow,
+  SpanResourceInfo,
+  TraceEventRollup,
+  TraceLogRecordDto,
+  ModelUsageStatsRow,
+  ModelSpanSampleRow,
+} from "./features/span/trace-span-read-model.ts";
 import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type {
   TraceFullReadInput,
   TraceFullRecord,
   TraceFullThreadReadInput,
 } from "./trace-full-read.contract.ts";
-import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
-import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
-import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import type { DiscoverResult, FacetValuesResult, TraceListPage } from "./trace-list-view.ts";
-import type { LogTraceContribution } from "./trace-log-contribution.ts";
-import type {
-  TraceAttributedTrace,
-  TraceAttributeMatch,
-  TraceAttributeUsageBucket,
-  TraceAttributeValueSpend,
-  TraceDailySpend,
-  TraceModelRequests,
-  TraceModelSpend,
-  TraceModelSpendWindow,
-  TraceSpendSummary,
-} from "./trace-model-spend.ts";
 import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
-  AssignTopicCommandData,
-  RecordCapturedSpanInput,
-  RecordMetricCorrelationCommandData,
-  RecordSpanCommandData,
-} from "./trace-processing.commands.ts";
-import type { LogRecordReceivedEventData } from "./trace-processing.events.ts";
-import type { TraceSummaryData } from "./trace-projection.ts";
-import type { TraceQueryEvaluationRun } from "./trace-query-evaluation.types.ts";
-import type {
-  TraceQueryClassification,
-  TraceQueryClassificationInput,
-  TraceQueryFieldCatalogueInput,
-} from "./trace-query.contract.ts";
-import type {
+  TraceCost,
   TraceLegacyListInput,
   TraceSummaryListOptions,
   TraceSummaryListQuery,
@@ -77,19 +106,6 @@ import type {
   TraceMetadataUpdate,
 } from "./trace-rest.schemas.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
-import type {
-  SpanSummaryRow,
-  SpanResourceInfo,
-  TraceEventRollup,
-  TraceLogRecordDto,
-  ModelUsageStatsRow,
-  ModelSpanSampleRow,
-} from "./trace-span-read-model.ts";
-import type {
-  TraceTopicClusteringCounts,
-  TraceTopicClusteringPage,
-  TraceTopicClusteringPageInput,
-} from "./trace-topic-clustering-read.ts";
 import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type {
@@ -100,9 +116,14 @@ import type {
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
-import type { DerivedTraceEvent, TracesConversationContext } from "./trace.responses.ts";
+import type {
+  DerivedTraceEvent,
+  TracesConversationContext,
+  TracesSessionsPage,
+} from "./trace.responses.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
+import type { TraceSessionGroupsInput } from "./traces.trpc.ts";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
 export type TraceSuggestionTarget =
@@ -211,6 +232,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       scrollId?: string | null;
       /** The v1 REST search's compiled query-language filter, ANDed into the read. */
       filterWhere?: { sql: string; params: Record<string, unknown> };
+      /** Refuse above this plan bound instead of clamping to the list bound. */
+      refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
     };
   }): Promise<TracesForProjectResult>;
   /**
@@ -369,6 +392,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectId: string;
     traceIds: readonly string[];
   }): Promise<string[]>;
+  /** Each named trace's latest summary cost inside `occurredAt` (epoch ms); unknown ids absent. */
+  findTraceCosts(input: {
+    projectId: string;
+    traceIds: readonly string[];
+    occurredAt: { from: number; to: number };
+  }): Promise<TraceCost[]>;
   loadTraces(input: {
     userId: string;
     projectId: string;
@@ -396,11 +425,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     logRows: TraceLogRecordDto[];
   }): Span;
   mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): unknown;
-  codingAgentLogContentKeys(eventName: string): readonly {
-    key: string;
-    category: "input" | "output" | "both";
-  }[];
-  buildCodingAgentTranscript(input: { spans: SpanDetail[]; logs: TraceLogRecordDto[] }): unknown;
   getLogsByTraceId(input: {
     tenantId: string;
     traceId: string;
@@ -529,6 +553,70 @@ export interface TraceApi extends TraceOtlpIngestApi {
     model?: string;
     limit: number;
   }): Promise<TraceAttributedTrace[]>;
+  /** Current and previous window spend of the traces matching every attribute; distinct actors. */
+  getAttributedSpendComparison(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    actorKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedSpendComparison>;
+  /** Spend per non-empty `valueKey` value of the matching traces, sorted and paged in the store. */
+  findAttributedSpendByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+    sortBy: TraceAttributedSpendSort;
+    sortDirection: "asc" | "desc";
+    limit: number;
+    offset: number;
+  }): Promise<TraceAttributedValueSpend[]>;
+  /** Per non-empty `valueKey` value, spend split at `currentStartMs`; unsorted. */
+  findAttributedSpendComparisonByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    previousStartMs: number;
+    currentStartMs: number;
+    endMs: number;
+  }): Promise<TraceAttributedValueComparison[]>;
+  /** Spend per (project, `valueKey` value) across one organisation's projects; unsorted. */
+  findSpendByProjectAndValue(input: {
+    projectIds: readonly string[];
+    valueKey: string;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceProjectValueSpend[]>;
+  /** Spend of the matching traces per UTC day and group value, oldest day first. */
+  findDailyAttributedSpend(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    groupBy: TraceDailySpendGroup;
+    window: TraceModelSpendWindow;
+  }): Promise<TraceDailyGroupSpend[]>;
+  /** Matching traces since `sinceMs`, counted per `valueKey` value among `values`. */
+  countAttributedTracesByValue(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    valueKey: string;
+    values: readonly string[];
+    sinceMs: number;
+  }): Promise<{ value: string; count: number }[]>;
+  /** The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes. */
+  findAttributedTracesBefore(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    attributeKeys: readonly string[];
+    beforeMs: number;
+    limit: number;
+  }): Promise<TraceAttributedTraceDetail[]>;
+  /** Matching trace counts since each of `countSinceMs`, and their newest occurrence ever. */
+  getAttributedTraceRecency(input: {
+    projectId: string;
+    matches: readonly TraceAttributeMatch[];
+    countSinceMs: readonly number[];
+  }): Promise<TraceAttributedRecency>;
   readRecentSpansByModels(input: {
     projectId: string;
     models: string[];
@@ -541,10 +629,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceIds: string[];
     protections: unknown;
   }): Promise<Record<string, unknown[]>>;
-  findEvaluationInputs(input: {
-    projectId: string;
-    evaluationId: string;
-  }): Promise<Record<string, unknown> | null>;
   readTopicCounts(input: TraceLegacyListInput): Promise<unknown>;
   readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
   /**
@@ -608,13 +692,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     spanId: string;
     protections: unknown;
   }): Promise<unknown>;
-  readTopics(input: { projectId: string }): Promise<
-    readonly Readonly<{
-      id: string;
-      name: string;
-      parentId: string | null;
-    }>[]
-  >;
   readTraceList(params: {
     tenantId: string;
     timeRange: { from: number; to: number };
@@ -625,7 +702,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
     filterWhere?: { sql: string; params: Record<string, unknown> };
     visibilityCutoffMs?: number | null;
   }): Promise<TraceListPage>;
-  readSessionGroups(params: unknown): Promise<unknown>;
+  /**
+   * One page of the Sessions lens through the viewer's protections: content redacted and spend
+   * gated, with `codingAgent` left null for coding-agent, which serves the lens, to fill and gate.
+   */
+  readSessionGroups(
+    input: TraceSessionGroupsInput & { protections: Protections },
+  ): Promise<TracesSessionsPage>;
   /**
    * The sidebar's facets under the active query: descriptors counted in the
    * window the list reads, each facet exempt from its own terms (ADR-139).
@@ -737,37 +820,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<SharedTraceDto>;
 
   /**
-   * The Explorer's Instant Eval, priced. The shorthand it sends is turned into
-   * the statement a CLI caller would write, judging nothing.
-   */
-  estimateExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalEstimateWire>;
-  /** The same shorthand, accepted and queued. Answers the run's counters. */
-  startExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalRunProgress>;
-  /** Asks a run to stop. A run that already finished is refused by name. */
-  cancelExplorerEvalRun(input: {
-    projectId: string;
-    runId: string;
-    requestedByUserId?: string;
-  }): Promise<InstantEvalRunProgress>;
-  /** One run's counters, which is all a chip and a progress bar read. */
-  getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress>;
-  /** Whether the Explorer may judge, and what its refusal popover offers this member. */
-  getExplorerEvalAccess(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess>;
-  /** The organization's own switch, thrown from the popover; the organization is the project's. */
-  enableExplorerEvals(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess>;
-  /**
    * The runs a query's `eval` chips claim, checked against the project and
    * dated for the compiler. A claim the project does not own is dropped, so
    * the chip behind it stays pending and selects no rows.
@@ -788,6 +840,10 @@ export interface TraceApi extends TraceOtlpIngestApi {
   ): DeriveClaudeResponseContentResult;
   /** Lifts a log record's attributes into Trace's canonical names. */
   canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
+  /** Lifts a decoded span's attributes and events into Trace's canonical names, as ingest does. */
+  canonicalizeSpanAttributes(
+    input: CanonicalizeSpanAttributesInput,
+  ): CanonicalizeSpanAttributesResult;
   /** A log record's input and output, each cut to Trace's 64 KiB projection preview. */
   extractLogRecordIO(input: LogRecordReceivedEventData): {
     input: string | null;

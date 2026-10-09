@@ -7,7 +7,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { FieldInfoTooltip } from "../src/components/field-info-tooltip.tsx";
+import { FieldInfoTooltip } from "../src/components/forms/field-info-tooltip.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

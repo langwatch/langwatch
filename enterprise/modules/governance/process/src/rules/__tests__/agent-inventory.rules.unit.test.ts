@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import type {
   DiscoveredAgentRecord,
   RegisteredAgentRecord,
-} from "../agent-inventory-rows.rules.ts";
-import { buildAgentInventory } from "../agent-inventory.rules.ts";
+} from "../../features/agents/rules/agent-inventory-rows.rules.ts";
+import { buildAgentInventory } from "../../features/agents/rules/agent-inventory.rules.ts";
 
 const NOW_DATE = new Date("2026-09-09T12:00:00.000Z");
 const NOW = fromDate(NOW_DATE);

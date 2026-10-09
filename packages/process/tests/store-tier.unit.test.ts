@@ -42,7 +42,7 @@ class ProjectApp implements ProjectApi {
 
   static create({
     repositories,
-  }: FeatureSetup<{}, unknown, undefined, { projects: { read(): string } }>): ProjectApp {
+  }: FeatureSetup<{}, undefined, { projects: { read(): string } }>): ProjectApp {
     return new ProjectApp(repositories.projects);
   }
 
@@ -65,7 +65,7 @@ describe("given a module that declares live and memory repositories", () => {
         role: "api",
         modules: [project],
         config: {},
-        members: memberSourceOf<Record<string, unknown>>({ redis: { read: () => "live project" } }),
+        stores: memberSourceOf({ redis: { read: () => "live project" } }),
       });
 
       await expect(boot).rejects.toThrow(StoreTierUnstatedError);
@@ -85,7 +85,7 @@ describe("given a module that declares live and memory repositories", () => {
         role: "worker",
         modules: [project],
         config: {},
-        members: { ...memoryStores(), close: async () => void 0 },
+        stores: memoryStores(),
       });
 
       try {

@@ -4,6 +4,7 @@
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { evaluationTrpc } from "@langwatch/evaluation-contract";
 import type { monitorTrpc } from "@langwatch/monitor-contract";
 
 /** One experiment, as the legacy-wizard check reads it. */
@@ -57,8 +58,10 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the declared namespace plus the borrowed two. */
-export type MonitorApiMap = ContractApiMap<typeof monitorTrpc> & BorrowedProcedures;
+/** Everything this family calls: its namespace, the evaluations trend and the borrowed two. */
+export type MonitorApiMap = ContractApiMap<typeof monitorTrpc> &
+  ContractApiMap<typeof evaluationTrpc> &
+  BorrowedProcedures;
 
 /**
  * The monitor family's typed tRPC hooks. Same machinery, same transport and

@@ -23,11 +23,13 @@ import {
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 
+import {
+  buildDataRetentionSeatPolicyPipeline,
+  type DataRetentionSeatPolicyPipeline,
+} from "../eventing/data-retention-seat-policy.pipeline.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import {
   DataRetentionPolicyService,
@@ -37,6 +39,7 @@ import { DataRetentionSnapshotService } from "../services/data-retention-snapsho
 import { DataRetentionService } from "../services/data-retention.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
+import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
 
@@ -74,13 +77,6 @@ export interface DataRetentionDirectoryReader {
   }): Promise<RetentionOrganizationDirectory>;
 
   /**
-   * The organization that owns a scope target, or null when it does not exist.
-   * The anchor every scope-targeted gate checks against — never a
-   * caller-supplied project id, which can name a different organization.
-   */
-  findScopeOrganizationId(input: { scope: ScopeAssignment }): Promise<string | null>;
-
-  /**
    * The live projects one scope resolves to, enumerated FROM the organization
    * so a foreign id resolves to no rows. Archived projects are excluded: the
    * storage card must not count what the reader cannot see.
@@ -93,7 +89,6 @@ export interface DataRetentionDirectoryReader {
 
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionModule.dependencies,
-  never,
   DataRetentionServerConfig,
   DataRetentionRepositories
 >;
@@ -101,8 +96,6 @@ type DataRetentionSetup = FeatureSetup<
 export class DataRetentionModule implements DataRetentionApiContract {
   static readonly contract = DataRetentionApi;
   static readonly dependencies = {
-    projects: ProjectApi,
-    organizations: OrganizationApi,
     permissions: AuthzApi,
     users: UserApi,
     entitlement: EntitlementApi,
@@ -113,6 +106,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #policy: DataRetentionPolicyService;
   readonly #snapshots: DataRetentionSnapshotService;
   readonly #scopeMeter: StorageMeterScopeService;
+  readonly #seatPolicies: SeatRetentionPolicyService;
   readonly #users: UserApi;
 
   private constructor(services: {
@@ -120,12 +114,14 @@ export class DataRetentionModule implements DataRetentionApiContract {
     policy: DataRetentionPolicyService;
     snapshots: DataRetentionSnapshotService;
     scopeMeter: StorageMeterScopeService;
+    seatPolicies: SeatRetentionPolicyService;
     users: UserApi;
   }) {
     this.#retention = services.retention;
     this.#policy = services.policy;
     this.#snapshots = services.snapshots;
     this.#scopeMeter = services.scopeMeter;
+    this.#seatPolicies = services.seatPolicies;
     this.#users = services.users;
   }
 
@@ -137,8 +133,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     const retention = DataRetentionService.create({
       policies: repositories.policies,
       pins: repositories.pins,
-      projects: dependencies.projects,
-      organizations: dependencies.organizations,
+      projectScopes: repositories.projectScopes,
       defaultRetentionDays: resolvePlatformDefaultRetentionDays({
         LANGWATCH_DEFAULT_RETENTION_DAYS: config.platformDefaultDays,
         NODE_ENV: config.nodeEnvironment,
@@ -171,8 +166,14 @@ export class DataRetentionModule implements DataRetentionApiContract {
         directory: repositories.directory,
         permissions,
       }),
+      seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
       users: dependencies.users,
     });
+  }
+
+  /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
+  seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
+    return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
@@ -192,6 +193,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   }
 
   setForScope(input: {
+    organizationId: string;
     scope: ScopeAssignment;
     category: RetentionCategory;
     retentionDays: number;
@@ -265,57 +267,65 @@ export class DataRetentionModule implements DataRetentionApiContract {
   }
 
   /**
-   * Gated by the same write-on-scope check as the removal it previews, so the
-   * resolved organization default never leaks to a caller who could not remove
-   * the rule.
+   * The door has asked the target's permission; this refuses a target outside the named
+   * organization, so the preview never leaks another organization's resolved default.
    */
   async previewScopeRemoval(
-    input: { scope: ScopeAssignment } & RetentionCallerInput,
+    input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<ResolvedRetention> {
-    const actor = await this.#actor(input.userId);
-    await this.#policy.assertCanWriteScope({ actor, scope: input.scope });
+    const target = await this.#scopeTarget(input);
+    await this.#retention.assertScopeInOrganization(target);
 
-    return this.#retention.previewScopeRemoval({ scope: input.scope });
+    return this.#retention.previewScopeRemoval(target);
   }
 
   async changeScopeRetention(
     input: {
+      organizationId?: string;
       scope: ScopeAssignment;
       category: RetentionCategory;
       retentionDays: number;
     } & RetentionCallerInput,
   ): Promise<RetentionPolicy> {
     const actor = await this.#actor(input.userId);
-    await this.#policy.assertCanWriteScope({ actor, scope: input.scope });
-    // The scope's owning organization and its plan, resolved ONCE: paid plans
-    // may persist only their fixed presets, enterprise and self-hosted the full
-    // range above the custom floor. The indefinite sentinel is a no-op here so
-    // the platform-operator check below still runs.
+    const { organizationId, scope } = await this.#scopeTarget(input);
+    await this.#retention.assertScopeInOrganization({ organizationId, scope });
+    // Paid plans may persist only their fixed presets, enterprise and self-hosted the full
+    // range above the custom floor. The indefinite sentinel is a no-op here so the
+    // platform-operator check below still runs.
     await this.#policy.assertWriteAllowed({
       actor,
-      scope: input.scope,
+      organizationId,
       retentionDays: input.retentionDays,
     });
     if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
       await this.#policy.assertCanDisableRetention({ actor });
     }
 
-    // `ScopeTargetNotFoundError` is a handled 404: the runtime maps its status
-    // to the door's code, so there is nothing to translate here.
     return this.#retention.setForScope({
-      scope: input.scope,
+      organizationId,
+      scope,
       category: input.category,
       retentionDays: input.retentionDays,
     });
   }
 
   async removeForScope(
-    input: { scope: ScopeAssignment; category: RetentionCategory } & RetentionCallerInput,
+    input: {
+      organizationId?: string;
+      scope: ScopeAssignment;
+      category: RetentionCategory;
+    } & RetentionCallerInput,
   ): Promise<void> {
     const actor = await this.#actor(input.userId);
-    await this.#policy.assertCanWriteScope({ actor, scope: input.scope });
-    await this.#policy.assertPlanForScope({ actor, scope: input.scope });
-    await this.#retention.removeForScope({ scope: input.scope, category: input.category });
+    const { organizationId, scope } = await this.#scopeTarget(input);
+    await this.#retention.assertScopeInOrganization({ organizationId, scope });
+    await this.#policy.assertPlanForScope({ actor, organizationId });
+    await this.#retention.removeForScope({
+      organizationId,
+      scope,
+      category: input.category,
+    });
   }
 
   /**
@@ -358,5 +368,17 @@ export class DataRetentionModule implements DataRetentionApiContract {
     const user = await this.#users.findById({ id: userId });
 
     return { userId, email: user?.email ?? null };
+  }
+
+  /** The named organisation, or the one the approved target sits in; never the page's project. */
+  async #scopeTarget(input: {
+    organizationId?: string;
+    scope: ScopeAssignment;
+  }): Promise<{ organizationId: string; scope: ScopeAssignment }> {
+    const organizationId =
+      input.organizationId ??
+      (await this.#retention.getScopeOrganizationId({ scope: input.scope }));
+
+    return { organizationId, scope: input.scope };
   }
 }

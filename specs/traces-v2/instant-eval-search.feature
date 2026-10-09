@@ -100,6 +100,18 @@ Feature: Instant Evals inside the Trace Explorer
       When the chips are drawn
       Then each is drawn as an eval chip, apart from the blue filter chips
 
+    @unit
+    Scenario: An eval question still being typed is green from its opening quote
+      Given the reader is typing `eval:"the assistant refused to help"` one character at a time
+      When the chips are drawn after each character from the opening quote on
+      Then each time one eval chip covers the field, the quote and the whole question so far
+
+    @integration
+    Scenario: The editor draws an eval question still being typed as one eval chip
+      Given the search bar editor holds `eval:"the assistant refused to` with the quote not closed
+      When the chips are drawn
+      Then the editor shows one eval chip holding the whole text
+
     @integration
     Scenario: An eval chip sweeps while its run is under way
       Given an eval chip in the search bar
@@ -139,8 +151,36 @@ Feature: Instant Evals inside the Trace Explorer
     @unit
     Scenario: Switching Instant Eval on is audited against the organization
       Given an organization manager on a project
-      When they switch Instant Eval on through traces.instantEval.enable
+      When they switch Instant Eval on through instantEval.enable
       Then the audit row names the project's organization as its scope and its target
+
+  Rule: Instant Eval serves the Explorer's procedures under its own namespace
+
+    # Round 36 D4: the namespace moves with its owner; traces.instantEval.* is no longer served.
+
+    @unit
+    Scenario: The Explorer's seven procedures are served under instantEval
+      When the instant-eval tRPC contract is read
+      Then it declares estimate, start, cancel, get, access, enable and classifySearch under instantEval
+      And trace's tRPC contracts declare no instantEval procedure
+
+    @unit
+    Scenario: Spending on a run asks analytics:manage
+      Given a member without analytics:manage on the project
+      When they ask instantEval.estimate, instantEval.start or instantEval.cancel
+      Then each is refused as forbidden before the run service is asked
+
+    @unit
+    Scenario: Reading a run asks analytics:view
+      Given a member without analytics:view on the project
+      When they ask instantEval.get or instantEval.access
+      Then each is refused as forbidden before the run service is asked
+
+    @unit
+    Scenario: The opt-in switch asks organization:manage through the project
+      Given a member of the project without organization:manage on its organization
+      When they ask instantEval.enable
+      Then it is refused as forbidden and nothing is switched or audited
 
   Rule: An eval chip filters by a run's verdicts
 
@@ -205,6 +245,26 @@ Feature: Instant Evals inside the Trace Explorer
       When the read compiles its filter
       Then the claimed run is checked against the project and dated before the compiler binds it
       And a run the project does not own leaves its chip pending, selecting no rows
+
+    @unit
+    Scenario: A claimed run is dated from the run table instant-eval shares with trace
+      Given instant-eval recorded a run for the project, accepted at 10:00 and finished at 11:00
+      When an Explorer read checks the chip that claims it
+      Then trace reads the run from instant-eval's run table, shared with it for reading, without calling instant-eval
+      And the window opens an hour before acceptance and closes an hour after the finish, for the writers' clock skew
+      And the resolved run keeps the chip's own question and target
+
+    @unit
+    Scenario: A claimed run still judging is dated up to the read
+      Given a claimed run instant-eval has not finished
+      When an Explorer read checks the claim
+      Then the window closes an hour after the read
+
+    @unit
+    Scenario: A claimed run another project recorded is not dated
+      Given a chip claiming a run instant-eval recorded for another project
+      When an Explorer read checks the claim
+      Then no window is answered for it, so the chip stays pending
 
     @unit
     Scenario: The eval field cannot be evaluated in memory
@@ -312,3 +372,95 @@ Feature: Instant Evals inside the Trace Explorer
       When the Explorer receives an Instant Eval payload
       Then the phrase search is applied
       And the refusal's copy is shown from the presentation registry
+
+  # ---------------------------------------------------------------------------
+  # Routing a sentence: instant-eval classifies, trace routes
+  # ---------------------------------------------------------------------------
+
+  Rule: The browser asks Instant Eval to classify before trace routes the sentence
+
+    @unit
+    Scenario: A sentence classified as a judgement routes to Instant Eval
+      Given Instant Evals are released for the project
+      And Instant Eval's classifier answers "instant_eval" for "frustrated users"
+      When the user submits "frustrated users"
+      Then trace routes the search with that classification and Instant Evals available
+      And the route is an Instant Eval decided by the classifier
+      And trace does not ask Instant Eval anything itself
+
+    @unit
+    Scenario: A sentence routes to the plain search when Instant Evals are unavailable
+      Given Instant Evals are not released for the project
+      And Instant Eval's classifier answers "instant_eval" for "frustrated users"
+      When the user submits "frustrated users"
+      Then trace routes the search with Instant Evals unavailable
+      And the route is a filter or the phrase search, never an Instant Eval
+
+    @integration
+    Scenario: A missing classification falls back as it does today
+      Given Instant Eval's classifier skips, fails, or is not composed
+      When the user submits "frustrated users"
+      Then trace routes the search with no classification
+      And the model decides and builds the route, as when no classifier is configured
+      And Instant Evals count as unavailable unless the browser says otherwise
+
+  Rule: Instant Eval classifies a search sentence in the context trace routes it in
+
+    # Coordinator 2026-10-08 (T2 D3): instantEval.classifySearch takes instant-eval-owned plain
+    # fields, so the classifier keeps today's context and never answers langy without Langy.
+
+    @unit
+    Scenario: The classifier reads the sentence next to the search's context
+      Given Instant Evals are released for the project
+      And the project has evaluator "ragas/faithfulness" and event "thumbs_up_down" in the window
+      When the browser asks instantEval.classifySearch for "frustrated users status:error" in the conversations lens over 24 hours, after "model:gpt-5-mini"
+      Then the classifier reads the sentence, the lens, the window, the filters typed beside it, the search applied before it and the known evaluators and events
+      And the answer is the classifier's route with Instant Evals available
+
+    @unit
+    Scenario: Without Langy the classifier is never offered langy
+      Given the browser says Langy is not open to the user
+      When the browser asks instantEval.classifySearch for "why did costs rise this week"
+      Then the routing question offers filter, instant_eval and free_text, and not langy
+
+    @unit
+    Scenario: Instant Evals not released are neither offered nor reported available
+      Given Instant Evals are not released for the project, or the release cannot be read
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the routing question does not offer instant_eval
+      And the answer reports Instant Evals unavailable
+
+    @unit
+    Scenario: A classifier that has no route answers no classification
+      Given the classifier skips, fails, or answers a label that names no route
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the answer has no classification and reports the release as read
+
+    @unit
+    Scenario: Known signals that cannot be read leave the context without them
+      Given the project's evaluator and event names cannot be read
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the classifier is still asked, with no evaluators and no events in its context
+
+    @unit
+    Scenario: Text with no sentence asks the classifier nothing
+      When the browser asks instantEval.classifySearch for "status:error"
+      Then the classifier is not asked and the answer has no classification
+
+    @unit
+    Scenario: Classifying a search asks analytics:view
+      Given a member without analytics:view on the project
+      When they ask instantEval.classifySearch
+      Then it is refused as forbidden before the classifier is asked
+
+    @integration
+    Scenario: The search bar asks Instant Eval to classify, then trace to route
+      When the user submits "frustrated users"
+      Then the browser asks instantEval.classifySearch with the text, the window, the applied query, the lens and whether Langy is open
+      And hands traces.routeSearch the classification when it names a route, with Instant Evals' availability
+
+    @integration
+    Scenario: A classification the browser could not get still routes the sentence
+      Given instantEval.classifySearch fails
+      When the user submits "frustrated users"
+      Then traces.routeSearch is asked with no classification and no availability

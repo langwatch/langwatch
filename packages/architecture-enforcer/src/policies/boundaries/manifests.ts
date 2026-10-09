@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "../../types.ts";
+import { listFiles } from "../../workspace/layout.ts";
 import { featurePackageName, type WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
@@ -247,6 +248,34 @@ function libraryRuntimeViolation(
   };
 }
 
+/** What a client may take beyond its contract: the wire, browser-host and React (§3.4). */
+const CLIENT_RUNTIME = /^(?:react|@langwatch\/api|@langwatch\/browser-host)(?:\/|$)/;
+
+/** Browser runtimes a client never takes: components and the browser runtime stay in browsers. */
+const CLIENT_REFUSED_BROWSER = /^@langwatch\/(?:browser|design-system)(?:\/|$)/;
+
+/** A client declaring a store, a process, or a runtime beyond the wire, browser-host and React. */
+function clientRuntimeViolation(
+  pkg: ClassifiedPackage,
+  dependency: string,
+): ArchitectureViolation | undefined {
+  if (pkg.kind !== "client") return undefined;
+  const isRuntime =
+    isEnterpriseRuntimeDependency(dependency) ||
+    SERVER_RUNTIME_PACKAGE.test(dependency) ||
+    CLIENT_REFUSED_BROWSER.test(dependency);
+  if (!isRuntime || CLIENT_RUNTIME.test(dependency)) return undefined;
+
+  return {
+    policy: "package-role",
+    file: pkg.manifestPath,
+    specifier: dependency,
+    message: `The client ${pkg.name} cannot depend on runtime, store or UI package ${dependency}.`,
+    allowed:
+      "A client takes its own contract, @langwatch/api, @langwatch/browser-host and react; move the rest into the module's browser or process package.",
+  };
+}
+
 /** Enterprise-catalogue-runtime-dependency violation, regardless of whether the target resolves. */
 function enterpriseRuntimeViolation(
   pkg: ClassifiedPackage,
@@ -269,12 +298,30 @@ function enterpriseRuntimeViolation(
 const SERVER_RUNTIME_PACKAGE =
   /^@langwatch\/(?:eventing|group-queue|prisma-client|clickhouse-client|redis-client|process(?:-server|-stores)?)$/;
 
+const EVENTING_TABLES_SPECIFIER = "@langwatch/eventing/tables";
+const IMPORT_SPECIFIER = /(?:\bfrom|\bimport)\s*["']([^"']+)["']/g;
+
+/** Eventing's plain-data table list is the one entry a contract may read (record ET-2). */
+function importsOnlyEventingTables(pkg: ClassifiedPackage): boolean {
+  const specifiers = listFiles({
+    directory: join(pkg.root, "src"),
+    accept: (file) => file.endsWith(".ts") || file.endsWith(".tsx"),
+    ignoredDirectories: new Set(["__tests__"]),
+  })
+    .flatMap((file) => [...readFileSync(file, "utf8").matchAll(IMPORT_SPECIFIER)])
+    .map((match) => match[1]!)
+    .filter((specifier) => /^@langwatch\/eventing(?:\/|$)/.test(specifier));
+
+  return specifiers.length > 0 && specifiers.every((item) => item === EVENTING_TABLES_SPECIFIER);
+}
+
 /** Contract-declares-a-server-runtime violation, read by name: raw clients are not snapshots. */
 function contractRuntimeViolation(
   pkg: ClassifiedPackage,
   dependency: string,
 ): ArchitectureViolation | undefined {
   if (pkg.kind !== "contract" || !SERVER_RUNTIME_PACKAGE.test(dependency)) return undefined;
+  if (dependency === "@langwatch/eventing" && importsOnlyEventingTables(pkg)) return undefined;
 
   return {
     policy: "package-role",
@@ -370,7 +417,8 @@ const enterpriseRootTargetCheck: DependencyCheck = (pkg, target, dependency) => 
  * Apps carry both tiers; a core module imports an enterprise contract like a peer's (record §11).
  */
 const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
-  const isAllowedEdge = pkg.kind === "application" || target.kind === "contract";
+  const isAllowedEdge =
+    pkg.kind === "application" || target.kind === "contract" || target.kind === "client";
   const crossesIntoEnterprise = !pkg.enterprise && target.enterprise && !isAllowedEdge;
 
   if (!crossesIntoEnterprise) return undefined;
@@ -388,7 +436,9 @@ const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
 const crossFeatureCheck: DependencyCheck = (pkg, target, dependency) => {
   if (!pkg.feature || !target.feature) return undefined;
   const isForeignFeature = pkg.feature !== target.feature;
-  const isImplementationTarget = !["contract", "browser", "library"].includes(target.kind);
+  const isImplementationTarget = !["contract", "browser", "library", "client"].includes(
+    target.kind,
+  );
   if (!isForeignFeature || !isImplementationTarget) return undefined;
 
   return {
@@ -451,6 +501,39 @@ const libraryTargetCheck: DependencyCheck = (pkg, target, dependency) => {
   };
 };
 
+/** A client takes its own contract only; another module's types are restated (§10.1). */
+const clientTargetCheck: DependencyCheck = (pkg, target, dependency) => {
+  // A client target is clientConsumerCheck's edge, reported there once.
+  if (pkg.kind !== "client" || target.kind === "client") return undefined;
+  if (target.kind === "contract" && target.feature === pkg.feature) return undefined;
+
+  return {
+    policy: "package-role",
+    file: pkg.manifestPath,
+    specifier: dependency,
+    message: `The client ${pkg.name} cannot depend on ${target.kind} package ${target.name}.`,
+    allowed:
+      "Depend only on this module's contract; restate another module's type as a structural shape.",
+  };
+};
+
+/** Only browser packages and apps/ui read a client (§2, §3.4; Alex, 2026-10-06). */
+const clientConsumerCheck: DependencyCheck = (pkg, target, dependency) => {
+  if (target.kind !== "client" || target === pkg) return undefined;
+  const isBrowserReader =
+    pkg.kind === "browser" || (pkg.kind === "application" && pkg.applicationRole === "ui");
+  if (isBrowserReader) return undefined;
+
+  return {
+    policy: "package-role",
+    file: pkg.manifestPath,
+    specifier: dependency,
+    message: `The ${pkg.kind} package ${pkg.name} cannot depend on the client ${target.name}.`,
+    allowed:
+      "Only browser packages and apps/ui read a client; a process or contract calls the owner's *Api.",
+  };
+};
+
 const DEPENDENCY_TARGET_CHECKS: DependencyCheck[] = [
   applicationBoundaryCheck,
   enterpriseCompositionMismatchCheck,
@@ -463,6 +546,8 @@ const DEPENDENCY_TARGET_CHECKS: DependencyCheck[] = [
   webServerCheck,
   serverWebCheck,
   libraryTargetCheck,
+  clientTargetCheck,
+  clientConsumerCheck,
 ];
 
 /** Violations for one declared dependency of a package, given the package index by name. */
@@ -474,6 +559,7 @@ function dependencyViolations(
   const runtimeViolations = [
     enterpriseRuntimeViolation(pkg, dependency),
     libraryRuntimeViolation(pkg, dependency),
+    clientRuntimeViolation(pkg, dependency),
     contractRuntimeViolation(pkg, dependency),
   ].flatMap((violation) => (violation ? [violation] : []));
   const target = byName.get(dependency);

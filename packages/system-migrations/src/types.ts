@@ -1,3 +1,5 @@
+import { type Instant, Temporal } from "@langwatch/time";
+
 /**
  * The per-tenant migration state: `finalized` is a one-way latch consumers
  * key legacy-path removal on. Blanking a finalized row does NOT roll it
@@ -11,6 +13,11 @@ export const TENANT_MIGRATION_STATUSES = [
 ] as const;
 
 export type TenantMigrationStatus = (typeof TENANT_MIGRATION_STATUSES)[number];
+
+/** Why a tenant is held: its own proof disagreed, or work it queued has not drained. */
+export const HELD_REASONS = ["proof", "pending"] as const;
+
+export type HeldReason = (typeof HELD_REASONS)[number];
 
 /**
  * The two terminal states the runner never re-runs: `finalized`, the one-way
@@ -36,24 +43,41 @@ export type TenantMigrationRecord = {
    *  error for a parked one, counts for a finalized one. Shape is owned by
    *  the migration that wrote it. */
   report: unknown;
+  /** Set only while held (`migrated`): why it is held. */
+  heldReason?: HeldReason;
+  /** Set only while held: when it became held, kept across re-proofs. */
+  heldSince?: Instant;
 };
 
+/** Held longer than this reads as failed. A chosen value, pending Alex's ruling. */
+export const HELD_FAILED_AFTER = Temporal.Duration.from({ hours: 24 });
+
+/** Failed is worked out on read, never stored: held, and held too long. */
+export function isHeldTenantFailed({
+  record,
+  now,
+}: {
+  record: TenantMigrationRecord;
+  now: Instant;
+}): boolean {
+  if (record.status !== "migrated" || !record.heldSince) return false;
+  return Temporal.Instant.compare(record.heldSince.add(HELD_FAILED_AFTER), now) < 0;
+}
+
 /**
- * What one pass over one tenant concluded. `migrated` is the held state:
- * work is done but the migration's own proof found disagreements, so the
- * tenant stays on its legacy path until a later pass's proof passes.
+ * What one pass over one tenant concluded. `migrated` is the held state: the
+ * tenant stays on its legacy path until a later pass's proof passes. Reason
+ * defaults to `proof`; work queued but not yet drained says `pending`.
  */
 export type TenantMigrationOutcome =
   | { status: "finalized"; report?: unknown }
-  | { status: "migrated"; report: unknown }
+  | { status: "migrated"; report: unknown; heldReason?: HeldReason }
   | { status: "parked"; report: unknown };
 
 export type MigrationPassSummary = {
   tenantsSeen: number;
   finalized: number;
   held: number;
-  /** Held outcomes from migrations that must settle before startup. */
-  finiteHeld?: number;
   parked: number;
   /** Outside the cohort, or an operator's mid-pass pin discarded the
    *  outcome. Never "already done" - that is `alreadyFinalized` /

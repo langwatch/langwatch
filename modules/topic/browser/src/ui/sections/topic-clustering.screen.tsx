@@ -99,7 +99,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   const host = useTopicHost();
   const utils = topicApi.useUtils();
 
-  const triggerClustering = topicApi.project.triggerTopicClustering.useMutation({
+  const triggerClustering = topicApi.topics.triggerTopicClustering.useMutation({
     onSuccess: (result) => {
       if (result.started) {
         host.succeeded({

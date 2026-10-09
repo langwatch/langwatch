@@ -11,10 +11,8 @@ import {
   type Currency,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
-  type SubscriptionInvite,
 } from "@langwatch/enterprise-billing-contract";
 import { moduleApi } from "@langwatch/module";
-import type { OrganizationCaller } from "@langwatch/organization-contract";
 
 /** The customer this checkout is opened for, as the provider knows them. */
 export type BillingSubscriber = Readonly<{ email?: string | null }>;
@@ -65,17 +63,6 @@ export interface BillingSubscriptionApi {
     /** The caller's own address; an account without one is refused by name. */
     actorEmail: string | null;
   }): Promise<unknown>;
-  createSubscriptionWithInvites(input: {
-    organizationId: string;
-    baseUrl: string;
-    membersToAdd: number;
-    customerId: string;
-    currency?: Currency;
-    billingInterval?: SubscriptionBillingInterval;
-    invites: readonly SubscriptionInvite[];
-    /** Who invited them: organization refuses invitations above what they hold. */
-    invitedBy: OrganizationCaller;
-  }): Promise<{ url: string | null }>;
   listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]>;
 }
 
@@ -163,28 +150,6 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) =>
     app.findLastNonCancelledSubscription({ organizationId: input.organizationId }),
   )
-
-  .procedure("upgradeWithInvites")
-  .withFacts(billingCallerEmailFact)
-  .withPermission("organization:manage")
-  // Checkout and the invitations that motivated it, as one act.
-  .handle(async ({ app, input, actor }, email) => {
-    const customerId = await app.getOrCreateCustomerId({
-      user: { email },
-      organizationId: input.organizationId,
-    });
-
-    return app.createSubscriptionWithInvites({
-      organizationId: input.organizationId,
-      baseUrl: input.baseUrl,
-      membersToAdd: input.totalSeats,
-      customerId,
-      invites: input.invites,
-      invitedBy: { id: actor.id },
-      ...(input.currency === undefined ? {} : { currency: input.currency }),
-      ...(input.billingInterval === undefined ? {} : { billingInterval: input.billingInterval }),
-    });
-  })
 
   .procedure("prospective")
   .withFacts(billingCallerEmailFact)

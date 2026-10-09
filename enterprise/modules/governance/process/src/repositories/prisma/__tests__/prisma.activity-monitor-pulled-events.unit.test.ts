@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const query = vi.fn();
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
+import type { ActivityMonitorTraces } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
 import type { GovernanceClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 class FakeClickHouseResolver implements GovernanceClickHouseResolver {
@@ -11,10 +12,31 @@ class FakeClickHouseResolver implements GovernanceClickHouseResolver {
   }
 }
 
+/** Trace's side of the source: one pushed trace, and its 24h/7d/30d counts. */
+const PUSHED: Partial<ActivityMonitorTraces> = {
+  findAttributedTracesBefore: async () => [
+    {
+      traceId: "pushed-trace",
+      attributes: {
+        "langwatch.ingestion_source.source_type": "otel_generic",
+        "langwatch.user_id": "push@example.com",
+      },
+      firstModel: "gpt-5",
+      costUsd: 0.01,
+      promptTokens: 10,
+      completionTokens: 4,
+      occurredAtMs: 1786619810000,
+      createdAtMs: 1786619811000,
+    },
+  ],
+  getAttributedTraceRecency: async () => ({ counts: [2, 2, 2], lastOccurredAtMs: 1000 }),
+};
+
 function activityMonitor(prisma: unknown) {
   return createActivityMonitorTestService({
     prisma: prisma as never,
     clickhouse: new FakeClickHouseResolver(),
+    traces: PUSHED,
   });
 }
 
@@ -30,7 +52,7 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
           if (sql.includes("stored_log_records")) {
             return [{ c24: "1", c7: "1", c30: "1", lastMs: "2000" }];
           }
-          return [{ c24: "2", c7: "2", c30: "2", lastMs: "1000" }];
+          return [];
         }
         return sql.includes("governance_ocsf_events")
           ? [
@@ -55,19 +77,7 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
                 }),
               },
             ]
-          : [
-              {
-                eventId: "pushed-trace",
-                eventType: "otel_generic",
-                actor: "push@example.com",
-                target: "gpt-5",
-                costUsd: 0.01,
-                tokensInput: 10,
-                tokensOutput: 4,
-                occurredMs: "1786619810000",
-                createdMs: "1786619811000",
-              },
-            ];
+          : [];
       },
     }));
   });

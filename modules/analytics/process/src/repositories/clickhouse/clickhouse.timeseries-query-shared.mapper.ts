@@ -159,11 +159,7 @@ export function appendMetadataValueFilterClauses({
   }
 }
 
-/**
- * The columns of a deduped slim read: `OccurredAt` plus every `<alias>.<Column>`
- * the given expressions mention, minus the dedup keys (always present, never
- * carried).
- */
+/** The columns of a deduped slim read: `OccurredAt` plus every `<alias>.<Column>` the expressions mention, minus the dedup keys. */
 export function referencedAliasColumns({
   alias,
   expressions,
@@ -177,7 +173,7 @@ export function referencedAliasColumns({
   const pattern = new RegExp(`\\b${alias}\\.([A-Za-z_][A-Za-z0-9_]*)`, "g");
   for (const expression of expressions) {
     for (const match of expression.matchAll(pattern)) {
-      columns.add(match[1]!);
+      if (match[1]) columns.add(match[1]);
     }
   }
   for (const key of keyColumns) columns.delete(key);

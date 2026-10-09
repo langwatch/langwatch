@@ -13,11 +13,11 @@ import type React from "react";
 import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 import { type TimeRange } from "../../../../behavior/query.slice.ts";
 import { useDataPrivacySnapshot } from "../../../../behavior/reads/use-project-reads.ts";
-import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useSearchSubmitRequestStore } from "../../../../features/explorer/behavior/search-submit-request.store.ts";
+import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
+import { useInstantEvalRuns } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import { PIIRedactionAlert } from "../../../blocks/pii-redaction-notice.tsx";
-import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
-import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { looksLikeEmail, redactsEmailAddresses } from "../utils/email-shaped-query.ts";
 import { QueryBreakdownChips } from "./query-breakdown-chips.tsx";
 

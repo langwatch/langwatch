@@ -24,6 +24,7 @@ type flagSpec struct {
 	long       string // "--follow"
 	short      string // "-f" or "" — a short means ONE thing across the CLI
 	takesValue bool
+	isSwitch   bool   // bare means on; "--flag=false" turns it off (a default-on switch)
 	value      string // help placeholder for the value, e.g. "<dur>"
 	summary    string
 }
@@ -105,8 +106,13 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 				return inv, fmt.Errorf("haven %s: unknown flag %q%s", spec.name, name, flagHint(spec))
 			}
 			if hasEmbedded {
-				if !f.takesValue {
+				if !f.takesValue && !f.isSwitch {
 					return inv, fmt.Errorf("haven %s: %s takes no value", spec.name, f.long)
+				}
+				if f.isSwitch {
+					if _, err := strconv.ParseBool(embedded); err != nil {
+						return inv, fmt.Errorf("haven %s: %s=%s is not true or false", spec.name, f.long, embedded)
+					}
 				}
 				inv.flags[f.long] = embedded
 				continue
@@ -201,10 +207,24 @@ var table = append(baseTable, tabSpecs()...)
 var baseTable = []commandSpec{
 	{
 		name:    "simulator",
-		args:    "<mail|idp|storage|voice|llm|analytics>",
+		args:    "<mail|idp|storage|voice|llm|analytics|outbound>",
 		maxArgs: 1,
 		hidden:  true,
 		run:     runBundledSimulator,
+	},
+	{
+		name:    "go-watch",
+		args:    "<binary> <service>…",
+		maxArgs: -1,
+		hidden:  true,
+		run:     runGoWatch,
+	},
+	{
+		name:    "keep",
+		args:    "<slug>",
+		maxArgs: 1,
+		hidden:  true,
+		run:     runKeep,
 	},
 	{
 		name:      "up",
@@ -213,22 +233,33 @@ var baseTable = []commandSpec{
 		maxArgs:   -1,
 		minusArgs: true,
 		flags: []flagSpec{
-			{long: "--watch", short: "-w", summary: "air hot-reload for the Go services"},
+			{long: "--watch", short: "-w", isSwitch: true, summary: "rebuild and swap the Go services on a change (the default; --watch=false turns it off)"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
+			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			if err := rejectRemovedSelectionEnv(); err != nil {
+				return err
+			}
+			if err := checkOneProcessEnv(os.Stderr); err != nil {
 				return err
 			}
 			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
 			if err != nil {
 				return err
 			}
+			sel, mode, err := d.orch.ResolveMode(d.worktree, sel, inv.value("--mode"))
+			if err != nil {
+				return err
+			}
+			if err := applyDeploymentMode(&d.opts, mode, d.worktree); err != nil {
+				return err
+			}
 			d.opts.Selection = sel
 			if inv.has("--watch") {
-				d.opts.ShouldGoWatch = true
+				d.opts.ShouldGoWatch = inv.value("--watch") != "false" && inv.value("--watch") != "0"
 			}
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			d.opts.ShouldForce = inv.has("--force")
@@ -245,7 +276,11 @@ var baseTable = []commandSpec{
 			// child above runs under Setsid and is naturally exempt.
 			ctx, unwatch := watchLaunchingGroup(ctx)
 			defer unwatch()
-			return d.orch.Up(ctx, d.params, d.opts)
+			d.opts.IsForegroundClient = !isSessionLeader()
+			if err := d.orch.Up(ctx, d.params, d.opts); err != nil {
+				return err
+			}
+			return followAsOwner(ctx, d)
 		},
 	},
 	{
@@ -290,29 +325,11 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "idp",
-		summary: "run the standalone IdP simulator; --json inspects this stack's identity providers",
-		flags: []flagSpec{
-			{long: "--tenants", takesValue: true, value: "<n>", summary: "tenant range size (default 3)"},
-			{long: "--json", summary: "read this stack's identity provider summaries"},
-			{long: "--stack", takesValue: true, value: "<slug>", summary: "with --json: inspect another stack"},
-		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			if inv.has("--json") {
-				return printSimulator(d, inv, "idp")
-			}
-			if inv.value("--stack") != "" {
-				return fmt.Errorf("--stack requires --json")
-			}
-			tenants := 0
-			if raw := inv.value("--tenants"); raw != "" {
-				n, err := strconv.Atoi(raw)
-				if err != nil || n < 1 {
-					return fmt.Errorf("--tenants needs a positive integer, got %q", raw)
-				}
-				tenants = n
-			}
-			return d.orch.RunIdPSolo(ctx, tenants)
-		},
+		summary: "idpsim: bare runs the standalone IdP simulator; with a verb it drives this stack's (tenants | tenant show | apps | populate | churn | user add | scim ... | dns | verification | activity | signin | reset | samlp | legacy | tamper | auth0-webhook | scim-event | rotate-key | skew | user disable/enable | saml unsolicited)",
+		args:    "[verb] [tenant] [args]",
+		maxArgs: -1,
+		flags:   simFlags(idpFlags...),
+		run:     runIdP,
 	},
 	{
 		name:    "limits",
@@ -326,17 +343,115 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "mail",
-		summary: "read this worktree's caught email: address | list | get <id> | wait | clear",
-		args:    "<address|list|get|wait|clear> [id]",
+		summary: "read this worktree's caught email: address | inbox | list | get <id> | links <id> | wait | delete <id> | clear",
+		args:    "<address|inbox|list|get|links|wait|delete|clear> [id]",
 		maxArgs: 2,
 		flags: []flagSpec{
 			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
 			{long: "--subject", takesValue: true, value: "<text>", summary: "list/wait: only messages with a matching subject"},
 			{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+			{long: "--after", takesValue: true, value: "<id>", summary: "wait: only mail caught after this message"},
 			{long: "--html", summary: "get: the message's raw HTML body instead of its text"},
 			{long: "--json", summary: "machine-readable"},
 		},
 		run: runMail,
+	},
+	{
+		name:    "llm",
+		summary: "llmsim's calls and settings: info | calls [--model <text>] [--failed] | call <id> | clear | set --error <status> --seed <value>",
+		args:    "<info|calls|call|clear|set> [id]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--error", takesValue: true, value: "<status>", summary: "set: force this 4xx/5xx on generation calls (0 turns it off)"},
+			flagSpec{long: "--seed", takesValue: true, value: "<value>", summary: "set: seed for deterministic replies (\"random\" or empty to unseed)"},
+			flagSpec{long: "--model", takesValue: true, value: "<text>", summary: "calls: only calls whose model contains this text"},
+			flagSpec{long: "--failed", summary: "calls: only calls answered with a 4xx or 5xx"},
+		),
+		run: runLLM,
+	},
+	{
+		name:    "analytics",
+		summary: "analyticssim's caught PostHog and Customer.io calls: status | records | clear | wait",
+		args:    "<status|records|clear|wait>",
+		maxArgs: 1,
+		flags: simFlags(
+			flagSpec{long: "--provider", takesValue: true, value: "<name>", summary: "records/wait: posthog or customerio"},
+			flagSpec{long: "--kind", takesValue: true, value: "<kind>", summary: "records/wait: only this kind of record"},
+			flagSpec{long: "--event", takesValue: true, value: "<name>", summary: "records/wait: only this event name"},
+			flagSpec{long: "--id", takesValue: true, value: "<id>", summary: "records/wait: only this distinct or person id"},
+			flagSpec{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+		),
+		run: runAnalytics,
+	},
+	{
+		name:    "outbound",
+		summary: "outboundsim's caught Slack, webhook and SQS sends: status | records | deliveries | clear | wait | fault | receiver | urls",
+		args:    "<status|records|deliveries|clear|wait|fault|receiver|urls> [add|list|clear|set] [name]",
+		maxArgs: 3,
+		flags: simFlags(
+			flagSpec{long: "--channel", takesValue: true, value: "<name>", summary: "records/wait/fault add: slack-webhook, slack-api, webhook or sqs"},
+			flagSpec{long: "--target", takesValue: true, value: "<glob>", summary: "records/wait/fault add: only this target"},
+			flagSpec{long: "--event-id", takesValue: true, value: "<id>", summary: "records/deliveries: only this event"},
+			flagSpec{long: "--since", takesValue: true, value: "<time>", summary: "records: only newer than this"},
+			flagSpec{long: "--count", takesValue: true, value: "<n>", summary: "wait: how many matches to wait for (default 1)"},
+			flagSpec{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+			flagSpec{long: "--status", takesValue: true, value: "<code>", summary: "fault add: the status to answer with"},
+			flagSpec{long: "--body", takesValue: true, value: "<text>", summary: "fault add: the body to answer with"},
+			flagSpec{long: "--retry-after", takesValue: true, value: "<seconds>", summary: "fault add: Retry-After to send"},
+			flagSpec{long: "--latency", takesValue: true, value: "<ms>", summary: "fault add: stall this long before answering"},
+			flagSpec{long: "--drop", summary: "fault add: close the connection without answering"},
+			flagSpec{long: "--times", takesValue: true, value: "<n>", summary: "fault add: apply this many times, then delete itself"},
+			flagSpec{long: "--secret", takesValue: true, value: "<secret>", summary: "receiver set: the webhook secret to verify signatures with"},
+		),
+		run: runOutbound,
+	},
+	{
+		name:    "feedback",
+		summary: "notes readers sent from the haven orb in the app page: list | show | resolve | wait",
+		args:    "<list|show|resolve|wait> [id]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--open", summary: "list: only feedback nobody resolved"},
+			flagSpec{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for new feedback (default 30s)"},
+		),
+		run: runFeedback,
+	},
+	{
+		name:    "page",
+		summary: "the app page's recent console messages and requests, as the haven orb saw them: console | network",
+		args:    "<console|network>",
+		maxArgs: 1,
+		flags: simFlags(
+			flagSpec{long: "--level", takesValue: true, value: "<level>", summary: "console: only this level (error, warn, info, log, debug)"},
+			flagSpec{long: "--failed", summary: "network: only requests that failed"},
+		),
+		run: runPage,
+	},
+	{
+		name:    "storage",
+		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | presign <bucket> <key> | delete | clear [bucket] | seed | requests",
+		args:    "<buckets|objects|object|presign|delete|clear|seed|requests> [bucket] [key]",
+		maxArgs: 3,
+		flags: simFlags(
+			flagSpec{long: "--raw", summary: "object: the stored bytes instead of the metadata"},
+			flagSpec{long: "--put", summary: "presign: a PUT URL instead of a GET"},
+			flagSpec{long: "--expires", takesValue: true, value: "<seconds>", summary: "presign: lifetime, 1..604800 (default 3600)"},
+		),
+		run: runStorage,
+	},
+	{
+		name:    "sims",
+		summary: "every simulator: running here or not, its console, the +name to start it, its verbs and skill",
+		flags:   simFlags(),
+		run:     runSims,
+	},
+	{
+		name:    "voice",
+		summary: "voicesim's calls: status | calls | call <id> | clear",
+		args:    "<status|calls|call|clear> [id]",
+		maxArgs: 2,
+		flags:   simFlags(),
+		run:     runVoice,
 	},
 	{
 		name:    "logs",
@@ -347,12 +462,17 @@ var baseTable = []commandSpec{
 			{long: "--tail", short: "-t", summary: "stream live"},
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
+			{long: "--loki", summary: "read the full stream from the stack's Loki (info/debug the consoles mute)"},
+			{long: "--grep", takesValue: true, value: "<text>", summary: "only lines containing text"},
+			{long: "--trace", takesValue: true, value: "<trace-id>", summary: "Loki lines for one trace (implies --loki)"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
 			{long: "--raw", summary: "the child's own bytes, unrendered"},
 			{long: "--json", summary: "one JSON object per line, lane stamped on"},
 		},
 		run: runLogsCmd,
 	},
+	querySpec(),
+	telemetrySpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",
@@ -467,14 +587,16 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "hmr",
-		summary: "AI-gated HMR: on [--ttl <dur>] defers Vite reloads, off resumes",
+		summary: "retired no-op: reloads are debounced, there is no hold (ADR-168)",
 		args:    "[on|off|status]",
 		maxArgs: 1,
+		// Kept so agent hooks still calling `haven hmr on --ttl <dur>` exit 0.
 		flags: []flagSpec{
-			{long: "--ttl", takesValue: true, value: "<dur>", summary: "how long the gate holds (default 30s)"},
+			{long: "--ttl", takesValue: true, value: "<dur>", summary: "ignored"},
 		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunHMR(ctx, d.worktree, inv.raw)
+		run: func(_ context.Context, _ deps, _ invocation) error {
+			fmt.Println("haven hmr is retired: reloads are debounced and nothing holds them; remove the call")
+			return nil
 		},
 	},
 	{
@@ -514,6 +636,7 @@ var baseTable = []commandSpec{
 			{long: "--list", summary: "report what is installed and what is missing; change nothing"},
 			{long: "--yes", summary: "install what haven needs without asking (leaves the optional ones alone)"},
 			{long: "--reset-skips", summary: "forget every never-ask-again, so the next run offers them all"},
+			{long: "--build", summary: "build the consoles and go-install haven quietly, one progress line per step (what make haven install runs first)"},
 		},
 		run: runInstall,
 	},
@@ -578,9 +701,12 @@ var baseTable = []commandSpec{
 		run:     runUpgrade,
 	},
 	{
-		name:   "daemon",
-		hidden: true,
-		run:    func(ctx context.Context, d deps, _ invocation) error { return d.orch.RunDaemon(ctx, d.dash) },
+		name:    "daemon",
+		args:    "[restart]",
+		maxArgs: 1,
+		flags:   []flagSpec{{long: "--after", takesValue: true, value: "<pid>", summary: "wait for this daemon to exit, then take over"}},
+		hidden:  true,
+		run:     runDaemon,
 	},
 }
 

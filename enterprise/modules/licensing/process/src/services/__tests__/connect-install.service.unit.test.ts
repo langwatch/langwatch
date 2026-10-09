@@ -23,9 +23,11 @@ import { MemoryConnectGatewayChannel } from "../../channels/memory/memory.connec
 import type { ConnectOrganizationRecord } from "../../repositories/connect-organization.repository.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
+import { licenseVerifyingKeyOf } from "../../rules/license-verifying-key.rules.ts";
 import type { ConnectUpstreamSlot } from "../connect-install.service.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
+import { appliedConnectFacts } from "./support/applied-connect-facts.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";
@@ -102,6 +104,7 @@ function install({
   const organizations = MemoryConnectOrganizationRepository.create({ rows });
   const service = ConnectInstallService.create({
     organizations,
+    facts: appliedConnectFacts(rows),
     identity: InstanceIdentityService.create({
       repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
       newInstanceId: () => "instance-1",
@@ -175,6 +178,35 @@ describe("what a self-hosted install may call", () => {
     await expect(
       service.setService({ organizationId: ORGANIZATION, service: "instant_evals", enabled: true }),
     ).rejects.toMatchObject({ code: "connect_disabled" });
+  });
+});
+
+describe("one hosted service's state", () => {
+  /** @scenario "A hosted service's state names which half said no" */
+  it("names whether the license carries the service and whether it is still on", async () => {
+    const named = install({ license: licenseNaming(["instant_evals"]) });
+    const switchedOff = install({
+      license: licenseNaming(["instant_evals"]),
+      servicesDisabled: ["instant_evals"],
+    });
+    const unnamed = install({ license: licenseNaming([]) });
+    const unlicensed = install({ license: null });
+    const stateOf = ({ service }: ReturnType<typeof install>) =>
+      service.getServiceState({ organizationId: ORGANIZATION, service: "instant_evals" });
+
+    expect(await stateOf(named)).toEqual({ isEntitled: true, isSwitchedOn: true });
+    expect(await stateOf(switchedOff)).toEqual({ isEntitled: true, isSwitchedOn: false });
+    expect(await stateOf(unnamed)).toEqual({ isEntitled: false, isSwitchedOn: false });
+    expect(await stateOf(unlicensed)).toEqual({ isEntitled: false, isSwitchedOn: false });
+    expect(named.gateway.classifications).toEqual([]);
+  });
+
+  it("answers neither half where the deployment switched Connect off", async () => {
+    const off = install({ license: licenseNaming(["instant_evals"]), permitted: false });
+
+    expect(
+      await off.service.getServiceState({ organizationId: ORGANIZATION, service: "instant_evals" }),
+    ).toEqual({ isEntitled: false, isSwitchedOn: false });
   });
 });
 
@@ -414,6 +446,22 @@ function forgedLicense(): string {
     signature: genuine.signature,
   });
 }
+
+describe("the key a release build reports", () => {
+  /** @scenario "A release build reports the embedded key in its usage report" */
+  it("reports the embedded key and its fingerprint though the override is set", async () => {
+    const { publicKey } = licenseVerifyingKeyOf({
+      override: TEST_PUBLIC_KEY,
+      isReleaseBuild: true,
+    });
+    const { service } = install({ license: null, override: publicKey !== undefined });
+
+    expect(await service.getDeployment()).toMatchObject({
+      licenseKeySource: "embedded",
+      licenseKeyFingerprint: fingerprintOf(DEFAULT_LICENSE_PUBLIC_KEY),
+    });
+  });
+});
 
 describe("the license key the usage report names", () => {
   /** @scenario "The report says whether licenses verify against the embedded key or an override" */

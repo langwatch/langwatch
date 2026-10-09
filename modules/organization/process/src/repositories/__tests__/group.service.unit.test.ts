@@ -1,11 +1,11 @@
 import {
   GrantExceedsCallerPermissionsError,
+  OrgExclusivePermissionScopeError,
   permissionsConferred,
   type AuthzApi,
 } from "@langwatch/authz-contract";
 import {
   GroupRoleNotAssignableError,
-  GroupRoleScopeError,
   UserNotInOrganizationError,
   type OrganizationGroup,
   type OrganizationTeam,
@@ -13,9 +13,9 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GroupIdentity } from "../../services/group-identity.service.ts";
+import type { GroupIdentity } from "../../features/group/services/group-identity.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
-import type { PersonalWorkspaceIdentity } from "../../services/personal-workspace-identity.service.ts";
 import type { TeamIdentity } from "../../services/team-identity.service.ts";
 import type { GroupRepository } from "../group.repository.ts";
 import type { OrganizationRepository } from "../organization.repository.ts";
@@ -194,7 +194,7 @@ describe("OrganizationService groups", () => {
         caller: { type: "user", id: "actor_1" },
         actor: { type: "user", id: "actor_1" },
       }),
-    ).rejects.toBeInstanceOf(GroupRoleScopeError);
+    ).rejects.toBeInstanceOf(OrgExclusivePermissionScopeError);
 
     expect(groupRepository.create).not.toHaveBeenCalled();
   });

@@ -19,16 +19,12 @@ it("binds every existing tRPC procedure once and preserves its permission", () =
     ["getById", "query", "evaluations:view"],
     ["create", "mutation", "evaluations:manage"],
     ["update", "mutation", "evaluations:manage"],
-    ["getRelatedEntities", "query", "evaluations:view"],
     ["cascadeArchive", "mutation", "evaluations:manage"],
     ["delete", "mutation", "evaluations:manage"],
     ["getCopies", "query", "evaluations:view"],
-    ["copy", "mutation", "evaluations:manage"],
     ["pushToCopies", "mutation", "evaluations:manage"],
     ["syncFromSource", "mutation", "evaluations:manage"],
     ["getHistory", "query", "evaluations:view"],
-    ["testTurn", "mutation", "evaluations:manage"],
-    ["testRun", "mutation", "scenarios:create"],
   ]);
 });
 

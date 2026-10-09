@@ -12,16 +12,16 @@ const SQS_QUEUE_URL_PATTERNS: readonly RegExp[] = [
   /^https:\/\/([a-z0-9-]+)\.queue\.amazonaws\.com(?:\.cn)?\/(\d{12})\/([A-Za-z0-9_-]{1,80}(\.fifo)?)$/,
 ];
 
-export type ParsedSqsQueueUrl = {
+type ParsedSqsQueueUrl = {
   queueUrl: string;
   region: string;
   accountId: string;
   queueName: string;
 };
 
-export type SqsQueueUrlProblem = "shape" | "fifo";
+type SqsQueueUrlProblem = "shape" | "fifo";
 
-export type SqsQueueUrlInspection =
+type SqsQueueUrlInspection =
   | { ok: true; parsed: ParsedSqsQueueUrl }
   | { ok: false; problem: SqsQueueUrlProblem };
 

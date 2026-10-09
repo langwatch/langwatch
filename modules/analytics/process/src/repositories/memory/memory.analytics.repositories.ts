@@ -1,4 +1,4 @@
-import type { AppFunctionStoreProbe } from "../../rules/langwatch-ql-app-function-store.rules.ts";
+import type { AppFunctionStoreProbe } from "../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import type { AnalyticsRepositories } from "../analytics.repositories.ts";
 import { LangWatchQLAppFunctionStoreRepository } from "../langwatch-ql-app-function-store.repository.ts";
 import {
@@ -33,11 +33,10 @@ export class MemoryAnalyticsRepositories {
     // The evaluation twin writes this table; the recency twin reads it.
     const evaluationRows: MemoryEvaluationAnalyticsTable = new Map();
     const evaluations = MemoryAnalyticsEvaluationRepository.create({ table: evaluationRows });
-    const analytics = MemoryAnalyticsRepository.create();
 
     return {
       sessions: MemoryAnalyticsSessionsRepository.create(),
-      analytics: { open: () => analytics },
+      analytics: MemoryAnalyticsRepository.create(),
       evaluations: { open: () => evaluations },
       appFunctionStore: MemoryLangWatchQLAppFunctionStoreRepository.create(),
       recency: MemoryAnalyticsRecencyRepository.create({ evaluations: evaluationRows }),

@@ -9,7 +9,7 @@ import React, { useCallback, useState } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../../behavior/lent-model-provider.tsx";
-import { useModelSelectionOptions } from "../../../../behavior/use-model-selection-options.ts";
+import { useModelSelectionOptions } from "../../../../features/model-selection/behavior/use-model-selection-options.ts";
 import {
   LLMConfigPopover,
   type Output,

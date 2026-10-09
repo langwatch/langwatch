@@ -1,8 +1,12 @@
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { twoStepVerificationTrpc } from "@langwatch/identity-contract";
 import { useCallback } from "react";
 
 import { personalWorkspaceApi } from "../../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../../model/personal-workspace-host.ts";
-import { twoStepVerificationApi } from "./two-step-verification-api.ts";
+
+/** Identity owns the setup; the screen is the personal workspace's. */
+const twoStepVerificationApi = createModuleApi<ContractApiMap<typeof twoStepVerificationTrpc>>();
 
 /**
  * The reader's own two-step verification: where it stands, and turning it off.

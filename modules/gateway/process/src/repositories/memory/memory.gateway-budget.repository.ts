@@ -593,6 +593,7 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
       projectId: input.projectId,
       virtualKeyId: input.virtualKeyId,
       principalUserId: input.principalUserId,
+      endUserId: input.endUserId,
       memberGroupIds: input.memberGroupIds,
     }).filter((entry) => budgetAppliesToProvider(entry.budget, input.providerKey));
     const spends =

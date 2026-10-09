@@ -19,7 +19,6 @@ import {
 } from "../../../model/dataset-table-context.tsx";
 import { DatasetTestHarness, StubDatasetHost } from "../../../testing.tsx";
 import { EditableCell } from "../../elements/editable-cell.tsx";
-import { renderDatasetImage } from "../../elements/render-dataset-image.tsx";
 import { AttachmentCell } from "../attachment-cell.tsx";
 
 const fetchMock = vi.fn();
@@ -69,7 +68,7 @@ function Harness({
     setSelectedCell: vi.fn(),
     toggleCellExpanded: vi.fn(),
     toggleRowSelection: vi.fn(),
-    renderImage: renderDatasetImage,
+    renderImage: () => null,
     renderAttachment: (slot) => <AttachmentCell {...slot} />,
   };
 
@@ -230,7 +229,11 @@ describe("AttachmentCell", () => {
       expect(await screen.findByRole("img")).toHaveAttribute("src", `/minted${storedPicture.url}`);
 
       expect(createUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: "proj-1", filename: "cat.png", mediaType: "image/png" }),
+        expect.objectContaining({
+          projectId: "proj-1",
+          filename: "cat.png",
+          mediaType: "image/png",
+        }),
       );
       const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(url).toBe("https://storage.example/obj-1");

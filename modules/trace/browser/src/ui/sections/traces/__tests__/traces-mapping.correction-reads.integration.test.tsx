@@ -37,7 +37,7 @@ vi.mock("../../use-project-event-types.ts", () => ({
   useProjectEventTypes: () => ({ eventTypes: [], isLoading: false }),
 }));
 
-vi.mock("../../use-annotations-by-trace-ids.ts", () => ({
+vi.mock("../../../../behavior/use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 

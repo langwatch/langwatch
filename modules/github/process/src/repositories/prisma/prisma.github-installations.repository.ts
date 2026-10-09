@@ -68,7 +68,7 @@ function reposToJson(
  * uses — states which model of the composition root's typed `PrismaClient`
  * this repository touches, with no cast at the seam.
  */
-export type PrismaGithubInstallationsDatabase = Pick<PrismaClient, "githubInstallation">;
+type PrismaGithubInstallationsDatabase = Pick<PrismaClient, "githubInstallation">;
 
 export class PrismaGithubInstallationsRepository extends GithubInstallationsRepository {
   static create(database: PrismaGithubInstallationsDatabase): PrismaGithubInstallationsRepository {

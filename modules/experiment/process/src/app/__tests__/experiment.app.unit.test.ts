@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * The experiment application: the rules that moved off its two doors onto it.
+ * @see modules/experiment/specs/experiment-batch-records.feature
  * @vitest-environment node
  */
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
@@ -13,8 +14,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { WorkflowEvaluationService } from "../../features/workflow/services/experiment-workflow-evaluation.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
-import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
 import { ExperimentModule } from "../experiment.app.ts";
@@ -86,10 +87,13 @@ const apiKeyToken = ({
 function harness({
   experiments = {},
   workflows = {},
+  dataset = {},
 }: {
   experiments?: Partial<ExperimentService>;
   workflows?: Partial<WorkflowApi>;
+  dataset?: Partial<DatasetApi>;
 } = {}) {
+  const datasetApi = createApiFixture<DatasetApi>(dataset);
   const experimentService = createApiFixture<ExperimentService>({
     findById: vi.fn(async () => experiment),
     archive: vi.fn(async () => ({ success: true as const })),
@@ -173,6 +177,7 @@ function harness({
   const workbenchObserver = { recordExperimentRan: vi.fn(), reportError: vi.fn() };
   return {
     experiments: experimentService,
+    datasetApi,
     workflows: workflowService,
     archiveWorkflow,
     monitors,
@@ -182,7 +187,7 @@ function harness({
       runLookup,
       workflows: workflowService,
       workflowAuthoring,
-      dataset: createApiFixture<DatasetApi>(),
+      dataset: datasetApi,
       monitors,
       broadcast,
       permissions,
@@ -498,6 +503,66 @@ describe("given the workbench's own doors", () => {
       expect(workbenchObserver.reportError).toHaveBeenCalledWith(failure, {
         projectId: "project-1",
       });
+    });
+  });
+});
+
+describe("given the batch-evaluation records experiment serves for dataset", () => {
+  describe("when the records of an experiment are asked for by its slug", () => {
+    /** @scenario "An experiment's batch-evaluation records are read by its slug" */
+    it("asks dataset for the rows of that experiment's id", async () => {
+      const listBatchEvaluations = vi.fn(async () => []);
+      const findBySlug = vi.fn(async () => experiment);
+      const { app } = harness({
+        experiments: { findBySlug },
+        dataset: { listBatchEvaluations },
+      });
+
+      await expect(
+        app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "nightly" }),
+      ).resolves.toEqual([]);
+      expect(findBySlug).toHaveBeenCalledWith({
+        projectId: "project-1",
+        slug: "nightly",
+      });
+      expect(listBatchEvaluations).toHaveBeenCalledWith({
+        projectId: "project-1",
+        experimentId: experiment.id,
+      });
+    });
+
+    /** @scenario "A slug no experiment has is refused" */
+    it("refuses a slug the project has no experiment by, and never asks dataset", async () => {
+      const listBatchEvaluations = vi.fn(async () => []);
+      const { app } = harness({
+        experiments: { findBySlug: vi.fn(async () => null) },
+        dataset: { listBatchEvaluations },
+      });
+
+      await expect(
+        app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "ghost" }),
+      ).rejects.toMatchObject({ code: "experiment_not_found" });
+      expect(listBatchEvaluations).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the batch-evaluations index asks for a project's rollup", () => {
+    /** @scenario "The batch-evaluation rollup is answered by dataset through experiment" */
+    it("answers dataset's rollup unchanged", async () => {
+      const rollup = [
+        {
+          experimentId: "experiment-1",
+          datasetSlug: "golden-set",
+          _count: { experimentId: 2 },
+          _sum: { cost: 0.02 },
+          _avg: { score: 0.5 },
+        },
+      ];
+      const { app } = harness({ dataset: { summariseBatchEvaluations: async () => rollup } });
+
+      await expect(app.summariseBatchEvaluations({ projectId: "project-1" })).resolves.toEqual(
+        rollup,
+      );
     });
   });
 });

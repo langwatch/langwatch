@@ -37,6 +37,19 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   `GET /control/t/<n>/activity`, or the tenant page's activity tab. Read it first when a
   login fails: it says whether the request even arrived.
 
+## Faults
+
+- Console: the tenant page's **Signing** tab does every fault below (disabling a user is on **Users**):
+  shows published key ids (which signs), skew and the armed break; rotates or drops a key,
+  applies skew, arms any tamper mode (ID token or SAML), signs an unsolicited SAML response
+  with a "Post it to the ACS" form, lists sign-in links (as `haven idp signin`) and resets.
+  After any reload its skew and break inputs show the tenant's values again.
+- `POST /control/t/<n>/tamper {"mode":"saml-bad-signature|saml-unsigned|saml-wrong-audience|saml-wrong-recipient|saml-expired|saml-not-yet-valid|saml-replayed-assertion|saml-wrong-in-response-to"}` breaks the next SAML response once (`haven idp tamper <n> <mode>`).
+- `POST /control/t/<n>/config {"skewSeconds":600}` runs the tenant clock ahead (negative = behind) for ID tokens and SAML assertions (`haven idp skew <n> <seconds>`).
+- `POST /control/t/<n>/rotate-key {}` makes a new signing key current while JWKS and SAML metadata still publish the old one; `{"dropPrevious":true}` stops publishing it (`haven idp rotate-key <n> [--drop-previous]`). Reset clears skew but keeps keys.
+- `POST /control/t/<n>/user-active {"user":"<email>","active":false}` disables a user at the IdP; OIDC and SAML sign-in refuse them (`haven idp user disable|enable <n> <email>`).
+- `POST /control/t/<n>/saml/unsolicited {"acsUrl","email","entityId?","relayState?"}` returns `{url, samlResponse, relayState}` for an IdP-initiated post (`haven idp saml unsolicited <n> --acs-url <u> --email <e> [--relay-state <s>]`).
+
 ## Provisioning and domains
 
 - SCIM out: `PUT /control/t/<n>/scim-target {"baseUrl","token"}` (the token is the one
@@ -46,7 +59,34 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 - Scale: `POST /control/t/<n>/population {"users":5000,"groups":12}` (caps 50,000 and 500),
   then `POST .../churn {"join":120,"leave":80,"rename":40}`. Seeded, so repeatable.
 - Domain proof: `dig @127.0.0.1 -p 15353 TXT acme1.test`; HTTP: any `/.well-known/<file>`.
-  More domains: `PUT /control/dns/txt`, `PUT /control/verification`.
+  More domains, one channel each: `PUT|DELETE /control/dns/txt {"domain","values"}`
+  (`haven idp dns add|remove`) and `PUT|DELETE /control/verification {"domain","token"}`
+  (`haven idp verification set <domain> <token>` / `clear <domain>`). Console: the **Domain**
+  tab's "A TXT record on any domain" and "Well-known verification file" panels.
+- SCIM events: the **Provisioning** tab's "Send one SCIM event" (shown when connected) has an
+  Advanced section for `--id`, `--member-id`, `--set` (one `key=value` per line), `--inactive`,
+  `--no-external-id` and the enterprise department, cost center and manager.
+
+## From a terminal or agent
+
+`haven idp <verb>` drives a running idpsim (`--json` on reads, `--stack <slug>` for another stack):
+`tenants` (every tenant, as the console's landing page lists them), `tenant show <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
+`scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
+`dns add|remove`, `verification set|clear`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
+`reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
+
+- Legacy SSO: `haven idp legacy provider <t> auth0|okta|cognito|onelogin|azure|show`, then
+  `haven idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
+  `azure` is Entra: the product's authority host is hard-wired, so resolve
+  `login.microsoftonline.com` to idpsim over https; the env gives `AZURE_AD_TENANT_ID`.
+- `populate` also gives each user `department`, `costCenter` and `manager` (from `--seed`);
+  pushes carry them under the SCIM enterprise extension.
+- Negative tokens: `haven idp tamper <t> bad-signature|wrong-audience|expired|replayed-nonce`
+  breaks the next ID token once.
+- Auth0 directory webhook: `haven idp auth0-webhook <t> --event create|deactivate --user <u>
+  --target <stack-url> --secret-env <VAR>`. The secret comes from your environment only; never
+  put it in a flag, a file in the tree or a message.
+- Bare `haven idp` still runs the standalone simulator.
 
 ## Reset
 

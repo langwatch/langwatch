@@ -17,8 +17,8 @@ import { useLocation } from "react-router";
 
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { type TimeRange } from "../../../../behavior/query.slice.ts";
-import { getPresetById } from "../../../../behavior/time-range-presets.ts";
 import { type LensConfig, getPersistedActiveLensId } from "../../../../behavior/view.slice.ts";
+import { getPresetById } from "../../../../features/explorer/behavior/time-range-presets.ts";
 
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";

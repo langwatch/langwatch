@@ -36,7 +36,6 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
     currentUser: () => ({ id: "user-1", name: "Ada" }),
     hasPermission: () => reading.granted,
     isSettled: () => reading.settled,
-    featureFlag: () => reading.flag,
   };
   const capabilities = {
     session,
@@ -63,6 +62,8 @@ vi.mock("../../model/langy/langy-demo-project.ts", () => ({ isLangyDemoProject: 
 
 vi.mock("@langwatch/design-system/use-reduced-motion", () => ({ useReducedMotion: () => false }));
 
+import { UiHostServiceProvider } from "@langwatch/browser-host/capabilities";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 import {
   createUiScopeHost,
   UiScopeHostProvider,
@@ -87,14 +88,15 @@ function renderGate({ organizationRole }: { organizationRole: string }) {
     organization: () => void 0,
     team: () => reading.team,
     organizationRole: () => organizationRole,
-    hasPermission: () => reading.granted,
   });
   render(
-    <UiScopeHostProvider value={scope}>
-      <ProjectHomeHostMount>
-        <LangyGate />
-      </ProjectHomeHostMount>
-    </UiScopeHostProvider>,
+    <UiHostServiceProvider value={new Map([[UiFlagsService.name, { flag: () => reading.flag }]])}>
+      <UiScopeHostProvider value={scope}>
+        <ProjectHomeHostMount>
+          <LangyGate />
+        </ProjectHomeHostMount>
+      </UiScopeHostProvider>
+    </UiHostServiceProvider>,
   );
   return screen.getByLabelText("langy");
 }

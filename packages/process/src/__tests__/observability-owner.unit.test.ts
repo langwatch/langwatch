@@ -5,25 +5,44 @@ import {
   parseProcessConfig,
   serviceVersion,
 } from "@langwatch/config";
+import { resolveTelemetry, TelemetryAliasConflictError } from "@langwatch/observability/node";
 import { describe, expect, it } from "vitest";
 
-import { observabilityOwner } from "../observability-owner.ts";
+import { observabilityOwner, processLoggerConfiguration } from "../observability-owner.ts";
 
 const parse = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [observabilityOwner], environment }).observability;
+const resolve = (environment: Record<string, string | undefined>) =>
+  resolveTelemetry(parse(environment));
+const collector = { OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318" };
 
 describe("the observability owner's declaration", () => {
+  describe("given a Grafana in the environment", () => {
+    /** @scenario "Every process role reads the Grafana settings from its observability config" */
+    it("carries its base URL and datasource uid, and nothing when the base is blank", () => {
+      const grafana = parse({
+        GRAFANA_BASE_URL: "https://grafana.example.com",
+        GRAFANA_TEMPO_DATASOURCE_UID: "tempo-prod",
+      }).grafana;
+      expect(grafana.baseUrl).toBe("https://grafana.example.com");
+      expect(grafana.tempoDatasourceUid).toBe("tempo-prod");
+      expect(parse({ GRAFANA_BASE_URL: "" }).grafana.baseUrl).toBeUndefined();
+    });
+  });
+
   describe("given no metrics mode in the environment", () => {
     /** @scenario "No metrics mode is configured" */
     it("pushes over OTLP, which is cheaper than a scrape at our cardinality", () => {
-      expect(parse({}).metrics.mode).toBe("otlp");
+      expect(resolve({}).metrics.pull).toBe(false);
     });
   });
 
   describe("given a deployment that asks for a scrape", () => {
     /** @scenario "A deployment asks for a Prometheus scrape instead" */
-    it("reads the mode by the word the operator wrote", () => {
-      expect(parse({ LANGWATCH_METRICS_MODE: "prometheus" }).metrics.mode).toBe("prometheus");
+    it("reads the standard exporter list", () => {
+      const metrics = resolve({ OTEL_METRICS_EXPORTER: "otlp,prometheus" }).metrics;
+      expect(metrics.pull).toBe(true);
+      expect(metrics.healthDoor).toBe(false);
     });
   });
 
@@ -75,8 +94,143 @@ describe("the observability owner's declaration", () => {
   });
 
   it("switches metrics off only on the explicit word", () => {
-    expect(parse({}).metrics.enabled).toBe(true);
-    expect(parse({ OTEL_METRICS_ENABLED: "false" }).metrics.enabled).toBe(false);
+    expect(resolve({}).metrics.enabled).toBe(true);
+    expect(resolve({ OTEL_METRICS_EXPORTER: "none" }).metrics.enabled).toBe(false);
+  });
+
+  describe("given nothing but a collector", () => {
+    it("exports traces, logs and metrics there, every log sink at LOG_LEVEL", () => {
+      const resolved = resolve({ ...collector, LOG_LEVEL: "warn" });
+      expect(resolved.tracesEndpoint).toBe("http://collector:4318");
+      expect(resolved.metrics.endpoint).toBe("http://collector:4318");
+      expect(resolved.logs).toEqual({
+        level: "warn",
+        consoleLevel: "warn",
+        otelLevel: "warn",
+        otelExport: true,
+      });
+      expect(resolved.deprecations).toEqual([]);
+    });
+
+    it("exports nothing without a collector, and nothing once the SDK is disabled", () => {
+      for (const resolved of [resolve({}), resolve({ ...collector, OTEL_SDK_DISABLED: "true" })]) {
+        expect(resolved.tracesEndpoint).toBeUndefined();
+        expect(resolved.logs.otelExport).toBe(false);
+        expect(resolved.metrics.endpoint).toBeUndefined();
+      }
+      expect(resolve({}).logs.otelLevel).toBe("info");
+    });
+
+    it("turns one signal off by its own exporter name", () => {
+      const resolved = resolve({
+        ...collector,
+        OTEL_TRACES_EXPORTER: "none",
+        OTEL_LOGS_EXPORTER: "none",
+      });
+      expect(resolved.tracesEndpoint).toBeUndefined();
+      expect(resolved.logs.otelExport).toBe(false);
+      expect(resolved.metrics.endpoint).toBe("http://collector:4318");
+    });
+
+    it("names the service by OTEL_SERVICE_NAME when it is set", () => {
+      expect(resolve({ OTEL_SERVICE_NAME: "langwatch-app" }).serviceName).toBe("langwatch-app");
+      expect(resolve({}).serviceName).toBeUndefined();
+    });
+  });
+
+  describe("given main's older names", () => {
+    it("reads each as its replacement and warns once per name", () => {
+      const resolved = resolve({
+        ...collector,
+        PINO_LOG_LEVEL: "debug",
+        PINO_CONSOLE_LEVEL: "error",
+        PINO_OTEL_LEVEL: "info",
+        PINO_OTEL_ENABLED: "false",
+        OTEL_METRICS_ENABLED: "false",
+      });
+      expect(resolved.logs).toEqual({
+        level: "debug",
+        consoleLevel: "error",
+        otelLevel: "info",
+        otelExport: false,
+      });
+      expect(resolved.metrics.enabled).toBe(false);
+      expect(resolved.deprecations).toHaveLength(5);
+      expect(resolved.deprecations[0]).toMatch(/PINO_LOG_LEVEL is deprecated, use LOG_LEVEL/);
+    });
+
+    it("accepts an old name that agrees with its replacement", () => {
+      const resolved = resolve({
+        LOG_LEVEL: "warn",
+        _LOG_LEVEL: "warn",
+        PINO_OTEL_ENABLED: "true",
+        OTEL_LOGS_EXPORTER: "otlp",
+      });
+      expect(resolved.logs.level).toBe("warn");
+    });
+
+    it("refuses the boot when an old name and its replacement disagree, naming both", () => {
+      expect(() => resolve({ LOG_LEVEL: "info", PINO_LOG_LEVEL: "debug" })).toThrowError(
+        TelemetryAliasConflictError,
+      );
+      expect(() =>
+        resolve({ OTEL_METRICS_EXPORTER: "otlp", OTEL_METRICS_ENABLED: "false" }),
+      ).toThrowError(
+        /OTEL_METRICS_EXPORTER=otlp, OTEL_METRICS_ENABLED=none: set only OTEL_METRICS_EXPORTER/,
+      );
+    });
+
+    it("declares a config leaf for every alias the table reads", () => {
+      expect(configEnvNames(observabilityOwner.config)).toEqual(
+        expect.arrayContaining([
+          "PINO_LOG_LEVEL",
+          "_LOG_LEVEL",
+          "PINO_OTEL_ENABLED",
+          "OTEL_METRICS_ENABLED",
+        ]),
+      );
+      expect(configEnvNames(observabilityOwner.config)).not.toContain("LANGWATCH_METRICS_MODE");
+    });
+  });
+});
+
+describe("processLoggerConfiguration", () => {
+  describe("given a process that boots no preamble, such as tasks or the scenario child", () => {
+    /** @scenario "A process without a preamble reads the same logger names" */
+    it("takes LOG_LEVEL, the collector switch and OTEL_SERVICE_NAME over its own name", () => {
+      const { configuration } = processLoggerConfiguration({
+        environment: { ...collector, LOG_LEVEL: "warn", OTEL_SERVICE_NAME: "tasks-eu" },
+        serviceName: "langwatch-tasks",
+      });
+      expect(configuration).toMatchObject({
+        serviceName: "tasks-eu",
+        level: "warn",
+        consoleLevel: "warn",
+        otelLevel: "warn",
+        otelExportEnabled: true,
+      });
+      const quiet = processLoggerConfiguration({ environment: {}, serviceName: "langwatch-tasks" });
+      expect(quiet.configuration).toMatchObject({
+        serviceName: "langwatch-tasks",
+        otelExportEnabled: false,
+      });
+    });
+
+    /** @scenario "A process without a preamble reads main's names as warned aliases" */
+    it("reads an old name with one warning and refuses one that disagrees", () => {
+      const { configuration, deprecations } = processLoggerConfiguration({
+        environment: { PINO_LOG_LEVEL: "error" },
+        serviceName: "langwatch-scenario-child",
+      });
+      expect(configuration.level).toBe("error");
+      expect(deprecations).toEqual([expect.stringContaining("PINO_LOG_LEVEL is deprecated")]);
+      expect(() =>
+        processLoggerConfiguration({
+          environment: { LOG_LEVEL: "info", _LOG_LEVEL: "debug" },
+          serviceName: "langwatch-tasks",
+        }),
+      ).toThrowError(TelemetryAliasConflictError);
+    });
   });
 });
 

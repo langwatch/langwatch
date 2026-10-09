@@ -3,7 +3,7 @@ import { SlackIntegrationMissingError, type SlackConnectionView } from "@langwat
 import { describe, expect, it } from "vitest";
 
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
-import { AutomationSlackConnectionService } from "../automation-slack-connection.service.ts";
+import { AutomationSlackConnectionService } from "../../features/slack/services/automation-slack-connection.service.ts";
 
 const PROJECT = "project-1";
 const WEBHOOK_URL = ["https://hooks.slack.com", "services", "fake"].join("/");

@@ -1,5 +1,6 @@
-import { pickNumber, pickString } from "./coding-agent-transcript-value.ts";
+import { pickNumber } from "./coding-agent-transcript-value.ts";
 import type { TranscriptEntry } from "./coding-agent-transcript.ts";
+import { pickString } from "./telemetry/coding-agent-span.ts";
 
 type NoteEntry = Extract<TranscriptEntry, { kind: "note" }>;
 

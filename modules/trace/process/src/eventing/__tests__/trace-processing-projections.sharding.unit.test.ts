@@ -6,7 +6,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { OtlpSpan, RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { EventingRecordSpanAdapter } from "../record-span.commands.ts";
 import {
   EventingTracePipelineAdapter,

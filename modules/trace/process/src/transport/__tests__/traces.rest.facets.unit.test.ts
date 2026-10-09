@@ -10,15 +10,14 @@ import {
  * is never read as a trace id.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createTraceAppHarness } from "../../app/__tests__/support/trace-app.harness.ts";
 import type { TracesListReader } from "../../app/trace.app.ts";
-import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { TraceFacetValuesService } from "../../services/trace-facet-values.service.ts";
-import { TraceTopicNamingService } from "../../services/trace-topic-naming.service.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { TraceFacetValuesService } from "../../features/facet/services/trace-facet-values.service.ts";
+import { TraceTopicNamingService } from "../../features/topic/services/trace-topic-naming.service.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
@@ -38,7 +37,7 @@ function mount(
   const facetValues = TraceFacetValuesService.create({
     repository: createApiFixture<TraceListRead>({}, "list repository"),
     topicNaming: TraceTopicNamingService.create({
-      topicService: createApiFixture<TopicApi>({}, "topics"),
+      topicNames: { findNamesByIds: async () => new Map() },
     }),
     facets: CLICKHOUSE_FACET_CATALOG,
   });

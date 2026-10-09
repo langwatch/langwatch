@@ -8,8 +8,8 @@ const planMock = vi.hoisted(() => ({
 import { Temporal } from "@langwatch/time";
 
 import { createSettlementProjects } from "../../__tests__/fixtures/settlement.fixtures.ts";
+import { AutomationPersistCapService } from "../../features/runaway/services/persist-cap.service.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
-import { AutomationPersistCapService } from "../persist-cap.service.ts";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";

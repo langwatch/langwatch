@@ -15,7 +15,7 @@ import { useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-import { formatDateTime } from "../../../admin/ui/elements/backoffice-cells.tsx";
+import { formatDateTime } from "../../../admin/ui/elements/admin-cells.tsx";
 
 /**
  * Who operates this installation: list, grant by address, revoke. authz refuses granting

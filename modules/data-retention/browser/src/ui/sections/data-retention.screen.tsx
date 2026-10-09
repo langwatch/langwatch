@@ -23,7 +23,15 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
-import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+import {
+  ScopeFilter,
+  type ScopeFilterValue,
+  isScopeInFilter,
+  resolveScopeFilter,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+} from "@langwatch/design-system/scope-filter";
 import { StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -33,13 +41,6 @@ import {
   removeRetentionScope,
   retentionPolicySaver,
 } from "../../behavior/retention-policy-save.ts";
-import {
-  isScopeInFilter,
-  resolveScopeFilter,
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  scopeHierarchyOf,
-} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   RETENTION_SCOPE_QUERY_KEY,
   useDataRetentionHost,
@@ -101,6 +102,12 @@ function hasWritableScope(
 ): boolean {
   if (!available) return false;
   return !!available.organization || available.teams.length > 0 || available.projects.length > 0;
+}
+
+/** A scope write names its organization; a page outside one offers no scope to write. */
+function organizationOf(organizationId: string | undefined): string {
+  if (!organizationId) throw new Error("Retention overrides are set inside an organization.");
+  return organizationId;
 }
 
 function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; projectId: string }) {
@@ -167,7 +174,11 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // Fallback preview for the remove-confirm dialog: owned here (transport is
   // an application concern) and passed down as controlled data so the dialog
   // itself stays presentation-only.
-  const removePreview = retentionRemovalPreviewQuery(projectId, removeTarget);
+  const removePreview = retentionRemovalPreviewQuery({
+    projectId,
+    organizationId,
+    target: removeTarget,
+  });
   const removePreviewQuery = dataRetentionApi.dataRetention.previewScopeRemoval.useQuery(
     removePreview.input,
     removePreview.options,
@@ -262,7 +273,13 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     projectId,
     notices: host,
     write: ({ scope, category, retentionDays }) =>
-      setForScope.mutateAsync({ projectId, scope, category, retentionDays }),
+      setForScope.mutateAsync({
+        projectId,
+        organizationId: organizationOf(organizationId),
+        scope,
+        category,
+        retentionDays,
+      }),
     trigger: (category) => triggerUpdate.mutateAsync({ projectId, category }),
     afterWrite: () => void invalidate(),
     close: closeDrawer,
@@ -386,7 +403,12 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             await removeRetentionScope({
               group: removeTarget,
               remove: ({ scope, category }) =>
-                removeForScope.mutateAsync({ projectId, scope, category }),
+                removeForScope.mutateAsync({
+                  projectId,
+                  organizationId: organizationOf(organizationId),
+                  scope,
+                  category,
+                }),
               afterWrite: () => void invalidate(),
               notices: host,
             });

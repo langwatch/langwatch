@@ -279,7 +279,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it resolves to Azure and a matching Azure driver is registered
     And no shared-key configuration is consulted
 
-  @unit
+  @integration
   Scenario: Reads of previously persisted azure-blob URIs succeed in a token-based mode
     Given objects were written under shared-key auth before the switch
     When they are read after the deployment moves to a token-based mode

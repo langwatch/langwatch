@@ -1,6 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 
-import { TraceExportSlotRepository } from "../trace-export-slot.repository.ts";
+import { TraceExportSlotRepository } from "../../features/export/repositories/trace-export-slot.repository.ts";
 
 /** The Redis slots' memory twin: a claim holds its key in this process until freed or expired. */
 export class MemoryTraceExportSlotRepository extends TraceExportSlotRepository {

@@ -5,7 +5,7 @@ import { Temporal } from "@langwatch/time";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CachedView } from "../src/components/cached-view.tsx";
+import { CachedView } from "../src/components/states/cached-view.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

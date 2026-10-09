@@ -12,6 +12,7 @@ const ACTION_META = {
   "agents.delete": { label: "Deleted", icon: Trash2 },
   "agents.cascadeArchive": { label: "Archived", icon: Trash2 },
   "agents.copy": { label: "Replicated", icon: Copy },
+  "workflow.copyAgent": { label: "Replicated", icon: Copy },
   "agents.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
   "agents.syncFromSource": { label: "Synced from source", icon: RefreshCw },
 } as const satisfies Record<string, { label: string; icon: LucideIcon }>;

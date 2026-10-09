@@ -224,14 +224,14 @@ func TestAWorktreeAnotherRunHeldIsDiscardedInTheBackground(t *testing.T) {
 func TestTheComposeStackStaysUpForTheNextRun(t *testing.T) {
 	root := t.TempDir()
 	recorder := &recordingRunner{}
-	first := &bootState{cfg: BootConfig{BranchDir: root, ComposeProject: "apidiff"}, stderr: io.Discard, run: recorder.run, workRoot: root}
+	first := &bootState{cfg: BootConfig{BranchDir: root, ComposeProject: "apidiff", ComposePostgres: true}, stderr: io.Discard, run: recorder.run, workRoot: root}
 	if err := first.resolveInfra(); err != nil {
 		t.Fatal(err)
 	}
 	if first.reusedPorts {
 		t.Fatal("the first run has no ports to reuse")
 	}
-	second := &bootState{cfg: BootConfig{BranchDir: root, ComposeProject: "apidiff"}, stderr: io.Discard, run: recorder.run, workRoot: root}
+	second := &bootState{cfg: BootConfig{BranchDir: root, ComposeProject: "apidiff", ComposePostgres: true}, stderr: io.Discard, run: recorder.run, workRoot: root}
 	if err := second.resolveInfra(); err != nil {
 		t.Fatal(err)
 	}

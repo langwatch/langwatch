@@ -12,6 +12,7 @@ import { useMemo } from "react";
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/personal-workspace-session.ts";
 import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
+import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { ExternalToolTile } from "../blocks/external-tool-tile.tsx";
 import { CodingAssistantTile } from "./coding-assistant-tile.tsx";
 import { GovernanceGettingStartedBanner } from "./governance-getting-started-banner.tsx";
@@ -30,9 +31,10 @@ const SECTION_ORDER: AiToolEntry["type"][] = [
 ];
 
 export function AiToolsPortal() {
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = usePersonalWorkspaceHost();
   const orgId = organization?.id ?? "";
-  const canManageCatalog = hasPermission("aiTools:manage");
+  const canManageCatalog = host.hasPermission("aiTools:manage");
 
   const listQuery = api.aiTools.list.useQuery(
     { organizationId: orgId },

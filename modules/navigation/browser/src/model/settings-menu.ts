@@ -320,6 +320,7 @@ export function opsGroup(): SettingsMenuGroup {
       // entry here pointed at a redirect.
       { label: "The Foundry", href: "/ops/foundry", icon: Anvil },
       { label: "Feature Flags", href: "/ops/feature-flags", icon: Flag },
+      { label: "Upgrades", href: "/ops/upgrades", icon: RefreshCw },
       { label: "Migrations", href: "/ops/migrations", icon: DatabaseZap },
     ],
   };

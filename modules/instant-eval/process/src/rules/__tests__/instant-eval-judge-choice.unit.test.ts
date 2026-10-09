@@ -7,44 +7,60 @@
 import { InstantEvalMemoryJudgeInProductionError } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
-import { instantEvalJudgeKind } from "../instant-eval-judge-choice.rules.ts";
+import {
+  instantEvalJudgeKind,
+  instantEvalJudgeRoute,
+  isInstantEvalJudgeChosenOnFirstCall,
+} from "../instant-eval-judge-choice.rules.ts";
 
-describe("instantEvalJudgeKind", () => {
-  /** @scenario "An install with its own judge key keeps using it" */
-  it("judges with the install's own key whenever it holds one", () => {
-    expect(
-      instantEvalJudgeKind({ classifier: undefined, hasOwnKey: true, isProduction: false }),
-    ).toBe("own_key");
-    expect(instantEvalJudgeKind({ classifier: "jev", hasOwnKey: true, isProduction: false })).toBe(
-      "own_key",
-    );
+describe("isInstantEvalJudgeChosenOnFirstCall", () => {
+  it("waits for the first call where the key decides", () => {
+    expect(isInstantEvalJudgeChosenOnFirstCall({ classifier: undefined })).toBe(true);
+    expect(isInstantEvalJudgeChosenOnFirstCall({ classifier: "jev" })).toBe(true);
   });
 
-  it("judges through Connect where the install holds no key", () => {
+  it("chooses at startup where the operator named the judge", () => {
+    for (const classifier of ["connect", "null", "memory"] as const) {
+      expect(isInstantEvalJudgeChosenOnFirstCall({ classifier })).toBe(false);
+    }
+  });
+});
+
+describe("instantEvalJudgeKind", () => {
+  it("judges with LangWatch's key on LangWatch Cloud", () => {
     expect(
-      instantEvalJudgeKind({ classifier: undefined, hasOwnKey: false, isProduction: false }),
+      instantEvalJudgeKind({ classifier: undefined, hasCloudKey: true, isProduction: false }),
+    ).toBe("cloud");
+    expect(
+      instantEvalJudgeKind({ classifier: "jev", hasCloudKey: true, isProduction: false }),
+    ).toBe("cloud");
+  });
+
+  it("judges through Connect where the judge holds no cloud key", () => {
+    expect(
+      instantEvalJudgeKind({ classifier: undefined, hasCloudKey: false, isProduction: false }),
     ).toBe("connect");
-    expect(instantEvalJudgeKind({ classifier: "jev", hasOwnKey: false, isProduction: false })).toBe(
-      "connect",
-    );
+    expect(
+      instantEvalJudgeKind({ classifier: "jev", hasCloudKey: false, isProduction: false }),
+    ).toBe("connect");
   });
 
   it("judges through Connect when the operator names it, key or not", () => {
     expect(
-      instantEvalJudgeKind({ classifier: "connect", hasOwnKey: true, isProduction: false }),
+      instantEvalJudgeKind({ classifier: "connect", hasCloudKey: true, isProduction: false }),
     ).toBe("connect");
   });
 
   it("judges nothing when the operator names the null classifier", () => {
-    expect(instantEvalJudgeKind({ classifier: "null", hasOwnKey: true, isProduction: false })).toBe(
-      "none",
-    );
+    expect(
+      instantEvalJudgeKind({ classifier: "null", hasCloudKey: true, isProduction: false }),
+    ).toBe("none");
   });
 
   /** @scenario "A deployment that names the memory classifier judges with the deterministic stand-in" */
   it("judges with the memory stand-in when the operator names it outside production", () => {
-    for (const hasOwnKey of [true, false]) {
-      expect(instantEvalJudgeKind({ classifier: "memory", hasOwnKey, isProduction: false })).toBe(
+    for (const hasCloudKey of [true, false]) {
+      expect(instantEvalJudgeKind({ classifier: "memory", hasCloudKey, isProduction: false })).toBe(
         "memory",
       );
     }
@@ -53,7 +69,19 @@ describe("instantEvalJudgeKind", () => {
   /** @scenario "A production process refuses to boot on the memory judge" */
   it("refuses the memory stand-in in production", () => {
     expect(() =>
-      instantEvalJudgeKind({ classifier: "memory", hasOwnKey: false, isProduction: true }),
+      instantEvalJudgeKind({ classifier: "memory", hasCloudKey: false, isProduction: true }),
     ).toThrow(InstantEvalMemoryJudgeInProductionError);
+  });
+});
+
+describe("instantEvalJudgeRoute", () => {
+  it("names the route a refusal reads, from the judge and whether Connect may call out", () => {
+    expect(instantEvalJudgeRoute({ kind: "none", isConnectPermitted: true })).toBe("off");
+    expect(instantEvalJudgeRoute({ kind: "cloud", isConnectPermitted: true })).toBe("own_key");
+    expect(instantEvalJudgeRoute({ kind: "memory", isConnectPermitted: true })).toBe("own_key");
+    expect(instantEvalJudgeRoute({ kind: "connect", isConnectPermitted: true })).toBe("connect");
+    expect(instantEvalJudgeRoute({ kind: "connect", isConnectPermitted: false })).toBe(
+      "disconnected",
+    );
   });
 });

@@ -1,7 +1,7 @@
 import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
-import type { TraceListItem } from "../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import type { CellDef } from "../../types.ts";
 
 export const ErrorTextCell = {

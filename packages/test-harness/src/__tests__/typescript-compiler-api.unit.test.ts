@@ -16,14 +16,17 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
 /**
- * Packages on TypeScript 6 as a library: sdks/typescript, mcp/typescript,
- * packages/ksuid (tsup and publish builds), architecture-enforcer (parser).
+ * On TypeScript 6: sdks/typescript, mcp/typescript, packages/ksuid and
+ * packages/webhook-verify (publish builds), architecture-enforcer (parser) and
+ * the readmegen extractor, which runs inside it (tools/readmegen/extract.go).
  */
 const HELD_ON_SIX = new Set([
   "sdks/typescript",
   "mcp/typescript",
   "packages/ksuid",
   "packages/architecture-enforcer",
+  "packages/webhook-verify",
+  "tools/readmegen/extract",
 ]);
 
 /**
@@ -135,9 +138,11 @@ describe("given TypeScript 7 is the compiler", () => {
 
     /** @scenario "The superseded preview compiler is gone" */
     it("declares the native-preview package nowhere", () => {
-      const offenders = manifests.filter((manifest) =>
-        readFileSync(resolve(REPO_ROOT, manifest), "utf8").includes("@typescript/native-preview"),
-      );
+      const offenders = manifests
+        .filter((manifest) => manifest !== "package.json")
+        .filter((manifest) =>
+          readFileSync(resolve(REPO_ROOT, manifest), "utf8").includes("@typescript/native-preview"),
+        );
 
       expect(offenders).toEqual([]);
     });

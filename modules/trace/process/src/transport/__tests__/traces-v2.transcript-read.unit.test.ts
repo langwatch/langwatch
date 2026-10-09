@@ -7,8 +7,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
-import { TestCodingAgentService } from "../../services/__tests__/support/coding-agent.service.fake.ts";
-import { TraceTranscriptReadService } from "../../services/trace-transcript-read.service.ts";
+import { TraceTranscriptReadService } from "../../features/read/services/trace-transcript-read.service.ts";
 import {
   createTranscriptApp,
   createTranscriptReadPorts,
@@ -16,10 +15,9 @@ import {
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
-const codingAgents = new TestCodingAgentService();
 const traceTranscriptReadService = TraceTranscriptReadService.create();
 
-const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp(codingAgents);
+const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp();
 const ports = createTranscriptReadPorts();
 
 function claudeLogRow(attributes: Record<string, string>, timeUnixMs: number) {

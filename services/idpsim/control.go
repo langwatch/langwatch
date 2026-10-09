@@ -2,8 +2,11 @@ package idpsim
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 )
 
 // handleControlState dumps the whole simulator as JSON — what an automated
@@ -84,6 +87,39 @@ func (s *Server) handleControlAddUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, &u)
 }
 
+// handleControlUserActive enables or disables a user at the IdP (body
+// {"user": "<email>", "active": false}); a disabled user is refused at sign-in.
+func (s *Server) handleControlUserActive(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	var body struct {
+		User   string `json:"user"`
+		Active *bool  `json:"active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.User == "" || body.Active == nil {
+		http.Error(w, "a user change needs the user and active: true or false", http.StatusBadRequest)
+		return
+	}
+	u, found := t.FindUser(body.User)
+	if !found {
+		http.Error(w, "no user "+body.User+" on this tenant", http.StatusNotFound)
+		return
+	}
+	t.mu.Lock()
+	u.Active = *body.Active
+	snapshot := *u
+	t.mu.Unlock()
+	verb := "disabled"
+	if snapshot.Active {
+		verb = "enabled"
+	}
+	s.record(t, Event{Kind: "fault.user", Outcome: OutcomeOK, Subject: snapshot.Email, Detail: verb + " " + snapshot.Email + " at the IdP"})
+	writeJSON(w, http.StatusOK, &snapshot)
+}
+
 // handleControlActivity is the tenant's recent history as JSON — what the
 // live feed on the tenant page polls, and what a test asserts against when it
 // wants to know that a login really did reach the identity provider.
@@ -140,6 +176,7 @@ func (s *Server) handleControlConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		SamlpSubjects *bool `json:"samlpSubjects"`
+		SkewSeconds   *int  `json:"skewSeconds"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "unparseable config body", http.StatusBadRequest)
@@ -148,7 +185,13 @@ func (s *Server) handleControlConfig(w http.ResponseWriter, r *http.Request) {
 	if body.SamlpSubjects != nil {
 		t.SetSamlpSubjects(*body.SamlpSubjects)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"samlpSubjects": t.SamlpSubjects()})
+	if body.SkewSeconds != nil {
+		t.SetSkew(time.Duration(*body.SkewSeconds) * time.Second)
+		s.record(t, Event{Kind: "fault.skew", Outcome: OutcomeOK, Detail: "clock skewed by " + t.Skew().String()})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"samlpSubjects": t.SamlpSubjects(), "skewSeconds": int(t.Skew() / time.Second),
+	})
 }
 
 // handleControlSCIMTarget sets or clears where the tenant provisions — the
@@ -289,4 +332,49 @@ func (s *Server) handleControlVerification(w http.ResponseWriter, r *http.Reques
 	}
 	s.verification.SetToken(body.Domain, body.Token)
 	writeJSON(w, http.StatusOK, map[string]any{"domain": normalizeDomain(body.Domain), "token": body.Token})
+}
+
+// handleControlRotateKey makes a fresh signing key current, keeping the old one
+// published; {"dropPrevious":true} instead stops publishing the old one.
+func (s *Server) handleControlRotateKey(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	var body struct {
+		DropPrevious bool `json:"dropPrevious"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, "unparseable rotate-key body", http.StatusBadRequest)
+		return
+	}
+	if body.DropPrevious {
+		s.dropPreviousKey(w, t)
+		return
+	}
+	if err := t.RotateKey(); err != nil {
+		http.Error(w, "rotating the key failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.record(t, Event{Kind: "fault.key", Outcome: OutcomeOK, Detail: "rotated the signing key to " + t.KeyID()})
+	writeJSON(w, http.StatusOK, publishedKeyIDs(t))
+}
+
+func (s *Server) dropPreviousKey(w http.ResponseWriter, t *Tenant) {
+	if !t.DropPreviousKey() {
+		http.Error(w, "there is no previous key to drop; rotate first", http.StatusConflict)
+		return
+	}
+	s.record(t, Event{Kind: "fault.key", Outcome: OutcomeOK, Detail: "dropped the previous signing key"})
+	writeJSON(w, http.StatusOK, publishedKeyIDs(t))
+}
+
+// publishedKeyIDs answers a key change with the kids the tenant now publishes, current first.
+func publishedKeyIDs(t *Tenant) map[string]any {
+	kids := []string{}
+	for _, k := range t.SigningKeys() {
+		kids = append(kids, k.KID)
+	}
+	return map[string]any{"current": kids[0], "published": kids}
 }

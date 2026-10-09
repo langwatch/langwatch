@@ -11,14 +11,14 @@ import {
   type InstantEvalShorthandQuestion,
   instantEvalShorthandSchema,
 } from "@langwatch/instant-eval-contract";
+import {
+  instantEvalTextBudget,
+  instantEvalTranscriptRenderTokens,
+} from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { expandInstantEvalShorthand } from "../instant-eval-shorthand.rules.ts";
-import {
-  instantEvalTextBudget,
-  instantEvalTranscriptRenderTokens,
-} from "../instant-eval-token-budget.rules.ts";
 
 const NOW = Temporal.Instant.from("2026-09-18T12:00:00.000Z");
 

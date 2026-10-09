@@ -29,7 +29,7 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
 import {
   datasetContextChip,
   traceContextChip,
-} from "../../../../../behavior/langy-context-chips.ts";
+} from "../../../../context-target/behavior/langy-context-chips.ts";
 import { Composer } from "../composer.tsx";
 
 const held = [

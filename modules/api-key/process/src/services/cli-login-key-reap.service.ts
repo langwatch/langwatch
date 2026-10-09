@@ -41,7 +41,7 @@ export class CliLoginKeyReapService {
    */
   async reap(): Promise<number> {
     const now = this.now();
-    const elapsed = await this.repository.findElapsedLoginKeys({ now });
+    const elapsed = await this.repository.sweepElapsedLoginKeys({ before: now });
 
     let count = 0;
     for (const key of elapsed) {

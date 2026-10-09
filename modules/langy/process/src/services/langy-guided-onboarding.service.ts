@@ -12,7 +12,7 @@ import type {
 } from "../eventing/langy-guided-onboarding-turn-failed.subscriber.ts";
 
 /** Sends one failed-turn fact to the `langy_guided_onboarding` pipeline. */
-export type GuidedOnboardingTurnFailedRecorder = (
+type GuidedOnboardingTurnFailedRecorder = (
   data: GuidedOnboardingTurnFailedEventData,
 ) => Promise<void>;
 

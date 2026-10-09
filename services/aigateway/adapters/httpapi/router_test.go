@@ -32,6 +32,7 @@ func (m *mockAuth) Resolve(ctx context.Context, key domain.PresentedKey) (*domai
 
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
+	streamFn   func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
 	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
@@ -39,8 +40,24 @@ func (m *mockProvider) Dispatch(ctx context.Context, req *domain.Request, cred d
 	return m.dispatchFn(ctx, req, cred)
 }
 
-func (m *mockProvider) DispatchStream(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
-	return nil, nil
+// DispatchStream answers from streamFn when a test sets one. Otherwise the
+// audio routes, which always stream, get dispatchFn's answer as one chunk,
+// with a provider refusal reshaped the way a real provider lane reports it.
+func (m *mockProvider) DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
+	if m.streamFn != nil {
+		return m.streamFn(ctx, req, cred)
+	}
+	if m.dispatchFn == nil {
+		return nil, nil
+	}
+	resp, err := m.dispatchFn(ctx, req, cred)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return nil, &domain.UpstreamError{StatusCode: resp.StatusCode, Body: resp.Body, Headers: resp.Headers}
+	}
+	return domain.BufferedStream(resp), nil
 }
 
 func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {

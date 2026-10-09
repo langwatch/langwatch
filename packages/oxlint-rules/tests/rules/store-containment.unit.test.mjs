@@ -4,7 +4,11 @@ import { storeContainmentRule } from "../../src/rules/store-containment.rule.mjs
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { contract: {}, process: {} } } },
+  features: {
+    agent: { layoutVersion: 0, roles: { client: {}, contract: {}, process: {} } },
+    auth: { layoutVersion: 0, roles: { process: {} } },
+    ops: { layoutVersion: 0, roles: { process: {} } },
+  },
 });
 
 afterAll(() => workspace.cleanup());
@@ -155,5 +159,40 @@ describe("given a test file", () => {
         'import Redis from "ioredis";',
       ),
     ).toEqual([]);
+  });
+});
+
+describe("given a client package", () => {
+  /** @scenario "A client package naming a store is reported" */
+  it("reports a store client like any module package", () => {
+    const client = "modules/agent/client/src/agent-client.ts";
+
+    expect(report(client, 'import Redis from "ioredis";')).toEqual([
+      { line: 1, messageId: "storeClientValue", store: "Redis" },
+    ]);
+    expect(report(client, 'import type { PrismaClient } from "@prisma/client";')).toEqual([
+      { line: 1, messageId: "storeNamed", store: "Prisma" },
+    ]);
+  });
+});
+
+describe("given a named exception", () => {
+  /** @scenario "A named exception names only the stores it lists, in its one file" */
+  it("allows its listed stores in its file and reports any other store or file", () => {
+    const auth = "modules/auth/process/src/app/auth-composition.build.ts";
+    const ops = "modules/ops/process/src/repositories/live/live.replay-runtime.repository.ts";
+
+    expect(report(auth, 'import { PrismaClient } from "@prisma/client";')).toEqual([]);
+    expect(report(auth, 'import Redis from "ioredis";')).toEqual([]);
+    expect(report(auth, 'import { createClient } from "@clickhouse/client";')).toEqual([
+      { line: 1, messageId: "storeClientValue", store: "ClickHouse" },
+    ]);
+    expect(report(ops, 'import { createClient } from "@clickhouse/client";')).toEqual([]);
+    expect(report(ops, 'import { PrismaClient } from "@prisma/client";')).toEqual([
+      { line: 1, messageId: "storeNamed", store: "Prisma" },
+    ]);
+    expect(
+      report("modules/auth/process/src/app/auth.app.ts", 'import Redis from "ioredis";'),
+    ).toEqual([{ line: 1, messageId: "storeClientValue", store: "Redis" }]);
   });
 });

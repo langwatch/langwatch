@@ -10,7 +10,7 @@ import { BadgeCheck, Gauge, type LucideIcon, Tag, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 
-import type { EvaluatorOption } from "../../hooks/use-evaluator-options.ts";
+import type { EvaluatorOption } from "../../../../../features/instant-eval/behavior/use-evaluator-options.ts";
 import { evalColumnLabel } from "../../trace-table/eval-columns.ts";
 
 /** Toast hint shown after a column is added, shared with the picker's own

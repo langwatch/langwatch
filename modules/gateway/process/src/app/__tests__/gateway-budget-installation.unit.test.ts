@@ -36,7 +36,6 @@ function memberSource() {
     tier: stores.tier,
     order: [...stores.order, "eventing"],
     read: (name: string) => (name === "eventing" ? eventing : stores.read(name)),
-    close: async () => void 0,
   };
 }
 
@@ -51,7 +50,7 @@ async function bootGateway() {
     role: "api",
     modules: [gatewayProcessModule],
     config: { gateway: {} },
-    members: memberSource(),
+    stores: memberSource(),
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     peers: [
       testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),

@@ -5,7 +5,7 @@ import { ChildProcessJobDataSchema, ScenarioConfigSchema } from "@langwatch/scen
  */
 import { describe, expect, it } from "vitest";
 
-import type { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
+import type { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import {
   createTestScenarioExecutionPrefetcherService,
   type ScenarioPrefetchFixture,

@@ -32,27 +32,26 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
 vi.mock("../../../presence/hooks/use-traces-v2-presence.ts", () => ({
   useTracesPresence: () => undefined,
 }));
-vi.mock("../../hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ totalHits: 0, pageTraceIds: [], itemNoun: "traces" }),
 }));
-vi.mock("../../hooks/use-instant-eval-run-watch.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-run-watch.ts", () => ({
   useInstantEvalRunWatch: () => undefined,
 }));
-vi.mock("../../hooks/use-lens-filter-dirty-sync.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-lens-filter-dirty-sync.ts", () => ({
   useLensFilterDirtySync: () => undefined,
 }));
-vi.mock("../../hooks/use-lens-sync.ts", () => ({ useLensSync: () => undefined }));
+vi.mock("../../../../../features/facet/behavior/use-lens-sync.ts", () => ({
+  useLensSync: () => undefined,
+}));
 vi.mock("../../hooks/use-reset-selection-on-view-change.ts", () => ({
   useResetSelectionOnViewChange: () => undefined,
 }));
 vi.mock("../../hooks/use-rolling-time-range.ts", () => ({
   useRollingTimeRange: () => undefined,
 }));
-vi.mock("../../hooks/use-trace-drawer-url-hydrator.ts", () => ({
-  useTraceDrawerUrlHydrator: () => undefined,
-}));
 vi.mock("../../hooks/use-trace-freshness.ts", () => ({ useTraceFreshness: () => undefined }));
-vi.mock("../../hooks/use-trace-list-export.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-list-export.ts", () => ({
   useTraceListExport: () => ({
     isDialogOpen: false,
     openExportDialog: vi.fn(),
@@ -63,7 +62,7 @@ vi.mock("../../hooks/use-trace-list-export.ts", () => ({
     cancelExport: vi.fn(),
   }),
 }));
-vi.mock("../../hooks/use-trace-list-query.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-list-query.ts", () => ({
   useTraceListQuery: () => ({ data: [] }),
 }));
 vi.mock("../../hooks/use-url-sync.ts", () => ({ useURLSync: () => undefined }));
@@ -106,7 +105,9 @@ vi.mock("../integrate-pane.tsx", () => ({
   IntegratePane: () => <div data-testid="integrate-pane" />,
 }));
 vi.mock("../empty-results-pane.tsx", () => ({ EmptyResultsPane: () => null }));
-vi.mock("../explorer-langy-actions.tsx", () => ({ ExplorerLangyActions: () => null }));
+vi.mock("../../../../../behavior/langy/use-explorer-langy-actions.ts", () => ({
+  useExplorerLangyActions: () => ({}),
+}));
 vi.mock("../page-keyboard-shortcuts.tsx", () => ({ PageKeyboardShortcuts: () => null }));
 vi.mock("../../export-config-dialog.tsx", () => ({ ExportConfigDialog: () => null }));
 vi.mock("../../../trace-find-bar.tsx", () => ({ FindBar: () => null }));
@@ -127,7 +128,7 @@ const follows = (first: Element, second: Element) =>
 
 describe("<TracesPage />", () => {
   describe("given the project has traces", () => {
-    it("with the filters open, puts them left, the table in the centre and the drawer right once a trace is open", () => {
+    it("with the filters open, puts them left and the table in the centre, leaving the open trace to the drawer host", () => {
       const view = renderWithDesignSystem(<TracesPage />);
 
       const filters = screen.getByRole("complementary", { name: "Trace filters" });
@@ -140,7 +141,7 @@ describe("<TracesPage />", () => {
       page.drawerTraceId = "trace-1";
       view.rerender(<TracesPage />);
 
-      expect(follows(results, screen.getByTestId("trace-drawer"))).toBe(true);
+      expect(screen.queryByTestId("trace-drawer")).not.toBeInTheDocument();
     });
   });
 

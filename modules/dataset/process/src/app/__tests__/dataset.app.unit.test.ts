@@ -12,12 +12,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { DatasetService } from "../../services/dataset.service.ts";
-import {
-  createDatasetTestApp,
-  createDatasetTestAuthz,
-  createDatasetTestExperiments,
-  datasetTestExperiment,
-} from "./dataset.fixture.ts";
+import { createDatasetTestApp, createDatasetTestAuthz } from "./dataset.fixture.ts";
 
 const replacing: Dataset = {
   id: "dataset_existing",
@@ -44,11 +39,9 @@ const replacing: Dataset = {
 
 function harness({
   dataset = {},
-  experiments = createDatasetTestExperiments(),
   permissions = createDatasetTestAuthz(),
 }: {
   dataset?: Partial<DatasetService>;
-  experiments?: ReturnType<typeof createDatasetTestExperiments>;
   permissions?: ReturnType<typeof createDatasetTestAuthz>;
 } = {}) {
   const datasetService = {
@@ -74,9 +67,8 @@ function harness({
 
   return {
     dataset: datasetService,
-    experiments,
     permissions,
-    app: createDatasetTestApp({ dependencies: { experiments, permissions } }),
+    app: createDatasetTestApp({ dependencies: { permissions } }),
   };
 }
 
@@ -139,47 +131,6 @@ describe("DatasetModule", () => {
     });
   });
 
-  describe("when an upsert names an experiment instead of a name", () => {
-    it("borrows the experiment's name", async () => {
-      const { app, dataset, experiments } = harness();
-
-      await app.upsertDataset({ projectId: "project-1", experimentId: "experiment-1" });
-
-      expect(experiments.getById).toHaveBeenCalledWith({
-        projectId: "project-1",
-        id: "experiment-1",
-      });
-      expect(firstCall(dataset.upsertDataset)).toMatchObject({
-        name: "Nightly regression",
-        columnTypes: [],
-      });
-    });
-
-    it("keeps the name the caller did send, and never reads the experiment", async () => {
-      const { app, dataset, experiments } = harness();
-
-      await app.upsertDataset({
-        projectId: "project-1",
-        experimentId: "experiment-1",
-        name: "Mine",
-      });
-
-      expect(experiments.getById).not.toHaveBeenCalled();
-      expect(firstCall(dataset.upsertDataset).name).toBe("Mine");
-    });
-
-    it("refuses when the experiment it named has no name to lend", async () => {
-      const { app, dataset } = harness({
-        experiments: createDatasetTestExperiments(datasetTestExperiment(null)),
-      });
-
-      await expect(
-        app.upsertDataset({ projectId: "project-1", experimentId: "experiment-1" }),
-      ).rejects.toThrow("Experiment experiment-1 has no name");
-      expect(dataset.upsertDataset).not.toHaveBeenCalled();
-    });
-  });
-
   describe("when an upsert names nothing to call the dataset", () => {
     it("refuses before the service is touched", async () => {
       const { app, dataset } = harness();
@@ -193,7 +144,7 @@ describe("DatasetModule", () => {
 
   describe("when an upsert names everything", () => {
     it("reads no row and borrows nothing", async () => {
-      const { app, dataset, experiments } = harness();
+      const { app, dataset } = harness();
 
       await app.upsertDataset({
         projectId: "project-1",
@@ -202,7 +153,6 @@ describe("DatasetModule", () => {
       });
 
       expect(dataset.getBySlugOrId).not.toHaveBeenCalled();
-      expect(experiments.getById).not.toHaveBeenCalled();
       expect(firstCall(dataset.upsertDataset)).toMatchObject({
         projectId: "project-1",
         name: "Brand New",
@@ -248,28 +198,6 @@ describe("DatasetModule", () => {
         sourceProjectId: "project-source",
         targetProjectId: "project-target",
       });
-    });
-  });
-
-  describe("when a page holds only the slug of a batch evaluation's experiment", () => {
-    it("turns it into the id those records are keyed by", async () => {
-      const { app, experiments } = harness();
-
-      await expect(
-        app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "nightly" }),
-      ).resolves.toEqual([]);
-      expect(experiments.findBySlug).toHaveBeenCalledWith({
-        projectId: "project-1",
-        slug: "nightly",
-      });
-    });
-
-    it("refuses when the project has no experiment by that slug", async () => {
-      const { app } = harness({ experiments: createDatasetTestExperiments(null) });
-
-      await expect(
-        app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "ghost" }),
-      ).rejects.toMatchObject({ code: "experiment_not_found" });
     });
   });
 

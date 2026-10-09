@@ -223,7 +223,15 @@ export class GatewayGuardrailEvaluationService {
         const monitor = monitorsByEvaluator.get(guardrail.evaluatorId);
         // A guardrail whose evaluator lost its AS_GUARDRAIL monitor fails by its failure mode.
         const outcome = monitor
-          ? await this.runOne({ guardrail, monitor, data, projectId, signal: run, deadlineAt })
+          ? await this.runOne({
+              guardrail,
+              monitor,
+              data,
+              direction,
+              projectId,
+              signal: run,
+              deadlineAt,
+            })
           : this.onFailure({
               guardrail,
               reason: "guardrail evaluator is not enabled for guardrail execution",
@@ -286,6 +294,7 @@ export class GatewayGuardrailEvaluationService {
     guardrail,
     monitor,
     data,
+    direction,
     projectId,
     signal,
     deadlineAt,
@@ -293,6 +302,7 @@ export class GatewayGuardrailEvaluationService {
     guardrail: { id: string; name: string; failureMode: string };
     monitor: EnabledGuardrailMonitor;
     data: { input: string; output: string };
+    direction: GuardrailWireDirection;
     projectId: string;
     signal: AbortSignal;
     deadlineAt: number | undefined;
@@ -306,6 +316,7 @@ export class GatewayGuardrailEvaluationService {
         evaluatorType: monitor.checkType,
         settings: (monitor.parameters ?? {}) as Record<string, unknown>,
         data,
+        direction,
         guardrail: { id: guardrail.id, name: guardrail.name, monitorId: monitor.id },
         signal,
         deadlineMs:

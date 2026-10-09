@@ -1,4 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
 import type {
@@ -79,7 +78,7 @@ export interface SuiteApi {
    * evaluators attached to it. Send only what changes.
    */
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
-  run(input: Omit<SuiteRunInput, "organizationId">): Promise<SuiteRunResult>;
+  run(input: Omit<SuiteRunInput, "organizationId">): Promise<SuiteRunResult & { planSlug: string }>;
   runAll(input: Omit<SuiteRunAllInput, "organizationId">): Promise<SuiteRunAllResult>;
   runPlan(input: Omit<SuiteRunPlanInput, "organizationId">): Promise<SuiteRunPlanResult>;
   getOrganizationId(projectId: string): Promise<string>;
@@ -121,10 +120,3 @@ export interface SuiteApi {
 }
 
 export const SuiteApi = moduleApi<SuiteApi>()("suite");
-
-/** Suite's settings: only the shared deployment origin its run plan links are built on. */
-export const suiteConfig = Config.define(() => ({
-  publicBaseUrl,
-}));
-
-export type SuiteServerConfig = ConfigOf<typeof suiteConfig>;

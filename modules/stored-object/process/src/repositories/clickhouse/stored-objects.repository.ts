@@ -13,7 +13,7 @@ import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 const TABLE_NAME = "stored_objects" as const;
 
 /** The one operation the legacy stored-object index needs, as the driver exposes it. */
-export type StoredObjectsClickHouseClient = Readonly<{
+type StoredObjectsClickHouseClient = Readonly<{
   query(input: {
     query: string;
     query_params: Record<string, unknown>;
@@ -58,7 +58,7 @@ export class RoutedStoredObjectsClickHouse implements StoredObjectsClickHouse {
  * The table is the read-only legacy index (ADR-158) and has no TenantId column: every
  * statement here is scoped by project_id, which the tenant guard's text check cannot see.
  */
-const LEGACY_INDEX_UNSCOPED = {
+export const LEGACY_INDEX_UNSCOPED = {
   reason:
     "Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the statement is filtered by project_id.",
 } as const;

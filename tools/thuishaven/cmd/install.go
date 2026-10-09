@@ -33,6 +33,9 @@ import (
 //	haven install redis        installs exactly what is named, skips and all
 
 func runInstall(ctx context.Context, d deps, inv invocation) error {
+	if inv.has("--build") {
+		return runInstallBuild(ctx, d)
+	}
 	if isDone, err := resetSkipsFirst(d, inv); isDone || err != nil {
 		return err
 	}
@@ -51,7 +54,7 @@ func runInstall(ctx context.Context, d deps, inv invocation) error {
 		if err != nil {
 			return err
 		}
-		return d.orch.InstallPrereqs(ctx, chosen)
+		return installAndShow(ctx, d, chosen)
 	}
 	return installFromReport(ctx, d, inv)
 }
@@ -128,7 +131,7 @@ func installAuto(ctx context.Context, d deps, report []domain.PrereqStatus) erro
 		printOptionalHint(os.Stdout, report)
 		return nil
 	}
-	return d.orch.InstallPrereqs(ctx, chosen)
+	return installAndShow(ctx, d, chosen)
 }
 
 // installInteractive shows the picker, records the never-ask-agains, and then
@@ -158,7 +161,36 @@ func installInteractive(ctx context.Context, d deps, report []domain.PrereqStatu
 		}
 		return nil
 	}
-	return d.orch.InstallPrereqs(ctx, result.Install)
+	return installAndShow(ctx, d, result.Install)
+}
+
+// installAndShow installs the chosen prerequisites, then shows what is left for the developer to
+// run, after the install narration so it is the last thing on screen.
+func installAndShow(ctx context.Context, d deps, chosen []domain.Chosen) error {
+	manual, err := d.orch.InstallPrereqs(ctx, chosen)
+	printManualSteps(os.Stdout, manual, painterFor(d.isAgent))
+	return err
+}
+
+// printManualSteps sets each step apart: its name, why it matters, and the command alone on its
+// own line, so it copies cleanly.
+func printManualSteps(w io.Writer, steps []app.ManualStep, paint painter) {
+	if len(steps) == 0 {
+		return
+	}
+	heading := "1 step needs you"
+	if len(steps) > 1 {
+		heading = fmt.Sprintf("%d steps need you", len(steps))
+	}
+	fmt.Fprintf(w, "\n%s %s\n", paint(havenui.Warn, "!"), paint(havenui.Title, heading))
+	for _, step := range steps {
+		fmt.Fprintf(w, "\n  %s\n", paint(havenui.Selected, step.Name))
+		if step.Why != "" {
+			fmt.Fprintf(w, "  %s\n", paint(havenui.Muted, step.Why))
+		}
+		fmt.Fprintf(w, "\n    %s\n", step.Command)
+	}
+	fmt.Fprintln(w)
 }
 
 // resolvedPosture is the machine's container posture for the report. A
@@ -362,6 +394,10 @@ func printSkippedNote(w io.Writer, report []domain.PrereqStatus) {
 // in truth it is the setting that decides how three other tiers run.
 func printPostureNote(w io.Writer, posture app.ContainerPosture, paint painter) {
 	if posture.Posture == domain.PostureUnset {
+		return
+	}
+	// macOS needs no runtime, so only a posture someone chose is worth a line.
+	if runtime.GOOS == "darwin" && posture.Source == domain.PostureDetected {
 		return
 	}
 	fmt.Fprintln(w, "  "+paint(havenui.Muted, posture.Line()))

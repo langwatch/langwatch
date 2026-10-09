@@ -5,8 +5,10 @@ import type {
   RecordProjectArchivedCommandData,
   RecordProjectMovedCommandData,
   RecordProjectCreatedCommandData,
+  RecordProjectDepartmentAssignedCommandData,
   RecordProjectLegacyKeyRevokedCommandData,
   RecordProjectPresenceSettingChangedCommandData,
+  RecordProjectTraceSharingDisabledCommandData,
 } from "../eventing/project-lifecycle.events.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
@@ -22,6 +24,14 @@ export type ProjectLifecycleSenders = Readonly<{
   >;
   recordProjectMoved: Pick<EventingCommandSender<RecordProjectMovedCommandData>, "send">;
   recordProjectArchived: Pick<EventingCommandSender<RecordProjectArchivedCommandData>, "send">;
+  recordProjectDepartmentAssigned: Pick<
+    EventingCommandSender<RecordProjectDepartmentAssignedCommandData>,
+    "send"
+  >;
+  recordProjectTraceSharingDisabled: Pick<
+    EventingCommandSender<RecordProjectTraceSharingDisabledCommandData>,
+    "send"
+  >;
 }>;
 
 type NoticeLogger = Readonly<{
@@ -54,11 +64,22 @@ export class ProjectCreatedNoticeService {
   /** Throws when the record fails, for a subscriber whose delivery the queue retries. */
   async record(input: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
     const admin = await this.dependencies.projects.findWithOrgAdmin(input.projectId);
-    await this.#send({ ...input, adminUserId: admin?.adminUserId ?? null });
+    const project = await this.dependencies.projects.findWithTeam(input.projectId);
+    await this.#send({
+      ...input,
+      adminUserId: admin?.adminUserId ?? null,
+      ...(project ? { teamId: project.teamId, isPersonal: project.isPersonal } : {}),
+    });
   }
 
   async created(
-    input: Readonly<{ projectId: string; organizationId: string; createdByUserId: string | null }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      createdByUserId: string | null;
+      teamId: string;
+      isPersonal: boolean;
+    }>,
   ): Promise<void> {
     try {
       const admin = await this.dependencies.projects.findWithOrgAdmin(input.projectId);
@@ -66,21 +87,28 @@ export class ProjectCreatedNoticeService {
     } catch (error) {
       this.dependencies.logger.error(
         { projectId: input.projectId, error },
-        "recording the new project failed; the next deploy's key-map backfill writes its row",
+        "recording the new project failed; re-run the backfill-project-created task to record it",
       );
     }
   }
 
   /**
    * Records every project of one organization again, marked as backfilled. Idempotent: the
-   * event keeps its key, and every peer treats a repeat as the same fact.
+   * event keeps its key, and every peer treats a repeat as the same fact. A dry run counts the
+   * projects it would record, recording nothing.
    */
-  async recordExisting(input: Readonly<{ organizationId: string }>): Promise<number> {
+  async recordExisting(
+    input: Readonly<{ organizationId: string; isDryRun?: boolean }>,
+  ): Promise<number> {
     const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
     let recorded = 0;
     for (const projectId of projectIds) {
       const found = await this.dependencies.projects.findWithOrgAdmin(projectId);
       if (!found?.organizationId) continue;
+      if (input.isDryRun) {
+        recorded += 1;
+        continue;
+      }
       await this.#send({
         projectId,
         organizationId: found.organizationId,
@@ -131,6 +159,17 @@ export class ProjectCreatedNoticeService {
     }
   }
 
+  /** Throws: share revokes the project's links only from this fact, so a lost one must surface. */
+  async traceSharingDisabled(
+    input: Readonly<{ projectId: string; organizationId: string; disabledByUserId: string }>,
+  ): Promise<void> {
+    await this.#connected().recordProjectTraceSharingDisabled.send({
+      tenantId: input.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      ...input,
+    });
+  }
+
   /** Best effort: the move is saved, so a failed record is logged; held lineage ages out. */
   async moved(
     input: Readonly<{
@@ -170,6 +209,30 @@ export class ProjectCreatedNoticeService {
     }
   }
 
+  /** Best effort, as a move's record is: the department is saved, so a failure is logged. */
+  async departmentAssigned(input: Readonly<{ projectId: string }>): Promise<void> {
+    try {
+      await this.#sendDepartmentAssigned({ projectId: input.projectId, backfilled: false });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the department assignment failed; data privacy keeps the previous department",
+      );
+    }
+  }
+
+  /** Records each project's stored department and team, marked backfilled and keyed per project. */
+  async recordExistingDepartmentAssignments(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<number> {
+    const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
+    let recorded = 0;
+    for (const projectId of projectIds) {
+      if (await this.#sendDepartmentAssigned({ projectId, backfilled: true })) recorded += 1;
+    }
+    return recorded;
+  }
+
   /** Records each project's stored presence setting, marked backfilled and keyed per project. */
   async recordExistingPresenceSettings(
     input: Readonly<{ organizationId: string }>,
@@ -196,6 +259,27 @@ export class ProjectCreatedNoticeService {
     return senders;
   }
 
+  /** The moment is taken before the read, so a move saved meanwhile is the newer fact. */
+  async #sendDepartmentAssigned(
+    input: Readonly<{ projectId: string; backfilled: boolean }>,
+  ): Promise<boolean> {
+    const senders = this.#connected();
+    const occurredAt = nowInstant().epochMilliseconds;
+    const project = await this.dependencies.projects.findWithTeam(input.projectId);
+    if (!project) return false;
+    await senders.recordProjectDepartmentAssigned.send({
+      tenantId: input.projectId,
+      projectId: input.projectId,
+      organizationId: project.team.organizationId,
+      occurredAt,
+      departmentId: project.departmentId,
+      teamId: project.teamId,
+      isPersonal: project.isPersonal,
+      ...(input.backfilled ? { backfilled: true } : {}),
+    });
+    return true;
+  }
+
   async #sendPresenceSetting(
     input: Readonly<{
       projectId: string;
@@ -220,6 +304,8 @@ export class ProjectCreatedNoticeService {
       organizationId: string;
       adminUserId: string | null;
       createdByUserId?: string | null;
+      teamId?: string;
+      isPersonal?: boolean;
       backfilled?: boolean;
     }>,
   ): Promise<void> {

@@ -26,7 +26,7 @@ GET    /api/messages/{id}    /{id}/html      one message: text, html, headers, l
 GET    /api/messages/wait?to=&subject=&after=<id>&timeout=30s
                                              long poll; 200 message, 204 on timeout
 DELETE /api/messages   |   DELETE /api/messages/{id}
-GET    /api/inbox                            stack, SMTP address, persistence
+GET    /api/inbox                            stack, own address, SMTP address, persistence
 ```
 
 Test pattern: trigger the action, then `curl ".../api/messages/wait?to=a@x.test&subject=verify&timeout=20s"`
@@ -44,3 +44,12 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 - Bounded: `MAILSIM_MAX_MESSAGES` (default 10000) keeps the newest and evicts the oldest;
   `MAILSIM_MAX_MESSAGE_BYTES` (default 10 MiB) caps one message. Id and recipient lookups
   are indexed. Benchmark: `go test -bench . -benchmem ./services/mailsim`.
+
+## From a terminal or agent
+
+`--json` on every read (default in agent mode); non-zero exit on failure, including a `wait` timeout.
+
+```
+haven mail address | inbox | list [--to] [--subject] | get <id> [--html] | links <id>
+haven mail wait [--to] [--subject] [--after <id>] [--timeout 30s] | delete <id> | clear
+```

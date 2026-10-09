@@ -27,6 +27,7 @@ import {
 } from "../api.ts";
 import { RefusalCallout } from "../refusal-callout.tsx";
 import { useAct } from "../use-act.ts";
+import { LegacyProviderPanel } from "./legacy-provider.tsx";
 
 /** A value truncated to one line, with the whole of it on hover and the clipboard. */
 const Copyable = ({ value, label }: { value: string; label: string }) => (
@@ -275,5 +276,6 @@ export const SetupTab = ({ tenant, reload }: { tenant: TenantView; reload: () =>
     <RegisterPanel tenant={tenant} reload={reload} />
     <ApplicationsPanel tenant={tenant} reload={reload} />
     <ProtocolPanels tenant={tenant} />
+    <LegacyProviderPanel tenant={tenant} />
   </Stack>
 );

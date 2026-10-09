@@ -5,7 +5,7 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
-} from "../trace-edit-overlay.repository.ts";
+} from "../../features/edit-overlay/repositories/trace-edit-overlay.repository.ts";
 
 function rowKey(projectId: string, traceId: string): string {
   return `${projectId}:${traceId}`;

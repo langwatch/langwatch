@@ -1,0 +1,331 @@
+/**
+ * Where the reader is standing, resolved from the address bar, the graph and
+ * the device's memory — the scope capability's half of the composition.
+ * @vitest-environment jsdom
+ */
+
+import type { UiSessionReading } from "@langwatch/browser-host/session";
+import type { UiScopeTeam } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { afterEach, describe, expect, it } from "vitest";
+
+import {
+  createBrowserUiScope,
+  useUiScopeReading,
+  type UiScopeReading,
+} from "../ui-scope-capability";
+import {
+  UI_ORGANIZATIONS_PROCEDURE,
+  UI_SHARED_TRACE_PROCEDURE,
+  type UiFeatureApiTransport,
+} from "../ui-scope-queries";
+import { UI_SELECTED_PROJECT_SLUG_KEY, UI_SELECTED_TEAM_ID_KEY } from "../ui-scope-storage";
+import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./ui-scope-graph";
+
+type Call = { path: string; input: unknown };
+
+/** The two reads the scope resolves itself from, answered from memory. */
+function recordingTransport({
+  teams = [PERSONAL_TEAM, SHARED_TEAM],
+  sharedTrace = "resolved",
+}: { teams?: readonly UiScopeTeam[]; sharedTrace?: "resolved" | "pending" | "failed" } = {}) {
+  const calls: Call[] = [];
+  const transport = createApiFixture<UiFeatureApiTransport>({
+    query: (path: string, input: unknown) => {
+      calls.push({ path, input });
+      switch (path) {
+        case UI_ORGANIZATIONS_PROCEDURE:
+          return Promise.resolve(organizationWith({ teams }));
+        case UI_SHARED_TRACE_PROCEDURE:
+          if (sharedTrace === "pending") return new Promise(() => {});
+          if (sharedTrace === "failed") return Promise.reject(new Error("token refused"));
+          return Promise.resolve({
+            project: { id: "proj-shared", name: "Shared", slug: "shared-project" },
+          });
+        default:
+          return Promise.reject(new Error(`No test answer for ${path}`));
+      }
+    },
+  });
+  const callsTo = (path: string) => calls.filter((call) => call.path === path);
+  return { transport, callsTo };
+}
+
+const SIGNED_IN: UiSessionReading = {
+  status: "authenticated",
+  user: { id: JANE, name: "Jane", email: null, image: null },
+};
+
+const SIGNED_OUT: UiSessionReading = { status: "anonymous", user: null };
+
+/** Every address the scope rules distinguish, mounted on one page component. */
+const ROUTE_PATHS = [
+  "/",
+  "/messages",
+  "/settings/api-keys",
+  "/me",
+  "/me/sessions",
+  "/share/:id",
+  "/:project",
+  "/:project/traces",
+];
+
+let dispose: (() => void) | undefined;
+
+afterEach(() => {
+  dispose?.();
+  dispose = void 0;
+  window.localStorage.clear();
+});
+
+/** What the scope answers, read through the port the composition installs. */
+function ScopeProbe({
+  transport,
+  session,
+}: {
+  transport: UiFeatureApiTransport;
+  session: UiSessionReading;
+}) {
+  const reading: UiScopeReading = useUiScopeReading({ transport, session });
+  const scope = createBrowserUiScope({ reading });
+  const active = scope.activeScope();
+  return (
+    <div>
+      <span data-testid="status">{reading.scope.status}</span>
+      <span data-testid="organization">{active.organizationId ?? "none"}</span>
+      <span data-testid="project">{active.projectId ?? "none"}</span>
+      <span data-testid="host">{scope.scopeHost() ? "published" : "none"}</span>
+    </div>
+  );
+}
+
+function renderScope({
+  path,
+  transport,
+  session = SIGNED_IN,
+}: {
+  path: string;
+  transport: UiFeatureApiTransport;
+  session?: UiSessionReading;
+}) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const router = createMemoryRouter(
+    ROUTE_PATHS.map((routePath) => ({
+      path: routePath,
+      element: (
+        <QueryClientProvider client={queryClient}>
+          <ScopeProbe transport={transport} session={session} />
+        </QueryClientProvider>
+      ),
+    })),
+    { initialEntries: [path] },
+  );
+  const view = render(<RouterProvider router={router} />);
+  dispose = () => {
+    view.unmount();
+    router.dispose();
+  };
+  return view;
+}
+
+describe("given the address bar names a project", () => {
+  it("resolves that project and the organization it belongs to", async () => {
+    const { transport } = recordingTransport();
+
+    const view = renderScope({ path: "/acme-app/traces", transport });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+    expect(view.getByTestId("organization").textContent).toBe("org-acme");
+  });
+
+  it("remembers it for the next page that names none", async () => {
+    const { transport } = recordingTransport();
+
+    renderScope({ path: "/acme-app/traces", transport });
+
+    await waitFor(() =>
+      expect(window.localStorage.getItem(UI_SELECTED_PROJECT_SLUG_KEY)).toBe('"acme-app"'),
+    );
+    expect(window.localStorage.getItem(UI_SELECTED_TEAM_ID_KEY)).toBe('"team-shared"');
+  });
+});
+
+describe("given the address bar names a reserved top-level route", () => {
+  it("does not look for a project of that name, and keeps the remembered one", async () => {
+    // The remembered project is deliberately NOT the team's first: a team
+    // with one project answers the same whether the reserved segment was
+    // refused as an address or merely matched nothing.
+    window.localStorage.setItem(UI_SELECTED_PROJECT_SLUG_KEY, JSON.stringify("acme-app"));
+    const { transport } = recordingTransport({
+      teams: [
+        {
+          ...SHARED_TEAM,
+          projects: [
+            { id: "proj-first", slug: "acme-first", name: "First" },
+            ...SHARED_TEAM.projects,
+          ],
+        },
+      ],
+    });
+
+    const view = renderScope({ path: "/messages", transport });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+  });
+});
+
+describe("given the page names no project and a personal workspace is remembered", () => {
+  it("resolves the organization's project rather than the private one", async () => {
+    window.localStorage.setItem(UI_SELECTED_TEAM_ID_KEY, JSON.stringify("team-personal"));
+    window.localStorage.setItem(
+      UI_SELECTED_PROJECT_SLUG_KEY,
+      JSON.stringify("personal-jane-abc123"),
+    );
+    const { transport } = recordingTransport();
+
+    const view = renderScope({ path: "/settings/api-keys", transport });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+  });
+});
+
+describe("given the page is the personal workspace's own", () => {
+  it("resolves the personal project, whatever an earlier page remembered", async () => {
+    window.localStorage.setItem(UI_SELECTED_TEAM_ID_KEY, JSON.stringify("team-shared"));
+    window.localStorage.setItem(UI_SELECTED_PROJECT_SLUG_KEY, JSON.stringify("acme-app"));
+    const { transport } = recordingTransport();
+
+    const view = renderScope({ path: "/me/sessions", transport });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-personal"));
+  });
+});
+
+describe("given a share token in the address bar", () => {
+  it("resolves the project the token addresses and no organization", async () => {
+    const { transport } = recordingTransport();
+
+    const view = renderScope({ path: "/share/token-123", transport, session: SIGNED_OUT });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-shared"));
+    expect(view.getByTestId("organization").textContent).toBe("none");
+  });
+
+  it("does not ask for the organization graph a share viewer has no claim on", async () => {
+    const { transport, callsTo } = recordingTransport();
+
+    const view = renderScope({ path: "/share/token-123", transport, session: SIGNED_OUT });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-shared"));
+    expect(callsTo(UI_ORGANIZATIONS_PROCEDURE)).toHaveLength(0);
+  });
+});
+
+describe("given nothing has resolved yet", () => {
+  it("reads as loading and publishes no legacy host, so nothing renders scoped", () => {
+    const { transport } = recordingTransport();
+
+    const view = renderScope({ path: "/acme-app/traces", transport });
+
+    expect(view.getByTestId("status").textContent).toBe("loading");
+    expect(view.getByTestId("project").textContent).toBe("none");
+    expect(view.getByTestId("host").textContent).toBe("none");
+  });
+});
+
+describe("given a signed-in viewer with an active project opens a share link", () => {
+  const rememberViewersProject = () => {
+    window.localStorage.setItem(UI_SELECTED_TEAM_ID_KEY, JSON.stringify("team-shared"));
+    window.localStorage.setItem(UI_SELECTED_PROJECT_SLUG_KEY, JSON.stringify("acme-app"));
+  };
+
+  /** @scenario "A share route never falls back to the viewer's active project" */
+  it("reads loading while the shared trace query is pending, publishing no project", async () => {
+    rememberViewersProject();
+    const { transport, callsTo } = recordingTransport({ sharedTrace: "pending" });
+
+    const view = renderScope({ path: "/share/token-123", transport });
+
+    await waitFor(() => expect(callsTo(UI_SHARED_TRACE_PROCEDURE)).toHaveLength(1));
+    expect(view.getByTestId("status").textContent).toBe("loading");
+    expect(view.getByTestId("project").textContent).toBe("none");
+  });
+
+  /** @scenario "A share route never falls back to the viewer's active project" */
+  it("reads unavailable when the shared trace query fails, publishing no project", async () => {
+    rememberViewersProject();
+    const { transport } = recordingTransport({ sharedTrace: "failed" });
+
+    const view = renderScope({ path: "/share/token-123", transport });
+
+    await waitFor(() => expect(view.getByTestId("status").textContent).toBe("unavailable"));
+    expect(view.getByTestId("project").textContent).toBe("none");
+  });
+});
+
+const JOHN = "user-john";
+
+/** The scope probe with the signed-in user under the test's control. */
+function SwitchingProbe({
+  transport,
+  control,
+}: {
+  transport: UiFeatureApiTransport;
+  control: { signInAs?: (userId: string) => void };
+}) {
+  const [userId, setUserId] = useState(JANE);
+  control.signInAs = setUserId;
+  const session: UiSessionReading = {
+    status: "authenticated",
+    user: { id: userId, name: userId, email: null, image: null },
+  };
+  return <ScopeProbe transport={transport} session={session} />;
+}
+
+describe("given the first user has resolved an organization and project", () => {
+  /** @scenario "Switching users does not reuse the previous user's graph or grants" */
+  it("publishes neither of them in the first render for a user whose graph has not answered", async () => {
+    const control: { signInAs?: (userId: string) => void } = {};
+    let graphReads = 0;
+    const transport = createApiFixture<UiFeatureApiTransport>({
+      query: (path: string) => {
+        if (path !== UI_ORGANIZATIONS_PROCEDURE) return Promise.reject(new Error(path));
+        graphReads += 1;
+        return graphReads === 1
+          ? Promise.resolve(organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] }))
+          : new Promise(() => {});
+      },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/:project/traces",
+          element: (
+            <QueryClientProvider client={queryClient}>
+              <SwitchingProbe transport={transport} control={control} />
+            </QueryClientProvider>
+          ),
+        },
+      ],
+      { initialEntries: ["/acme-app/traces"] },
+    );
+    const view = render(<RouterProvider router={router} />);
+    dispose = () => {
+      view.unmount();
+      router.dispose();
+    };
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+    expect(view.getByTestId("organization").textContent).toBe("org-acme");
+
+    act(() => control.signInAs?.(JOHN));
+
+    expect(view.getByTestId("organization").textContent).toBe("none");
+    expect(view.getByTestId("project").textContent).toBe("none");
+    expect(view.getByTestId("host").textContent).toBe("none");
+  });
+});

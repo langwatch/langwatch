@@ -19,7 +19,7 @@ import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chip
 import { TabCount } from "@langwatch/design-system/tab-count";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
-import { toEpochMs } from "@langwatch/time";
+import { toEpochMs, readableDate } from "@langwatch/time";
 import {
   Ban,
   Bird,
@@ -56,7 +56,7 @@ import {
 } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import type { GatewayTeam } from "../../../model/gateway-host.ts";
-import { readableDate } from "../../../model/readable-date.ts";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
@@ -140,12 +140,13 @@ function VirtualKeysHeader({
 
 function VirtualKeysPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const router = useGatewayRouter();
-  const canCreate = hasPermission("virtualKeys:create");
-  const canRotate = hasPermission("virtualKeys:rotate");
-  const canRevoke = hasPermission("virtualKeys:delete");
-  const canUpdate = hasPermission("virtualKeys:update");
+  const canCreate = host.hasPermission("virtualKeys:create");
+  const canRotate = host.hasPermission("virtualKeys:rotate");
+  const canRevoke = host.hasPermission("virtualKeys:delete");
+  const canUpdate = host.hasPermission("virtualKeys:update");
 
   const utils = api.useUtils();
   const orgId = organization?.id ?? "";

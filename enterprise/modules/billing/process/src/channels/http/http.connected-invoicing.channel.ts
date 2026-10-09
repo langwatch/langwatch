@@ -38,8 +38,6 @@ const creditGrantMethods = {
   }),
 };
 
-const STRIPE_API_VERSION = "2024-04-10";
-
 const CreditGrantsResource = Stripe.StripeResource.extend(creditGrantMethods);
 
 type CreditGrants = Stripe.StripeResource & typeof creditGrantMethods;
@@ -62,15 +60,12 @@ export class HttpConnectedInvoicingChannel extends ConnectedInvoicingChannel {
   }
 
   static create(input: {
-    /** The payment provider's secret key, resolved through the secrets chain. */
-    secretKey: string;
+    /** The one Stripe client billing builds. */
+    stripe: Stripe;
     /** The quarterly metered price, absent until that mode is provisioned. */
     usagePriceId: () => string | undefined;
   }): HttpConnectedInvoicingChannel {
-    return new HttpConnectedInvoicingChannel(
-      new Stripe(input.secretKey, { apiVersion: STRIPE_API_VERSION }),
-      input.usagePriceId,
-    );
+    return new HttpConnectedInvoicingChannel(input.stripe, input.usagePriceId);
   }
 
   async createCustomer(input: CreateCustomerInput): Promise<{ id: string }> {

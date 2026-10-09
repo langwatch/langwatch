@@ -17,6 +17,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Mail, MailX, MoreVertical, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -25,7 +26,6 @@ import {
   EMAIL_SUPPRESSIONS_MANAGE_PERMISSION,
   useNotificationHost,
 } from "../../model/notification-host.ts";
-import { readableDate } from "../../model/readable-date.ts";
 
 export default function EmailSuppressionsScreen() {
   const host = useNotificationHost();

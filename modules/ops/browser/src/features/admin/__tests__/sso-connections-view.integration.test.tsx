@@ -136,9 +136,9 @@ beforeEach(() => {
   byIdState.current = { data: ATTESTED, error: null };
 });
 
-describe("the back-office single sign-on list", () => {
+describe("the admin single sign-on list", () => {
   describe("when an operator opens it", () => {
-    /** @scenario "The connection list behaves like every other back-office list" */
+    /** @scenario "The connection list behaves like every other admin list" */
     it("searches, pages and shows its loading and empty states like the other lists", async () => {
       const { rerenderWithOpsHost } = renderView();
 
@@ -189,7 +189,7 @@ describe("the back-office single sign-on list", () => {
       expect(screen.queryByText("Published record")).toBeNull();
     });
 
-    /** @scenario "The connection list behaves like every other back-office list" */
+    /** @scenario "The connection list behaves like every other admin list" */
     it("puts each row's actions in that row's overflow menu, with removal set apart", async () => {
       renderView();
 

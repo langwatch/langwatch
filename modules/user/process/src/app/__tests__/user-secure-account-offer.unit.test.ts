@@ -3,6 +3,7 @@
  * One offer about the account, two halves each on its own gate, one dismissal
  * for both (ADR-120, D06). Spec: specs/identity/passkeys.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,7 +31,9 @@ async function offerFor({
   dismissedDaysAgo?: number | null;
   signedInWith?: "password" | "passkey" | "federated" | "unknown";
 } = {}) {
-  const database = MemoryUserDatabase.create();
+  const database = MemoryUserDatabase.create({
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
   const users = MemoryUserRepository.create({ database });
   const { id } = await users.createCredentialUser({
     name: "Sam",
@@ -52,17 +55,16 @@ async function offerFor({
   if (holdsPasskey) database.writePasskey({ id: "passkey-1", userId: id });
 
   const auth = Object.assign(createUserTestAuth(), {
-    offersTwoStepVerification: vi.fn(() => twoStep),
     getSignedInWith: vi.fn(async () => signedInWith),
   });
   const app = createUserTestApp({
     repositories: {
-      ...MemoryUserRepositories.create(),
+      ...MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
       users,
       credentials: MemoryUserCredentialRepository.create({ database }),
     },
     dependencies: { auth },
-    facts: { passkeysEnabled: passkeys, baseUrl: null },
+    facts: { passkeysEnabled: passkeys, mfaEnrollmentOpen: twoStep },
     now: () => fromDate(NOW),
   });
 

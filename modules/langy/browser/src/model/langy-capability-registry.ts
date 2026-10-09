@@ -20,7 +20,7 @@ import {
   wordCapabilityProgress,
 } from "@langwatch/langy-contract";
 
-import { type LangyFeatureMap } from "./langy-feature-map.ts";
+import { featureForCliCommand } from "./shared/langy/feature-map.ts";
 
 /** Visual tone of the shared capability-card shell. */
 export type CapabilityTone = "read" | "created" | "updated" | "removed";
@@ -323,10 +323,7 @@ function bodyWidgetFor({
  * Resolve a CLI tool name (`langwatch.<resource>.<verb>`) to its card, surface, wording
  * and tone.
  */
-export function resolveCliCapability(
-  rawName: string,
-  featureMap?: Pick<LangyFeatureMap, "featureForCliCommand">,
-): CliCapability | null {
+export function resolveCliCapability(rawName: string): CliCapability | null {
   const command = parseCliToolName(rawName);
   if (!command) return null;
 
@@ -348,7 +345,7 @@ export function resolveCliCapability(
     };
   }
 
-  const feature = featureMap?.featureForCliCommand(command);
+  const feature = featureForCliCommand(command);
   const surface = (feature && SURFACE_BY_FEATURE[feature.id]) ?? "platform";
   return {
     command,
@@ -411,11 +408,8 @@ export interface CapabilityProgress {
 /**
  * Word a RUNNING capability call, or null when the name maps to no card.
  */
-export function resolveCapabilityProgress(
-  rawName: string,
-  featureMap?: Pick<LangyFeatureMap, "featureForCliCommand">,
-): CapabilityProgress | null {
-  const cli = resolveCliCapability(rawName, featureMap);
+export function resolveCapabilityProgress(rawName: string): CapabilityProgress | null {
+  const cli = resolveCliCapability(rawName);
   const progress = wordCapabilityProgress(rawName);
   if (!cli || progress.outcome === "none") return null;
   return {
@@ -430,11 +424,8 @@ export function resolveCapabilityProgress(
  * render it, or null to fall through to the raw-JSON view. `resolveCliCapability`
  * decides the structure (gate + shared contract); `cliOverline` words it.
  */
-export function resolveCapability(
-  rawName: string,
-  featureMap?: Pick<LangyFeatureMap, "featureForCliCommand">,
-): CapabilityDescriptor | null {
-  const cli = resolveCliCapability(rawName, featureMap);
+export function resolveCapability(rawName: string): CapabilityDescriptor | null {
+  const cli = resolveCliCapability(rawName);
   if (!cli) return null;
 
   return {

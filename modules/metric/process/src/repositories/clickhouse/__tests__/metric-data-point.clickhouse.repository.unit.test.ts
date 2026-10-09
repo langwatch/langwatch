@@ -1,13 +1,14 @@
 import { formatQueryParams } from "@clickhouse/client/dist/common";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
-import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
 import { point } from "../../../app/__tests__/metric.fixture.ts";
-import type { MetricClickHouseClient } from "../clickhouse.metric-data-point-append.repository.ts";
+import {
+  ClickHouseMetricDataPointAppendRepository,
+  type MetricClickHouseClient,
+} from "../clickhouse.metric-data-point-append.repository.ts";
 import { metricRawRow } from "../clickhouse.metric-data-point.mapper.ts";
-import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository.ts";
 
 type InsertCall = { table: string; values: readonly unknown[] };
 
@@ -34,13 +35,9 @@ function client({
   return { insert, query };
 }
 
-function repository(
-  project: MetricClickHouseClient,
-  organization = project,
-): MetricDataPointClickHouseRepository {
-  return MetricDataPointClickHouseRepository.create({
+function repository(project: MetricClickHouseClient): ClickHouseMetricDataPointAppendRepository {
+  return ClickHouseMetricDataPointAppendRepository.create({
     resolveClient: async () => project,
-    resolveOrganizationClient: async () => organization,
     defaultRetentionDays: 30,
   });
 }
@@ -132,7 +129,7 @@ function readerWithPredecessor(): {
   return { queries, client: client({ query }) };
 }
 
-describe("MetricDataPointClickHouseRepository", () => {
+describe("ClickHouseMetricDataPointAppendRepository", () => {
   /** @scenario "Valid OTLP points become canonical durable events" */
   it("writes raw data before its payload-free usage estimate", async () => {
     const insert = vi.fn<MetricClickHouseClient["insert"]>(async () => undefined);
@@ -188,59 +185,6 @@ describe("MetricDataPointClickHouseRepository", () => {
     expect(insert).toHaveBeenCalledOnce();
     expect(insertCalls(insert)[0]?.values).toHaveLength(1);
     expect(insertCalls(insert)[0]?.values[0]).toMatchObject({ LastSeenAt: new Date(3_000) });
-  });
-
-  /** @scenario "The organization-wide usage read still routes by organization" */
-  it("routes usage reads through the organization resolver and deduplicates by PointId", async () => {
-    const queryCalls: string[] = [];
-    const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {
-      queryCalls.push(sql);
-      return response([
-        {
-          OrganizationId: "organization-1",
-          UniqueActiveSeries: "2",
-          ActiveSeriesHours: "3",
-          AcceptedPoints: "5",
-          CanonicalRetainedBytes: "123",
-          ProjectedEventEquivalentUsage: "3",
-        },
-      ]);
-    };
-    const project = client({ onQuery: () => [] });
-    const organization = client({ query });
-    const projectResolver = vi.fn(async () => project);
-    const organizationResolver = vi.fn(async () => organization);
-    const repositoryInstance = MetricDataPointClickHouseRepository.create({
-      resolveClient: projectResolver,
-      resolveOrganizationClient: organizationResolver,
-      defaultRetentionDays: 30,
-    });
-
-    await expect(
-      repositoryInstance.queryUsageEstimates({
-        organizationId: "organization-1",
-        from: Temporal.Instant.from("2026-01-01T00:00:00Z"),
-        to: Temporal.Instant.from("2026-02-01T00:00:00Z"),
-        groupBy: "organization",
-      }),
-    ).resolves.toEqual([
-      {
-        organizationId: "organization-1",
-        tenantId: null,
-        metricName: null,
-        acceptedHour: null,
-        uniqueActiveSeries: 2,
-        activeSeriesHours: 3,
-        acceptedPoints: 5,
-        canonicalRetainedBytes: 123,
-        projectedEventEquivalentUsage: 3,
-      },
-    ]);
-    expect(projectResolver).not.toHaveBeenCalled();
-    expect(organizationResolver).toHaveBeenCalledWith("organization-1");
-    expect(queryCalls[0]).toContain("GROUP BY u.PointId");
-    expect(queryCalls[0]).toContain("OrganizationId = {organizationId:String}");
-    expect(queryCalls[0]).not.toContain("TenantId = {tenantId:String}");
   });
 
   /** @scenario "A folded rollup read leaves the stored payload behind" */

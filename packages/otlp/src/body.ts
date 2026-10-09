@@ -5,7 +5,7 @@
  */
 
 import { promisify } from "node:util";
-import { brotliDecompress, gunzip, inflate } from "node:zlib";
+import { brotliDecompress, gunzip, inflate, zstdDecompress } from "node:zlib";
 
 import type {
   IExportLogsServiceRequest,
@@ -23,6 +23,7 @@ import {
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
 const brotliDecompressAsync = promisify(brotliDecompress);
+const zstdDecompressAsync = promisify(zstdDecompress);
 
 /** One generated collector message: decodes wire bytes, re-encodes a parsed body. */
 type OtlpMessageType<T> = Readonly<{
@@ -123,12 +124,31 @@ const DECOMPRESSORS = {
   gzip: gunzipAsync,
   deflate: inflateAsync,
   br: brotliDecompressAsync,
+  zstd: zstdDecompressAsync,
 } as const satisfies Record<string, Decompressor>;
 
 type SupportedEncoding = keyof typeof DECOMPRESSORS;
 
 function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
   return encoding in DECOMPRESSORS;
+}
+
+const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
+const ZSTD_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
+
+function startsWith(buf: Buffer, magic: Buffer): boolean {
+  return buf.subarray(0, magic.length).equals(magic);
+}
+
+/**
+ * The encoding a body's leading bytes announce, or null. Exporters send zstd
+ * with no Content-Encoding, or gzip under a wrong one, so the header cannot be
+ * trusted; deflate and brotli have no magic number and stay header-driven.
+ */
+function sniffEncoding(buf: Buffer): SupportedEncoding | null {
+  if (startsWith(buf, GZIP_MAGIC)) return "gzip";
+  if (startsWith(buf, ZSTD_MAGIC)) return "zstd";
+  return null;
 }
 
 /**
@@ -214,40 +234,40 @@ async function readWireBody(req: OtlpBodySource): Promise<Buffer> {
 export type OtlpBodySource = Pick<Request, "body" | "headers">;
 
 /**
- * Reads the request body, decompressing per `Content-Encoding`. Throws on
- * unsupported encodings or a body over {@link OTLP_MAX_BODY_BYTES} — bounded
- * by zlib itself, so an oversized body stops being written past the line.
+ * Reads the request body and decompresses it (see {@link decodeOtlpBody}). The
+ * body is read before the encoding is known, since its magic bytes may decide
+ * it; the read is already bounded by {@link OTLP_MAX_BODY_BYTES}.
  */
 export async function readOtlpBody(req: OtlpBodySource): Promise<ArrayBuffer> {
-  const encoding = req.headers.get("content-encoding");
-  if (encoding && encoding !== "identity" && !isSupportedEncoding(encoding)) {
-    throw new OtlpUnsupportedEncodingError({ encoding });
-  }
-  return decodeOtlpBody(await readWireBody(req), encoding);
+  return decodeOtlpBody(await readWireBody(req), req.headers.get("content-encoding"));
 }
 
+/**
+ * Decompresses by the body's magic bytes (gzip, zstd), falling back to the
+ * `Content-Encoding` header. Throws on an unsupported encoding or a body over
+ * {@link OTLP_MAX_BODY_BYTES}, bounded by each decoder's `maxOutputLength`.
+ */
 export async function decodeOtlpBody(
   bytes: Uint8Array,
-  encoding: string | null,
+  headerEncoding: string | null,
 ): Promise<ArrayBuffer> {
   if (bytes.byteLength > OTLP_MAX_BODY_BYTES) {
-    throw new OtlpBodyTooLargeError({ maxBytes: OTLP_MAX_BODY_BYTES, encoding });
+    throw new OtlpBodyTooLargeError({ maxBytes: OTLP_MAX_BODY_BYTES, encoding: headerEncoding });
   }
   const raw = Buffer.from(bytes);
+  const encoding = sniffEncoding(raw) ?? headerEncoding;
 
   if (!encoding || encoding === "identity") {
     return toArrayBuffer(raw);
   }
 
-  // Settled before the body is read, so a request we are going to refuse
-  // outright does not get to spend the read budget first.
   if (!isSupportedEncoding(encoding)) {
     throw new OtlpUnsupportedEncodingError({ encoding });
   }
 
-  // Widened to the shared signature deliberately: the three entries differ in
-  // their options type (ZlibOptions vs BrotliOptions), so calling the indexed
-  // union directly is not something TypeScript will resolve.
+  // Widened to the shared signature deliberately: the entries differ in their
+  // options type (ZlibOptions vs BrotliOptions vs ZstdOptions), so calling the
+  // indexed union directly is not something TypeScript will resolve.
   const decompress: Decompressor = DECOMPRESSORS[encoding];
 
   try {
@@ -259,7 +279,7 @@ export async function decodeOtlpBody(
         encoding,
       });
     }
-    // Anything else zlib raises here is a body that does not decompress —
+    // Anything else the decoder raises here is a body that does not decompress —
     // truncated by a disconnect, or not the encoding it claimed. Both are the
     // sender's, and neither is a reason to answer 500.
     throw new OtlpBodyUnreadableError({ cause: error });

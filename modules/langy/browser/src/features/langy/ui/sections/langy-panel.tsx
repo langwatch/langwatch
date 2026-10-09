@@ -13,7 +13,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import {
   AppWindow,
@@ -33,23 +34,22 @@ import {
 } from "lucide-react";
 import { Profiler, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { mergeContextChips } from "../../../../behavior/langy-context-chips.ts";
-import { removeContextChip } from "../../../../behavior/langy-context-target.store.ts";
 import {
   attachedContextToChip,
   type LangyPanelEffect,
   type LangyPanelMode,
   useLangyStore,
 } from "../../../../behavior/langy.store.ts";
-import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
-import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone.ts";
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import { useLangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
+import { mergeContextChips } from "../../../context-target/behavior/langy-context-chips.ts";
+import { removeContextChip } from "../../../context-target/behavior/langy-context-target.store.ts";
+import { useLangyContextDropZone } from "../../../context-target/behavior/use-langy-context-drop-zone.ts";
 import {
   guidedPathInProgress,
   guidedPullRequestFromMessages,
@@ -180,7 +180,7 @@ export function LangySidecar({ proposalHandlersRef, actionHandlersRef }: LangySi
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const peekDock = useFeatureFlag("release_ui_langy_peek_dock_enabled", {
+  const peekDock = useFeatureFlag(FrontendFlags.release_ui_langy_peek_dock_enabled, {
     projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id ?? NOT_TARGETED,
   });
@@ -418,6 +418,8 @@ function LangyPanel({
   const navigation = useLangyConversationNavigation({
     projectId,
     isBusy,
+    modelQueriesSettled: model.modelQueriesSettled,
+    langyNeedsModel: model.langyNeedsModel,
     send,
     resetEngine: engine.resetEngine,
     resetRecovery: failure.recovery.reset,
@@ -675,7 +677,7 @@ function LangyPanel({
                         model,
                         onHistoryErrorAction: history.refetch,
                         restoringMessageCount: facts.restoringMessageCount,
-                        hasPendingPrompt: !!pendingPrompt,
+                        pendingPrompt,
                         // Before the kickoff message exists: in progress while the tour runs,
                         // settled once it ended and the kickoff only waits to send.
                         tourCard:

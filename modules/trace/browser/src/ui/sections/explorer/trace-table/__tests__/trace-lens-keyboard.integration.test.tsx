@@ -8,7 +8,10 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../behavior/explorer/types/trace.ts";
 import { useTraceLensKeyboard } from "../use-trace-lens-keyboard.ts";
 
 const host = vi.hoisted(() => ({
@@ -18,12 +21,13 @@ const host = vi.hoisted(() => ({
   openTrace: vi.fn(),
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ closeDrawer: host.closeDrawer, currentDrawer: host.currentDrawer }),
   useDrawerParams: () => host.params,
 }));
 
-vi.mock("../../hooks/use-open-trace-drawer.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts", () => ({
   useOpenTraceDrawer: () => host.openTrace,
 }));
 

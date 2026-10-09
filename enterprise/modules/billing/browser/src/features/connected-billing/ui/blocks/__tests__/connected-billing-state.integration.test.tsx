@@ -47,7 +47,7 @@ afterEach(() => cleanup());
 
 describe("the connected billing panel", () => {
   describe("given a customer that was onboarded, has used hosted services and has synced", () => {
-    /** @scenario "The backoffice shows the commercial state of each connected customer" */
+    /** @scenario "The admin console shows the commercial state of each connected customer" */
     it("shows the commit, the amount drawn down, the overage and the seats", () => {
       render(<ConnectedBillingState overview={overview()} />, { wrapper });
 
@@ -57,7 +57,7 @@ describe("the connected billing panel", () => {
       expect(screen.getByText("50 licensed, 51 reported")).toBeInTheDocument();
     });
 
-    /** @scenario "The backoffice shows the commercial state of each connected customer" */
+    /** @scenario "The admin console shows the commercial state of each connected customer" */
     it("lists the open invoices, each one markable as paid", () => {
       const onMarkPaid = vi.fn();
       render(
@@ -97,7 +97,7 @@ describe("the connected billing panel", () => {
   });
 
   describe("when the spend ledger cannot be read", () => {
-    /** @scenario "The backoffice says so when live spend cannot be read" */
+    /** @scenario "The admin console says so when live spend cannot be read" */
     it("shows the drawn down amount as unavailable rather than zero", () => {
       render(
         <ConnectedBillingState

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useSelectionStore } from "../../../../../behavior/explorer.store.ts";
-import type { TraceListItem } from "../../types/trace.ts";
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
 import { traceSelectColumnDef } from "../select-column.tsx";
 import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
 

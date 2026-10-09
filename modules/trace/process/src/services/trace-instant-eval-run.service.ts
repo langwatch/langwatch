@@ -1,108 +1,59 @@
 /**
- * The Explorer's Instant Evals, over the run service another module owns: the
- * search bar's vocabulary in, the run's counters out. The statement, the
- * budget and the judging are all the peer's.
+ * The runs an Explorer read's `eval` chips name, checked against the run table
+ * instant-eval shares with trace for reading (R40, round 47). Starting,
+ * pricing and reading runs are instant-eval's.
  */
-import type {
-  InstantEvalApi,
-  InstantEvalEstimateWire,
-  InstantEvalOptInAccess,
-  InstantEvalRunProgress,
-  InstantEvalRunReference,
-} from "@langwatch/instant-eval-contract";
-import type {
-  ExplorerInstantEvalRunInput,
-  ResolvedInstantEvalRun,
-} from "@langwatch/trace-contract";
-
 import {
-  toExplorerRunInput,
-  toExplorerRunProgress,
-  toResolvedInstantEvalRun,
-} from "../rules/trace-instant-eval-run.rules.ts";
+  instantEvalSkewedWrittenWindow,
+  type InstantEvalRunReference,
+} from "@langwatch/instant-eval-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
+import type { ResolvedInstantEvalRun } from "@langwatch/trace-contract";
 
-/** What this service is composed from: the peer that owns the runs. */
-interface TraceInstantEvalRunDeps {
-  instantEvals: InstantEvalApi;
-}
+import type { TraceInstantEvalRunsReadRepository } from "../repositories/trace-instant-eval-runs.repository.ts";
+import { toResolvedInstantEvalRun } from "../rules/trace-instant-eval-run.rules.ts";
 
 export class TraceInstantEvalRunService {
-  static create(deps: TraceInstantEvalRunDeps): TraceInstantEvalRunService {
-    return new TraceInstantEvalRunService(deps.instantEvals);
+  static create(deps: {
+    runs: TraceInstantEvalRunsReadRepository;
+    now?: () => Instant;
+  }): TraceInstantEvalRunService {
+    return new TraceInstantEvalRunService(deps.runs, deps.now ?? nowInstant);
   }
 
-  #instantEvals: InstantEvalApi;
-  private constructor(instantEvals: InstantEvalApi) {
-    this.#instantEvals = instantEvals;
-  }
-
-  /** What the run would read and what judging it would cost, judging nothing. */
-  estimateRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalEstimateWire> {
-    return this.#instantEvals.estimateRun({
-      projectId: input.request.projectId,
-      actor: { kind: "member", userId: input.userId },
-      input: toExplorerRunInput(input.request),
-    });
-  }
-
-  async startRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalRunProgress> {
-    const run = await this.#instantEvals.createRun({
-      projectId: input.request.projectId,
-      actor: { kind: "member", userId: input.userId },
-      input: toExplorerRunInput(input.request),
-    });
-
-    return toExplorerRunProgress(run);
-  }
-
-  async cancelRun(input: {
-    projectId: string;
-    runId: string;
-    requestedByUserId?: string;
-  }): Promise<InstantEvalRunProgress> {
-    const run = await this.#instantEvals.cancelRun({
-      projectId: input.projectId,
-      runId: input.runId,
-      ...(input.requestedByUserId === undefined
-        ? {}
-        : { requestedByUserId: input.requestedByUserId }),
-    });
-
-    return toExplorerRunProgress(run);
-  }
-
-  /** What the refusal popover offers; the peer resolves the project's organization. */
-  getAccess(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals.getOptInAccess(input);
-  }
-
-  /** The organization's own switch; the route has already asked `organization:manage`. */
-  enable(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals.optIn(input);
-  }
-
-  async getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
-    return toExplorerRunProgress(await this.#instantEvals.getRun(input));
-  }
+  private constructor(
+    private readonly runs: TraceInstantEvalRunsReadRepository,
+    private readonly now: () => Instant,
+  ) {}
 
   /**
    * The runs a query's `eval` chips claim, checked against the project and
-   * dated for the compiler. A claim this project does not own is dropped by
-   * the peer, so the chip behind it stays pending and selects no rows.
+   * dated for the compiler. A claim this project did not record is dropped,
+   * so the chip behind it stays pending and selects no rows.
    */
   async findRegisteredRuns(input: {
     projectId: string;
     references: readonly InstantEvalRunReference[];
   }): Promise<ResolvedInstantEvalRun[]> {
     if (input.references.length === 0) return [];
-    const windows = await this.#instantEvals.findRunWindows(input);
+    const rows = await this.runs.findRunsByIds({
+      projectId: input.projectId,
+      runIds: input.references.map((reference) => reference.runId),
+    });
+    const byId = new Map(rows.map((row) => [row.runId, row]));
+    const now = this.now();
 
-    return windows.map(toResolvedInstantEvalRun);
+    return input.references.flatMap((reference) => {
+      const row = byId.get(reference.runId);
+      if (!row) return [];
+      return [
+        toResolvedInstantEvalRun({
+          question: reference.question,
+          target: reference.target,
+          runId: row.runId,
+          ...instantEvalSkewedWrittenWindow(row, now),
+        }),
+      ];
+    });
   }
 }

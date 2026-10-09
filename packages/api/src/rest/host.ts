@@ -14,9 +14,19 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
-import type { MountableRestApp } from "./addressing.ts";
+import { allRegisteredRoutes } from "../route-registry.ts";
+import {
+  claimsNoPrefix,
+  middlewareScopesOf,
+  routeScopesOf,
+  type MountableRestApp,
+} from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";
-import type { RestDoorCredential, RestTransportDeclaration } from "./declaration.ts";
+import type {
+  RestDoorCredential,
+  RestSharedPath,
+  RestTransportDeclaration,
+} from "./declaration.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
 import {
   isRestCredentialBinding,
@@ -33,6 +43,7 @@ const restDeprecationLog: RestDeprecationLog = {
   deprecatedRouteCalled: (route) => restErrorLogger.warn(route, "Deprecated REST route called"),
 };
 import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
+import { assertEveryRouteDeclared } from "./security.ts";
 import { SessionKeyIdentity } from "./session-key-identity.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
@@ -78,6 +89,13 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
    */
   readonly app = new Hono();
 
+  /** Which module claims each prefixed namespace mounted so far. */
+  private readonly claims = new Map<string, string>();
+
+  /** The prefixes claimed and the unprefixed addresses served so far, each with its module. */
+  private readonly prefixes: ClaimedPrefix[] = [];
+  private readonly unclaimed: UnclaimedAddress[] = [];
+
   private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {}
 
   /**
@@ -91,6 +109,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     options?: FeatureRestMountOptions,
   ): MountableRestApp {
     const declaration = transport as RestTransportDeclaration<unknown>;
+    this.claimNamespace(declaration);
     const identities = this.identitiesFor(declaration);
     const bindings = options?.facts ?? [];
     const credentials = new Set<RestDoorCredential>();
@@ -141,6 +160,51 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     return family;
   }
 
+  /**
+   * Refuses to serve while this application answers a route no declaration registered,
+   * naming each one. Reads only the REST application: tRPC, websocket and raw HTTP
+   * never mount here.
+   */
+  assertEveryRouteDeclared(): void {
+    assertEveryRouteDeclared({ app: this.app, registry: allRegisteredRoutes() });
+  }
+
+  /**
+   * A family claiming a prefix claims `/api/<namespace>` whole, so a second module's would run
+   * its middleware ahead of the first's routes: it declares a shared path instead (§8, R10).
+   */
+  private claimNamespace(declaration: RestTransportDeclaration<unknown>): void {
+    const serving = declaration.api.name;
+
+    if (claimsNoPrefix(declaration)) {
+      const addresses = addressesOfFamilyClaimingNoPrefix(declaration);
+      for (const address of addresses) {
+        for (const claim of this.prefixes) assertSharedPathAdmitted({ address, claim });
+      }
+      this.unclaimed.push(...addresses);
+      return;
+    }
+
+    const claimant = this.claims.get(declaration.namespace);
+
+    if (claimant !== void 0 && claimant !== serving) {
+      throw new Error(
+        `REST "${declaration.namespace}" of ${serving} claims a namespace ${claimant} already claims; ` +
+          `declare .withSharedPath({ owner: "${claimant}", reason, deprecate }) on each of its routes`,
+      );
+    }
+
+    const claims = middlewareScopesOf(declaration).map((scope) => ({
+      prefix: scope.replace(/\/\*$/, ""),
+      module: serving,
+    }));
+    for (const claim of claims) {
+      for (const address of this.unclaimed) assertSharedPathAdmitted({ address, claim });
+    }
+    this.prefixes.push(...claims);
+    this.claims.set(declaration.namespace, serving);
+  }
+
   private identitiesFor(
     declaration: RestTransportDeclaration<unknown>,
   ): Record<RestDoorCredential, RestDoor> {
@@ -152,6 +216,60 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       session_key: SessionKeyIdentity.unbound(declaration.namespace),
       cli_token: CliTokenIdentity.unbound(declaration.namespace),
     };
+  }
+}
+
+type ClaimedPrefix = { prefix: string; module: string };
+
+type UnclaimedAddress = {
+  method: string;
+  path: string;
+  module: string;
+  sharedPath: RestSharedPath | undefined;
+};
+
+/** Each address the routes of a family claiming no prefix answer at, v1 twins included. */
+function addressesOfFamilyClaimingNoPrefix(
+  declaration: RestTransportDeclaration<unknown>,
+): UnclaimedAddress[] {
+  return declaration.routes.flatMap((route) =>
+    routeScopesOf({ route, declaration }).map((path) => ({
+      method: route.method.toUpperCase(),
+      path,
+      module: declaration.api.name,
+      sharedPath: route.sharedPath,
+    })),
+  );
+}
+
+/**
+ * A route claiming no prefix, under a prefix another module's family claims, runs that family's
+ * middleware: it says so with `.withSharedPath`, naming the claimant (§8, R10).
+ */
+function assertSharedPathAdmitted({
+  address,
+  claim,
+}: {
+  address: UnclaimedAddress;
+  claim: ClaimedPrefix;
+}): void {
+  const under = address.path === claim.prefix || address.path.startsWith(`${claim.prefix}/`);
+  if (!under || address.module === claim.module) return;
+
+  const where = `REST ${address.method} ${address.path} of ${address.module} sits under ${claim.prefix}, which ${claim.module} claims`;
+
+  if (address.sharedPath === void 0) {
+    throw new Error(
+      `${where}; declare .withSharedPath({ owner: "${claim.module}", reason, deprecate }) on the route, ` +
+        `or serve it under a prefix ${address.module} owns`,
+    );
+  }
+
+  if (address.sharedPath.owner !== claim.module) {
+    throw new Error(
+      `${where}, but its shared path names ${address.sharedPath.owner}; ` +
+        `declare .withSharedPath({ owner: "${claim.module}", ... }) instead`,
+    );
   }
 }
 

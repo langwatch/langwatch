@@ -7,8 +7,8 @@ type SsoDomainProofRecord = {
 
 /**
  * The two mails a verified domain's evidence going missing sends (ADR-123).
- * Same split as {@link JoinRequestMail}: resolved names and addresses in,
- * the link and the envelope the composition root's.
+ * Resolved names and addresses in; the link and the envelope are the
+ * composition root's.
  */
 export interface SsoDomainProofMail {
   /** The record is gone and the grace has started. Sent to one admin. */

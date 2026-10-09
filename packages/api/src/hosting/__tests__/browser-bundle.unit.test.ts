@@ -206,3 +206,23 @@ describe("the browser application on the door", () => {
     expect(response.headers.get("permissions-policy")).toBe("camera=()");
   });
 });
+
+describe("given a development api with no built bundle", () => {
+  /** @scenario "A development api renders the shell's public config without a built bundle" */
+  it("answers /index.html with the public config meta and 404s other documents", async () => {
+    const empty = await mkdtemp(path.join(tmpdir(), "langwatch-nobundle-"));
+    directories.push(empty);
+    const bundle = BrowserBundle.create({
+      dist: empty,
+      publicConfig: () => '<meta name="public-config" content="safe">',
+      sessionReader: SessionReader.create({ verify: async () => null }),
+      security: SecurityHeaders.strict(),
+    });
+    const mux = HttpMux.create().route("/", bundle);
+
+    const shell = await mux.fetch(new Request("http://localhost/index.html"));
+    expect(shell.status).toBe(200);
+    expect(await shell.text()).toContain('<head><meta name="public-config" content="safe">');
+    expect((await mux.fetch(new Request("http://localhost/projects/one"))).status).toBe(404);
+  });
+});

@@ -1,6 +1,7 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useLentHooks } from "@langwatch/browser-host/lent";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+import { UpgradeModalToken } from "@langwatch/enterprise-licensing-client";
 import { promptClient } from "@langwatch/prompt-client";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useRef, useState } from "react";
@@ -159,9 +160,7 @@ function useStagedSave({
 }) {
   const { project, hasPermission, storedPrompt, methods } = input;
   const { createMutation, updateMutation } = mutations;
-  const openLiteMemberRestriction = useUpgradeModalStore(
-    (state) => state.openLiteMemberRestriction,
-  );
+  const upgradeModal = useLentHooks(UpgradeModalToken);
   const pendingSaveDataRef = useRef<ReturnType<typeof formValuesToTriggerSaveVersionParams> | null>(
     null,
   );
@@ -193,7 +192,7 @@ function useStagedSave({
       if (!project?.id || !saveData || (!isStored && !newPrompt)) return;
       const permission = isStored ? "prompts:update" : "prompts:create";
       if (!hasPermission(permission)) {
-        openLiteMemberRestriction({ resource: "prompts" });
+        upgradeModal?.openLiteMemberRestriction({ resource: "prompts" });
         return;
       }
       submitSave({
@@ -212,7 +211,7 @@ function useStagedSave({
       createMutation,
       updateMutation,
       hasPermission,
-      openLiteMemberRestriction,
+      upgradeModal,
     ],
   );
 

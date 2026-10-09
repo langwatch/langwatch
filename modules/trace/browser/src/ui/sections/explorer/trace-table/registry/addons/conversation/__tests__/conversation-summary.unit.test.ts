@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { TraceListItem } from "../../../../../types/trace.ts";
-import type { ConversationGroup } from "../../../../conversation-groups.ts";
+import type { ConversationGroup } from "../../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { traceCountLabel } from "../conversation-summary.tsx";
 
 function group(overrides: Partial<ConversationGroup> = {}): ConversationGroup {

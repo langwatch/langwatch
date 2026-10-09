@@ -4,13 +4,10 @@
  * mount's readings, extending the port class the caller hands in.
  */
 
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type {
-  NavigationAccountMenu,
-  NavigationCommandBar,
   NavigationDeployment,
   NavigationFlagReading,
-  NavigationHost,
-  NavigationLangy,
   NavigationOpsAccess,
   NavigationOrganization,
   NavigationPlanReading,
@@ -19,10 +16,18 @@ import type {
   NavigationSupportChat,
   NavigationTeam,
   NavigationUser,
-} from "@langwatch/navigation-browser/navigation";
+} from "@langwatch/navigation-contract";
 import type { ReactNode } from "react";
 
 import { joinOffer, organizationMfaGate, teamAccessWaiting } from "./navigation-host-capabilities";
+import type { UiRootCapabilities } from "./ui-root-capabilities";
+
+/** Navigation's node-bearing shapes, read off the lent port rather than its package. */
+type NavigationHostClass = UiRootCapabilities["navigationHost"]["NavigationHost"];
+type NavigationHost = InstanceType<NavigationHostClass>;
+export type NavigationCommandBar = NonNullable<ReturnType<NavigationHost["commandBar"]>>;
+export type NavigationLangy = NonNullable<ReturnType<NavigationHost["langy"]>>;
+export type NavigationAccountMenu = NonNullable<ReturnType<NavigationHost["accountMenu"]>>;
 
 /** Everything the shell has already read by the time the chrome draws. */
 export type BrowserNavigationReading = {
@@ -51,7 +56,7 @@ export type BrowserNavigationReading = {
   notFound: ReactNode;
   hasPermission: (permission: string) => boolean;
   /** Tri-state at the source: `undefined` is "not answered yet". */
-  featureFlag: (flag: string) => boolean | undefined;
+  featureFlag: (flag: ReleaseFlagToken) => boolean | undefined;
 };
 
 /** Everything the chrome asks the shell to DO. */
@@ -63,6 +68,7 @@ export type BrowserNavigationActions = {
   signOut: () => void;
   setDocumentTitle: (title: string) => () => void;
   openDrawer: (drawer: string, params?: Record<string, string>) => void;
+  openDrawerByToken: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
 };
 
 /** Builds a host over the shell's readings and actions. */
@@ -71,7 +77,7 @@ export type BrowserNavigationHosts = {
 };
 
 /** The shell's host class, over the navigation port class it is handed. */
-export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavigationHosts {
+export function browserNavigationHosts(port: NavigationHostClass): BrowserNavigationHosts {
   class BrowserNavigationHost extends port {
     static create(
       reading: BrowserNavigationReading,
@@ -128,7 +134,7 @@ export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavi
     }
 
     /** The port's own tri-state: unanswered is neither on nor off. */
-    featureFlag(flag: string): NavigationFlagReading {
+    featureFlag(flag: ReleaseFlagToken): NavigationFlagReading {
       const answer = this.reading.featureFlag(flag);
       return { enabled: answer === true, isLoading: answer === void 0 };
     }
@@ -220,6 +226,10 @@ export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavi
 
     openDrawer(drawer: string, params?: Record<string, string>): void {
       this.actions.openDrawer(drawer, params);
+    }
+
+    openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+      this.actions.openDrawerByToken(drawer, props);
     }
 
     override joinOffer(input: { currentOrganizationId: string | null | undefined }): ReactNode {

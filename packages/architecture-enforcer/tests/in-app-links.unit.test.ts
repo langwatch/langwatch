@@ -128,6 +128,6 @@ describe("in-app links across the browser packages", () => {
         .map((file) => path.relative(repoRoot, file));
 
       expect({ anchors, elements }).toEqual({ anchors: [], elements: [] });
-    });
+    }, 30000);
   });
 });

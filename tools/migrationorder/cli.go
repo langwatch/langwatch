@@ -31,12 +31,19 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	steps, err := Repo{Root: *root}.Steps(context.Background(), *baseRef, released...)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
 	// Non-nil so -json renders no findings as [] rather than null; the workflow
 	// script indexes findings.length.
 	findings := []Finding{}
 	for i := range inputs {
 		findings = append(findings, Check(inputs[i])...)
 	}
+	findings = append(findings, CheckSteps(steps)...)
 
 	if *asJSON {
 		if err := json.NewEncoder(stdout).Encode(findings); err != nil {

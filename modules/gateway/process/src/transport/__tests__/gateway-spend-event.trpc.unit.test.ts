@@ -17,6 +17,7 @@ import {
   memoryVirtualKeySeed,
 } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../app/gateway.app.ts";
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { gatewaySpendEventTrpcTransport } from "../gateway-spend-event.trpc.ts";
 
@@ -59,6 +60,7 @@ async function gatewayAppStub() {
   const repositories = await seededRepositories();
   const pageReads = vi.spyOn(repositories.spendEvents, "readSpendEventsPage");
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: peer("authz"),
       projects: projectsStub({ findOrganizationId: async () => "org_1" }),
@@ -74,6 +76,7 @@ async function gatewayAppStub() {
     },
     repositories,
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,

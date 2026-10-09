@@ -35,6 +35,7 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "zod": "catalog:"
   },

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ScenarioRoleMetricsDerivationService } from "../../../services/scenario-role-metrics-derivation.service.ts";
-import { SpanCostService } from "../../../services/span-cost.service.ts";
-import { TraceModelCostService } from "../../../services/trace-model-cost.service.ts";
+import { SpanCostService } from "../../../features/span/services/span-cost.service.ts";
+import { TraceModelCostService } from "../../../features/derivation/services/trace-model-cost.service.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../trace-derivation-span.repository.ts";
 
 /**

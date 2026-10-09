@@ -3,14 +3,21 @@ import {
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { WorkbenchCredential } from "@langwatch/experiment-contract";
-import { defineProcessModule } from "@langwatch/process";
+import type {
+  ExperimentApi,
+  ExperimentServerConfig,
+  WorkbenchCredential,
+} from "@langwatch/experiment-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { ExperimentModule } from "#app/experiment.app";
 
 import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
 import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
+import { batchRecordTrpcTransport } from "./transport/batch-record.trpc.ts";
+import { experimentBatchLogRest } from "./transport/experiment-batch-log.rest.ts";
+import { experimentDatasetEvaluationRest } from "./transport/experiment-dataset-evaluation.rest.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
 import {
@@ -19,10 +26,15 @@ import {
 } from "./transport/experiment-v3-legacy.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
+import { experimentWorkflowEvaluationRest } from "./transport/experiment-workflow-evaluation.rest.ts";
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
-export const experimentProcessModule = defineProcessModule("experiment")
+export const experimentProcessModule: PublishedProcessModule<
+  "experiment",
+  ExperimentApi,
+  ExperimentServerConfig
+> = defineProcessModule("experiment")
   .withRepositories(experimentRepositories)
   .withApi(ExperimentModule)
   .withTransports(
@@ -37,7 +49,14 @@ export const experimentProcessModule = defineProcessModule("experiment")
     // `/api/evaluations/v3/*`, the SDKs' older name for the same doors.
     experimentV3LegacyRest,
     experimentWorkbenchRunLegacyRest,
+    // `/api/evaluations/batch/log_results`, the SDK's batch result log.
+    experimentBatchLogRest,
+    // `/api/dataset/evaluate`, the SDK's dataset evaluation, in dataset's namespace.
+    experimentDatasetEvaluationRest,
+    // `/api/workflows/:id/evaluate`, the workflow evaluate door, in workflow's namespace.
+    experimentWorkflowEvaluationRest,
     experimentTrpcTransport,
+    batchRecordTrpcTransport,
   )
   // This family answers behind the project door, so re-resolving the key here
   // would ask a second question that could answer differently from the door

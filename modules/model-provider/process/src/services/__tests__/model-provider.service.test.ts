@@ -1,4 +1,4 @@
-import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   ModelCostNotFoundError,
   type ModelCost,
@@ -16,26 +16,28 @@ import {
   ModelProviderNotFoundError,
   ModelDefaultNotFoundError,
 } from "@langwatch/model-provider-contract";
-import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryModelProviderCodexGatewayPingChannel } from "../../channels/memory/memory.model-provider-codex-gateway-ping.channel.ts";
 import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";
+import { CodexTokenRefresher } from "../../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
+import { ModelProviderConnectionRateLimiter } from "../../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type { ModelCostRepository } from "../../repositories/model-cost.repository.ts";
 import type {
   ModelDefaultConfigSaveInput,
   ModelDefaultRepository,
 } from "../../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../../repositories/model-provider.repository.ts";
-import { CodexTokenRefresher } from "../codex-oauth-model-provider-token-refresher.service.ts";
 import { ModelProviderCredentialPolicy } from "../model-provider-keys.service.ts";
 import { ModelProviderService } from "../model-provider.service.ts";
 import { ModelProviderIdService } from "../prefixed-model-provider-id.service.ts";
 import { ModelProviderCatalog } from "../registry-model-provider-catalog.service.ts";
 import { ModelTranslation } from "../vercel-ai-model-translation.service.ts";
-import { ModelProviderConnectionRateLimiter } from "../windowed-model-provider-connection-rate-limiter.service.ts";
 
 const now = toDate(nowInstant());
 function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
@@ -68,6 +70,9 @@ class Providers implements ModelProviderRepository {
   }
 
   async updateLegacyColumns(): Promise<void> {}
+  async updateLegacyColumnsIfUnchanged(): Promise<boolean> {
+    return false;
+  }
 
   async countUsage(): Promise<{ providers: string[] }> {
     return { providers: [] };
@@ -164,7 +169,7 @@ class ConnectionRateLimiter extends ModelProviderConnectionRateLimiter {
     return Promise.resolve();
   }
 }
-class Authorization extends AuthzService {
+class Authorization {
   canWriteResult = true;
   listApiKeyBindings(): Promise<never> {
     return this.notUsed();
@@ -393,12 +398,13 @@ function createProjects(): ProjectApi {
           },
         ]),
       listIdsByOrganization: () => Promise.resolve([project.id]),
+      findLiveNonGovernanceIdsByOrganization: () => Promise.resolve([project.id]),
     },
     "ProjectApi",
   );
 }
 
-class Organizations extends OrganizationService {
+class Organizations {
   private notUsed(): never {
     throw new Error("Organization method is not used by this test");
   }
@@ -457,9 +463,6 @@ class Organizations extends OrganizationService {
     return this.notUsed();
   }
   getOldestTeamId() {
-    return this.notUsed();
-  }
-  claimBillingCustomerId() {
     return this.notUsed();
   }
   ensurePersonalWorkspace() {
@@ -846,6 +849,8 @@ function service(
     authorization: authorizationApi(authorization),
     translation: new Translator(),
     connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+    codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+    secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
     ids: new Ids(),
   });
 }
@@ -1391,6 +1396,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation,
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     });
 
@@ -1423,6 +1430,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation: new Translator(),
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     });
 
@@ -1822,6 +1831,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation: new Translator(),
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     });
 
@@ -1870,6 +1881,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation: new Translator(),
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     }).upsert({ projectId: "project_1", provider: "openai", enabled: true });
 

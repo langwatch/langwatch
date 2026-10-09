@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { MeProject } from "@langwatch/user-contract";
 
 import type { UserOrganizationDirectoryRepository } from "../user-organization-directory.repository.ts";
 
@@ -47,6 +48,22 @@ export class PrismaUserOrganizationDirectoryRepository implements UserOrganizati
     return project?.slug ?? null;
   }
 
+  async findPersonalProjectId(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
+    const project = await this.database.project.findFirst({
+      where: {
+        isPersonal: true,
+        ownerUserId: input.userId,
+        archivedAt: null,
+        team: { organizationId: input.organizationId, isPersonal: true },
+      },
+      select: { id: true },
+    });
+    return project?.id ?? null;
+  }
+
   /** The organization's first administrator, by seat age. */
   async findFirstAdminEmail(organizationId: string): Promise<string | null> {
     const admin = await this.database.organizationUser.findFirst({
@@ -56,5 +73,12 @@ export class PrismaUserOrganizationDirectoryRepository implements UserOrganizati
     });
 
     return admin?.user.email ?? null;
+  }
+
+  findKeyProject({ projectId }: { projectId: string }): Promise<MeProject | null> {
+    return this.database.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, name: true, slug: true, isPersonal: true },
+    });
   }
 }

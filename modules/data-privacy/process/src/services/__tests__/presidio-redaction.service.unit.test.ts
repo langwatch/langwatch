@@ -1,10 +1,8 @@
 import {
-  type EvaluationApi,
   LangevalsPiiDetectionError,
   type PiiDetectionOutcome,
   type PiiDetectionRequest,
 } from "@langwatch/evaluation-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -34,13 +32,13 @@ class RecordingMetrics implements Pick<
 function setup(answer: (input: PiiDetectionRequest) => Promise<PiiDetectionOutcome>) {
   const requests: PiiDetectionRequest[] = [];
   const metrics = new RecordingMetrics();
-  const evaluation = createApiFixture<EvaluationApi>({
-    detectPii: (input) => {
+  const presidio = {
+    detect: (input: PiiDetectionRequest) => {
       requests.push(input);
       return answer(input);
     },
-  });
-  const service = PresidioRedactionService.create({ evaluation, metrics, timeoutMs: 60_000 });
+  };
+  const service = PresidioRedactionService.create({ presidio, metrics, timeoutMs: 60_000 });
   return { requests, metrics, service };
 }
 
@@ -154,7 +152,7 @@ describe("PresidioRedactionService", () => {
   });
 
   describe("when asked whether the analysis service is configured", () => {
-    /** @scenario "Whether the analysis service is reachable is asked of evaluation, once" */
+    /** @scenario "Whether the analysis service is configured is asked once" */
     it("asks once with an empty batch and remembers the answer", async () => {
       const { requests, service } = setup(async () => ({ kind: "not_configured" }));
 
@@ -164,16 +162,16 @@ describe("PresidioRedactionService", () => {
       expect(requests[0]!.texts).toEqual([]);
     });
 
-    /** @scenario "Whether the analysis service is reachable is asked of evaluation, once" */
+    /** @scenario "Whether the analysis service is configured is asked once" */
     it("asks again after an answer failed", async () => {
       let calls = 0;
       const { service } = setup(async () => {
         calls += 1;
-        if (calls === 1) throw new Error("evaluation not ready");
+        if (calls === 1) throw new Error("analysis service not ready");
         return { kind: "detected", results: [] };
       });
 
-      await expect(service.isConfigured()).rejects.toThrow("evaluation not ready");
+      await expect(service.isConfigured()).rejects.toThrow("analysis service not ready");
       expect(await service.isConfigured()).toBe(true);
     });
   });

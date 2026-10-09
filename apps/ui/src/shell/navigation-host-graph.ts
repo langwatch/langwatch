@@ -4,10 +4,7 @@
  * raw read, whose fields the narrowing drops.
  */
 
-import type {
-  NavigationOrganization,
-  NavigationTeam,
-} from "@langwatch/navigation-browser/navigation";
+import type { NavigationOrganization, NavigationTeam } from "@langwatch/navigation-contract";
 
 import type { UiRootCapabilities } from "./ui-root-capabilities";
 

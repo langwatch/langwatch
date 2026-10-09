@@ -11,12 +11,12 @@ import type { ConnectedAgentBrowser } from "../../../model/agent-client.ts";
 
 const turns: unknown[] = [];
 
-vi.mock("../../../behavior/agent-api.ts", async () => {
+vi.mock("@langwatch/scenario-client", async () => {
   const { useState } = await import("react");
   return {
-    agentApi: {
-      agents: {
-        testTurn: {
+    scenarioClient: {
+      scenarios: {
+        testAgentTurn: {
           useMutation: () => {
             const [data, setData] = useState<unknown>(undefined);
             return {

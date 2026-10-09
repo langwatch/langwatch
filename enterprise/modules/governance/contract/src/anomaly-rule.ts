@@ -77,7 +77,7 @@ export class AnomalyRuleNotFoundError extends NotFoundError {
   }
 }
 
-export const SUPPORTED_DESTINATION_TYPES = ["webhook"] as const;
+export const SUPPORTED_DESTINATION_TYPES = ["webhook", "webhook_endpoint"] as const;
 export const webhookDestinationSchema = z
   .object({
     type: z.literal("webhook"),
@@ -88,15 +88,25 @@ export const webhookDestinationSchema = z
         message: "url must use the https scheme",
       }),
     sharedSecret: z.string().min(1).max(512).optional(),
+    /** Set by the destination migration: delivery goes through this endpoint (Alex, 2026-10-09). */
+    endpointId: z.string().min(1).optional(),
   })
   .strict();
-export const anomalyDestinationSchema = z.discriminatedUnion("type", [webhookDestinationSchema]);
+/** One of the organisation's registered webhook endpoints, delivered via WebhookApi (ADR-167). */
+export const webhookEndpointDestinationSchema = z
+  .object({ type: z.literal("webhook_endpoint"), endpointId: z.string().min(1) })
+  .strict();
+export const anomalyDestinationSchema = z.discriminatedUnion("type", [
+  webhookDestinationSchema,
+  webhookEndpointDestinationSchema,
+]);
 export const destinationConfigSchema = z
   .object({ destinations: z.array(anomalyDestinationSchema).max(10) })
   .strict();
 
 export type SupportedDestinationType = (typeof SUPPORTED_DESTINATION_TYPES)[number];
 export type WebhookDestination = z.infer<typeof webhookDestinationSchema>;
+export type WebhookEndpointDestination = z.infer<typeof webhookEndpointDestinationSchema>;
 export type AnomalyDestination = z.infer<typeof anomalyDestinationSchema>;
 export type DestinationConfig = z.infer<typeof destinationConfigSchema>;
 export type Destination = AnomalyDestination;
@@ -301,9 +311,14 @@ export const anomalyAlertDispatchOutcomeSchema = z.discriminatedUnion("status", 
   }),
   z.object({
     destinationIndex: z.number().int().nonnegative(),
-    type: z.literal("webhook"),
+    type: z.enum(["webhook", "webhook_endpoint"]),
     status: z.literal("failed"),
     reason: z.string(),
+  }),
+  z.object({
+    destinationIndex: z.number().int().nonnegative(),
+    type: z.literal("webhook_endpoint"),
+    status: z.literal("queued"),
   }),
 ]);
 export type AnomalyAlertDispatchOutcome = z.infer<typeof anomalyAlertDispatchOutcomeSchema>;

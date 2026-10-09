@@ -4,7 +4,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-contract";
+import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-client";
 
 export const projectWeb = defineBrowserModule("project")
   .withHosts({
@@ -34,7 +34,7 @@ export const projectWeb = defineBrowserModule("project")
   /** The inline command palette, lent to governance's overview hero by token (§10.1). */
   .lends(HeroAskFieldToken, {
     load: async () => ({
-      default: (await import("./ui/sections/home/components/hero-ask-field.tsx")).HeroAskField,
+      default: (await import("./ui/sections/home/components/langy-home-hero.tsx")).HeroAskField,
     }),
   })
   /** Main's project selector, lent to pages outside the navigation shell (§10). */

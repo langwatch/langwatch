@@ -14,7 +14,7 @@ until it can.
 
 Objective: <one sentence, outcome-shaped>
 Owner: <lane name, or `unassigned`>
-Model: <opus | fable | sonnet | haiku> <one clause saying why>
+Model: <agent type from COORDINATOR.md §3, e.g. lane-opus-xhigh | lane-opus | lane-sonnet-medium | lane-haiku> <one clause saying why>
 Budget: <n> tool calls or <n> minutes, whichever comes first
 Handoff: .claude/handoffs/<task-id>.md
 

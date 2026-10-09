@@ -7,17 +7,17 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { admissionSeat, seatsFree } from "@langwatch/organization-contract";
 import type { UserProfile, UserApi } from "@langwatch/user-contract";
 
+import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type {
   ScimRepository,
   ScimUserRecord,
   ScimUserResourceRecord,
 } from "../repositories/scim.repository.ts";
-import {
-  ScimCostCenterService,
-  type ScimDepartmentAssignment,
-} from "./scim-cost-center.service.ts";
+import { ScimCostCenterService, type ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import type { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
@@ -55,30 +55,38 @@ export class ScimProvisioningService {
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
   private readonly authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
+  private readonly seats: ScimSeatRepository;
+  private readonly plans: Pick<EntitlementApi, "getActivePlan">;
 
   private constructor({
     prisma,
     writer,
     grants,
     users,
-    governance,
+    costCenterFacts,
     organization,
     lifecycle,
     provenOffboarding,
     authority,
+    seats,
+    plans,
   }: {
     prisma: ScimRepository;
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
+    seats: ScimSeatRepository;
+    plans: Pick<EntitlementApi, "getActivePlan">;
   }) {
     this.prisma = prisma;
     this.authority = authority;
+    this.seats = seats;
+    this.plans = plans;
     this.userService = users;
     this.grants = grants;
     this.membershipAccess = ScimMembershipAccessService.create({
@@ -91,7 +99,7 @@ export class ScimProvisioningService {
     });
     this.listing = ScimUserListingService.create(prisma);
     this.provenOffboarding = provenOffboarding;
-    this.costCenters = ScimCostCenterService.create(governance);
+    this.costCenters = ScimCostCenterService.create(costCenterFacts);
     this.patches = ScimUserPatchService.create(this.costCenters);
   }
 
@@ -100,11 +108,13 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
+    seats: ScimSeatRepository;
+    plans: Pick<EntitlementApi, "getActivePlan">;
   }): ScimProvisioningService {
     return new ScimProvisioningService(options);
   }
@@ -264,9 +274,14 @@ export class ScimProvisioningService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const role = await this.directoryAssertedOrganizationRole({ userId, organizationId });
+    const asserted = await this.directoryAssertedOrganizationRole({ userId, organizationId });
+    const [plan, seats] = await Promise.all([
+      this.plans.getActivePlan({ organizationId, user: { id: userId } }),
+      this.seats.countMemberSeats({ organizationId }),
+    ]);
+    const { role, pending } = admissionSeat({ requested: asserted, ...seatsFree({ plan, seats }) });
     try {
-      await this.prisma.addMembership({ userId, organizationId, role });
+      await this.prisma.addMembership({ userId, organizationId, role, pending });
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
     }

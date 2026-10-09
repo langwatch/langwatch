@@ -1,14 +1,15 @@
 import type { TransportPeers } from "@langwatch/api";
-import { ModuleApiToken, type ResolvedTokens, SupplyToken } from "@langwatch/module";
+import { ModuleApiToken, type ResolvedTokens } from "@langwatch/module";
 import { type StoresMemberSource } from "@langwatch/process-stores";
 
 import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
+import { channelsBind } from "./channel-registry.ts";
 import type {
   InstallableServerFeature,
   ModuleSecretsScope,
   ServerRole,
 } from "./feature-installer.ts";
-import { membersFrom, storesBackedMembers } from "./module-members.ts";
+import type { RuntimeService } from "./lifecycle/runtime-lifecycle.ts";
 import { ObservabilitySupply } from "./process-supply.options.ts";
 import type {
   InstalledPeersInAnyBranch,
@@ -22,7 +23,7 @@ import type {
   SupplyModule,
   ValidateSupply,
 } from "./process-supply.types.ts";
-import type { RuntimeService } from "./runtime-lifecycle.ts";
+import { type TestPeer, testPeer } from "./testing.ts";
 import type { FeatureTransportHosts } from "./transport-mounting.ts";
 
 type SupplyRecord = Readonly<Record<string, unknown>>;
@@ -94,7 +95,7 @@ type StoreSuppliedNames =
 
 declare const supplyState: unique symbol;
 declare const missingSupply: unique symbol;
-interface MissingSupply<Names extends string> {
+interface MissingRequirement<Names extends string> {
   readonly [missingSupply]: Names;
 }
 type Boot<
@@ -127,14 +128,13 @@ type Boot<
         InstalledPeerSetInAnyBranch
       >,
     ) => Promise<BootedRuntime<SupplyRecord, Rest, Trpc>>
-  : "" & MissingSupply<Missing>;
+  : "" & MissingRequirement<Missing>;
 type Exact<Left, Right> = [Left] extends [Right]
   ? [Right] extends [Left]
     ? unknown
     : never
   : never;
 type CheckedModule<Module extends SupplyModule> = Module extends {
-  readonly members: readonly string[];
   readonly types: { readonly dependencies: infer Dependencies };
 }
   ? Exact<ResolvedTokens<Module["dependencies"]>, Dependencies> extends never
@@ -315,22 +315,6 @@ export class ProcessSupply<
     return this.#withMembers({ encryption });
   }
 
-  withRelational<Value extends MemberValueFrom<RequiredMemberSet, "relational">>(
-    relational: Value,
-  ) {
-    return this.#withMembers({ relational });
-  }
-
-  withAnalytical<Value extends MemberValueFrom<RequiredMemberSet, "analytical">>(
-    analytical: Value,
-  ) {
-    return this.#withMembers({ analytical });
-  }
-
-  withKeyvalue<Value extends MemberValueFrom<RequiredMemberSet, "keyvalue">>(keyvalue: Value) {
-    return this.#withMembers({ keyvalue });
-  }
-
   withEventing<Value extends MemberValueFrom<RequiredMemberSet, "eventing">>(eventing: Value) {
     return this.#withMembers({ eventing });
   }
@@ -460,13 +444,26 @@ export class ProcessSupply<
 
   #boot(): Promise<BootedRuntime<SupplyRecord, Rest, Trpc>> {
     const state = this.#state;
+    const supplied = new Set<ModuleApiToken<unknown>>();
+    const peers: TestPeer[] = [];
+    for (const module of state.modules) {
+      for (const token of [...Object.values(module.dependencies), ...boundTokens(module)]) {
+        if (
+          token instanceof ModuleApiToken &&
+          Object.hasOwn(state.peers, token.name) &&
+          !supplied.has(token)
+        ) {
+          peers.push(testPeer({ token, instance: state.peers[token.name] }));
+          supplied.add(token);
+        }
+      }
+    }
     const options = {
+      peers,
       role: state.role,
       config: state.config,
       ...(state.secrets ? { secrets: state.secrets } : {}),
-      members: state.stores
-        ? storesBackedMembers(state.stores, legacyMemberNames(state.members))
-        : membersFrom(legacyMemberNames(state.members)),
+      stores: storesWith(state.stores, legacyMemberNames(state.members)),
     };
     const transport = state.transport;
     let exposed: ExposedSurface<Rest, Trpc> | undefined;
@@ -479,21 +476,8 @@ export class ProcessSupply<
           () => exposed?.serve(),
         )
       : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
-    const supplied = new Set<ModuleApiToken<unknown> | SupplyToken<unknown>>();
-    for (const module of state.modules) {
-      for (const token of Object.values(module.dependencies)) {
-        if (
-          (token instanceof ModuleApiToken || token instanceof SupplyToken) &&
-          Object.hasOwn(state.peers, token.name) &&
-          !supplied.has(token)
-        ) {
-          builder.withProvided(token, state.peers[token.name]);
-          supplied.add(token);
-        }
-      }
-    }
     for (const service of state.services) builder.withService(service);
-    const modules = state.modules as readonly InstallableServerFeature<SupplyRecord>[];
+    const modules = state.modules as readonly InstallableServerFeature[];
     const selectedModules = modules.map((module) =>
       state.stores?.tier && module.repositoryRegistry
         ? { ...module, tier: state.stores.tier }
@@ -508,9 +492,35 @@ export class ProcessSupply<
   }
 }
 
+/** A bound channel's `*Api` on either tier, so `provide()` can stand in for it (record §5). */
+function boundTokens(module: SupplyModule): readonly ModuleApiToken<unknown>[] {
+  const channels = module.channelRegistry;
+  if (channels === undefined) return [];
+  return (["live", "memory"] as const).flatMap((tier) =>
+    channelsBind(channels, tier).map(([, token]) => token),
+  );
+}
+
 interface CreateAppOptions {
   readonly role: ServerRole;
   readonly secrets?: ModuleSecretsScope;
+}
+
+/** `.withMembers(...)` values answer before the stores' own and extend their order. */
+function storesWith(
+  stores: StoresMemberSource | undefined,
+  overrides: SupplyRecord,
+): StoresMemberSource {
+  const opened = stores?.order.filter((name) => !Object.hasOwn(overrides, name)) ?? [];
+  return {
+    ...(stores?.tier === void 0 ? {} : { tier: stores.tier }),
+    order: [...opened, ...Object.keys(overrides)],
+    read(name) {
+      if (Object.hasOwn(overrides, name)) return overrides[name];
+      if (stores === void 0) throw new Error(`No "${name}" member was handed to this process.`);
+      return stores.read(name);
+    },
+  };
 }
 
 function legacyMemberNames(members: SupplyRecord): SupplyRecord {

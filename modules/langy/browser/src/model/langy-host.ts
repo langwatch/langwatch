@@ -59,6 +59,10 @@ export abstract class LangyHostApi {
 
   abstract hasPermission(permission: string): boolean;
 
+  /** Asked of the organization alone: a grant held only on a team or project reads false. */
+  abstract hasOrganizationPermission(permission: string): boolean;
+
+  /** Whether the session, the scope or the grants are still arriving. */
   abstract isLoading(): boolean;
 
   /**
@@ -67,9 +71,6 @@ export abstract class LangyHostApi {
    * the application reads its own config leaf and answers here.
    */
   abstract isDemoProject(): boolean;
-
-  /** Tri-state: `undefined` while the answer is still arriving. */
-  abstract featureFlag(flag: string): boolean | undefined;
 
   abstract route(): LangyRouteReading;
 

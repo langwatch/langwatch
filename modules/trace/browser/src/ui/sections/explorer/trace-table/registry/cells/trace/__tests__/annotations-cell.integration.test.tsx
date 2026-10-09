@@ -10,9 +10,9 @@ vi.mock("../../../../../../use-score-names-by-id.ts", () => ({
   useScoreNamesById: () => new Map([["score-abc123", "goodness"]]),
 }));
 
-import type { AnnotationByTrace } from "../../../../../../use-annotations-by-trace-ids.ts";
-import type { TraceListItem } from "../../../../../types/trace.ts";
-import { NO_TRACE_EVENTS } from "../../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../../../../behavior/explorer/types/trace.ts";
+import type { AnnotationByTrace } from "../../../../../../../../behavior/use-annotations-by-trace-ids.ts";
 import { AnnotationsCell } from "../annotations-cell.tsx";
 
 afterEach(cleanup);

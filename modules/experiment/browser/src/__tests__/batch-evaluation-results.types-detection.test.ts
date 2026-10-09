@@ -5,6 +5,7 @@ import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
 import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types.ts";
+import { WHOLE_RUN_COMPLETENESS } from "./run-completeness.fixture.ts";
 
 const createTimestamps = () => ({ createdAt: 1, updatedAt: 1 });
 
@@ -42,6 +43,7 @@ const createRun = (
   experimentId: "exp-1",
   runId: "run-1",
   projectId: "proj-1",
+  completeness: WHOLE_RUN_COMPLETENESS,
   targets,
   dataset: datasetFor(
     rowCount,

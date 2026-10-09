@@ -7,6 +7,7 @@
  */
 import { createTenantId } from "@langwatch/eventing";
 import { ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,7 +17,11 @@ import {
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
 } from "../organization-lifecycle.commands.ts";
-import { buildOrganizationLifecyclePipeline } from "../organization-lifecycle.pipeline.ts";
+import {
+  type BillingFactsApplier,
+  type LicensingFactsApplier,
+  buildOrganizationLifecyclePipeline,
+} from "../organization-lifecycle.pipeline.ts";
 
 const AT = Date.UTC(2026, 8, 29, 12);
 const envelope = { tenantId: "org_acme", organizationId: "org_acme", occurredAt: AT };
@@ -91,7 +96,11 @@ describe("organization's lifecycle pipeline", () => {
   });
 
   it("declares no subscriber of its own: its peers react from their side", () => {
-    expect(buildOrganizationLifecyclePipeline().eventSubscribers.size).toBe(0);
+    const billingFacts = createApiFixture<BillingFactsApplier>({}, "BillingFactsApplier");
+    const licensingFacts = createApiFixture<LicensingFactsApplier>({}, "LicensingFactsApplier");
+    expect(
+      buildOrganizationLifecyclePipeline({ billingFacts, licensingFacts }).eventSubscribers.size,
+    ).toBe(0);
   });
 
   describe("when the organization's presence setting is recorded", () => {

@@ -1,57 +1,32 @@
 {{/*
-  The pre-roll migration gate (ADR-155).
+  The pre-roll upgrade (ADR-155; specs/upgrade/entry-points.feature).
 
-  Why. A migration is never breaking: it is applied to the live database while
-  the PREVIOUS image is still serving, and the new image must work on the old
-  schema until its own migration has run. That contract only buys anything if
-  the order is actually fixed, and until this hook it was not. Both the app and
-  the workers container run `start:prepare:db` themselves on boot, so on a helm
-  upgrade the migration ran inside whichever new pod won the advisory lock,
-  concurrently with the old pods still serving and with each other. Three
-  consequences, all of them things operators have hit:
+  By default nothing runs ahead of the roll: the new worker pods run
+  `pnpm task upgrade` under the runner's lease, and the new api pods report
+  not ready until the ledger is current, so the old pods keep serving
+  (UIW-4).
 
-    - a migration that fails takes the new pod into CrashLoopBackOff rather
-      than stopping the upgrade, and the error is one line inside a restarting
-      container's log;
-    - the app and the workers race for the lock, so the loser's startupProbe
-      budget is spent waiting on the winner's DDL;
-    - nothing in the release says when the schema changed, so "was the schema
-      already migrated when that request failed?" cannot be answered.
+  This Job renders only with `app.storedObjects.localFilesystem.serializeUpgrades`
+  active (UIW-11): those hooks hold the workers at 0 until the app has rolled,
+  so no worker could run the upgrade. Here the Job runs the api's one
+  preparation script (`start:prepare:db`: `pnpm task upgrade` alone) on the NEW
+  image before any Deployment rolls, under the same lease. It is fail-closed:
+  a failed upgrade stops the helm upgrade with the old image still serving.
 
-  What this does. One Job, on the NEW image, running only the migration tasks,
-  before helm applies any Deployment. It is fail-closed: a migration that fails
-  stops the upgrade with the new image never rolled and the old one still
-  serving the old schema, which is the state an operator can reason about. The
-  containers' own `start:prepare:db` stays exactly as it was and becomes a
-  no-op second pass — that is what keeps a first install, a non-helm install
-  and `docker compose` working unchanged.
-
-  Scope. pre-upgrade only, deliberately:
-    - not pre-install: helm applies hook resources before the rest of the
-      manifests, so on a first install the Secrets this Job reads do not exist
-      yet. The app container migrates on first boot, as it always has.
-    - not pre-rollback: a rollback must never run migrations. Rolling back to
-      the previous image on the migrated schema is precisely what the
-      expand/contract rules guarantee, and a "down" migration is not how the
-      way back works here.
-
-  ArgoCD and Flux map pre-upgrade to PreSync and will run this on every sync,
-  including the first. Both migration runners are idempotent (prisma keeps its
-  applied-checksum table, goose its version table) and hold an advisory lock,
-  so a redundant run is a no-op that exits 0.
-
-  Opt out with `app.migrations.preRoll: false`, for an operator who applies
-  migrations themselves as a separate pipeline step. They then still run inside
-  the containers on boot, so nothing is skipped by turning this off.
+  pre-upgrade only: never pre-install (the Secrets it reads do not exist yet;
+  the first install's worker runs the upgrade) and never pre-rollback (a
+  rollback never migrates; expand/contract makes the old image safe).
+  ArgoCD and Flux map pre-upgrade to PreSync; `upgrade` is idempotent, so a
+  redundant run exits 0. `app.migrations.preRoll: false` turns it off.
 */}}
 {{- $preRoll := dig "migrations" "preRoll" true .Values.app }}
-{{- if $preRoll }}
+{{- if and $preRoll (eq (include "langwatch.storedObjects.serializeUpgradesActive" .) "true") }}
 {{- $name := printf "%s-migrate-pre-roll" .Release.Name }}
-{{/* The migration sequence can legitimately take a long time on a large
-     installation, and a deadline shorter than the work turns a slow migration
-     into a failed upgrade half way through the DDL. The app's own startupProbe
-     budget is 40 minutes for the same sequence plus a boot, so this default
-     sits just under it. */}}
+{{/* The upgrade can legitimately take a long time on a large installation,
+     and a deadline shorter than the work turns a slow migration into a failed
+     upgrade half way through the DDL. The app's startupProbe budget is 40
+     minutes, which a first install spends on the same upgrade plus a boot, so
+     this default sits just under it. */}}
 {{- $deadline := dig "migrations" "preRollTimeoutSeconds" 2100 .Values.app }}
 apiVersion: batch/v1
 kind: Job
@@ -104,10 +79,10 @@ spec:
             {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          # The migration half of the app's own start script, and nothing else:
-          # no listener, no queues, no projections. A serving process holding
-          # DDL locks is how deploys die (ARCHITECTURE.md §7). The image has no
-          # workspace root package.json, so it runs from the api like the app.
+          # The upgrade and nothing else: no listener, no queues, no
+          # projections. A serving process holding DDL locks is how deploys
+          # die (ARCHITECTURE.md §7). The image has no workspace root
+          # package.json, so it runs the api's one preparation script.
           workingDir: /app/apps/api
           command: ["pnpm"]
           args: ["-s", "run", "start:prepare:db"]

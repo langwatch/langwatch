@@ -1,5 +1,4 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
-import { AuthzService as AuthzServiceContract } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
@@ -26,10 +25,6 @@ function makeService({ listing = new StubAuthzListingRepository(), reader = make
 }
 
 describe("AuthzService portable facade", () => {
-  it("is the concrete implementation of the portable capability", () => {
-    expect(makeService().service).toBeInstanceOf(AuthzServiceContract);
-  });
-
   /** @scenario "Authorization witnesses can only be minted by the service" */
   /** @scenario "A declared check and an imperative check decide through the same service" */
   /** @scenario "A passing imperative check returns a proof, not a boolean" */

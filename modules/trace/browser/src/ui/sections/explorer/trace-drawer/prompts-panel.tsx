@@ -1,5 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatDuration } from "@langwatch/design-system/display-formatters";
 import {
   Badge,
@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo } from "react";
 import {
@@ -23,14 +24,14 @@ import {
 } from "react-icons/lu";
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
+import { useSpansFull } from "../../../../features/span/behavior/use-spans-full.ts";
+import { usePromptByHandle } from "../../../../features/trace-drawer/behavior/use-prompt-by-handle.ts";
 import type { PromptReference } from "../../../../model/prompt-attributes.ts";
 import {
   extractPromptReference,
   parseTracePromptIds,
   promptReferenceKey,
 } from "../../../../model/prompt-attributes.ts";
-import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
-import { useSpansFull } from "../hooks/use-spans-full.ts";
 
 interface PromptsPanelProps {
   trace: TraceHeader;
@@ -159,7 +160,7 @@ export function PromptsPanel({
 }: PromptsPanelProps) {
   const { openDrawer } = useDrawer();
   const onOpenPromptEditor = (handle: string) => {
-    openDrawer("promptEditor", { promptId: handle });
+    openDrawer(PromptEditorDrawerToken, { promptId: handle });
   };
 
   const fallbackRefs = useMemo(() => parseTracePromptIds(trace.attributes), [trace.attributes]);

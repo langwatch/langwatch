@@ -1,7 +1,6 @@
 /**
  * Operator task for controlled S3 <-> Azure Blob migration.
  */
-import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
 import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
@@ -14,10 +13,6 @@ const azureCredentials = AzureBlobCredentialsService.create();
 import { z } from "zod";
 
 import type { ObjectStorageMigrationInventoryRepository } from "#repositories/object-storage-migration-inventory.repository";
-import {
-  MigrationCutoverAuditRedisRepository,
-  type MigrationCutoverRedisConfig,
-} from "#repositories/redis/redis.object-storage-migration-audit.repository";
 import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 
 import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules.ts";
@@ -26,10 +21,7 @@ import {
   type MigrationFinalizeReport,
   type MigrationPlan,
   type ObjectStorageMigrationDeps,
-  type QueueMigrationBlocker,
 } from "../services/object-storage-migration.service.ts";
-
-const logger = createLogger("langwatch:tasks:migrate-object-storage");
 
 const providerSchema = z.enum(["s3", "azure"]);
 const authModeSchema = z.enum(["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"]);
@@ -125,7 +117,7 @@ function parseMigrationTaskPhase(value: string | undefined): MigrationTaskPhase 
   throw new Error('Migration phase must be one of "plan", "copy", "finalize", or "verify"');
 }
 
-export function assertMigrationPhaseMatchesActiveProvider({
+function assertMigrationPhaseMatchesActiveProvider({
   phase,
   config,
   activeEnvironment,
@@ -241,13 +233,6 @@ export function createMigrationTask({
     writesPaused: () => config.writesPaused,
     readsPaused: () => config.readsPaused,
   });
-}
-
-/** The cutover's group-queue check, over the process's own Redis resolution. */
-export async function auditQueuesForCutover(
-  config: MigrationCutoverRedisConfig,
-): Promise<QueueMigrationBlocker[]> {
-  return MigrationCutoverAuditRedisRepository.create({ config, logger }).audit();
 }
 
 /** Runs one phase of the migration. */

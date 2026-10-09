@@ -3,7 +3,7 @@ import { useDebounce } from "use-debounce";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { InstancesTable } from "../blocks/instances-table.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 import { InstanceDetailDrawer } from "./instance-detail-drawer.tsx";
 
 const PAGE_SIZE = 25;
@@ -25,7 +25,7 @@ export default function SelfHostedInstancesView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Self-hosted installs"
         searchValue={search}
         onSearchChange={(value) => {
@@ -48,7 +48,7 @@ export default function SelfHostedInstancesView() {
           isLoading={list.isLoading}
           onOpen={setOpenId}
         />
-      </BackofficeTable>
+      </AdminTable>
 
       <InstanceDetailDrawer instanceRowId={openId} onClose={() => setOpenId(null)} />
     </>

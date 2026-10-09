@@ -14,7 +14,7 @@ import {
   isMicrosoftGraphUrl,
   microsoftDirectoryEvents,
   readDirectoryUserRows,
-} from "../../rules/microsoft-graph-directory.rules.ts";
+} from "../../features/microsoft/rules/microsoft-graph-directory.rules.ts";
 
 const USER_ID = "f6481ec4-e30f-4bf3-954f-2a8f29bb1c4a";
 

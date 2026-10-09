@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
-  ScimService,
   type ScimListResponse,
   type ScimUser,
   scimPatchRequestSchema,
@@ -13,6 +12,7 @@ import { ScimDirectoryStreamService } from "../services/scim-directory-stream.se
 import { ScimDirectoryService } from "../services/scim-directory.service.ts";
 import type { ScimDirectoryRepository } from "../services/scim-directory.service.ts";
 import { ScimGrantsService } from "../services/scim-grants.service.ts";
+import type { ScimService } from "../services/scim.service.ts";
 import { GrantsFake } from "./support/grants-fake.ts";
 
 function groupsRepository(): ScimDirectoryRepository {
@@ -68,7 +68,7 @@ const scimUserList: ScimListResponse<ScimUser> = {
   Resources: [scimUser],
 };
 
-class ScimServiceFake extends ScimService {
+class ScimServiceFake implements Pick<ScimService, keyof ScimService> {
   readonly findOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_1" }));
   readonly createUser: ScimService["createUser"] = vi.fn(async () => scimUser);
   readonly listUsers: ScimService["listUsers"] = vi.fn(async () => scimUserList);
@@ -93,6 +93,7 @@ class ScimServiceFake extends ScimService {
   readonly replaceGroup: ScimService["replaceGroup"] = vi.fn();
   readonly updateGroup: ScimService["updateGroup"] = vi.fn();
   readonly deleteGroup: ScimService["deleteGroup"] = vi.fn();
+  readonly toScimUser: ScimService["toScimUser"] = vi.fn();
 }
 
 describe("SCIM characterization: group PATCH membership and operation casing", () => {

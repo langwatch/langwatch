@@ -24,6 +24,7 @@ import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 import { LicenseRefreshService } from "../license-refresh.service.ts";
 import { LicenseSyncService } from "../license-sync.service.ts";
+import { appliedConnectFacts } from "./support/applied-connect-facts.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";
@@ -175,6 +176,7 @@ describe("a reissued license over a sync", () => {
     const refresher = LicenseRefreshService.create({
       install: ConnectInstallService.create({
         organizations,
+        facts: appliedConnectFacts(rows),
         identity: InstanceIdentityService.create({
           repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
           newInstanceId: () => INSTANCE,
@@ -190,7 +192,7 @@ describe("a reissued license over a sync", () => {
         publicKey: TEST_PUBLIC_KEY,
       }),
       instanceId: async () => INSTANCE,
-      organizations,
+      facts: appliedConnectFacts(rows),
       seats: { getMemberCount: async () => 53, getMembersLiteCount: async () => 7 },
       licenses: {
         validateAndStoreLicense: async ({ licenseKey }) => {

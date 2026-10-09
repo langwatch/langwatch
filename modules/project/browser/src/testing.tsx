@@ -5,6 +5,9 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { UiHostServiceProvider } from "@langwatch/browser-host/capabilities";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -65,7 +68,6 @@ export class FakeProjectHost extends ProjectHostApi {
       project?: ProjectHostProject | null;
       permissions?: readonly string[];
       isLiteMember?: boolean;
-      flags?: readonly string[];
       projectSwitcher?: ReactNode;
     } = {},
   ) {
@@ -92,10 +94,6 @@ export class FakeProjectHost extends ProjectHostApi {
     return this.options.isLiteMember ?? false;
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return (this.options.flags ?? ["release_ui_ai_governance_enabled"]).includes(flag);
-  }
-
   projectSwitcher(): ReactNode | null {
     return this.options.projectSwitcher ?? null;
   }
@@ -113,6 +111,14 @@ export class FakeProjectHost extends ProjectHostApi {
   }
 }
 
+/** The governance section flag, on as it is by default (ADR-038). */
+const GOVERNANCE_ON = new Map([
+  [
+    UiFlagsService.name,
+    { flag: ({ name }: ReleaseFlagToken) => name === "release_ui_ai_governance_enabled" },
+  ],
+]);
+
 /** Renders the screen inside the Design System's provider and a host. */
 export function renderWithProjectHost(
   element: ReactElement,
@@ -122,7 +128,9 @@ export function renderWithProjectHost(
     host,
     ...render(
       <ChakraProvider value={defaultSystem}>
-        <ProjectHostProvider value={host}>{element}</ProjectHostProvider>
+        <UiHostServiceProvider value={GOVERNANCE_ON}>
+          <ProjectHostProvider value={host}>{element}</ProjectHostProvider>
+        </UiHostServiceProvider>
       </ChakraProvider>,
     ),
   };

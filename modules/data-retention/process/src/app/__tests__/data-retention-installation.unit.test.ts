@@ -7,14 +7,13 @@ import {
 } from "@langwatch/data-retention-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
 import {
   createDataRetentionTestAuthz,
   createDataRetentionTestEntitlement,
-  createDataRetentionTestOrganizations,
-  createDataRetentionTestProjects,
   createDataRetentionTestUsers,
   retentionTestGraph,
 } from "./data-retention.fixture.ts";
@@ -34,8 +33,6 @@ function process(
       },
     })
     .provide({
-      project: createDataRetentionTestProjects(),
-      organization: createDataRetentionTestOrganizations(),
       authz: createDataRetentionTestAuthz(),
       user: createDataRetentionTestUsers(),
       entitlement: createDataRetentionTestEntitlement(),
@@ -51,30 +48,49 @@ describe("data retention app installation", () => {
 
       expect(runtime.module(dataRetentionProcessModule).provided).toBe(app);
 
+      // The memory placement reader starts empty: a project with no row is refused, not defaulted.
       await expect(
         app.getResolvedForProject({ projectId: retentionTestGraph.projectId }),
-      ).resolves.toEqual({
-        traces: PLATFORM_DEFAULT_RETENTION_DAYS,
-        scenarios: PLATFORM_DEFAULT_RETENTION_DAYS,
-        experiments: PLATFORM_DEFAULT_RETENTION_DAYS,
-      });
+      ).rejects.toMatchObject({ code: "project_not_found" });
+      expect(app.getPlatformDefaultRetentionDays()).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
 
       await expect(app.listByProject({ projectId: retentionTestGraph.projectId })).resolves.toEqual(
         [],
       );
 
-      // The settings page's read: its directory comes from the registry, not a member.
+      // The settings page's read resolves through the same reader, so it refuses the same way.
       await expect(
         app.getPolicySnapshot({ projectId: retentionTestGraph.projectId, userId: "user-1" }),
-      ).resolves.toMatchObject({ projectId: retentionTestGraph.projectId, rules: [] });
+      ).rejects.toMatchObject({ code: "project_not_found" });
     } finally {
       await runtime.stop();
     }
   });
 
+  describe("when a worker installs data retention", () => {
+    /** @scenario "Data retention installs no project-scope fold and no replay step" */
+    it("hosts no project-scope pipeline and collects no project-scope replay step", async () => {
+      const runtime = await process("worker").boot();
+
+      try {
+        const steps = runtime.migrationSteps(isMigrationStep).map(({ id }) => id);
+
+        expect(steps).not.toContain("data-retention:replay-project-scope");
+        expect(dataRetentionProcessModule.eventing?.pipeline).toContain(
+          "data_retention_seat_policy",
+        );
+        expect(dataRetentionProcessModule.eventing?.pipeline).not.toContain(
+          "data_retention_project_scope",
+        );
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when boot validates a platform default named in its configuration", () => {
     /** @scenario "Boot supplies the platform default" */
-    it("resolves every project to that default, with the contract reading no environment", async () => {
+    it("resolves a scope with no rule to that default, with the contract reading no environment", async () => {
       const runtime = await process("api", {
         platformDefaultDays: "7",
         nodeEnvironment: "test",
@@ -82,9 +98,11 @@ describe("data retention app installation", () => {
 
       try {
         await expect(
-          runtime
-            .service(DataRetentionApi)
-            .getResolvedForProject({ projectId: retentionTestGraph.projectId }),
+          runtime.service(DataRetentionApi).previewScopeRemoval({
+            organizationId: retentionTestGraph.organizationId ?? "",
+            scope: { scopeType: "ORGANIZATION", scopeId: retentionTestGraph.organizationId ?? "" },
+            userId: "user-1",
+          }),
         ).resolves.toEqual({ traces: 7, scenarios: 7, experiments: 7 });
       } finally {
         await runtime.stop();

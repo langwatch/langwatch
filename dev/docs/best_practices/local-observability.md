@@ -15,7 +15,10 @@ The stack is **not a compose service**. `haven` (thuishaven — the hostname-bas
 local-dev orchestrator) owns its lifecycle. That buys three things a raw
 `docker compose up` did not:
 
-- **It runs on colima, not Docker Desktop.** The VM has an explicit, per-profile
+- **On macOS it runs natively by default; elsewhere it runs on colima.** The
+  native tier (Grafana, Prometheus, Loki, Tempo, Alloy) needs no container
+  runtime, and Pyroscope exists only on the container tier. The rest of this
+  bullet describes the container tier, which uses colima, not Docker Desktop. The VM has an explicit, per-profile
   RAM/CPU/disk ceiling, so a background telemetry stack can never take the whole
   machine. haven starts colima if it is down; a profile it creates is capped, one
   that already exists is never resized out from under you.
@@ -37,7 +40,7 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
 ## TL;DR
 
 ```bash
-make observability            # start the capped stack on colima (OTLP :4318, Grafana :3000)
+make observability            # start the capped stack (native on macOS, colima elsewhere) (OTLP :4318, Grafana :3000)
                               #   (equivalently: haven restart obs)
 make observability-connect    # mint a Grafana token + configure gcx
 # any pnpm dev stack you start while it is up exports to it automatically,
@@ -55,7 +58,7 @@ stack health and the image actually running.
 Retention and the resource ceilings live in `haven`'s
 `domain.DefaultObservabilityLimits` (a debugging window, not an archive). The
 stack keeps **no volume**, so stopping it reclaims every byte regardless. Override the image or ports with `HAVEN_OBS_IMAGE`,
-`LW_OBS_GRAFANA_PORT`, `LW_OBS_OTLP_HTTP_PORT`; pick the colima profile with
+`LW_OBS_GRAFANA_PORT`, `LW_OBS_OTLP_HTTP_PORT`; pick the colima profile (container tier only) with
 `HAVEN_COLIMA_PROFILE`.
 
 ## What ships where
@@ -65,7 +68,7 @@ stack keeps **no volume**, so stopping it reclaims every byte regardless. Overri
 | Traces   | Tempo      | `OTEL_EXPORTER_OTLP_ENDPOINT`              | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`        |
 | Logs     | Loki       | `PINO_OTEL_ENABLED=true`                   | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT`   |
 | Metrics  | Prometheus | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
-| Profiles | Pyroscope  | `PYROSCOPE_SERVER_ADDRESS`                 | `PYROSCOPE_SERVER_ADDRESS`                             |
+| Profiles | Pyroscope (container tier only) | `PYROSCOPE_SERVER_ADDRESS`                 | `PYROSCOPE_SERVER_ADDRESS`                             |
 
 `make observability-connect` sets all of these in `.env` for you
 (backing it up first). The Go services **dual-export**: their product/customer

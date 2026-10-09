@@ -1,4 +1,4 @@
-import { InMemoryProcessStore } from "@langwatch/eventing";
+import type { InMemoryProcessStore } from "@langwatch/eventing";
 
 import type { AutomationRepositories } from "../automation.repositories.ts";
 import { MemoryAutomationCallCounterRepository } from "./memory.automation-call-counter.repository.ts";
@@ -16,9 +16,11 @@ import { MemoryTriggerRepository } from "./memory.trigger.repository.ts";
 
 /** The "memory" tier: every automation row the app is tested without a database. */
 export class MemoryAutomationRepositories {
-  static readonly requires = [] as const;
+  static readonly requires = ["processStore"] as const;
 
-  static create(): AutomationRepositories {
+  static create({
+    processStore,
+  }: Readonly<{ processStore: InMemoryProcessStore }>): AutomationRepositories {
     // One store behind all seven rows, the way one database serves them: a
     // trigger written through `triggers` is the trigger `names` answers with
     // and the trigger a graph incident is opened against.
@@ -36,7 +38,7 @@ export class MemoryAutomationRepositories {
       callCounter: MemoryAutomationCallCounterRepository.create(),
       containmentClaims: MemoryAutomationContainmentClaimRepository.create(),
       emailCaps: MemoryAutomationEmailCapRepository.create(),
-      processStore: InMemoryProcessStore.createForLocalDevelopment(),
+      processStore,
     };
   }
 }

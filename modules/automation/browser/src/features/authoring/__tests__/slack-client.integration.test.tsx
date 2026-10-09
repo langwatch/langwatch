@@ -77,25 +77,6 @@ vi.mock("../../../behavior/automation-feedback.ts", () => ({
       fallbackTitle ?? "Something went wrong",
 }));
 
-vi.mock("../../../behavior/slack-api.ts", () => ({
-  slackApi: {
-    slackIntegration: {
-      list: {
-        useQuery: () => ({
-          data: connectionList.current
-            ? {
-                connections: connectionList.current,
-                canManageProject: connectionList.canManage,
-                canManageOrganization: false,
-              }
-            : undefined,
-          refetch: vi.fn(),
-        }),
-      },
-    },
-  },
-}));
-
 vi.mock("../../../behavior/automation-api.ts", () => ({
   api: {
     automation: {
@@ -119,6 +100,22 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
           isPending: false,
           isError: !!mutationError.current,
           error: mutationError.current,
+        }),
+      },
+    },
+  },
+  slackApi: {
+    slackIntegration: {
+      list: {
+        useQuery: () => ({
+          data: connectionList.current
+            ? {
+                connections: connectionList.current,
+                canManageProject: connectionList.canManage,
+                canManageOrganization: false,
+              }
+            : undefined,
+          refetch: vi.fn(),
         }),
       },
     },

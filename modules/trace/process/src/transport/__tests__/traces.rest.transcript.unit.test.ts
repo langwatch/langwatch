@@ -52,25 +52,28 @@ function mount(readTraceTranscript: TraceApi["readTraceTranscript"]) {
     ],
   });
 
-  return (traceId: string) =>
-    hono.request(`http://api.test/api/v1/traces/${traceId}/transcript`, { method: "GET" });
+  return (traceId: string, base = "/api/v1/traces") =>
+    hono.request(`http://api.test${base}/${traceId}/transcript`, { method: "GET" });
 }
 
 describe("GET /api/v1/traces/:traceId/transcript", () => {
   describe("when the trace resolves", () => {
     /** @scenario "The REST transcript route answers one trace's transcript for the API key" */
-    it("answers the transcript read with the key's own credential", async () => {
-      const read = vi.fn(async () => transcript);
-      const res = await mount(read)("trace-abc");
+    it.each(["/api/v1/traces", "/api/traces"])(
+      "answers the transcript read with the key's own credential at %s",
+      async (base) => {
+        const read = vi.fn(async () => transcript);
+        const res = await mount(read)("trace-abc", base);
 
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual(transcript);
-      expect(read).toHaveBeenCalledWith({
-        projectId: "project-1",
-        traceId: "trace-abc",
-        principal: { type: "apiKey" as const, id: "key-1" },
-      });
-    });
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual(transcript);
+        expect(read).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "trace-abc",
+          principal: { type: "apiKey" as const, id: "key-1" },
+        });
+      },
+    );
   });
 
   describe("when no trace matches", () => {

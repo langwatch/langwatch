@@ -46,6 +46,8 @@ export abstract class ScenarioRepository {
   }): Promise<ScenarioLookup>;
   abstract findAll(input: { projectId: string }): Promise<Scenario[]>;
   abstract count(input: { projectId: string }): Promise<number>;
+  /** Active scenarios across the projects, which the cloud Free scenario cap counts. */
+  abstract countActiveByProjects(input: { projectIds: string[] }): Promise<number>;
   abstract update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario>;
   abstract findVersions(
     input: ScenarioVersionListInput & { take: number },

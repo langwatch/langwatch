@@ -16,8 +16,7 @@ export const planProviderUserSchema = z.object({
 
 /**
  * The operator behind a request, as a door knows them: identifiers only. The
- * plan sources read an email, and looking one up is the app's work, not a
- * transport's.
+ * subscription source decides any override from the impersonator's id.
  */
 export const entitlementOperatorSchema = z.object({
   id: z.string(),

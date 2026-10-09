@@ -402,6 +402,8 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | `size-prod.yaml`        | Production, single-node CH    | ~8.9 CPU, ~23 Gi            |
 | `size-ha.yaml`          | HA production, replicated CH  | ~23 CPU, ~85 Gi             |
 
+`size-prod.yaml` and `size-ha.yaml` run more than one replica, so they need `app.dataplane` (S3 or Azure Blob) for stored objects. `cold-storage-s3.yaml` covers ClickHouse only.
+
 ### Access Overlays
 
 | Overlay                | Description                          |
@@ -473,8 +475,8 @@ clickhouse:
 The chart-managed ClickHouse is pinned to a version the release is tested
 against. An external instance is yours, so the version is your choice.
 LangWatch supports ClickHouse 25.8 and later, including 26.x and ClickHouse
-Cloud. The app runs its ClickHouse migrations at startup, so the version has to
-accept every migration in the release you deploy.
+Cloud. The upgrade applies the release's ClickHouse migrations before the app
+starts, so the version has to accept every migration in the release you deploy.
 
 ### Auto-Tuning
 
@@ -507,7 +509,7 @@ Three things to know when running it:
 
    The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
-3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. The workers also run the upgrade, so the chart refuses `workers.enabled=false`.
 
 ## Upgrade
 
@@ -516,10 +518,12 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
 
-Database migrations run automatically on startup. Set `SKIP_PRISMA_MIGRATE=true` to disable PostgreSQL migrations if needed.
+The new worker pods run `pnpm task upgrade` on start, and the new api pods are not ready until it completes, so the previous version keeps serving meanwhile and if it fails. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), a pre-upgrade Job runs it on the new image before any pod rolls instead, and a failure fails the `helm upgrade`. On a first install the worker runs it once on its first boot.
+
+Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. With serialised upgrades, to run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new api pods are not ready.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 

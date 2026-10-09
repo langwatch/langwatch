@@ -6,8 +6,11 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { TraceListEventGroup, TraceListItem } from "../../../../../types/trace.ts";
-import { NO_TRACE_EVENTS } from "../../../../../types/trace.ts";
+import type {
+  TraceListEventGroup,
+  TraceListItem,
+} from "../../../../../../../../behavior/explorer/types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { EventsCell } from "../events-cell.tsx";
 
 afterEach(cleanup);

@@ -8,15 +8,13 @@ import { EvaluatorNotFoundError } from "@langwatch/evaluator-contract";
 import {
   MonitorEvaluatorRequiredError,
   MonitorNotFoundError,
+  MonitorParametersUnusedError,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import {
-  FakeEvaluatorSettings,
-  FakeMonitorEvaluators,
-} from "../../app/__tests__/monitor.fixture.ts";
+import { FakeMonitorEvaluators, FakeRecoverySwitch } from "../../app/__tests__/monitor.fixture.ts";
 import { MonitorService } from "../../services/monitor.service.ts";
 import { MemoryMonitorRepository } from "../memory/memory.monitor.repository.ts";
 
@@ -55,7 +53,7 @@ function harness(
     service: MonitorService.create({
       repository,
       evaluators,
-      evaluation: new FakeEvaluatorSettings(),
+      featureFlags: new FakeRecoverySwitch(),
       generateId: () => options.id ?? "monitor_test",
     }),
   };
@@ -101,6 +99,25 @@ describe("MonitorService", () => {
 
     expect(updated.mappings).toEqual({ mapping: {}, expansions: [] });
     expect(updated.evaluatorId).toBe("evaluator_1");
+  });
+
+  describe("when the settings-recovery switch cannot be read", () => {
+    it("keeps recovery active and refuses parameters the runner would not read", async () => {
+      const recoverySwitch = new FakeRecoverySwitch();
+      recoverySwitch.unreadable = true;
+      const service = MonitorService.create({
+        repository: MemoryMonitorRepository.create(),
+        evaluators: new FakeMonitorEvaluators(["evaluator_1"], {
+          evaluator_1: { evaluatorType: "langevals/llm_boolean", prompt: "Polite?" },
+        }),
+        featureFlags: recoverySwitch,
+        generateId: () => "monitor_test",
+      });
+
+      await expect(
+        service.create({ ...create, evaluatorId: "evaluator_1", parameters: { prompt: "Rude?" } }),
+      ).rejects.toBeInstanceOf(MonitorParametersUnusedError);
+    });
   });
 
   /** @scenario "Explicitly removing an evaluator is rejected" */

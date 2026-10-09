@@ -1,6 +1,7 @@
 // julia's lane: orchestrator that implements RuntimeApi.
 // Wired up by the CLI through its static import of `runtime`.
 
+import { scaffoldEnvFile } from "../shared/env.ts";
 import { featureEnv, resolveEffectiveFeatures } from "../shared/features.ts";
 import type {
   RuntimeApi,
@@ -12,14 +13,12 @@ import { startAigateway } from "./aigateway.ts";
 import { ensureAppDir } from "./app-dir.ts";
 import { startClickhouse } from "./clickhouse.ts";
 import { readEnvFile } from "./env-file.ts";
-import { scaffoldEnv } from "./env.ts";
 import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { ensureLangyCli } from "./langy-cli.ts";
 import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
-import { runMigrations } from "./migrate.ts";
 import { startNlpgo } from "./nlpgo.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { ensureTiktokenEncodings } from "./offline-defaults.ts";
@@ -42,8 +41,13 @@ function busFor(ctx: RuntimeContext): EventBus {
 }
 
 const runtimeImpl: RuntimeApi = {
-  async scaffoldEnv(ctx, opts) {
-    return scaffoldEnv(ctx, opts);
+  // Idempotent .env scaffolder. reconcilePorts defaults to true (start flow).
+  async scaffoldEnv(ctx, { shouldReconcilePorts = true } = {}) {
+    return scaffoldEnvFile({
+      ports: ctx.ports,
+      path: ctx.envFile,
+      shouldReconcilePorts,
+    });
   },
 
   async installServices(ctx) {
@@ -83,16 +87,6 @@ const runtimeImpl: RuntimeApi = {
       startClickhouse(ctx, bus),
     ]);
     handles.push(pg, redis, ch);
-
-    // Phase 2: migrations (Prisma + ClickHouse goose). Both shell out to
-    // the langwatch app's existing pnpm scripts so we stay in lockstep with
-    // helm/docker.
-    try {
-      await runMigrations(ctx, bus, envFromFile);
-    } catch (err) {
-      await stopHandles(handles);
-      throw err;
-    }
 
     // Phase 3: app-tier services in parallel. The langwatch app receives
     // userEnv overlay so the user's provider keys (OPENAI_API_KEY etc.)

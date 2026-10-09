@@ -2,6 +2,7 @@ import { type OrganizationRole } from "@langwatch/authorization";
 import {
   bindingScopeCanGrantPermission,
   builtinRolePermissions,
+  seatCapsBinding,
   roleKeyForTeamRole,
   type AuthzAccessBinding,
   type AuthzAccessBreakdownInput,
@@ -127,15 +128,23 @@ export class AuthzGrantReaderService {
       groupIds,
     });
     const scopes = await this.scopeContext({ organizationId, bindings });
-    const bindingSummary = (binding: AuthzAccessBinding) => ({
-      id: binding.id,
-      role: binding.role,
-      customRoleName: binding.customRole?.name ?? null,
-      scopeType: binding.scopeType,
-      scopeId: binding.scopeId,
-      scopeName: scopes.names.get(binding.scopeId) ?? null,
-      permissions: this.permissionsForBinding(binding),
-    });
+    const bindingSummary = (binding: AuthzAccessBinding) => {
+      const permissions = this.permissionsForBinding(binding);
+      return {
+        id: binding.id,
+        role: binding.role,
+        customRoleName: binding.customRole?.name ?? null,
+        scopeType: binding.scopeType,
+        scopeId: binding.scopeId,
+        scopeName: scopes.names.get(binding.scopeId) ?? null,
+        permissions,
+        cappedBySeat: seatCapsBinding({
+          binding: { scopeType: binding.scopeType, viaGroupId: binding.groupId },
+          organizationRole: organizationRole ?? "MEMBER",
+          permissions,
+        }),
+      };
+    };
     const groupBindings = new Map<string, AuthzAccessBinding[]>();
     for (const binding of bindings) {
       if (!binding.groupId) {

@@ -23,7 +23,7 @@ export class UndeclaredSecretError extends HandledError {
 }
 
 /** A required secret no adapter answered, refused by its one id. */
-export class AbsentSecretError extends HandledError {
+export class SecretNotSetError extends HandledError {
   constructor(id: string) {
     super(
       "secret_absent",

@@ -1,19 +1,23 @@
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type {
+  NamedTopicCounts,
   Topic,
   TopicApi,
   TopicClusteringRunHistoryEntry,
   TopicClusteringRequestInput,
   TopicClusteringStatus,
+  TopicClusteringTriggerResult,
   TopicNamesInput,
   TopicProjectInput,
 } from "@langwatch/topic-contract";
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
-import { TraceApi } from "@langwatch/trace-contract";
+import { TraceApi, type traceFilterInputSchema } from "@langwatch/trace-contract";
+import type { z } from "zod";
 
 import {
   createTopicClusteringProcessingPipeline,
@@ -21,7 +25,11 @@ import {
 } from "../eventing/topic-clustering-processing.pipeline.ts";
 import { TopicClusteringRunner } from "../eventing/topic-clustering-runner.intent.ts";
 import { classifyClusteringError } from "../eventing/topic-clustering.intent.ts";
-import { LegacyImportTopicClusteringMigration } from "../migrations/legacy-import.topic-clustering.migration.ts";
+import {
+  LegacyImportTopicClusteringMigration,
+  type TopicSeedStepInput,
+  type TopicSeedStepReport,
+} from "../migrations/legacy-import.topic-clustering.migration.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TopicClusteringBootstrapService } from "../services/topic-clustering-bootstrap.service.ts";
 import {
@@ -32,21 +40,21 @@ import { TopicClusteringManualRunService } from "../services/topic-clustering-ma
 import { OtelTopicClusteringMetricsService } from "../services/topic-clustering-metrics.service.ts";
 import { ModelProviderTopicClusteringModelsService } from "../services/topic-clustering-models.service.ts";
 import { EventingTopicClusteringScheduleService } from "../services/topic-clustering-schedule.service.ts";
+import { TopicClusteringTriggerService } from "../services/topic-clustering-trigger.service.ts";
+import { TopicCountsService } from "../services/topic-counts.service.ts";
 import { TopicService } from "../services/topic.service.ts";
+import type { TopicBrowserApi } from "../transport/topic.trpc.ts";
 
 /** Eventing-owned schedule read needed by the Topic status projection. */
 export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
 
-type TopicSetup = FeatureSetup<
-  typeof TopicModule.dependencies,
-  never,
-  undefined,
-  TopicRepositories
->;
+const triggerLogger = createLogger("langwatch:topic:clustering-trigger");
 
-export class TopicModule implements TopicApi {
+type TopicSetup = FeatureSetup<typeof TopicModule.dependencies, undefined, TopicRepositories>;
+
+export class TopicModule implements TopicApi, TopicBrowserApi {
   static readonly contract = TopicApiToken;
   static readonly dependencies = {
     evaluations: EvaluationApi,
@@ -55,26 +63,46 @@ export class TopicModule implements TopicApi {
   };
 
   readonly #topics: TopicService;
+  readonly #counts: TopicCountsService;
   readonly #commands: EventingTopicClusteringCommandsService;
   readonly #outcomes: EventingTopicClusteringOutcomeCommandsService;
-  readonly #bootstrap: TopicClusteringBootstrapService;
   readonly #manualRun: TopicClusteringManualRunService;
+  readonly #trigger: TopicClusteringTriggerService;
   readonly #pipeline: TopicClusteringProcessingPipelineDefinition;
+  readonly #seeds: LegacyImportTopicClusteringMigration;
 
   private constructor(parts: {
     topics: TopicService;
+    counts: TopicCountsService;
     commands: EventingTopicClusteringCommandsService;
     outcomes: EventingTopicClusteringOutcomeCommandsService;
-    bootstrap: TopicClusteringBootstrapService;
     manualRun: TopicClusteringManualRunService;
     pipeline: TopicClusteringProcessingPipelineDefinition;
+    seeds: LegacyImportTopicClusteringMigration;
   }) {
+    this.#trigger = TopicClusteringTriggerService.create({
+      clustering: this,
+      reportFailure: (error, { projectId }) =>
+        triggerLogger.error({ error, projectId }, "Topic clustering request failed."),
+      now: () => nowInstant().epochMilliseconds,
+    });
     this.#topics = parts.topics;
+    this.#counts = parts.counts;
     this.#commands = parts.commands;
     this.#outcomes = parts.outcomes;
-    this.#bootstrap = parts.bootstrap;
     this.#manualRun = parts.manualRun;
     this.#pipeline = parts.pipeline;
+    this.#seeds = parts.seeds;
+  }
+
+  /** The `topic:seed-topic-model-history` ledger step's pass, through the connected pipeline. */
+  seedTopicModelHistoryStep(input: TopicSeedStepInput): Promise<TopicSeedStepReport> {
+    return this.#seeds.seedTopicModelHistoryStep(input);
+  }
+
+  /** The `topic:seed-clustering-schedules` ledger step's pass. */
+  seedClusteringSchedulesStep(input: TopicSeedStepInput): Promise<TopicSeedStepReport> {
+    return this.#seeds.seedClusteringSchedulesStep(input);
   }
 
   static create(setup: TopicSetup): TopicModule {
@@ -103,18 +131,15 @@ export class TopicModule implements TopicApi {
       observePayloadSize: (kind, sizeBytes) => metrics.observePayloadSize(kind, sizeBytes),
     });
 
+    const topics = TopicService.create({ repository: repositories.topics, schedule });
+
     return new TopicModule({
-      topics: TopicService.create({
-        repository: repositories.topics,
-        schedule,
-      }),
+      topics,
+      counts: TopicCountsService.create({ traces: dependencies.traces, topics }),
       commands,
       outcomes,
-      bootstrap: TopicClusteringBootstrapService.create({
-        claims: repositories.claims,
-        commands,
-      }),
       manualRun: TopicClusteringManualRunService.create({ runner }),
+      seeds: migration,
       pipeline: createTopicClusteringProcessingPipeline({
         topicClusteringRunStatusStore: repositories.runStatus,
         topicClusteringRunHistoryStore: repositories.runHistory,
@@ -126,8 +151,28 @@ export class TopicModule implements TopicApi {
           metrics,
         },
         seeds: migration,
+        bootstrap: TopicClusteringBootstrapService.create({
+          claims: repositories.claims,
+          commands,
+        }),
       }),
     });
+  }
+
+  /** This module's own application, which the browser door reads through. */
+  topics(): TopicApi {
+    return this;
+  }
+
+  triggerTopicClustering(input: {
+    projectId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<TopicClusteringTriggerResult> {
+    return this.#trigger.trigger(input);
+  }
+
+  getTopicCounts(input: z.infer<typeof traceFilterInputSchema>): Promise<NamedTopicCounts> {
+    return this.#counts.getTopicCounts(input);
   }
 
   /** The pipeline `topic_clustering_processing` registers, built once by {@link create}. */
@@ -151,10 +196,6 @@ export class TopicModule implements TopicApi {
   requestClustering(input: TopicClusteringRequestInput): Promise<void> {
     const { projectId, ...request } = input;
     return this.#commands.requestClustering({ tenantId: projectId, ...request });
-  }
-
-  bootstrapClustering(input: TopicProjectInput): Promise<void> {
-    return this.#bootstrap.bootstrap(input);
   }
 
   /** The tasks role's manual walk over every clustering page for one project. */

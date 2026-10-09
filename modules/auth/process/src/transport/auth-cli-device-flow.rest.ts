@@ -77,7 +77,7 @@ const CLI_DEVICE_FLOW_PROTOCOL = {
  */
 const CLI_DEVICE_FLOW_DOOR = publicRoute({
   reason:
-    "the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals",
+    "the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals",
 });
 
 /**

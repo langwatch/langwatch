@@ -13,7 +13,7 @@ vi.mock("../custom-graph.tsx", () => ({
   CustomGraph: () => <div data-testid="builder-graph" />,
 }));
 
-vi.mock("../langwatch-ql-dashboard-widget.tsx", () => ({
+vi.mock("../../../features/dashboard-widget/ui/sections/langwatch-ql-dashboard-widget.tsx", () => ({
   LangWatchQLDashboardWidget: ({
     chartId,
     granularitySeconds,
@@ -59,11 +59,14 @@ vi.mock("../../../behavior/use-analytics-period.ts", () => ({
   }),
 }));
 
-vi.mock("../dashboard-widget-in-place-editor.tsx", () => ({
-  DashboardWidgetInPlaceEditor: () => null,
-}));
+vi.mock(
+  "../../../features/dashboard-widget/ui/sections/dashboard-widget-in-place-editor.tsx",
+  () => ({
+    DashboardWidgetInPlaceEditor: () => null,
+  }),
+);
 
-vi.mock("../dashboard-widget-frame.tsx", () => ({
+vi.mock("../../../features/dashboard-widget/ui/sections/dashboard-widget-frame.tsx", () => ({
   DashboardWidgetFrame: ({ id, graph }: { id: string; graph: unknown }) => (
     <div data-testid="dashboard-widget" data-id={id} data-graph={JSON.stringify(graph)} />
   ),

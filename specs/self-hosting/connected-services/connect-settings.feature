@@ -114,10 +114,10 @@ Feature: Connect on a self-hosted install
     And the verdicts come back in the shape every other classifier returns
 
   @unit
-  Scenario: An install with its own judge key keeps using it
-    Given the install has its own judge key configured
-    Then eval functions are judged with that key
-    And nothing is sent to the hosted services host
+  Scenario: A self-hosted install never judges with a judge key it sets
+    Given a self-hosted install that sets a judge key
+    Then eval functions are never judged with that key
+    And they are judged through the hosted service only when "Instant Evals" is switched on
 
   @unit
   Scenario: An install with the service off publishes eval functions as unavailable

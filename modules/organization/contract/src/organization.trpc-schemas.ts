@@ -153,6 +153,35 @@ export const organizationApiInviteScopeSchema = z.object({
 });
 export type OrganizationApiInviteScope = z.infer<typeof organizationApiInviteScopeSchema>;
 
+/**
+ * A seat checkout and the invitations that motivated it, the wire billing's
+ * `subscription.upgradeWithInvites` had; organization's invite door now holds it (C2 A).
+ */
+export const organizationApiSeatCheckoutInputSchema = z.object({
+  organizationId: z.string(),
+  baseUrl: z.string(),
+  currency: z.enum(["USD", "EUR"]).optional(),
+  billingInterval: z.enum(["monthly", "annual"]).optional(),
+  totalSeats: z.number().min(1),
+  invites: z.array(
+    z.object({
+      email: z.string().email(),
+      role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
+    }),
+  ),
+});
+export type OrganizationApiSeatCheckoutInput = z.infer<
+  typeof organizationApiSeatCheckoutInputSchema
+>;
+
+/** Where the browser is sent to pay; none when the provider answered no page. */
+export const organizationSeatCheckoutRedirectSchema = z
+  .object({ url: z.string().nullable() })
+  .strict();
+export type OrganizationSeatCheckoutRedirect = z.infer<
+  typeof organizationSeatCheckoutRedirectSchema
+>;
+
 export const organizationApiAcceptInviteInputSchema = z.object({ inviteCode: z.string() });
 export type OrganizationApiAcceptInviteInput = z.infer<
   typeof organizationApiAcceptInviteInputSchema

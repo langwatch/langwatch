@@ -1,7 +1,10 @@
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { twoStepVerificationTrpc } from "@langwatch/identity-contract";
 import { useCallback } from "react";
 
 import { enrollmentGateOf } from "../model/enrollment-gate.ts";
-import { twoStepVerificationApi } from "./two-step-verification-api.ts";
+
+const twoStepVerificationApi = createModuleApi<ContractApiMap<typeof twoStepVerificationTrpc>>();
 
 /**
  * Asked per organization on the way into its data, never once per session, so

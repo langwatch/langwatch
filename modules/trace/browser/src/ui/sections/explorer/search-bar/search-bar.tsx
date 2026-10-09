@@ -21,14 +21,17 @@ import { editorStyles } from "../../../../behavior/editor-styles.ts";
 import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
-import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
-import { useInstantEvalRunStore } from "../../../../behavior/instant-eval-run.store.ts";
 import { registerInstantEvalRoute } from "../../../../behavior/langy/instant-eval-route.bridge.ts";
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
-import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
 import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useSearchSubmitRequestStore } from "../../../../features/explorer/behavior/search-submit-request.store.ts";
+import { useFacetHoverStore } from "../../../../features/facet/behavior/facet-hover.store.ts";
+import { useTraceFacets } from "../../../../features/facet/behavior/use-trace-facets.ts";
+import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
+import { useInstantEvalAccess } from "../../../../features/instant-eval/behavior/use-instant-eval-access.ts";
+import { useInstantEvalRuns } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import {
   instantEvalChipMarks,
   isInstantEvalBusy,
@@ -37,9 +40,6 @@ import { explainAnyError } from "../../errors/index.ts";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
 import { AskAiButton } from "../ai/ask-ai-button.tsx";
-import { useInstantEvalAccess } from "../hooks/use-instant-eval-access.ts";
-import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
-import { useTraceFacets } from "../hooks/use-trace-facets.ts";
 import { InstantEvalConfirmDialog } from "../instant-eval-confirm-dialog.tsx";
 import { InstantEvalRefusalPopover } from "../instant-eval-refusal-popover.tsx";
 import { ActiveSearchEditor } from "./active-search-editor.tsx";
@@ -366,6 +366,7 @@ export const SearchBar: React.FC = () => {
         onClose={instantEval.dismissRefusal}
         onEnable={instantEval.enableInstantEvals}
         isEnabling={instantEval.isEnabling}
+        viaConnect={instantEvalAccess.viaConnect}
       >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>

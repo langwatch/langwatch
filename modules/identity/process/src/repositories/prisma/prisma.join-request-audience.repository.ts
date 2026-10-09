@@ -7,7 +7,7 @@ import type {
   JoinRequestAdmin,
   JoinRequestAudienceRepository,
   JoinRequestAudienceProfile,
-} from "../join-request-audience.repository.ts";
+} from "../../features/join-request/repositories/join-request-audience.repository.ts";
 
 /** Every model a join-request notification reads, and no other. */
 type PrismaJoinRequestAudienceDatabase = Pick<

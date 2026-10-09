@@ -13,16 +13,16 @@ import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryElevenLabsConversationChannel } from "../../channels/memory/memory.elevenlabs-conversation.channel.ts";
-import { MemoryGatewayRealtimeSessionRepository } from "../../repositories/memory/memory.gateway-realtime-session.repository.ts";
-import { GatewayElevenLabsCredentialService } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
-} from "../../services/gateway-realtime-session-reconciliation.service.ts";
-import { GatewayRealtimeSessionSweepService } from "../../services/gateway-realtime-session-sweep.service.ts";
-import type { GatewaySpendConfirmation } from "../../services/gateway-realtime-session.service.ts";
-import { GatewayRealtimeSessionService } from "../../services/gateway-realtime-session.service.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
+} from "../../features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
+import { GatewayRealtimeSessionSweepService } from "../../features/realtime-session/services/gateway-realtime-session-sweep.service.ts";
+import type { GatewaySpendConfirmation } from "../../features/realtime-session/services/gateway-realtime-session.service.ts";
+import { GatewayRealtimeSessionService } from "../../features/realtime-session/services/gateway-realtime-session.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
+import { MemoryGatewayRealtimeSessionRepository } from "../../repositories/memory/memory.gateway-realtime-session.repository.ts";
+import { GatewayElevenLabsCredentialService } from "../../services/gateway-elevenlabs-credential.service.ts";
 import { runGatewayRealtimeSessionReconcile } from "../gateway-realtime-session-reconcile.intent.ts";
 import type { ConfirmSpendCommandData } from "../gateway-spend-commands.process.ts";
 
@@ -46,6 +46,7 @@ async function reconcileOnce(modelProviders: Pick<ModelProviderApi, "getCustomKe
     sessions,
     spendRating: ModelCatalogGatewaySpendRatingService.create(),
     spendConfirmation,
+    spanIngestion: { ingestNormalizedSpan: async () => {} },
   };
   const operations = GatewayRealtimeSessionService.create();
   await operations.reserveRealtimeSession({

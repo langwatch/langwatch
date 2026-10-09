@@ -18,10 +18,10 @@ import {
 } from "@langwatch/coding-agent-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
-import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
 import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { ClaudeAnswersTraceCanonicalisation } from "../../__tests__/fixtures/trace-canonicalisation.fixture.ts";
 import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
 import { codingAgentSessionStateFromRow } from "../../rules/coding-agent-session-state-mapper.rules.ts";
 import { contextUsageKey } from "../../rules/coding-agent-session-usage-key.rules.ts";
@@ -39,7 +39,7 @@ import {
 const SESSION_ID = "8f2c9a1e-4711-4e0f-9d2e-session";
 const TRACE_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 const TRACE_B = "b1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d7";
-const traceCanonicalisation = TraceCanonicalisationService.create();
+const traceCanonicalisation = ClaudeAnswersTraceCanonicalisation.create();
 const stateProjection = CodingAgentSessionStateProjection.create();
 const modelProviders = new TestModelProviderService((input: ModelCostEstimateInput): number => {
   if (input.model === "a-model-no-registry-lists") {

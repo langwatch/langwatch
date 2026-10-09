@@ -1,3 +1,4 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { fromDate } from "@langwatch/time";
 /**
  * @vitest-environment node
@@ -10,7 +11,11 @@ import { MemoryUserRepositories } from "../memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../user.repositories.ts";
 
 const backends: readonly { name: string; create: () => UserRepositories }[] = [
-  { name: "memory", create: () => MemoryUserRepositories.create() },
+  {
+    name: "memory",
+    create: () =>
+      MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
+  },
 ];
 
 const ISSUER = "credential";

@@ -85,6 +85,21 @@ describe("<SignInError/>", () => {
     });
   });
 
+  describe("when an unsolicited single sign-on response meets a browser signed in as someone else", () => {
+    /** @scenario "An unsolicited response for another person is refused while somebody is signed in" */
+    it("asks the person to sign out, then sign in again from their identity provider", () => {
+      renderError("signed_in_as_another_user");
+      expect(
+        screen.getByText(
+          "You are already signed in as someone else. Sign out, then sign in again from your identity provider.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Sign out" }).getAttribute("href")).toBe(
+        FEDERATED_LOGOUT_PATH,
+      );
+    });
+  });
+
   describe("when linking is refused due to a different email (settings flow)", () => {
     it("keeps the user in settings rather than offering a logout", () => {
       renderError("DIFFERENT_EMAIL_NOT_ALLOWED");
@@ -158,6 +173,22 @@ describe("given a sign-in refused because an unconfirmed account holds the addre
 
     expect(screen.getByText(/An account with this address already exists/i)).toBeTruthy();
     expect(screen.getByText(/Sign in the way you did before/i)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+});
+
+describe("given a sign-in method refused until an administrator approves the link", () => {
+  /** @scenario "A handled refusal crosses with its own code" */
+  it("crosses as a stable code, so the screen stays put and offers a sign-out, not a bounce", () => {
+    // Stable is what stops the five-second timer sending them back to the provider.
+    expect(signInErrorMayCross("LINK_NEEDS_APPROVAL")).toBe(true);
+
+    renderError("LINK_NEEDS_APPROVAL");
+
+    expect(screen.getByText("This sign-in method needs approval")).toBeTruthy();
+    expect(screen.getByText(/administrator in your organization can review/i)).toBeTruthy();
+    const recovery = screen.getByRole("link", { name: /sign out.*try again/i });
+    expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });

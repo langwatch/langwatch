@@ -9,7 +9,7 @@
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import { useEffect, useState } from "react";
 
-import type { CompareRow } from "./compare-rows.ts";
+import type { CompareRow } from "../run-compare/compare-rows.ts";
 import type { RunScope } from "./run-configuration.ts";
 import type { RunDialogSubject } from "./run-dialog-types.ts";
 

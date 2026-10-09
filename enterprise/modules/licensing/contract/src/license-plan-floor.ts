@@ -2,7 +2,7 @@
 import { planPublishing } from "@langwatch/plans";
 
 import { UNLIMITED_PLAN } from "./license-constants.ts";
-import type { PlanInfo } from "./license-plan.ts";
+import type { PlanInfo } from "./license-constants.ts";
 
 /**
  * Raises a license-resolved plan so it is never more restrictive than the

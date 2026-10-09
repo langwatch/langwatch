@@ -40,6 +40,12 @@ import {
   type SummaryEvaluation,
 } from "./experiment-summary.ts";
 import { generateHumanReadableId } from "./humanReadableId.ts";
+import {
+  describeRefusedEntry,
+  endsTheRun,
+  halveLogResultsBody,
+  splitLogResultsBody,
+} from "./log-results-batching.ts";
 import type {
   Batch,
   BatchEntry,
@@ -62,12 +68,6 @@ import type {
   TargetExecutionContext,
   TargetContext,
 } from "./types.ts";
-import {
-  describeRefusedEntry,
-  endsTheRun,
-  halveLogResultsBody,
-  splitLogResultsBody,
-} from "./log-results-batching.ts";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
@@ -128,6 +128,9 @@ export class Experiment {
   private batch: Batch = { dataset: [], evaluations: [], targets: [] };
   private lastSentMs = 0;
   private pendingFlush: Promise<void> | null = null;
+  /** Every row and verdict sent so far, by the identity the platform stores it under. */
+  private readonly sentRows = new Set<string>();
+  private readonly sentEvaluations = new Set<string>();
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Cumulative record for printSummary() — never cleared, mirrors batch.
@@ -1072,6 +1075,15 @@ export class Experiment {
       }
     }
 
+    for (const entry of this.batch.dataset) {
+      this.sentRows.add(`${entry.index}:${entry.target_id ?? ""}`);
+    }
+    for (const evaluation of this.batch.evaluations) {
+      this.sentEvaluations.add(
+        `${evaluation.index ?? ""}:${evaluation.target_id ?? ""}:${evaluation.evaluator}`,
+      );
+    }
+
     const body: LogResultsRequest = {
       experiment_slug: this.experimentSlug,
       name: this.name,
@@ -1111,6 +1123,11 @@ export class Experiment {
         created_at: this.createdAtMs,
         finished_at: finished ? Date.now() : null,
       },
+      // What the run reported in total, so a reader can tell results that are still being
+      // stored from a run that is whole.
+      ...(finished
+        ? { expected: { dataset: this.sentRows.size, evaluations: this.sentEvaluations.size } }
+        : {}),
     };
 
     // Fire and forget (with error logging). Requests go out one after another, so the parts

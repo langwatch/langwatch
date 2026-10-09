@@ -15,7 +15,6 @@ import {
   type GetAgentInput,
   type AgentProjectInput,
   type AgentIdsInput,
-  type AgentCreationWindowInput,
   type ListAgentsInput,
   type CreateAgentCommand,
   type UpdateAgentCommand,
@@ -26,11 +25,14 @@ import {
   type AgentReferenceState,
   type AgentName,
   type AgentPage,
+  type WorkflowAgentConfig,
+  httpSecretsKeepingStored,
 } from "@langwatch/agent-contract";
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
-import { httpSecretsKeepingStored, movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
+import { movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
+import { workflowFieldsKeepingStored } from "../rules/agent-view.rules.ts";
 
 export class AgentService {
   #repository: AgentRepository;
@@ -127,6 +129,12 @@ export class AgentService {
       }
       config = httpSecretsKeepingStored({ stored, incoming: checked.data.config });
     }
+    if (checked.data.type === "workflow" && existing.type === "workflow") {
+      config = workflowFieldsKeepingStored({
+        stored: existing.config as WorkflowAgentConfig,
+        incoming: checked.data.config,
+      });
+    }
 
     return this.#repository.update({ ...parsed.data, type, config });
   }
@@ -207,9 +215,5 @@ export class AgentService {
 
   touchLastSeenAt(input: AgentPresenceInput): Promise<void> {
     return this.#repository.touchLastSeenAt(input);
-  }
-
-  findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
-    return this.#repository.findIdsCreatedInWindow(input);
   }
 }

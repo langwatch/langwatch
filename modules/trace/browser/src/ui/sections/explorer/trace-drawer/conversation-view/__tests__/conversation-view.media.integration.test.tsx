@@ -8,11 +8,15 @@ import "@testing-library/jest-dom/vitest";
 
 const turns: TraceListItem[] = [];
 
-vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: { items: turns }, isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -22,15 +26,15 @@ vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turn-events.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
-vi.mock("../../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -56,7 +60,6 @@ vi.mock("../../../../markdown.tsx", () => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: () => false,
   }),
 }));
 
@@ -73,7 +76,10 @@ vi.mock("../../../../simulations/media-part.tsx", () => ({
 
 import type { TraceMediaRef } from "@langwatch/trace-contract";
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../behavior/explorer/types/trace.ts";
 import { ConversationView } from "../conversation-view.tsx";
 
 const CALLER_RECORDING = "/api/files/project-1/caller";

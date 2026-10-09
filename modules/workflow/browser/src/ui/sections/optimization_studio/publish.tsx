@@ -24,6 +24,7 @@ import {
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { nowInstant } from "@langwatch/time";
 import {
   getEntryInputs,
@@ -44,11 +45,11 @@ import {
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi, type RouterOutputs } from "../../../behavior/workflow-api.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
-import { exportedDatasetCutNotice } from "../../../model/workflow-export-dataset.ts";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
 } from "../../../model/studio-dataset.utils.ts";
+import { exportedDatasetCutNotice } from "../../../model/workflow-export-dataset.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { RenderCode } from "../code/render-code.tsx";
 import { useVersionState } from "./use-version-state.ts";
@@ -95,16 +96,17 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
     },
   });
 
-  const toggleSaveAsEvaluatorMutation = workflowApi.optimization.toggleSaveAsEvaluator.useMutation({
-    onSuccess: () => {
-      void trpc.optimization.getComponents.invalidate();
-      toaster.create({
-        title: "Evaluator status updated",
-        type: "success",
-        duration: 5000,
-      });
-    },
-  });
+  const toggleSaveAsEvaluatorMutation =
+    evaluatorClient.evaluators.toggleSaveAsEvaluator.useMutation({
+      onSuccess: () => {
+        void trpc.optimization.getComponents.invalidate();
+        toaster.create({
+          title: "Evaluator status updated",
+          type: "success",
+          duration: 5000,
+        });
+      },
+    });
 
   const toggleSaveAsComponent = () => {
     if (!workflowId || !project?.id) return;
@@ -293,7 +295,7 @@ function PublishMenu({
     },
   });
 
-  const disableAsEvaluatorMutation = workflowApi.optimization.disableAsEvaluator.useMutation({
+  const disableAsEvaluatorMutation = evaluatorClient.evaluators.disableAsEvaluator.useMutation({
     onSuccess: () => {
       void trpc.optimization.getComponents.invalidate();
       toaster.create({

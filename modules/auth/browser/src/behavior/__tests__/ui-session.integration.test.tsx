@@ -5,6 +5,7 @@
  * @vitest-environment jsdom
  */
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,11 +13,9 @@ import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { UiAuthClient } from "../../session";
 import { useBrowserUiSession, useUiSessionReading } from "../ui-session";
 import {
   UI_EFFECTIVE_PERMISSIONS_PROCEDURE,
-  UI_FEATURE_FLAG_PROCEDURE,
   type UiFeatureApiTransport,
 } from "../ui-session-queries";
 import { answeringTransport } from "./answering-transport.test-helpers";
@@ -25,21 +24,14 @@ const JANE = "user-jane";
 
 type Call = { path: string; input: unknown };
 
-/** The two procedures a session is built from, answered from memory. */
-function recordingTransport({
-  permissions = [],
-  enabledFlags = [],
-}: { permissions?: readonly string[]; enabledFlags?: readonly string[] } = {}) {
+/** The procedure a session is built from, answered from memory. */
+function recordingTransport({ permissions = [] }: { permissions?: readonly string[] } = {}) {
   const calls: Call[] = [];
   const transport = answeringTransport((path, input) => {
     calls.push({ path, input });
     switch (path) {
       case UI_EFFECTIVE_PERMISSIONS_PROCEDURE:
         return Promise.resolve({ permissions });
-      case UI_FEATURE_FLAG_PROCEDURE:
-        return Promise.resolve({
-          enabled: typeof input.flag === "string" && enabledFlags.includes(input.flag),
-        });
       default:
         return Promise.reject(new Error(`No test answer for ${path}`));
     }
@@ -109,13 +101,11 @@ function SessionProbe({
   authClient,
   scope = ON_ACME_APP,
   asks = [],
-  flag,
 }: {
   transport: UiFeatureApiTransport;
   authClient: UiAuthClient;
   scope?: UiActiveScopeReading;
   asks?: readonly string[];
-  flag?: string;
 }) {
   const reading = useUiSessionReading({
     feedback: new SilentFeedback(),
@@ -136,7 +126,6 @@ function SessionProbe({
       <span data-testid="answers">
         {asks.map((permission) => `${permission}=${session.hasPermission(permission)}`).join(" ")}
       </span>
-      <span data-testid="flag">{flag ? String(session.isFeatureEnabled(flag)) : ""}</span>
     </div>
   );
 }
@@ -278,87 +267,19 @@ describe("given a screen that asks what the reader may do", () => {
       await waitFor(() =>
         expect(view.getByTestId("answers").textContent).toContain("datasets:view=true"),
       );
-      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2);
+      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1);
     });
 
-    it("asks separately about the resolved project and organization", async () => {
+    it("asks once, about the resolved project, as main did (scope knot Q2)", async () => {
       const { transport, callsTo } = recordingTransport();
 
       const view = renderSession({ transport, authClient: signedInAsJane });
 
       await waitFor(() => expect(view.getByTestId("user").textContent).toBe(JANE));
-      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2));
+      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1));
       expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE).map((call) => call.input)).toEqual([
         { projectId: "proj-app" },
-        { organizationId: "org-acme" },
       ]);
-    });
-  });
-});
-
-describe("given a screen that asks whether a feature is switched on", () => {
-  describe("when it asks for the first time", () => {
-    it("answers no, and has the answer on the render after", async () => {
-      const { transport, callsTo } = recordingTransport({ enabledFlags: ["release_new_thing"] });
-
-      const view = renderSession({
-        transport,
-        authClient: signedInAsJane,
-        flag: "release_new_thing",
-      });
-
-      expect(view.getByTestId("flag").textContent).toBe("false");
-      await waitFor(() => expect(view.getByTestId("flag").textContent).toBe("true"));
-      expect(callsTo(UI_FEATURE_FLAG_PROCEDURE)).toHaveLength(1);
-    });
-
-    it("states both scopes on the read, so a rule that names one can match", async () => {
-      const { transport, callsTo } = recordingTransport({ enabledFlags: ["release_new_thing"] });
-
-      const view = renderSession({
-        transport,
-        authClient: signedInAsJane,
-        flag: "release_new_thing",
-      });
-
-      await waitFor(() => expect(view.getByTestId("flag").textContent).toBe("true"));
-      expect(callsTo(UI_FEATURE_FLAG_PROCEDURE)[0]?.input).toEqual({
-        flag: "release_new_thing",
-        projectId: "proj-app",
-        organizationId: "org-acme",
-      });
-    });
-  });
-
-  describe("when the scope has not resolved yet", () => {
-    it("asks nothing, since a read that leaves out a scope can never match", async () => {
-      const { transport, callsTo } = recordingTransport({ enabledFlags: ["release_new_thing"] });
-
-      const view = renderSession({
-        transport,
-        authClient: signedInAsJane,
-        scope: RESOLVING,
-        flag: "release_new_thing",
-      });
-
-      await waitFor(() => expect(view.getByTestId("user").textContent).toBe(JANE));
-      expect(view.getByTestId("flag").textContent).toBe("false");
-      expect(callsTo(UI_FEATURE_FLAG_PROCEDURE)).toHaveLength(0);
-    });
-  });
-
-  describe("when the flag is off for this scope", () => {
-    it("keeps answering no", async () => {
-      const { transport, callsTo } = recordingTransport({ enabledFlags: [] });
-
-      const view = renderSession({
-        transport,
-        authClient: signedInAsJane,
-        flag: "release_new_thing",
-      });
-
-      await waitFor(() => expect(callsTo(UI_FEATURE_FLAG_PROCEDURE)).toHaveLength(1));
-      expect(view.getByTestId("flag").textContent).toBe("false");
     });
   });
 });

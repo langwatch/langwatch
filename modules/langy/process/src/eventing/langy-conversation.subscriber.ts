@@ -37,7 +37,7 @@ export interface LangyConversationLivenessRecord {
   currentTurnId: string | null;
   lastActivityAtMs: number | null;
 }
-export interface LangyConversationLivenessReader {
+interface LangyConversationLivenessReader {
   /** Throws `langy_conversation_not_found` until the conversation is folded. */
   getById(params: {
     projectId: string;
@@ -97,7 +97,7 @@ type LangyTurnHandoffRecordLookup =
 interface LangyTurnHandoffReader {
   read(params: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffRecordLookup>;
 }
-export interface AgentTurnLivenessSubscriberDeps {
+interface AgentTurnLivenessSubscriberDeps {
   buffer: LangyLivenessBuffer;
   conversations: LangyConversationLivenessReader;
   failTurn: LangyFailTurnCommand;
@@ -105,12 +105,12 @@ export interface AgentTurnLivenessSubscriberDeps {
   handoffStore: LangyTurnHandoffReader;
   clock?: () => number;
 }
-export interface LangyConversationFreshnessRecord {
+interface LangyConversationFreshnessRecord {
   cursor: ProjectionCursor;
   ownerUserId: string;
   isShared: boolean;
 }
-export interface LangyConversationFreshnessReader {
+interface LangyConversationFreshnessReader {
   /** Throws `langy_conversation_not_found` until the conversation is folded. */
   getById(params: {
     projectId: string;
@@ -129,7 +129,7 @@ export interface LangyConversationUpdateChannel {
     eventType: "langy_conversation_updated",
   ): Promise<void>;
 }
-export interface LangyConversationUpdateBroadcastSubscriberDeps {
+interface LangyConversationUpdateBroadcastSubscriberDeps {
   broadcast: LangyConversationUpdateChannel;
   conversations: LangyConversationFreshnessReader;
 }

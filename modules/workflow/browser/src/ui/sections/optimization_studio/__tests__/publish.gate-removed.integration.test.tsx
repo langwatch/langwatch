@@ -94,9 +94,7 @@ vi.mock("../../../../behavior/workflow-api.ts", () => {
           isEvaluator: false,
         }),
         toggleSaveAsComponent: mutationStub(),
-        toggleSaveAsEvaluator: mutationStub(),
         disableAsComponent: mutationStub(),
-        disableAsEvaluator: mutationStub(),
         getComponents: { invalidate: vi.fn() },
       },
       datasetRecord: {
@@ -105,6 +103,24 @@ vi.mock("../../../../behavior/workflow-api.ts", () => {
       workflow: {
         publish: mutationStub(),
         commitVersion: mutationStub(),
+      },
+    },
+  };
+});
+vi.mock("@langwatch/evaluator-client", () => {
+  const mutationStub = () => ({
+    useMutation: () => ({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isLoading: false,
+      isPending: false,
+    }),
+  });
+  return {
+    evaluatorClient: {
+      evaluators: {
+        toggleSaveAsEvaluator: mutationStub(),
+        disableAsEvaluator: mutationStub(),
       },
     },
   };

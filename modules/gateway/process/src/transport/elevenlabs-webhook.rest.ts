@@ -9,14 +9,9 @@ import {
   gatewayElevenLabsWebhookParamsSchema,
 } from "@langwatch/gateway-contract/gateway-elevenlabs-webhook-schemas";
 import { resolveRequestBound } from "@langwatch/plans";
-import { HTTPException } from "hono/http-exception";
 
 const WEBHOOK_PUBLIC_REASON =
   "ElevenLabs delivers this callback publicly; the application verifies the raw bytes against the provider row's stored HMAC secret.";
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -32,7 +27,7 @@ export const elevenLabsWebhookRest = defineRestRouter(GatewayApi)
   .post("/api/elevenlabs/webhook/:modelProviderId", "receiveElevenLabsWebhook")
   .withParams(gatewayElevenLabsWebhookParamsSchema)
   .withRawBody("text")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess({ kind: "public", reason: WEBHOOK_PUBLIC_REASON })
   .withResponse("protocol", {
     produces: "application/json",

@@ -14,10 +14,8 @@ const { state } = vi.hoisted(() => ({
   state: {
     evaluators: [] as Record<string, unknown>[],
     isLoading: false,
-    related: {
-      workflow: null as { id: string; name: string } | null,
-      monitors: [] as { id: string; name: string }[],
-    },
+    related: { workflow: null as { id: string; name: string } | null },
+    monitors: [] as { id: string; name: string; evaluatorId: string | null }[],
     relatedLoading: false,
   },
 }));
@@ -58,6 +56,9 @@ vi.mock("../../../behavior/evaluator-api.ts", () => {
         evaluators: { getAll: { invalidate: calls.invalidateAll } },
         licenseEnforcement: { checkLimit: { invalidate: calls.invalidateLimit } },
       }),
+      monitors: {
+        getAllForProject: { useQuery: () => ({ data: state.monitors, isLoading: false }) },
+      },
     },
   };
 });
@@ -98,12 +99,12 @@ const evaluator = (overrides: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   state.evaluators = [evaluator()];
   state.isLoading = false;
-  state.related = { workflow: null, monitors: [] };
+  state.related = { workflow: null };
+  state.monitors = [];
   state.relatedLoading = false;
   calls.deleteEvaluator.mockReset().mockReturnValue({});
   calls.cascadeArchive.mockReset().mockReturnValue({
     archivedWorkflow: null,
-    deletedMonitorsCount: 0,
   });
   calls.syncFromSource.mockReset().mockReturnValue({ ok: true });
   calls.invalidateAll.mockReset();
@@ -215,13 +216,12 @@ describe("given a project with evaluators", () => {
 
 describe("given an evaluator other things depend on", () => {
   beforeEach(() => {
-    state.related = {
-      workflow: { id: "wf_1", name: "Relevancy workflow" },
-      monitors: [
-        { id: "mon_1", name: "Relevancy on production" },
-        { id: "mon_2", name: "Relevancy on staging" },
-      ],
-    };
+    state.related = { workflow: { id: "wf_1", name: "Relevancy workflow" } };
+    state.monitors = [
+      { id: "mon_1", name: "Relevancy on production", evaluatorId: "eval_1" },
+      { id: "mon_2", name: "Relevancy on staging", evaluatorId: "eval_1" },
+      { id: "mon_3", name: "Toxicity on production", evaluatorId: "eval_2" },
+    ];
   });
 
   describe("when its deletion is started", () => {
@@ -258,7 +258,6 @@ describe("given an evaluator other things depend on", () => {
     it("takes the cascade and reports what else went with it", async () => {
       calls.cascadeArchive.mockReturnValue({
         archivedWorkflow: { id: "wf_1", name: "Relevancy workflow" },
-        deletedMonitorsCount: 2,
       });
       const { host } = renderWithEvaluatorHost(<EvaluatorsScreen />);
 

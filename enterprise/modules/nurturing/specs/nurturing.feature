@@ -100,3 +100,66 @@ Feature: Nurturing sends the signals its owners record
     Given nurturing learned an organization from a live project creation
     When project's backfill records that project again, once or many times
     Then the organization stays unseeded and its first evaluation still raises the milestone
+
+  # Migration plan D.1 (DATA-NURTURING-GUARD): seeded is computed at read, so it also covers
+  # organizations already stored unseeded. The cutover is a constant in the owner-signals rules.
+  @unit
+  Scenario: An organization that held a project before the cutover never gets a first milestone
+    Given an organization whose earliest project was created before nurturing's cutover
+    And nurturing learned it unseeded from a new project's live creation
+    When the first evaluation and the first finished simulation run nurturing counts for it settle
+    Then neither first_evaluation_created nor first_simulation_ran is sent
+
+  @unit
+  Scenario: An organization whose projects all came after the cutover still gets its first milestone
+    Given an organization whose earliest project was created after nurturing's cutover
+    When the first evaluation nurturing counts for it settles
+    Then first_evaluation_created is sent once
+
+  @unit
+  Scenario: An organization with no project its owners hold is not seeded by the cutover
+    Given nurturing learned an organization unseeded and project's table holds none of its projects
+    When nurturing reads whether it is seeded
+    Then only the stored flag decides
+
+  @integration
+  Scenario: Nurturing reads an organization's earliest project through its teams
+    Given an organization with projects in its teams, one of them archived
+    When an evaluation in one of them is counted
+    Then the organization's earliest project creation, archived included, comes with the count
+
+  # Round 46 E1 (R40): nurturing places a project through project's and organization's tables,
+  # never a copy, so a project created before the cutover counts toward its organization.
+  @unit
+  Scenario: An evaluation in a project nurturing never saw created counts toward its organization
+    Given nurturing learned an organization from a live project creation
+    And another of its projects was created before the cutover, so nurturing never saw it created
+    When an evaluation in that older project settles
+    Then nurturing counts it toward the organization
+
+  @unit
+  Scenario: An evaluation in an organization nurturing never learned raises nothing
+    Given a project its owners hold, in an organization nurturing never learned
+    When an evaluation in that project settles
+    Then nothing is counted and no milestone is raised
+
+  @integration
+  Scenario: Nurturing reads a project's organization through its team
+    Given a project stored by project, in a team organization stores under an organization
+    And nurturing learned that organization
+    When an evaluation in that project is counted
+    Then the organization's evaluation count rises by one
+
+  # Round 35 (Alex, 2026-10-08): user's created fact is identify only; sign-ups keep their own facts.
+  @unit
+  Scenario: A minted account is identified to PostHog and Customer.io, with no signed_up
+    Given user records "lw.user.created" for an account minted by any path
+    When the fact is delivered, once or many times
+    Then PostHog and Customer.io each learn the person once, the address and name read fresh from UserApi
+    And no signed_up milestone is tracked
+
+  @unit
+  Scenario: A backfilled created fact is not sent to PostHog or Customer.io
+    Given user's seed step records "lw.user.created" with backfilled set for an older account
+    When the fact is delivered
+    Then nothing is sent to PostHog or Customer.io

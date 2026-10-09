@@ -25,18 +25,14 @@ const mutations = vi.hoisted(() => ({
 }));
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
-    traces: {
-      instantEval: {
-        estimate: { useMutation: () => mutations.estimate },
-        start: { useMutation: () => mutations.start },
-        enable: { useMutation: () => mutations.enable },
-      },
+    instantEval: {
+      estimate: { useMutation: () => mutations.estimate },
+      start: { useMutation: () => mutations.start },
+      enable: { useMutation: () => mutations.enable },
     },
     useUtils: () => ({
-      traces: {
-        instantEval: {
-          access: { setData: mutations.setAccess, invalidate: mutations.invalidateAccess },
-        },
+      instantEval: {
+        access: { setData: mutations.setAccess, invalidate: mutations.invalidateAccess },
       },
     }),
   },
@@ -261,6 +257,25 @@ describe("given Instant Evals are off and the reader may not switch them on", ()
   });
 });
 
+describe("given an eval chip refused on a self-hosted install", () => {
+  /** @scenario "Each self-hosted refusal says what to do about it" */
+  it.each(["not_in_license", "switched_off", "not_connected", "ask_operator"] as const)(
+    "opens the %s popover, with no estimate and no switch",
+    (offer) => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: offer }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: offer });
+
+      act(() => result.current.enableInstantEvals());
+      expect(mutations.enable.mutate).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe("given Instant Evals are off for a self-serve organization", () => {
   /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
   it("opens the opt-in popover with no estimate, and dismissing it leaves the typed query alone", () => {
@@ -291,11 +306,11 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     expect(enable.input).toEqual({ projectId: "project-1" });
     expect(mutations.estimate.mutate).not.toHaveBeenCalled();
 
-    act(() => enable.options.onSuccess?.({ released: true, offer: "enable" }));
+    act(() => enable.options.onSuccess?.({ released: true, offer: "enable", viaConnect: false }));
 
     expect(mutations.setAccess).toHaveBeenCalledWith(
       { projectId: "project-1" },
-      { released: true, offer: "enable" },
+      { released: true, offer: "enable", viaConnect: false },
     );
     expect(mutations.invalidateAccess).toHaveBeenCalledTimes(1);
     expect(result.current.refusal).toBeNull();
@@ -332,13 +347,17 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     act(() => result.current.enableInstantEvals());
     const dismissed = lastCall(mutations.enable);
     act(() => result.current.dismissRefusal());
-    act(() => dismissed.options.onSuccess?.({ released: true, offer: "enable" }));
+    act(() =>
+      dismissed.options.onSuccess?.({ released: true, offer: "enable", viaConnect: false }),
+    );
 
     act(() => result.current.onInstantEvalRoute(payload));
     act(() => result.current.enableInstantEvals());
     const superseded = lastCall(mutations.enable);
     act(() => result.current.abandonPendingRun());
-    act(() => superseded.options.onSuccess?.({ released: true, offer: "enable" }));
+    act(() =>
+      superseded.options.onSuccess?.({ released: true, offer: "enable", viaConnect: false }),
+    );
 
     expect(mutations.setAccess).toHaveBeenCalledTimes(2);
     expect(mutations.estimate.mutate).not.toHaveBeenCalled();

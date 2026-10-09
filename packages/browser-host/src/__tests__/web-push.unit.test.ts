@@ -65,7 +65,7 @@ describe("ensureWebPushSubscription", () => {
 
   describe("when the browser is asked twice at once", () => {
     it("subscribes once and answers both with the same endpoint", async () => {
-      const { ensureWebPushSubscription } = await import("../web-push.ts");
+      const { ensureWebPushSubscription } = await import("../push/web-push.ts");
 
       const [first, second] = await Promise.all([
         ensureWebPushSubscription(KEY),
@@ -80,7 +80,7 @@ describe("ensureWebPushSubscription", () => {
 
   describe("when the browser already holds a subscription for the key", () => {
     it("reuses it", async () => {
-      const { ensureWebPushSubscription } = await import("../web-push.ts");
+      const { ensureWebPushSubscription } = await import("../push/web-push.ts");
 
       const first = await ensureWebPushSubscription(KEY);
       const again = await ensureWebPushSubscription(KEY);

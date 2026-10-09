@@ -1,4 +1,5 @@
-import { readableDate } from "../../../model/ops-formatters.ts";
+import { readableDate } from "@langwatch/time";
+
 import { EVENT_TYPE_COLORS } from "./deja-view-types.ts";
 
 export function hashEventTypeColor(eventType: string): string {

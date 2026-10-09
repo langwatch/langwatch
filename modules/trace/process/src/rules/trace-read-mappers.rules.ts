@@ -1,4 +1,4 @@
-import type { CodingAgentApi, LogContentCategory } from "@langwatch/coding-agent-contract";
+import { type LogContentCategory, logContentKeys } from "@langwatch/coding-agent-contract";
 /**
  * Shared mapping/redaction layer for both trace-view transports (authenticated
  * and anonymous). Single implementation ensures a redaction cannot drift between
@@ -9,6 +9,7 @@ import {
   CONTENT_CATEGORIES,
   type ContentCategory,
 } from "@langwatch/data-privacy-contract";
+import { resolveNonBilledCost } from "@langwatch/span-normalisation";
 import type {
   CategoryVisibility,
   Protections,
@@ -29,7 +30,6 @@ import {
   deriveTraceTimestamp,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
-  resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
@@ -857,17 +857,15 @@ function formatVisibleToLabel(
 export function redactTraceLogContent({
   row,
   protections,
-  codingAgents,
   derivedAttrPrefixes,
 }: {
   row: TraceLogRecordDto;
   protections: LogVisibility;
-  codingAgents: Pick<CodingAgentApi, "logContentKeys">;
   derivedAttrPrefixes: TraceDerivedAttrPrefixes;
 }): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
 
-  const contentKeys = codingAgents.logContentKeys(eventName);
+  const contentKeys = logContentKeys(eventName);
   const hiddenKeys = contentKeys.filter((entry) => {
     const value = row.attributes[entry.key];
     return (
@@ -917,7 +915,6 @@ export function gateTraceLogVisibility({
   row,
   protections,
   visibilityCutoffMs,
-  codingAgents,
   derivedAttrPrefixes,
 }: {
   row: TraceLogRecordDto;
@@ -928,7 +925,6 @@ export function gateTraceLogVisibility({
     capturedOutputVisibleTo?: string | null;
   };
   visibilityCutoffMs: number | null;
-  codingAgents: Pick<CodingAgentApi, "logContentKeys">;
   derivedAttrPrefixes: TraceDerivedAttrPrefixes;
 }): TraceLogRecordDto {
   const isBeforeCutoff = visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;
@@ -937,7 +933,6 @@ export function gateTraceLogVisibility({
     protections: isBeforeCutoff
       ? { canSeeCapturedInput: false, canSeeCapturedOutput: false }
       : protections,
-    codingAgents,
     derivedAttrPrefixes,
   });
 }

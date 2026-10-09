@@ -21,13 +21,14 @@ export {
   type UiModuleHostMount,
   type UnrequiredHostMount,
   type UnmountedHostOwner,
-} from "./ui-host-mounts.ts";
-export { BrowserLendRefusedError, checkLends, findLendRefusals } from "./ui-module-lends.ts";
+} from "./module/ui-host-mounts.ts";
+export { BrowserHostServiceRefusedError } from "./module/ui-module-host-services.ts";
+export { BrowserLendRefusedError, checkLends, findLendRefusals } from "./module/ui-module-lends.ts";
 export {
   BrowserPageClaimedTwiceError,
   checkScreenAddresses,
   findClaimedTwice,
-} from "./ui-screen-addresses.ts";
+} from "./page/ui-screen-addresses.ts";
 export { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 export type {
   MissingUiSupplyFields,

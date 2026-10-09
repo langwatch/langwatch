@@ -1,18 +1,20 @@
+import { EventNotFoundError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 
-import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
+import type { TraceIOExtractionService } from "#features/derivation/services/trace-io-extraction.service";
 
 /**
  * Bulk read-path resolution of offloaded trace event refs (ADR-022). Resolving each trace of a
  * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
  * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
-import type { ResolveTraceSpansBatchFn } from "../repositories/trace-legacy-read.repository.ts";
+import type { ResolveTraceSpansBatchFn } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
+import { TraceEventPayloadFieldNotFoundError } from "../repositories/trace-payload-reader.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
-import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
-import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
-import type { BlobResolutionDeps } from "./trace-legacy-read.service.ts";
+import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "../features/media/services/trace-blob-store.service.ts";
+import type { BlobResolutionDeps } from "../features/legacy/services/trace-legacy-read.service.ts";
 import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service.ts";
 
 const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
@@ -99,7 +101,12 @@ function warnResolutionFailure({
   attrKey: string;
   error: unknown;
 }): void {
-  if (error instanceof BlobNotFoundError || error instanceof BlobFieldNotFoundError) {
+  if (
+    error instanceof EventNotFoundError ||
+    error instanceof TraceEventPayloadFieldNotFoundError ||
+    error instanceof BlobNotFoundError ||
+    error instanceof BlobFieldNotFoundError
+  ) {
     logger.warn(
       {
         projectId,
@@ -154,7 +161,6 @@ export class TraceOffloadResolutionBatchService {
     blobStore,
     ioExtractionService,
     logger,
-    aggregateType = "trace",
     concurrency = EVENT_LOG_RESOLVE_CONCURRENCY,
   }: {
     projectId: string;
@@ -162,7 +168,6 @@ export class TraceOffloadResolutionBatchService {
     blobStore: TraceBlobStoreService;
     ioExtractionService: TraceIOExtractionService;
     logger: WarnLogger;
-    aggregateType?: string;
     concurrency?: number;
   }): Promise<ResolvedTraceSpans[]> {
     const fetchTasks = new Map<string, FetchTask>();
@@ -180,7 +185,6 @@ export class TraceOffloadResolutionBatchService {
             eventId: task.eventId,
             field: task.field,
             tenantId: projectId,
-            aggregateType,
             aggregateId: task.aggregateId,
           });
           fetchResults.set(fetchKey, { ok: true, value });

@@ -14,14 +14,18 @@ const mocks = vi.hoisted(() => ({
   closeDrawer: vi.fn(),
 }));
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({
     openDrawer: mocks.openDrawer,
     closeDrawer: mocks.closeDrawer,
@@ -67,7 +71,7 @@ vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-conversation-context.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
   useConversationContext: () => ({
     turns: [],
     position: null,
@@ -82,7 +86,7 @@ vi.mock("../../../hooks/use-trace-refresh.ts", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn(), isRefreshing: false }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({
     canGoBack: false,
     goBack: vi.fn(),
@@ -92,7 +96,7 @@ vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-span-tree.ts", () => ({
+vi.mock("../../../../../../features/span/behavior/use-span-tree.ts", () => ({
   useSpanTree: () => ({ data: [], isLoading: false }),
 }));
 
@@ -124,7 +128,7 @@ vi.mock("../../raw-json-dialog.tsx", () => ({ RawJsonDialog: () => null }));
 
 import type { TraceHeader } from "@langwatch/trace-contract";
 
-import { usePinnedAttributesStore } from "../../../../../../behavior/pinned-attributes.store.ts";
+import { usePinnedAttributesStore } from "../../../../../../features/facet/behavior/pinned-attributes.store.ts";
 import { DrawerHeader } from "../drawer-header.tsx";
 
 function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {

@@ -314,9 +314,9 @@ export function importChunk<T>(
 }
 
 /** `React.lazy` over `loadChunk`: a code-split component that survives a dropped request. */
-export function lazyChunk<Component extends ComponentType<never>>(
-  load: () => Promise<{ default: Component }>,
-): LazyExoticComponent<Component> {
+export function lazyChunk<Props>(
+  load: () => Promise<{ default: ComponentType<Props> }>,
+): LazyExoticComponent<ComponentType<Props>> {
   return lazy(() => loadChunk(load));
 }
 

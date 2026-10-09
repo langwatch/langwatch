@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let isSaaS = true;
 let role: string | undefined = "MEMBER";
 let granted: string[] = ["langy:view"];
+let organizationGranted: string[] = [];
 let projectSlug = "acme";
 
 const session = {
@@ -19,8 +20,13 @@ const session = {
   }),
   currentUser: () => ({ id: "user_1", name: "Member", email: "m@example.com", image: null }),
   hasPermission: (permission: string) => granted.includes(permission),
-  featureFlag: () => true,
+  hasOrganizationPermission: (permission: string) => organizationGranted.includes(permission),
+  isSettled: () => true,
 };
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
 
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -32,6 +38,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
 const { default: LangyHostMount } = await import("../behavior/langy-host-mount.tsx");
 const { usePlanManagementUrl } = await import("../behavior/use-plan-management-url.ts");
 const { useLangyVisibility } = await import("../features/langy/behavior/use-show-langy.ts");
+const { useLangyHost } = await import("../model/langy-host.ts");
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <LangyHostMount>{children}</LangyHostMount>
@@ -42,6 +49,7 @@ describe("LangyHostMount", () => {
     isSaaS = true;
     role = "MEMBER";
     granted = ["langy:view"];
+    organizationGranted = [];
     projectSlug = "acme";
   });
 
@@ -82,6 +90,22 @@ describe("LangyHostMount", () => {
       projectSlug = "demo";
       const { result } = renderHook(() => useLangyVisibility(), { wrapper });
       expect(result.current.show).toBe(false);
+    });
+  });
+
+  describe("given organization:manage held only below the organization", () => {
+    it("refuses the organization permission", () => {
+      granted = ["langy:view", "organization:manage"];
+      const { result } = renderHook(() => useLangyHost(), { wrapper });
+      expect(result.current.hasOrganizationPermission("organization:manage")).toBe(false);
+    });
+  });
+
+  describe("given organization:manage held on the organization", () => {
+    it("grants the organization permission", () => {
+      organizationGranted = ["organization:manage"];
+      const { result } = renderHook(() => useLangyHost(), { wrapper });
+      expect(result.current.hasOrganizationPermission("organization:manage")).toBe(true);
     });
   });
 });

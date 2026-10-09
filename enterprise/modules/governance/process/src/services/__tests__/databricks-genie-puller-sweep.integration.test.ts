@@ -32,7 +32,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FetchHttp } from "../../__tests__/support/puller-test-ports.ts";
-import { DatabricksGeniePullerService } from "../databricks-genie-puller.service.ts";
+import { DatabricksGeniePullerService } from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
 
 /** Mirrors the adapter's own constant; asserted against, not imported by it. */
 const WATERMARK_LAG_MS = 5 * 60 * 1000;

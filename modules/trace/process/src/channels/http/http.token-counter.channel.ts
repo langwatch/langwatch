@@ -38,12 +38,14 @@ const registryEntrySchema = z.intersection(
 );
 
 /** A port of main's `WorkerTiktokenCounterAdapter`: encoding tables read from
- * TIKTOKENS_PATH, else fetched. */
+ * TIKTOKENS_PATH, else fetched. DISABLE_TOKENIZATION counts nothing, as main's
+ * `NullTokenizerClient` did. */
 export class HttpTokenCounterChannel implements TraceTokenCounter {
   static create(tokenizer: TraceServerConfig["tokenizer"]): HttpTokenCounterChannel {
     return new HttpTokenCounterChannel(
       tokenizer.bpeDirectory,
       resolveTokenizerFetchTimeoutMs(tokenizer.fetchTimeoutMs),
+      tokenizer.disabled,
     );
   }
 
@@ -53,10 +55,11 @@ export class HttpTokenCounterChannel implements TraceTokenCounter {
   private constructor(
     private readonly bpeDirectory: string | undefined,
     private readonly fetchTimeoutMs: number,
+    private readonly disabled: boolean,
   ) {}
 
   async computeTokenCount(model: string, text: string | undefined): Promise<number | undefined> {
-    if (!text) return undefined;
+    if (this.disabled || !text) return undefined;
     const modelName = model.split("/").pop() ?? model;
     const encoder = await this.#encoder(encodingByModel[modelName] ?? DEFAULT_ENCODING);
     if (!encoder) return undefined;

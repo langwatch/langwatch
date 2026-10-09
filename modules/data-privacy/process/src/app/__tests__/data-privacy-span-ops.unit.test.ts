@@ -1,19 +1,11 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { type DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
-import {
-  createDataPrivacyTestProjects,
-  dataPrivacyTestGraph,
-  dataPrivacyTestSecrets,
-} from "./data-privacy.fixture.ts";
+import { createDataPrivacyTestApp, dataPrivacyTestGraph } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
 
@@ -35,24 +27,19 @@ function spanWith(value: string): OtlpSpan {
   };
 }
 
+/** Data privacy built from what a process holds, with the test project placed by its rows. */
 async function boot({ enforcement }: { enforcement?: string }) {
-  const runtime = await createApp({ role: "worker", secrets: dataPrivacyTestSecrets() })
-    .withModules([dataPrivacyProcessModule])
-    .withStores(memoryStores())
-    .withConfig({
-      "data-privacy": { googleDlpDisabled: undefined, enforcement, nodeEnvironment: undefined },
-    })
-    .provide({
-      project: createDataPrivacyTestProjects(),
-      authz: createApiFixture<AuthzApi>({
+  const app = await createDataPrivacyTestApp({
+    enforcement,
+    dependencies: {
+      permissions: createApiFixture<AuthzApi>({
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
-      "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-      evaluation: createApiFixture<EvaluationApi>(),
-    })
-    .boot();
+      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
+    },
+  });
 
-  return { app: runtime.service(DataPrivacyApi), stop: () => runtime.stop() };
+  return { app, stop: async () => undefined };
 }
 
 async function dropInputForProject(app: DataPrivacyApi): Promise<void> {

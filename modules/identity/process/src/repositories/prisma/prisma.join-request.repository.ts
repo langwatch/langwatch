@@ -18,7 +18,7 @@ import { z } from "zod";
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
-} from "../join-request.repository.ts";
+} from "../../features/join-request/repositories/join-request.repository.ts";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
 
 /**
@@ -153,16 +153,13 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
     return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
   }
 
-  async findApprovedForMembers({
+  async findApprovedForOrganization({
     organizationId,
-    userIds,
   }: {
     organizationId: string;
-    userIds: readonly string[];
   }): Promise<JoinRequestAggregateState[]> {
-    if (userIds.length === 0) return [];
     const rows = await this.prisma.joinRequest.findMany({
-      where: { organizationId, userId: { in: [...userIds] }, state: "APPROVED" },
+      where: { organizationId, state: "APPROVED" },
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));

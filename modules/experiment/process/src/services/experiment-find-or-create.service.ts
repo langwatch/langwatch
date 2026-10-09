@@ -20,7 +20,7 @@ import type { ExperimentService } from "./experiment.service.ts";
 const EXPERIMENT_KSUID_RESOURCE = "experiment";
 
 /** What an SDK names an experiment by. Either identifier, or both. */
-export type ExperimentFindOrCreateInput = Readonly<{
+type ExperimentFindOrCreateInput = Readonly<{
   /**
    * Only the id is read. The API boundary carries a project IDENTITY rather
    * than a project row, so naming the row here would ask three call sites for

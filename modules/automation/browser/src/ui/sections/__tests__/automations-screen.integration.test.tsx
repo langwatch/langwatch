@@ -56,14 +56,11 @@ vi.mock("../../../behavior/automation-api.ts", () => {
       },
     },
   );
-  return { api, automationApi: api };
-});
-
-vi.mock("../../../behavior/slack-api.ts", () => ({
-  slackApi: {
+  const slackApi = {
     slackIntegration: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
-  },
-}));
+  };
+  return { api, automationApi: api, slackApi };
+});
 
 /**
  * Both editors, as anything the screen mounted would print. Stubbed

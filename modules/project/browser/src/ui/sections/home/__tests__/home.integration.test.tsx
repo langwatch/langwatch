@@ -7,7 +7,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const gates = {
-  composition: "classic" as "langy" | "classic",
+  composition: "classic" as "signal-focused" | "langy" | "classic",
   langy: false,
   isNewProject: false,
   activePlan: undefined as { free?: boolean | null } | undefined,
@@ -24,6 +24,11 @@ vi.mock("../components/use-project-reach.ts", () => ({
     hasEvaluations: false,
     hasExperiments: false,
   }),
+}));
+vi.mock("../components/dev/home-state-switcher.tsx", () => ({ HomeStateSwitcher: () => null }));
+vi.mock("../components/dev/home-dev-state.ts", () => ({
+  useHomeDevState: () => null,
+  chartVariantFor: () => "strip",
 }));
 vi.mock("../../../../behavior/home-api.ts", () => ({
   homeApi: {
@@ -46,9 +51,15 @@ vi.mock("../components/langy-home-hero.tsx", () => ({
   LangyHomeHero: () => <div data-testid="lantern" />,
 }));
 
+vi.mock("../briefing/index.ts", () => ({
+  HomeBriefingSection: () => <div data-testid="briefing-sheet" />,
+  SetupHairline: () => <div data-testid="setup-hairline" />,
+  BriefingMockSwitcher: () => null,
+}));
 vi.mock("../components/docs-guides.tsx", () => ({
   DocsGuides: () => <div data-testid="docs-guides" />,
 }));
+vi.mock("../components/home-fortune.tsx", () => ({ HomeFortune: () => null }));
 vi.mock("../components/home-page-banners.tsx", () => ({
   HomePageBanners: ({ variant, children }: { variant?: string; children?: React.ReactNode }) => (
     <div data-testid="banners" data-variant={variant ?? "default"}>
@@ -139,7 +150,20 @@ describe("HomePage composition", () => {
     gates.activePlan = { free: true };
   });
 
-  describe("given Langy access while the classic home is the resolved composition", () => {
+  describe("given the signal-focused home is enabled but Langy is not", () => {
+    /** @scenario The rollout decides the composition, not Langy */
+    it("leads with the briefing sheet and drops the classic sections", () => {
+      gates.composition = "signal-focused";
+      renderHome();
+
+      expect(screen.getByTestId("briefing-sheet")).toBeDefined();
+      expect(screen.queryByTestId("traces-overview")).toBeNull();
+      expect(screen.queryByTestId("onboarding-checklist")).toBeNull();
+      expect(screen.queryByTestId("lantern")).toBeNull();
+    });
+  });
+
+  describe("given Langy access without either home rollout", () => {
     // Unbound on purpose: the spec scenario this pinned was removed when
     // "having Langy is having the Langy home" landed (langy-home.feature).
     // The test stays while the code still has this state; reconcile in #3338.
@@ -148,8 +172,8 @@ describe("HomePage composition", () => {
       renderHome();
 
       // The composition stays classic...
+      expect(screen.queryByTestId("briefing-sheet")).toBeNull();
       expect(screen.getByTestId("banners").dataset.variant).toBe("legacy");
-
       expect(screen.getByTestId("recent-items")).toBeDefined();
       expect(screen.getByTestId("onboarding-checklist")).toBeDefined();
       expect(screen.queryByTestId("lantern")).toBeNull();
@@ -189,6 +213,7 @@ describe("HomePage composition", () => {
       renderHome();
 
       expect(screen.getByTestId("lantern")).toBeDefined();
+      expect(screen.queryByTestId("briefing-sheet")).toBeNull();
       expect(screen.getByTestId("recent-items")).toBeDefined();
       expect(screen.getByTestId("onboarding-checklist")).toBeDefined();
     });

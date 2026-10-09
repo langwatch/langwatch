@@ -2,9 +2,9 @@
 /** Main's `actorIdForRollupWrite`: the stand-in the cost rollup keys an erased spender by (ADR-128 §9 step 5). */
 import { describe, expect, it } from "vitest";
 
+import { erasureDigest } from "../../features/identity/rules/erasure-digest.rules.ts";
+import { ErasureSuppressionService } from "../../features/identity/services/erasure-suppression.service.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { erasureDigest } from "../../rules/erasure-digest.rules.ts";
-import { ErasureSuppressionService } from "../erasure-suppression.service.ts";
 
 const SECRET = "b".repeat(32);
 const ERASED = "leaver@acme.test";

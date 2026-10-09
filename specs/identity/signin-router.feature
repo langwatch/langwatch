@@ -465,21 +465,23 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
 
   @unit
   Scenario: An ambiguous match becomes a proposal, not a guess
-    Given the callback's verified email matches a user with identifiers the organization cannot vouch for
+    Given the callback's verified email is held by more than one user
     When the SSO callback completes
     Then a LinkProposed event is recorded and the sign-in is refused with guidance
     And confirming the proposal later attaches the identifier and admits the user
 
+  @unit @unimplemented
+  Scenario: A match holding identifiers the organization cannot vouch for becomes a proposal
+    Given the callback's verified email matches a user with identifiers the organization cannot vouch for
+    When the SSO callback completes
+    Then a LinkProposed event is recorded and the sign-in is refused with guidance
+
   # WHERE THE RULE ABOVE ACTUALLY RUNS.
   #
-  # The four scenarios above describe the callback service that owns the whole
-  # decision: resolve the person, then link, propose or provision. On every
-  # deployment we run, the identity library owns that resolution instead, and
-  # the only moment it offers before a sign-in method exists is one where the
-  # link has already been chosen. So the same rule is applied there, from the
-  # one shared refusal function, and these two scenarios bind THAT — a
-  # scenario bound only to the service above would be bound to code no
-  # deployment reaches.
+  # The callback scenarios above run in the SSO user resolution the identity
+  # library asks before it links or creates anybody. A method added to an
+  # account that already signs in is judged later, when the library is about to
+  # attach it, and these two scenarios bind that moment.
   #
   # It judges an addition to an account that already signs in some way. A
   # person with no sign-in method yet is covered by
@@ -506,7 +508,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the SSO callback completes on a connection that allows JIT
     Then a user is provisioned and signed in
     But on a connection that forbids JIT the sign-in is refused
-    And the refusal carries the reason code "jit_disabled"
+    And the refusal carries the reason code "identity_jit_disabled"
 
   @integration @unimplemented
   Scenario: The pending SSO setup flag is reconciled once and retired

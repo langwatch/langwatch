@@ -14,11 +14,16 @@ const mocks = vi.hoisted(() => ({
   annotationsForTrace: vi.fn(() => ({ data: [], isLoading: false })),
 }));
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:manage" ? mocks.canManage : true,
+  }),
+}));
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:manage" ? mocks.canManage : true,
   }),
 }));
 

@@ -11,7 +11,11 @@ import "@testing-library/jest-dom/vitest";
 
 // The header's translate hook dispatches through tRPC; these tests pin
 // container chrome, so stub it to the identity passthrough.
-vi.mock("../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
+vi.mock("../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -25,7 +29,6 @@ vi.mock("../../hooks/use-text-translation.ts", () => ({
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: () => false,
   }),
 }));
 

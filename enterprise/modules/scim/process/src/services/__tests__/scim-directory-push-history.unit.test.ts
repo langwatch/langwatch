@@ -28,6 +28,11 @@ import {
 } from "../scim-sync-lifecycle.service.ts";
 import { ScimService } from "../scim.service.ts";
 
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
+
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_okta_primary";
 
@@ -101,9 +106,8 @@ function directoryOver({ ledger }: { ledger: ScimSyncLedgerWriterService }) {
     prisma: store,
     writer: new GrantsFake(),
     users,
-    governance: {
-      departmentResolveByNameOrCreate: vi.fn(),
-      departmentAssignUser: vi.fn(async () => undefined),
+    costCenterFacts: {
+      recordCostCenterChanged: vi.fn(async () => undefined),
     },
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),
@@ -114,6 +118,7 @@ function directoryOver({ ledger }: { ledger: ScimSyncLedgerWriterService }) {
     }),
     provenOffboarding: false,
     tokenPepper: "scim-test-pepper",
+    seats: openSeats,
   });
 }
 

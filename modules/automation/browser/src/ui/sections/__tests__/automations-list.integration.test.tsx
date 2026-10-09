@@ -40,12 +40,8 @@ vi.mock("../../../behavior/automation-api.ts", async () => {
         getRecentActivity: { useQuery: () => settled(reads.activity) },
       },
     },
+    slackApi: fixture.listPagesSlackApi(),
   };
-});
-
-vi.mock("../../../behavior/slack-api.ts", async () => {
-  const fixture = await vi.importActual<typeof ListPagesFixture>("./list-pages.fixture.ts");
-  return { slackApi: fixture.listPagesSlackApi() };
 });
 
 const HOUR = 60 * 60 * 1000;

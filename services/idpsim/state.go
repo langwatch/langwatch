@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 type savedState struct {
@@ -32,6 +33,12 @@ type savedTenant struct {
 	LastProvisioning *ProvisioningOutcome `json:"lastProvisioning,omitempty"`
 	SamlpSubjects    bool                 `json:"samlpSubjects"`
 	Events           []Event              `json:"events,omitempty"`
+	LegacyProvider   LegacyProvider       `json:"legacyProvider,omitempty"`
+	KeyVersion       int                  `json:"keyVersion,omitempty"`
+	PreviousKey      []byte               `json:"previousKey,omitempty"`
+	PreviousCert     []byte               `json:"previousCertificate,omitempty"`
+	Skew             time.Duration        `json:"skew,omitempty"`
+	LastAssertionID  string               `json:"lastAssertionId,omitempty"`
 }
 
 type stateStore struct {
@@ -102,38 +109,63 @@ func restoreTenant(raw json.RawMessage, id int, baseURL string) (*Tenant, error)
 	if saved.ID != id || saved.Domain == "" || saved.SCIMToken == "" {
 		return nil, fmt.Errorf("invalid tenant identity")
 	}
-	key, err := x509.ParsePKCS1PrivateKey(saved.Key)
+	key, cert, err := parseKeyPair(saved.Key, saved.Certificate)
 	if err != nil {
-		return nil, fmt.Errorf("parsing signing key: %w", err)
+		return nil, err
 	}
-	cert, err := x509.ParseCertificate(saved.Certificate)
-	if err != nil {
-		return nil, fmt.Errorf("parsing signing certificate: %w", err)
-	}
-	publicKey, ok := cert.PublicKey.(*rsa.PublicKey)
-	if !ok || !publicKey.Equal(&key.PublicKey) {
-		return nil, fmt.Errorf("signing certificate does not match key")
-	}
-	return &Tenant{
+	t := &Tenant{
 		ID: id, BaseURL: fmt.Sprintf("%s/t/%d", strings.TrimSuffix(baseURL, "/"), id),
 		Domain: saved.Domain, SCIMToken: saved.SCIMToken, Key: key, Cert: cert,
 		users: saved.Users, groups: saved.Groups, apps: saved.Applications,
 		provisioning: saved.Provisioning, lastProvisioning: saved.LastProvisioning,
 		samlpSubjects: saved.SamlpSubjects, events: saved.Events,
-		codes: map[string]*authCode{}, grants: map[string]*accessGrant{},
-	}, nil
+		legacyProvider: saved.LegacyProvider,
+		codes:          map[string]*authCode{}, grants: map[string]*accessGrant{},
+		keyVersion: max(saved.KeyVersion, 1), skew: saved.Skew, lastAssertionID: saved.LastAssertionID,
+	}
+	if len(saved.PreviousKey) == 0 {
+		return t, nil
+	}
+	t.previousKey, t.previousCert, err = parseKeyPair(saved.PreviousKey, saved.PreviousCert)
+	if err != nil {
+		return nil, fmt.Errorf("previous key: %w", err)
+	}
+	return t, nil
+}
+
+// parseKeyPair decodes a saved signing key and certificate, refusing a pair that does not match.
+func parseKeyPair(keyDER, certDER []byte) (*rsa.PrivateKey, *x509.Certificate, error) {
+	key, err := x509.ParsePKCS1PrivateKey(keyDER)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing signing key: %w", err)
+	}
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing signing certificate: %w", err)
+	}
+	publicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+	if !ok || !publicKey.Equal(&key.PublicKey) {
+		return nil, nil, fmt.Errorf("signing certificate does not match key")
+	}
+	return key, cert, nil
 }
 
 func (t *Tenant) snapshotState() (json.RawMessage, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return json.Marshal(savedTenant{
+	saved := savedTenant{
 		ID: t.ID, Domain: t.Domain, SCIMToken: t.SCIMToken,
 		Key: x509.MarshalPKCS1PrivateKey(t.Key), Certificate: t.Cert.Raw,
 		Users: t.users, Groups: t.groups, Applications: t.apps,
 		Provisioning: t.provisioning, LastProvisioning: t.lastProvisioning,
 		SamlpSubjects: t.samlpSubjects, Events: t.events,
-	})
+		LegacyProvider: t.legacyProvider,
+		KeyVersion:     t.keyVersion, Skew: t.skew, LastAssertionID: t.lastAssertionID,
+	}
+	if t.previousKey != nil {
+		saved.PreviousKey, saved.PreviousCert = x509.MarshalPKCS1PrivateKey(t.previousKey), t.previousCert.Raw
+	}
+	return json.Marshal(saved)
 }
 
 func (s *Server) saveState() error {

@@ -1,5 +1,8 @@
 {
   "name": "@langwatch/error-views",
+  "langwatch": {
+    "group": "browser"
+  },
   "version": "0.1.0",
   "private": true,
   "description": "The browser views for a handled error: the alert, the remediation action and the retry affordance the presentation registry describes.",
@@ -24,11 +27,17 @@
     "@chakra-ui/react": "catalog:",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "lucide-react": "catalog:",
     "react": "catalog:"
   },
   "devDependencies": {
     "@emotion/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
+    "jsdom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

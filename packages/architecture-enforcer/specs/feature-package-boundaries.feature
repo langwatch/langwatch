@@ -6,15 +6,6 @@ Feature: Feature package boundary lint
   So that feature boundaries cannot be bypassed by imports or exported types
 
   @unit @architecture
-  Scenario: Concurrent architecture checks wait before loading the lint engine
-    Given every architecture check runs through the machine-wide check slot
-    When further checks start from any worktree while the slots are held
-    Then they wait without loading the lint engine
-    And no more checks run at once than the machine's slot limit allows
-    And a completed or killed check releases its slot
-    And waiting callers can be cancelled without consuming a slot
-
-  @unit @architecture
   Scenario: A valid feature graph passes
     Given a singular feature and its subjects are registered in the ownership catalogue
     And it has a contract package with portable dependencies
@@ -90,6 +81,14 @@ Feature: Feature package boundary lint
     And no contract source imports it
     When architecture lint checks the package
     Then the declared dependency is reported
+
+  @unit @architecture
+  Scenario: A contract may declare eventing when it imports only the tables subpath
+    Given a contract package.json declares eventing
+    And every eventing import in its source is "@langwatch/eventing/tables"
+    When architecture lint checks the package
+    Then the declared dependency is accepted
+    And any other eventing import, or none, still reports it
 
   @unit @architecture
   Scenario: Feature contracts remain transport-neutral
@@ -353,3 +352,10 @@ Feature: Feature package boundary lint
     And that package depends back on the contract
     When architecture lint checks the fixture workspace
     Then it reports the package cycle, although the framework package is no feature package
+
+  @unit @architecture
+  Scenario: A strongly connected component is one package cycle naming every member
+    Given three workspace packages that all reach each other through two overlapping cycles
+    And a separate pair of packages that depend on each other
+    When architecture lint checks the fixture workspace
+    Then it reports one package cycle per component, each naming every member and one concrete cycle

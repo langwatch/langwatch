@@ -78,19 +78,6 @@ export class RoleUserNotTeamMemberError extends HandledError {
   }
 }
 
-/** An organization-exclusive permission was bound at TEAM or PROJECT scope. */
-export class OrgExclusivePermissionScopeError extends HandledError {
-  declare readonly code: "org_exclusive_permission_scope";
-  constructor(permission: string, scopeType: string) {
-    super(
-      "org_exclusive_permission_scope",
-      "That permission only takes effect at organization scope",
-      { httpStatus: 422, meta: { permission, scopeType } },
-    );
-    this.name = "OrgExclusivePermissionScopeError";
-  }
-}
-
 /** `admin`, `member` and `viewer` are fixed: a change or delete is refused, not ignored. */
 export class RoleIsBuiltInError extends HandledError {
   declare readonly code: "role_is_built_in";

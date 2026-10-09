@@ -1,9 +1,9 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { SpanNormalizationPipelineService } from "#services/span-normalization.service";
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { SpanNormalizationPipelineService } from "#features/span/services/span-normalization.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 const service = SpanNormalizationPipelineService.create(TraceCanonicalisationService.create());
 

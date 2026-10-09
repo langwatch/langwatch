@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ConnectedStatement } from "../services/connected-monthly-statement.service.ts";
+import type { ConnectedStatement } from "../features/connected-billing/services/connected-monthly-statement.service.ts";
 
 /**
  * The monthly statement mail, as billing hands it over. Envelope, template and

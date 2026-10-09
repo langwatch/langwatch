@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { Temporal } from "@langwatch/time";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithAnnotationHost } from "../../../testing.tsx";
@@ -14,7 +14,43 @@ const mocks = vi.hoisted(() => ({
   badges: [] as unknown[],
   downloadCsv: vi.fn(),
   listProps: null as Record<string, unknown> | null,
+  /** Trace list pages by scrollId ("first" for none); `error` fails that page. */
+  tracePages: {} as Record<string, { ids: string[]; scrollId?: string; error?: boolean }>,
+  pageRequests: [] as string[],
+  byTraceIds: [] as unknown[],
+  byTraceIdsRequests: [] as string[][],
+  getAllEnabled: [] as boolean[],
 }));
+
+type BatchedCall = {
+  path: "page" | "byIds";
+  input: { scrollId?: string | null; traceIds?: string[] };
+  opts: { enabled?: boolean };
+};
+
+/** One fake answer per batched read; a disabled read answers nothing, as react-query does. */
+function answerBatched({ path, input, opts }: BatchedCall) {
+  if (opts.enabled === false) return { isLoading: false, isError: false };
+  if (path === "byIds") {
+    mocks.byTraceIdsRequests.push(input.traceIds ?? []);
+    const wanted = new Set(input.traceIds);
+    return {
+      isLoading: false,
+      isError: false,
+      data: mocks.byTraceIds.filter((one) => wanted.has((one as { traceId: string }).traceId)),
+    };
+  }
+  const id = input.scrollId ?? "first";
+  mocks.pageRequests.push(id);
+  const page = mocks.tracePages[id];
+  if (!page) return { isLoading: true, isError: false };
+  if (page.error) return { isLoading: false, isError: true };
+  return {
+    isLoading: false,
+    isError: false,
+    data: { groups: [page.ids.map((trace_id) => ({ trace_id }))], scrollId: page.scrollId },
+  };
+}
 
 // The list has its own two suites; here it only has to report what the view
 // handed it, which is the whole subject of this file.
@@ -43,12 +79,28 @@ vi.mock("@langwatch/csv/download", () => ({ downloadCsv: mocks.downloadCsv }));
 
 vi.mock("../../../behavior/annotation-api.ts", () => ({
   annotationApi: {
+    useQueries: (build: (t: unknown) => BatchedCall[]) =>
+      build({
+        traces: {
+          getAllForProject: (input: never, opts: never) => ({ path: "page", input, opts }),
+        },
+        annotation: {
+          getByTraceIds: (input: never, opts: never) => ({ path: "byIds", input, opts }),
+        },
+      }).map(answerBatched),
     annotation: {
       getPendingItemsCount: { useQuery: () => ({ data: { count: 4 } }) },
       getAssignedItemsCount: { useQuery: () => ({ data: { count: 2 } }) },
       getQueueItemsCounts: { useQuery: () => ({ data: mocks.badges }) },
       getQueueBySlugOrId: { useQuery: () => ({ data: mocks.queue, error: mocks.queueError }) },
-      getAll: { useQuery: () => ({ data: mocks.annotations, isLoading: false }) },
+      getAll: {
+        useQuery: (_input: unknown, opts: { enabled: boolean }) => {
+          mocks.getAllEnabled.push(opts.enabled);
+          return opts.enabled
+            ? { data: mocks.annotations, isLoading: false }
+            : { isLoading: false };
+        },
+      },
     },
     traces: {
       getTracesWithSpans: { useQuery: () => ({ data: mocks.traces, isLoading: false }) },
@@ -83,6 +135,11 @@ beforeEach(() => {
   mocks.queueError = null;
   mocks.badges = [];
   mocks.listProps = null;
+  mocks.tracePages = {};
+  mocks.pageRequests = [];
+  mocks.byTraceIds = [];
+  mocks.byTraceIdsRequests = [];
+  mocks.getAllEnabled = [];
   mocks.downloadCsv.mockReset();
 });
 afterEach(() => {
@@ -368,6 +425,62 @@ describe("given the All Annotations address", () => {
       expect(call.rows[0]).toContain("the question");
       expect(call.fileName).toMatch(/^Traces - \d{4}-\d{2}-\d{2}\.csv$/);
     });
+  });
+});
+
+describe("given the All Annotations address with trace filters applied", () => {
+  const traceFilters = { startDate: 1, endDate: 2, filters: { "metadata.user_id": ["u1"] } };
+
+  describe("when the filters match more traces than one page holds", () => {
+    /** @scenario "The filtered annotations list walks trace pages at the cap" */
+    it("follows the scrollId to the last page and lists the annotations of every matched trace", async () => {
+      mocks.tracePages = {
+        first: { ids: ["trace-1"], scrollId: "s2" },
+        s2: { ids: ["trace-2"] },
+      };
+      mocks.byTraceIds = [
+        annotation({ id: "a1", traceId: "trace-1" }),
+        annotation({ id: "a2", traceId: "trace-2" }),
+        annotation({ id: "a3", traceId: "trace-9" }),
+      ];
+
+      renderWithAnnotationHost(<AnnotationsScreen view="all" />, { traceFilters });
+
+      await waitFor(() => expect(mocks.listProps?.rows).toHaveLength(2));
+      expect(mocks.pageRequests).toContain("s2");
+      expect(mocks.byTraceIdsRequests.at(-1)).toEqual(["trace-1", "trace-2"]);
+      expect(mocks.getAllEnabled.every((enabled) => !enabled)).toBe(true);
+    });
+  });
+
+  describe("when a later trace page fails to load", () => {
+    /** @scenario "A failed trace page never shows a partial annotations list" */
+    it("uses no trace ids and says the filtered read failed", async () => {
+      mocks.tracePages = {
+        first: { ids: ["trace-1"], scrollId: "s2" },
+        s2: { ids: [], error: true },
+      };
+      mocks.byTraceIds = [annotation({ id: "a1", traceId: "trace-1" })];
+
+      renderWithAnnotationHost(<AnnotationsScreen view="all" />, { traceFilters });
+
+      await waitFor(() => expect(mocks.listProps?.emptyNotice).toBeDefined());
+      expect(mocks.listProps?.rows).toEqual([]);
+      expect(mocks.byTraceIdsRequests).toEqual([]);
+      expect(mocks.listProps?.emptyNotice).toMatchObject({
+        title: "Couldn't load the annotations for these filters",
+      });
+    });
+  });
+});
+
+describe("given the All Annotations address with no trace filters", () => {
+  it("reads the whole project and walks no trace page", () => {
+    renderWithAnnotationHost(<AnnotationsScreen view="all" />);
+
+    expect(mocks.getAllEnabled.at(-1)).toBe(true);
+    expect(mocks.pageRequests).toEqual([]);
+    expect(mocks.listProps?.emptyNotice).toBeUndefined();
   });
 });
 

@@ -18,12 +18,13 @@ import {
 import type { ScenarioGenerateBoundsService } from "./scenario-generate-bounds.service.ts";
 
 export interface ScenarioGenerationDependencies {
-  bounds: ScenarioGenerateBoundsService;
-  modelProviders: ModelProviderApi;
+  bounds: Pick<ScenarioGenerateBoundsService, "assertGenerateWithinBounds">;
+  modelProviders: Pick<ModelProviderApi, "generateStructured">;
+  /** `SCENARIO_GENERATE_TIMEOUT_MS`, already defaulted by the scenario config leaf. */
+  timeoutMs: number;
 }
 
 const SCENARIO_GENERATE_FEATURE_KEY = "scenarios.generator";
-const SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS = 30_000;
 const SCENARIO_GENERATE_MAX_RETRIES = 1;
 const logger = createLogger("langwatch:scenario:generation");
 
@@ -86,7 +87,7 @@ export class ScenarioGenerationService {
         system: SYSTEM_PROMPT,
         prompt: userPrompt,
         maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
-        timeoutMs: SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
+        timeoutMs: this.#dependencies.timeoutMs,
       });
 
       return { scenario: scenarioGenerateResultSchema.parse(generated) };

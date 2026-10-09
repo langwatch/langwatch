@@ -8,7 +8,6 @@ import {
   isConnectedAgentStale,
   type Agent,
   type AgentIdsInput,
-  type AgentCreationWindowInput,
   type AgentProjectInput,
   type ConnectedAgentsEnvironmentInput,
   type ConnectedAgentsInput,
@@ -150,6 +149,22 @@ export class MemoryAgentRepository implements AgentRepository {
     });
   }
 
+  updateConfigIfUnchanged(
+    input: Parameters<AgentRepository["updateConfigIfUnchanged"]>[0],
+  ): Promise<boolean> {
+    const agent = this.#agents.get(input.id);
+    if (
+      !agent ||
+      agent.projectId !== input.projectId ||
+      agent.updatedAt.getTime() !== input.updatedAt.epochMilliseconds
+    ) {
+      return Promise.resolve(false);
+    }
+    this.#save({ ...agent, config: input.config });
+
+    return Promise.resolve(true);
+  }
+
   async archive(input: GetAgentInput): Promise<Agent> {
     const agent = await this.getById(input);
 
@@ -243,23 +258,6 @@ export class MemoryAgentRepository implements AgentRepository {
 
   async touchLastSeenAt(input: AgentPresenceInput): Promise<void> {
     this.#save({ ...this.#get(input), lastSeenAt: toDate(input.at) });
-  }
-
-  async findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
-    const from = toDate(input.from).getTime();
-    const to = toDate(input.to).getTime();
-
-    return [...this.#agents.values()]
-      .filter(
-        (agent) =>
-          agent.projectId === input.projectId &&
-          agent.createdAt.getTime() >= from &&
-          agent.createdAt.getTime() <= to &&
-          (input.copiedFromAgentId === void 0 ||
-            agent.copiedFromAgentId === input.copiedFromAgentId),
-      )
-      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-      .map((agent) => agent.id);
   }
 
   #get(input: GetAgentInput): Agent {

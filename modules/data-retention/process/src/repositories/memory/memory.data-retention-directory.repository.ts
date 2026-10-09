@@ -1,5 +1,3 @@
-import type { ScopeAssignment } from "@langwatch/data-retention-contract";
-
 import type {
   DataRetentionDirectoryReader,
   RetentionOrganizationDirectory,
@@ -9,7 +7,6 @@ import type {
 type MemoryDirectoryRows = Readonly<{
   lineage?: RetentionProjectLineage;
   directory?: RetentionOrganizationDirectory;
-  scopeOrganizationId?: string | null;
   scopeProjects?: readonly { id: string; teamId: string }[];
 }>;
 
@@ -28,11 +25,6 @@ export class MemoryDataRetentionDirectoryRepository implements DataRetentionDire
 
   async findOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
     return this.rows.directory ?? { teams: [], projects: [] };
-  }
-
-  async findScopeOrganizationId(input: { scope: ScopeAssignment }): Promise<string | null> {
-    void input;
-    return this.rows.scopeOrganizationId ?? null;
   }
 
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {

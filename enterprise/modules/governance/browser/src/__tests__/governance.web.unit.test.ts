@@ -1,6 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
+import { SampleChoiceToken } from "@langwatch/enterprise-governance-client";
 import { describe, expect, it } from "vitest";
 
 import { governanceWeb } from "../governance.web.ts";
@@ -9,6 +11,15 @@ import {
   subscribeToSampleChoice,
   writeSampleChoice,
 } from "../ui/elements/governance-sample-mode.ts";
+
+function lentSampleChoice() {
+  const lend = governanceWeb.installation.lends.find(
+    ({ token }) => token.key === SampleChoiceToken.key,
+  );
+  if (!lend || !("value" in lend)) throw new Error("governance lends no sample choice");
+
+  return lend.value as { setSampleChoice(choice: boolean | null): void };
+}
 
 function browserDocument() {
   const mount = document.createElement("div");
@@ -22,7 +33,7 @@ describe("given a browser that installs governance", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([governanceWeb] as const)
+        .withModules([hostServiceFakes(), governanceWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 
@@ -60,7 +71,7 @@ describe("given a browser that installs governance", () => {
   describe("when the guided tour shows and then hides sample data", () => {
     /** @scenario The sample-data choice is offered as a capability, not an import */
     it("writes the sample choice every governance page reads", () => {
-      const { sampleChoice } = governanceWeb.installation.capabilities;
+      const sampleChoice = lentSampleChoice();
 
       sampleChoice.setSampleChoice(true);
       expect(readSampleChoice()).toBe(true);
@@ -74,7 +85,7 @@ describe("given a browser that installs governance", () => {
   describe("when the tour sets the choice and then forgets it through the capability", () => {
     /** @scenario The sample-data choice is offered as a capability, not an import */
     it("follows the choice, returns to the default, and tells every mounted affordance each time", () => {
-      const { sampleChoice } = governanceWeb.installation.capabilities;
+      const sampleChoice = lentSampleChoice();
       let heard = 0;
       const unsubscribe = subscribeToSampleChoice(() => {
         heard += 1;

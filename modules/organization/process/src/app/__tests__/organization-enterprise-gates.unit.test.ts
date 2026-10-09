@@ -53,6 +53,8 @@ async function application() {
     userId: COLLEAGUE_ID,
     pendingAdmissionId: "admission-1",
     via: "invite",
+    seat: "MEMBER",
+    pending: false,
   });
   ledger.seedTeamBinding({
     id: "binding-caller",

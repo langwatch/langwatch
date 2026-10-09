@@ -1,9 +1,8 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
@@ -39,7 +38,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
 
   describe("given an install that reported, attributed to an organization", () => {
     /** @scenario "A deployment composed from its stores lists installs with their customer's name" */
-    it("lists the install with the name the organization feature answers", async () => {
+    it("lists the install with the name organization's table holds", async () => {
       const organization = await prisma.organization.create({
         data: { name: "Acme", slug: `${RUN}-acme` },
       });
@@ -65,19 +64,8 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
       const app = await LicensingModule.create({
         dependencies: {
           instantEval: createApiFixture<InstantEvalApi>(),
-          projects: createApiFixture<ProjectApi>(),
+          scopes: createApiFixture<AuthzApi>(),
           gateway: createApiFixture<GatewayApi>(),
-          organizations: createApiFixture<OrganizationApi>({
-            findProvisioningSummary: async (organizationId) =>
-              organizationId === organization.id
-                ? {
-                    id: organization.id,
-                    name: "Acme Corp",
-                    slug: organization.slug,
-                    createdAt: nowInstant(),
-                  }
-                : null,
-          }),
         },
         repositories: LiveLicensingRepositories.create({
           prisma,
@@ -99,7 +87,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
         {
           instanceId: `${RUN}-install`,
           organizationId: organization.id,
-          organizationName: "Acme Corp",
+          organizationName: "Acme",
         },
       ]);
     });

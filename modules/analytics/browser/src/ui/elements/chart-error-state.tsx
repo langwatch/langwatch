@@ -3,22 +3,34 @@ import {
   Button,
   Flex,
   HStack,
+  Link,
   Text,
   VisuallyHidden,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { AlertCircle, AlertTriangle, RefreshCw } from "lucide-react";
-
-import { resolveErrorCopy } from "../../model/resolve-error-copy.ts";
-import { ErrorActions } from "./error-actions.tsx";
 
 const DEFAULT_FALLBACK_TITLE = "Couldn't load this chart";
 
+/** The registry's copy for a failed panel; registered copy beats the caller's fallback. */
+function chartErrorCopy({ error, fallbackTitle }: { error: unknown; fallbackTitle: string }) {
+  const handled = readHandledError(error);
+  const explanation = explainAnyError(error);
+  return {
+    title: explanation.isRegistered ? explanation.title : fallbackTitle,
+    description: explanation.description,
+    docsUrl: handled?.docsUrl,
+    traceId: handled?.traceId || readEnvelopeTraceId(error),
+  };
+}
+
 /**
- * A failed panel, inside its own bounds: registry headline, one line of advice, Retry and the
- * error id. No tips list, since a dashboard can show a dozen failed panels at once. For a
- * figure in a tab header or a small card, use `ChartErrorIndicator`.
+ * A failed analytics panel: headline, one line of what to do, Retry and the error id. Never
+ * `error.message` (the code slug, #5984), never the tips list (a dashboard can show a dozen
+ * failed panels). For a tab header or a small card, use `ChartErrorIndicator`.
  */
 export function ChartErrorState({
   error,
@@ -37,7 +49,7 @@ export function ChartErrorState({
   /** Keeps the panel at the height its content would have had. */
   minHeight?: string | number;
 }) {
-  const copy = resolveErrorCopy({ error, fallbackTitle });
+  const copy = chartErrorCopy({ error, fallbackTitle });
 
   return (
     <Flex
@@ -50,8 +62,7 @@ export function ChartErrorState({
       paddingY={6}
     >
       <VStack gap={1.5} maxWidth="360px" textAlign="center" minWidth={0}>
-        {/* The icon sits inline in the headline so a narrow panel wraps the
-            words under it instead of losing a column to it. */}
+        {/* Inline icon: a narrow panel wraps the words under it instead of losing a column. */}
         <Text textStyle="sm" fontWeight="medium" color="fg" lineClamp={3}>
           <Box
             as="span"
@@ -73,16 +84,25 @@ export function ChartErrorState({
           <RefreshCw size={12} aria-hidden="true" />
           Retry
         </Button>
-        <ErrorActions docsUrl={copy.docsUrl} traceId={copy.traceId} />
+        {(copy.docsUrl ?? copy.traceId) && (
+          <HStack gap={2} textStyle="xs" color="fg.subtle">
+            {copy.docsUrl && (
+              <Link href={copy.docsUrl} target="_blank" rel="noopener noreferrer">
+                Docs
+              </Link>
+            )}
+            {copy.traceId && <Text>Error ID: {copy.traceId}</Text>}
+          </HStack>
+        )}
       </VStack>
     </Flex>
   );
 }
 
 /**
- * The compact error state: an icon and "Couldn't load" where the number would be, the
- * registry copy and error id in a tooltip. No button, so it is safe inside a tab trigger;
- * Retry lives in the panel body (see `useRetryFailedAnalytics`).
+ * The compact error state, for a figure in a tab header or a small summary card: a warning
+ * icon and two words where the number would be, the registry's copy in a tooltip. It holds no
+ * button, so it is safe inside a tab trigger; Retry lives in the panel body.
  */
 export function ChartErrorIndicator({
   error,
@@ -91,7 +111,7 @@ export function ChartErrorIndicator({
   error: unknown;
   fallbackTitle?: string;
 }) {
-  const copy = resolveErrorCopy({ error, fallbackTitle });
+  const copy = chartErrorCopy({ error, fallbackTitle });
 
   return (
     <Tooltip

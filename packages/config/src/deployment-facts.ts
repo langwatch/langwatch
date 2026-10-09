@@ -10,6 +10,25 @@ import { environmentExactOneSchema, environmentOneOrTrueSchema } from "./env-sch
 
 const positiveInteger = z.coerce.number().int().positive();
 
+const optionalSetting = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
+
+/** Log level and format: observability reads them, the scenario child is handed them. */
+export const { logSettings } = Config.define((c) => ({
+  logSettings: {
+    LOG_LEVEL: c.env("LOG_LEVEL", optionalSetting),
+    LOG_CONSOLE_LEVEL: c.env("LOG_CONSOLE_LEVEL", optionalSetting),
+    LOG_OTEL_LEVEL: c.env("LOG_OTEL_LEVEL", optionalSetting),
+    LOG_FORMAT: c.env("LOG_FORMAT", z.enum(["pretty", "json"]).optional()),
+    PINO_LOG_LEVEL: c.env("PINO_LOG_LEVEL", optionalSetting),
+    _LOG_LEVEL: c.env("_LOG_LEVEL", optionalSetting),
+    PINO_CONSOLE_LEVEL: c.env("PINO_CONSOLE_LEVEL", optionalSetting),
+    PINO_OTEL_LEVEL: c.env("PINO_OTEL_LEVEL", optionalSetting),
+  },
+}));
+
 /** Whether this deployment is the hosted product; gateway's browser projection reads it too. */
 export const { isSaas } = Config.define((c) => ({
   isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
@@ -121,6 +140,15 @@ const optionalNonBlank = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.string().min(1).optional(),
 );
+
+/** Grafana Explore deep links: no base URL, no links. Datasource uids default to LGTM's. */
+export const { grafana } = Config.define((c) => ({
+  grafana: {
+    baseUrl: c.env("GRAFANA_BASE_URL", optionalNonBlank),
+    tempoDatasourceUid: c.env("GRAFANA_TEMPO_DATASOURCE_UID", optionalNonBlank),
+    lokiDatasourceUid: c.env("GRAFANA_LOKI_DATASOURCE_UID", optionalNonBlank),
+  },
+}));
 
 /**
  * The release this install runs, as the deployment names it: observability and every module that
@@ -303,8 +331,51 @@ export const { signUpMode, signUpAllowedDomains } = Config.define((c) => ({
   ),
 }));
 
+/**
+ * The sign-in capability switches (round 48, A1-a): auth builds the surfaces, identity and user
+ * read the same leaves. Passkeys are offered unless "off"; two-step enrolment opens only on "on";
+ * own passwords beside a federated provider (D09) only on "on". Any other value refuses the boot.
+ */
+export const { passkeysEnabled, mfaEnrollmentOpen, localPasswords } = Config.define((c) => ({
+  passkeysEnabled: c.env(
+    "PASSKEYS_ENABLED",
+    z
+      .enum(["off", "on"])
+      .optional()
+      .transform((value) => value !== "off"),
+  ),
+  mfaEnrollmentOpen: c.env(
+    "MFA_ENROLLMENT_OPEN",
+    z
+      .union([z.literal("on"), z.literal("")])
+      .optional()
+      .transform((value) => value === "on"),
+  ),
+  localPasswords: c.env(
+    "LOCAL_PASSWORDS_ENABLED",
+    z
+      .enum(["off", "on"])
+      .optional()
+      .transform((value) => value === "on"),
+  ),
+}));
+
+/**
+ * Identity providers this operator trusts outright (commas or spaces; honoured in production too),
+ * and the worktree's identity-provider simulator, trusted outside production only.
+ */
+export const { trustedIdpOrigins, idpSimulatorUrl } = Config.define((c) => ({
+  trustedIdpOrigins: c.env("SSO_TRUSTED_IDP_ORIGINS", z.string().optional()),
+  idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
+}));
+
 /** Where server-side product analytics goes: shared config no module owns (Alex, 2026-09-29). */
 export const { posthogKey, posthogHost } = Config.define((c) => ({
   posthogKey: c.env("POSTHOG_KEY", z.string().optional()),
   posthogHost: c.env("POSTHOG_HOST", z.string().optional()),
+}));
+
+/** How long a fold's cached state lives in Redis (main's knob); the cache floors it at 300. */
+export const { foldCacheTtlSeconds } = Config.define((c) => ({
+  foldCacheTtlSeconds: c.env("LANGWATCH_FOLD_CACHE_TTL_SECONDS", positiveInteger.default(300)),
 }));

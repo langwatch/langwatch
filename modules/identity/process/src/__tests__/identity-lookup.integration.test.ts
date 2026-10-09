@@ -89,6 +89,10 @@ class FakeAuditLog implements AuditLogApi {
   async listEntityHistory() {
     return [];
   }
+
+  async findByTargetKind() {
+    return [];
+  }
 }
 
 function noopRateLimiter(): RateLimiter {

@@ -29,8 +29,8 @@ const HELD: OrganizationMfaStanding = {
   holdsPasskey: false,
 };
 
-vi.mock("../behavior/two-step-verification-api.ts", () => ({
-  twoStepVerificationApi: {
+vi.mock("@langwatch/api/web", () => ({
+  createModuleApi: () => ({
     twoStepVerification: {
       standing: {
         useQuery: (input: { organizationId: string }, options: { enabled: boolean }) => {
@@ -39,7 +39,7 @@ vi.mock("../behavior/two-step-verification-api.ts", () => ({
         },
       },
     },
-  },
+  }),
 }));
 
 vi.mock("../../../behavior/personal-workspace-api.ts", () => ({

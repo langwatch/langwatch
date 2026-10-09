@@ -3,7 +3,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PersonalAccessTokenBanner } from "../src/components/personal-access-token-banner.tsx";
+import { PersonalAccessTokenBanner } from "../src/components/states/personal-access-token-banner.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

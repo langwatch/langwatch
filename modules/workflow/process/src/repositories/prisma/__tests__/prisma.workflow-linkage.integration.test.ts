@@ -9,7 +9,6 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { WorkflowDslService } from "../../../services/workflow-dsl.service.ts";
 import { PrismaWorkflowRepository } from "../prisma.workflow.repository.ts";
 
 class TestQueryGuard extends PrismaQueryGuard {
@@ -100,12 +99,6 @@ async function createWorkflow(results: { identifier: string; type: string }[]) {
   return id;
 }
 
-async function fields(ids: string[]) {
-  const sources = await repository().findFieldSources({ projectId, workflowIds: ids });
-  const dsl = WorkflowDslService.create();
-  return Object.fromEntries(sources.map((source) => [source.id, dsl.mappingFields(source.dsl)]));
-}
-
 describe.skipIf(!databaseUrl)("persisted workflow linkage", () => {
   beforeAll(async () => {
     await database().organization.create({
@@ -145,50 +138,15 @@ describe.skipIf(!databaseUrl)("persisted workflow linkage", () => {
     }
   });
 
-  it("reads multiple entry/end fields in a batch and preserves object outputs", async () => {
-    const outputs = [
-      { identifier: "answer", type: "str" },
-      { identifier: "chunks", type: "dict" },
-    ];
-    const first = await createWorkflow(outputs);
-    const second = await createWorkflow([]);
-    const result = await fields([first, second]);
-
-    expect(result[first]).toEqual({
-      inputFields: [{ identifier: "question", type: "str" }],
-      outputFields: outputs,
-      fieldsResolved: true,
-    });
-    expect(result[second]?.outputFields).toEqual([]);
-    expect(result[second]?.fieldsResolved).toBe(true);
-  });
-
-  it("observes a newly committed graph without a copied field cache", async () => {
-    const id = await createWorkflow([{ identifier: "answer", type: "str" }]);
-    expect((await fields([id]))[id]?.outputFields).toHaveLength(1);
-    await commitVersion(id, [
-      { identifier: "answer", type: "str" },
-      { identifier: "citations", type: "list" },
-    ]);
-    expect((await fields([id]))[id]?.outputFields.map((field) => field.identifier)).toEqual([
-      "answer",
-      "citations",
-    ]);
-  });
-
   it("excludes archived, missing and wrong-project workflows", async () => {
     const id = await createWorkflow([]);
     await repository().archiveLinked({ projectId, workflowId: id });
-    expect(await fields([id, "missing"])).toEqual({});
     expect(
       await repository().findSummaries({ projectId: "another-project", workflowIds: [id] }),
     ).toEqual([]);
     await database().workflow.update({ where: { id, projectId }, data: { archivedAt: null } });
     expect(
       await repository().findSummaries({ projectId: "another-project", workflowIds: [id] }),
-    ).toEqual([]);
-    expect(
-      await repository().findFieldSources({ projectId: "another-project", workflowIds: [id] }),
     ).toEqual([]);
   });
 

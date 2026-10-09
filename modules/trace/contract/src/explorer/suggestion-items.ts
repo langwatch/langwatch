@@ -4,7 +4,7 @@ import {
   FIELD_VALUES,
   SEARCH_FIELDS,
   type SearchFieldGroup,
-} from "../trace-query-metadata.ts";
+} from "../features/query/trace-query-metadata.ts";
 
 // Field mode is uncapped — the dropdown's 240px scroll handles overflow.
 // Value mode keeps a top-N because facet enumerations can run to hundreds.

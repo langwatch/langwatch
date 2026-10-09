@@ -135,6 +135,20 @@ describe("given one confirmed address and one that was never confirmed", () => {
     });
   });
 
+  describe("when the section is read as a nudge", () => {
+    /** @scenario "A second address is nudged, never gated" */
+    it("says the second address is unconfirmed, offers its link again and blocks nothing", () => {
+      renderSection();
+
+      const [confirmed, unconfirmed] = rows();
+      expect(within(unconfirmed!).getByTestId("address-unconfirmed")).toBeTruthy();
+      expect(within(unconfirmed!).getByTestId("resend-address-link")).toBeTruthy();
+      expect(within(confirmed!).getByTestId("address-confirmed")).toBeTruthy();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+  });
+
   describe("when the link is sent again", () => {
     /** @scenario "An unconfirmed address offers to send its link again" */
     it("sends a fresh ceremony and names the address it went to", async () => {

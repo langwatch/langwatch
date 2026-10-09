@@ -13,7 +13,7 @@ import { MemoryEvaluationInputRepository } from "./memory.evaluation-input.repos
 import { MemoryEvaluationRunRepository } from "./memory.evaluation-run.repository.ts";
 
 /** The trend over no traces: nothing in this module writes the rows it folds. */
-export class MemoryMonitorPerformanceRepository extends MonitorPerformanceRepository {
+class MemoryMonitorPerformanceRepository extends MonitorPerformanceRepository {
   static create(): MemoryMonitorPerformanceRepository {
     return new MemoryMonitorPerformanceRepository();
   }

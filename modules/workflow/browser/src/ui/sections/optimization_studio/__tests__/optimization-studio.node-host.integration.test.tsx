@@ -117,7 +117,8 @@ vi.mock("@langwatch/browser-host/link", () => ({
   Link: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@langwatch/browser-host/toaster", () => ({ toaster: { create: vi.fn() } }));
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ closeDrawer: vi.fn(), currentDrawer: undefined }),
 }));
 vi.mock("../../../../behavior/workflow-api.ts", () => ({
@@ -143,10 +144,6 @@ vi.mock("@langwatch/design-system/color-mode", async (importOriginal) => ({
 vi.mock("../../../elements/workflow-icons.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ComponentIcon: () => null,
-}));
-vi.mock("../../../../behavior/crisp-bubble-policy.ts", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  assertCrispChatHidden: () => undefined,
 }));
 vi.mock("react-dnd", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

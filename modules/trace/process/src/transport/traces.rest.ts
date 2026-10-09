@@ -45,9 +45,9 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
-import { unkeyedLegacyFilterViolations } from "#rules/trace-legacy-filter-keys.rules";
+import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
-import { compileProjection } from "#rules/trace-projection-compile.rules";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 const logger = createLogger("langwatch:api:traces");
 

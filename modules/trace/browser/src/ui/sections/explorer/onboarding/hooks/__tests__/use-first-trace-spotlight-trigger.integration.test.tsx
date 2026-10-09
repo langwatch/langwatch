@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { uiDeclarations } from "@langwatch/browser-host/declarations";
+import { GuidedPathActiveToken } from "@langwatch/onboarding-client";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +10,7 @@ import { useOnboardingStore } from "../../../../../../behavior/explorer/onboardi
 
 let isTourDismissed = false;
 let isGuidedPathActive = false;
+let isOnboardingInstalled = true;
 let isTourPreferenceResolved = true;
 const mockPersistDismissal = vi.fn();
 
@@ -19,12 +22,19 @@ vi.mock("../use-trace-explorer-tour-preference.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/browser-host/capabilities", () => ({
-  useUiDeclarations: () => ({
-    declared: () => [
-      { module: "onboarding", capability: { useIsActive: () => isGuidedPathActive } },
-    ],
-  }),
+const onboardingLends = uiDeclarations([
+  {
+    name: "onboarding",
+    installation: {
+      capabilities: {},
+      lends: [{ token: GuidedPathActiveToken, value: { useIsActive: () => isGuidedPathActive } }],
+    },
+  },
+]);
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useUiDeclarations: () => (isOnboardingInstalled ? onboardingLends : uiDeclarations([])),
 }));
 
 import { useFirstTraceSpotlightTrigger } from "../use-first-trace-spotlight-trigger.ts";
@@ -34,6 +44,7 @@ describe("useFirstTraceSpotlightTrigger", () => {
     vi.useFakeTimers();
     isTourDismissed = false;
     isGuidedPathActive = false;
+    isOnboardingInstalled = true;
     isTourPreferenceResolved = true;
     mockPersistDismissal.mockReset();
     useOnboardingStore.setState({
@@ -74,6 +85,7 @@ describe("useFirstTraceSpotlightTrigger", () => {
 
   describe("given a guided onboarding path is active", () => {
     describe("when the first traces arrive", () => {
+      /** @scenario Trace reads onboarding's guided path through its client token */
       it("stays quiet and leaves the auto-start for later", () => {
         isGuidedPathActive = true;
 
@@ -140,5 +152,24 @@ describe("useFirstTraceSpotlightTrigger", () => {
 
     expect(useOnboardingStore.getState().spotlightsActive).toBe(true);
     expect(useOnboardingStore.getState().firstTraceSpotlightFired).toBe(true);
+  });
+
+  describe("given no installed module lends the guided path token", () => {
+    describe("when the first traces arrive", () => {
+      /** @scenario An uninstalled onboarding leaves trace's first-trace tour free to start */
+      it("reads no guided path and auto-starts the tour", () => {
+        isOnboardingInstalled = false;
+
+        renderHook(() =>
+          useFirstTraceSpotlightTrigger({ projectId: "current-project", hasAnyTraces: true }),
+        );
+
+        act(() => {
+          vi.advanceTimersByTime(2_000);
+        });
+
+        expect(useOnboardingStore.getState().spotlightsActive).toBe(true);
+      });
+    });
   });
 });

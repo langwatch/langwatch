@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Handled errors for the license registry (ADR-156). The callers are LangWatch
- * operators in the backoffice, so each one names a cause an operator can act on.
+ * operators in the admin console, so each one names a cause an operator can act on.
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -51,7 +51,7 @@ export class LicenseAlreadyRegisteredError extends HandledError {
 
 /**
  * The action needs an active license, and this one is revoked, superseded or
- * past its term. The backoffice names the state in its copy.
+ * past its term. The admin console names the state in its copy.
  */
 export class IssuedLicenseNotActiveError extends HandledError {
   declare readonly code: "issued_license_not_active";

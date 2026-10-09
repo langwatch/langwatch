@@ -13,9 +13,10 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
+import { AddOrEditDatasetRoutedDrawerToken } from "@langwatch/dataset-client";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import type { SlackConnectionSaved } from "@langwatch/slack-contract";
 import { useMemo, type ReactNode } from "react";
@@ -114,14 +115,6 @@ class CapabilityAutomationHost extends AutomationHost {
     return this.members.session.hasPermission(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.members.session.isFeatureEnabled(flag);
-  }
-
-  featureFlag(flag: string): boolean | undefined {
-    return this.members.session.featureFlag(flag);
-  }
-
   route(): AutomationRouteReading {
     const { params, query } = this.members.uiRoute.reading();
     return { params, query };
@@ -158,7 +151,7 @@ class CapabilityAutomationHost extends AutomationHost {
     created: (dataset: AutomationDatasetCreation) => void;
     returned: () => void;
   }): void {
-    this.members.openRegisteredDrawer("addOrEditDataset", {
+    this.members.openRegisteredDrawer(AddOrEditDatasetRoutedDrawerToken, {
       onSuccess: (saved: { datasetId: string; columnTypes: DatasetColumns }) =>
         handover.created({ datasetId: saved.datasetId, columnTypes: saved.columnTypes }),
       onClose: () => {

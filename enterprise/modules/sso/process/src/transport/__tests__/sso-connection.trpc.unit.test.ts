@@ -6,7 +6,7 @@
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type {
-  SsoConnectionBackofficeApi,
+  SsoConnectionAdminApi,
   SsoConnectionHistoryApi,
   SsoSetupApi,
 } from "@langwatch/identity-contract";
@@ -90,7 +90,12 @@ async function harness() {
         commands,
       }),
       authorization: createSsoTestAuthorization([STAFF_ID]),
-      auditLog: { record, listEntityHistory: async () => [], hasRecordedSince: async () => false },
+      auditLog: {
+        record,
+        listEntityHistory: async () => [],
+        hasRecordedSince: async () => false,
+        findByTargetKind: async () => [],
+      },
     },
   });
 
@@ -115,11 +120,9 @@ const IDP = {
   clientSecret: "shhh",
 } as const;
 
-type BackofficeConnection = NonNullable<
-  Awaited<ReturnType<SsoConnectionBackofficeApi["findById"]>>
->;
+type AdminConnection = NonNullable<Awaited<ReturnType<SsoConnectionAdminApi["findById"]>>>;
 
-function legacyConnection(organizationId: string): BackofficeConnection {
+function legacyConnection(organizationId: string): AdminConnection {
   return {
     connectionId: "ssoc_1",
     organizationId,
@@ -144,7 +147,7 @@ function legacyConnection(organizationId: string): BackofficeConnection {
   };
 }
 
-describe("the back-office single sign-on surface", () => {
+describe("the admin single sign-on surface", () => {
   let context: Awaited<ReturnType<typeof harness>>;
 
   beforeEach(async () => {

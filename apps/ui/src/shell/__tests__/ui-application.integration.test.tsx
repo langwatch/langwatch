@@ -53,10 +53,6 @@ class StubSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return true;
-  }
 }
 
 /** The host's registry: one loader per page key the route table names; layouts pass through. */

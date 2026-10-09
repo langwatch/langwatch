@@ -40,12 +40,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Full history, so `git diff --numstat` counts every changed file. Only
-      # the classifier script is checked out into the working tree.
+      # the classifier script and .gitattributes (whose linguist-generated
+      # lines drive the Generated category) are checked out.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/scripts
+            /.gitattributes
           sparse-checkout-cone-mode: false
 
       - name: Build and upsert impact map comment
@@ -54,10 +57,14 @@ jobs:
           script: |
             const MARKER = "<!-- pr-impact-map -->";
 
-            const { classify, moduleOf } = require(
+            const { classify, generatedMatcher, moduleOf } = require(
               `${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-impact-map-categories.cjs`
             );
             const { execFileSync } = require("node:child_process");
+            const { readFileSync } = require("node:fs");
+            const isGenerated = generatedMatcher(
+              readFileSync(`${process.env.GITHUB_WORKSPACE}/.gitattributes`, "utf8")
+            );
 
             const pr = context.payload.pull_request;
             const { owner, repo } = context.repo;
@@ -95,7 +102,7 @@ jobs:
               map.set(key, bucket);
             };
             for (const file of files) {
-              add(buckets, classify(file.filename), file);
+              add(buckets, classify(file.filename, { isGenerated }), file);
               const mod = moduleOf(file.filename);
               if (mod) add(modules, mod, file);
             }

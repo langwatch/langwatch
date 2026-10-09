@@ -46,10 +46,6 @@ export type WorkflowVersionHistoryRecord = {
 };
 
 export abstract class WorkflowRepository {
-  abstract findFieldSources(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<{ id: string; dsl: unknown }[]>;
   abstract findSummaries(input: {
     projectId: string;
     workflowIds: string[];

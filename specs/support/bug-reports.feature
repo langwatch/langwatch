@@ -81,9 +81,9 @@ Feature: Bug Reports Intake
   # --- admin area ---
 
   @integration
-  Scenario: Admins see reports in the backoffice
+  Scenario: Admins see reports in the admin console
     Given stored bug reports exist
-    When a LangWatch admin opens the bug reports backoffice page
+    When a LangWatch admin opens the bug reports admin page
     Then they see a table of reports with date, source, agent, kind, title, and contact
     And they can open a report to read the full summary and session transcript
 

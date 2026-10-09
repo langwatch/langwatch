@@ -9,12 +9,12 @@ import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
 import { type DeepPartial, useForm, type UseFormReturn } from "react-hook-form";
 
+import { useModelLimits } from "../features/model-selection/behavior/use-model-limits.ts";
 import {
   buildDefaultFormValues,
   inputsAndOutputsToDemostrationColumns,
 } from "../model/prompt-form/index.ts";
 import { salvageValidData } from "../model/zod-salvage.ts";
-import { useModelLimits } from "./use-model-limits.ts";
 
 interface UsePromptConfigFormProps {
   configId?: string;

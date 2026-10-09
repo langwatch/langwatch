@@ -1,4 +1,4 @@
-import type { RuntimeService } from "./runtime-lifecycle.ts";
+import type { RuntimeService } from "./lifecycle/runtime-lifecycle.ts";
 
 export type ResourceCloser = () => void | Promise<void>;
 

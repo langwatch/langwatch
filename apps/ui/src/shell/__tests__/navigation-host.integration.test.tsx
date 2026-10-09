@@ -18,10 +18,13 @@ import {
   type UiCapabilities,
   UiScope,
 } from "@langwatch/browser-host/capabilities";
+import { resetGraphicsQualityOverrideForTests } from "@langwatch/browser-host/facilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
-import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
+import { UiDesignSystemShell } from "@langwatch/browser/outer-providers";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,15 +32,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import UiAppChrome from "../ui-app-chrome";
 import { loadUiRootCapabilities } from "../ui-root-capabilities";
 
-const ROOT = await loadUiRootCapabilities();
+const LOADED = await loadUiRootCapabilities();
+/** The lent chrome capability stands in for the shell, so the test reads the host alone. */
+const ROOT: typeof LOADED = {
+  ...LOADED,
+  navigationChrome: {
+    ...LOADED.navigationChrome,
+    useNavigationTracking: () => undefined,
+    NavigationShell: ({ children }: { children?: ReactNode }) => (
+      <div data-testid="navigation-shell">{children}</div>
+    ),
+  },
+};
+const PROCESS: ProcessWebConfig = { mode: "test", deployment: "self-hosted", nlp: true };
 const { useOptionalNavigationHost } = ROOT.navigationHost;
-
-vi.mock("@langwatch/navigation-browser/chrome", () => ({
-  useNavigationTracking: () => undefined,
-  NavigationShell: ({ children }: { children: ReactNode }) => (
-    <div data-testid="navigation-shell">{children}</div>
-  ),
-}));
 
 const ORGANIZATION_ID = "org_1";
 const PROJECT_ID = "project_1";
@@ -127,9 +135,6 @@ class SignedInSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-  featureFlag(): boolean | undefined {
-    return void 0;
-  }
 }
 
 const CAPABILITIES: UiCapabilities = {
@@ -154,9 +159,14 @@ function HostProbe() {
       data-loading={String(host.isLoading())}
       data-organizations={host.organizations().length}
       data-presence={host.accountMenu()?.presence ? "offered" : "absent"}
+      data-graphics={host.accountMenu()?.graphicsQuality?.label ?? "absent"}
       data-langy={host.langy() ? "offered" : "absent"}
-      data-flag={JSON.stringify(host.featureFlag("release_langy_enabled"))}
-    />
+      data-flag={JSON.stringify(host.featureFlag(FrontendFlags.release_langy_enabled))}
+    >
+      <button type="button" onClick={() => host.accountMenu()?.graphicsQuality?.set("on")}>
+        reduce graphics
+      </button>
+    </div>
   );
 }
 
@@ -188,7 +198,7 @@ function renderChrome(
         <UiCapabilityContextProvider value={capabilities}>
           <UiDesignSystemShell>
             <Routes>
-              <Route element={<UiAppChrome capabilities={ROOT} />}>
+              <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
                 <Route path={address.pattern} element={<HostProbe />} />
               </Route>
             </Routes>
@@ -246,7 +256,7 @@ describe("the application chrome", () => {
           <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc, session }}>
             <UiDesignSystemShell>
               <Routes>
-                <Route element={<UiAppChrome capabilities={ROOT} />}>
+                <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
                   <Route path="/:project/traces" element={<HostProbe />} />
                 </Route>
               </Routes>
@@ -325,7 +335,7 @@ describe("the application chrome", () => {
   });
 
   describe("when the graph refuses the read", () => {
-    class RefusingRpc extends GraphRpc {
+    class FailingRpc extends GraphRpc {
       override query(): Promise<unknown> {
         return Promise.reject(new Error("refused"));
       }
@@ -333,7 +343,7 @@ describe("the application chrome", () => {
 
     /** @scenario A graph that refused the read is not a graph still reading */
     it("draws the refusal rather than a chrome still reading", async () => {
-      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() });
+      renderChrome({ ...CAPABILITIES, rpc: new FailingRpc() });
 
       await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
       expect(screen.queryByTestId("probe")).toBeNull();
@@ -341,7 +351,7 @@ describe("the application chrome", () => {
 
     /** @scenario The landing address says a refused read failed rather than waiting on it */
     it("says the workspace could not be opened on the landing address", async () => {
-      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() }, { path: "/", pattern: "/" });
+      renderChrome({ ...CAPABILITIES, rpc: new FailingRpc() }, { path: "/", pattern: "/" });
 
       await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
       expect(screen.getByText(/couldn't open your workspace/i)).toBeTruthy();
@@ -356,11 +366,26 @@ describe("the application chrome", () => {
     );
   });
 
+  /** @scenario The avatar menu offers the reduced graphics switch and remembers the pick */
+  it("offers the reduced graphics switch and persists the pick", async () => {
+    resetGraphicsQualityOverrideForTests();
+    renderChrome();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-graphics")).toBe("Auto"),
+    );
+    act(() => screen.getByRole("button", { name: "reduce graphics" }).click());
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-graphics")).toBe("On"),
+    );
+    resetGraphicsQualityOverrideForTests();
+  });
+
   it("draws the address bare when no application shell answers, rather than throwing", () => {
     render(
       <MemoryRouter initialEntries={["/my-project/traces"]}>
         <Routes>
-          <Route element={<UiAppChrome capabilities={ROOT} />}>
+          <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
             <Route path="/:project/traces" element={<HostProbe />} />
           </Route>
         </Routes>
@@ -383,7 +408,7 @@ describe("the application chrome", () => {
 
   describe("when the workspace read is refused", () => {
     it("says the workspace could not be opened and offers to try again", async () => {
-      class RefusingRpc extends GraphRpc {
+      class FailingRpc extends GraphRpc {
         override query(): Promise<unknown> {
           return Promise.reject(new Error("the workspace graph refused"));
         }
@@ -398,10 +423,10 @@ describe("the application chrome", () => {
           <QueryClientProvider
             client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
           >
-            <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new RefusingRpc() }}>
+            <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new FailingRpc() }}>
               <UiDesignSystemShell>
                 <Routes>
-                  <Route element={<UiAppChrome capabilities={ROOT} />}>
+                  <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
                     <Route path="/:project/traces" element={<HostProbe />} />
                   </Route>
                 </Routes>

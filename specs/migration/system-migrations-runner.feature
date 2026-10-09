@@ -26,13 +26,6 @@ Feature: Running system migrations across organizations
     And the migration receives "project_one" as its tenant identifier
     And its persisted checkpoint is keyed by "project_one"
 
-  @unit
-  Scenario: Project-rooted startup migrations prove completion for projects
-    Given an explicitly configured project-rooted startup migration
-    When startup drives and verifies the migration
-    Then both execution and completion verification enumerate project identifiers
-    And an organization identifier is never substituted for a project identifier
-
   # ═══ Passes and claims ════════════════════════════════════════════════
 
   @unit
@@ -132,30 +125,20 @@ Feature: Running system migrations across organizations
   # ═══ Converging ═══════════════════════════════════════════════════════
   # One pass is never enough on its own: a pass cannot observe its own
   # events, so an organization it adopts reads as held and only a LATER pass
-  # finalizes it. Startup therefore runs a blocking preflight of passes rather
-  # than one background pass — nobody should receive traffic, have to restart
-  # the app, or click "run a pass" before the counts settle.
+  # finalizes it. Passes therefore run in bounded runs, on the worker and once
+  # in the preparation step. A run never gates a boot (plan §6.8, Alex Q7): a
+  # held or parked tenant stays on its legacy path and nothing waits on it.
   #
-  # It stops on NO PROGRESS, never on "everything is terminal": a held
+  # A run stops on NO PROGRESS, never on "everything is terminal": a held
   # organization is re-proved on every pass and may legitimately never reach
   # a terminal state, so waiting for terminal would never stop.
 
   @unit
   Scenario: The runner drives passes until nothing advances
-    When the app starts
+    When a run of passes starts
     Then passes run one after another while each one advances an organization
     And the first pass that advances nothing ends the run
-    And runtime processes start only after that run completes
-
-  @unit
-  Scenario: Preflight projection work cannot consume application traffic
-    Given the preflight emits events while an existing worker is still running
-    When those events and application events are queued concurrently
-    Then the preflight uses the canonical queue and its aggregate locks
-    And it dispatches only groups registered by that preflight
-    And blocked or failed work in those groups prevents startup
-    And worker-scoped durable subscribers run for the preflight events
-    And schedulers, process-manager consumers, and general workers do not start
+    And nothing waits for that run before serving
 
   # The barrier's deadline is the one refusal a booting fleet cannot answer:
   # every replica runs this preflight before it starts consuming, so work it
@@ -164,9 +147,12 @@ Feature: Running system migrations across organizations
   # already starts on the legacy path with its migration gate closed — so
   # giving up on the wait costs a later pass, never correctness; a failure is
   # a fault a later pass will not clear, and that half still refuses.
-    And blocked or failed work the preflight itself caused in those groups prevents startup
-    And worker-scoped durable subscribers run for the preflight events
-    And schedulers, process-manager consumers, and general workers do not start
+  @integration
+  Scenario: Work the preflight itself failed or blocked refuses startup
+    Given the preflight registered the groups its own work runs in
+    When work in one of those groups fails or is blocked under the preflight
+    Then startup is refused
+    And a failed group is named in the refusal
 
   # A group's error marker has no expiry and is cleared only by a later success
   # on that same group, so a failure ordinary traffic left before the upgrade —
@@ -211,15 +197,15 @@ Feature: Running system migrations across organizations
 
   @unit
   Scenario: A recurring reconciliation does not loop forever
-    Given a migration declares its held outcome to be recurring reconciliation
-    When the app starts
+    Given a migration that reconciles on every pass and is re-proved held each time
+    When a run of passes starts
     Then it is re-proved once and the run ends
     And being re-proved into the same state does not count as progress
 
   @unit
   Scenario: A held migration stays on the legacy path without preventing startup
     Given a migration remains held after its pass, with nothing advancing
-    When the app starts
+    When a run of passes starts
     Then it is re-proved once and the run ends
     And being re-proved into the same state does not count as progress
     And its migration gate stays closed on the legacy path
@@ -227,17 +213,16 @@ Feature: Running system migrations across organizations
   @unit
   Scenario: One tenant's parked migration does not stop the fleet starting
     Given one tenant's migration parks on an error
-    When the app starts
-    Then the preflight still completes and runtime processes start
+    When a run of passes starts
+    Then the run still completes and nothing waits on that tenant
     And that tenant stays on its legacy path, served as it was before
     And the park is reported as an error against its tenant and migration
 
   @unit
   Scenario: Cancelling startup stops the loop between passes
     Given a run waiting between two passes
-    When startup is cancelled
+    When the run is cancelled
     Then no further pass starts
-    And runtime processes do not start
 
   # A pass now enumerates only the tenants with work left, so it may ask that
   # question of the whole installation — a walk no single tenant owns, which
@@ -275,7 +260,7 @@ Feature: Running system migrations across organizations
   Scenario: A peer's claims do not keep this process from starting
     Given passes that advance nothing while a peer holds some of the fleet
     When the same shape repeats pass after pass
-    Then the run ends and runtime processes start
+    Then the run ends
     And no further pass waits on the peer
 
   # A pass now enumerates only the tenants with work left, so on a settled
@@ -289,14 +274,14 @@ Feature: Running system migrations across organizations
     Given an earlier pass claimed a tenant of its own
     When every later pass finds the few remaining tenants held by a peer
     Then the loop stops rather than running to the cap
-    Then the run ends and runtime processes start
+    Then the run ends
 
   @unit
   Scenario: A process never granted a claim keeps trying rather than settling
     Given no pass has ever been granted a claim
     When every pass finds every tenant held
     Then the loop keeps running to the cap
-    Then the preflight fails rather than starting
+    And it stops there without calling the fleet settled
 
   @unit
   Scenario: A momentary overlap with a peer is still waited out
@@ -305,12 +290,12 @@ Feature: Running system migrations across organizations
     Then that pass is what ends the run
 
   @unit
-  Scenario: A loop that never converges prevents startup
+  Scenario: A loop that never settles stops at the cap without claiming success
     Given passes that report progress every time
     When the maximum number of passes is reached
-    Then the preflight fails
-    And it says how many passes it gave up after
-    And runtime processes do not start
+    Then the run stops
+    And it says how many passes it gave up after, and that the fleet did not settle
+    And nothing is refused: the worker's later passes carry on
 
   # Main drove this loop in the background of every worker boot, so how fast a
   # fleet converged was a function of the deploy cadence. It is an ordered step
@@ -321,14 +306,62 @@ Feature: Running system migrations across organizations
     When the fleet stops advancing
     Then the task returns and the boot chain continues to the process it was going to start
     And a pass that fails outright ends the task without failing the boot chain
+    And a run that stops at the cap ends the task without failing the boot chain
 
   @unit
-  Scenario: A failed pass prevents startup
+  Scenario: A failed pass ends the run without preventing startup
     Given a pass that fails outright
     When the run reaches it
-    Then the preflight fails rather than retrying immediately
-    And runtime processes do not start
-    And the next start retries the pass
+    Then the run stops rather than retrying immediately
+    And nothing waits on it
+    And a later run retries the pass
+
+  # ═══ Held tenants ═════════════════════════════════════════════════════
+  # A held tenant never gates anything (plan §6.8, Alex Q7). It stays on its
+  # legacy path, and its record says why it is held and since when.
+
+  @unit
+  Scenario: A held tenant records why it is held
+    Given a migration whose own proof disagrees for "org_acme"
+    When a pass runs
+    Then "org_acme" is held with reason "proof"
+
+  @unit
+  Scenario: A held tenant records the moment it became held
+    Given a migration whose own proof disagrees for "org_acme"
+    When a pass runs at a known moment
+    Then "org_acme" is held since that moment
+
+  @unit
+  Scenario: Re-proving a held tenant keeps the moment it was first held
+    Given "org_acme" has been held since an earlier pass
+    When a later pass re-proves it held
+    Then the moment it was first held is unchanged
+
+  # Failed is worked out on read, never stored (Alex, 2026-10-09).
+  @unit
+  Scenario: A tenant held past the threshold reads as failed
+    Given "org_acme" has been held for longer than the held threshold
+    When its record is read
+    Then it reads as failed
+
+  @unit
+  Scenario: A tenant held within the threshold does not read as failed
+    Given "org_acme" was held moments ago
+    When its record is read
+    Then it does not read as failed
+
+  @unit
+  Scenario: A tenant whose queued work has not drained is held as pending
+    Given a migration whose work for "org_acme" is queued but not drained
+    When a pass runs
+    Then "org_acme" is held with reason "pending"
+
+  @unit
+  Scenario: A tenant that leaves held drops its reason
+    Given "org_acme" is held
+    When a later pass finalizes it
+    Then its record carries no held reason
 
   # ═══ Re-driving after startup ═════════════════════════════════════════
   # The preflight converges once and then stops. Every stored status but
@@ -809,9 +842,3 @@ Feature: Running system migrations across organizations
     When an operator asks for a pass now
     Then the page is told the pass started
     And the failure is logged rather than answered
-
-  @unit
-  Scenario: A finite held migration prevents startup
-    Given a migration that stays held through the bounded startup polls
-    When startup waits for migrations to converge
-    Then startup is refused for lack of progress

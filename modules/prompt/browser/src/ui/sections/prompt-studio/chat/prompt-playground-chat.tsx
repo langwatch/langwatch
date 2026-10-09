@@ -12,7 +12,7 @@ import {
   usePromptExecution,
 } from "../../../../behavior/playground/use-prompt-execution.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useDraggableTabsBrowserStore } from "../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { playgroundConversationLabels } from "../../../../model/playground-conversation-labels.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import { useTabId } from "../studio-internals.ts";

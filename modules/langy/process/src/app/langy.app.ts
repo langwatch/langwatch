@@ -112,9 +112,8 @@ import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { z } from "zod";
 
-import { HttpLangyWorkerChannel } from "../channels/http/http.langy-worker.channel.ts";
 import type { LangyWorker } from "../channels/langy-worker.channel.ts";
-import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
+import type { LangyChannels } from "../channels/langy.channels.ts";
 import { RedisLangyConversationProducerRepository } from "../eventing/langy-conversation-producer.pipeline.ts";
 import { EventingLangyConversationAdapter } from "../eventing/langy-conversation-runtime.pipeline.ts";
 import { LangyConversationCommandSenders } from "../eventing/langy-conversation.commands.ts";
@@ -125,61 +124,59 @@ import {
   type LangyGuidedOnboardingPipeline,
 } from "../eventing/langy-guided-onboarding.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
-import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
+import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
+import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
+import {
+  LANGY_GITHUB_PRS_PER_DAY,
+  LangyGithubPrQuotaService,
+} from "../features/github/services/langy-github-pr-quota.service.ts";
+import { LangyGithubTurnTokenService } from "../features/github/services/langy-github-turn-token.service.ts";
+import { LocalControlConnectionService } from "../features/local-control/services/langy-local-control-connection.service.ts";
+import { LocalControlLongPollService } from "../features/local-control/services/langy-local-control-long-poll.service.ts";
+import { LangyLocalControlRuntimeService } from "../features/local-control/services/langy-local-control-runtime.service.ts";
+import type { LocalControlRuntime } from "../features/local-control/services/langy-local-control-runtime.service.ts";
+import { LangyLocalControlTerminalService } from "../features/local-control/services/langy-local-control-terminal.service.ts";
+import { LocalControlSessionCoreService } from "../features/local-control/services/langy-local-session.service.ts";
+import { LangyLocalWorkerService } from "../features/local-control/services/langy-local-worker.service.ts";
+import { LangyLocalWorkspaceService } from "../features/local-control/services/langy-local-workspace.service.ts";
+import { LangyPanelAccessService } from "../features/panel/services/langy-panel-access.service.ts";
+import { LangyPanelConversationService } from "../features/panel/services/langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../features/panel/services/langy-panel-egress.service.ts";
+import { LangyPanelLocalService } from "../features/panel/services/langy-panel-local.service.ts";
+import { LangyPanelTurnStreamService } from "../features/panel/services/langy-panel-turn-stream.service.ts";
+import { LangySessionKeyMetricsOtelService } from "../features/session-key/services/langy-session-key-metrics-otel.service.ts";
+import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
+import { LangyVirtualKeyGatewayService } from "../features/session-key/services/langy-virtual-key-gateway.service.ts";
+import { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
+import { LangyTurnSettlementWaiterService } from "../features/turn/services/langy-turn-settlement-waiter.service.ts";
+import { LangyTurnsBoundsService } from "../features/turn/services/langy-turns-bounds.service.ts";
+import { LangyUiActionBackendService } from "../features/ui-action/services/langy-ui-action-backend.service.ts";
+import { LangyUiActionCatalogService } from "../features/ui-action/services/langy-ui-action-catalog.service.ts";
+import { LangyUiActionDoorService } from "../features/ui-action/services/langy-ui-action-door.service.ts";
+import { LangyUiActionExperimentBackendService } from "../features/ui-action/services/langy-ui-action-experiment-backend.service.ts";
+import { LangyUiActionPageService } from "../features/ui-action/services/langy-ui-action-page.service.ts";
+import { LangyUiActionSurfaceService } from "../features/ui-action/services/langy-ui-action-surface.service.ts";
+import { LangyUiActionService } from "../features/ui-action/services/langy-ui-action.service.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { RedisLangyTurnRelayRepository } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
 import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
-import { LangyConversationUpdateService } from "../services/langy-conversation-update.service.ts";
-import { LangyGithubPrPermitService } from "../services/langy-github-pr-permit.service.ts";
-import {
-  LANGY_GITHUB_PRS_PER_DAY,
-  LangyGithubPrQuotaService,
-} from "../services/langy-github-pr-quota.service.ts";
-import { LangyGithubTurnTokenService } from "../services/langy-github-turn-token.service.ts";
 import { LangyGuidedKickoffService } from "../services/langy-guided-kickoff.service.ts";
 import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
-import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
-import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
-import { LangyLocalControlRuntimeService } from "../services/langy-local-control-runtime.service.ts";
-import type { LocalControlRuntime } from "../services/langy-local-control-runtime.service.ts";
-import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
-import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
-import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
-import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyModelService } from "../services/langy-model.service.ts";
 import { LangyNavigateFallbackService } from "../services/langy-navigate-fallback.service.ts";
 import { LangyNavigateResourceLocatorService } from "../services/langy-navigate-resource-locator.service.ts";
-import { LangyPanelAccessService } from "../services/langy-panel-access.service.ts";
-import { LangyPanelConversationService } from "../services/langy-panel-conversation.service.ts";
-import { LangyPanelEgressService } from "../services/langy-panel-egress.service.ts";
-import { LangyPanelLocalService } from "../services/langy-panel-local.service.ts";
 import {
   LangyPostgresService,
   type LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
-import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
-import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
-import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import { LangySkillGatesService } from "../services/langy-skill-gates.service.ts";
 import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
-import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
-import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
-import { LangyUiActionBackendService } from "../services/langy-ui-action-backend.service.ts";
-import { LangyUiActionCatalogService } from "../services/langy-ui-action-catalog.service.ts";
-import { LangyUiActionDoorService } from "../services/langy-ui-action-door.service.ts";
-import { LangyUiActionExperimentBackendService } from "../services/langy-ui-action-experiment-backend.service.ts";
-import { LangyUiActionPageService } from "../services/langy-ui-action-page.service.ts";
-import { LangyUiActionSurfaceService } from "../services/langy-ui-action-surface.service.ts";
-import { LangyUiActionService } from "../services/langy-ui-action.service.ts";
-import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
-import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
-import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
 import type { LangyService, OpenLangyRelay } from "../services/langy.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 
@@ -200,8 +197,6 @@ type LangyAppDependencies = {
   /** The per-project window every turn is counted against before it dispatches. */
   turnBounds: LangyTurnsBoundsService;
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
-  /** The maintenance sweep's own service: no aggregate, no commands, just the reap. */
-  sessionKeyReap: LangySessionKeyReapService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
   uiActionDoor: LangyUiActionDoorService;
@@ -214,6 +209,7 @@ type LangyAppDependencies = {
   sockets: LocalControlConnectionService;
   sessionKeyDoor: RestIdentity;
   panelConversations: LangyPanelConversationService;
+  panelTurnStream: LangyPanelTurnStreamService;
   panelLocal: LangyPanelLocalService;
   panelEgress: LangyPanelEgressService;
   /** The pipeline's senders, bound once the process registers it (§9). */
@@ -237,9 +233,9 @@ interface LangyLocalControl {
 
 type LangySetup = FeatureSetup<
   typeof LangyModule.dependencies,
-  never,
   LangyServerConfig,
-  LangyRepositories
+  LangyRepositories,
+  LangyChannels
 >;
 
 export class LangyModule implements LangyApiContract {
@@ -286,22 +282,14 @@ export class LangyModule implements LangyApiContract {
   static readonly secrets = langySecrets;
 
   static async create(setup: LangySetup): Promise<LangyModule> {
-    const { channel, door, configured } = await setup.secrets.into(
+    const channel = setup.channels.worker;
+    const { door, configured } = await setup.secrets.into(
       langySecrets.internal,
       (internalSecret) => {
         assertLangyServerConfig(setup.config, internalSecret);
-        const metrics = LangyWorkerMetricsOtelService.create();
         const configured = Boolean(setup.config.agentUrl && internalSecret);
-        const channel =
-          setup.config.agentUrl && internalSecret
-            ? HttpLangyWorkerChannel.create({
-                agentUrl: setup.config.agentUrl,
-                internalSecret,
-                metrics,
-              })
-            : UnavailableLangyWorkerChannel.create(metrics);
         const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
-        return { channel, door, configured };
+        return { door, configured };
       },
     );
     const adapter = LangyPostgresService.create({
@@ -459,10 +447,6 @@ export class LangyModule implements LangyApiContract {
       virtualKeyProvisioning: LangyVirtualKeyProvisioningService.create({
         virtualKeys: built.credentials.virtualKeys,
       }),
-      sessionKeyReap: LangySessionKeyReapService.create({
-        repository: setup.repositories.sessionKeyReap,
-        metrics: LangySessionKeyMetricsOtelService.create(),
-      }),
       callers,
       localControl: { runtime, commands, workspace, baseHost: setup.config.publicBaseUrl },
       localWorker: LangyLocalWorkerService.create({
@@ -487,9 +471,13 @@ export class LangyModule implements LangyApiContract {
         turnBounds,
         rateLimits: setup.repositories.rateLimits,
         presence: setup.dependencies.presence,
+        uiActions: LangyUiActionPageService.create({ uiActions: setup.repositories.uiActions }),
+      }),
+      panelTurnStream: LangyPanelTurnStreamService.create({
+        access,
+        langy,
         turnAccess: setup.repositories.turnAccess,
         openBuffer: () => setup.repositories.tokenBuffer.openBlocking(),
-        uiActions: LangyUiActionPageService.create({ uiActions: setup.repositories.uiActions }),
       }),
       panelLocal: LangyPanelLocalService.create({
         access,
@@ -641,18 +629,11 @@ export class LangyModule implements LangyApiContract {
   }
 
   /**
-   * The pipeline `langy_maintenance` registers (ADR-144), ported from the
-   * deleted `LangyMaintenanceWorkerFeatureInstaller`. `deleteDispatchedBefore`
-   * is the installing process's own outbox prune, handed in by the seam.
+   * The pipeline `langy_maintenance` registers (ADR-144): a new project's
+   * virtual key, minted from project's created fact.
    */
-  maintenanceEventingPipeline(
-    deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">,
-  ): StaticPipelineDefinition<never> {
+  maintenanceEventingPipeline(): StaticPipelineDefinition<never> {
     return buildLangyMaintenancePipeline({
-      sessionKeyReap: {
-        reap: () => this.dependencies.sessionKeyReap.reap(),
-        deleteDispatchedBefore: deps.deleteDispatchedBefore,
-      },
       virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
     });
   }
@@ -1082,7 +1063,7 @@ export class LangyModule implements LangyApiContract {
   watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
   ): AsyncIterable<LangyStreamEntry> {
-    return this.dependencies.panelConversations.watchTurnStream(input);
+    return this.dependencies.panelTurnStream.watchTurnStream(input);
   }
 
   getPanelLocalRecord(

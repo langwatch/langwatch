@@ -70,12 +70,14 @@ export async function bootApi({
   );
   await resolver.preflight(declared);
 
+  const stores = memoryStores();
   const eventing =
     runtimeEventing ??
     new EventSourcing({
       enabled: false,
       participation: "produce",
       processManagerMode: "producer-only",
+      processStore: stores.processStore,
     });
   const supply: WholeListSupply = createApp({
     role: ROLE,
@@ -84,7 +86,7 @@ export async function bootApi({
   const configured = supply
     .withModules(processModules)
     .withConfig(config)
-    .withStores(memoryStores())
+    .withStores(stores)
     .withMembers({
       logger: createTestLogger().logger,
       clock: systemClock(),

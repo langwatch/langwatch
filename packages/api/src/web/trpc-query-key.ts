@@ -1,6 +1,9 @@
 /** tRPC's React Query cache key rebuilt from a procedure path string; for procedures
  * not yet declared in the feature's map; use typed API once declared */
 
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+
 export type TrpcQueryKey =
   | readonly [readonly string[]]
   | readonly [readonly string[], { input?: unknown; type?: "query" | "infinite" }];
@@ -32,4 +35,17 @@ export function trpcQueryFilter(
   options: { input?: unknown } = {},
 ): { queryKey: TrpcQueryKey } {
   return { queryKey: trpcQueryKey(path, options) };
+}
+
+/** Invalidates a procedure the feature's map does not declare (migration escape hatch);
+ * prefer `moduleApi.useUtils().<procedure>.invalidate()` once declared */
+export function useInvalidateProcedure() {
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    async (path: string, options: { input?: unknown } = {}) => {
+      await queryClient.invalidateQueries(trpcQueryFilter(path, options));
+    },
+    [queryClient],
+  );
 }

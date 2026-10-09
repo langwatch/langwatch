@@ -17,10 +17,10 @@ vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
   uiLeaveTo: (url: string) => departures.to.push(url),
 }));
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 
-import type { UiAuthClient } from "../../session";
 import { useBrowserUiSession, useUiSessionReading } from "../ui-session";
 import {
   UI_EFFECTIVE_PERMISSIONS_PROCEDURE,

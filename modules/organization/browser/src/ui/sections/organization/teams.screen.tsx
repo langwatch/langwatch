@@ -21,11 +21,12 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import {
   CreateProjectDrawerToken,
   CreateTeamDrawerToken,
   EditProjectDrawerToken,
-} from "@langwatch/organization-contract";
+} from "@langwatch/organization-client";
 import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -775,10 +776,10 @@ function TeamCard({
   const [expanded, setExpanded] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const { openDrawer } = useDrawer();
-  const { hasPermission } = useOrganizationTeamProject();
+  const host = useOrganizationHost();
   const queryClient = api.useUtils();
   const governanceEnabled = useOrganizationHost().isFeatureEnabled(
-    "release_ui_ai_governance_enabled",
+    FrontendFlags.release_ui_ai_governance_enabled,
   );
   const department = useDepartmentColumn(organizationId, governanceEnabled);
 
@@ -981,7 +982,7 @@ function TeamCard({
                   Projects
                 </Text>
                 <Spacer />
-                {hasPermission("project:create") && (
+                {host.hasPermission("project:create") && (
                   <Button
                     size="xs"
                     variant="outline"
@@ -1036,7 +1037,8 @@ function TeamCard({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TeamsScreen() {
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useOrganizationHost();
   const { openDrawer } = useDrawer();
 
   const teams = api.team.getTeamsWithGrants.useQuery(
@@ -1044,7 +1046,7 @@ export default function TeamsScreen() {
     { enabled: !!organization },
   );
 
-  const canManage = hasPermission("team:manage");
+  const canManage = host.hasPermission("team:manage");
 
   if (!organization) return null;
 
@@ -1059,7 +1061,7 @@ export default function TeamsScreen() {
           </Text>
         </Box>
         <Spacer />
-        {hasPermission("project:create") && (
+        {host.hasPermission("project:create") && (
           <PageLayout.HeaderButton
             onClick={() => openDrawer(CreateProjectDrawerToken)}
             data-testid="teams-project-add"

@@ -4,16 +4,13 @@ import { type CapabilityIconName, type CapabilitySurface } from "@langwatch/lang
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { buildSurfaceHref, SURFACE_LABEL } from "../../../../../model/langy-capability-registry.ts";
 import {
   CapabilityRowSkeletons,
   LangyCapabilityCard as LangyCapabilityCardPresentation,
   type LangyCapabilityTone,
 } from "../../../../../ui/sections/langy-capability-card.tsx";
 import { useSpaLinkClick } from "../../../behavior/logic/spa-link.ts";
-import {
-  buildSurfaceHref,
-  SURFACE_LABEL,
-} from "../../../model/capabilities/capability-registry.ts";
 import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
 
 export { CapabilityRowSkeletons };

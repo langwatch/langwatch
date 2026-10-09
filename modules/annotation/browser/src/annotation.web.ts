@@ -1,17 +1,15 @@
 /**
  * What a browser installs when it installs annotation: the five screens the
- * product routes today, the surfaces other modules mount, and the one
- * injected value these screens are allowed to read.
+ * product routes today and the surfaces other modules mount.
  */
 
 import {
   AnnotateBodyToken,
   AnnotationFormFooterToken,
   SuggestBodyToken,
-} from "@langwatch/annotation-contract";
+} from "@langwatch/annotation-client";
 import { defineBrowserModule } from "@langwatch/browser";
 import { createElement } from "react";
-import { z } from "zod";
 
 import type { AnnotationView } from "./model/annotation-view.ts";
 
@@ -95,10 +93,4 @@ export const annotationWeb = defineBrowserModule("annotation")
   })
   .lends(AnnotationFormFooterToken, {
     load: async () => ({ default: (await import("./annotation-form.ts")).FormFooter }),
-  })
-  /**
-   * The deployment mode decides which documentation host an annotation screen
-   * links into, read off the process owner's slice. The supply parses it before
-   * a component renders, and refuses the boot naming this module.
-   */
-  .withConfig({ process: z.object({ mode: z.enum(["development", "test", "production"]) }) });
+  });

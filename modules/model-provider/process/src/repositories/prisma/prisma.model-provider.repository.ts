@@ -13,6 +13,7 @@ import {
   type ModelProviderScope,
   Prisma,
 } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import type {
@@ -254,7 +255,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
   }
 
   async findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]> {
-    return this.database.modelProvider.findMany({
+    const rows = await this.database.modelProvider.findMany({
       where: { scopes: { some: { scopeType: "PROJECT" } } },
       select: {
         id: true,
@@ -262,37 +263,53 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
         customKeys: true,
         customModels: true,
         customEmbeddingsModels: true,
+        updatedAt: true,
       },
+    });
+    return rows.map((row) => ({ ...row, updatedAt: fromDate(row.updatedAt) }));
+  }
+
+  async updateLegacyColumns(input: ModelProviderLegacyColumnsUpdate): Promise<void> {
+    await this.database.modelProvider.update({
+      where: { id: input.id },
+      data: this.legacyColumnsData(input),
     });
   }
 
-  async updateLegacyColumns({
-    id,
+  async updateLegacyColumnsIfUnchanged(
+    input: Parameters<ModelProviderRepository["updateLegacyColumnsIfUnchanged"]>[0],
+  ): Promise<boolean> {
+    const written = await this.database.modelProvider.updateMany({
+      where: { id: input.id, updatedAt: toDate(input.updatedAt) },
+      data: this.legacyColumnsData(input),
+    });
+
+    return written.count === 1;
+  }
+
+  private legacyColumnsData({
     customKeys,
     customModels,
     customEmbeddingsModels,
-  }: ModelProviderLegacyColumnsUpdate): Promise<void> {
-    await this.database.modelProvider.update({
-      where: { id },
-      data: {
-        ...(customKeys === undefined
-          ? {}
-          : {
-              customKeys: PrismaModelProviderRepository.toPrismaInputJson(
-                this.credentials.encode(customKeys),
-              ),
-            }),
-        ...(customModels === undefined
-          ? {}
-          : { customModels: PrismaModelProviderRepository.toPrismaInputJson(customModels) }),
-        ...(customEmbeddingsModels === undefined
-          ? {}
-          : {
-              customEmbeddingsModels:
-                PrismaModelProviderRepository.toPrismaInputJson(customEmbeddingsModels),
-            }),
-      },
-    });
+  }: ModelProviderLegacyColumnsUpdate) {
+    return {
+      ...(customKeys === undefined
+        ? {}
+        : {
+            customKeys: PrismaModelProviderRepository.toPrismaInputJson(
+              this.credentials.encode(customKeys),
+            ),
+          }),
+      ...(customModels === undefined
+        ? {}
+        : { customModels: PrismaModelProviderRepository.toPrismaInputJson(customModels) }),
+      ...(customEmbeddingsModels === undefined
+        ? {}
+        : {
+            customEmbeddingsModels:
+              PrismaModelProviderRepository.toPrismaInputJson(customEmbeddingsModels),
+          }),
+    };
   }
 
   isRoutingHandleConflict(error: unknown): boolean {

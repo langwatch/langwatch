@@ -126,6 +126,7 @@ describe("given a project attached to a team and organization", () => {
 describe("given the setup checklist asks whether a provider is configured", () => {
   describe("when the repository counts the enabled providers in the project's scopes", () => {
     /** @scenario All database access goes through the repository */
+    /** @scenario "Step setupModelProviders ignores disabled providers" */
     it("counts one issued by the repository, an organization one included, and reads no credential", async () => {
       const issued: unknown[] = [];
       const database = prismaDouble({

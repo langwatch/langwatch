@@ -35,6 +35,11 @@ const sum = (values) => values.reduce((total, value) => total + value, 0);
 const days = (from = 0, to = LAST) => DAYS.map((_, i) => i).filter((i) => i >= from && i <= to);
 const isWeekend = (i) => [0, 6].includes(new Date(FIRST_DAY + i * DAY_MS).getUTCDay());
 const isAfterRelease = (i) => i >= RELEASE;
+/** The share of calls that dropped: worst on the incident day, lower after the release. */
+const droppedShare = (i) => {
+  if (i === INCIDENT) return 0.09;
+  return isAfterRelease(i) ? 0.022 : 0.036;
+};
 const at = (i, time = "09:14:00") => `${DAYS[i].slice(0, 10)} ${time}`;
 const daily = (row) => DAYS.map((bucket, i) => ({ bucket, ...row(i) }));
 const PRESENT = [{ present: 1 }];
@@ -143,6 +148,8 @@ const TOPIC_SHIFT = [
 ];
 const topicRows = (row) => TOPICS.map(([topic, share], n) => ({ topic, ...row({ share, n }) }));
 
+/** By scenario index: the two scenarios the new release fails runs of. The others pass all 6. */
+const NEW_PASSED = { 1: 3, 4: 5 };
 const SCENARIOS = [
   ["sc-refund-limit", "Refund over the limit"],
   ["sc-late-parcel", "Late parcel, upset customer"],
@@ -350,7 +357,7 @@ export const SAMPLES = {
   "ship-verdict/scenarios": SCENARIOS.map(([scenario, name], n) => ({
     scenario,
     name,
-    new_passed: n === 1 ? 3 : n === 4 ? 5 : 6,
+    new_passed: NEW_PASSED[n] ?? 6,
     new_runs: 6,
     current_passed: n === 1 ? 22 : 23,
     current_runs: 24,
@@ -384,7 +391,7 @@ export const SAMPLES = {
       scenario,
       name,
       strip,
-      passed: [...strip].filter((run) => run === "1").length,
+      passed: strip.split("").filter((run) => run === "1").length,
       runs: strip.length,
     };
   }),
@@ -740,7 +747,7 @@ export const SAMPLES = {
     const calls = Math.round(conversations(i) * 0.3);
     return {
       calls,
-      dropped: Math.round(calls * (i === INCIDENT ? 0.09 : isAfterRelease(i) ? 0.022 : 0.036)),
+      dropped: Math.round(calls * droppedShare(i)),
       repeating: Math.round(calls * 0.06),
     };
   }),
@@ -866,12 +873,13 @@ export const SAMPLES = {
   "att-change/units": CUSTOMERS.flatMap(([unit, share], n) =>
     ["support-agent v13", "support-agent v14"].map((version, after) => {
       const judged = Math.round(CHECKS * share * (after ? 0.3 : 0.7));
+      const passedBefore = n === 2 ? 0.85 : 0.91;
       return {
         unit_key: "langwatch.customer_id",
         unit,
         version,
         first_seen: at(after ? RELEASE : 1, "10:42:00.000"),
-        passed: Math.round(judged * (after ? 0.95 : n === 2 ? 0.85 : 0.91)),
+        passed: Math.round(judged * (after ? 0.95 : passedBefore)),
         judged,
       };
     }),

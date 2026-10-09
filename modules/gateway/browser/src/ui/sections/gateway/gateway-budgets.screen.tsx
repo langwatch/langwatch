@@ -21,7 +21,7 @@ import {
 } from "@langwatch/design-system/provider-scope-chips";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
-import { toEpochMs } from "@langwatch/time";
+import { toEpochMs, readableDate } from "@langwatch/time";
 import { Archive, Eye, Gauge, MoreVertical, Pencil, Plus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
@@ -31,7 +31,7 @@ import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { BudgetCreateDrawer } from "../../../features/budgets/ui/sections/budget-create-drawer.tsx";
 import { BudgetEditDrawer } from "../../../features/budgets/ui/sections/budget-edit-drawer.tsx";
-import { readableDate } from "../../../model/readable-date.ts";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
@@ -151,10 +151,11 @@ function usagePalette(pct: number): "red" | "orange" | "green" {
 
 function BudgetsPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, hasPermission } = useOrganizationTeamProject();
-  const canCreate = hasPermission("gatewayBudgets:create");
-  const canUpdate = hasPermission("gatewayBudgets:update");
-  const canDelete = hasPermission("gatewayBudgets:delete");
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
+  const canCreate = host.hasPermission("gatewayBudgets:create");
+  const canUpdate = host.hasPermission("gatewayBudgets:update");
+  const canDelete = host.hasPermission("gatewayBudgets:delete");
 
   const router = useGatewayRouter();
   const { rows, spendAvailable, isLoading, isError, error, refetch } = useBudgetRows(

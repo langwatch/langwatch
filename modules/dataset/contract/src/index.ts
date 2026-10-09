@@ -1,5 +1,4 @@
 export * from "./dataset.ts";
-export * from "./dataset-lent-components.ts";
 export * from "./dataset.responses.ts";
 export * from "./dataset-file.ts";
 export * from "./dataset-attachment-policy.ts";
@@ -13,6 +12,7 @@ export * from "./dataset-rest.schemas.ts";
 export * from "./dataset.api.ts";
 export * from "./dataset.trpc.ts";
 export * from "./dataset-record.trpc.ts";
-export * from "./batch-record.trpc.ts";
+export * from "./batch-evaluation.schemas.ts";
 export * from "./trace-mapping.ts";
 export * from "./evaluator-mappings.ts";
+export * from "./dataset.config.ts";

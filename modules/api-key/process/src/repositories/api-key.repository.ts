@@ -104,14 +104,18 @@ export abstract class ApiKeyRepository {
   abstract findLivenessById(input: {
     id: string;
   }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null>;
-  /**
-   * Every unrevoked CLI login key past its session. Cross-tenant, like
-   * {@link revokeExpiredByName}: the caller is the hourly sweep, not a
-   * request. `expiresAt: { not: null }` excludes a key minted before device metadata.
-   */
+  /** One organization's unrevoked CLI login keys past their session at `now`. */
   abstract findElapsedLoginKeys(input: {
+    organizationId: string;
     now: Instant;
-    organizationId?: string;
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]>;
+  /**
+   * Every organization's unrevoked CLI login keys elapsed at `before`.
+   * Cross-tenant, like {@link revokeExpiredByName}: only the scheduled sweep
+   * calls it. A key with no expiry (minted before device metadata) is excluded.
+   */
+  abstract sweepElapsedLoginKeys(input: {
+    before: Instant;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]>;
   /** One organization's unrevoked CLI login keys that carry an expiry. */
   abstract findLiveLoginKeys(input: {

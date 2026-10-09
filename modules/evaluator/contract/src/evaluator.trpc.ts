@@ -14,6 +14,9 @@ import {
   evaluatorApiPushToCopiesInputSchema,
   evaluatorApiSlugInputSchema,
   evaluatorApiUpdateInputSchema,
+  evaluatorApiWorkflowInputSchema,
+  evaluatorApiWorkflowToggleInputSchema,
+  evaluatorByWorkflowSchema,
   evaluatorCascadeArchiveSchema,
   evaluatorCopySchema,
   evaluatorHistoryEntrySchema,
@@ -21,6 +24,7 @@ import {
   evaluatorRelatedEntitiesSchema,
   evaluatorSyncFromSourceSchema,
   evaluatorWorkflowFieldsSchema,
+  evaluatorWorkflowSwitchedSchema,
 } from "./evaluator.schemas.ts";
 import { evaluatorSchema, evaluatorWithFieldsSchema } from "./evaluator.ts";
 
@@ -47,12 +51,17 @@ export const evaluatorTrpc = defineTrpcContract("evaluators")
   .withInput(evaluatorApiUpdateInputSchema)
   .withOutput(evaluatorSchema)
 
-  /** The workflow and monitors the archive confirmation names. */
+  /** The workflow the archive confirmation names; the monitors are read from monitor. */
   .query("getRelatedEntities")
   .withInput(evaluatorApiEvaluatorIdInputSchema)
   .withOutput(evaluatorRelatedEntitiesSchema)
 
-  /** Archives the evaluator, its workflow, and the monitors running it. */
+  /** The live evaluators a workflow backs, named for its archive preview. */
+  .query("listByWorkflow")
+  .withInput(evaluatorApiWorkflowInputSchema)
+  .withOutput(evaluatorByWorkflowSchema.array())
+
+  /** Archives the evaluator and its workflow; monitor removes its rows on the fact. */
   .mutation("cascadeArchive")
   .withInput(evaluatorApiEvaluatorIdInputSchema)
   .withOutput(evaluatorCascadeArchiveSchema)
@@ -87,4 +96,14 @@ export const evaluatorTrpc = defineTrpcContract("evaluators")
   .query("getHistory")
   .withInput(evaluatorApiEvaluatorInputSchema)
   .withOutput(evaluatorHistoryEntrySchema.array())
+
+  /** Clears a workflow's evaluator flag and archives the evaluator that wrapped it. */
+  .mutation("disableAsEvaluator")
+  .withInput(evaluatorApiWorkflowInputSchema)
+  .withOutput(evaluatorWorkflowSwitchedSchema)
+
+  /** Publishes a workflow as an evaluator, creating or renaming the one that wraps it. */
+  .mutation("toggleSaveAsEvaluator")
+  .withInput(evaluatorApiWorkflowToggleInputSchema)
+  .withOutput(evaluatorWorkflowSwitchedSchema)
   .build();

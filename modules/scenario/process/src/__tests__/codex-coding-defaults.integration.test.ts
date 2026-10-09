@@ -94,7 +94,6 @@ describe("given a project whose FAST role default is a codex model", () => {
           labels: [],
         }),
       },
-      suiteConfigFetcher: { getBySetId: async () => null },
       promptFetcher: { findByIdOrHandle: async () => null },
       agentFetcher: { findById: async () => ({ ...agent, projectId: PROJECT_ID }) },
       workflowVersionFetcher: {

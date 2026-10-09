@@ -9,9 +9,12 @@ import {
   builtinRolePermissions,
   type BuiltInRoleId,
   type Grant,
+  type GrantScopeTier,
   type GrantScopeType,
 } from "@langwatch/authz-contract";
-import { currentTimeZone, type Instant, Temporal } from "@langwatch/time";
+import { currentTimeZone, type Instant, Temporal, toEpochMs } from "@langwatch/time";
+
+import type { ManagedGrant } from "../managed-grant.ts";
 
 /** A grant as the browser holds one: the wire carries its dates as strings. */
 export type GrantRow = Omit<Grant, "expiresAt" | "createdAt"> & {
@@ -83,8 +86,46 @@ const SCOPE_LABEL: Readonly<Record<GrantScopeType, string>> = {
   project: "Project",
 };
 
+/** Main's words: "Organization", "Team Platform"; an unresolved name says its kind and stops. */
 export function grantScopeText(scope: GrantRow["scope"]): string {
-  return `${SCOPE_LABEL[scope.type]} · ${scope.name ?? scope.id}`;
+  if (scope.type === "organization") return SCOPE_LABEL.organization;
+
+  return scope.name ? `${SCOPE_LABEL[scope.type]} ${scope.name}` : SCOPE_LABEL[scope.type];
+}
+
+export const SCOPE_TYPE_OF_TIER: Readonly<Record<GrantScopeTier, GrantScopeType>> = {
+  ORGANIZATION: "organization",
+  TEAM: "team",
+  PROJECT: "project",
+};
+
+function principalOf(grant: ManagedGrant): GrantRow["principal"] {
+  if (grant.userId) {
+    return { type: "user", id: grant.userId, name: grant.userName ?? grant.userEmail };
+  }
+  if (grant.groupId) return { type: "group", id: grant.groupId, name: grant.groupName };
+  if (grant.apiKeyId) return { type: "apiKey", id: grant.apiKeyId, name: grant.apiKeyName };
+
+  return { type: "user", id: grant.id, name: null };
+}
+
+/** A holder row's grant as the change and revoke dialogs read it; expired as the server rules. */
+export function grantRowOf({ grant, nowMs }: { grant: ManagedGrant; nowMs: number }): GrantRow {
+  const expiresAt = grant.expiresAt ?? null;
+  const builtIn = BUILT_IN_ROLES.find((role) => role.id === grant.role.toLowerCase());
+
+  return {
+    id: grant.id,
+    principal: principalOf(grant),
+    role:
+      builtIn && !grant.customRoleId
+        ? { id: builtIn.id, name: builtIn.name, builtIn: true }
+        : { id: grant.customRoleId ?? grant.role, name: grant.customRoleName, builtIn: false },
+    scope: { type: SCOPE_TYPE_OF_TIER[grant.scopeType], id: grant.scopeId, name: grant.scopeName },
+    status: expiresAt && toEpochMs(expiresAt) <= nowMs ? "expired" : "active",
+    expiresAt,
+    createdAt: grant.createdAt,
+  };
 }
 
 export function grantPrincipalText(principal: GrantRow["principal"]): string {

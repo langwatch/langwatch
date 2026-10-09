@@ -7,6 +7,11 @@ import { z } from "zod";
 
 import { LANGY_CONVERSATION_EVENT_TYPES } from "./constants.ts";
 import {
+  langyCodeAccessPreferenceSchema,
+  langyLocalRecordSchema,
+  langyLocalWorkspaceStatusSchema,
+} from "./features/local-control/langy.local-control-http.ts";
+import {
   langyAnswerLocalPermissionInputSchema,
   langyAnswerQuestionInputSchema,
   langyClaimUiActionInputSchema,
@@ -48,11 +53,6 @@ import {
   langyUiActionCompletedSchema,
   langyWarmedWorkerSchema,
 } from "./langy.dtos.ts";
-import {
-  langyCodeAccessPreferenceSchema,
-  langyLocalRecordSchema,
-  langyLocalWorkspaceStatusSchema,
-} from "./langy.local-control-http.ts";
 import { langyStreamEntrySchema } from "./langy.stream-entry.ts";
 
 export const langyTrpc = defineTrpcContract("langy")

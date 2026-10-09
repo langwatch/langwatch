@@ -21,7 +21,7 @@ import (
 )
 
 // familyNames are the loads a run can fire, each checked in code to reach the worker.
-var familyNames = []string{"otlp", "collector", "evaluation", "monitor", "annotation", "scenario", "batch", "automation", "analytics"}
+var familyNames = append([]string{"otlp", "collector", "evaluation", "monitor", "annotation", "scenario", "batch", "automation", "analytics"}, ingestFamilyNames...)
 
 // familyPipelines are the worker pipelines each family's commands run through: what drain watches.
 var familyPipelines = map[string][]string{
@@ -52,7 +52,7 @@ func (run *run) chosen() []string {
 func (run *run) pipelines() []string {
 	var names []string
 	for _, family := range run.chosen() {
-		for _, pipeline := range familyPipelines[family] {
+		for _, pipeline := range append(familyPipelines[family], ingestFamilyPipelines[family]...) {
 			if !slices.Contains(names, pipeline) {
 				names = append(names, pipeline)
 			}
@@ -102,6 +102,7 @@ func (run *run) plan(ctx context.Context) []*item {
 	items = append(items, run.batchItems()...)
 	items = append(items, run.automationItems(ctx)...)
 	items = append(items, run.analyticsItems(collectors)...)
+	items = append(items, run.ingestItems()...)
 	shuffle := rand.New(rand.NewPCG(uint64(run.options.Seed), 0)) // #nosec G404 -- fire order, not a secret.
 	shuffle.Shuffle(len(items), func(a, b int) { items[a], items[b] = items[b], items[a] })
 	return items

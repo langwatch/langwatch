@@ -16,8 +16,8 @@ import {
 import {
   activateSsoConnectionInputSchema,
   attestSsoDomainInputSchema,
-  backofficeSsoConnectionPageSchema,
-  backofficeSsoConnectionSchema,
+  adminSsoConnectionPageSchema,
+  adminSsoConnectionSchema,
   listSsoConnectionsInputSchema,
   operatorSsoMigrationProgressInputSchema,
   registerSsoConnectionInputSchema,
@@ -31,11 +31,11 @@ import {
 export const ssoConnectionTrpc = defineTrpcContract("ssoConnections")
   .query("getAll")
   .withInput(listSsoConnectionsInputSchema)
-  .withOutput(backofficeSsoConnectionPageSchema)
+  .withOutput(adminSsoConnectionPageSchema)
 
   .query("getById")
   .withInput(ssoConnectionByIdSchema)
-  .withOutput(backofficeSsoConnectionSchema.nullable())
+  .withOutput(adminSsoConnectionSchema.nullable())
 
   /** The connection's history in the organization's own words; null for an unknown id. */
   .query("getHistory")

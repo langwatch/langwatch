@@ -63,6 +63,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if lt $granted (int $required) }}
 {{- fail (printf "terminationGracePeriodSeconds is %d, too short for the configured drain: shutdown.preDrainWaitSeconds (%d) + shutdown.timeoutSeconds (%d) + %ds of slack needs at least %d. Raise terminationGracePeriodSeconds to %d or more, or lower the drain timing." $granted $drain $timeout $slack $required $required) }}
 {{- end }}
+{{- /* Voice calls run on their own clock from the same SIGTERM: the drain,
+       then 30s to end what is left and send the final usage reports. */}}
+{{- $voice := int .Values.shutdown.voiceDrainSeconds }}
+{{- $voiceRequired := add $voice 30 5 }}
+{{- if lt $granted (int $voiceRequired) }}
+{{- fail (printf "terminationGracePeriodSeconds is %d, too short for the voice call drain: shutdown.voiceDrainSeconds (%d) + 30s to end the remaining calls + 5s of slack needs at least %d. Raise terminationGracePeriodSeconds to %d or more, or lower shutdown.voiceDrainSeconds." $granted $voice $voiceRequired $voiceRequired) }}
+{{- end }}
 {{- end }}
 
 {{/*

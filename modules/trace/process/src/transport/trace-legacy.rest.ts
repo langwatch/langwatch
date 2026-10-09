@@ -1,11 +1,5 @@
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  resolver,
-  type RestProtocolRefusal,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
 import type { PrincipalRef } from "@langwatch/authorization";
-import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -24,18 +18,17 @@ import {
   type TraceSharedFiltersInput,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { z } from "zod";
+import { z } from "zod";
 
+import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
+import { traceLegacySearchBodySchema } from "#features/legacy/rules/trace-legacy-search-body.rules";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
-import { unkeyedLegacyFilterViolations } from "#rules/trace-legacy-filter-keys.rules";
-import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rules";
 
 import { tracesRestCredential } from "./traces.rest.ts";
 /**
@@ -52,10 +45,6 @@ const PRODUCES_JSON = "application/json";
  * explicit size is clamped to the caller's tier by the application, not here.
  */
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** Search filters can name many ids; the bulk cap is the ceiling they get. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
@@ -291,37 +280,17 @@ async function unshareLegacyTrace({
   return answer({ status: "success" }, 200);
 }
 
-/**
- * Main's 400 for a search body not sent as JSON, in the sentence it has always written;
- * every other refusal (401, 403, 413) stays on the family's boundary, as before.
- */
-const searchMalformedBody: RestProtocolRefusal = ({ failure, response }) =>
-  HandledError.isHandled(failure) && failure.code === "malformed_request"
-    ? response.write({
-        status: 400,
-        mediaType: PRODUCES_JSON,
-        body: JSON.stringify({ error: "Invalid body" }),
-      })
-    : response.decline();
-
 /** `searchLegacyTraces`: the deprecated search, behind the project door. */
 async function searchLegacyTraces({
   app,
-  raw,
+  input,
   door,
 }: {
   app: LegacyApp;
-  raw: string;
+  input: Record<string, unknown>;
   door: LegacyDoor;
 }): Promise<LegacyAnswer> {
-  let body: unknown;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    return answer({ error: "Invalid body" }, 400);
-  }
-
-  const parsed = app.searchBodySchema().safeParse(body);
+  const parsed = app.searchBodySchema().safeParse(input);
   if (!parsed.success) {
     return answer({ error: app.describeValidationError(parsed.error) }, 400);
   }
@@ -475,17 +444,15 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
 
   // ── the deprecated trace search ───────────────────────────────────────────
   //
-  // The body is the evidence: it is read once and parsed by the family's own
-  // schema, so a malformed payload earns the sentence a deployed SDK parses.
+  // The framework reads the body; the family's own schema then parses it.
   .post("/api/trace/search", "searchLegacyTraces")
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })
   .withPermission("traces:view")
   .withMiddleware(tracesRestCredential)
   .withResponse("protocol", {
     produces: PRODUCES_JSON,
     because: LEGACY_PROTOCOL_REASON,
-    refusal: searchMalformedBody,
   })
   .withDocs({
     operationId: "postApiTraceSearch",
@@ -500,8 +467,8 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
       },
     },
   })
-  .handle(async ({ app, raw, scope, response }, caller) =>
-    response.write(await searchLegacyTraces({ app, raw, door: { projectId: scope.id, caller } })),
+  .handle(async ({ app, input, scope, response }, caller) =>
+    response.write(await searchLegacyTraces({ app, input, door: { projectId: scope.id, caller } })),
   )
 
   // ── the deprecated thread read ────────────────────────────────────────────

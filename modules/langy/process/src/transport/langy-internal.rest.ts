@@ -10,6 +10,9 @@ import {
   langyRelayTallySchema,
 } from "@langwatch/langy-contract";
 
+const LANGY_SERVICE_REASON =
+  "the caller is the deployment's own Langy service, not a tenant; its shared bearer is the whole gate and no RBAC grain applies";
+
 export const langyInternalRest = defineRestRouter(LangyApi)
   .withNamespace("langy-internal")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -17,9 +20,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
 
   .post("/api/internal/langy/turn/:turnId/result", "ingestTurnResult")
   .withCredential("internal_secret")
-  .withAccess(
-    anyAuthenticated({ reason: "The deployment's Langy bearer authenticates its control plane." }),
-  )
+  .withAccess(anyAuthenticated({ reason: LANGY_SERVICE_REASON }))
   .withParams(langyInternalTurnParamsSchema)
   .withInput(langyTurnResultSchema)
   .withOutput(langyInternalAcceptedSchema)
@@ -28,18 +29,14 @@ export const langyInternalRest = defineRestRouter(LangyApi)
 
   .post("/api/internal/langy/credentials/revoke", "revokeWorkerSessionKey")
   .withCredential("internal_secret")
-  .withAccess(
-    anyAuthenticated({ reason: "The deployment's Langy bearer authenticates its control plane." }),
-  )
+  .withAccess(anyAuthenticated({ reason: LANGY_SERVICE_REASON }))
   .withInput(langyRevokeCredentialsSchema)
   .withOutput(langyInternalRevokedSchema)
   .handle(({ app, input }) => app.revokeInternalCredentials(input))
 
   .post("/api/internal/langy/relay/frames", "streamRelayFrames")
   .withCredential("internal_secret")
-  .withAccess(
-    anyAuthenticated({ reason: "The deployment's Langy bearer authenticates its control plane." }),
-  )
+  .withAccess(anyAuthenticated({ reason: LANGY_SERVICE_REASON }))
   // NDJSON frames arrive on a long-lived stream and cannot be buffered before handling.
   .withRawBody("stream", { mediaType: "application/x-ndjson" })
   .withOutput(langyRelayTallySchema)

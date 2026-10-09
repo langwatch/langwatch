@@ -1,7 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
-import type { CodexTokenKeys } from "./codex-account.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
 import type { PlatformProviderEntry } from "./model-provider-platform-chain.ts";
 import type {
@@ -35,6 +34,7 @@ import type {
   ModelProviderStructuredGenerationInput,
   ModelProviderTextGenerationInput,
   ModelProviderListOrganizationInput,
+  CodexTokenKeys,
   ModelProviderListProjectInput,
   ModelProviderResolution,
   ModelProviderSummary,

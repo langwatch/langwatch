@@ -5,18 +5,12 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { createAbsentRequestBound, entitlementProcessModule } from "../../entitlement.module.ts";
-import {
-  createEntitlementTestApp,
-  createEntitlementTestUsers,
-  fixedEntitlementSource,
-} from "./entitlement.fixture.ts";
+import { createEntitlementTestApp, fixedEntitlementSource } from "./entitlement.fixture.ts";
 
 const free: Plan = {
   planSource: "free",
@@ -153,11 +147,8 @@ describe("EntitlementModule.requestBound", () => {
       .withStores(memoryStores())
       .withObservability((observability) => observability.withLogging(logger))
       .provide({
-        user: createEntitlementTestUsers(),
         billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
-        trace: createApiFixture<TraceApi>({}),
         organization: createApiFixture<OrganizationApi>({}),
-        project: createApiFixture<ProjectApi>({}),
         licensing: createApiFixture<LicensingApi>({
           resolve: async () => ({ granted: true, plan: free }),
         }),

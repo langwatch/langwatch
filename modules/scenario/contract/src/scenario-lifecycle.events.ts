@@ -1,7 +1,7 @@
 import { onboardingVariantSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
-import { simulationEventSchema } from "./simulation.events.ts";
+import { simulationEventSchema } from "./features/simulation/simulation.events.ts";
 
 /** The scenario's own lifecycle, apart from its runs. */
 export const SCENARIO_LIFECYCLE_PIPELINE_NAME = "scenario_lifecycle" as const;

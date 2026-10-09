@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/clickhouse-migrations",
+  "langwatch": { "group": "data" },
   "version": "0.1.0",
   "private": true,
   "description": "ClickHouse schema migrations and storage maintenance: the goose runner that spawns the migration binary as a child process, the 87 versioned SQL migrations it applies, and the TTL reconciler that brings retention expressions back in line with configured policy. Separated from the query client because this half shells out and owns files on disk, while the client only opens connections.",
@@ -25,7 +26,6 @@
   "dependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/clickhouse-client": "workspace:*",
-    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/task": "workspace:*"
   },

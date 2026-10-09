@@ -3,7 +3,7 @@ import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createUiQueryClient, resetUiQueries } from "../query-client.ts";
+import { createUiQueryClient, resetUiQueries } from "../wire/query-client.ts";
 
 function recordingHost() {
   const failed: UiFailureNotice[] = [];

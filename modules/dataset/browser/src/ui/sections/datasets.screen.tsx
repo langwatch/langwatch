@@ -29,6 +29,7 @@ import {
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import {
   ChevronDown,
   Copy,
@@ -44,7 +45,6 @@ import { type ReactNode, useMemo, useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
-import { readableDate } from "../../model/readable-date.ts";
 import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
 import { BulkUploadDrawer } from "./bulk-upload-drawer.tsx";

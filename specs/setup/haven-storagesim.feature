@@ -55,12 +55,24 @@ Feature: storagesim, a local S3 stand-in run by haven
     Then the data directory is 0700 and each stored file 0600 under a content-addressed name
     And a GET serves it nosniff, sandboxed and as an attachment
 
-  # Pending thuishaven: haven keeps <home>/storage/<slug> today (see the storagesim README).
+  # Implemented by tools/thuishaven/app/db.go (haven db reset); awaiting a bound thuishaven test.
   @unimplemented
   Scenario: A stack's objects are discarded with its databases
     Given a stack whose storagesim holds objects
     When the developer runs "haven db reset"
     Then the stack's storagesim data directory is removed with the databases
+
+  Scenario: A client lists a bucket's keys with ListObjectsV2
+    Given a bucket holding objects under several prefixes
+    When a client sends GET /<bucket>?list-type=2, optionally with a prefix
+    Then it answers ListBucketResult with each key, size, ETag and LastModified in lexical order
+    And an unknown bucket answers 404 NoSuchBucket and a bad token or max-keys 400 InvalidArgument
+
+  Scenario: A long listing is paged with a continuation token
+    Given a bucket holding more keys than max-keys
+    When a client lists it page by page
+    Then each page is truncated with a NextContinuationToken until the last
+    And following the tokens yields every key once, with a delimiter's common prefixes never repeated
 
   Scenario: A streamed SDK upload is stored without its chunk framing
     When the server's S3 client PUTs a body with aws-chunked framing
@@ -112,6 +124,33 @@ Feature: storagesim, a local S3 stand-in run by haven
     When the console reads /_sim/api/requests
     Then it lists each request's method, key, status and time, newest first
     And it holds only the newest 500
+
+  Scenario: The console deletes one object or clears a bucket
+    Given objects in two buckets
+    When the developer deletes one object, then clears one bucket, over the console API
+    Then the deleted object reads as missing and only the other bucket's objects remain
+
+  Scenario: The console mints a presigned URL that storagesim accepts
+    Given an empty store
+    When the console asks /_sim/api/presign for a PUT and then a GET of one key
+    Then the presigned PUT stores the bytes and the presigned GET reads them back
+    And a missing key, a method other than GET or PUT, or an expiry outside S3's bounds answers 400
+    And the request log names each request's auth as presigned, with its request id
+
+  Scenario: The console adds the demo objects on request
+    Given an empty store
+    When the developer POSTs /_sim/api/seed
+    Then the demo objects are in bucket langwatch, and a GET of the route answers 405
+
+  @integration
+  Scenario: The console deletes, clears, seeds and presigns from its screens
+    Given the console lists an object
+    When the developer deletes it, clears its bucket, adds the demo objects and copies a presigned URL
+    Then each action calls its control route and the lists refresh
+
+  Scenario: haven storage presigns, seeds and reads the request log for agents
+    When an agent runs "haven storage presign <bucket> <key> --put", "haven storage seed" and "haven storage requests"
+    Then each calls its control route, and the requests verb prints auth and request id per line
 
   Scenario: The console serves its bundle beside the S3 paths
     When a browser opens /_sim/ on storagesim

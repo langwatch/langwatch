@@ -4,10 +4,11 @@
  * Spec: specs/ui/ui-page-composition.feature
  */
 
+import { ReleaseFlagToken } from "@langwatch/module";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { uiPage, withHost } from "../ui-page.tsx";
+import { uiPage, withHost } from "../page/ui-page.tsx";
 
 function Screen() {
   return <div>the screen</div>;
@@ -43,7 +44,7 @@ describe("uiPage", () => {
   describe("when a flag is the only policy", () => {
     /** @scenario A flag alone still mounts the guard */
     it("mounts the guard around the screen", async () => {
-      const page = await uiPage({ screen, flags: ["release_x"] })();
+      const page = await uiPage({ screen, flags: [ReleaseFlagToken.create("release_x")] })();
       expect(page.default.displayName).toBe("withUiPageGuard(Screen)");
     });
   });

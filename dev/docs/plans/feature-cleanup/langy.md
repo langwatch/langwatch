@@ -787,7 +787,7 @@ async ensureWorkerCredentials(args: {
   file path" rot, and it should be corrected in commit 6.
 
   `CLAUDE.md`'s frontend-boundary note still lists
-  `modules/langy/process/src/streaming/langy-turn-relay.ts` among the
+  `modules/langy/process/src/repositories/redis/redis.langy-turn-relay.repository.ts` among the
   imports that predate the guard. That entry is stale and should be dropped —
   the enforcing test, `platform/app/src/server/__tests__/frontend-boundary.unit.test.ts`,
   walks the real graph, so nothing has regressed; only the prose is out of date.

@@ -3,7 +3,7 @@ import type { Attributes } from "@opentelemetry/api";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
 import type { ExhaustedOutcome } from "./deadLetter.ts";
-import type { ObjectStore, ProjectStorageDestination } from "./storage.ts";
+import type { MintStorageUri, ObjectStore } from "./storage.ts";
 
 export interface GroupQueuePayloadSchema<Payload> {
   parse(value: unknown): Payload;
@@ -102,14 +102,15 @@ export interface GroupQueueFailureClassifier {
   classify(error: unknown): GroupQueueFailureDecision;
 }
 
-export interface GroupQueueDependencies<Payload> {
+export interface GroupQueueDependencies<Payload, Destination = unknown> {
   redis: IORedis | Cluster;
   policy?: GroupQueuePolicy;
   context?: GroupQueueContext;
   activity?: GroupQueueActivity<Payload>;
   failures?: GroupQueueFailureClassifier;
   objectStoreFor?: (projectId: string) => ObjectStore;
-  resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
+  resolveStorageDestination?: (projectId: string) => Promise<Destination>;
+  mintUri?: MintStorageUri<Destination>;
   /**
    * Names the preflight allow-list this queue's dispatch is scoped by. Set by
    * the migration role so system-migrations can register the groups it will

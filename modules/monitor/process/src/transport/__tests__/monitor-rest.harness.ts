@@ -15,7 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   createMonitorTestApp,
   createMonitorTestRepositories,
-  FakeEvaluatorSettings,
+  FakeRecoverySwitch,
   FakeMonitorEvaluators,
 } from "../../app/__tests__/monitor.fixture.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
@@ -39,13 +39,13 @@ export function mountMonitorRest(
     evaluatorConfigs?: Record<string, unknown>;
   } = {},
 ) {
-  const effectiveSettings = new FakeEvaluatorSettings();
+  const recoverySwitch = new FakeRecoverySwitch();
   const repository = MemoryMonitorRepository.create({ seed: options.seed ?? [] });
 
   const app = createMonitorTestApp({
     repositories: createMonitorTestRepositories(repository),
     evaluators: new FakeMonitorEvaluators(["evaluator-1", "evaluator-2"], options.evaluatorConfigs),
-    effectiveSettings,
+    recoverySwitch,
     permissions: createApiFixture<AuthzApi>({
       hasProjectPermission: async () => options.permits ?? true,
     }),
@@ -85,7 +85,7 @@ export function mountMonitorRest(
   return {
     app: app as MonitorApi,
     repository,
-    effectiveSettings,
+    recoverySwitch,
     get: (path: string) => send("GET", path),
     post: (path: string, body?: unknown) => send("POST", path, body ?? {}),
     patch: (path: string, body?: unknown) => send("PATCH", path, body ?? {}),

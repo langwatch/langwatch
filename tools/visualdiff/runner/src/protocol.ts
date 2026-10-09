@@ -86,6 +86,8 @@ export interface Plan {
   check?: boolean;
   /** colorScheme is light (the default), dark, or both: a pass of each, dark keyed `<key>@dark`. */
   colorScheme?: ColorSchemeChoice;
+  /** judge asks Haiku about each flagged pair (judge.ts); cacheFile outlives the run. */
+  judge?: { cacheFile: string };
 }
 
 export interface Concurrency {

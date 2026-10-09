@@ -42,6 +42,10 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
 
   async updateLegacyColumns(): Promise<void> {}
 
+  async updateLegacyColumnsIfUnchanged(): Promise<boolean> {
+    return false;
+  }
+
   async countEnabledInScopes(input: {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<number> {

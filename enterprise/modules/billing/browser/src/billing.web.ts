@@ -7,19 +7,20 @@
 import { defineBrowserModule } from "@langwatch/browser";
 import {
   ContactSalesToken,
+  LicenseBillingSectionToken,
   SeatProrationPreviewToken,
-} from "@langwatch/enterprise-billing-contract";
+} from "@langwatch/enterprise-billing-client";
+import { billingWebConfigSchema } from "@langwatch/enterprise-billing-contract";
 
 export const billingWeb = defineBrowserModule("billing")
+  .withConfig({ billing: billingWebConfigSchema }, ({ billing }) => billing)
   .withHosts({
     requires: ["BillingHostApi"],
     mounts: { BillingHostApi: { load: () => import("./behavior/billing-host-mount.tsx") } },
   })
-  // The license drawer's Billing section, for the backoffice that hosts that drawer.
-  .withCapabilities({
-    licenseBillingSection: {
-      load: () => import("./features/connected-billing/ui/sections/license-billing-section.tsx"),
-    },
+  // The license drawer's Billing section, for the Admin that hosts that drawer.
+  .lends(LicenseBillingSectionToken, {
+    load: () => import("./features/connected-billing/ui/sections/license-billing-section.tsx"),
   })
   .withScreens({
     // Placed by the application's settings table until a settings anchor

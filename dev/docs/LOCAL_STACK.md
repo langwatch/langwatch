@@ -11,7 +11,7 @@ like a slow boot are covered by the `haven` skill's `troubleshooting.md`.
 | `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA, :5560)             |
 | `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560)  |
 | `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers          |
-| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills, run before serve   |
+| `apps/tasks`          | `@langwatch/tasks`        | `pnpm task upgrade` and one-shot tasks, before serve  |
 | `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                       |
 | `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                        |
 | `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561) |
@@ -163,20 +163,22 @@ refuses and prints two ready-to-paste options (a free slot via
 `PORT=5570 pnpm dev`, or a port-scoped kill). Paste one; don't hunt processes by
 hand. `dev/scripts/kill-dev-tree.sh` already does it correctly.
 
-Locally there are two Node processes: the `api` lane runs the api and the worker
-in one process. It is a launcher, not a process role: each still resolves its
+Locally there is one Node process by default: the `app` lane runs the ui's Vite
+server, the api and the worker together (see "One process" below). It is a
+launcher, not a process role: each still resolves its
 own secrets, config and graph; boot is worker then api, and shutdown drains the
 worker first. Production runs three Node deployments.
 
 | Script                                   | What runs                                                                                |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pnpm dev`                               | ui + backend + go (+ langy when selected)                                                |
+| `pnpm dev`                               | app (ui + api + worker) + go (+ langy when selected)                                     |
 | `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone                                                                           |
-| `pnpm dev:one`                           | ui + api + worker in one Node process (see "One process" below)                          |
+| `pnpm dev:one`                           | the app lane alone: ui + api + worker in one Node process                                |
 | `pnpm dev:api` + `pnpm dev:worker`       | the production process shape; use when a blocked worker job must not read as API latency |
 
-Both Node lanes restart on change, debounced by
-`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (default 2000 ms); the Go lane restarts through
+The backend reloads on change, debounced by `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`
+(default 2000 ms, never more than `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`, 30 s, after
+the first change), one reload at a time; the Go lane restarts through
 `air` on successful builds only. The Go services auto-start when the toolchain is
 on PATH and reuse an existing listener from another worktree. Opt out per
 service with `LANGWATCH_SKIP_AIGATEWAY=1`, `LANGWATCH_SKIP_NLP=1` or
@@ -186,18 +188,24 @@ or `make service-watch svc=nlpgo`. The gateway needs the "AI GATEWAY" block
 from `.env.example`; langyagent writes its own `.env` block on first run and
 needs the worker binary (`pnpm --filter @langwatch/langyworker build:binary`).
 
-### One process (trial, ADR-168 B1)
+### One process (the default, ADR-168 B1)
 
-`LANGWATCH_DEV_ONE_PROCESS=1` (plain `pnpm dev`, or `haven up -f` with it
-exported or in `.env`) replaces the ui and backend lanes with one `app` lane:
-`tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
+Plain `pnpm dev` and `haven up` run one `app` lane: `tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
 unchanged, still proxying `/api`) and loads the api and worker through a Vite
-module runner. `pnpm dev:one` runs that process alone. Ports are unchanged.
+module runner, under the same `dev-supervisor.mjs --watch` as the split backend
+lane. `LANGWATCH_DEV_ONE_PROCESS=0` (plain `pnpm dev`, or `haven up -f` with it
+exported or in `.env`) splits it back into a `ui` lane and a `backend` lane
+(haven: `api`). Ports are the same either way. Under haven the same switch also
+folds the simulators into the `go` lane (`=0` gives them a `sims` lane);
+`LANGWATCH_GO_ONE_PROCESS` is a deprecated alias, warned once and refused when it
+disagrees. The Go lane is watched by default (`haven go-watch` rebuilds and swaps
+the child); `LANGWATCH_GO_WATCH=0` or `haven up --watch=false` turns it off.
 
 A backend edit that touches a loaded file re-links only what it reaches, then
 drains the old generation (worker, then api) and boots the new one; the browser
 keeps its HMR socket. A change that does not link leaves the old generation
-serving; a failed boot waits for the next change. Each generation logs one
+serving; a failed boot waits for the next change. An edit that lands during a
+boot, the first one included, is answered by one follow-up reload. Each generation logs one
 `backend ready` line with its number, changed files, `drainMs`, `readyMs` and
 `rssMiB`. Under haven, `haven logs ui|api|worker` read the `app` capture;
 `haven restart ui` or `api` restarts the whole process.
@@ -210,6 +218,24 @@ or plain `pnpm`. Preparing a fresh worktree (`pnpm start:prepare:files`, then
 `mail` builds from it when another worktree already made them from the same
 inputs. Don't set `NX_CACHE_DIRECTORY`: it makes the cache per worktree again.
 Why and how the cache stays trustworthy: ADR-150.
+
+## Migrations and the upgrade gate
+
+The api and worker never migrate. They read the upgrade ledger at boot and refuse by name
+(`refuses to serve: the installation is behind this image`) while a blocking step of the checkout is
+not done. haven runs the preparation once per `up`, before the lanes; outside haven run it yourself
+after pulling new migrations:
+
+```bash
+pnpm start:prepare:db                                  # upgrade, then the system-migrations pass
+pnpm --filter @langwatch/tasks task upgrade status     # what the ledger says
+pnpm --filter @langwatch/tasks task upgrade plan       # what an upgrade would apply
+```
+
+`pnpm prisma:migrate` and `pnpm clickhouse:migrate` are aliases of `pnpm task upgrade`: each runs
+the whole upgrade (Postgres and every ClickHouse target) through the ledger. ClickHouse is required: a stack without it refuses to
+serve. Live api and worker suites run `upgrade` once per test process on the test stores
+(`specs/upgrade/live-test-fixtures.feature`). Writing a migration: the `migration` skill.
 
 ## Compose presets
 

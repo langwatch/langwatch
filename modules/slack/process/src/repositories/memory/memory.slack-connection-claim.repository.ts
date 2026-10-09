@@ -1,5 +1,6 @@
 import {
   SlackConnectionClaimRepository,
+  type SlackConnectionClaimKey,
   type SlackConnectionClaimRow,
 } from "../slack-connection-claim.repository.ts";
 
@@ -49,4 +50,28 @@ export class MemorySlackConnectionClaimRepository extends SlackConnectionClaimRe
     );
     return Promise.resolve(claims.map((claim) => ({ ...claim })));
   }
+
+  findPage({
+    after,
+    limit,
+  }: {
+    after?: SlackConnectionClaimKey;
+    limit: number;
+  }): Promise<SlackConnectionClaimRow[]> {
+    const byKey = (a: SlackConnectionClaimKey, b: SlackConnectionClaimKey) =>
+      a.connectionId === b.connectionId
+        ? compare(a.claimantId, b.claimantId)
+        : compare(a.connectionId, b.connectionId);
+    const claims = [...this.#claims.values()]
+      .filter((claim) => !after || byKey(claim, after) > 0)
+      .toSorted(byKey)
+      .slice(0, limit);
+    return Promise.resolve(claims.map((claim) => ({ ...claim })));
+  }
+}
+
+/** One order for both the sort and the cursor, so a page resumes exactly after its last claim. */
+function compare(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
 }

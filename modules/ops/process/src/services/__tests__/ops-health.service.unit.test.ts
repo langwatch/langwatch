@@ -6,6 +6,7 @@
 import type {
   DashboardData,
   OpsMigrationOverview,
+  OpsUpgradeStatus,
   PhaseMetrics,
   ProcessFleetSummary,
 } from "@langwatch/ops-contract";
@@ -157,11 +158,31 @@ const MIGRATIONS: OpsMigrationOverview[] = [
   },
 ];
 
+/** A ledger with one failed step whose id and error name a tenant. */
+const UPGRADE: OpsUpgradeStatus = {
+  state: "needs_attention",
+  label: "Needs attention",
+  tone: "red",
+  reason: `step ops:tenant-split failed for ${TENANT}`,
+  summary: "One step failed",
+  installed: "3.21.0",
+  origin: "3.20.1",
+  image: "3.21.0",
+  floor: "3.20.1",
+  ledgerFloor: "3.20.1",
+  lease: null,
+  lastRun: null,
+  counts: { done: 4, failed: 1 },
+  failedStepIds: ["ops:tenant-split"],
+  failedTargets: 2,
+};
+
 function health(overrides: Partial<OpsHealthReaders> = {}) {
   return OpsHealthService.create({
     findDashboardData: () => DASHBOARD,
     getFleetSummary: async () => FLEET,
     listSystemMigrations: async () => MIGRATIONS,
+    getUpgradeStatus: async () => UPGRADE,
     ...overrides,
   }).read();
 }
@@ -191,7 +212,32 @@ describe("given an install with a backlog, dead letters, a blocked group and a p
           },
         },
         migrations: { tenant_split_v2: { parked: 2, rolled_back: 0 } },
+        upgrade: {
+          state: "needs_attention",
+          release: "3.21.0",
+          floor: "3.20.1",
+          failed_steps: 1,
+          failed_targets: 2,
+          held_tenants: 2,
+        },
       });
+    });
+
+    /** @scenario "The report carries the install's upgrade summary" */
+    it("summarises the upgrade ledger as our own release names and counts, naming no step or tenant", async () => {
+      const answer = await health();
+      const wire = JSON.stringify(answer.upgrade);
+
+      expect(answer.upgrade).toEqual({
+        state: "needs_attention",
+        release: "3.21.0",
+        floor: "3.20.1",
+        failed_steps: 1,
+        failed_targets: 2,
+        held_tenants: 2,
+      });
+      expect(wire).not.toContain("ops:tenant-split");
+      expect(wire).not.toContain(TENANT);
     });
 
     /** @scenario "Ops health carries no ids, payloads, error messages or tenant names" */
@@ -215,6 +261,9 @@ describe("given a section of ops health that cannot be read", () => {
         listSystemMigrations: async () => {
           throw new Error("postgres went away");
         },
+        getUpgradeStatus: async () => {
+          throw new Error("postgres went away");
+        },
       });
 
       expect(answer).toEqual({
@@ -223,7 +272,20 @@ describe("given a section of ops health that cannot be read", () => {
         queues: null,
         pipelines: null,
         migrations: null,
+        upgrade: null,
       });
+    });
+
+    /** @scenario "An unreadable upgrade ledger is reported as unknown, not as current" */
+    it("answers null for the upgrade summary when the ledger cannot be read, and keeps the rest", async () => {
+      const answer = await health({
+        getUpgradeStatus: async () => {
+          throw new Error("ledger went away");
+        },
+      });
+
+      expect(answer.upgrade).toBeNull();
+      expect(answer.migrations).toEqual({ tenant_split_v2: { parked: 2, rolled_back: 0 } });
     });
 
     it("keeps the dashboard's sections when only the process fleet fails", async () => {

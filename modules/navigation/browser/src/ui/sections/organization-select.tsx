@@ -2,10 +2,11 @@
 
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
+import type { NavigationOrganization } from "@langwatch/navigation-contract";
 import { Building2, Check, ChevronsUpDown } from "lucide-react";
 
 import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";
-import { useNavigationHost, type NavigationOrganization } from "../../model/navigation-host.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 import type { ProductId } from "../../model/products.ts";
 import { resolveOrgSwitchDestination } from "../../model/resolve-org-switch-destination.ts";
 

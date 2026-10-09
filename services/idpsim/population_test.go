@@ -288,3 +288,48 @@ func TestGrownDirectoryConvergesAfterOneSync(t *testing.T) {
 	assert.Zero(t, second.Updated, "and updates nobody")
 	assert.Zero(t, second.Deactivated, "and retires nobody")
 }
+
+func TestPopulateGivesEveryUserEnterpriseFieldsFromTheSeed(t *testing.T) {
+	t.Parallel()
+	first := populated(t, PopulationSpec{Users: 50, Groups: 4, Seed: 7})
+	second := populated(t, PopulationSpec{Users: 50, Groups: 4, Seed: 7})
+	other := populated(t, PopulationSpec{Users: 50, Groups: 4, Seed: 8})
+
+	users := first.Users()
+	ids := map[string]bool{}
+	for i, u := range users {
+		assert.NotEmpty(t, u.Department)
+		assert.Regexp(t, `^CC-\d{4}$`, u.CostCenter)
+		if i == 0 {
+			assert.Empty(t, u.Manager, "the first user heads the organization")
+		} else {
+			assert.True(t, ids[u.Manager], "a manager is someone earlier in the directory")
+		}
+		ids[u.ID] = true
+	}
+	assert.Equal(t, enterpriseOf(users), enterpriseOf(second.Users()))
+	assert.NotEqual(t, enterpriseOf(users), enterpriseOf(other.Users()))
+}
+
+func TestSCIMResourceCarriesTheEnterpriseExtension(t *testing.T) {
+	t.Parallel()
+	tenant := populated(t, PopulationSpec{Users: 5, Groups: 2, Seed: 3})
+	u := tenant.Users()[1]
+	resource := scimUserResource(u)
+
+	assert.Equal(t, []string{scimUserSchema, scimEnterpriseSchema}, resource["schemas"])
+	ext, ok := resource[scimEnterpriseSchema].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, u.Department, ext["department"])
+	assert.Equal(t, u.CostCenter, ext["costCenter"])
+	assert.Equal(t, map[string]any{"value": u.Manager}, ext["manager"])
+	assert.NotContains(t, scimUserResource(&User{ID: "x", UserName: "x"}), scimEnterpriseSchema)
+}
+
+func enterpriseOf(users []*User) []string {
+	out := make([]string, 0, len(users))
+	for _, u := range users {
+		out = append(out, u.Department+"|"+u.CostCenter+"|"+u.Manager)
+	}
+	return out
+}

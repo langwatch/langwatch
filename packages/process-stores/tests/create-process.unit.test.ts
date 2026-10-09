@@ -18,7 +18,7 @@ function config(): ProcessConfig {
   };
 }
 
-describe("given a process stated with createProcess", () => {
+describe("given the stores built for a process from config alone", () => {
   describe("when the caller hands a member in as undefined", () => {
     it("refuses by name rather than building the real client", () => {
       expect(

@@ -48,9 +48,11 @@ export interface IdentitySecretCarryRepository {
     secrets: IdentityAccountSecrets;
     updatedAtMs: number;
   }): Promise<void>;
+  /** Drop this user's credential rows mirroring these accounts; answers how many went. */
+  deleteCredentials(args: { userId: string; accountIds: readonly string[] }): Promise<number>;
 }
 
-export interface IdentitySecretCarryOutcome {
+interface IdentitySecretCarryOutcome {
   /** Credential rows created — a user's secrets carried across at latch. */
   carried: number;
   /** Credential rows overwritten — the reverse mirror's heal leg. */
@@ -70,6 +72,25 @@ export class IdentitySecretCarryService {
   /** The heal pass's cohort: only users whose secrets could have drifted (Q64). */
   findDriftedUserIdsAfter(args: { cursor: string | null; limit: number }): Promise<string[]> {
     return this.reads.findDriftedUserIdsAfter(args);
+  }
+
+  /**
+   * The mirror follows its source the other way too: a credential row whose `Account` row is
+   * gone holds a secret no sign-in method backs any more (an adoption drops pre-proof ones).
+   */
+  async dropCredentials({
+    userId,
+    accountIds,
+  }: {
+    userId: string;
+    accountIds: readonly string[];
+  }): Promise<number> {
+    if (accountIds.length === 0) return 0;
+    const dropped = await this.reads.deleteCredentials({ userId, accountIds });
+    if (dropped > 0) {
+      logger.info({ userId, dropped }, "dropped credential rows whose account row is gone");
+    }
+    return dropped;
   }
 
   async carryForUser({ userId }: { userId: string }): Promise<IdentitySecretCarryOutcome> {

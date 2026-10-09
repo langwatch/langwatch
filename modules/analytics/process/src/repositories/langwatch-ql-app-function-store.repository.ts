@@ -1,4 +1,4 @@
-import type { AppFunctionStoreProbe } from "../rules/langwatch-ql-app-function-store.rules.ts";
+import type { AppFunctionStoreProbe } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 
 /** Where this server would keep the LangWatchQL app functions. */
 export abstract class LangWatchQLAppFunctionStoreRepository {

@@ -77,6 +77,7 @@ describe("the evaluator tRPC declaration", () => {
         ["create", "mutation", "evaluations:manage"],
         ["update", "mutation", "evaluations:manage"],
         ["getRelatedEntities", "query", "evaluations:view"],
+        ["listByWorkflow", "query", "workflows:view"],
         ["cascadeArchive", "mutation", "evaluations:manage"],
         ["delete", "mutation", "evaluations:manage"],
         ["getWorkflowFields", "query", "evaluations:view"],
@@ -85,7 +86,22 @@ describe("the evaluator tRPC declaration", () => {
         ["pushToCopies", "mutation", "evaluations:manage"],
         ["syncFromSource", "mutation", "evaluations:manage"],
         ["getHistory", "query", "evaluations:view"],
+        ["disableAsEvaluator", "mutation", "workflows:update"],
+        ["toggleSaveAsEvaluator", "mutation", "workflows:update"],
       ]);
+    });
+
+    /** @scenario "A workflow's archive preview names its evaluators at the workflow's grain" */
+    it("answers the by-workflow read under workflows:view with ids and names only", () => {
+      const names = Object.keys(evaluatorTrpc.members);
+      const member = evaluatorTrpc.members.listByWorkflow;
+
+      expect(permissionsOf(evaluatorTrpcTransport)[names.indexOf("listByWorkflow")]).toBe(
+        "workflows:view",
+      );
+      expect(
+        member.output?.parse([{ id: "ev_1", name: "Judge", config: { secret: "x" } }]),
+      ).toEqual([{ id: "ev_1", name: "Judge" }]);
     });
 
     /** @scenario "The server repeats nothing the contract said" */

@@ -1,7 +1,27 @@
 /**
  * Slim SQL builder for `evaluation_analytics` — ADR-034 Phase 6 (eval mirror
- * of `slim-timeseries-query.ts`), kept separate from the trace slim builder
- * since their column sets differ too much to share one parameterised builder.
+ * of `slim-timeseries-query.ts`).
+ *
+ * Deliberately separate from the trace slim builder because the column set
+ * differs: the eval slim has typed columns for Score / Passed / EvaluatorType
+ * / Status / Label rather than the trace slim's TraceName / Models / cost-
+ * and-token bag. Parameterising one builder across both would devolve into a
+ * pile of source-conditional column picks; two builders read straight-line
+ * better and let each one's exhaustiveness assertion guard its own column
+ * set.
+ *
+ * Routing decides whether to call this builder (`pickAnalyticsTable` returns
+ * `"evaluation_analytics"`); the builder only handles what the eval slim
+ * supports — any unsupported shape is a programmer error and throws.
+ *
+ * All queries:
+ *   * include `WHERE TenantId = {tenantId:String}` as the FIRST predicate
+ *     (multi-tenancy contract);
+ *   * filter on the partition column `OccurredAt` so ClickHouse prunes
+ *     partitions (clickhouse-queries best-practices);
+ *   * dedup the slim table to the latest version of each evaluation (eval
+ *     slim is `ReplacingMergeTree(UpdatedAt)`) with the spillable `argMax`
+ *     collapse of `latestVersionSubquery`.
  */
 
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
@@ -75,10 +95,11 @@ function buildEvalSlimGroupByExpression(groupBy?: string): string | null {
     case "evaluations.evaluator_type":
       return `if(${ea}.EvaluatorType = '', 'unknown', ${ea}.EvaluatorType)`;
     case "evaluations.evaluation_passed":
-      // Status-gated like the metric columns, so a stray verdict on an errored
-      // row buckets as 'unknown' (#6833). No OR: the tenant guard refuses one
-      // above the deduped read's tenant predicate.
-      return `if(${ea}.Status = 'processed' AND ${ea}.Passed IS NOT NULL, if(${ea}.Passed, 'passed', 'failed'), 'unknown')`;
+      // Nullable(Bool) → display string for group_key. Status-gated like the
+      // metric columns: a historical errored row carrying a stray verdict
+      // must bucket as 'unknown', not 'failed' — the legacy per-evaluator
+      // path gates the same way (aggregation-builder.ts, #6833).
+      return `if(${ea}.Status != 'processed' OR ${ea}.Passed IS NULL, 'unknown', if(${ea}.Passed, 'passed', 'failed'))`;
     case "evaluations.evaluation_label":
       // Same status gate — an errored run's label is not a verdict (#6833).
       return `if(${ea}.Status != 'processed', 'unknown', coalesce(${ea}.Label, 'unknown'))`;
@@ -121,8 +142,10 @@ function evalSlimAggExpression(agg: AnalyticsAggregation, column: string): strin
 
 /**
  * Deduped FROM-clause for the eval slim table: the latest version of each
- * evaluation, by the spillable {@link latestVersionSubquery} collapse, carrying
- * only the columns the outer query reads.
+ * evaluation in range (slim is `ReplacingMergeTree(UpdatedAt)`), collapsed
+ * with the spillable `argMax` form of {@link latestVersionSubquery}, carrying
+ * only the columns the outer query reads. Same pattern as the trace slim
+ * builder.
  */
 function dedupedSlim({
   alias,

@@ -8,7 +8,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { translateFilter } from "../../../rules/trace-query.rules.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -106,7 +106,11 @@ let ch: ClickHouseClient;
 
 /** The trace ids a compiled filter selects, sorted. */
 async function matching(filter: string, tenant = tenantId): Promise<string[]> {
-  const compiled = translateFilter({ queryText: filter, tenantId: tenant, timeRange: WINDOW });
+  const compiled = traceQueryTranslation.translateFilter({
+    queryText: filter,
+    tenantId: tenant,
+    timeRange: WINDOW,
+  });
   if (!compiled) throw new Error(`compiled to nothing: ${filter}`);
   const result = await ch.query({
     query: `SELECT DISTINCT TraceId FROM trace_summaries ts WHERE TenantId = {tenantId:String} AND ${compiled.sql}`,

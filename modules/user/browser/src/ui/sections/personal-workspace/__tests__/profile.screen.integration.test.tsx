@@ -16,14 +16,17 @@ import ProfileScreen from "../profile.screen.tsx";
 vi.mock("../../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
-    useUtils: () => ({ user: { browserSessions: { invalidate: () => Promise.resolve() } } }),
+    useUtils: () => ({ auth: { browserSessions: { invalidate: () => Promise.resolve() } } }),
+    routingPolicy: { personalContext: { useQuery: () => ({ error: null, isFetching: false }) } },
     identity: { myIdentifiers: { useQuery: () => ({ data: [] }) } },
-    auth: { myAddressConfirmation: { useQuery: () => ({ data: undefined }) } },
-    user: {
+    auth: {
+      myAddressConfirmation: { useQuery: () => ({ data: undefined }) },
       browserSessions: { useQuery: () => ({ data: [], isLoading: false }) },
       endBrowserSession: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve({ ended: 0 }), isPending: false }),
       },
+    },
+    user: {
       getLinkedAccounts: { useQuery: () => ({ data: [] }) },
       hasPassword: { useQuery: () => ({ data: { hasPassword: true } }) },
       updateName: { useMutation: () => ({ mutate: () => {}, isPending: false }) },
@@ -37,8 +40,9 @@ vi.mock("@langwatch/api-key-client", () => ({
   apiKeyClient: { apiKey: { list: { useQuery: () => ({ data: [] }) } } },
 }));
 
-vi.mock("../../../../behavior/user-api.ts", () => ({
-  userApi: { user: { getAvatarUrl: { useQuery: () => ({ data: undefined }) } } },
+vi.mock("../../../../behavior/use-user-avatar-url.ts", () => ({
+  useUserAvatarUrl: (image?: string | null) =>
+    image?.startsWith("/api/user-avatar/") ? null : (image ?? null),
 }));
 
 afterEach(() => cleanup());

@@ -1,5 +1,4 @@
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
-import { AnalyticsTripwire } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 
 const tolerance = 0.001;
@@ -14,16 +13,14 @@ interface Divergence {
   legacy: number | null;
 }
 
-export class LoggingAnalyticsTripwireService extends AnalyticsTripwire {
+export class LoggingAnalyticsTripwireService {
   static create(options: {
     isEnabled: (projectId: string) => Promise<boolean>;
   }): LoggingAnalyticsTripwireService {
     return new LoggingAnalyticsTripwireService(options.isEnabled);
   }
 
-  private constructor(private readonly enabled: (projectId: string) => Promise<boolean>) {
-    super();
-  }
+  private constructor(private readonly enabled: (projectId: string) => Promise<boolean>) {}
 
   isEnabled(projectId: string): Promise<boolean> {
     return this.enabled(projectId);

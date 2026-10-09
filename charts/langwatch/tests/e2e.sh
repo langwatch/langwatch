@@ -235,11 +235,11 @@ test_resources() {
     fail "Deployment ${RELEASE}-app missing"
   fi
 
-  # Workers Deployment absent (enabled: false)
+  # Workers Deployment present with no pod (the chart refuses enabled: false)
   if kc get deployment "${RELEASE}-workers" &>/dev/null; then
-    fail "Workers Deployment should not exist (enabled=false)"
+    pass "Deployment ${RELEASE}-workers (replicaCount=0)"
   else
-    pass "Workers Deployment absent (enabled=false)"
+    fail "Deployment ${RELEASE}-workers missing"
   fi
 }
 
@@ -996,7 +996,7 @@ test_workers() {
   # ── the liveness probe contract ─────────────────────────────────────────
   # Regression guard for the CrashLoopBackOff class: probing /metrics instead
   # of /healthz crash-loops BOTH a stock install (production + no
-  # LANGWATCH_METRICS_TOKEN ⇒ no scrape door, 404) and a secretKeyRef
+  # METRICS_API_KEY ⇒ no scrape door, 404) and a secretKeyRef
   # install (an httpGet probe cannot read a Secret ⇒ 401). Assert the live
   # Deployment probes the unauthenticated liveness path and carries no
   # credentials, then prove the endpoint really answers that way in-cluster.
@@ -1076,22 +1076,22 @@ test_metrics_collection() {
   # The gate: no credential and a wrong credential are both refused, and
   # neither leaks samples.
   assert_eq "Worker /metrics rejects an unauthenticated scrape" \
-    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "401 no-samples"
+    "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics)" "401 no-samples"
   assert_eq "Worker /metrics rejects the wrong key" \
-    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics wrong-key)" \
+    "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics wrong-key)" \
     "401 no-samples"
 
   # …and the path Prometheus actually uses: an authenticated scrape really
   # collects samples. This is the assertion the suite exists for.
   assert_eq "Worker /metrics serves samples to an authenticated scrape" \
-    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics "$METRICS_KEY")" \
+    "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")" \
     "200 samples"
 
   # The app tier carries the same gate on its own registry.
   assert_eq "App /metrics rejects an unauthenticated scrape" \
-    "$(http_probe "deploy/${RELEASE}-app" 5560 /metrics)" "401 no-samples"
+    "$(http_probe "deploy/${RELEASE}-app" 9464 /metrics)" "401 no-samples"
   assert_eq "App /metrics serves samples to an authenticated scrape" \
-    "$(http_probe "deploy/${RELEASE}-app" 5560 /metrics "$METRICS_KEY")" \
+    "$(http_probe "deploy/${RELEASE}-app" 9464 /metrics "$METRICS_KEY")" \
     "200 samples"
 
   # ── the same key delivered from a Secret ────────────────────────────────
@@ -1126,7 +1126,7 @@ test_metrics_collection() {
 
   # The value really made it out of the Secret and into the auth gate.
   assert_eq "Worker /metrics serves samples using the Secret-delivered key" \
-    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics "$METRICS_KEY")" \
+    "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")" \
     "200 samples"
 
   # The Secret is deliberately left in place. Deleting it here would leave the

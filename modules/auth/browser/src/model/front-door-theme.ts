@@ -62,6 +62,8 @@ export const frontDoorThemeConfig = defineConfig({
           /** Fields: a translucent pane over the card's glass. */
           fieldBg: mode(white(0.62), white(0.06)),
           fieldBorder: mode("rgba(20, 20, 23, 0.14)", white(0.14)),
+          /** A near-solid floor for a card that is one sentence with nothing to operate. */
+          cardBgSolid: mode(white(0.85), "rgba(12, 12, 15, 0.88)"),
         },
       },
     },
@@ -77,9 +79,9 @@ export const FRONT_DOOR_GRADIENT = {
   accent: "var(--lw-front-door-accent-gradient)",
 } as const;
 
-/** The shapes: pills for actions, a soft radius for fields, 14px for the card. */
+/** One radius language: every control is cut to the field's radius, 14px for the card. */
 export const SHAPE = {
-  action: "full",
+  control: "10px",
   field: "10px",
   card: "14px",
 } as const;

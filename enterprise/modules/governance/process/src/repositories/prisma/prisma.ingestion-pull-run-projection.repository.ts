@@ -7,7 +7,7 @@ import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { IngestionPullRunStatusData } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
-import type { AgentsListingSummary } from "../../rules/agents-listing-outcome.rules.ts";
+import type { AgentsListingSummary } from "../../features/agents/rules/agents-listing-outcome.rules.ts";
 import { IngestionPullRunRepository } from "../ingestion-pull-run.repository.ts";
 import { buildIngestionSourceMirror } from "./prisma.ingestion-source-mirror.mapper.ts";
 
@@ -55,7 +55,7 @@ function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type IngestionPullRunProjectionDatabase = Pick<
+type IngestionPullRunProjectionDatabase = Pick<
   PrismaClient,
   "ingestionPullRunProjection" | "ingestionSource" | "$transaction"
 >;

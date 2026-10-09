@@ -68,10 +68,10 @@ for (const route of lanes.routes) {
   serve(route.method, route.path, "packages/process/src/transport/api-surface.ts");
 }
 
-const healthFile = join(repoRoot, "apps/api/src/api-health-route.ts");
+const healthFile = join(repoRoot, "apps/api/src/main.ts");
 if (existsSync(healthFile)) {
   const { apiHealthRoute } = await import(pathToFileURL(healthFile).href);
-  serve("ALL", apiHealthRoute.path, "apps/api/src/api-health-route.ts");
+  serve("ALL", apiHealthRoute.path, "apps/api/src/main.ts");
 }
 
 const sorted = [...routes.values()].toSorted(

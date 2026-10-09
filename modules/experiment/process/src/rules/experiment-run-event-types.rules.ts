@@ -54,3 +54,10 @@ export const EXPERIMENT_RUN_PROJECTION_VERSIONS = {
   RUN_STATE: "2025-02-01",
   RUN_PROGRESS: "2026-09-28",
 } as const;
+
+/**
+ * How many queued results of one dataset row are appended, and stored, with one insert
+ * (ADR-066 pillar 2). Matches the log and metric ceilings; the queue's byte budget bounds
+ * batches of rows that carry large entries.
+ */
+export const EXPERIMENT_RUN_RESULT_COALESCE_MAX_BATCH = 256;

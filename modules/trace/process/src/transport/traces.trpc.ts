@@ -11,17 +11,13 @@ import {
   distinctFieldNamesResultSchema,
   evaluationSchema,
   facetValuesResultSchema,
-  type namedTopicCountsSchema,
   TraceAiQueryUnavailableError,
   TraceApi,
   traceListPageSchema,
   traceSummaryDataSchema,
   tracesEvaluationRunsSchema,
-  topicCountsResultSchema,
   tracesTrpc,
-  sessionGroupsResultSchema,
 } from "@langwatch/trace-contract";
-import type { z } from "zod";
 
 import {
   traceDerivedAttrPrefixes,
@@ -29,7 +25,6 @@ import {
 } from "../rules/trace-read-mapper-ports.rules.ts";
 import {
   buildSpanContentRedactions,
-  contentSearchTermsForViewer,
   gateTraceLogVisibility,
   mapLegacySpanSummaryToTreeNode,
   mapSpansToDetailDtos,
@@ -39,8 +34,6 @@ import {
 import {
   gateHeaderCost,
   gateResources,
-  gateSessionCost,
-  gateSessionTitle,
   gateTreeCost,
   withoutHiddenResourceAttrs,
 } from "../rules/trace-view-gates.rules.ts";
@@ -60,7 +53,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       return app.listTraces({
         query: input,
         protections,
-        options: { scrollId: input.scrollId },
+        options: { scrollId: input.scrollId, refuseAbove: "tracesPageSizeMax" },
       });
     })
 
@@ -92,12 +85,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       return evaluationSchema.array().optional().parse(evaluations[input.traceId]);
     })
 
-    .procedure("getEvaluationInputs")
-    .withPermission("traces:view")
-    .handle(({ app, input }) =>
-      app.findEvaluationInputs({ projectId: input.projectId, evaluationId: input.evaluationId }),
-    )
-
     .procedure("getEvaluationsMultiple")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor }) => {
@@ -118,41 +105,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           evaluationsSchema.parse(traceEvaluations),
         ]),
       );
-    })
-
-    .procedure("getTopicCounts")
-    .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
-      const result = topicCountsResultSchema.parse(await app.readTopicCounts(input));
-
-      const topicsMap = Object.fromEntries(
-        (await app.readTopics({ projectId: input.projectId })).map((topic) => [topic.id, topic]),
-      );
-
-      const mapBuckets = (buckets: { key: string; count: number }[], includeParent = false) => {
-        return buckets.reduce<z.infer<typeof namedTopicCountsSchema>["subtopicCounts"]>(
-          (acc, bucket) => {
-            const topic = topicsMap[bucket.key];
-            if (!topic) return acc;
-
-            return [
-              ...acc,
-              {
-                id: bucket.key,
-                name: topic.name,
-                count: bucket.count,
-                ...(includeParent && { parentId: topic.parentId }),
-              },
-            ];
-          },
-          [],
-        );
-      };
-
-      return {
-        topicCounts: mapBuckets(result.topicCounts),
-        subtopicCounts: mapBuckets(result.subtopicCounts, true),
-      };
     })
 
     .procedure("getCustomersAndLabels")
@@ -275,6 +227,27 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       ),
     )
 
+    // `project:view`, as on `project.getFieldRedactionStatus`: the path moved, not the gate.
+    .procedure("getFieldRedactionStatus")
+    .withPermission("project:view")
+    .handle(async ({ app, input, actor }) => {
+      const protections = await app.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: actor.id,
+      });
+
+      return {
+        isRedacted: {
+          input: !protections.canSeeCapturedInput,
+          output: !protections.canSeeCapturedOutput,
+        },
+        visibleTo: {
+          input: protections.capturedInputVisibleTo ?? null,
+          output: protections.capturedOutputVisibleTo ?? null,
+        },
+      };
+    })
+
     .procedure("getAllForDownload")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor }) => {
@@ -294,6 +267,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           includeSpans: input.includeSpans,
           resolveBlobs: true,
           scrollId: input.scrollId,
+          refuseAbove: "tracesDownloadPageSizeMax",
         },
       });
     })
@@ -349,57 +323,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       };
     })
 
-    /**
-     * Sessions lens: one row per `gen_ai.conversation.id` with rollups computed in
-     * ClickHouse over every trace in range, not just the fetched page.
-     */
-    .procedure("sessions")
-    .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
-      const protections = await app.resolveViewerProtections({
-        projectId: input.projectId,
-        userId: actor.id,
-      });
-      const filterWhere = app.compileExplorerTraceFilter({
-        query: input.query ?? "",
-        tenantId: input.projectId,
-        timeRange: input.timeRange,
-        evalRuns: await app.findExplorerEvalRuns({
-          projectId: input.projectId,
-          evalRuns: input.evalRuns,
-        }),
-      });
-      const result = sessionGroupsResultSchema.parse(
-        await app.readSessionGroups({
-          tenantId: input.projectId,
-          timeRange: input.timeRange,
-          sort: input.sort,
-          pageSize: input.pageSize,
-          cursor: input.cursor,
-          filterWhere,
-          contentTerms: contentSearchTermsForViewer({
-            terms: app.extractTraceFreeTextTerms(input.query ?? ""),
-            protections,
-          }),
-          visibilityCutoffMs: protections.visibilityCutoffMs,
-        }),
-      );
-
-      return {
-        ...result,
-        sessions: gateSessionCost({
-          sessions: gateSessionTitle({
-            sessions: result.sessions.map((session) =>
-              redactV2Content(session, protections, traceReadMapperPorts.contentPrivacy),
-            ),
-            protections,
-          }),
-          protections,
-        }),
-      };
-    })
-
-    /** Event rollups for the trace list's Events column, keyed by trace id. */
     .procedure("listEvents")
     .withPermission("traces:view")
     .handle(({ app, input }) =>
@@ -622,13 +545,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           row,
           protections,
           visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
-          codingAgents: {
-            logContentKeys: (eventName) =>
-              app.codingAgentLogContentKeys(eventName).map((entry) => ({
-                key: entry.key,
-                category: entry.category,
-              })),
-          },
           derivedAttrPrefixes: traceDerivedAttrPrefixes,
         }),
       );

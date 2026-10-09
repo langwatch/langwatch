@@ -1,6 +1,3 @@
-import { existsSync, readFileSync } from "fs";
-import path from "path";
-
 import type { Plugin } from "vite";
 
 /** The one Vite server surface the gate touches: the reload it sends. */
@@ -20,12 +17,12 @@ function releaseIsolatedUpdate<Module>({
   return modules;
 }
 
-type HmrGateOptions = { markerPath?: string; burstGapMs?: number; burstSettleMs?: number };
+type HmrGateOptions = { burstGapMs?: number; burstSettleMs?: number };
 
 /**
- * Auto-gated HMR: coalesces a rapid burst of saves (an AI agent editing)
+ * Debounced HMR: coalesces a rapid burst of saves (an AI agent editing)
  * into one trailing full-reload, instead of thrashing a human's browser
- * through every intermediate state. `haven hmr on|off` still overrides it.
+ * through every intermediate state. ADR-168 (2026-10-09 amendment).
  */
 export function havenHmrGate(options?: HmrGateOptions): Plugin {
   const gate = createHmrGate(options);
@@ -47,24 +44,12 @@ export function createHmrGate(options?: HmrGateOptions): {
   attach(server: HmrReloadChannel): void;
   hotUpdate<Module>(modules: Module[]): Module[];
 } {
-  const marker = options?.markerPath ?? path.resolve(process.cwd(), ".haven-hmr-gate");
   const BURST_GAP_MS = options?.burstGapMs ?? 300; // updates closer together than this = one burst
   const BURST_SETTLE_MS = options?.burstSettleMs ?? 500; // delay before coalesced reload
-  const MAX_GATE_MS = 60_000; // never hold longer than this, whatever the marker says
   let server: HmrReloadChannel | undefined;
   let isReloadOwed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastUpdateAt = 0;
-
-  function gateExpiry(): number {
-    try {
-      if (!existsSync(marker)) return 0;
-      const exp = Number(readFileSync(marker, "utf8").trim());
-      return Number.isFinite(exp) ? exp : 0;
-    } catch {
-      return 0; // never let the gate break the dev server
-    }
-  }
 
   function flush(): void {
     isReloadOwed = false;
@@ -87,14 +72,6 @@ export function createHmrGate(options?: HmrGateOptions): {
     },
     hotUpdate(modules) {
       const now = Date.now();
-
-      // Explicit override (haven hmr on) wins when active, regardless of cadence.
-      const markerRemaining = gateExpiry() - now;
-      if (markerRemaining > 0) {
-        scheduleFlush(Math.min(markerRemaining, MAX_GATE_MS) + 250);
-        lastUpdateAt = now;
-        return [];
-      }
 
       const sinceLast = now - lastUpdateAt;
       lastUpdateAt = now;

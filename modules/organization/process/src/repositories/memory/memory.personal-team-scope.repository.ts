@@ -1,6 +1,6 @@
 import { GrantScopeTier } from "@langwatch/authz-contract";
 
-import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
+import type { PersonalTeamScopeReader } from "../../features/personal-workspace/services/personal-team-scope.service.ts";
 import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
 
 /** In-memory {@link PersonalTeamScopeReader}, for tests and a memory-backed boot. */

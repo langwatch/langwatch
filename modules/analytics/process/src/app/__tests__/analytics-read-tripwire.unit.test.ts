@@ -15,6 +15,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -83,10 +84,8 @@ async function harness(tripwireOn: boolean) {
         getPlatformDefaultRetentionDays: () => 30,
       }),
     },
-    repositories: {
-      ...MemoryAnalyticsRepositories.create(),
-      analytics: { open: () => repository },
-    },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
+    repositories: { ...MemoryAnalyticsRepositories.create(), analytics: repository },
     config: {
       langwatchQl: {
         url: void 0,

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
 
 import { usePromptConfigForm } from "../../../../../behavior/use-prompt-config-form.ts";
-import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useDraggableTabsBrowserStore } from "../../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { type LayoutMode, LayoutModeContext } from "../../../../../model/layout-mode.ts";
 import { type TabData, useTabId } from "../../studio-internals.ts";
 import { PromptBrowserHeader } from "./prompt-browser-header.tsx";

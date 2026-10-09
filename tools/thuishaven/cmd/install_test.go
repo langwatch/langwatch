@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
@@ -212,5 +213,16 @@ func TestOptionalHintNamesWhatYesDeliberatelyLeftAlone(t *testing.T) {
 	printOptionalHint(&out, domain.PlanPrereqs(found, nil, "darwin"))
 	if !strings.Contains(out.String(), "clickhouse-client") {
 		t.Errorf("--yes must say which optional entries it skipped, got:\n%s", out.String())
+	}
+}
+
+func TestManualStepsShowTheNameTheReasonAndACopyableCommand(t *testing.T) {
+	var out bytes.Buffer
+	printManualSteps(&out, []app.ManualStep{{Name: "Homebrew", Why: "the package manager", Command: "/bin/bash -c install.sh"}}, plainPainter)
+	got := out.String()
+	for _, want := range []string{"1 step needs you", "Homebrew", "the package manager", "\n    /bin/bash -c install.sh\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output %q lacks %q", got, want)
+		}
 	}
 }

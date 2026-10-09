@@ -132,12 +132,13 @@ Feature: haven install checks the machine's prerequisites
       # a v1.64.8 binary satisfied nothing and refused the repo's v2 config,
       # so the report has to say so rather than reading as installed
 
-    Scenario: A small macOS accept queue is reported with the sysctl fix
+    Scenario: A small macOS accept queue is reported and haven install sets it
       Given the machine is macOS and kern.ipc.somaxconn is 128
       When the prerequisites are planned
       Then the accept queue is reported missing
-      And it prints `sudo sysctl kern.ipc.somaxconn=1024` and how to persist it
-      # vite cold loads through the proxy can 502 under bursts; haven never runs sudo
+      And installing it runs `sudo sysctl -w kern.ipc.somaxconn=1024` in the developer's terminal
+      And it writes the setting to /etc/sysctl.conf so it survives a reboot
+      # vite cold loads through the proxy can 502 under bursts
 
     Scenario: The accept queue is not checked off macOS
       Given the machine is not macOS
@@ -205,6 +206,44 @@ Feature: haven install checks the machine's prerequisites
 
     Scenario: One failed install does not silently skip the rest
       Given three prerequisites were chosen
-      When the second one fails to install
+      When the second one, a required one, fails to install
       Then the failure is reported naming the prerequisite
       And the run stops rather than reporting a success it did not get
+
+    Scenario: A failed recommended install does not stop the run
+      Given a recommended prerequisite and a later one were chosen
+      When the recommended one fails to install
+      Then the failure is logged naming the prerequisite
+      And the later one is still installed
+      And the summary lists the failure and the run does not fail
+
+  Rule: On macOS the install brings the native tier, and a container runtime is optional
+
+    Scenario: macOS install fetches the native tier and colima stays optional
+      Given a Mac with Homebrew and no observability tools or pinned binaries
+      When the developer runs "haven install --yes"
+      Then grafana, prometheus and loki are installed through Homebrew
+      And the pinned ClickHouse, Tempo and Alloy releases are downloaded and their sha256 verified
+      And the container runtime is reported optional, never required
+
+    Scenario: A second install run fetches nothing
+      Given the pinned ClickHouse, Tempo and Alloy binaries are already on disk
+      When the developer runs "haven install" again
+      Then nothing is downloaded and the row reads as installed with every version
+
+    Scenario: Haven fetches a pinned, checksummed Alloy instead of building it
+      Given a Mac whose Command Line Tools are too old to build Alloy from source
+      When the developer runs "haven install"
+      Then haven downloads the pinned Alloy darwin zip for its architecture into its home
+      And unpacks the alloy binary only when the zip matches its pinned sha256
+
+    Scenario: Linux install keeps today's catalogue
+      Given a Linux machine
+      When the developer runs "haven install"
+      Then the observability tools and the pinned binaries are reported not applicable
+
+    Scenario: Two concurrent installs of a pinned binary download it once
+      Given a pinned artifact that is not yet in haven's home
+      When two haven runs ensure it at the same time
+      Then one downloads it and the other waits for the lock
+      And the waiting run finds the binary in place and downloads nothing

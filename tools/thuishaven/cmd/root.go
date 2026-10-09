@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -24,6 +25,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudesettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudestate"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousenative"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/codexsettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
@@ -31,7 +33,6 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/jobscratch"
-	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/postgresbrew"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/prereqs"
@@ -160,25 +161,20 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		return naming.URL(svc, "", scheme, port)
 	}
 
-	// ClickHouse and observability share one colima VM (not Docker Desktop): its
-	// ceiling is explicit and per-profile, so neither container can quietly take
-	// the machine. Both containers are sized against this machine's RAM/CPU.
+	// ClickHouse and the observability container tier share one colima VM (not
+	// Docker Desktop): its ceiling is explicit and per-profile, so neither
+	// container can quietly take the machine. Both containers are sized against this machine's RAM/CPU.
 	ram, cpus := sys.TotalMemory(), runtime.NumCPU()
 	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup)
-	ch := clickhousedocker.New(rt, havenHome(), envOr("HAVEN_CH_IMAGE", domain.ClickHouseImage), clickHouseLimits())
+	chRuntime, ch := managedClickHouse(rt)
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
 	rds := redisbrew.New(
 		envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula),
 		envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort),
 		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
 	)
-	obs := otellgtm.New(
-		rt,
-		havenHome(),
-		envOr("HAVEN_OBS_IMAGE", domain.ObservabilityImage),
-		observabilityEndpoints(),
-		observabilityLimits(ram, cpus),
-	)
+	obs := observabilityStack(rt, ram, cpus)
+	obsTier, _, _ := selectedObservabilityTier()
 
 	// The console floor haven imposes while the observability stack is up: default
 	// warn, because the full info/debug stream is in Grafana and the terminal only
@@ -217,7 +213,9 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),
+		GoWatchArgv:             goWatchArgv(),
 		UpArgv:                  selfArgv(worktree, "up"),
+		KeepArgv:                selfArgv(trustedRepoRoot(), "keep"),
 		IsAgent:                 isAgent,
 		PortlessDisabled:        devEnv("PORTLESS") == "0",
 		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",
@@ -226,12 +224,15 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		// and `haven db url clickhouse` both reach this server with no stack up,
 		// and a default-on stop would yank it out from under them.
 		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
+		ClickHousePostgresHost:   chRuntime.PostgresHost(),
+		ClickHouseRuntime:        chRuntime,
+		ObservabilityTier:        obsTier,
 		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
 		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
 		RedisDBOverride:          app.RedisDBOverrideFromEnv(devEnv("LANGWATCH_HAVEN_REDIS_DB")),
 		PublicURL:                app.PublicURLFromEnv(),
-		// Observability shares CH's colima VM, so it defaults ON now — the VM is
-		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
+		// On by default: agents debug from it. Native on macOS, so it holds no VM
+		// open (see observabilityStack). LANGWATCH_HAVEN_OBS=0 opts out.
 		ShouldStartObservability:   devEnv("LANGWATCH_HAVEN_OBS") != "0",
 		LocalAPIKey:                envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:                   worktree,
@@ -279,6 +280,9 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				Start:   orch.StartWorktreeStack,
 				Down:    orch.DownStack,
 				Destroy: orch.DestroyStack,
+				// Add one service to a live stack; reset a stack's databases.
+				StartService:   orch.StartStackService,
+				ResetDatabases: orch.ResetStackDatabases,
 			},
 			Limits: dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
 		}),
@@ -353,6 +357,20 @@ func observabilityEndpoints() domain.ObservabilityEndpoints {
 	return e
 }
 
+// managedClickHouse picks the shared server's runtime (HAVEN_CH_RUNTIME, else
+// native where a binary is pinned): a bad statement is reported, then the
+// container is used, the way a bad LANGWATCH_HAVEN_REDIS_DB is ignored.
+func managedClickHouse(rt *colima.Runtime) (domain.ClickHouseRuntime, app.ClickHouse) {
+	chRuntime, err := domain.ResolveClickHouseRuntime(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "haven: %v; using the ClickHouse container\n", err)
+	}
+	if artifact, ok := domain.ClickHouseNativeArtifactFor(runtime.GOOS, runtime.GOARCH); ok && chRuntime == domain.ClickHouseRuntimeNative {
+		return chRuntime, clickhousenative.New(havenHome(), artifact, clickHouseLimits())
+	}
+	return chRuntime, clickhousedocker.New(rt, havenHome(), envOr("HAVEN_CH_IMAGE", domain.ClickHouseImage), clickHouseLimits())
+}
+
 // clickHouseLimits applies the proven-in-production memory tuning, sized to this
 // machine's RAM, with the container ceiling overridable by env.
 func clickHouseLimits() domain.ClickHouseLimits {
@@ -390,20 +408,57 @@ func observabilityLimits(ram uint64, cpus int) domain.ObservabilityLimits {
 }
 
 func optionsFromEnv(repoRoot string) app.PlanOptions {
+	isOneProcess, _, _ := readOneProcess()
 	return app.PlanOptions{
-		ShouldGoWatch:       devEnv("LANGWATCH_GO_WATCH") == "1",
-		ShouldRunOneProcess: devEnv("LANGWATCH_DEV_ONE_PROCESS") == "1",
-		ShouldSeed:          os.Getenv("LANGWATCH_SEED") == "1",
-		// What the langyagent worker's local isolation posture is resolved from;
-		// `up` settles it against this machine before it builds the stack. Default
-		// (neither flag) is the sandboxed, production-like tier: the worker runs in
-		// colima with the per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes
-		// the sandbox inside the VM; LANGY_UNSAFE_HOST_ACCESS drops the VM and runs
-		// it on the host, and set to a falsey value refuses the host tier outright.
+		ShouldGoWatch:           devEnv("LANGWATCH_GO_WATCH") != "0",
+		ShouldRunOneProcess:     isOneProcess,
+		ShouldRunGoAsOneProcess: isOneProcess,
+		ShouldSeed:              os.Getenv("LANGWATCH_SEED") == "1",
+		// The langyagent isolation request; `up` settles it against this machine
+		// (domain.ResolveLangyTier). Off macOS the default is the sandboxed tier in
+		// colima; on macOS it is the host tier. LANGY_UNSAFE_CONTAINER relaxes the
+		// sandbox inside the VM; LANGY_UNSAFE_HOST_ACCESS=1 picks the host, =0 refuses it.
 		LangyTierRequest: langyTierRequest(),
 		IsStub:           os.Getenv("HAVEN_STUB") == "1",
 		RepoRoot:         repoRoot,
 	}
+}
+
+// readOneProcess reads the one switch that splits (=0) or folds both the Node
+// app lane and the Go lane: LANGWATCH_DEV_ONE_PROCESS, with the old
+// LANGWATCH_GO_ONE_PROCESS read only when the new name is unset.
+func readOneProcess() (isOneProcess, isAlias bool, err error) {
+	newVal, _ := dotenvLookup("LANGWATCH_DEV_ONE_PROCESS")
+	oldVal, _ := dotenvLookup("LANGWATCH_GO_ONE_PROCESS")
+	return resolveOneProcess(newVal, oldVal)
+}
+
+// resolveOneProcess is the pure rule: an empty value is unset, "0" splits and
+// anything else folds; the alias is refused when it disagrees with the new name.
+func resolveOneProcess(newVal, oldVal string) (isOneProcess, isAlias bool, err error) {
+	if !isSet(oldVal) {
+		return newVal != "0", false, nil
+	}
+	if !isSet(newVal) {
+		return oldVal != "0", true, nil
+	}
+	if (newVal != "0") != (oldVal != "0") {
+		return newVal != "0", true, fmt.Errorf(
+			"LANGWATCH_DEV_ONE_PROCESS=%s and LANGWATCH_GO_ONE_PROCESS=%s disagree — LANGWATCH_DEV_ONE_PROCESS is the one switch for the Node app lane and the Go lane; remove LANGWATCH_GO_ONE_PROCESS",
+			newVal, oldVal,
+		)
+	}
+	return newVal != "0", true, nil
+}
+
+// checkOneProcessEnv refuses a disagreeing pair and warns once that the old
+// name is deprecated.
+func checkOneProcessEnv(warn io.Writer) error {
+	_, isAlias, err := readOneProcess()
+	if isAlias && err == nil {
+		fmt.Fprintln(warn, "haven: LANGWATCH_GO_ONE_PROCESS is deprecated; LANGWATCH_DEV_ONE_PROCESS=0 now splits both the Node app lane and the Go lane")
+	}
+	return err
 }
 
 // langyTierRequest reads the two isolation knobs and the environment this
@@ -418,6 +473,7 @@ func langyTierRequest() domain.LangyTierRequest {
 		UnsafeHostAccess:  hostAccessSet && isTruthy,
 		HostAccessRefused: hostAccessSet && !isTruthy,
 		IsDevelopment:     domain.IsDevelopmentEnvironment(devEnv("NODE_ENV"), devEnv("ENVIRONMENT")),
+		IsMacOS:           runtime.GOOS == "darwin",
 	}
 }
 
@@ -727,7 +783,7 @@ func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 		return detachedStack{}, err
 	}
 	logPath := stackLogPath(d.worktree, slug)
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
 		return detachedStack{}, err
 	}
 	root := trustedRepoRoot()

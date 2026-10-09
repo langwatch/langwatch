@@ -32,7 +32,8 @@ Feature: Shared organization service
     Given trace sharing is currently enabled
     When a management transport commits the organization settings update
     Then the organization service reports that trace-share revocation is required
-    And the transport lists each project and revokes its trace shares after the commit
+    And organization records trace sharing disabled after the commit, naming each project
+    And share revokes those projects' trace links from its own side
 
   @unit
   Scenario: A request manages a shared team
@@ -136,6 +137,7 @@ Feature: Shared organization service
     And each identifier carries the resource prefix the existing rows already use
     And the team and the project receive separate slugs seeded from the user identifier
     And no composition root describes any of those formats
+    And the personal project id is a fresh strict project KSUID, never derived from the team id
 
   @unit
   Scenario: Ensuring a personal workspace leaves an existing membership as it was
@@ -222,3 +224,153 @@ Feature: Shared organization service
     When the organization's dataset limits are read
     Then the per-file limit answers 104857600 bytes
     And an organization with nothing stored, or an unknown one, answers no limit
+
+  @integration
+  Scenario: A licence is stored with the moment it was validated and cleared with both its dates
+    Given an organization in Postgres
+    When a licence is set with its expiry and the moment it was validated
+    Then the organization carries the licence, its expiry and that validated stamp
+    And a licence set with no validated stamp stores none
+    And clearing the licence empties the licence, its expiry and its validated stamp
+    And setting or clearing a licence on an unknown organization refuses with organization not found
+
+  @unit
+  Scenario: The memory organization store sets and clears a licence the same way
+    Given a memory organization
+    When a licence is set with its expiry and the moment it was validated
+    Then the organization carries the licence, its expiry and that validated stamp
+    And clearing the licence empties the licence, its expiry and its validated stamp
+    And setting or clearing a licence on an unknown organization refuses with organization not found
+
+  @unit
+  Scenario: An organization's support contact is the one set in its settings, else its longest-seated enabled administrator
+    Given an organization whose settings name a support contact
+    When its support contact is found
+    Then the configured contact answers
+    And without one, the email of the earliest-seated administrator who is not disabled answers
+    And with no enabled administrator, no contact answers
+
+  @integration
+  Scenario: The longest-seated enabled administrator is read from Postgres
+    Given an organization whose earliest administrator is disabled, followed by two enabled administrators
+    When its first administrator's email is read
+    Then the earlier-seated of the two enabled administrators answers
+    And an organization with no enabled administrator answers none
+
+  # Organization decides who holds a seat; user owns what a browser session is. Taking a seat is
+  # immediate for authorization, while the live sessions end from organization's fact a few
+  # seconds later (dev/docs/plans/peer-cycle-cuts-2026-10-06.md §7, ruling R7).
+  Rule: Taking a seat refuses the next request at once and records the revocation for user
+
+    @unit
+    Scenario: Disabling a member takes their access away before the call returns
+      Given an active member of an organization
+      When an administrator disables that member
+      Then the membership is written and the organization's cached authorization answers retired before the call returns
+      And no browser session is ended inline
+
+    @unit
+    Scenario: Disabling a member records that their seat was taken away
+      Given an active member of an organization
+      When an administrator disables that member
+      Then the membership is written first
+      And organization records that member as disabled, naming who disabled them
+
+    @unit
+    Scenario: Re-enabling a member records no seat revocation
+      Given a disabled member of an organization
+      When an administrator re-enables that member
+      Then no seat revocation is recorded
+
+    @unit
+    Scenario: A process that cannot record the seat revocation refuses the disable
+      Given a process in which organization's lifecycle pipeline is not registered
+      When an administrator disables a member
+      Then the disable is refused rather than left without its session revocation
+
+  @unit
+  Scenario: A new personal workspace answers pending until project has created its project
+    Given a user with no personal workspace in an organization
+    When the user's personal workspace is ensured
+    Then organization creates the personal team and its owner membership, and no project row
+    And it records "lw.organization.personal_team_created" with the team id, a freshly minted project id and the project slug
+    And it answers pending with the team to wait on
+
+  @unit
+  Scenario: Ensuring again while the personal project is pending creates no second team
+    Given a personal team whose personal project has not been created yet
+    When the user's personal workspace is ensured again
+    Then no second personal team is created
+    And it answers pending with the same team
+    And it records "lw.organization.personal_team_created" again with a new project id, so a lost record heals
+
+  @unit
+  Scenario: Ensuring a personal workspace whose project exists answers ready
+    Given a personal team whose personal project has been created
+    When the user's personal workspace is ensured
+    Then it answers ready with the team and the project, and records nothing
+
+  @unit
+  Scenario: The personal team fact never carries the project key
+    When organization records "lw.organization.personal_team_created"
+    Then the fact carries no API key
+
+  @unit
+  Scenario: A mutation that needs a pending personal project refuses as retryable
+    Given a personal workspace whose project is pending
+    When a caller needs the personal project to make a change
+    Then it refuses with "personal_workspace_pending", a retryable handled error, and changes nothing
+
+  @unit
+  Scenario: Removing a member records their archived personal teams for project
+    Given a member who owns a personal team in an organization
+    When an administrator removes the member
+    Then organization archives the personal team and writes no project row
+    And it records "lw.organization.personal_workspace_archived" with the archived team ids, awaited, so an unrecorded removal fails loudly
+
+  @unit
+  Scenario: Ensuring a returning member's workspace records its revival for project
+    Given a returning member whose archived personal team organization has revived
+    When the user's personal workspace is ensured and answers pending
+    Then it records "lw.organization.personal_workspace_revived" with the team id, awaited
+    And project revives the archived personal project, while a brand-new team's record changes nothing
+
+  @unit
+  Scenario: Switching personal workspace features records them for project
+    Given the owner of a personal workspace
+    When the owner enables or disables all its features
+    Then organization audits the switch and writes no project row
+    And it records "lw.organization.personal_workspace_features_changed" with the project id and the new switches, awaited
+
+  @unit
+  Scenario: Every way an organization is created records lw.organization.created
+    Given an organization is created by sign-up, by instance provisioning or for a self-hosted customer
+    When the organization and its first team are committed
+    Then organization records "lw.organization.created" carrying the organization's id and name
+    And peers such as prompt seed their own defaults from that fact
+
+  @unit
+  Scenario: The organization presence step records every organization a page at a time
+    Given three organizations with stored presence settings, served two to a page
+    When the organization presence upgrade step runs
+    Then each organization's stored setting is recorded once
+    And the step saves its checkpoint after each page, naming the page's last organization
+
+  @unit
+  Scenario: The organization presence step resumes after the last page it saved
+    Given the organization presence upgrade step's checkpoint names the second organization
+    When the step runs again
+    Then only the organizations after the second are recorded
+
+  @unit
+  Scenario: A dry run of the organization presence step records nothing and saves no checkpoint
+    Given three organizations with stored presence settings
+    When the organization presence upgrade step runs as a dry run
+    Then no setting is recorded and no checkpoint is saved
+    And the report counts the organizations it would visit
+
+  @integration
+  Scenario: The organization presence step is a background step that waits for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then organization:record-presence-settings is a background data step
+    And it runs only once no older image serves

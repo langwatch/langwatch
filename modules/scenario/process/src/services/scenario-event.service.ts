@@ -25,6 +25,8 @@ import {
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import type { ScenarioCreationCapService } from "./scenario-creation-cap.service.ts";
+
 const logger = createLogger("langwatch:scenario-events");
 
 export class ScenarioEventService {
@@ -35,6 +37,7 @@ export class ScenarioEventService {
     traces: TraceApi;
     entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
     projects: Pick<ProjectApi, "getOrganizationId">;
+    creationCaps: Pick<ScenarioCreationCapService, "assertRunStartAllowed">;
   }): ScenarioEventService {
     return new ScenarioEventService(input);
   }
@@ -45,6 +48,7 @@ export class ScenarioEventService {
   #traces: TraceApi;
   #entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
   #projects: Pick<ProjectApi, "getOrganizationId">;
+  #creationCaps: Pick<ScenarioCreationCapService, "assertRunStartAllowed">;
 
   private constructor(input: {
     simulations: SimulationService;
@@ -53,6 +57,7 @@ export class ScenarioEventService {
     traces: TraceApi;
     entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
     projects: Pick<ProjectApi, "getOrganizationId">;
+    creationCaps: Pick<ScenarioCreationCapService, "assertRunStartAllowed">;
   }) {
     this.#simulations = input.simulations;
     this.#scenarioTabs = input.scenarioTabs;
@@ -60,6 +65,7 @@ export class ScenarioEventService {
     this.#traces = input.traces;
     this.#entitlement = input.entitlement;
     this.#projects = input.projects;
+    this.#creationCaps = input.creationCaps;
   }
 
   async report(input: Pick<ScenarioEventReportInput, "projectId" | "event">): Promise<{
@@ -77,6 +83,13 @@ export class ScenarioEventService {
       },
       "Received scenario event",
     );
+
+    // A run that starts a new simulation past the plan's cap is refused
+    // before anything is stored.
+    await this.#creationCaps.assertRunStartAllowed({
+      projectId: input.projectId,
+      event: input.event,
+    });
 
     const extracted = await this.#traces.extractInlineMediaFromEvent({
       event: input.event,

@@ -8,9 +8,9 @@ import {
   type StripePriceMap,
   type StripePricesFile,
 } from "@langwatch/enterprise-billing-contract";
-import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
+import type { StripeMeter } from "../../channels/stripe-meters.channel.ts";
 import {
   backfillCatalogDefaults,
   createEmptyCatalog,
@@ -18,7 +18,6 @@ import {
   mergeWithExisting,
   normalizeMeterEventName,
   resolveRequiredMeterMappings,
-  transformPrice,
   validateMappings,
 } from "../stripe-prices-sync.task.ts";
 
@@ -104,65 +103,11 @@ const createStripePricesFile = (overrides?: Partial<StripePricesFile>): StripePr
   };
 };
 
-const createFakeMeter = (overrides?: Partial<Stripe.Billing.Meter>): Stripe.Billing.Meter => {
-  return {
-    id: "mtr_test_abc123",
-    object: "billing.meter",
-    created: 1700000000,
-    display_name: "Billable Events",
-    event_name: "langwatch_billable_events",
-    event_time_window: null,
-    livemode: false,
-    status: "active",
-    status_transitions: { deactivated_at: null },
-    updated: 1700000000,
-    customer_mapping: { event_payload_key: "stripe_customer_id", type: "by_id" },
-    default_aggregation: { formula: "sum" },
-    value_settings: { event_payload_key: "value" },
-    ...overrides,
-  } as Stripe.Billing.Meter;
-};
-
-/** A whole Stripe price, as the API returns one; the test names what it reads. */
-const stripePrice = (fields: Partial<Stripe.Price> & Pick<Stripe.Price, "id">): Stripe.Price => ({
-  object: "price",
-  active: true,
-  billing_scheme: "per_unit",
-  created: 0,
-  currency: "usd",
-  custom_unit_amount: null,
-  livemode: false,
-  lookup_key: null,
-  metadata: {},
-  nickname: null,
-  product: "prod_default",
-  recurring: null,
-  tax_behavior: null,
-  tiers_mode: null,
-  transform_quantity: null,
-  type: "one_time",
-  unit_amount: null,
-  unit_amount_decimal: null,
-  ...fields,
-});
-
-const stripeProduct = (id: string): Stripe.Product => ({
-  id,
-  object: "product",
-  active: true,
-  created: 0,
-  description: null,
-  images: [],
-  livemode: false,
-  marketing_features: [],
-  metadata: {},
-  name: id,
-  package_dimensions: null,
-  shippable: null,
-  tax_code: null,
-  type: "service",
-  updated: 0,
-  url: null,
+const createFakeMeter = (overrides?: Partial<StripeMeter>): StripeMeter => ({
+  id: "mtr_test_abc123",
+  eventName: "langwatch_billable_events",
+  status: "active",
+  ...overrides,
 });
 
 describe("syncStripePrices", () => {
@@ -181,65 +126,6 @@ describe("syncStripePrices", () => {
       expect(() => detectEnvironment("pk_live_123")).toThrow(
         "STRIPE_SECRET_KEY must start with sk_test_, sk_live_, rk_test_, or rk_live_",
       );
-    });
-  });
-
-  describe("transformPrice()", () => {
-    it("maps recurring Stripe prices to persisted details", () => {
-      const input = stripePrice({
-        id: "price_123",
-        livemode: false,
-        product: stripeProduct("prod_123"),
-        unit_amount: 9900,
-        type: "recurring",
-        recurring: {
-          aggregate_usage: null,
-          interval: "month",
-          interval_count: 1,
-          meter: null,
-          trial_period_days: null,
-          usage_type: "licensed",
-        },
-        nickname: "Pro Monthly",
-        lookup_key: "PRO",
-        metadata: { langwatch_key: "PRO" },
-      });
-
-      const result = transformPrice(input);
-
-      expect(result).toEqual({
-        id: "price_123",
-        active: true,
-        livemode: false,
-        product: "prod_123",
-        unitAmount: 9900,
-        currency: "usd",
-        type: "recurring",
-        recurring: { interval: "month", intervalCount: 1 },
-        nickname: "Pro Monthly",
-        lookupKey: "PRO",
-        metadata: { langwatch_key: "PRO" },
-      });
-    });
-
-    it("maps one-time prices with null recurring", () => {
-      const input = stripePrice({
-        id: "price_456",
-        livemode: true,
-        product: "prod_456",
-        unit_amount: 500,
-        type: "one_time",
-        recurring: null,
-        nickname: null,
-        lookup_key: null,
-        metadata: {},
-      });
-
-      const result = transformPrice(input);
-
-      expect(result.recurring).toBeNull();
-      expect(result.product).toBe("prod_456");
-      expect(result.type).toBe("one_time");
     });
   });
 
@@ -311,7 +197,7 @@ describe("syncStripePrices", () => {
     it("matches meters by normalized event_name with langwatch_ prefix", () => {
       const meter = createFakeMeter({
         id: "mtr_test_matched",
-        event_name: "langwatch_billable_events",
+        eventName: "langwatch_billable_events",
         status: "active",
       });
       const result = resolveRequiredMeterMappings({ environment: "test", fetchedMeters: [meter] });
@@ -324,7 +210,7 @@ describe("syncStripePrices", () => {
     it("matches meters by event_name without prefix", () => {
       const meter = createFakeMeter({
         id: "mtr_test_no_prefix",
-        event_name: "billable_events",
+        eventName: "billable_events",
         status: "active",
       });
       const result = resolveRequiredMeterMappings({ environment: "test", fetchedMeters: [meter] });
@@ -347,12 +233,12 @@ describe("syncStripePrices", () => {
     it("prefers active meters over inactive", () => {
       const inactive = createFakeMeter({
         id: "mtr_test_inactive",
-        event_name: "langwatch_billable_events",
+        eventName: "langwatch_billable_events",
         status: "inactive",
       });
       const active = createFakeMeter({
         id: "mtr_test_active",
-        event_name: "langwatch_billable_events",
+        eventName: "langwatch_billable_events",
         status: "active",
       });
       const result = resolveRequiredMeterMappings({
@@ -367,7 +253,7 @@ describe("syncStripePrices", () => {
     it("warns when matched meter is inactive", () => {
       const inactive = createFakeMeter({
         id: "mtr_test_inactive",
-        event_name: "langwatch_billable_events",
+        eventName: "langwatch_billable_events",
         status: "inactive",
       });
       const result = resolveRequiredMeterMappings({

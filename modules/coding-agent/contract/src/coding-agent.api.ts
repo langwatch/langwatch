@@ -1,20 +1,17 @@
 import { moduleApi } from "@langwatch/module";
-import type { SpanDetail } from "@langwatch/trace-contract";
+import type { TraceSessionGroupsInput, TracesSessionsPage } from "@langwatch/trace-contract";
 
-import type { LogContentKey } from "./coding-agent-log-content.ts";
 import type { ContributeSpanFactsCommandData } from "./coding-agent-processing.events.ts";
-import type { CodingAgentReceivedSpan } from "./coding-agent-span-admission.ts";
 import type {
   CodingAgentTracePullRequestInput,
   CodingAgentTracePullRequestLink,
 } from "./coding-agent-trace-pull-request.ts";
-import type { CodingAgentTranscript, TranscriptLogRecord } from "./coding-agent-transcript.ts";
+import type { CodingAgentTranscript } from "./coding-agent-transcript.ts";
 import type {
   CodingAgentSessionLookupInput,
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPullRequestDetail,
-  CodingAgentPullRequestMappingBackfillInput,
   CodingAgentPullRequestUsage,
   CodingAgentRecentSessionsInput,
   CodingAgentSession,
@@ -35,13 +32,6 @@ export type CodingAgentCallerScope =
 
 /** Who a viewer-scoped read is answered for. */
 export type CodingAgentViewer = { readonly id: string };
-
-/** The input `shouldFilterSpan` decides from: no store read, no session lookup. */
-export type CodingAgentSpanFilterInput = {
-  scopeName: string | null | undefined;
-  spanName: string;
-  attributeKeys: readonly string[];
-};
 
 /**
  * One read of a pull request's usage rollup, as it is written down. Never the
@@ -69,13 +59,6 @@ export interface CodingAgentUsageCount {
 }
 
 export interface CodingAgentApi {
-  logContentKeys(eventName: string): readonly LogContentKey[];
-  contentAttrKeys(eventName: string): readonly string[];
-  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean;
-  buildTranscript(input: {
-    spans: SpanDetail[];
-    logs: TranscriptLogRecord[];
-  }): CodingAgentTranscript;
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
   findSessionForTrace(input: {
     projectId: string;
@@ -100,7 +83,6 @@ export interface CodingAgentApi {
   ): Promise<CodingAgentSessionEventsPage>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
-  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
   /**
    * The Sessions screen's rows, cut to what this viewer may see: the generated
    * title follows the project's content visibility, the cost follows
@@ -112,8 +94,10 @@ export interface CodingAgentApi {
   ): Promise<CodingAgentSessionListRow[]>;
   /** Queues one span's bounded session facts onto coding_agent_processing (ADR-056/069). */
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
-  /** Derives a received span's session facts and contributes them, as main's dispatch did. */
-  contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void>;
+  /** The Sessions lens (main's `traces.sessions`): trace's page for the viewer, enriched here. */
+  readSessionGroupsForViewer(
+    input: TraceSessionGroupsInput & { viewerUserId: string },
+  ): Promise<TracesSessionsPage>;
   /** Records who read an answer that names people. */
   recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;
   githubWebBase(): string;

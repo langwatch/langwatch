@@ -99,26 +99,6 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
 
   describe("when the trace behind it is read", () => {
     /** @scenario "A rewritten evaluation is not hidden by the read's own column aliases" */
-    it("returns the latest version of the evaluation", async () => {
-      const repository = EvaluationRunClickHouseReadRepository.create({
-        resolveClient: async () => client as never,
-      });
-
-      const result = await repository.findTraceEvaluations({
-        tenantId: TENANT,
-        traceIds: [TRACE_ID],
-      });
-
-      expect(result[TRACE_ID]).toHaveLength(1);
-      expect(result[TRACE_ID]?.[0]).toMatchObject({
-        evaluationId: "eval_dedup_1",
-        status: "processed",
-        passed: true,
-      });
-      expect(result[TRACE_ID]?.[0]?.timestamps.completedAt).toBeTypeOf("number");
-    });
-
-    /** @scenario "A rewritten evaluation is not hidden by the read's own column aliases" */
     it("returns it through the by-trace read as well", async () => {
       const repository = EvaluationRunClickHouseReadRepository.create({
         resolveClient: async () => client as never,

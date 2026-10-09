@@ -43,24 +43,24 @@ Measured 2026-10-06 (grep, re-measure per batch):
    every route (`packages/browser/src/ui-module-hosts.tsx:39-51`), and `TraceHostProvider`
    (`trace-host.ts:185-211`) and `ScenarioHostProvider` (`scenario-host.ts:120-146`) each
    re-publish a `UiScopeHostProvider` without `hasOrganizationPermission` or `isDemoProject`. The
-   browser-host hook therefore answers organization permissions from project grants and reads
-   the demo project as false, contradicting `specs/ui/shared-scope-host.feature` ("Organization
-   permissions are independent of project permissions"). Main answered `hasOrgPermission =
-hasPermission` (origin/main line 537), so this is a branch spec against main's behaviour; the
-   first test of batch 3 must prove the shadowing before anything changes.
+   browser-host hook therefore answers organization permissions from the module host's
+   `hasPermission` and reads the demo project as false. Main answered `hasOrgPermission =
+hasPermission` (origin/main line 537), and Q2 rules main's behaviour back in, so since Q2 the
+   shadowing changes no permission answer; the demo flag is the defect left. The first test of
+   batch 3 must prove the shadowing before anything changes.
 
 ## Batches (one lane each; each binds its scenarios in the same change)
 
-| #   | What lands                                                                                                                                                                                                                | Paths (owned by that lane)                                                                                                                                                            | Binds                                                           |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 1   | `UiSession.hasOrganizationPermission` (section 3.5 names it); auth implements it over `permissions.canInOrganization`; test doubles follow; organization's host mount reads the session, not the scope host               | `packages/browser-host/src/capabilities.ts`, `testing.ts`; `modules/auth/browser/src/behavior/ui-session.ts`; `modules/organization/browser/src/behavior/organization-host-mount.tsx` | the two session scenarios                                       |
-| 2   | The explicit no-session answer on public routes (decision Q1); auth's grant reads disabled there                                                                                                                          | `modules/auth/browser/src/behavior/*`; `apps/ui/src/main.tsx` if Q1 needs the route passed (shared: coordinator applies); trace and scenario host mounts only if Q1 says so           | the six public-page scenarios                                   |
-| 3   | Trace and scenario stop re-publishing `UiScopeHostProvider`; the shell's is the only one (section 10.1, "the only mount pattern")                                                                                         | `modules/trace/browser/src/behavior/trace-host.ts`, `modules/scenario/browser/src/model/scenario-host.ts`, their tests                                                                | the two "under every module host" scenarios                     |
-| 4a  | trace call sites: permission reads go to `useTraceHost().hasPermission`; the module shim drops `hasPermission`                                                                                                            | `modules/trace/browser/src/**` (about 20 production, 32 test files)                                                                                                                   | "A migrated screen answers ... the same as before" (first bind) |
-| 4b  | gateway (10), organization (7 plus 12 organization-permission readers)                                                                                                                                                    | `modules/gateway/browser/src/**`, `modules/organization/browser/src/**`                                                                                                               | same scenario, one test per module                              |
-| 4c  | experiment, prompt, project, scenario (and `use-can.ts` onto the scenario host)                                                                                                                                           | those modules' `browser/src/**`                                                                                                                                                       | Agent Testing scenario                                          |
-| 4d  | langy, user, model-provider, workflow, automation, governance testing, dataset tests                                                                                                                                      | those modules' `browser/src/**`                                                                                                                                                       | same scenario                                                   |
-| 5   | Delete `hasPermission`, `hasOrganizationPermission`, `hasOrgPermission` from `UiScopeHost`, `UiScopeHostReadings`, `UiScopeReading`; `createBrowserUiScope` stops taking the session; record 10.1 says the knot is untied | `packages/browser-host/src/use-organization-team-project.ts`; `modules/organization/browser/src/behavior/ui-scope-capability.ts`; `apps/ui/src/main.tsx` and the record (shared)      | the two scope scenarios                                         |
+| #   | What lands                                                                                                                                                                                                                | Paths (owned by that lane)                                                                                                                                                            | Binds                                                            |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | `UiSession.hasOrganizationPermission` (section 3.5 names it); auth implements it over `permissions.canInOrganization`; test doubles follow; organization's host mount reads the session, not the scope host               | `packages/browser-host/src/capabilities.ts`, `testing.ts`; `modules/auth/browser/src/behavior/ui-session.ts`; `modules/organization/browser/src/behavior/organization-host-mount.tsx` | the two session scenarios                                        |
+| 2   | The explicit no-session answer on public routes (decision Q1); auth's grant reads disabled there                                                                                                                          | `modules/auth/browser/src/behavior/*`; `apps/ui/src/main.tsx` if Q1 needs the route passed (shared: coordinator applies); trace and scenario host mounts only if Q1 says so           | the six public-page scenarios                                    |
+| 3   | Trace and scenario stop re-publishing `UiScopeHostProvider`; the shell's is the only one (section 10.1, "the only mount pattern"). After Q2 this fixes the demo flag; the organization answer is already the same         | `modules/trace/browser/src/behavior/trace-host.ts`, `modules/scenario/browser/src/model/scenario-host.ts`, their tests                                                                | the two "under every module host" scenarios; the batch 2 outline |
+| 4a  | trace call sites: permission reads go to `useTraceHost().hasPermission`; the module shim drops `hasPermission`                                                                                                            | `modules/trace/browser/src/**` (about 20 production, 32 test files)                                                                                                                   | "A migrated screen answers ... the same as before" (first bind)  |
+| 4b  | gateway (10), organization (7 plus 12 organization-permission readers)                                                                                                                                                    | `modules/gateway/browser/src/**`, `modules/organization/browser/src/**`                                                                                                               | same scenario, one test per module                               |
+| 4c  | experiment, prompt, project, scenario (and `use-can.ts` onto the scenario host)                                                                                                                                           | those modules' `browser/src/**`                                                                                                                                                       | Agent Testing scenario                                           |
+| 4d  | langy, user, model-provider, workflow, automation, governance testing, dataset tests                                                                                                                                      | those modules' `browser/src/**`                                                                                                                                                       | same scenario                                                    |
+| 5   | Delete `hasPermission`, `hasOrganizationPermission`, `hasOrgPermission` from `UiScopeHost`, `UiScopeHostReadings`, `UiScopeReading`; `createBrowserUiScope` stops taking the session; record 10.1 says the knot is untied | `packages/browser-host/src/use-organization-team-project.ts`; `modules/organization/browser/src/behavior/ui-scope-capability.ts`; `apps/ui/src/main.tsx` and the record (shared)      | the two scope scenarios                                          |
 
 Order: 1 before 4b (organization needs the session method); 2 and 3 are independent of each other
 and of 4; every 4x before 5. Batch 4 lanes run in parallel: their paths do not overlap. A screen's
@@ -85,10 +85,13 @@ does not rise); `pnpm lint:architecture --policies peer-cycles` (must not rise).
   explicit, but a new declaration slot. (c) trace's and scenario's host mounts publish a
   no-session host on public routes; local, but two copies and every future module repeats it.
   Needed to choose: whether "explicit" means a named object (a) or a declaration (b).
-- **Q2. Organization permissions independent of project grants.** The branch spec says
-  independent; main said the same as project. Batch 3 makes the branch spec true everywhere; a
-  reader whose organization grant is narrower than a project grant sees team and plan controls
-  disappear under trace and scenario pages. Confirm that is the ruling.
+- **Q2. Organization permissions independent of project grants.** Ruled (Alex, 2026-10-06
+  afternoon): organization permissions follow the project grant, as main did; the branch spec
+  is reworded to main. The session sends one grant read (the project's, or the organization's
+  where no project is chosen) and `hasOrganizationPermission` answers from it, as main's
+  `hasOrgPermission = hasPermission`; the second, organization-only read is gone.
+  As put: the branch spec said independent; main said the same as project; batch 3 would have
+  made the branch spec true everywhere.
 - **Q3. A guard against re-adding.** After batch 5 the type refuses a permission on the scope
   host; a lint rule is only needed if a module republishes one by hand. Proposed, not planned.
 
@@ -102,12 +105,58 @@ does not rise); `pnpm lint:architecture --policies peer-cycles` (must not rise).
   changes the trace, the unknown or revoked link. They bind in a composition test under
   `apps/ui/src/__tests__/` or in trace's share page tests.
 
+- Q2 landed: the session's organization answer follows the one grant read (as main); the two
+  session scenarios are reworded and rebound, plus a third for the positive case;
+  `specs/ui/shared-scope-host.feature`'s "independent" scenario is reworded to main and rebound.
+- Batch 3, adjusted: the "under every module host" organization scenario and the batch 2 outline
+  bind where trace's and scenario's providers can be mounted: their own host tests (mount
+  `TraceHostProvider` / `ScenarioHostProvider` over a host answering `session.x()`, read
+  `useOrganizationTeamProject`), or an `apps/ui/src/__tests__` composition over the declarations'
+  host mounts (needs each module's api binding and a `getScopeGraph` answer). The demo scenario
+  needs the provider change itself.
+
+- Batch 3 landed: `TraceHostProvider` and `ScenarioHostProvider` publish their host only; the
+  shell's scope host is the one scope reading. Bound in each module's host test: the organization
+  answer and the demo flag under the module host. The batch 2 outline stays `@unimplemented`: it
+  needs the real public-route session under each host mount, so it binds in an `apps/ui` test.
+
+- Batch 4a landed: trace's 19 production permission readers ask `useTraceHost().hasPermission`
+  (including `redacted-field.tsx`, which read the browser-host hook); trace's scope shim no longer
+  offers `hasPermission`; 37 tests mock `useTraceHost` instead. Bound: "A migrated screen answers
+  ... the same as before" (trace-host-permission-reads test). Batches 4b-4d not started.
+- Batch 4c landed: experiment's three readers ask `useWorkflowHost().hasPermission` (experiment requires
+  `WorkflowHostApi`); prompt's editor drawer reads `usePromptProject().hasPermission`; project already
+  read its hosts; scenario's `useCan` asks `useScenarioHost().hasPermission` and sends no
+  `authz.effectivePermissions` read. Bound: "Agent Testing asks the session ..." (use-can test).
+- Batch 4b landed: gateway's 9 and organization's 7 production permission readers ask their
+  own host (`useGatewayHost()` / `useOrganizationHost()`); `team-form.tsx`'s `hasOrgPermission`
+  reads `host.hasOrganizationPermission`. Both module shims dropped their permission fields. Bound
+  by one test per module (`*-host-permission-reads.integration.test.tsx`).
+- Batch 4d tail (SK-LANGY-ORG, Alex 2026-10-09): `LangyHostApi.hasOrganizationPermission` answers
+  from the session as organization's host does; the make-default ask and the plan limit card read
+  it; langy's scope shim dropped `hasOrgPermission`. Bound in `langy-host-mount` test. No production
+  reader of the scope host's permissions remains (`git grep`, 2026-10-09).
+- Batch 5 not started: the scope host's `isLoading` answers `permissions.isLoading` from the
+  session (`ui-scope-capability.ts` `legacyScopeHost`); dropping the session from
+  `createBrowserUiScope` needs a ruling on what it answers instead (see the sk-batch5 handoff).
+- The batch 2 outline's `apps/ui` test is blocked on a decision: apps/ui reaches a module only
+  through `./declaration`, so it cannot import `useTraceHost`/`useScenarioHost` to ask the host;
+  see the sk-batch4 handoff for options.
+
 ## Wire and data
 
-No route, procedure, input, output or stored byte changes. The one behaviour change against the
-branch is defect 1 (back to main); against main, Q2.
+No route, procedure, input or output changes. Behaviour changes against the branch: defect 1
+and Q2, both back to main; Q2 also drops the branch's second `authz.effectivePermissions` read
+(organization-only) per project page, as main sent one.
 
 ## Done when
 
 Every scenario in the spec is bound and none `@unimplemented`; the scope port is built without the
 session; `UiScopeHost` names no permission; record 10.1's knot paragraph records it untied.
+
+- Batch 5 (SK-SCOPE-LOADING, Alex 2026-10-09): `UiScopeHost`, `UiScopeHostReadings` and
+  `UiScopeReading` carry no permission; `createBrowserUiScope({ reading })`; the scope's `isLoading`
+  is the scope's alone. The gates that waited on grants (langy's and trace's `useLangyVisibility`,
+  scenario's `useAgentTestingGate`, workflow's `isResolved`) wait on their host's `isLoading()`,
+  which now answers `!session.isSettled()`. The organization-permission-under-every-host scenario
+  lost its subject: see the sk-batch5b handoff.

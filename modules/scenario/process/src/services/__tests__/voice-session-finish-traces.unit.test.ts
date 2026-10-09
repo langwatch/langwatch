@@ -11,9 +11,9 @@ import type { RecordSpanCommandData, TraceApi } from "@langwatch/trace-contract"
 import { describe, expect, it } from "vitest";
 
 import { MemoryVoiceRecordingChannel } from "../../channels/memory/memory.voice-recording.channel.ts";
+import { VoiceSessionService } from "../../features/voice/services/voice-session.service.ts";
 import { signVoiceSessionToken } from "../../rules/voice-session-token.rules.ts";
 import type { ScenarioService } from "../scenario.service.ts";
-import { VoiceSessionService } from "../voice-session.service.ts";
 
 const SECRET = "voice-test-secret";
 

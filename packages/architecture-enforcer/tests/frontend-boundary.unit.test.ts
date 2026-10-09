@@ -233,7 +233,7 @@ describe("browser-only UI never reaches backend code", () => {
   // statement whatsoever, so without this rule it is a dead end in the walk
   // rather than the React leaf it actually is.
   describe("given a component whose only React edge is the JSX runtime", () => {
-    const icon = join(REPO_ROOT, "modules/auth/browser/src/ui/elements/github-icon.tsx");
+    const icon = join(REPO_ROOT, "modules/auth/browser/src/ui/elements/google-icon.tsx");
 
     it("reports a chain, even with no import statement in the file", () => {
       expect(existsSync(icon)).toBe(true);

@@ -86,6 +86,7 @@ const organizationManagementRestAccessBindingSchema = z.object({
   scopeId: z.string(),
   scopeName: z.string().nullable(),
   permissions: z.array(z.string()),
+  cappedBySeat: z.boolean(),
 });
 
 export const organizationManagementRestAccessBreakdownSchema = z.object({

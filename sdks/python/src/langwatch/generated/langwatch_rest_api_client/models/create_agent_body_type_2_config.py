@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ..models.create_agent_body_type_2_config_parameters_item import CreateAgentBodyType2ConfigParametersItem
     from ..models.create_agent_body_type_2_config_scenario_mappings import CreateAgentBodyType2ConfigScenarioMappings
     from ..models.create_agent_body_type_2_config_versions import CreateAgentBodyType2ConfigVersions
+    from ..models.create_agent_body_type_2_config_workflow_fields import CreateAgentBodyType2ConfigWorkflowFields
 
 
 T = TypeVar("T", bound="CreateAgentBodyType2Config")
@@ -36,6 +37,7 @@ class CreateAgentBodyType2Config:
         published_id (str | Unset):
         version_id (str | Unset):
         versions (CreateAgentBodyType2ConfigVersions | Unset):
+        workflow_fields (CreateAgentBodyType2ConfigWorkflowFields | Unset):
         scenario_mappings (CreateAgentBodyType2ConfigScenarioMappings | Unset):
         scenario_output_field (str | Unset):
     """
@@ -53,6 +55,7 @@ class CreateAgentBodyType2Config:
     published_id: str | Unset = UNSET
     version_id: str | Unset = UNSET
     versions: CreateAgentBodyType2ConfigVersions | Unset = UNSET
+    workflow_fields: CreateAgentBodyType2ConfigWorkflowFields | Unset = UNSET
     scenario_mappings: CreateAgentBodyType2ConfigScenarioMappings | Unset = UNSET
     scenario_output_field: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -101,6 +104,10 @@ class CreateAgentBodyType2Config:
         if not isinstance(self.versions, Unset):
             versions = self.versions.to_dict()
 
+        workflow_fields: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.workflow_fields, Unset):
+            workflow_fields = self.workflow_fields.to_dict()
+
         scenario_mappings: dict[str, Any] | Unset = UNSET
         if not isinstance(self.scenario_mappings, Unset):
             scenario_mappings = self.scenario_mappings.to_dict()
@@ -136,6 +143,8 @@ class CreateAgentBodyType2Config:
             field_dict["version_id"] = version_id
         if versions is not UNSET:
             field_dict["versions"] = versions
+        if workflow_fields is not UNSET:
+            field_dict["workflowFields"] = workflow_fields
         if scenario_mappings is not UNSET:
             field_dict["scenarioMappings"] = scenario_mappings
         if scenario_output_field is not UNSET:
@@ -152,6 +161,7 @@ class CreateAgentBodyType2Config:
             CreateAgentBodyType2ConfigScenarioMappings,
         )
         from ..models.create_agent_body_type_2_config_versions import CreateAgentBodyType2ConfigVersions
+        from ..models.create_agent_body_type_2_config_workflow_fields import CreateAgentBodyType2ConfigWorkflowFields
 
         d = dict(src_dict)
         field_library_ref = d.pop("_library_ref", UNSET)
@@ -208,6 +218,13 @@ class CreateAgentBodyType2Config:
         else:
             versions = CreateAgentBodyType2ConfigVersions.from_dict(_versions)
 
+        _workflow_fields = d.pop("workflowFields", UNSET)
+        workflow_fields: CreateAgentBodyType2ConfigWorkflowFields | Unset
+        if isinstance(_workflow_fields, Unset):
+            workflow_fields = UNSET
+        else:
+            workflow_fields = CreateAgentBodyType2ConfigWorkflowFields.from_dict(_workflow_fields)
+
         _scenario_mappings = d.pop("scenarioMappings", UNSET)
         scenario_mappings: CreateAgentBodyType2ConfigScenarioMappings | Unset
         if isinstance(_scenario_mappings, Unset):
@@ -231,6 +248,7 @@ class CreateAgentBodyType2Config:
             published_id=published_id,
             version_id=version_id,
             versions=versions,
+            workflow_fields=workflow_fields,
             scenario_mappings=scenario_mappings,
             scenario_output_field=scenario_output_field,
         )

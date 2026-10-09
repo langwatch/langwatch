@@ -52,7 +52,7 @@ Feature: A browser cannot boot without what its web modules declared
       When a module carrying its own web settings is installed
       Then the composition is asked for a reader of the injected configuration
 
-    @unit @unimplemented
+    @unit
     Scenario: A module declaring no drawers contributes none
       Given an installed web module that declares screens and no drawers
       When the drawer registry is composed
@@ -128,7 +128,7 @@ Feature: A browser cannot boot without what its web modules declared
       Then the build fails, naming both modules and the drawer
       And the two declarations are not silently combined
 
-    @integration @unimplemented
+    @integration
     Scenario: Every declared drawer opens from its own address
       Given the composed drawer registry
       When each drawer name is put in the address bar
@@ -175,13 +175,13 @@ Feature: A browser cannot boot without what its web modules declared
 
   Rule: every installed module's configuration slice has a source, and the compiler says so
 
-    @unit @unimplemented
+    @unit
     Scenario: A module whose settings have no projection fails the build
       Given a module declaring web settings
       When it declares no projection from the injected configuration
       Then the build fails, naming the module
 
-    @unit @unimplemented
+    @unit
     Scenario: A projection naming a field the injected configuration does not carry fails the build
       Given a module projecting a field the public configuration does not declare
       Then the build fails, naming the module and the field
@@ -208,7 +208,7 @@ Feature: A browser cannot boot without what its web modules declared
       When the browser boots
       Then every slice is parsed before the first render
 
-    @unit @unimplemented
+    @unit
     Scenario: A key no module claims is still refused
       Given an injected configuration carrying a key the schema does not declare
       When it is read

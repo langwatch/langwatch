@@ -80,6 +80,7 @@ function seededMembership(): MemoryOrganizationMembershipRepository {
     organizationId: "org-1",
     archivedAt: null,
     createdAt: T0,
+    updatedAt: T0,
     personalFeatures: null,
   });
   return MemoryOrganizationMembershipRepository.create({ memory });

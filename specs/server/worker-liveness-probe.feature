@@ -123,6 +123,15 @@ Feature: Worker liveness probe endpoint
       Then the response status is 503
       # A stalled loop fails the scrape, never the probe.
 
+    @unit
+    Scenario: A slow answer from a turning main loop is not cut off
+      Given the liveness thread is serving the process port
+      And the main loop's heartbeat keeps moving
+      When a caller makes a request the main thread answers after the proxy timeout
+      Then the reply is served with the main thread's status
+      # The api serves through this thread too: a long poll or a slow export
+      # is work in progress, not a stall.
+
   Rule: Liveness boots before any stage that can block for minutes
 
     # The voice public URL tunnel (cloudflared quick tunnel) can take up to

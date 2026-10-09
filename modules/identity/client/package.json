@@ -1,0 +1,28 @@
+{
+  "name": "@langwatch/identity-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The typed tRPC hooks generated from Identity's own contract.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

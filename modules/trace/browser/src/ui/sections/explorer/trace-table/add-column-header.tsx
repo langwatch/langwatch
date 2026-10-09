@@ -4,8 +4,8 @@ import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import type React from "react";
 
+import type { TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
 import { ColumnPickerContent } from "../toolbar/column-picker-content.tsx";
-import type { TraceListItem } from "../types/trace.ts";
 
 /** Id of the trailing "+" column. Kept out of the lens column list — it's a
  *  synthetic UI affordance, like the leading row-select column. */

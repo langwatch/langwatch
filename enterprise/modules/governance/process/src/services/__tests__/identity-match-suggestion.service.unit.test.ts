@@ -6,11 +6,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import {
   IdentityMatchSuggestionService,
   MAX_SUGGESTIONS_PER_PERSON,
-} from "../identity-match-suggestion.service.ts";
+} from "../../features/identity/services/identity-match-suggestion.service.ts";
+import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 
 const ORG = "org_acme";
 const COMPUTED_AT = Temporal.Instant.from("2026-09-03T05:41:00Z");

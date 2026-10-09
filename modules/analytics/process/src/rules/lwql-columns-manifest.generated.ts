@@ -357,6 +357,8 @@ export interface LwqlClickHouseRows {
     readonly LastEventOccurredAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
     readonly _size_bytes: "UInt32";
+    readonly ExpectedTargetResults: "Nullable(UInt32)";
+    readonly ExpectedEvaluatorResults: "Nullable(UInt32)";
   };
   readonly gateway_budget_ledger_events: {
     readonly TenantId: "String";

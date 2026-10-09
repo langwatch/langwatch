@@ -6,6 +6,14 @@ export const WEBHOOK_FEATURE_ID = "webhook" as const;
 export const webhookDestinationKindSchema = z.enum(["http", "sqs"]);
 export type WebhookDestinationKind = z.infer<typeof webhookDestinationKindSchema>;
 
+/**
+ * How an endpoint formats and signs: absent is the batch envelope signed `t=,v1=`; `legacy_sha256`
+ * is one raw message per POST signed `sha256=`, only for endpoints migrated from governance
+ * anomaly destinations (request delivery Q2 and Q3, 2026-10-05).
+ */
+export const webhookSignatureSchemeSchema = z.enum(["legacy_sha256"]);
+export type WebhookSignatureScheme = z.infer<typeof webhookSignatureSchemeSchema>;
+
 export const sqsCredentialModeSchema = z.enum(["assume_role", "static", "ambient"]);
 export type SqsCredentialMode = z.infer<typeof sqsCredentialModeSchema>;
 

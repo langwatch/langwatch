@@ -8,13 +8,13 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { createModelProviderTestManagedProviders } from "../../app/__tests__/model-provider.fixture.ts";
+import { UnavailableModelProviderCredentialProbeService } from "../../features/credential-probe/services/unavailable-model-provider-credential-probe.service.ts";
 import type { ModelProviderRepository } from "../../repositories/model-provider.repository.ts";
 import { ManagedModelProviderGatewayService } from "../managed-model-provider-gateway.service.ts";
 import { ModelProviderKeysService } from "../model-provider-keys.service.ts";
 import { ModelProviderQueryService } from "../model-provider-query.service.ts";
 import type { ModelProviderScopeService } from "../model-provider-scope.service.ts";
 import { RegistryModelProviderCatalogService } from "../registry-model-provider-catalog.service.ts";
-import { UnavailableModelProviderCredentialProbeService } from "../unavailable-model-provider-credential-probe.service.ts";
 
 const MANAGED_ORG = "org-managed";
 

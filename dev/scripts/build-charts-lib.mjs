@@ -1,18 +1,19 @@
 // @ts-nocheck
 
 /**
- * Bundles chartsLib into a plain-JS IIFE (`bridge/chartsLibSource.ts`,
- * mirrors `shimSource.ts`). Reads `window.React`/`window.Recharts`
- * directly — the sandboxed iframe loads both as CDN UMD globals first.
+ * Bundles chartsLib into a plain-JS IIFE (`chart-frame-charts-lib-source.ts`).
+ * Reads `window.React`/`window.Recharts`: the sandboxed frame loads both as UMD globals first.
+ * `--print` writes the fresh bundle to stdout instead (the freshness test compares it).
  */
 
 import { writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { build } from "esbuild";
-
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+// ponytail: borrows apps/worker's esbuild until dev/scripts declares its own.
+const { build } = createRequire(path.join(ROOT, "apps/worker/package.json"))("esbuild");
 const ENTRY = path.join(
   ROOT,
   "modules/analytics/browser/src/model/dashboard-widget/chartsLib/index.ts",
@@ -32,9 +33,13 @@ async function main() {
   });
 
   const script = result.outputFiles[0].text;
+  if (process.argv.includes("--print")) {
+    process.stdout.write(script);
+    return;
+  }
 
   const source = `/**
- * GENERATED — do not hand-edit. Produced by \`node dev/scripts/build-charts-lib.mjs\`
+ * GENERATED, do not hand-edit. Produced by \`node dev/scripts/build-charts-lib.mjs\`
  * from \`modules/analytics/browser/src/model/dashboard-widget/chartsLib/index.ts\`,
  * bundled by esbuild in IIFE format. Reads \`window.React\`/\`window.Recharts\`.
  */

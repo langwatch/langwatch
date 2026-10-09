@@ -7,6 +7,7 @@ import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
+import { servedConfig } from "../../__tests__/ui-feature-config.fixtures";
 import { browserModules } from "../../browser-modules.generated.ts";
 import type { UiRouteDescriptor } from "../ui-route-table";
 
@@ -17,15 +18,6 @@ vi.mock("../../../../../modules/annotation/browser/src/ui/sections/annotations-s
     <div data-testid="annotation-view">{view}</div>
   ),
 }));
-
-/** The page's config as the api serves it: the process owner's slice is all a module reads. */
-const injectedConfig = {
-  process: {
-    mode: "test",
-    deployment: "self-hosted",
-    nlp: true,
-  },
-} as const;
 
 /** The one anchor a project-scoped declaration mounts below. */
 const anchorTable: readonly UiRouteDescriptor[] = [
@@ -40,7 +32,7 @@ async function installModules() {
   return createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport({ query: () => Promise.resolve(null) })
-    .withInjectedConfig(() => injectedConfig)
+    .withInjectedConfig(() => servedConfig)
     .render();
 }
 
@@ -153,7 +145,20 @@ describe("given the installed web modules", () => {
     it("hands each module the owner slices its declaration reads", async () => {
       const installed = await installModules();
 
-      expect(installed.config).toEqual({ annotation: { process: { mode: "test" } } });
+      expect(installed.config).toEqual({
+        auth: {
+          authProvider: "auth0",
+          passkeysEnabled: true,
+          emailPasswordEnabled: true,
+          signUpMode: "invite_only",
+        },
+        authz: {},
+        billing: {},
+        evaluator: { hasLangevals: true },
+        gateway: { gatewayBaseUrl: "https://gateway.langwatch.test" },
+        notification: { hasEmailProvider: true },
+        ops: { cloudOps: false, browserTracing: true, sampleRatio: 0.1 },
+      });
     });
   });
 });

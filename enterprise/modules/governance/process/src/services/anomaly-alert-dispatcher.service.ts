@@ -13,12 +13,24 @@ import type { AnomalyAlertHttpClient } from "../channels/anomaly-alert.channel.t
 import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
 import { silentGovernanceDiagnostics } from "./governance-policy.service.ts";
 
+/** Records one deliver intent in governance's outbox; a repeated key is one intent (ADR-167). */
+export interface AnomalyAlertDeliveryOutbox {
+  record(input: {
+    organizationId: string;
+    ruleId: string;
+    alertId: string;
+    endpointId: string;
+    body: Record<string, unknown>;
+  }): Promise<void>;
+}
+
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_BACKOFF_MS = 250;
 
 export class AnomalyAlertDispatcherService {
   private readonly http: AnomalyAlertHttpClient;
+  private readonly outbox: () => AnomalyAlertDeliveryOutbox | undefined;
   private readonly diagnostics: GovernanceDiagnosticsSink;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
@@ -26,18 +38,21 @@ export class AnomalyAlertDispatcherService {
 
   private constructor({
     http,
+    outbox,
     diagnostics,
     timeoutMs,
     maxRetries,
     retryBackoffMs,
   }: {
     http: AnomalyAlertHttpClient;
+    outbox: () => AnomalyAlertDeliveryOutbox | undefined;
     diagnostics: GovernanceDiagnosticsSink;
     timeoutMs: number;
     maxRetries: number;
     retryBackoffMs: number;
   }) {
     this.http = http;
+    this.outbox = outbox;
     this.diagnostics = diagnostics;
     this.timeoutMs = timeoutMs;
     this.maxRetries = maxRetries;
@@ -46,6 +61,8 @@ export class AnomalyAlertDispatcherService {
 
   static create(options: {
     http: AnomalyAlertHttpClient;
+    /** Read at dispatch: the outbox exists once the worker has built governance's pipeline. */
+    outbox?: () => AnomalyAlertDeliveryOutbox | undefined;
     diagnostics?: GovernanceDiagnosticsSink;
     timeoutMs?: number;
     maxRetries?: number;
@@ -53,6 +70,7 @@ export class AnomalyAlertDispatcherService {
   }): AnomalyAlertDispatcherService {
     return new AnomalyAlertDispatcherService({
       http: options.http,
+      outbox: options.outbox ?? (() => undefined),
       diagnostics: options.diagnostics ?? silentGovernanceDiagnostics,
       timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       maxRetries: options.maxRetries ?? DEFAULT_MAX_RETRIES,
@@ -82,15 +100,18 @@ export class AnomalyAlertDispatcherService {
       return { dispatchTag: "log_only", outcomes: [] };
     }
 
-    const body = JSON.stringify(AnomalyAlertDispatcherService.alertPayload(input));
+    const payload = AnomalyAlertDispatcherService.alertPayload(input);
+    const body = JSON.stringify(payload);
     const outcomes: AnomalyAlertDispatchOutcome[] = [];
     for (let index = 0; index < parsed.data.destinations.length; index++) {
       outcomes.push(
         await this.dispatchOne({
           destination: parsed.data.destinations[index]!,
           body,
+          payload,
           destinationIndex: index,
-          ruleId: input.rule.id,
+          rule: input.rule,
+          alertId: input.alert.id,
         }),
       );
     }
@@ -101,19 +122,51 @@ export class AnomalyAlertDispatcherService {
   private async dispatchOne(input: {
     destination: Destination;
     body: string;
+    payload: Record<string, unknown>;
     destinationIndex: number;
-    ruleId: string;
+    rule: AnomalyAlertDispatchInput["rule"];
+    alertId: string;
   }): Promise<AnomalyAlertDispatchOutcome> {
-    if (input.destination.type !== "webhook") {
-      return {
-        destinationIndex: input.destinationIndex,
-        type: "webhook",
-        status: "failed",
-        reason: "Unsupported destination type",
-      };
+    if (input.destination.type === "webhook_endpoint") {
+      return this.recordEndpointDelivery({ ...input, endpointId: input.destination.endpointId });
+    }
+    if (input.destination.endpointId !== undefined) {
+      return this.recordEndpointDelivery({ ...input, endpointId: input.destination.endpointId });
     }
 
-    return this.dispatchWebhook({ ...input, destination: input.destination });
+    return this.dispatchWebhook({
+      destination: input.destination,
+      body: input.body,
+      destinationIndex: input.destinationIndex,
+      ruleId: input.rule.id,
+    });
+  }
+
+  /** Nothing is posted here: the intent's handler asks WebhookApi.requestDelivery after commit. */
+  private async recordEndpointDelivery(input: {
+    endpointId: string;
+    payload: Record<string, unknown>;
+    destinationIndex: number;
+    rule: AnomalyAlertDispatchInput["rule"];
+    alertId: string;
+  }): Promise<AnomalyAlertDispatchOutcome> {
+    const outbox = this.outbox();
+    if (!outbox) {
+      return {
+        destinationIndex: input.destinationIndex,
+        type: "webhook_endpoint",
+        status: "failed",
+        reason: "Webhook endpoint delivery has no outbox in this process",
+      };
+    }
+    await outbox.record({
+      organizationId: input.rule.organizationId,
+      ruleId: input.rule.id,
+      alertId: input.alertId,
+      endpointId: input.endpointId,
+      body: input.payload,
+    });
+    return { destinationIndex: input.destinationIndex, type: "webhook_endpoint", status: "queued" };
   }
 
   private async dispatchWebhook(input: {
@@ -185,7 +238,7 @@ export class AnomalyAlertDispatcherService {
     };
   }
 
-  private static alertPayload(input: AnomalyAlertDispatchInput) {
+  private static alertPayload(input: AnomalyAlertDispatchInput): Record<string, unknown> {
     return {
       ruleId: input.rule.id,
       ruleName: input.rule.name,
@@ -205,6 +258,12 @@ export class AnomalyAlertDispatcherService {
   }
 
   private static summariseOutcomes(outcomes: AnomalyAlertDispatchOutcome[]): string {
+    const queued = outcomes.filter((outcome) => outcome.status === "queued").length;
+    if (queued > 0) {
+      const failedEndpoints = outcomes.filter((outcome) => outcome.status === "failed").length;
+      const delivered = outcomes.length - queued - failedEndpoints;
+      return `queued_webhook_endpoint_${queued}_dispatched_${delivered}_failed_${failedEndpoints}`;
+    }
     const succeeded = outcomes.filter((outcome) => outcome.status === "succeeded").length;
     const failed = outcomes.length - succeeded;
     if (succeeded > 0 && failed === 0) {

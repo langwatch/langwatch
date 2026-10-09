@@ -52,7 +52,13 @@
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/client/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"
@@ -80,6 +86,12 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/client/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

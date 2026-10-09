@@ -6,15 +6,18 @@
 
 import {
   useUiCapabilities,
-  useUiDeclarations,
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
-import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { useLent } from "@langwatch/browser-host/lent";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
-import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
+import { useLent, useLentAll } from "@langwatch/browser-host/lent";
+import { DirectorySummaryToken } from "@langwatch/enterprise-scim-client";
+import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
+import type { ProjectSwitcherProps } from "@langwatch/project-contract";
+import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   OrganizationHostApi,
@@ -47,7 +50,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       isPlanLoading: boolean;
       /** Whether this deployment can send the invitation rather than only mint a link. */
       hasEmailProvider: boolean;
-      isFeatureEnabled: (flag: string) => boolean;
+      flags: UiFlags;
       openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
       closeOverlay: () => void;
       succeeded: (notice: OrganizationSuccessNotice) => void;
@@ -102,8 +105,8 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     return this.deps.hasEmailProvider;
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.deps.isFeatureEnabled(flag);
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
+    return this.deps.flags.flag(flag) === true;
   }
 
   openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
@@ -176,26 +179,15 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
     projectId: activeScope.projectId ?? void 0,
   });
   const facts = useUiOrganizationFacts();
+  const flags = useUiFlags();
   const sessionActor = session.currentUser();
   const reading = route.reading();
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so a card is not remounted.
+  const lentCards = useLentAll(AuthenticationOverviewCardToken);
   const overviewCards = useMemo(
-    () =>
-      declarations
-        .declared("authenticationOverviewCard")
-        .toSorted(
-          (left, right) =>
-            Number(right.capability.section === "sign-in") -
-            Number(left.capability.section === "sign-in"),
-        )
-        .map(({ module, capability }) => ({ key: module, Card: lazy(capability.load) })),
-    [declarations],
+    () => lentCards.map(({ owner, Component }) => ({ key: owner, Card: Component })),
+    [lentCards],
   );
-  const directorySummary = useMemo(() => {
-    const [lent] = declarations.declared("directorySummary");
-    return lent ? lazy(lent.capability.load) : void 0;
-  }, [declarations]);
+  const directorySummary = useLent(DirectorySummaryToken);
   const Switcher = useLent(ProjectSwitcherToken);
 
   const host = useMemo(
@@ -214,7 +206,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         isEnterprise: facts.isEnterprise,
         isPlanLoading: facts.isPlanLoading,
         hasEmailProvider: deployment.hasEmailProvider,
-        isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
+        flags,
         openOverlay: (drawer, props) => openDrawer(drawer, props),
         closeOverlay: () => closeDrawer(),
         succeeded: (notice) => feedback.succeeded(notice),
@@ -232,6 +224,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       graph,
       session,
       sessionActor,
+      flags,
       facts.isEnterprise,
       facts.isPlanLoading,
       deployment.hasEmailProvider,

@@ -6,9 +6,9 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { IngestionTemplateService } from "../../features/ingestion-source/services/ingestion-template.service.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { MemoryIngestionTemplateRepository } from "../../repositories/memory/memory.ingestion-template.repository.ts";
-import { IngestionTemplateService } from "../ingestion-template.service.ts";
 
 function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate {
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { conversationTurnsWindow } from "../use-conversation-turns.ts";
+import { conversationTurnsWindow } from "../../../../../features/conversation/behavior/use-conversation-turns.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
 

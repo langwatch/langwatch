@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildChildEnvironment,
   type ScenarioChildProcessConfig,
-} from "../services/node-scenario-child.service.ts";
+} from "../features/child/services/node-scenario-child.service.ts";
 
 const config: ScenarioChildProcessConfig = {
   packageRoot: "/app/apps/worker",

@@ -2,8 +2,8 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { Box, Button, HStack, Input, Spacer, Text, Textarea, VStack } from "../../primitives.ts";
-import { Menu } from "../menu.tsx";
-import { Tooltip } from "../tooltip.tsx";
+import { Menu } from "../overlays/menu.tsx";
+import { Tooltip } from "../overlays/tooltip.tsx";
 import { FieldTypeSelect } from "./field-type-select.tsx";
 import { generateUniqueIdentifier, normalizeIdentifier } from "./identifier.ts";
 import type { AvailableSource, FieldMapping, FieldType } from "./types.ts";

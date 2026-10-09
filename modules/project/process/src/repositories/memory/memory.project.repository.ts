@@ -1,3 +1,4 @@
+import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
   ProjectNotFoundError,
@@ -19,9 +20,12 @@ import {
   type TraceSharingConfig,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
+  type ProjectIdPage,
+  type ProjectIdPageInput,
+  type ProjectOrganizationPage,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
   ProjectRepository,
@@ -334,6 +338,34 @@ export class MemoryProjectRepository implements ProjectRepository {
     };
   }
 
+  async listAllIds({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectIdPage> {
+    const ids = this.#database
+      .projects()
+      .map((project) => project.id)
+      .filter((id) => after === undefined || id > after)
+      .toSorted();
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async listAllWithOrganization({
+    after,
+    limit,
+  }: ProjectIdPageInput = {}): Promise<ProjectOrganizationPage> {
+    const projects = this.#database
+      .projects()
+      .filter((project) => after === undefined || project.id > after)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .flatMap((project) => {
+        const organizationId = this.#database.findTeam(project.teamId)?.organizationId;
+        return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
+      });
+    if (limit === undefined || projects.length <= limit) return { projects, next: null };
+    const page = projects.slice(0, limit);
+    return { projects: page, next: page[page.length - 1]?.id ?? null };
+  }
+
   async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {
     return this.#database
       .projects()
@@ -378,12 +410,18 @@ export class MemoryProjectRepository implements ProjectRepository {
       .map((project) => project.id);
   }
 
-  async findLiveNonGovernanceIds(organizationId: string): Promise<string[]> {
+  async findLiveNonGovernanceIds({
+    organizationId,
+    includeArchived,
+  }: {
+    organizationId: string;
+    includeArchived: boolean;
+  }): Promise<string[]> {
     return this.#database
       .projects()
       .filter(
         (project) =>
-          project.archivedAt === null &&
+          (includeArchived || project.archivedAt === null) &&
           project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
           this.#database.isInOrganization(project, organizationId),
       )
@@ -523,6 +561,58 @@ export class MemoryProjectRepository implements ProjectRepository {
     this.#database.putProject({ ...project, apiKey: input.token });
 
     return true;
+  }
+
+  async createPersonal(input: {
+    id: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+    ownerUserId: string;
+  }): Promise<string> {
+    const existing = this.#database
+      .projects()
+      .find((row) => row.teamId === input.teamId && row.isPersonal);
+    if (existing) return existing.id;
+    this.#database.putProject(
+      this.#row({
+        id: input.id,
+        name: "Personal Workspace",
+        slug: input.slug,
+        apiKey: input.apiKey,
+        teamId: input.teamId,
+        language: "other",
+        framework: "other",
+        isPersonal: true,
+        ownerUserId: input.ownerUserId,
+      }),
+    );
+    return input.id;
+  }
+
+  async archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void> {
+    for (const project of this.#database.projects()) {
+      if (!input.teamIds.includes(project.teamId)) continue;
+      if (!project.isPersonal || project.archivedAt !== null) continue;
+      this.#database.putProject({ ...project, archivedAt: toDate(input.archivedAt) });
+    }
+  }
+
+  async revivePersonalInTeam(input: { teamId: string }): Promise<void> {
+    for (const project of this.#database.projects()) {
+      if (project.teamId !== input.teamId) continue;
+      if (!project.isPersonal || project.archivedAt === null) continue;
+      this.#database.putProject({ ...project, archivedAt: null });
+    }
+  }
+
+  async updatePersonalFeatures(input: {
+    projectId: string;
+    features: PersonalFeatures;
+  }): Promise<void> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project?.isPersonal) return;
+    this.#database.putProject({ ...project, personalFeatures: input.features });
   }
 
   async findPersonalProjectOwner(input: {

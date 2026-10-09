@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { Instant } from "@langwatch/time";
+
 import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
 import type {
   ConnectedBillingAccountRecord,
@@ -21,16 +23,41 @@ export type MemoryBillingOrganization = {
   selfHostedCustomer: boolean;
   teamIds: string[];
   signupData: Record<string, unknown>;
+  sentPlanLimitAlert?: Instant | null;
 };
 
-/** One billable-event row of the ClickHouse table usage's meter writes. */
-export type MemoryBillableEvent = {
+/** A membership as organization's shared OrganizationUser table shows it to billing. */
+type MemoryBillingMember = {
   organizationId: string;
+  userId: string;
+  role: string;
+  disabled: boolean;
+};
+
+/** A person as user's shared User table shows them to billing. */
+type MemoryBillingUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  deactivated: boolean;
+};
+
+/** A project as project's shared table shows it to billing. */
+type MemoryBillingProject = {
+  id: string;
+  name: string;
+  organizationId: string;
+  archived: boolean;
+  governance: boolean;
+};
+
+/** One request's row in gateway's shared spend ledger, at its latest status. */
+type MemoryBillingSpendRow = {
   tenantId: string;
-  eventId: string;
-  eventType: string;
-  deduplicationKey: string;
-  eventTimestamp: number;
+  requestType: string;
+  status: string;
+  costNanoUsd: number;
+  occurredAtMs: number;
 };
 
 /**
@@ -40,6 +67,9 @@ export type MemoryBillableEvent = {
  */
 export class MemoryBillingStore {
   readonly organizations = new Map<string, MemoryBillingOrganization>();
+  /** Organization's memberships and user's people, as their shares show them to billing. */
+  readonly members: MemoryBillingMember[] = [];
+  readonly users = new Map<string, MemoryBillingUser>();
   /** Connected self-hosted billing accounts, keyed by organization. */
   readonly connectedBillingAccounts = new Map<string, ConnectedBillingAccountRecord>();
   readonly connectedSeatChanges = new Map<string, ConnectedSeatChangeRecord>();
@@ -51,7 +81,10 @@ export class MemoryBillingStore {
   readonly subscriptions: BillingSubscriptionRecord[] = [];
   readonly checkpoints = new Map<string, BillingCheckpoint>();
   readonly organizationOfTenant = new Map<string, string>();
-  readonly billableEvents: MemoryBillableEvent[] = [];
+  /** Project's rows and gateway's ledger, as their shares show them to billing. */
+  readonly projects: MemoryBillingProject[] = [];
+  readonly gatewaySpend: MemoryBillingSpendRow[] = [];
+  spendSourceAvailable = true;
 
   static create(): MemoryBillingStore {
     return new MemoryBillingStore();

@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BrowserPageClaimedTwiceError, createUi, defineBrowserModule } from "../src/index.ts";
+import { hostServiceFakes } from "../src/module/ui-host-service-fakes.ts";
 import { browserUiTransport, documentRoot } from "./ui-supply.fixtures.ts";
 
 const page = { default: () => null };
@@ -26,7 +27,7 @@ describe("screen addresses at boot", () => {
     /** @scenario "Two modules claiming one address are refused by name" */
     it("refuses before the first render, naming both modules and the address", async () => {
       const refusal = await createUi({ document: documentRoot, mount: "root" })
-        .withModules([traces, rival])
+        .withModules([hostServiceFakes(), traces, rival])
         .withTransport(browserUiTransport)
         .render()
         .catch((caught: unknown) => caught);
@@ -42,7 +43,7 @@ describe("screen addresses at boot", () => {
   describe("given installed modules whose screens declare different paths", () => {
     it("boots", async () => {
       const booted = createUi({ document: documentRoot, mount: "root" })
-        .withModules([traces, runs])
+        .withModules([hostServiceFakes(), traces, runs])
         .withTransport(browserUiTransport)
         .render();
 

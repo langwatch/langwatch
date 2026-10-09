@@ -33,6 +33,9 @@
       "path": "../design-system/tsconfig.build.json"
     },
     {
+      "path": "../error-views/tsconfig.build.json"
+    },
+    {
       "path": "../module/tsconfig.build.json"
     },
     {

@@ -7,17 +7,15 @@ import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
-import {
-  BillingCheckoutCompletionService,
-  type InviteApprover,
-} from "./billing-checkout-completion.service.ts";
+import { BillingCheckoutCompletionService } from "./billing-checkout-completion.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
   BillingSubscriptionLifecycleService,
-  type SeatRetentionRules,
+  type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
@@ -35,7 +33,10 @@ type ItemCalculator = Pick<SubscriptionItemCalculatorService, "calculateQuantity
  * The webhook service routes these before any org lookup.
  */
 export interface LicensePurchaseHandler {
-  handle(params: { checkoutSession: Stripe.Checkout.Session; stripe: Stripe }): Promise<void>;
+  handle(params: {
+    checkoutSession: Stripe.Checkout.Session;
+    stripeSubscriptions: Pick<StripeSubscriptionsChannel, "listCheckoutLineItems">;
+  }): Promise<void>;
 }
 
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
@@ -80,9 +81,8 @@ export interface ConnectedBillingInvoiceEvents {
 export class EEWebhookService implements WebhookService {
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
-  private readonly stripe: Stripe;
+  private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly itemCalculator: ItemCalculator;
-  private readonly inviteApprover?: InviteApprover;
   private readonly licensePurchaseHandler?: LicensePurchaseHandler;
   private readonly licensePaymentLinkId?: string;
   private readonly host: BillingWebhookHost;
@@ -94,34 +94,32 @@ export class EEWebhookService implements WebhookService {
   private constructor({
     subscriptionRepository,
     organizationRepository,
-    stripe,
+    stripeSubscriptions,
     itemCalculator,
-    inviteApprover,
+    licenses,
     licensePurchaseHandler,
     licensePaymentLinkId,
     host,
-    retention,
     connectedBilling,
     announcer,
   }: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
-    stripe: Stripe;
+    stripeSubscriptions: StripeSubscriptionsChannel;
     itemCalculator: ItemCalculator;
-    inviteApprover?: InviteApprover;
+    /** Clears a trial's licence once its subscription activates; organization owns the row. */
+    licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
     host: BillingWebhookHost;
-    retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     /** Records the checkout and subscription changes for peers; absent where none is composed. */
     announcer?: BillingLifecycleAnnouncerService;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
-    this.stripe = stripe;
+    this.stripeSubscriptions = stripeSubscriptions;
     this.itemCalculator = itemCalculator;
-    this.inviteApprover = inviteApprover;
     this.licensePurchaseHandler = licensePurchaseHandler;
     this.licensePaymentLinkId = licensePaymentLinkId;
     this.host = host;
@@ -129,20 +127,19 @@ export class EEWebhookService implements WebhookService {
     this.checkout = BillingCheckoutCompletionService.create({
       subscriptionRepository,
       organizationRepository,
-      stripe,
+      stripeSubscriptions,
       itemCalculator,
-      inviteApprover,
+      licenses,
       host,
-      retention,
       ...(announcer ? { announcer } : {}),
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
       organizationRepository,
-      stripe,
+      licenses,
+      stripeSubscriptions,
       itemCalculator,
       host,
-      retention,
       ...(announcer ? { announcer } : {}),
     });
   }
@@ -150,13 +147,12 @@ export class EEWebhookService implements WebhookService {
   static create(options: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
-    stripe: Stripe;
+    stripeSubscriptions: StripeSubscriptionsChannel;
     itemCalculator: ItemCalculator;
-    inviteApprover?: InviteApprover;
+    licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
     host: BillingWebhookHost;
-    retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     announcer?: BillingLifecycleAnnouncerService;
   }): EEWebhookService {
@@ -249,7 +245,7 @@ export class EEWebhookService implements WebhookService {
 
     await this.licensePurchaseHandler.handle({
       checkoutSession,
-      stripe: this.stripe,
+      stripeSubscriptions: this.stripeSubscriptions,
     });
 
     return { status: "ok" };

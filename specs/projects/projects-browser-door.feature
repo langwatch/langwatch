@@ -25,10 +25,12 @@ Feature: The project.* browser namespace is served by the application the compos
     When somebody creates a project into a new team
     Then they are answered with the slug of the project created
 
-  Scenario: the redaction status reads the caller's own protections
+  # The door moved to traces.getFieldRedactionStatus with the protections' owner (CD-2,
+  # T2b 2026-10-08): modules/trace/specs/trace-viewer-protection.feature.
+  Scenario: the redaction status is read from traces, not project
     Given the project module installed over memory repositories
-    When somebody reads the project's field redaction status
-    Then the answer is resolved from the caller's own captured-content protections
+    When somebody reads the field redaction status on the project namespace
+    Then they are answered as for a procedure that does not exist
 
   # Project records the creation as a fact; Langy mints from its own side, so project never
   # names Langy (peer cycle cut, ARCHITECTURE.md §5 and §9).
@@ -101,12 +103,6 @@ Feature: The project.* browser namespace is served by the application the compos
     When the request is served
     Then their standing is asked about the project being archived
     And the project is archived only when that answer permits it
-
-  Scenario: a clustering request that fails is reported, not raised
-    Given a deployment whose clustering scheduler cannot be reached
-    When somebody asks for topic clustering
-    Then the failure is reported for the project it happened on
-    And the caller is answered with an unknown failure rather than a named one
 
   Scenario: A project manager revokes the legacy project key and is shown no key
     Given a project with a legacy project key

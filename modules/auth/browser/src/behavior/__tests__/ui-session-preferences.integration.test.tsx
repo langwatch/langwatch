@@ -4,6 +4,7 @@
  * @vitest-environment jsdom
  */
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import { defineSlice } from "@langwatch/browser-host/global-store";
 import { clearReaderUiStorage } from "@langwatch/browser-host/storage";
@@ -12,7 +13,6 @@ import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { UiAuthClient } from "../../session";
 import { useUiSessionReading } from "../ui-session";
 import { signOutUi } from "../ui-session-client";
 

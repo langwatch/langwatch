@@ -1,5 +1,18 @@
 /** Stub host for tests; built from partial reading with fail-closed defaults */
 
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
+import type {
+  NavigationDeployment,
+  NavigationFlagReading,
+  NavigationOpsAccess,
+  NavigationOrganization,
+  NavigationPlanReading,
+  NavigationProject,
+  NavigationScopeWrite,
+  NavigationSupportChat,
+  NavigationTeam,
+  NavigationUser,
+} from "@langwatch/navigation-contract";
 import type { ReactNode } from "react";
 
 import {
@@ -7,17 +20,7 @@ import {
   NavigationHostProvider,
   type NavigationAccountMenu,
   type NavigationCommandBar,
-  type NavigationDeployment,
-  type NavigationFlagReading,
   type NavigationLangy,
-  type NavigationOpsAccess,
-  type NavigationOrganization,
-  type NavigationPlanReading,
-  type NavigationProject,
-  type NavigationScopeWrite,
-  type NavigationSupportChat,
-  type NavigationTeam,
-  type NavigationUser,
 } from "./model/navigation-host.ts";
 
 export type StubNavigationReadings = {
@@ -59,6 +62,7 @@ export type StubNavigationActions = {
   signOut?: () => void;
   setDocumentTitle?: (title: string) => void;
   openDrawer?: (drawer: string, params?: Record<string, string>) => void;
+  openDrawerByToken?: (drawer: UiDrawerToken<never>, props?: object) => void;
 };
 
 const SELF_HOSTED_PRODUCTION: NavigationDeployment = {
@@ -139,8 +143,8 @@ export class StubNavigationHost extends NavigationHost {
     return (this.readings.permissions ?? []).includes(permission);
   }
 
-  featureFlag(flag: string): NavigationFlagReading {
-    return this.readings.flags?.[flag] ?? { enabled: false, isLoading: false };
+  featureFlag(flag: ReleaseFlagToken): NavigationFlagReading {
+    return this.readings.flags?.[flag.name] ?? { enabled: false, isLoading: false };
   }
 
   waiting(): ReactNode {
@@ -191,6 +195,10 @@ export class StubNavigationHost extends NavigationHost {
 
   openDrawer(drawer: string, params?: Record<string, string>): void {
     this.actions.openDrawer?.(drawer, params);
+  }
+
+  openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.actions.openDrawerByToken?.(drawer, props);
   }
 
   langy(): NavigationLangy | null {

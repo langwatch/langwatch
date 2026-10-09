@@ -5,9 +5,7 @@ import {
   type BugReport,
   type DetailSnapshot,
   type LiveSnapshot,
-  type ProcessAuditEntryView,
   type ReplayHistoryEntry,
-  type SchedulerAuditEntryView,
   type ReplayStatus,
 } from "@langwatch/ops-contract";
 
@@ -75,9 +73,6 @@ export class MemoryOpsStore {
   /** Per ClickHouse endpoint, the last storage reading and the last backup it saw. */
   readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
   readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();
-  /** The operator trails, newest act last. */
-  readonly processAudit: ProcessAuditEntryView[] = [];
-  readonly schedulerAudit: SchedulerAuditEntryView[] = [];
   /** The published snapshots and the writer lease over them; a lease here never lapses. */
   readonly snapshots: {
     live?: LiveSnapshot;

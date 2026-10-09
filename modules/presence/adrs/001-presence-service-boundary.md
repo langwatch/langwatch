@@ -25,17 +25,18 @@ procedures with the reusable web state and components.
 
 ## Dependencies
 
-The server holds no peer: it folds project's and organization's
-presence-setting facts through its own peer subscribers into durable Redis keys
-(rulings 2026-10-05, "Presence flag"), beside a private Presence repository and
-narrow broadcast and diagnostics ports. The web package
+The server holds no peer: it reads project's `Project` and organization's
+`Team` and `Organization` presence settings through declared Postgres shares
+(round 46 E1, R40, superseding the 2026-10-05 Redis fold), beside a private
+Presence repository and narrow broadcast and diagnostics ports. The web package
 depends on the contract and UI libraries, never app transport hooks.
 
 ## Persistence
 
 Redis and in-memory repositories are private server adapters. Presence owns
 TTL and delta semantics but neither Project configuration nor the Redis
-connection.
+connection. Its live registry adds a Prisma store that only reads the owners'
+settings rows; the memory twin of those rows is handed in by a test (record §7).
 
 ## Runtime and registration
 

@@ -17,9 +17,9 @@ import type {
   AutomationProviderSecrets,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
+import type { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
 import type { AutomationService } from "./automation.service.ts";
-import type { SlackDestinationService } from "./slack-destination.service.ts";
 
 /** The dashboard's test-fire window, keyed on the project an API key acts for. */
 const TEST_FIRE_WINDOW_SECONDS = 60;

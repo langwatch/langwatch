@@ -5,23 +5,29 @@ import {
   keyDoorPrincipalOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import { defineProcessModule } from "@langwatch/process";
+import type {
+  GatewayApi,
+  GatewayRequestCredential,
+  GatewayServerConfig,
+} from "@langwatch/gateway-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayModule } from "./app/gateway.app.ts";
+import { gatewayChannels } from "./channels/gateway-channels.registry.ts";
+import { gatewayConnectManagedKeyEventing } from "./eventing/gateway-connect-managed-key.pipeline.ts";
 import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
+import { gatewayInstantEvalJudgeSpendEventing } from "./eventing/gateway-instant-eval-judge-spend.pipeline.ts";
 import { gatewayPulledUsageLedgerEventing } from "./eventing/gateway-pulled-usage-ledger.pipeline.ts";
 import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
-import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
-import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
-} from "./services/gateway-budget-change-dedupe.service.ts";
+} from "./features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
+import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
-import { VirtualKeyConfigBackfillTask } from "./tasks/virtual-key-config-backfill.task.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
@@ -39,8 +45,13 @@ import { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
-export const gatewayProcessModule = defineProcessModule("gateway")
+export const gatewayProcessModule: PublishedProcessModule<
+  "gateway",
+  GatewayApi,
+  GatewayServerConfig
+> = defineProcessModule("gateway")
   .withRepositories(gatewayRepositories)
+  .withChannels(gatewayChannels)
   .withApi(GatewayModule)
   .withTransports(
     agentCacheRest,
@@ -59,11 +70,10 @@ export const gatewayProcessModule = defineProcessModule("gateway")
   .withEventing(gatewaySpendEventing)
   .withEventing(gatewayRealtimeSessionEventing)
   .withEventing(gatewayPulledUsageLedgerEventing)
+  .withEventing(gatewayInstantEvalJudgeSpendEventing)
+  .withEventing(gatewayConnectManagedKeyEventing)
   .withTasks(({ repositories }) => [
     TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
-    VirtualKeyConfigBackfillTask.create({
-      repository: () => repositories.virtualKeyConfigBackfill,
-    }),
   ])
   .withTransportFacts(({ app }) => {
     if (!(app instanceof GatewayModule)) {

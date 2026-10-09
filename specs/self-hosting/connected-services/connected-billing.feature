@@ -140,7 +140,7 @@ Feature: Billing a connected self-hosted customer
     Then it shows the LangWatch bank details and no payment provider bank transfer instructions
 
   @integration
-  Scenario: Finance marks an invoice paid out of band from the backoffice
+  Scenario: Finance marks an invoice paid out of band from the admin console
     Given an open invoice for "ACME" that was paid by wire
     When an operator marks it paid out of band
     Then the invoice is paid without a charge through the payment provider
@@ -228,7 +228,7 @@ Feature: Billing a connected self-hosted customer
     Given the seat change recorded its intent and the payment provider call then failed
     When the next seat invoicing pass runs
     Then the invoice is created once
-    And the backoffice showed the change as pending until then
+    And the admin console showed the change as pending until then
 
   @unit
   Scenario: A seat invoice raised but never recorded is found rather than raised again
@@ -309,26 +309,26 @@ Feature: Billing a connected self-hosted customer
     Then the run counts one failure and the month is not recorded, so the next tick sends it
 
   # ============================================================================
-  # Backoffice
+  # Admin console
   # ============================================================================
 
   @integration
-  Scenario: The backoffice shows the commercial state of each connected customer
+  Scenario: The admin console shows the commercial state of each connected customer
     Given "ACME" was onboarded, has used hosted services and has synced
-    When an operator opens the customer in the backoffice
+    When an operator opens the customer in the admin console
     Then they see the commit, the amount drawn down, the overage, the seats licensed and the seats reported, the time of the last sync and the open invoices
 
   @unit
   Scenario: The Billing section shows a seat change until billing decides it
     Given licensing recorded a seat change billing has not decided yet
-    When an operator opens the customer in the backoffice
+    When an operator opens the customer in the admin console
     Then the change is shown as recorded and awaiting billing
     And once a pass decided it, the change shows that decision
 
   @integration
   Scenario: The Billing section shows each seat change and how its invoicing stands
     Given seat changes that are awaiting, not onboarded, invoiced and owed nothing
-    When an operator opens the customer in the backoffice
+    When an operator opens the customer in the admin console
     Then each change has its own line saying what finance needs to know
 
   @unit @unimplemented
@@ -338,7 +338,7 @@ Feature: Billing a connected self-hosted customer
     Then the section updates on its server event, with no timer
 
   @unit
-  Scenario: The backoffice says so when live spend cannot be read
+  Scenario: The admin console says so when live spend cannot be read
     Given the spend ledger cannot be read
-    When an operator opens the customer in the backoffice
+    When an operator opens the customer in the admin console
     Then the drawn down amount is shown as unavailable rather than zero

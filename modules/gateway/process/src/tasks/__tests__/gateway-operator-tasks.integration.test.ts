@@ -8,10 +8,8 @@ import { describe, expect, it } from "vitest";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import { reportTraceDestinationBackfill } from "../trace-destination-report.task.ts";
-import { VirtualKeyConfigBackfillTask } from "../virtual-key-config-backfill.task.ts";
 
 const ORG = "org_1";
-const SIGNAL = new AbortController().signal;
 
 function gatewayHoldingKeys() {
   const store = MemoryGatewayStore.create({
@@ -69,44 +67,6 @@ describe("the gateway's operator tasks over its own stores", () => {
       });
       expect(report.organizationsWithDestinationlessKeys).toEqual(["org_bare"]);
       expect(report.organizationsWithoutGovernanceProject).toBe(1);
-    });
-  });
-
-  describe("given a key holding legacy aliases in its config", () => {
-    const legacy = { modelAliases: { fast: "gpt-5-mini" }, keep: true };
-
-    async function seededKey() {
-      const world = gatewayHoldingKeys();
-      await world.repositories.virtualKeys.create({
-        ...keyInput({ id: "vk_legacy" }),
-        config: legacy,
-      });
-      const task = VirtualKeyConfigBackfillTask.create({
-        repository: () => world.repositories.virtualKeyConfigBackfill,
-      });
-      return { ...world, task };
-    }
-
-    /** @scenario "The operator tasks run over the gateway's own stores" */
-    it("leaves the stored key as it was without --execute", async () => {
-      const { repositories, task } = await seededKey();
-
-      await task.run({ args: [], signal: SIGNAL });
-
-      const key = await repositories.virtualKeys.findById({ id: "vk_legacy", organizationId: ORG });
-      expect(key?.config).toEqual(legacy);
-      expect(key?.routingPolicyId).toBeNull();
-    });
-
-    /** @scenario "The operator tasks run over the gateway's own stores" */
-    it("mints the routing policy and strips the legacy keys with --execute", async () => {
-      const { repositories, task } = await seededKey();
-
-      await task.run({ args: ["--execute"], signal: SIGNAL });
-
-      const key = await repositories.virtualKeys.findById({ id: "vk_legacy", organizationId: ORG });
-      expect(key?.config).toEqual({ keep: true });
-      expect(key?.routingPolicyId).toEqual(expect.any(String));
     });
   });
 });

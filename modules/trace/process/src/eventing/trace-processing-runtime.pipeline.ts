@@ -1,33 +1,23 @@
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingParticipation } from "@langwatch/eventing";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
-import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service.ts";
-import { OtlpSpanTokenEstimationService } from "../services/span-token-estimation.service.ts";
-import { TraceEvaluationLoopMetricsService } from "../services/trace-evaluation-loop-metrics.service.ts";
-import { TraceIoExtractionAdapterService } from "../services/trace-io-extraction-adapter.service.ts";
-import { TraceMediaReferenceService } from "../services/trace-media-reference.service.ts";
-import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
+import { leanForProjection } from "../features/projection/rules/trace-projection-lean.rules.ts";
+import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-cost-enrichment.service.ts";
+import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
+import { TraceIoExtractionAdapterService } from "../features/derivation/services/trace-io-extraction-adapter.service.ts";
+import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
+import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
-import { TraceSpanNormalizationAdapterService } from "../services/trace-span-normalization-adapter.service.ts";
-import { createCodingAgentSpanFactsDispatchSubscriber } from "./coding-agent-span-facts-dispatch.subscriber.ts";
-import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subscriber.ts";
+import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
-import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
-import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
 import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
@@ -50,22 +40,14 @@ import {
 } from "./tracked-event-sync.subscriber.ts";
 
 interface TraceProcessingPeers {
-  codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<
     DataRetentionApi,
     "getPlatformDefaultRetentionDays" | "getResolvedForProject"
   >;
-  evaluations: Pick<
-    EvaluationApi,
-    "queueTraceEvaluation" | "reportEvaluation" | "deriveEvaluatorId"
-  >;
-  experiments: Pick<ExperimentApi, "computeRunMetrics" | "lookupExperimentId">;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
-  monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
-  topics: Pick<TopicApi, "bootstrapClustering">;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -172,7 +154,6 @@ export class TraceProcessingRuntimeAdapter {
 
   #reactions(): Parameters<typeof buildTraceProcessingConsumer>[1] {
     const { peers, commands } = this.input;
-    const normalization = TraceSpanNormalizationAdapterService.create(this.input.canonicalisation);
     const resolveOrigin = createDeferredOriginHandler((data) => commands.resolveOrigin(data));
     return {
       resolveDeferredOrigin: async ({ tenantId, traceId }) => {
@@ -180,41 +161,13 @@ export class TraceProcessingRuntimeAdapter {
         if (summary?.attributes["langwatch.origin"]) return;
         await resolveOrigin({ id: traceId, tenantId, traceId });
       },
-      evaluationTrigger: createEvaluationTriggerSubscriber({
-        featureFlags: peers.featureFlags,
-        monitors: peers.monitors,
-        evaluation: { send: (data) => peers.evaluations.queueTraceEvaluation(data) },
-        metrics: TraceEvaluationLoopMetricsService.create(),
-      }),
-      customEvaluationSync: createCustomEvaluationSyncHandler({
-        reportEvaluation: (data) => peers.evaluations.reportEvaluation(data),
-        deriveEvaluatorId: (name) => peers.evaluations.deriveEvaluatorId(name),
-      }),
       trackedEventSync: createTrackedEventSyncHandler({
         recordTrackedEvent: this.input.recordTrackedEvent,
       }),
       traceUpdateBroadcast: createTraceUpdateBroadcastHandler({ broadcast: this.input.broadcast }),
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
-        bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
         milestones: this.input.milestones,
-      }),
-      experimentMetricsSync: createExperimentMetricsSyncHandler({
-        computeExperimentRunMetrics: (data) => peers.experiments.computeRunMetrics(data),
-        lookupExperimentId: async (tenantId, runId) => {
-          const found = await peers.experiments.lookupExperimentId({ tenantId, runId });
-          return found.kind === "recorded" ? found.experimentId : null;
-        },
-      }),
-      codingAgentSpanFactsDispatch: createCodingAgentSpanFactsDispatchSubscriber({
-        normalize: (event) =>
-          normalization.normalizeSpanReceived({
-            tenantId: String(event.tenantId),
-            span: event.data.span,
-            resource: event.data.resource,
-            instrumentationScope: event.data.instrumentationScope,
-          }),
-        contributeReceivedSpan: (input) => peers.codingAgents.contributeReceivedSpan(input),
       }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,

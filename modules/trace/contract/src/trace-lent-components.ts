@@ -1,7 +1,5 @@
 /** Trace UI that reads trace's own data, lent by token to the modules that show it (§10, §10.1). */
 
-import { uiTokens } from "@langwatch/module";
-
 /** What a screen hands trace's input/output viewer. */
 export type RenderInputOutputProps = {
   value: unknown;
@@ -25,8 +23,18 @@ export type SetupWithAgentButtonProps = {
   size?: "sm" | "md";
 };
 
-export const RenderInputOutputToken =
-  uiTokens("trace").component<RenderInputOutputProps>("renderInputOutput");
-export const TraceIdPeekToken = uiTokens("trace").component<TraceIdPeekProps>("traceIdPeek");
-export const SetupWithAgentButtonToken =
-  uiTokens("trace").component<SetupWithAgentButtonProps>("setupWithAgentButton");
+/** What annotation's queue walker hands the conversation trace lends it. */
+export type AnnotationQueueConversationProps = {
+  /** The trace the queue item names; its turn is the one under review. */
+  traceId: string;
+  /** The thread that trace belongs to, or null for a trace in no thread. */
+  conversationId: string | null;
+};
+
+/** What a screen hands trace's way into correcting one trace. */
+export type TraceEditButtonProps = {
+  traceId: string;
+  /** When the trace started, so the drawer reads its partition; null when unknown. */
+  occurredAtMs: number | null;
+  disabled?: boolean;
+};

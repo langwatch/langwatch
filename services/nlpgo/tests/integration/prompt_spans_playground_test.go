@@ -1,16 +1,8 @@
-// Prompt-span emission parity tests for the playground surface.
-//
-// Pinned by specs/nlp-go/prompt-spans-playground.feature. These tests
-// will exercise nlpgo's engine emitting PromptApiService.get +
-// Prompt.compile spans byte-equivalent to python-sdk's
-// prompt_service_tracing.py + prompt_tracing.py decorators when the
-// TS PromptStudioAdapter dispatches a playground send via
-// execute_component with origin="playground".
-//
-// Stubs landed alongside the spec so /** @scenario */ doc comments
-// satisfy the parity binder (after the binder patch lands to scan Go
-// test roots). The Skip markers go away as the engine emission +
-// sdks/go/prompts/ helpers land in this PR.
+// Prompt-span emission parity tests for the playground surface, pinned by
+// specs/nlp-go/prompt-spans-playground.feature. An HTTP dispatch with
+// origin="playground" must emit PromptApiService.get + Prompt.compile spans
+// matching python-sdk's prompt tracing decorators. The engine emission is
+// unit-tested in services/nlpgo/app/engine/prompt_spans_emit_test.go.
 
 package integration_test
 
@@ -21,14 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const promptSpansPendingMsg = "pending: sdks/go/prompts wiring + nlpgo engine emission in this PR"
+// promptSpansPendingMsg: the engine emission is covered by the unit tests in
+// app/engine/prompt_spans_emit_test.go; only this HTTP-level test is unwritten.
+const promptSpansPendingMsg = "not yet asserted over HTTP; engine emission is covered by app/engine/prompt_spans_emit_test.go"
 
-/** @scenario "playground send on a saved prompt version emits a get+compile span pair" */
-func TestPromptSpansPlayground_SavedVersionEmitsGetCompilePair(t *testing.T) {
-	// Real assertion (Lane D). Other stubs in this file stay t.Skip
-	// until a future PR demands them — engine.runSignature emission
-	// is already pinned at the helper level by
-	// services/nlpgo/app/engine/prompt_spans_emit_test.go.
+// promptSpansHeldMsg marks scenarios whose expected outcome awaits a ruling.
+const promptSpansHeldMsg = "held: expected outcome awaits a ruling; do not enable until it lands"
+
+// dispatchSavedPlaygroundPrompt sends a playground request for saved prompt
+// version pizza-prompt:6 through the engine and returns the recorded spans.
+func dispatchSavedPlaygroundPrompt(t *testing.T) *promptSpansFixture {
+	t.Helper()
 	body := signatureWorkflowBody(t, signatureNodeOpts{
 		ConfigID:      "prompt_4RXLJtB9Cj-OA1BaLpxWc",
 		Handle:        "pizza-prompt",
@@ -37,8 +32,13 @@ func TestPromptSpansPlayground_SavedVersionEmitsGetCompilePair(t *testing.T) {
 		Instructions:  "You are a helpful assistant.",
 		TemplateMsgs:  []map[string]any{{"role": "user", "content": "{{input}}"}},
 	}, map[string]any{"input": "I want a refund"})
-
 	fx, _ := runPromptSpansDispatch(t, body)
+	return fx
+}
+
+/** @scenario "playground send on a saved prompt version emits a get+compile span pair" */
+func TestPromptSpansPlayground_SavedVersionEmitsGetCompilePair(t *testing.T) {
+	fx := dispatchSavedPlaygroundPrompt(t)
 
 	get := fx.FindPromptSpan(t, "PromptApiService.get")
 	getAttrs := promptSpanAttrs(get)
@@ -69,7 +69,7 @@ func TestPromptSpansPlayground_SavedVersionEmitsGetCompilePair(t *testing.T) {
 
 /** @scenario "playground send on an unsaved fresh prompt emits compile but no get" */
 func TestPromptSpansPlayground_FreshAdhocEmitsCompileOnly(t *testing.T) {
-	t.Skip(promptSpansPendingMsg)
+	t.Skip(promptSpansHeldMsg)
 }
 
 /** @scenario "every declared variable on the prompt is captured on the compile span" */
@@ -79,10 +79,24 @@ func TestPromptSpansPlayground_DeclaredVariablesCapturedOnCompile(t *testing.T) 
 
 /** @scenario "error during compile records the exception on the compile span" */
 func TestPromptSpansPlayground_CompileErrorRecordedOnSpan(t *testing.T) {
-	t.Skip(promptSpansPendingMsg)
+	t.Skip(promptSpansHeldMsg)
 }
 
 /** @scenario "span hierarchy matches python-sdk shape (get + compile + llm are siblings)" */
 func TestPromptSpansPlayground_GetCompileLLMSiblingsUnderSameParent(t *testing.T) {
-	t.Skip(promptSpansPendingMsg)
+	fx := dispatchSavedPlaygroundPrompt(t)
+
+	get := fx.FindPromptSpan(t, "PromptApiService.get")
+	compile := fx.FindPromptSpan(t, "Prompt.compile")
+	llm := findLLMSpan(fx.Spans())
+	require.NotNil(t, llm, "expected an LLM-typed span; fake LLM should produce one")
+
+	parent := llm.Parent().SpanID()
+	require.True(t, parent.IsValid(), "the LLM span must have a parent, not be an orphan root")
+	assert.Equal(t, parent, get.Parent().SpanID(), "get must share the LLM span's parent")
+	assert.Equal(t, parent, compile.Parent().SpanID(), "compile must share the LLM span's parent, not nest under get")
+
+	traceID := llm.SpanContext().TraceID()
+	assert.Equal(t, traceID, get.SpanContext().TraceID())
+	assert.Equal(t, traceID, compile.SpanContext().TraceID())
 }

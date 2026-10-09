@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { Temporal } from "@langwatch/time";
+import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAuthSessionRepository } from "../../repositories/memory/memory.auth-session.repository.ts";
@@ -18,11 +18,10 @@ function refusal(code: string): Error {
 function twoStep(protocol: Partial<TwoStepProtocol> = {}) {
   const memory = MemoryAuthDatabase.create();
   const session = (id: string, rest: { userId: string; identifierId: string; amr: string[] }) =>
-    memory.sessions.set(id, {
+    memory.db.Session.push({
       id,
       sessionToken: id,
-      impersonation: null,
-      expires: id.startsWith("lapsed") ? NOW.subtract({ hours: 1 }) : NOW.add({ hours: 1 }),
+      expires: toDate(id.startsWith("lapsed") ? NOW.subtract({ hours: 1 }) : NOW.add({ hours: 1 })),
       ...rest,
     });
   session("s-1", { userId: "u-1", identifierId: "i-1", amr: ["pwd", "otp"] });

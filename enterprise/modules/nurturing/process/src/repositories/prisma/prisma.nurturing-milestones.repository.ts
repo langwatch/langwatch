@@ -3,7 +3,7 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 
 import type {
   NurturingMilestonesRepository,
-  NurturingOrganizationState,
+  NurturingOrganizationCounts,
 } from "../nurturing-milestones.repository.ts";
 
 const ORGANIZATION_STATE = {
@@ -14,55 +14,56 @@ const ORGANIZATION_STATE = {
   simulationRunCount: true,
 } as const;
 
+/** Nurturing's organizations, the one table it claims; the owners' rows are read elsewhere (R40). */
 export class PrismaNurturingMilestonesRepository
-  extends PrismaRepository.for("NurturingProject", "NurturingOrganization")
+  extends PrismaRepository.for("NurturingOrganization")
   implements NurturingMilestonesRepository
 {
   static readonly create = this.factory(
     (prisma) => new PrismaNurturingMilestonesRepository(prisma),
   );
 
-  async recordProject({
-    projectId,
+  async recordOrganization({
     organizationId,
     adminUserId,
     seeded,
-  }: Parameters<NurturingMilestonesRepository["recordProject"]>[0]): Promise<void> {
+  }: Parameters<NurturingMilestonesRepository["recordOrganization"]>[0]): Promise<void> {
     await this.prisma.nurturingOrganization.upsert({
       where: { organizationId },
       create: { organizationId, adminUserId, seeded },
       update: adminUserId ? { adminUserId } : {},
     });
-    await this.prisma.nurturingProject.upsert({
-      where: { projectId },
-      create: { projectId, organizationId },
-      update: { organizationId },
-    });
   }
 
-  async countEvaluation({
-    projectId,
-  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    const project = await this.prisma.nurturingProject.findUnique({ where: { projectId } });
-    if (!project) return [];
-    const organization = await this.prisma.nurturingOrganization.update({
-      where: { organizationId: project.organizationId },
-      data: { evaluationCount: { increment: 1 } },
-      select: ORGANIZATION_STATE,
-    });
-    return [organization];
+  countEvaluation({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    return this.count({ organizationId, data: { evaluationCount: { increment: 1 } } });
   }
 
-  async countSimulationRun({
-    projectId,
-  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    const project = await this.prisma.nurturingProject.findUnique({ where: { projectId } });
-    if (!project) return [];
-    const organization = await this.prisma.nurturingOrganization.update({
-      where: { organizationId: project.organizationId },
-      data: { simulationRunCount: { increment: 1 } },
+  countSimulationRun({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    return this.count({ organizationId, data: { simulationRunCount: { increment: 1 } } });
+  }
+
+  /** Empty when nurturing never learned the organization. */
+  private async count({
+    organizationId,
+    data,
+  }: {
+    organizationId: string;
+    data: { evaluationCount: { increment: 1 } } | { simulationRunCount: { increment: 1 } };
+  }): Promise<NurturingOrganizationCounts[]> {
+    const { count } = await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId },
+      data,
+    });
+    if (count === 0) return [];
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
       select: ORGANIZATION_STATE,
     });
-    return [organization];
+    return organization ? [organization] : [];
   }
 }

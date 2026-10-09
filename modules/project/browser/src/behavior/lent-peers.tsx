@@ -1,36 +1,24 @@
-/** What analytics, navigation, organization and trace lend this module (§3.4 rule 7). */
+/** What analytics, navigation, onboarding, organization and trace lend this module (§10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type {
-  UiAgentActionsMenuProps,
-  UiCustomGraphProps,
-  UiInlineCommandPaletteProps,
-  UiPendingJoinRequestsProps,
-  UiProjectDepartmentFieldProps,
-} from "@langwatch/browser-host/declarations";
+import { CustomGraphToken, type CustomGraphProps } from "@langwatch/analytics-client";
 import { Lent } from "@langwatch/browser-host/lent";
 import {
-  GuidedOnboardingOfferToken,
-  type GuidedOnboardingOfferProps,
-} from "@langwatch/onboarding-contract";
-import { lazy, Suspense, useMemo } from "react";
+  InlineCommandPaletteToken,
+  type InlineCommandPaletteProps,
+} from "@langwatch/navigation-client";
+import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-client";
+import type { GuidedOnboardingOfferProps } from "@langwatch/onboarding-contract";
+import {
+  PendingJoinRequestsToken,
+  ProjectDepartmentFieldToken,
+  type PendingJoinRequestsProps,
+  type ProjectDepartmentFieldProps,
+} from "@langwatch/organization-client";
+import { AgentActionsMenuToken, type AgentActionsMenuProps } from "@langwatch/trace-client";
 
 /** Navigation's command palette, drawn inline as navigation lends it. */
-export function InlineCommandPalette(props: UiInlineCommandPaletteProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("inlineCommandPalette")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function InlineCommandPalette(props: InlineCommandPaletteProps) {
+  return <Lent of={InlineCommandPaletteToken} props={props} />;
 }
 
 /** Onboarding's "Start guided onboarding" pill, drawn as onboarding lends it. */
@@ -39,73 +27,21 @@ export function GuidedOnboardingOffer(props: GuidedOnboardingOfferProps) {
 }
 
 /** Organization's department row for a project, as organization lends it. */
-export function ProjectDepartmentField(props: UiProjectDepartmentFieldProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("projectDepartmentField")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function ProjectDepartmentField(props: ProjectDepartmentFieldProps) {
+  return <Lent of={ProjectDepartmentFieldToken} props={props} />;
 }
 
 /** Organization's card of people waiting to join, drawn as organization lends it. */
-export function PendingJoinRequests(props: UiPendingJoinRequestsProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("pendingJoinRequests")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function PendingJoinRequests(props: PendingJoinRequestsProps) {
+  return <Lent of={PendingJoinRequestsToken} props={props} />;
 }
 
 /** Analytics' custom graph, drawn as analytics lends it. */
-export function CustomGraph(props: UiCustomGraphProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("customGraph")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function CustomGraph(props: CustomGraphProps) {
+  return <Lent of={CustomGraphToken} props={props} />;
 }
 
 /** Trace's agent actions menu, drawn as trace lends it. */
-export function AgentActionsMenu(props: UiAgentActionsMenuProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("agentActionsMenu")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function AgentActionsMenu(props: AgentActionsMenuProps) {
+  return <Lent of={AgentActionsMenuToken} props={props} />;
 }

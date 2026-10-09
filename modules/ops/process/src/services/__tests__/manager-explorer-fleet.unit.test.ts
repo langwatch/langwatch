@@ -1,12 +1,14 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { InMemoryProcessStore, type ProcessStore } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { OpsEventingIntrospection, OpsProcessManagerMetadata } from "../../app/ops.app.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
-import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.process-audit.repository.ts";
 import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
 import type { ProcessNameCounts } from "../../repositories/process-ops.repository.ts";
 import { ManagerExplorerService } from "../manager-explorer.service.ts";
+import { ProcessAuditService } from "../process-audit.service.ts";
 
 function fakeStore(): ProcessStore {
   return InMemoryProcessStore.createForTesting();
@@ -60,7 +62,11 @@ function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = 
   return ManagerExplorerService.create({
     store: fakeStore(),
     fleet,
-    audit: MemoryProcessAuditRepository.create({ store: MemoryOpsStore.create() }),
+    audit: ProcessAuditService.create({
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async () => ({ id: "audit", occurredAt: 0 }),
+      }),
+    }),
     introspection: new FakeIntrospection(),
   });
 }

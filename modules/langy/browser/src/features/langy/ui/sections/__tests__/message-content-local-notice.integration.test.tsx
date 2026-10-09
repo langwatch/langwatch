@@ -45,7 +45,7 @@ vi.mock("recharts", async (importOriginal) => {
 
 import type * as rechartsModule from "recharts";
 
-import { isLangyTranscriptMessage } from "../../../../../model/langy-transcript.ts";
+import { isLangyTranscriptMessage } from "../../../../transcript/model/langy-transcript.ts";
 import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);

@@ -1,6 +1,5 @@
 import { moduleApi } from "@langwatch/module";
 import type { Monitor } from "@langwatch/monitor-contract";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 
 import type {
@@ -9,6 +8,7 @@ import type {
 } from "./automation-rest.schemas.ts";
 import type {
   AutomationListRow,
+  CustomGraphNameRef,
   AutomationPersistCapStatus,
   SlackChannelListing,
 } from "./automation.responses.ts";
@@ -26,7 +26,6 @@ import type {
   TriggerLatestEvaluation,
 } from "./automation.trpc-schemas.ts";
 import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
-import type { CustomGraphNameRef } from "./custom-graph.ts";
 import type { AutomationPersistCapCount } from "./persist-cap.ts";
 import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
 import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
@@ -107,8 +106,6 @@ export interface AutomationApi {
     limit: number;
   }): Promise<WebhookDeliveryRow[]>;
   getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]>;
-  /** The ORGANIZATION-rooted migrations automation registers (the Slack connection move). */
-  registeredMigrations(): readonly SystemMigration[];
   /** The Slack conversations a connection's bot can see, for the channel picker. */
   listSlackChannels(input: AutomationApiListSlackChannelsInput): Promise<SlackChannelListing>;
   create(input: CreateTriggerCommand): Promise<Trigger>;

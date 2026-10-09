@@ -7,17 +7,7 @@
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { topicTrpc } from "@langwatch/topic-contract";
 
-/** Procedures another feature owns. */
-type BorrowedProcedures = {
-  project: {
-    /** Asks for a run now. `started: false` means one was already underway. */
-    triggerTopicClustering: {
-      mutation: { input: { projectId: string }; output: { started: boolean } };
-    };
-  };
-};
-
-export type TopicApiMap = ContractApiMap<typeof topicTrpc> & BorrowedProcedures;
+export type TopicApiMap = ContractApiMap<typeof topicTrpc>;
 
 /**
  * The topic family's typed tRPC hooks. Same machinery, same transport and same

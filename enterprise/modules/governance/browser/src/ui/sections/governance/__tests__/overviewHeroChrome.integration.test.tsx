@@ -9,7 +9,7 @@
 import "@testing-library/jest-dom/vitest";
 import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -225,6 +225,7 @@ describe("given the overview renders", () => {
         await userEvent.click(screen.getByRole("button", { name: /Add source/ }));
       }
       await userEvent.click((await screen.findAllByRole("menuitem"))[index] ?? document.body);
+      await waitFor(() => expect(screen.queryAllByRole("menu", { hidden: true })).toEqual([]));
     }
     for (const to of host.recording.navigations) hrefs.add(to);
     expect(hrefs.has(addSourceHref("openai_admin"))).toBe(true);

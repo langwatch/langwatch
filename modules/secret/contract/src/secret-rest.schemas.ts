@@ -29,7 +29,6 @@ export type SecretPublic = z.infer<typeof secretPublicSchema>;
 export const secretPublicListInputSchema = z
   .object({ projectId: z.string().min(1).optional() })
   .strict();
-export type SecretPublicListInput = z.infer<typeof secretPublicListInputSchema>;
 
 /** `/api/secrets` addresses a secret as `{id}`, the name main published it under. */
 export const secretPublicAliasParamsSchema = z.object({ id: secretIdSchema }).strict();
@@ -58,7 +57,6 @@ export type SecretPublicUpdateInput = z.infer<typeof secretPublicUpdateInputSche
 export const secretPublicDeleteOutputSchema = z
   .object({ id: secretIdSchema, deleted: z.literal(true) })
   .strict();
-export type SecretPublicDeleteOutput = z.infer<typeof secretPublicDeleteOutputSchema>;
 
 export function toSecretPublic(secret: Secret): SecretPublic {
   return secretPublicSchema.parse({

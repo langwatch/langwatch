@@ -5,10 +5,11 @@
  */
 
 import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useLent } from "@langwatch/browser-host/lent";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
-import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
+import type { ProjectSwitcherProps } from "@langwatch/project-contract";
 import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
@@ -31,7 +32,6 @@ class CapabilityProjectHost extends ProjectHostApi {
   private readonly organization_: ProjectHostOrganization | undefined;
   private readonly project_: ProjectHostProject | undefined;
   private readonly hasPermissionOf: (permission: string) => boolean;
-  private readonly isFeatureEnabledOf: (flag: string) => boolean;
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly succeededOf: (notice: ProjectSuccessNotice) => void;
   private readonly failedOf: (failure: ProjectFailureNotice) => void;
@@ -42,7 +42,6 @@ class CapabilityProjectHost extends ProjectHostApi {
     organization: ProjectHostOrganization | undefined;
     project: ProjectHostProject | undefined;
     hasPermissionOf: (permission: string) => boolean;
-    isFeatureEnabledOf: (flag: string) => boolean;
     scopeHost: UiScopeHost | undefined;
     succeededOf: (notice: ProjectSuccessNotice) => void;
     failedOf: (failure: ProjectFailureNotice) => void;
@@ -53,7 +52,6 @@ class CapabilityProjectHost extends ProjectHostApi {
     this.organization_ = options.organization;
     this.project_ = options.project;
     this.hasPermissionOf = options.hasPermissionOf;
-    this.isFeatureEnabledOf = options.isFeatureEnabledOf;
     this.scopeHost = options.scopeHost;
     this.succeededOf = options.succeededOf;
     this.failedOf = options.failedOf;
@@ -75,10 +73,6 @@ class CapabilityProjectHost extends ProjectHostApi {
 
   isLiteMember(): boolean {
     return this.scopeHost?.organizationRole() === "EXTERNAL";
-  }
-
-  isFeatureEnabled(flag: string): boolean {
-    return this.isFeatureEnabledOf(flag);
   }
 
   /** The switcher project lends by token (ARCHITECTURE §10); null where none is lent. */
@@ -147,7 +141,6 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
         organization,
         project,
         hasPermissionOf: (permission) => session.hasPermission(permission),
-        isFeatureEnabledOf: (flag) => session.isFeatureEnabled(flag),
         scopeHost,
         succeededOf: (notice) => feedback.succeeded(notice),
         failedOf: (notice) => feedback.failed(notice),

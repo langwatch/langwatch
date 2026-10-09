@@ -2,13 +2,13 @@ import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useMemo } from "react";
 import type { DeepPartial } from "react-hook-form";
 
+import { usePromptDefaultModel } from "../features/model-selection/behavior/use-prompt-default-model.ts";
+import { useTabById } from "../features/tabs/behavior/use-tab-by-id.ts";
 import {
   areFormValuesEqual,
   computeInitialFormValuesForPrompt,
 } from "../model/prompt-form/index.ts";
-import { usePromptDefaultModel } from "./use-prompt-default-model.ts";
 import { usePromptVersion } from "./use-prompt-version.ts";
-import { useTabById } from "./use-tab-by-id.ts";
 
 /**
  * Whether the prompt in this tab has unsaved changes: form values against the LOADED version

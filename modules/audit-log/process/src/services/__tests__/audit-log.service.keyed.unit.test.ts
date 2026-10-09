@@ -5,27 +5,27 @@
  * Spec: modules/audit-log/specs/audit-log.feature (the audit outbox rule).
  */
 import { generate } from "@langwatch/ksuid";
-import { instantiateRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
-import { auditLogRepositories } from "../../repositories/audit-log-repositories.registry.ts";
+import {
+  MemoryAuditLogRepository,
+  MemoryAuditLogStore,
+} from "../../repositories/memory/memory.audit-log.repository.ts";
 import { AuditLogService } from "../audit-log.service.ts";
 
 function keyedAuditLog() {
-  const repositories = instantiateRepositories(auditLogRepositories, {
-    tier: "memory",
-    members: {},
-  });
-  const service = AuditLogService.create({ repository: repositories.entries, maxArgsBytes: 4096 });
+  const store = new MemoryAuditLogStore();
+  const repository = MemoryAuditLogRepository.create({ store });
+  const service = AuditLogService.create({ repository, maxArgsBytes: 4096 });
   const history = () =>
-    repositories.entries.findEntityHistory({
+    repository.findEntityHistory({
       projectId: "project-1",
       actionPrefix: "emailSuppression.",
       entityId: "trigger-1",
       argumentNames: ["triggerId"],
       limit: 10,
     });
-  return { service, history };
+  return { service, history, store };
 }
 
 const entry = {
@@ -45,9 +45,23 @@ describe("AuditLogService.record with an idempotency key", () => {
       const first = await service.record({ ...entry, idempotencyKey });
       const second = await service.record({ ...entry, idempotencyKey });
 
-      expect(first.id).toBe(idempotencyKey);
       expect(second).toEqual(first);
       expect(await history()).toHaveLength(1);
+    });
+  });
+
+  describe("when the producer's outbox delivers a keyed entry", () => {
+    /** @scenario "A keyed audit row takes the table's own id, not its key" */
+    it("stores the key beside the row's own id", async () => {
+      const { service, store } = keyedAuditLog();
+      const idempotencyKey = generate("audit").toString();
+
+      const recorded = await service.record({ ...entry, idempotencyKey });
+
+      expect(recorded.id).not.toBe(idempotencyKey);
+      expect(store.rows.map((row) => [row.id, row.idempotencyKey])).toEqual([
+        [recorded.id, idempotencyKey],
+      ]);
     });
   });
 

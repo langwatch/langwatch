@@ -108,6 +108,12 @@ export const downPath = ({ slug }: { slug: string }) =>
 export const destroyPath = ({ slug }: { slug: string }) =>
   `/api/stacks/${encodeURIComponent(slug)}/destroy`;
 
+export const startServicePath = ({ slug, service }: { slug: string; service: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/start-service?service=${encodeURIComponent(service)}`;
+
+export const resetDatabasesPath = ({ slug }: { slug: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/reset-databases`;
+
 export const LIMITS_PATH = "/api/limits";
 
 export const limitPath = ({ name }: { name: string }) =>

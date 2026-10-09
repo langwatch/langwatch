@@ -1,6 +1,7 @@
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
+  RESERVED_SYSTEM_KEY_NAMES,
   type ApiKeyRevocationCause,
 } from "@langwatch/api-key-contract";
 import { prismaTables, type PrismaModelClient } from "@langwatch/prisma-client";
@@ -14,8 +15,9 @@ import type {
   ApiKeyUpdateRecord,
 } from "../api-key.repository.ts";
 
-/** The key rows, plus the raw write the fenced revoke needs. */
-export type PrismaApiKeyDatabase = PrismaModelClient<"ApiKey"> & Pick<PrismaClient, "$executeRaw">;
+/** The key rows, plus the raw SQL the fenced revoke and the fleet-wide sweeps need. */
+type PrismaApiKeyDatabase = PrismaModelClient<"ApiKey"> &
+  Pick<PrismaClient, "$executeRaw" | "$queryRaw">;
 
 /** Prisma persistence is private to the API-key server package. */
 export class PrismaApiKeyRepository implements ApiKeyRepository {
@@ -167,26 +169,32 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     });
   }
   /**
-   * One bounded UPDATE over (name, revokedAt, expiresAt). `expiresAt: {
-   * not: null }` is explicit, not left to `lte`: a NULL treated as "before
-   * now" would revoke every key of this name in the product at once.
+   * The fleet-wide sweep, declared here rather than hatched in the tenancy guard: only a
+   * reserved name, and a name a customer key could also carry needs `isSystemManaged`.
+   * `"expiresAt" IS NOT NULL` is explicit: a NULL "before now" would revoke every key of the name.
    */
   async revokeExpiredByName(input: {
     name: string;
     now: Instant;
     systemManagedOnly?: boolean;
   }): Promise<number> {
+    if (!RESERVED_SYSTEM_KEY_NAMES.includes(input.name)) {
+      throw new Error(`The key sweep refuses "${input.name}", which is not a reserved name`);
+    }
+    const markedOnly =
+      input.systemManagedOnly === true || !HIDDEN_SYSTEM_KEY_NAMES.includes(input.name);
     const now = toDate(input.now);
-    const { count } = await this.database.apiKey.updateMany({
-      where: {
-        name: input.name,
-        revokedAt: null,
-        expiresAt: { not: null, lte: now },
-        ...(input.systemManagedOnly ? { isSystemManaged: true } : {}),
-      },
-      data: { revokedAt: now },
-    });
-    return count;
+    return this.database.$executeRaw`
+      -- @tenancy: fleet-wide sweep of one reserved system key name, bounded to elapsed rows.
+      UPDATE "ApiKey"
+         SET "revokedAt" = ${now},
+             "updatedAt" = now()
+       WHERE "name" = ${input.name}
+         AND "revokedAt" IS NULL
+         AND "expiresAt" IS NOT NULL
+         AND "expiresAt" <= ${now}
+         AND ("isSystemManaged" = true OR ${markedOnly} = false)
+    `;
   }
   findLiveChildren(input: {
     parentApiKeyId: string;
@@ -214,19 +222,32 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
     };
   }
-  findElapsedLoginKeys(input: {
+  async findElapsedLoginKeys(input: {
+    organizationId: string;
     now: Instant;
-    organizationId?: string;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     return this.database.apiKey.findMany({
       where: {
-        ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+        organizationId: input.organizationId,
         name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
         revokedAt: null,
         expiresAt: { not: null, lte: toDate(input.now) },
       },
       select: { id: true, userId: true, organizationId: true },
     });
+  }
+  async sweepElapsedLoginKeys(input: {
+    before: Instant;
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
+    return this.database.$queryRaw<{ id: string; userId: string | null; organizationId: string }[]>`
+      -- @tenancy: fleet-wide sweep of CLI login keys; create refuses a customer key under the prefix.
+      SELECT "id", "userId", "organizationId"
+        FROM "ApiKey"
+       WHERE starts_with("name", ${CLI_LOGIN_KEY_NAME_PREFIX})
+         AND "revokedAt" IS NULL
+         AND "expiresAt" IS NOT NULL
+         AND "expiresAt" <= ${toDate(input.before)}
+    `;
   }
   async extendLoginKeyExpiry(input: {
     id: string;

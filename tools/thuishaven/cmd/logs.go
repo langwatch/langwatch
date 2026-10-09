@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer"
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
@@ -63,7 +65,7 @@ func apiLaneFile(available map[string]bool) string {
 // goLaneSimulators are the simulators a go.work checkout's sims lane hosts
 // (cmd/service/combined_dev.go), or its go lane on an older haven. They have
 // no capture of their own, so `haven logs idp` reads that lane's lines.
-var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics"}
+var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "telemetry"}
 
 // logSource is one selected view: a capture file, the CLI name its lines are
 // labeled with, and — for one application of a shared lane — the application a
@@ -99,7 +101,7 @@ var logServiceColors = map[string]string{
 	// The single Node lane of a monolith checkout, in the ui lane's color:
 	// it is the same half of the stack, in one process instead of two.
 	"app":           "34",
-	"design-system": "96", "mail-room": "95", "idp": "92", "mail": "94", "storage": "36", "voice": "93", "llm": "35", "analytics": "33",
+	"design-system": "96", "mail-room": "95", "idp": "92", "mail": "94", "storage": "36", "voice": "93", "llm": "35", "analytics": "33", "outbound": "90", "telemetry": "91",
 	// Earlier lane names. A log file written before the local topology changed
 	// still reads in its own color rather than falling to plain text.
 	"backend": "32", "workers": "32", "gateway": "33", "nlp": "36",
@@ -110,6 +112,10 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	// come from docker, but through the same one command.
 	if len(inv.args) == 1 && inv.args[0] == "obs" {
 		return d.orch.ObservabilityLogs(ctx, inv.has("--tail"))
+	}
+
+	if inv.has("--loki") || inv.has("--trace") {
+		return runLokiLogs(d, inv)
 	}
 
 	slug := inv.value("--stack")
@@ -147,6 +153,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 
 	lines, offsets, elided := readLogTails(dir, services)
 	lines = filterLogLines(lines, since, level)
+	lines = grepLogLines(lines, inv.value("--grep"))
 	if since.IsZero() && len(lines) > logsTailLines {
 		lines = lines[len(lines)-logsTailLines:]
 	}
@@ -606,4 +613,74 @@ func (f *follower) run(ctx context.Context) error {
 			printLogLine(l, f.mode, f.plain)
 		}
 	}
+}
+
+// grepLogLines keeps the lines whose payload contains the text.
+func grepLogLines(lines []logLine, grep string) []logLine {
+	if grep == "" {
+		return lines
+	}
+	var out []logLine
+	for _, l := range lines {
+		if strings.Contains(l.text, grep) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// lokiReadLimit caps one `haven logs --loki` read at the newest lines.
+const lokiReadLimit = 5000
+
+// runLokiLogs reads the full stream from this stack's Loki, where the info
+// and debug lines the muted consoles never printed live.
+func runLokiLogs(d deps, inv invocation) error {
+	slug, err := tabSlug(d, inv)
+	if err != nil {
+		return err
+	}
+	window, err := parseDurationFlag(inv, "--since")
+	if err != nil {
+		return err
+	}
+	if window == 0 {
+		window = time.Hour
+	}
+	level := inv.value("--level")
+	if level != "" && minLevelRank(level) == 0 {
+		return fmt.Errorf("--level wants debug, info, warn, or error, got %q", level)
+	}
+	if id := inv.value("--trace"); id != "" && !traceIDPattern.MatchString(id) {
+		return fmt.Errorf("--trace %q is not a trace id (hex, up to 32 characters)", id)
+	}
+	loki := sources.NewLoki(observabilityEndpoints().GrafanaPort, slug, time.Now().Add(-window))
+	q := sources.LogQuery{Services: inv.args, Grep: inv.value("--grep"), TraceID: inv.value("--trace"), Limit: lokiReadLimit}
+	lines, err := loki.Query(q)
+	if err != nil {
+		return traceReadError(err)
+	}
+	out := readOutput{w: os.Stdout, link: loki.QueryURL(q), asJSON: inv.has("--json") || d.isAgent}
+	return printLokiLines(out, lines, level)
+}
+
+func printLokiLines(out readOutput, lines []sources.LogLine, level string) error {
+	w, asJSON := out.w, out.asJSON
+	floor := minLevelRank(level)
+	enc := json.NewEncoder(w)
+	for _, l := range lines {
+		if floor > 0 && logLevelRank[l.Level] < floor && lineLevelRank(l.Text) < floor {
+			continue
+		}
+		if asJSON {
+			if err := enc.Encode(l); err != nil {
+				return err
+			}
+			continue
+		}
+		fmt.Fprintf(w, "%s  %s  %s\n", l.At.Format(time.RFC3339Nano), l.Lane, l.Text)
+	}
+	if !asJSON {
+		fmt.Fprintln(w, "grafana:", out.link)
+	}
+	return nil
 }

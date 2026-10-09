@@ -86,10 +86,10 @@ export abstract class ScopeLineageRepository {
   abstract findProjectLineage: (args: {
     projectId: string;
   }) => Promise<{ teamId: string; organizationId: string } | null>;
-  /** A team's organization, or null when the team is unknown. */
+  /** A team's organization, personal flag and name, or null when the team is unknown. */
   abstract findTeamOrganization: (args: {
     teamId: string;
-  }) => Promise<{ organizationId: string } | null>;
+  }) => Promise<{ organizationId: string; isPersonal?: boolean; name?: string } | null>;
 }
 
 export abstract class AuthzReadRepository extends ScopeLineageRepository {
@@ -105,6 +105,8 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
     userId: string;
     organizationId: string;
   }) => Promise<OrganizationMembership | null>;
+  /** User ids of the ADMIN memberships whose seat is not disabled; none for an unknown org. */
+  abstract findActiveAdministratorIds: (args: { organizationId: string }) => Promise<string[]>;
   /** Direct user bindings - viaGroupId null. Fenced on an ACTIVE membership. */
   abstract findUserBindings: (args: {
     userId: string;

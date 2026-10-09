@@ -3,6 +3,7 @@ import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { createUiRouteObjects } from "@langwatch/browser/route-objects";
 import { describe, expect, it } from "vitest";
 
+import { servedConfig, uiFeatureConfigFrom } from "../../__tests__/ui-feature-config.fixtures";
 /**
  * The crash this covers: the table named two layout keys whose files were
  * deleted with the features tree, and `createUiRouteObjects` resolves EVERY
@@ -21,7 +22,10 @@ const loaders = mergeUiPageLoaders({
 });
 
 /** Composed exactly as `main.tsx` composes it. */
-const shellLayouts = uiShellLayouts(await loadUiRootCapabilities());
+const shellLayouts = uiShellLayouts({
+  root: await loadUiRootCapabilities(),
+  config: await uiFeatureConfigFrom(servedConfig),
+});
 
 describe("given the route table and the modules this build installs", () => {
   describe("when the shell builds its router from them", () => {

@@ -31,8 +31,6 @@ vi.mock("../../../behavior/topic-api.ts", () => ({
       getClusteringRunHistory: {
         useQuery: () => ({ data: [], isLoading: false }),
       },
-    },
-    project: {
       triggerTopicClustering: {
         useMutation: (options?: { onSuccess?: (result: { started: boolean }) => void }) => ({
           isPending: false,

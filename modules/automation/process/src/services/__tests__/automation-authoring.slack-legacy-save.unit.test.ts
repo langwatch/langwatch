@@ -9,11 +9,11 @@ import { describe, expect, it } from "vitest";
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { createTestSlackDestinations } from "../../__tests__/testing.ts";
+import { AutomationSlackConnectionService } from "../../features/slack/services/automation-slack-connection.service.ts";
 import { triggerRow } from "../../transport/__tests__/automation-rest-redaction.fixture.ts";
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";
 import { AutomationProviderRegistryService } from "../automation-provider-registry.service.ts";
 import { AutomationRulesService } from "../automation-rules.service.ts";
-import { AutomationSlackConnectionService } from "../automation-slack-connection.service.ts";
 import type { AutomationService } from "../automation.service.ts";
 
 /** @see modules/slack/specs/slack-connections.feature */

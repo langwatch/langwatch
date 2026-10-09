@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { Instant } from "@langwatch/time";
 
 import type { MigrationLeaseRepository } from "./lease.repository.ts";
 import {
@@ -10,6 +11,7 @@ import type { TenantSource } from "./tenant-source.ts";
 import {
   isTerminalTenantStatus,
   type MigrationPassSummary,
+  type TenantMigrationOutcome,
   type TenantMigrationRecord,
 } from "./types.ts";
 
@@ -43,6 +45,8 @@ export type SystemMigrationRunnerDeps = {
   tenants: TenantSource;
   cohort: MigrationCohort;
   migrations: readonly SystemMigration[];
+  /** The clock a held tenant's `heldSince` is read from. */
+  now: () => Instant;
   /** How long each claim grant lasts. Defaults to a minute. */
   leaseTtlMs?: number;
   /** How often a held claim renews. Must stay well inside the TTL. */
@@ -68,7 +72,6 @@ export class SystemMigrationRunnerService {
       tenantsSeen: 0,
       finalized: 0,
       held: 0,
-      finiteHeld: 0,
       parked: 0,
       skipped: 0,
       alreadyFinalized: 0,
@@ -270,12 +273,14 @@ export class SystemMigrationRunnerService {
       // anything this pass concluded. A refused write is the pin winning -
       // terminal for this tenant this pass; the row stays exactly as the
       // operator left it.
-      const wasWritten = await state.upsertRecordUnlessRolledBack({
+      const record: TenantMigrationRecord = {
         migrationName: migration.name,
         tenantId,
         status: outcome.status,
         report: outcome.report ?? null,
-      });
+        ...heldFields({ outcome, existing, now: this.deps.now }),
+      };
+      const wasWritten = await state.upsertRecordUnlessRolledBack(record);
       if (!wasWritten) {
         summary.skipped += 1;
         logger.warn(
@@ -290,16 +295,16 @@ export class SystemMigrationRunnerService {
       // previous record is a transition - pending is a state.
       if (existing?.status !== outcome.status) summary.advanced += 1;
       if (outcome.status === "finalized") summary.finalized += 1;
-      else if (outcome.status === "migrated") {
-        summary.held += 1;
-        if (migration.startupSettlement !== "recurring") {
-          summary.finiteHeld = (summary.finiteHeld ?? 0) + 1;
-        }
-      } else summary.parked += 1;
-      logger.info(
-        { migration: migration.name, tenantId, status: outcome.status },
-        "tenant migration outcome",
-      );
+      else if (outcome.status === "migrated") summary.held += 1;
+      else summary.parked += 1;
+      const { heldReason } = record;
+      const fields = { migration: migration.name, tenantId, status: outcome.status };
+      if (heldReason) {
+        logger.warn(
+          { ...fields, heldReason },
+          "tenant migration held; it stays on its legacy path and nothing waits on it",
+        );
+      } else logger.info(fields, "tenant migration outcome");
     } catch (error) {
       // Parked, never fatal: the tenant stays on its legacy path (behaviour
       // unchanged) and the next pass tries again. One broken tenant must
@@ -312,6 +317,21 @@ export class SystemMigrationRunnerService {
       );
     }
   }
+}
+
+/** Held carries why and since when (the first moment, while still held); else neither. */
+function heldFields({
+  outcome,
+  existing,
+  now,
+}: {
+  outcome: TenantMigrationOutcome;
+  existing: TenantMigrationRecord | undefined;
+  now: () => Instant;
+}): Pick<TenantMigrationRecord, "heldReason" | "heldSince"> {
+  if (outcome.status !== "migrated") return {};
+  const heldSince = existing?.status === "migrated" ? existing.heldSince : undefined;
+  return { heldReason: outcome.heldReason ?? "proof", heldSince: heldSince ?? now() };
 }
 
 async function recordParkedTenant({

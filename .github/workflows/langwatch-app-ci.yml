@@ -179,10 +179,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: the changed paths come
+          # from git trees (.github/actions/detect-changes),
+          # and every file this job needs on disk lives under .github/.
+          # Checking out the rest of the tree is pure runner time.
           sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
@@ -275,6 +275,7 @@ jobs:
               - 'services/langevals/**'
               - 'dev/scripts/**'
               - '.github/scripts/**'
+              - '.gitattributes'
               - '.github/workflows/langwatch-app-ci.yml'
 
   # Which applications a change actually reaches, from the Nx project graph
@@ -682,8 +683,13 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/authorization run test
 
+      # This job has no Postgres service. The repository contract suite runs
+      # its postgres leg wherever a database URL is set, so the URL is blanked
+      # here; package-suites runs that leg against a real database.
       - name: Run @langwatch/authz-process unit tests
         if: matrix.app == 'platform-api'
+        env:
+          DATABASE_URL: ""
         run: pnpm --filter @langwatch/authz-process run test
 
       # @langwatch/identity-contract is the pure identity core (ADR-115) and
@@ -1095,6 +1101,9 @@ jobs:
       - name: Lint rule reference is current (blocking)
         run: pnpm --filter @langwatch/architecture-enforcer docs:check
 
+      - name: Image code step list is current (blocking)
+        run: node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts --check
+
       # `pnpm lint:architecture` in CI: the architecture-enforcer policies that
       # read zero findings on this tree, named one by one; a policy joins the
       # list when its findings reach zero. `declarations` is left out because
@@ -1103,7 +1112,7 @@ jobs:
         run: >-
           pnpm --filter @langwatch/architecture-enforcer lint --
           --no-declarations
-          --policies application-boundaries,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration
+          --policies application-boundaries,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams,teaching-citations,deleted-spellings-in-teaching,lint-rule-skill-pointers,feature-configuration,rest-namespace-owners,cycles,architecture-records,browser-package-exports,manifests,browser-node-leak,migration-owners,eventing-table-access,feature-layout,service-ceilings,rerunnable-migrations
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.
@@ -1140,6 +1149,16 @@ jobs:
       # The Prisma client, the generated SDK types and the built SDK dist are
       # imports the type-aware rules resolve; without them they read as `any`.
       - uses: ./.github/actions/prepare-generated-files
+
+      # After the generated files, so the REST cross-check can mount the api.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Generated READMEs are current (blocking)
+        run: pnpm check:readmes
 
       - name: Oxlint (blocking -- config errors included)
         env:
@@ -1482,12 +1501,31 @@ jobs:
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
 
+      - name: Test detect-changes-source.sh
+        run: bash .github/scripts/__tests__/detect-changes-source.test.sh
+
+      - name: Test detect-changes-by-sha.sh
+        run: bash .github/scripts/__tests__/detect-changes-by-sha.test.sh
+
+      - name: Test the change detector's pathspec parity with dorny's matcher
+        run: |
+          picomatch_dir="$(mktemp -d)"
+          npm install --prefix "$picomatch_dir" --no-save --no-audit --no-fund picomatch@^2.3.1
+          export PICOMATCH="$picomatch_dir/node_modules/picomatch"
+          bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
+
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which
       # .github/** is not — so it would never start for a change to its own
       # guard. This job's gate already lists `.github/scripts/**`.
       - name: Test guard-deployment-impact.ts
         run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+
+      - name: Test that every generated file is marked generated
+        run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts
+
+      - name: Test the PR impact map categories
+        run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
 
   # The npm artifact's staging filters, run over the real tree.
   #

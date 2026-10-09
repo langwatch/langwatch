@@ -1,5 +1,5 @@
 /**
- * Bundles the scenario child into `dist/server/scenario-child-process.cjs`, so a
+ * Bundles the scenario child into `dist/server/scenario-child-process.mjs`, so a
  * simulation spawns plain `node` on one file rather than `pnpm exec tsx`.
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
@@ -115,14 +115,9 @@ const externalize = () => ({
   },
 });
 
-// CommonJS output. CJS is deliberate: `__dirname`/`__filename`/`require` are
-// native, and OTel's require-in-the-middle patches the external
-// instrumentation targets, which CJS requires go through.
-
-// CJS has no `import.meta`, so esbuild leaves every form of it empty unless it
-// is defined here — silently, as a build WARNING rather than an error. Each has
-// an exact CJS equivalent. `url` is the bundle's own DIRECTORY url, which is
-// the directory `__dirname` is.
+// ESM output. The banner restores `require`, `__filename` and `__dirname`
+// for inlined code that expects them; `import.meta` env reads are defined
+// below so esbuild does not leave them empty.
 const banner = {
   js: [
     'import { createRequire as __lwCreateRequire } from "node:module";',
@@ -236,12 +231,12 @@ for (const { name, entry } of ENTRIES) {
   if (emitMeta) {
     writeFileSync(path.join(OUT_DIR, `${name}.meta.json`), JSON.stringify(result.metafile));
   }
-  console.log(`  built dist/server/${name}.cjs`);
+  console.log(`  built dist/server/${name}.mjs`);
 }
 
 for (const [spec, files] of unlistedSideEffectImports) {
   console.error(
-    `  error: bare side-effect import "${spec}" in ${[...files].join(", ")} would be dropped by sideEffects:false — add it to sideEffectImports in scripts/build-server.mjs`,
+    `  error: bare side-effect import "${spec}" in ${[...files].join(", ")} would be dropped by sideEffects:false — add it to sideEffectImports in scripts/build-child.mjs`,
   );
 }
 if (undeclared.size > 0) {

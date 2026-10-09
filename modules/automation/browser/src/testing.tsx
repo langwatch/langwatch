@@ -85,9 +85,9 @@ export type FakeAutomationHostOptions = {
   /**
    * The frontend flags that are on. `"all"` is the default, since the
    * platform suites mocked `useFeatureFlag` to answer yes; name a list
-   * when the flag matters, and `"pending"` when the answer hasn't arrived.
+   * when the flag matters.
    */
-  enabledFlags?: readonly string[] | "all" | "pending";
+  enabledFlags?: readonly string[] | "all";
   /** `null` means the scope has not resolved, which several surfaces gate on. */
   organization?: AutomationOrganization | null;
   team?: AutomationTeam | null;
@@ -199,17 +199,6 @@ export class FakeAutomationHost extends AutomationHost {
 
   hasPermission(permission: string): boolean {
     return permissionSatisfiedBy({ granted: this.granted, requested: permission });
-  }
-
-  isFeatureEnabled(flag: string): boolean {
-    return this.featureFlag(flag) === true;
-  }
-
-  featureFlag(flag: string): boolean | undefined {
-    const flags = this.options.enabledFlags ?? "all";
-    if (flags === "pending") return void 0;
-    if (flags === "all") return true;
-    return flags.includes(flag);
   }
 
   appBaseUrl(): string {

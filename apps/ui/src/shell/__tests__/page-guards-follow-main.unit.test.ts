@@ -92,9 +92,7 @@ function accessFor({
   const screen = declared[page];
   return resolveUiPageAccess({
     ...(screen?.requires === void 0 ? {} : { permission: screen.requires }),
-    ...(screen?.flags === void 0
-      ? {}
-      : { flags: screen.flags.map((flag) => (typeof flag === "string" ? flag : flag.name)) }),
+    ...(screen?.flags === void 0 ? {} : { flags: screen.flags }),
     featureFlag: () => flagsOn,
     hasPermission: (needed) => grants.includes(needed),
     isSettled: () => true,
@@ -108,7 +106,7 @@ describe("given the pages main guarded", () => {
   /** @scenario "Every page main guarded declares main's grant and flags" */
   it.each(MAIN_GUARDS)("$page declares main's grant and flags", ({ page, permission, flags }) => {
     expect(declared[page]?.requires).toBe(permission);
-    expect(declared[page]?.flags).toEqual(flags);
+    expect(declared[page]?.flags?.map(({ name }) => name)).toEqual(flags);
   });
 
   /** @scenario "A reader without a page's grant is refused and told the grant" */
@@ -123,6 +121,15 @@ describe("given the pages main guarded", () => {
   it.each(granted)("$page opens for a reader holding $permission", ({ page, permission }) => {
     const grants = permission === void 0 ? [] : [permission];
     expect(accessFor({ page, grants, flagsOn: true })).toEqual({ kind: "open" });
+  });
+
+  /** @scenario "Only an organization administrator may open the audit trail" */
+  it("refuses the audit trail to a reader holding organization:view without organization:manage", () => {
+    const page = "pages/settings/audit-log";
+    expect(
+      accessFor({ page, grants: ["organization:view", "auditLog:view"], flagsOn: true }),
+    ).toEqual({ kind: "forbidden", permission: "organization:manage" });
+    expect(declared[page]?.within).toBe("settings");
   });
 
   /** @scenario "A page behind a release flag that is off does not exist" */

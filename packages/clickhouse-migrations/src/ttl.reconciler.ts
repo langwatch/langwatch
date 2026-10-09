@@ -1,5 +1,4 @@
 import { createClient } from "@clickhouse/client";
-import { RETENTION_TTL_MANAGED_TABLES } from "@langwatch/data-retention-contract/retention-tables";
 import { createLogger } from "@langwatch/observability";
 
 import { parseConnectionUrl } from "./goose.migration-runner.ts";
@@ -340,13 +339,19 @@ export function hasRetentionTTL(engineFull: string): boolean {
 }
 
 /** Whether this table should get the retention-only TTL rewrite (no cold storage). */
-function isRetentionOnlyEligible(
-  retentionTTLExpr: string | null,
-  tableConfig: TableTTLEntry,
-  engineFull: string,
-): boolean {
+function isRetentionOnlyEligible({
+  retentionTTLExpr,
+  tableConfig,
+  engineFull,
+  managedTables,
+}: {
+  retentionTTLExpr: string | null;
+  tableConfig: TableTTLEntry;
+  engineFull: string;
+  managedTables: readonly string[];
+}): boolean {
   if (!retentionTTLExpr) return false;
-  if (!RETENTION_TTL_MANAGED_TABLES.includes(tableConfig.table)) return false;
+  if (!managedTables.includes(tableConfig.table)) return false;
   return !hasRetentionTTL(engineFull);
 }
 
@@ -358,6 +363,8 @@ interface ReconcileOptions {
   coldStorageEnabled?: boolean;
   /** The operator's hot-days overrides, keyed by the variables in `HOT_DAYS_VARIABLES`. */
   hotDayOverrides?: Readonly<Record<string, string | undefined>>;
+  /** The tables that carry the retention DELETE clause; the reconciler manages exactly these. */
+  managedTables?: readonly string[];
   verbose?: boolean;
 }
 
@@ -387,15 +394,25 @@ type TableTTLPlan = Readonly<{
  * TTL volume routing (`TO VOLUME 'cold'`) only works on tiered-storage tables. A table on another
  * policy, or any table while cold-storage management is off, still gets its retention DELETE TTL.
  */
-function planRetentionOnlyTTL(
-  tableConfig: TableTTLEntry,
-  tableInfo: TableEngineInfo,
-): TableTTLPlan {
+function planRetentionOnlyTTL({
+  tableConfig,
+  tableInfo,
+  managedTables,
+}: {
+  tableConfig: TableTTLEntry;
+  tableInfo: TableEngineInfo;
+  managedTables: readonly string[];
+}): TableTTLPlan {
   const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
   const table = tableConfig.table;
   if (
     retentionTTLExpr &&
-    isRetentionOnlyEligible(retentionTTLExpr, tableConfig, tableInfo.engine_full)
+    isRetentionOnlyEligible({
+      retentionTTLExpr,
+      tableConfig,
+      engineFull: tableInfo.engine_full,
+      managedTables,
+    })
   ) {
     return {
       kind: "alter",
@@ -422,16 +439,18 @@ function planTieredTTL({
   tableConfig,
   engineFull,
   hotDayOverrides,
+  managedTables,
 }: {
   tableConfig: TableTTLEntry;
   engineFull: string;
   hotDayOverrides: ReconcileOptions["hotDayOverrides"];
+  managedTables: readonly string[];
 }): TableTTLPlan {
   const table = tableConfig.table;
   const desiredDays = resolveHotDays(tableConfig, hotDayOverrides);
   const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
   const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-  const retention = RETENTION_TTL_MANAGED_TABLES.includes(table) ? retentionTTLExpr : null;
+  const retention = managedTables.includes(table) ? retentionTTLExpr : null;
   const retentionMissing = retention !== null && !hasRetentionTTL(engineFull);
 
   if (!shouldRewriteTTL({ currentDays, desiredDays, engineFull }) && !retentionMissing) {
@@ -459,11 +478,13 @@ function planTableTTL({
   tableInfo,
   coldStorageEnabled,
   hotDayOverrides,
+  managedTables,
 }: {
   tableConfig: TableTTLEntry;
   tableInfo: TableEngineInfo | undefined;
   coldStorageEnabled: boolean;
   hotDayOverrides: ReconcileOptions["hotDayOverrides"];
+  managedTables: readonly string[];
 }): TableTTLPlan {
   if (!tableInfo) {
     return {
@@ -475,9 +496,14 @@ function planTableTTL({
     };
   }
   if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY || !coldStorageEnabled) {
-    return planRetentionOnlyTTL(tableConfig, tableInfo);
+    return planRetentionOnlyTTL({ tableConfig, tableInfo, managedTables });
   }
-  return planTieredTTL({ tableConfig, engineFull: tableInfo.engine_full, hotDayOverrides });
+  return planTieredTTL({
+    tableConfig,
+    engineFull: tableInfo.engine_full,
+    hotDayOverrides,
+    managedTables,
+  });
 }
 
 /**
@@ -523,6 +549,7 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
         tableInfo: tableInfoByName.get(tableConfig.table),
         coldStorageEnabled,
         hotDayOverrides: options.hotDayOverrides,
+        managedTables: options.managedTables ?? [],
       });
       if (options.verbose) logger[plan.level](plan.context, plan.message);
       if (plan.kind === "alter") {

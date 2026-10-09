@@ -21,7 +21,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
-import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+import {
+  ScopeFilter,
+  type ScopeFilterValue,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+} from "@langwatch/design-system/scope-filter";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
@@ -34,11 +40,6 @@ import {
   useModelProviderConnectionTest,
   type ConnectionTestState,
 } from "../../behavior/use-model-provider-connection-test.ts";
-import {
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  scopeHierarchyOf,
-} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   MODEL_PROVIDER_MANAGE_PERMISSION,
   MODEL_PROVIDER_SCOPE_QUERY_KEY,

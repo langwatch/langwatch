@@ -33,6 +33,16 @@ const { state, calls } = vi.hoisted(() => ({
   calls: { generate: vi.fn(), revoke: vi.fn(), invalidate: vi.fn(), getRequests: vi.fn() },
 }));
 
+vi.mock("../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: () => ({
+    data: state.provenance,
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock("../../../behavior/scim-api.ts", () => ({
   directoryMembershipApi: {
     organization: {
@@ -41,14 +51,6 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
           data: state.members,
           isLoading: false,
           error: state.membersError,
-          refetch: vi.fn(),
-        }),
-      },
-      getMemberProvenance: {
-        useQuery: () => ({
-          data: state.provenance,
-          isLoading: false,
-          error: null,
           refetch: vi.fn(),
         }),
       },

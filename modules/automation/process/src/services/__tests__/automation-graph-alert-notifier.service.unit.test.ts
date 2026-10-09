@@ -1,4 +1,5 @@
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { SendEmailCommand } from "@langwatch/notification-contract";
 import { frozenAt } from "@langwatch/test-harness";
@@ -8,12 +9,12 @@ import { describe, expect, it } from "vitest";
 import { settlementTrigger } from "../../__tests__/fixtures/settlement.fixtures.ts";
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import type { GraphAlertDispatchInput } from "../../channels/automation-graph-alert.channel.ts";
+import { AutomationGraphAlertNotifierService } from "../../features/graph-alert/services/automation-graph-alert-notifier.service.ts";
+import { AutomationEmailCapService } from "../../features/runaway/services/email-cap.service.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { MemoryAutomationRepositories } from "../../repositories/memory/memory.automation.repositories.ts";
-import { AutomationGraphAlertNotifierService } from "../automation-graph-alert-notifier.service.ts";
 import { AutomationNotificationDeliveryService } from "../automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../automation-provider-registry.service.ts";
-import { AutomationEmailCapService } from "../email-cap.service.ts";
 
 const BASE_HOST = "https://app.langwatch.test";
 const SAVED_AT = toDate(Temporal.Instant.from("2026-06-01T00:00:00.000Z"));
@@ -23,7 +24,9 @@ function composeNotifier(publicBaseUrl: string | undefined) {
   const mail = { sent, sendEmail: async (command: SendEmailCommand) => void sent.push(command) };
   const notifier = AutomationGraphAlertNotifierService.create({
     publicBaseUrl,
-    repositories: MemoryAutomationRepositories.create(),
+    repositories: MemoryAutomationRepositories.create({
+      processStore: InMemoryProcessStore.createForTesting(),
+    }),
     caps: { emailHourlyCap: 10, tenantDailyCap: 100 },
     providers: AutomationProviderRegistryService.create(
       sealWith({ encrypt: (value) => value, decrypt: (value) => value }),

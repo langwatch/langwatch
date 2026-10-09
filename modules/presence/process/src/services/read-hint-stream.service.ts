@@ -4,16 +4,18 @@ import {
   type PresenceApi,
   type ReadHint,
 } from "@langwatch/presence-contract";
+import { UPGRADE_READ_HINT_SCOPE, upgradeReadHintSchema } from "@langwatch/upgrade/runner";
+import type { z } from "zod";
 
 type TenantEmitters = Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
 
-/** The hints in a fan-out frame `{ event, timestamp }` (none or one); `event` is serialised. */
-function hintsIn(frame: unknown): ReadHint[] {
+/** The serialised `event` of a fan-out frame `{ event, timestamp }`; none when malformed. */
+function eventIn<Schema extends z.ZodType>(frame: unknown, schema: Schema): z.infer<Schema>[] {
   if (typeof frame !== "object" || frame === null || !("event" in frame)) return [];
   if (typeof frame.event !== "string") return [];
   try {
-    const hint = readHintSchema.safeParse(JSON.parse(frame.event));
-    return hint.success ? [hint.data] : [];
+    const parsed = schema.safeParse(JSON.parse(frame.event));
+    return parsed.success ? [parsed.data] : [];
   } catch {
     return [];
   }
@@ -29,12 +31,36 @@ export class ReadHintStreamService {
 
   // ponytail: a member without that read's permission learns only that something under it
   // changed; per-read filtering if that ever matters. The refetch enforces the read's permission.
-  async *watch({
+  watch({
     tenantIds,
     signal,
   }: {
     tenantIds: readonly string[];
     signal?: AbortSignal;
+  }): AsyncGenerator<ReadHint> {
+    return this.relay({ tenantIds, signal, hintsIn: (frame) => eventIn(frame, readHintSchema) });
+  }
+
+  /**
+   * The upgrade runner's hints (round 8, U2-LIVE): only frames on the platform upgrade scope, which
+   * no tenant shares, and only those the runner's own schema accepts. The door asks `ops:view`.
+   */
+  watchUpgrades({ signal }: { signal?: AbortSignal }): AsyncGenerator<ReadHint> {
+    return this.relay({
+      tenantIds: [UPGRADE_READ_HINT_SCOPE],
+      signal,
+      hintsIn: (frame) => eventIn(frame, upgradeReadHintSchema).map(({ path }) => ({ path })),
+    });
+  }
+
+  private async *relay({
+    tenantIds,
+    signal,
+    hintsIn,
+  }: {
+    tenantIds: readonly string[];
+    signal: AbortSignal | undefined;
+    hintsIn: (frame: unknown) => ReadHint[];
   }): AsyncGenerator<ReadHint> {
     const tenants = [...new Set(tenantIds)];
     const queued: unknown[] = [];

@@ -25,7 +25,8 @@ const { openDrawerMock, capturedHeaderInputs } = vi.hoisted(() => ({
   capturedHeaderInputs: [] as HeaderInput[],
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
@@ -49,7 +50,6 @@ const scopeHost = createUiScopeHost({
   project: () => ({ id: "p1", name: "Checkout", slug: "checkout" }),
   organization: () => ({ id: "o1" }),
   team: () => ({ id: "t1" }),
-  hasPermission: () => true,
 });
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

@@ -10,15 +10,20 @@ const harness = vi.hoisted(() => ({
   permissions: { annotationsView: true },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "acme" },
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
     hasPermission: (permission: string) =>
       permission === "annotations:view" ? harness.permissions.annotationsView : true,
   }),
 }));
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1", slug: "acme" },
+  }),
+}));
 
-vi.mock("../../hooks/use-evaluator-options.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 
@@ -36,7 +41,7 @@ vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../../../behavior/time-format.store.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/time-format.store.ts", () => ({
   useTimeFormatStore: (selector: (s: unknown) => unknown) =>
     selector({ format: "relative", setFormat: vi.fn() }),
 }));

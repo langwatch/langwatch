@@ -8,9 +8,7 @@ import {
   OrganizationInvalidCredentialsError,
   OrganizationMissingCredentialsError,
 } from "@langwatch/api";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,40 +20,35 @@ import { organizationsProvisioningRest } from "../organizations.rest.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
 
 const INSTANCE_KEY = "instance-administrator-key";
-const BOOTSTRAP_TOKEN = "sk-lw-bootstrap";
 
 const onError = createCanonicalFamilyErrorHandler({
   loggerName: "langwatch:test:organizations:errors",
   label: "Organizations API Error",
 });
 
-/**
- * The application `OrganizationModule.create` builds over the empty memory tier of its own
- * registry. `failKeys` makes the bootstrap key's creation refuse, `n` times.
- */
-async function application({ failKeys = 0 }: { failKeys?: number } = {}) {
-  const keyRequests: unknown[] = [];
+/** The application `OrganizationModule.create` builds over its own registry's empty memory tier. */
+async function application() {
   const permissions = TestAuthzApi.create({ people: [] });
-  let keyFailuresLeft = failKeys;
-
-  const apiKeys = createApiFixture<ApiKeyApi>(
-    {
-      create: async (input) => {
-        keyRequests.push(input);
-        if (keyFailuresLeft > 0) {
-          keyFailuresLeft -= 1;
-          throw new Error("the key store refused");
-        }
-        return { token: BOOTSTRAP_TOKEN, apiKey: { id: "key-1" } as never };
-      },
-    },
-    "ApiKeyApi",
-  );
-
-  const setup = organizationModuleSetup({ permissions, apiKeys });
+  const setup = organizationModuleSetup({ permissions });
   const app = await OrganizationModule.create(setup);
+  const accepts = { send: async () => undefined };
+  app.connectLifecycle({
+    recordCreated: accepts,
+    recordSignedUp: accepts,
+    recordMembersInvited: accepts,
+    recordInviteAccepted: accepts,
+    recordIntegrationMethodChosen: accepts,
+    recordPersonalWorkspaceProvisioned: accepts,
+    recordPersonalTeamCreated: accepts,
+    recordPersonalWorkspaceArchived: accepts,
+    recordPersonalWorkspaceRevived: accepts,
+    recordPersonalWorkspaceFeaturesChanged: accepts,
+    recordPresenceSettingChanged: accepts,
+    recordTraceSharingDisabled: accepts,
+    recordMemberDisabled: accepts,
+  });
 
-  return { app, repositories: setup.repositories, permissions, keyRequests };
+  return { app, repositories: setup.repositories, permissions };
 }
 
 /** The slugs of every organization the registry holds. */
@@ -117,112 +110,42 @@ const ROSTER_PATHS = [
   "/api/v1/organizations/2026-08-07",
 ] as const;
 
-type Provisioned = {
-  organization: { id: string; name: string; slug: string };
-  adminApiKey: { id: string; token: string };
-};
-
-describe("given an instance administrator and an instance with no organizations", () => {
-  describe("when an organization is created with a slug outside the documented shape", () => {
-    /** @scenario "A slug outside the documented shape is refused" */
-    it("refuses with 422 and creates no organization", async () => {
-      const { app, repositories, permissions } = await application();
-      const { send } = mountProvisioning(app);
-
-      const response = await send("/api/organizations", {
-        method: "POST",
-        body: { name: "Acme", slug: "Not A Slug" },
-      });
-
-      expect(response.status).toBe(422);
-      expect(await storedSlugs(repositories, permissions)).toEqual([]);
-    });
-  });
-
-  describe("when an organization is created with a name and a slug", () => {
-    /** @scenario "An instance administrator creates an organization with a bootstrap key" */
-    it("answers 201 with its id, name, slug and an admin key whose binding is the new organization", async () => {
-      const { app, keyRequests } = await application();
-      const { send } = mountProvisioning(app);
-
-      const response = await send("/api/organizations", {
-        method: "POST",
-        body: { name: "Acme", slug: "acme" },
-      });
-
-      expect(response.status).toBe(201);
-      const body = (await response.json()) as Provisioned;
-      expect(body.organization).toEqual({ id: expect.any(String), name: "Acme", slug: "acme" });
-      expect(body.adminApiKey).toEqual({ id: "key-1", token: BOOTSTRAP_TOKEN });
-      expect(keyRequests).toEqual([
-        expect.objectContaining({
-          organizationId: body.organization.id,
-          permissionMode: "all",
-          bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: body.organization.id }],
-        }),
-      ]);
-    });
-  });
-
-  describe("when a second organization is created with a slug that is taken", () => {
+describe("given an instance with no organizations", () => {
+  describe("when a second organization is provisioned with a slug that is taken", () => {
     /** @scenario "A duplicate organization slug is refused" */
-    it("refuses with organization_slug_taken and 409 and creates no second organization", async () => {
-      const { app, repositories, permissions, keyRequests } = await application();
-      const { send } = mountProvisioning(app);
-      const first = await send("/api/organizations", {
-        method: "POST",
-        body: { name: "Acme", slug: "acme" },
-      });
-      expect(first.status).toBe(201);
+    it("refuses with organization_slug_taken and keeps one organization", async () => {
+      const { app, repositories, permissions } = await application();
+      await app.createForProvisioning({ name: "Acme", slug: "acme" });
 
-      const second = await send("/api/organizations", {
-        method: "POST",
-        body: { name: "Acme Again", slug: "acme" },
-      });
-
-      expect(second.status).toBe(409);
-      expect(((await second.json()) as { code: string }).code).toBe("organization_slug_taken");
+      await expect(
+        app.createForProvisioning({ name: "Acme Again", slug: "acme" }),
+      ).rejects.toMatchObject({ code: "organization_slug_taken" });
       expect(await storedSlugs(repositories, permissions)).toEqual(["acme"]);
-      expect(keyRequests).toHaveLength(1);
     });
   });
 
-  describe("when the organization's bootstrap key cannot be created", () => {
+  describe("when a provisioned organization is deleted after its bootstrap key failed", () => {
     /** @scenario "A failed bootstrap key leaves no organization behind" */
-    it("fails, leaves no organization with that slug, and lets the slug be provisioned again", async () => {
-      const { app, repositories, permissions } = await application({ failKeys: 1 });
-      const { send } = mountProvisioning(app);
+    it("leaves no organization with that slug and lets the slug be provisioned again", async () => {
+      const { app, repositories, permissions } = await application();
+      const created = await app.createForProvisioning({ name: "Acme", slug: "acme" });
 
-      const failed = await send("/api/organizations", {
-        method: "POST",
-        body: { name: "Acme", slug: "acme" },
-      });
-
-      expect(failed.status).toBeGreaterThanOrEqual(500);
+      await app.deleteProvisionedOrganization({ organizationId: created.organization.id });
       expect(await storedSlugs(repositories, permissions)).not.toContain("acme");
 
-      const retried = await send("/api/organizations", {
-        method: "POST",
-        body: { name: "Acme", slug: "acme", adminApiKeyName: "Valid key" },
-      });
-
-      expect(retried.status).toBe(201);
+      await app.createForProvisioning({ name: "Acme", slug: "acme" });
       expect(await storedSlugs(repositories, permissions)).toEqual(["acme"]);
     });
   });
 });
 
-describe("given an organization created with the instance administrator's key", () => {
+describe("given an organization provisioned on the instance", () => {
   async function created() {
     const { app } = await application();
     const mounted = mountProvisioning(app);
-    const response = await mounted.send("/api/organizations", {
-      method: "POST",
-      body: { name: "Acme", slug: "acme" },
-    });
-    expect(response.status).toBe(201);
+    const { organization } = await app.createForProvisioning({ name: "Acme", slug: "acme" });
 
-    return { ...mounted, provisioned: (await response.json()) as Provisioned };
+    return { ...mounted, app, provisioned: { organization: { ...organization, slug: "acme" } } };
   }
 
   describe("when it is fetched by the id creation returned", () => {
@@ -251,11 +174,8 @@ describe("given an organization created with the instance administrator's key", 
   describe("when the organizations are listed without the instance key", () => {
     /** @scenario "Listing organizations requires the instance key" */
     it("refuses a missing credential and a foreign one, and lists both with the key", async () => {
-      const { send, provisioned } = await created();
-      await send("/api/organizations", {
-        method: "POST",
-        body: { name: "Beta", slug: "beta" },
-      });
+      const { app, send, provisioned } = await created();
+      await app.createForProvisioning({ name: "Beta", slug: "beta" });
 
       const missing = await send("/api/organizations", { credential: null });
       expect(missing.status).toBe(401);

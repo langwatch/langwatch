@@ -15,7 +15,7 @@ import {
   useDashboardAutoRefresh,
 } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-draft.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import {
   useBlockPickerAddress,

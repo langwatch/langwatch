@@ -3,7 +3,7 @@
  * bar opens (`?drawer.open=<name>`).
  */
 
-import { HttpConfigEditorToken } from "@langwatch/agent-contract";
+import { HttpConfigEditorToken } from "@langwatch/agent-client";
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const agentWeb = defineBrowserModule("agent")

@@ -7,6 +7,7 @@ import { listFiles } from "../workspace/layout.ts";
 import { sourceText } from "../workspace/module-graph.ts";
 import { repositoryHomes } from "../workspace/repository-homes.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
+import { isStagedModule } from "../workspace/staged-module.ts";
 
 /** Colocated tests are not the shape they test. */
 const TEST_DIRECTORIES = new Set(["__tests__"]);
@@ -60,7 +61,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "unregistered-repositories":
     "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ live, memory }) and select it with .withRepositories() in <feature>.module.ts.",
   "unregistered-channels":
-    "A channel carries messages the module does not own the state of. Add channels/<feature>-channels.registry.ts exporting { live, memory }, each a class with static readonly requires and static create, and a memory twin under channels/memory/ for every live tier.",
+    "A channel carries messages the module does not own the state of. Add channels/<feature>-channels.registry.ts exporting defineChannels({ live, memory }), each a class with static readonly requires and static create, named on the installer with .withChannels(...), and a memory twin under channels/memory/ for every live tier.",
   "postgres-without-memory":
     "Every Prisma repository has a memory twin under repositories/memory/, bundled by memory.<feature>.repositories.ts, so the app is tested without a database.",
   "memory-twin-untested":
@@ -200,12 +201,13 @@ function serverFindings({
   const installer = join(src, `${feature}.module.ts`);
   const installed = isFile(installer);
   const bootedSomewhere = installed && isBooted(feature, booted);
+  const staged = isStagedModule({ root, manifest: pkg.manifest });
 
-  if (!installed) add("no-installer", src);
-  else if (!bootedSomewhere) add("installer-not-booted", installer);
+  if (!installed && !staged) add("no-installer", src);
+  else if (installed && !bootedSomewhere) add("installer-not-booted", installer);
 
   const appMissing = !isFile(join(src, "app", `${feature}.app.ts`));
-  if (appMissing) add("no-app", src);
+  if (appMissing && !staged) add("no-app", src);
 
   const adapter = files(join(src, "adapters")).find((name) => PERSISTENCE_ADAPTER.test(name));
   if (adapter) add("persistence-adapter", join(src, "adapters", adapter));

@@ -37,6 +37,10 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
       app.unblockAllQueueGroups({ ...input, requestedBy: actor.id }),
     )
 
+    .procedure("reapStrandedGroups")
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, actor }) => app.reapStrandedQueueGroups({ requestedBy: actor.id }))
+
     .procedure("drainGroup")
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input, actor }) => app.drainQueueGroup({ ...input, requestedBy: actor.id }))

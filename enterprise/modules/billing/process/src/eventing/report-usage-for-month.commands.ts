@@ -16,20 +16,27 @@ import type {
 import type { BillingOrganizationCacheRepository } from "../repositories/billing-organization-cache.repository.ts";
 import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
 import {
+  billingMonthDateRange,
+  type BillableEventsTotalResult,
+} from "../rules/billing-month.rules.ts";
+import {
   instantEvalMeterIdentifier,
   instantEvalMeterUnitsToUsd,
   INSTANT_EVAL_USD_EVENT_NAME,
 } from "../rules/instant-eval-meter.rules.ts";
 import { meterEventTimestampSeconds } from "../rules/meter-event-timestamp.rules.ts";
-import {
-  BillableEventsQueryService,
-  type BillableEventsTotalResult,
-} from "../services/billable-events-query.service.ts";
+import { type NotUsageBilledReason, usageBilledOf } from "../rules/usage-billed.rules.ts";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import type { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import type { UsageReportingService } from "../services/usage-reporting.service.ts";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage-for-month");
+
+const NOT_USAGE_BILLED_LOG: Record<Exclude<NotUsageBilledReason, "not_found">, string> = {
+  not_usage_priced: "organization is not on usage-based pricing, skipping usage reporting",
+  no_stripe_customer: "no Stripe customer ID, skipping usage reporting",
+  no_active_subscription: "no active subscription, skipping usage reporting",
+};
 
 /** Stripe meter event name for billable events. */
 export const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
@@ -132,7 +139,7 @@ function billableEventsIdentifier({
 
 /** When the billing month ended, in epoch milliseconds. */
 function billingMonthEndMs(billingMonth: string): number {
-  const [, end] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+  const [, end] = billingMonthDateRange({ billingMonth });
 
   return Temporal.Instant.from(`${end.replace(" ", "T")}Z`).epochMilliseconds;
 }
@@ -261,34 +268,21 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         await this.deps.organizationCache.set(organizationId, lookup);
       }
 
-      if (lookup.outcome === "not_found") {
-        logger.warn({ organizationId }, "organization not found, skipping");
+      // The meter's one rule, shared with the usage-billing fact (ADR-174 decision 12).
+      const verdict = usageBilledOf({ lookup });
+      if (!verdict.usageBilled) {
+        // Only a missing organization warns: a free or legacy plan reaching here is the system
+        // working as designed (dispatch has no view on pricing), so warn would put a permanent,
+        // recurring line in front of whoever greps for warnings during an incident.
+        if (verdict.reason === "not_found") {
+          logger.warn({ organizationId }, "organization not found, skipping");
+        } else {
+          logger.debug({ organizationId }, NOT_USAGE_BILLED_LOG[verdict.reason]);
+        }
         return [];
       }
 
-      if (lookup.outcome === "not_usage_billed") {
-        // Debug, like the two skips below it: a free or legacy plan reaching
-        // here is the system working as designed (dispatch has no view on
-        // pricing), so warn would put a permanent, recurring line in front
-        // of whoever greps for warnings during an incident.
-        logger.debug(
-          { organizationId },
-          "organization is not on usage-based pricing, skipping usage reporting",
-        );
-        return [];
-      }
-
-      const org = lookup.organization;
-
-      if (!org.stripeCustomerId) {
-        logger.debug({ organizationId }, "no Stripe customer ID, skipping usage reporting");
-        return [];
-      }
-
-      if (org.subscriptions.length === 0) {
-        logger.debug({ organizationId }, "no active subscription, skipping usage reporting");
-        return [];
-      }
+      const org = verdict.organization;
 
       // 2. Report for billing month, one meter after the other. A meter that
       // fails does not stop the next: each keeps its own checkpoint and its

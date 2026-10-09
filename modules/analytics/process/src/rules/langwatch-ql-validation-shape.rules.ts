@@ -5,13 +5,15 @@ import type {
   LangWatchQLViolation,
   LangWatchQLViolationCode,
 } from "@langwatch/analytics-contract";
-
 /**
  * LangWatchQL analytics SQL — the vocabulary the default-deny walk is written in.
  * @see specs/lwql/api.feature
  */
+import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";
+
 import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import type { ResolvedLangWatchQLPolicy } from "./langwatch-ql-policy.rules.ts";
+import { appendDefaultRowLimit } from "./langwatch-ql-row-limit.rules.ts";
 
 /** A bound parameter the query declares, e.g. `{since:DateTime}`. */
 export interface LangWatchQLParameter {
@@ -250,4 +252,80 @@ export interface NodeRule {
    * Returning `null` refuses the subtree without descending into it.
    */
   readonly enter?: (args: NodeArgs) => Frame | null;
+}
+
+/**
+ * A statement that passed the gate, plus what the surface's time window means
+ * for it.
+ */
+export interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
+  /** Whether the statement declares the reserved time-window parameters. */
+  readonly followsTimeWindow: boolean;
+  /**
+   * The values to execute with — the caller's, plus the window this surface
+   * injected for the reserved names the statement declares.
+   */
+  readonly boundParameters?: Readonly<Record<string, unknown>>;
+  /** Reserved names the statement declares that no window filled. */
+  readonly awaitingTimeWindow: readonly string[];
+}
+
+export function langWatchQLExecutionParameters({
+  validation,
+  granularity,
+}: {
+  readonly validation: ValidatedLangWatchQL;
+  readonly granularity: { readonly granularitySeconds?: number | undefined };
+}): Record<string, unknown> {
+  return {
+    ...validation.boundParameters,
+    ...(granularity.granularitySeconds === undefined
+      ? {}
+      : {
+          [LWQL_PERIOD_GRANULARITY_PARAMETER]: granularity.granularitySeconds,
+        }),
+  };
+}
+
+/** The statement with the default row limit applied where the validation asked for one. */
+export function langWatchQLRowLimitedSql({
+  sql,
+  validation,
+  maxRows,
+}: {
+  readonly sql: string;
+  readonly validation: Pick<ValidatedLangWatchQL, "appendRowLimit" | "appendRowLimitBeforeOffset">;
+  readonly maxRows: number;
+}): string {
+  return validation.appendRowLimit
+    ? appendDefaultRowLimit({
+        sql,
+        maxRows,
+        ...(validation.appendRowLimitBeforeOffset
+          ? { beforeOffset: validation.appendRowLimitBeforeOffset }
+          : {}),
+      })
+    : sql;
+}
+
+/**
+ * Declared parameters nothing supplies. A name the surface's window or granularity will fill
+ * is deferred to the surface, where `execute` turns it into a refusal.
+ */
+export function langWatchQLMissingParameters({
+  declared,
+  window,
+}: {
+  readonly declared: readonly { readonly name: string }[];
+  readonly window: {
+    readonly parameters?: Readonly<Record<string, unknown>> | undefined;
+    readonly awaitingTimeWindow: readonly string[];
+  };
+}): string[] {
+  return declared
+    .map((parameter) => parameter.name)
+    .filter((name) => window.parameters?.[name] === undefined)
+    .filter((name) => !window.awaitingTimeWindow.includes(name))
+    .filter((name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER)
+    .toSorted();
 }

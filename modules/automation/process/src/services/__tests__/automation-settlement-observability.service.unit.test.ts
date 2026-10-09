@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME,
   AutomationSettlementObservabilityService,
-} from "../automation-settlement-observability.service.ts";
+} from "../../features/settlement/services/automation-settlement-observability.service.ts";
 
 const inc = vi.hoisted(() => vi.fn());
 const counter = vi.hoisted(() => vi.fn((_options: { name: string }) => ({ inc })));

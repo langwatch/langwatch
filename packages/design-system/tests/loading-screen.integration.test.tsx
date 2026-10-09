@@ -4,7 +4,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LoadingScreen } from "../src/components/loading-screen.tsx";
+import { LoadingScreen } from "../src/components/brand/loading-screen.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 function answerMotionPreference({ reduce }: { reduce: boolean }) {

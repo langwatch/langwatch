@@ -4,7 +4,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -75,7 +75,9 @@ function project({ stars = STARS, listFails = false }: { stars?: Star[]; listFai
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
     if (call.path === "dashboards.listStarred") {
-      return listFails ? Promise.reject(new Error("down")) : Promise.resolve(stars);
+      return listFails
+        ? Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403))
+        : Promise.resolve(stars);
     }
     if (call.path === "dashboards.getAll") return Promise.resolve(BOARDS);
     if (call.path === "dashboards.create") {
@@ -206,7 +208,10 @@ describe("the Dashboards sidebar", () => {
       await user.unhover(about);
       await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
 
-      about.focus();
+      // Tab from the heading: only keyboard focus opens a tooltip.
+      screen.getByRole("button", { name: "From LangWatch" }).focus();
+      await user.tab();
+      expect(about).toHaveFocus();
       expect(await screen.findByRole("tooltip")).toHaveTextContent(FROM_LANGWATCH_ABOUT);
       expect(screen.getByRole("button", { name: "From LangWatch" })).toHaveAttribute(
         "aria-expanded",
@@ -283,8 +288,9 @@ describe("the Dashboards sidebar", () => {
     /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */
     it("offers Unstar, Move up, Move down then Duplicate to edit on a starred template", async () => {
       const { user } = renderSection();
+      const starred = within(await listNamed("Starred dashboards"));
 
-      await user.click(await screen.findByRole("button", { name: "Actions for Release check" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
       await screen.findByRole("menuitem", { name: "Duplicate to edit" });
 
       expect(menuItemNames()).toEqual(["Unstar", "Move up", "Move down", "Duplicate to edit"]);
@@ -295,26 +301,28 @@ describe("the Dashboards sidebar", () => {
       const { user } = renderSection();
 
       await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
-      expect(await screen.findByRole("menuitem", { name: "Move up" })).toHaveAttribute(
+      expect(await screen.findByRole("menuitem", { name: "Move Latency up" })).toHaveAttribute(
         "aria-disabled",
         "true",
       );
       await user.keyboard("{Escape}");
-      await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Move up" })).toBeNull());
+      await waitFor(() =>
+        expect(screen.queryByRole("menuitem", { name: "Move Latency up" })).toBeNull(),
+      );
 
       await user.click(screen.getByRole("button", { name: "Actions for Release check" }));
-      expect(await screen.findByRole("menuitem", { name: "Move down" })).toHaveAttribute(
-        "aria-disabled",
-        "true",
-      );
+      expect(
+        await screen.findByRole("menuitem", { name: "Move Release check down" }),
+      ).toHaveAttribute("aria-disabled", "true");
     });
 
     /** @scenario "AC155 Move up and Move down reorder the member's stars" */
     it("swaps a star with the one above and saves the order, boards and templates alike", async () => {
       const { user, calls } = renderSection();
+      const starred = within(await listNamed("Starred dashboards"));
 
-      await user.click(await screen.findByRole("button", { name: "Actions for Release check" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Move up" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "dashboards.reorderStars")).toEqual([

@@ -41,6 +41,11 @@ describe("given the evaluations tRPC transport", () => {
         },
         "evaluations.runEvaluation": { kind: "permission", permission: "evaluations:manage" },
         "evaluations.warmupLambda": { kind: "permission", permission: "evaluations:view" },
+        "evaluations.getMonitorPerformanceForProject": {
+          kind: "permission-all",
+          permissions: ["evaluations:view", "analytics:view"],
+        },
+        "evaluations.getEvaluationInputs": { kind: "permission", permission: "traces:view" },
       });
     });
 

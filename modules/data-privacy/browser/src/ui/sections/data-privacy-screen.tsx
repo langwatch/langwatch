@@ -21,14 +21,15 @@ import {
   ScopeChipPicker,
   type ScopeChipPickerScopeType,
 } from "@langwatch/design-system/scope-chip-picker";
-import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+import {
+  ScopeFilter,
+  type ScopeFilterValue,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+} from "@langwatch/design-system/scope-filter";
 import { useMemo } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import {
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,

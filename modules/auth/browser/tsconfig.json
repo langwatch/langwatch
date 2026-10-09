@@ -45,7 +45,13 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../feature-flag/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/client/tsconfig.build.json"
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"

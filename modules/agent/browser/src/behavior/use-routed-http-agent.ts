@@ -1,6 +1,7 @@
 import { httpAgentTestInputSchema } from "@langwatch/agent-contract";
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { getDrawerStack } from "@langwatch/browser-host/drawer";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useRef } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
@@ -39,7 +40,7 @@ export function useRoutedHttpAgent({
   );
   const create = agentApi.agents.create.useMutation();
   const update = agentApi.agents.update.useMutation();
-  const test = agentApi.httpProxy.execute.useMutation();
+  const test = scenarioClient.scenarios.testHttpAgent.useMutation();
 
   const options: HttpAgentEditorOptions = {
     open: true,

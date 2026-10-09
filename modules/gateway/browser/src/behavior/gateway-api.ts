@@ -168,20 +168,6 @@ export type GatewayOrganizationGraph = {
   }[];
 };
 
-export type PersonalWorkspaceContext = {
-  workspace: {
-    team: { id: string; name: string; slug: string; createdAtMs: number };
-    project: {
-      id: string;
-      name: string;
-      slug: string;
-      createdAtMs: number;
-    };
-    created: boolean;
-  };
-  routingPolicy: { id: string; name: string } | null;
-};
-
 export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> &
   ContractApiMap<typeof virtualKeyTrpc> &
   ContractApiMap<typeof gatewayBudgetTrpc> &
@@ -301,12 +287,6 @@ export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> &
           input: Record<string, never>;
           output: GatewayOrganizationGraph[];
         };
-      };
-    };
-
-    user: {
-      personalContext: {
-        query: { input: { organizationId: string }; output: PersonalWorkspaceContext };
       };
     };
 

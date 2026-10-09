@@ -58,10 +58,11 @@ export class DataPrivacyScopeAuthorizationService {
     );
   }
 
+  /** Answers the organization both belong to, which a rule write lands in. */
   async assertScopeBelongsToProjectOrganization(input: {
     projectId: string;
     scope: DataPrivacyScope;
-  }): Promise<void> {
+  }): Promise<string> {
     const [scopeOrganizationId, project] = await Promise.all([
       this.directory.findScopeOrganizationId({ scope: input.scope }),
       this.directory.findProjectLineage({ projectId: input.projectId }),
@@ -78,6 +79,8 @@ export class DataPrivacyScopeAuthorizationService {
     if (projectOrganizationId !== scopeOrganizationId) {
       throw new ScopeOutsideOrganizationError();
     }
+
+    return projectOrganizationId;
   }
 
   private async canWriteScope(input: {

@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
   getStoreForTesting,
-} from "../../../../../behavior/prompt-tabs-store.ts";
+} from "../../../../../features/tabs/behavior/prompt-tabs-store.ts";
 import type { PromptBrowserStorage } from "../../../../../model/browser-capabilities.ts";
 import { PublishedPromptsList } from "../published-prompts-list.tsx";
 

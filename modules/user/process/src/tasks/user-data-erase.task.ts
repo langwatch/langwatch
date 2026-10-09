@@ -5,7 +5,7 @@ import type { GdprUserDataEraseRepository } from "../repositories/user-data-eras
 
 const logger = createLogger("langwatch:task:user-data-erase");
 
-export type GdprUserDataEraseOutcome = {
+type GdprUserDataEraseOutcome = {
   userId: string;
   email: string;
   mode: "dry-run" | "execute";
@@ -114,6 +114,7 @@ export async function runGdprUserDataErase({
   const soleOwnedOrgIds = soleOwnedOrgs.map((org) => org.id);
   const projectIds = projects.map((project) => project.id);
 
+  // The erased fact commits with this transaction, through user's fact outbox.
   await repository.eraseUserAndOwnedResources({
     userId,
     projectIds,

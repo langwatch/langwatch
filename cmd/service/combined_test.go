@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/langwatch/langwatch/pkg/contexts"
 )
 
 // @scenario "The combined Go process hosts the data-plane services"
@@ -60,5 +65,28 @@ func TestCombinedRefusesAnUnknownService(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "langyagent") {
 		t.Errorf("error %q does not name the service that was refused", err)
+	}
+}
+
+// @scenario "A panicking service in the combined Go process stops alone"
+func TestCombinedSurvivesAPanickingService(t *testing.T) {
+	saved := combinedServices
+	t.Cleanup(func() { combinedServices = saved })
+	combinedServices = []combinedService{
+		{Name: "brokensim", Telemetry: "langwatch-service-brokensim", Run: func(context.Context, string) error {
+			panic("simulator bug")
+		}},
+		{Name: "aigateway", Telemetry: "langwatch-service-aigateway", Run: func(ctx context.Context, _ string) error {
+			select {
+			case <-ctx.Done():
+				return errors.New("the gateway was canceled by another service's panic")
+			case <-time.After(200 * time.Millisecond):
+				return nil
+			}
+		}},
+	}
+	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{Service: "langwatch-service-combined"})
+	if err := combinedRoot(ctx, nil); err != nil {
+		t.Fatalf("combinedRoot = %v, want the gateway to outlive the panicking simulator", err)
 	}
 }

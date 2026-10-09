@@ -1,10 +1,11 @@
 import { configuredSsoProviderStatus, extractEmailDomain } from "@langwatch/auth-contract";
-import { HandledError } from "@langwatch/handled-error";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { BetterAuthHooksRepository } from "../repositories/better-auth-hooks.repository.ts";
 
 interface FederatedAccountReadsServiceDeps {
   accounts: BetterAuthHooksRepository;
+  organizations: Pick<OrganizationApi, "findBySsoDomain">;
 }
 
 /**
@@ -41,14 +42,7 @@ export class FederatedAccountReadsService {
 
     const accounts = await this.deps.accounts.findFederatedAccountsForUser({ userId });
     const status = await configuredSsoProviderStatus({
-      organizations: {
-        findByDomain: (args) =>
-          this.deps.accounts.getOrganizationBySsoDomain(args).catch((error: unknown) => {
-            if (HandledError.isHandled(error) && error.code === "organization_not_found")
-              return null;
-            throw error;
-          }),
-      },
+      organizations: { findByDomain: (args) => this.deps.organizations.findBySsoDomain(args) },
       domain,
       accounts,
     });

@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 import { openSideBrowser, type Side, type SideBrowser } from "./capture.ts";
 import { keyed, passesFor, passPlan } from "./color-scheme.ts";
 import { DiffPool } from "./diff-pool.ts";
+import type { DiffFiles, PixelDiff } from "./diff.ts";
+import { judgeFor, type JudgeKey, type PairJudge } from "./judge.ts";
 import { Pairing, readReplay } from "./pairing.ts";
 import { awaitSide } from "./pending-side.ts";
 import { emit, note, type Plan, type PlanFlow, type PlanSide } from "./protocol.ts";
@@ -122,11 +125,28 @@ const captureSide = async ({
   });
 };
 
-const main = async (): Promise<void> => {
-  const plan = readPlan(process.argv.slice(2));
+/** judgedDiffer diffs a pair, then, when the plan has a judge, asks it about the pair. */
+const judgedDiffer =
+  ({ differ, judge }: { differ: DiffPool; judge: PairJudge | undefined }) =>
+  async (files: DiffFiles): Promise<PixelDiff | null> => {
+    const diff = await differ.diff(files);
+    if (diff !== null && judge !== undefined) {
+      await judge.check({
+        label: basename(files.out, ".png"),
+        ratio: diff.ratio,
+        base: readFileSync(files.base),
+        candidate: readFileSync(files.candidate),
+      });
+    }
+    return diff;
+  };
+
+const main = async ({ argv, key }: { argv: string[]; key: JudgeKey }): Promise<void> => {
+  const plan = readPlan(argv);
   emit({ message: { type: "ready" }, out });
   const differ = new DiffPool(DIFF_WORKERS);
-  const pairing = new Pairing(plan, async (files) => differ.diff(files));
+  const judge = judgeFor({ plan, key });
+  const pairing = new Pairing(plan, judgedDiffer({ differ, judge }));
   const diffs: Promise<void>[] = [];
   const collect: Collect = (message) => {
     emit({ message, out });
@@ -181,6 +201,7 @@ const main = async (): Promise<void> => {
       }),
     );
     await windDown({ step: "comparing the screenshots", work: Promise.all(diffs) });
+    judge?.save(join(plan.outDir, "judge.json"));
   } finally {
     await windDown({
       step: "closing the browsers",
@@ -191,15 +212,18 @@ const main = async (): Promise<void> => {
   emit({ message: { type: "done" }, out });
 };
 
-main()
-  .then(() => exit(0))
-  .catch((thrown: unknown) => {
-    emit({
-      message: {
-        type: "error",
-        message: String(thrown instanceof Error ? thrown.message : thrown),
-      },
-      out,
+/** run is the runner's whole life; capture.entrypoint.ts hands it the environment. */
+export const run = ({ argv, key }: { argv: string[]; key: JudgeKey }): void => {
+  main({ argv, key })
+    .then(() => exit(0))
+    .catch((thrown: unknown) => {
+      emit({
+        message: {
+          type: "error",
+          message: String(thrown instanceof Error ? thrown.message : thrown),
+        },
+        out,
+      });
+      exit(1);
     });
-    exit(1);
-  });
+};

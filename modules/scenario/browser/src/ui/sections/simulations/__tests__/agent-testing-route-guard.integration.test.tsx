@@ -9,8 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ flagEnabled: true, permitted: true }));
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
-  useFeatureFlag: (flag: string) => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name: flag }: { name: string }) => ({
     enabled: flag === "release_ui_agent_testing_v2_enabled" && state.flagEnabled,
     isLoading: false,
   }),
@@ -25,7 +25,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 }));
 
 vi.mock("../../../../model/scenario-host.ts", () => ({
-  useScenarioHost: () => ({ hasPermission: () => state.permitted }),
+  useScenarioHost: () => ({ hasPermission: () => state.permitted, isLoading: () => false }),
 }));
 
 vi.mock("../../agent-testing/agent-testing-page.tsx", () => ({

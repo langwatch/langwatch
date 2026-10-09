@@ -9,6 +9,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
+import { recordingLifecycleSenders } from "../../eventing/__tests__/annotation-lifecycle.fixture.ts";
 import type { AnnotationRepositories } from "../../repositories/annotation.repositories.ts";
 import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
 import { AnnotationModule } from "../annotation.app.ts";
@@ -97,9 +98,11 @@ export function createAnnotationTestApp(
       permissions: AuthzApi;
       entitlement: EntitlementApi;
     }>;
+    /** annotation_lifecycle's senders; by default a recording log nobody reads. */
+    facts?: ReturnType<typeof recordingLifecycleSenders>;
   }> = {},
 ): AnnotationModule {
-  return AnnotationModule.create({
+  const app = AnnotationModule.create({
     repositories: input.repositories ?? MemoryAnnotationRepositories.create(),
     dependencies: {
       projects: input.dependencies?.projects ?? createAnnotationTestProjects(),
@@ -111,4 +114,6 @@ export function createAnnotationTestApp(
     },
     config: undefined,
   });
+  app.connectLifecycleCommands((input.facts ?? recordingLifecycleSenders()).senders);
+  return app;
 }

@@ -27,28 +27,28 @@
       "default": "./src/visualization/__tests__/fixtures/index.ts"
     },
     "./chart-frame-document": {
-      "types": "./dist/chart-frame-document.d.ts",
-      "default": "./src/chart-frame-document.ts"
+      "types": "./dist/features/chart-frame/chart-frame-document.d.ts",
+      "default": "./src/features/chart-frame/chart-frame-document.ts"
     },
     "./chart-frame-import-map": {
-      "types": "./dist/chart-frame-import-map.d.ts",
-      "default": "./src/chart-frame-import-map.ts"
+      "types": "./dist/features/chart-frame/chart-frame-import-map.d.ts",
+      "default": "./src/features/chart-frame/chart-frame-import-map.ts"
     },
     "./chart-frame-protocol": {
-      "types": "./dist/chart-frame-protocol.d.ts",
-      "default": "./src/chart-frame-protocol.ts"
+      "types": "./dist/features/chart-frame/chart-frame-protocol.d.ts",
+      "default": "./src/features/chart-frame/chart-frame-protocol.ts"
     },
     "./chart-grid": {
-      "types": "./dist/chart-grid.d.ts",
-      "default": "./src/chart-grid.ts"
+      "types": "./dist/features/dashboard-widget/chart-grid.d.ts",
+      "default": "./src/features/dashboard-widget/chart-grid.ts"
     },
     "./dashboard-widget-definition": {
-      "types": "./dist/dashboard-widget-definition.d.ts",
-      "default": "./src/dashboard-widget-definition.ts"
+      "types": "./dist/features/dashboard-widget/dashboard-widget-definition.d.ts",
+      "default": "./src/features/dashboard-widget/dashboard-widget-definition.ts"
     },
     "./langwatch-ql-limits": {
-      "types": "./dist/langwatch-ql-limits.d.ts",
-      "default": "./src/langwatch-ql-limits.ts"
+      "types": "./dist/features/lwql/langwatch-ql-limits.d.ts",
+      "default": "./src/features/lwql/langwatch-ql-limits.ts"
     }
   },
   "scripts": {

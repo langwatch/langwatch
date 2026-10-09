@@ -1,4 +1,3 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { SessionReader } from "@langwatch/api/hosting";
 import { TrpcHost } from "@langwatch/api/trpc";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
@@ -8,14 +7,11 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
  * @see specs/projects/projects-browser-door.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
-import type { Protections, TraceApi } from "@langwatch/trace-contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
@@ -26,16 +22,9 @@ const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";
 const ORGANIZATION_ID = "organization-1";
 const CREATED_AT = new Date("2026-09-01T00:00:00.000Z");
-const CALLER_PROTECTIONS: Protections = {
-  canSeeCapturedInput: false,
-  canSeeCapturedOutput: true,
-  capturedInputVisibleTo: "Admins",
-  capturedOutputVisibleTo: null,
-};
 
 type Peers = Readonly<{
   auditLog: AuditLogApi;
-  trace: TraceApi;
 }>;
 
 function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
@@ -71,11 +60,7 @@ function installed(peers: Peers) {
           updatedAt: CREATED_AT,
         }),
       }),
-      "api-key": createApiFixture<ApiKeyApi>({}),
-      share: createApiFixture<ShareApi>({}),
-      topic: createApiFixture<TopicApi>({}),
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
-      trace: peers.trace,
       "audit-log": peers.auditLog,
       "data-privacy": createApiFixture<DataPrivacyApi>({}),
     })
@@ -88,12 +73,6 @@ const PERMITTED = { permitted: true, organizationRole: null };
 async function doors(overrides: Partial<Peers> = {}) {
   const runtime = await installed({
     auditLog: overrides.auditLog ?? recordingAuditLog([]),
-    trace:
-      overrides.trace ??
-      createApiFixture<TraceApi>({
-        resolveViewerProtections: async (input) =>
-          input.projectId === PROJECT_ID && input.userId === ACTOR.id ? CALLER_PROTECTIONS : {},
-      }),
   });
   const provided = () => runtime.module(projectProcessModule).provided;
   const host = TrpcHost.create({
@@ -205,29 +184,19 @@ describe("given the project module installed over memory repositories", () => {
     });
   });
 
-  describe("when the field redaction status is read", () => {
-    /** @scenario "the redaction status reads the caller's own protections" */
-    it("answers with what the caller may see", async () => {
+  describe("when somebody reads the field redaction status on the project namespace", () => {
+    /** @scenario "the redaction status is read from traces, not project" */
+    it("answers project.getFieldRedactionStatus as a procedure that does not exist", async () => {
       const { runtime, host } = await doors();
 
       try {
-        expect(
-          await call(host, {
-            path: "project.getFieldRedactionStatus",
-            type: "query",
-            input: { projectId: PROJECT_ID },
-          }),
-        ).toEqual({
-          status: 200,
-          body: {
-            result: {
-              data: {
-                isRedacted: { input: true, output: false },
-                visibleTo: { input: "Admins", output: null },
-              },
-            },
-          },
+        const answer = await call(host, {
+          path: "project.getFieldRedactionStatus",
+          type: "query",
+          input: { projectId: PROJECT_ID },
         });
+
+        expect(answer.status).toBe(404);
       } finally {
         await runtime.stop();
       }

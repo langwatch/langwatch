@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -160,7 +161,7 @@ func (o *Orchestrator) resolveSlug(p UpParams) (string, error) {
 }
 
 // provision resolves the slug, allocates ports, registers the hostnames, writes
-// the overlay + registry entry, and starts the heartbeat. It returns the stack
+// the overlay + registry entry; the caller starts the heartbeat. It returns the stack
 // and a cleanup that deregisters the routes and drops the registry entry. When
 // shouldManageDBs is set it also ensures the shared ClickHouse + Postgres servers
 // and this stack's databases on them before the overlay is written, so
@@ -200,10 +201,14 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// Detected once, here, and read by everything downstream: the plan, the
 		// one-shot jobs, the lanes status reports and the names restart accepts.
 		Layout:      detectLayout(p.WorktreeDir),
-		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
+		LauncherPID: o.sys.Getpid(), LauncherStart: o.sys.ProcessStart(o.sys.Getpid()), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], VoiceSocketPort: ports[nSvc+4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 		PublicURL:            o.cfg.PublicURL,
 		LangyTier:            opts.LangyTier,
+		Mode:                 opts.DeploymentMode.Name,
+		ModeEnv:              opts.DeploymentMode.Env,
+		ModeOverriddenBy:     opts.ModeOverriddenBy,
+		EffectiveMode:        domain.EffectiveMode(opts.DeploymentMode.Name, opts.ModeOverriddenBy),
 		LangyImage:           opts.langyImageTag,
 		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
@@ -319,7 +324,6 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, fmt.Errorf("recording database activity for %q: %w", st.Slug, err)
 	}
 	o.printStack(st)
-	go o.heartbeat(ctx, st)
 	return st, cleanup, nil
 }
 
@@ -518,7 +522,15 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err != nil {
 		return err
 	}
-	defer cleanup()
+	stopBeat := o.startHeartbeat(ctx, st)
+	isHandedOver := false
+	defer func() {
+		stopBeat()
+		if !isHandedOver {
+			cleanup()
+			removeKeeperPlan(st.WorktreeDir, st.Slug)
+		}
+	}()
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.DescribeForLayout(st.Layout))
 
@@ -527,7 +539,14 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	}
 	o.EnsureGateHookForUp(p.WorktreeDir)
 	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
-	o.sup.Supervise(ctx, o.planChildren(st, opts, p.WorktreeDir))
+	o.ensureLangyWorkerBinary(ctx, st, &opts)
+	children := o.planChildren(st, opts, p.WorktreeDir)
+	retireStaleSimsCapture(children)
+	stopBeat()
+	if err := o.handOver(st, children, opts.IsForegroundClient); err != nil {
+		return err
+	}
+	isHandedOver = true
 	return nil
 }
 
@@ -743,6 +762,7 @@ func (o *Orchestrator) UpStub(ctx context.Context, p UpParams, echo func(ports [
 		return err
 	}
 	defer cleanup()
+	go o.heartbeat(ctx, st)
 	var ports []int
 	for _, s := range st.Services {
 		ports = append(ports, s.Port)
@@ -767,7 +787,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	if !ok || st.LauncherPID == o.sys.Getpid() {
 		return true, nil
 	}
-	if !o.sys.ProcessAlive(st.LauncherPID) {
+	if !o.launcherIsOurs(st) {
 		// A dead launcher's registry entry must never block up. Clean it up
 		// and take its hostnames down with it. A route that outlives its stack
 		// is worse than no route: the kernel hands that loopback port to the
@@ -783,7 +803,12 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	// Everything that makes the running stack differ from what was asked for.
 	// A term missing here becomes a silent no-op: `up` reports "nothing to do"
 	// while the stack keeps running under the old settings.
-	selectionMatches := domain.SelectionFromStack(st) == opts.Selection
+	// The mode rides on Selection but a stack record derives none from its
+	// services, so it is compared on its own below.
+	requested := opts.Selection
+	requested.Mode = ""
+	selectionMatches := domain.SelectionFromStack(st) == requested
+	modeMatches := st.Mode == opts.DeploymentMode.Name && slices.Equal(st.ModeEnv, opts.DeploymentMode.Env)
 	imageMatches := st.LangyImage == opts.langyImageTag
 	// The langy isolation posture is a security property, not a preference:
 	// re-running `up` after unsetting LANGY_UNSAFE_CONTAINER must actually put
@@ -795,7 +820,7 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	// a proxy the operator just asked to bypass, defeating the whole escape
 	// hatch — see #7117).
 	portlessMatches := st.PortlessDisabled == o.cfg.PortlessDisabled
-	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && imageMatches && tierMatches && portlessMatches {
+	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && modeMatches && imageMatches && tierMatches && portlessMatches {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
 		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
 		return false, nil
@@ -807,6 +832,8 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		fmt.Printf("stack %q is running — replacing it to rebuild its images (--rebuild)\n", slug)
 	case !portlessMatches:
 		fmt.Printf("stack %q is running with a different PORTLESS setting — restarting it to match\n", slug)
+	case !modeMatches:
+		fmt.Printf("stack %q is running a different deployment mode — restarting it with the requested one\n", slug)
 	case !tierMatches:
 		fmt.Printf("stack %q is running under a different langy isolation tier — restarting it with the requested one\n", slug)
 	case !imageMatches:
@@ -885,7 +912,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 		return err
 	}
 	st, ok := o.stackBySlug(slug)
-	if ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
+	if ok && st.LauncherPID != o.sys.Getpid() && o.launcherIsOurs(st) {
 		if force {
 			// -f: no grace — SIGKILL the launcher's whole process group at once,
 			// for the stack that is wedged or just needs to be gone NOW.
@@ -912,6 +939,10 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	}
 	o.stopNxDaemon(ctx, p.WorktreeDir)
 	o.store.RemoveStack(slug)
+	if ok {
+		removeKeeperPlan(st.WorktreeDir, slug)
+	}
+	removeKeeperPlan(p.WorktreeDir, slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	return nil
 }
@@ -937,6 +968,7 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	}
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
+	st.ClickHousePostgresHost = o.cfg.ClickHousePostgresHost
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	scheme, epPort := o.serviceEndpoint(proxyScheme, proxyPort, port)
 	st.Services = append(st.Services, domain.Service{
@@ -1134,6 +1166,10 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.LLM
 	case domain.AnalyticsService:
 		return opts.Selection.Analytics
+	case domain.OutboundService:
+		return opts.Selection.Outbound
+	case domain.TelemetryService:
+		return opts.Selection.Telemetry
 	default:
 		return true
 	}

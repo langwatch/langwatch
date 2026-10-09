@@ -20,7 +20,7 @@ import (
 )
 
 // canonicalClaudeCodeStatements mirrors the 9-statement starter in
-// `enterprise/modules/governance/contract/src/ingestion-source.ts`.
+// `enterprise/modules/governance/contract/src/features/ingestion/ingestion-source.ts`.
 // Keep these in sync — the contract is that applying THESE statements
 // to a captured Claude Code OTLP/JSON payload yields the canonical
 // `langwatch.*` fields the cost ledger reads from.

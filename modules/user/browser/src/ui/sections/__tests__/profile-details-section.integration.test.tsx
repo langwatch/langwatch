@@ -18,6 +18,8 @@ type NameMutationOptions = { onSuccess?: () => Promise<void>; onError?: (error: 
 vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
+    useUtils: () => ({}),
+    routingPolicy: { personalContext: { useQuery: () => ({ error: null, isFetching: false }) } },
     user: {
       updateName: {
         useMutation: (options: NameMutationOptions) => ({
@@ -35,8 +37,9 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../behavior/user-api.ts", () => ({
-  userApi: { user: { getAvatarUrl: { useQuery: () => ({ data: undefined }) } } },
+vi.mock("../../../behavior/use-user-avatar-url.ts", () => ({
+  useUserAvatarUrl: (image?: string | null) =>
+    image?.startsWith("/api/user-avatar/") ? null : (image ?? null),
 }));
 
 function renderSection(options: FakePersonalHostOptions = {}) {

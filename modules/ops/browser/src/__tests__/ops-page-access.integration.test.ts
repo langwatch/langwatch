@@ -48,11 +48,11 @@ describe("given the pages of the Ops workspace and the Back office", () => {
 
   /** @scenario "The Back office stays narrower than the workspace" */
   it("refuses every Back office page to a reader holding view and not manage", () => {
-    const backOffice = screens.filter(([, screen]) => screen.requires === "ops:manage");
+    const adminScreens = screens.filter(([, screen]) => screen.requires === "ops:manage");
 
     expect(open({ page: WORKSPACE_PAGE, grants: ["ops:view"] })).toEqual({ kind: "open" });
-    expect(backOffice.length).toBeGreaterThan(0);
-    for (const [page] of backOffice) {
+    expect(adminScreens.length).toBeGreaterThan(0);
+    for (const [page] of adminScreens) {
       expect(open({ page, grants: ["ops:view"] })).toEqual({
         kind: "forbidden",
         permission: "ops:manage",

@@ -8,7 +8,6 @@ import type React from "react";
 import { Suspense, useMemo } from "react";
 
 import { LEGAL_LINKS } from "../../behavior/legal-links.ts";
-import { onboardingApi } from "../../behavior/onboarding-api.ts";
 import { desireItems, roleItems, usageStyleItems } from "../../behavior/onboarding-data.ts";
 import {
   type DesireType,
@@ -19,6 +18,7 @@ import {
   type RoleType,
   type UsageStyle,
 } from "../../behavior/types.ts";
+import { useJoinLookup } from "../../behavior/use-join-lookup.ts";
 import { extractJoinInsteadNames, formatJoinInsteadNames } from "../../model/join-instead.ts";
 import { joinOriginOf } from "../../model/join-origin.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
@@ -63,7 +63,7 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const analytics = useUiAnalytics();
   // Answers only for the caller's OWN verified address, so no organization
   // name reaches the browser before the domain is proved.
-  const joinLookup = onboardingApi.joinRequests.lookup.useQuery();
+  const joinLookup = useJoinLookup();
   const joinOffers = useOnboardingHost().joinOffers();
   // A request made on behalf of `langwatch login`'s device page lands a Developer (ADR-171 v6).
   const { query } = useRouter();

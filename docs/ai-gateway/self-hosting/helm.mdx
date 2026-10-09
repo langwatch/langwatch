@@ -75,6 +75,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
   otel:
@@ -101,7 +102,7 @@ helm repo update
 helm upgrade --install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace \
   -f values.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
 
 The umbrella chart bundles the gateway sub-chart, so one `helm upgrade` rolls the app and the gateway together. The gateway Deployment uses a `RollingUpdate` with `maxSurge: 1` and `maxUnavailable: 0`.
@@ -137,12 +138,15 @@ The chart passes these environment variables to the container. Every other key i
 | `LW_GATEWAY_BASE_URL`                                  | `controlPlane.baseUrl`, else `http://<release>-app:5560`             | Control plane URL                              |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_OTLP_ENDPOINT` | `otel.endpoint`, only when set                                       | OTLP/HTTP endpoint for the gateway's own spans |
 | `LW_GATEWAY_SPEND_ENABLED`                             | `spend.enabled`                                                      | Spend record emission                          |
+| `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_PROMETHEUS_PORT` | `otlp,prometheus` and `metrics.port`, only when `metrics.enabled` is `true` | Metrics listener, default port 9464 |
+| `METRICS_API_KEY`                                      | Secret key `metrics.apiKey.secretKey` (default `METRICS_API_KEY`), in `metrics.apiKey.existingSecretName` or else `secrets.existingSecretName`, only when `metrics.enabled` is `true` | Bearer a scrape sends |
 | `SERVER_MAX_REQUEST_BODY_BYTES`                        | `security.maxRequestBodyBytes`                                       | Request body cap                               |
 | `SERVER_DRAIN_DELAY_SECONDS`                           | `shutdown.preDrainWaitSeconds`                                       | Wait after `/readyz` flips to 503              |
 | `SERVER_GRACEFUL_SECONDS`                              | `shutdown.timeoutSeconds`                                            | In-flight request budget on shutdown           |
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS`                       | Secret, key `secrets.jwtSecretPreviousKey`, only when set            | Previous JWT secret during rotation            |
@@ -198,7 +202,8 @@ Watch `gateway_draining` together with `gateway_in_flight_requests`. During a he
 
 | Direction | Allowed                                                                                                | Value                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| Ingress   | Pods in the `ingress-nginx` namespace, and Prometheus pods in the `monitoring` namespace, to port 5563 | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Pods in the `ingress-nginx` namespace, to port 5563                                                    | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Prometheus pods in the `monitoring` namespace, to the metrics port, only when `metrics.enabled` is `true` | `networkPolicy.metricsFrom`                                         |
 | Egress    | DNS to `kube-system` on TCP and UDP 53                                                                 | fixed                                                                  |
 | Egress    | Pods labelled `app.kubernetes.io/name: langwatch-app` on port 5560                                     | `networkPolicy.egressToControlPlane`, `networkPolicy.controlPlanePort` |
 | Egress    | OTLP collector on port 4318, only when the list is non-empty                                           | `networkPolicy.egressToOTLP`                                           |

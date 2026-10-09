@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
+import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
 
 describe("computeSpanCost", () => {
   describe("when span has custom cost rates", () => {

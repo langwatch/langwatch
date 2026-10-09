@@ -1,12 +1,13 @@
-/**
- * @vitest-environment node
- * `GatewayModule.getDeploymentAddresses`: what the checkup's gateway rows read.
- */
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+/**
+ * @vitest-environment node
+ * `GatewayModule.getDeploymentAddresses`: what the checkup's gateway rows read.
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
@@ -24,6 +25,7 @@ function gatewayApp({
   publicUrl?: string;
 }): Promise<GatewayModule> {
   return GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture({}),
       projects: createApiFixture({}),
@@ -39,6 +41,7 @@ function gatewayApp({
     },
     repositories: MemoryGatewayRepositories.create(),
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl,
       controlPlaneUrl,

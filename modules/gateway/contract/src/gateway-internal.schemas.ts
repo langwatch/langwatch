@@ -4,8 +4,8 @@
  */
 import { z } from "zod";
 
+import { spendUsageSchema } from "./features/spend/gateway-spend.schemas.ts";
 import { GUARDRAIL_WIRE_DIRECTIONS } from "./gateway-guardrail.ts";
-import { spendUsageSchema } from "./gateway-spend.schemas.ts";
 
 /** The virtual key a data-plane node presents for exchange against a JWT. */
 export const gatewayInternalResolveKeySchema = z.object({
@@ -90,6 +90,14 @@ export const gatewayInternalReserveSessionSchema = z.object({
   vendor: z.enum(["openai", "elevenlabs"]),
   agent_id: z.string().max(256).optional(),
   model: z.string().min(1).max(512),
+  /** How the session is priced. A string, so a kind added later still books. */
+  kind: z.string().min(1).max(32).optional(),
+  metering: z.enum(["client", "gateway"]).optional(),
+  transcription_model: z.string().min(1).max(512).optional(),
+  /** The end user the mint was attributed to; every spend record of the session carries it. */
+  end_user_id: z.string().max(512).optional(),
+  /** Epoch milliseconds at which the minted credential stops opening a socket. */
+  credential_expires_at: z.number().int().positive().optional(),
 });
 
 /**
@@ -103,21 +111,37 @@ export const gatewayInternalPatchSessionSchema = z
     vendor_conversation_id: z.string().min(1).max(256).optional(),
     status: z.enum(["FAILED", "EXPIRED"]).optional(),
     reason: z.string().max(256).optional(),
+    credential_expires_at: z.number().int().positive().optional(),
   })
-  .refine((body) => Boolean(body.vendor_conversation_id ?? body.status), {
-    message: "a vendor_conversation_id or a terminal status is required",
-  });
+  .refine(
+    (body) => Boolean(body.vendor_conversation_id ?? body.status ?? body.credential_expires_at),
+    { message: "a vendor_conversation_id, a credential expiry or a terminal status is required" },
+  );
 
 /**
  * What one booked session consumed. `virtual_key_id` is required: several
  * keys can point at one project, so the project alone doesn't say whose
  * session this is — spend belongs to the key that was admitted.
  */
-export const gatewayInternalReportUsageSchema = z.object({
-  project_id: z.string().min(1).max(256),
-  virtual_key_id: z.string().min(1).max(256),
-  usage: spendUsageSchema,
-});
+export const gatewayInternalReportUsageSchema = z
+  .object({
+    project_id: z.string().min(1).max(256),
+    virtual_key_id: z.string().min(1).max(256),
+    /** Absent only on a bare close. */
+    usage: spendUsageSchema.optional(),
+    /** Names one report. Absent means `usage` is the session total and closes it. */
+    report_key: z.string().min(1).max(256).optional(),
+    /** Prices this report under another catalog id than the session's. */
+    model: z.string().min(1).max(512).optional(),
+    /** Prices this report under the session's transcription model, unless `model` names one. */
+    priced_as: z.enum(["transcription"]).optional(),
+    final: z.boolean().optional(),
+    duration_ms: z.number().int().min(0).optional(),
+    source: z.enum(["client", "gateway"]).optional(),
+  })
+  .refine((body) => body.usage !== undefined || body.final === true, {
+    message: "usage is required unless the report only closes the session",
+  });
 
 /** The booked session a patch or a usage report names. */
 export const gatewayInternalSessionParamsSchema = z.object({
@@ -208,7 +232,20 @@ export const gatewayInternalPatchSessionAnswers = {
 } as const;
 export const gatewayInternalReportUsageAnswers = {
   ...internalRefusals,
-  200: z.object({ session_id: z.string(), status: z.literal("CLOSED") }),
+  200: z.object({
+    session_id: z.string(),
+    status: z.enum(["recorded", "duplicate", "closed", "already_closed"]),
+    /** This report as rated; zero for a duplicate or a closed session. */
+    cost_nano_usd: z.number().int().min(0),
+    /** Everything recorded for the session so far. */
+    session_cost_nano_usd: z.number().int().min(0),
+    budget: z.object({
+      exceeded: z.boolean(),
+      scope: z.string().optional(),
+      budget_id: z.string().optional(),
+      unknown: z.literal(true).optional(),
+    }),
+  }),
 } as const;
 export const gatewayInternalBootstrapAnswers = {
   ...internalRefusals,
@@ -240,3 +277,20 @@ export const gatewayInternalBucketQuerySchema = z.object({
   budget_id: z.string().default(""),
   end_user_id: z.string().default(""),
 });
+
+/* The credential a connected install presents on `/resolve-key` (ADR-156): `lwl_` and a SHA-256.
+ * The gateway looks a key up by a second hash of it, so a stored hash is never a credential. */
+export const LICENSE_TOKEN_PREFIX = "lwl_";
+
+const LICENSE_TOKEN_SHAPE = /^lwl_[0-9a-f]{64}$/;
+
+/** Whether a presented credential has the shape of a license token. */
+export function isLicenseTokenShape(value: string): boolean {
+  return LICENSE_TOKEN_SHAPE.test(value);
+}
+
+/** What a managed key stores and is looked up by: the SHA-256 of the whole token, as hex. */
+export async function registryHashForToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}

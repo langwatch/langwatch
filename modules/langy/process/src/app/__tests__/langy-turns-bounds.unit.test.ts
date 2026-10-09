@@ -39,6 +39,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryLangyChannels } from "../../channels/memory/memory.langy.channels.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangyModule } from "../langy.app.ts";
 
@@ -81,6 +82,7 @@ function fakePresence(): PresenceApi {
     events: async function* () {},
     cursors: async function* () {},
     readHints: async function* () {},
+    upgradeReadHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };
@@ -131,6 +133,7 @@ async function harness() {
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,
     repositories: MemoryLangyRepositories.create(),
+    channels: MemoryLangyChannels.create(),
   });
   app.connectConversationCommands(
     recordingEventing().register(app.conversationPipeline({ participation: "produce" })).commands,

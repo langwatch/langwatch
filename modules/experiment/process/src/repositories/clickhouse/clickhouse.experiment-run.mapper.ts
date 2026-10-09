@@ -6,7 +6,7 @@
 
 import { Temporal, toEpochMs } from "@langwatch/time";
 
-export const OCCURRED_AT_BUFFER_MS = 24 * 60 * 60 * 1000;
+import { OCCURRED_AT_BUFFER_MS } from "../../rules/experiment-run-occurred-at.rules.ts";
 export const WARN_OLD_RUN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const RUN_ITEMS_DEDUP_KEY =

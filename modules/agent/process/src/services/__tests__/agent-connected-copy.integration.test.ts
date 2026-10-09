@@ -20,11 +20,10 @@ describe("copying a connected agent", () => {
     });
 
     await expect(
-      app.copy({
+      app.createCopy({
         sourceAgentId: registered.id,
         sourceProjectId: registered.projectId,
         targetProjectId: "project_2",
-        actorUserId: "user_1",
         newAgentId: "agent_copy",
       }),
     ).rejects.toMatchObject({ code: "agent_register_only" });

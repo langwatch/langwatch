@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { CreateProjectDrawerToken } from "@langwatch/organization-contract";
+import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -44,6 +44,7 @@ import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-
 import { Select } from "@langwatch/design-system/select";
 
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
+import { useOrganizationHost } from "../../model/organization-host.ts";
 import {
   TeamRoleSelect,
   type TeamUserRoleForm,
@@ -57,7 +58,8 @@ function TeamProjectsBody({
   team: TeamWithProjectsAndMembers;
   onArchiveClick: (project: { id: string; name: string }) => void;
 }) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const host = useOrganizationHost();
 
   return (
     <Table.Body>
@@ -70,7 +72,7 @@ function TeamProjectsBody({
             </HStack>
           </Table.Cell>
           <Table.Cell textAlign="right">
-            {teamProject.id !== project?.id && hasPermission("project:delete") && (
+            {teamProject.id !== project?.id && host.hasPermission("project:delete") && (
               <Button
                 variant="ghost"
                 color="red.fg"
@@ -198,8 +200,8 @@ export const TeamForm = ({
     name: "members",
   });
 
-  const { hasOrgPermission } = useOrganizationTeamProject();
-  const canManageOrganization = hasOrgPermission("organization:manage");
+  const host = useOrganizationHost();
+  const canManageOrganization = host.hasOrganizationPermission("organization:manage");
 
   const queryClient = api.useUtils();
   const { project } = useOrganizationTeamProject();

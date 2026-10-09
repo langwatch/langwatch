@@ -23,16 +23,10 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
-)
-
-// Column widths, padded as plain text and styled afterwards — see
-// havenui.Pad for why that order is not a preference.
-const (
-	nameWidth        = 22
-	requirementWidth = 13
 )
 
 // Result is what the developer decided.
@@ -91,6 +85,8 @@ type model struct {
 	confirmed bool
 	note      string // a one-line refusal, shown until the next keypress
 	width     int
+	// expanded shows the highlighted entry's long explanation (the ? key).
+	expanded bool
 }
 
 func newModel(report []domain.PrereqStatus) model {
@@ -115,12 +111,12 @@ func newRow(st domain.PrereqStatus) row {
 	// Pre-ticked: what haven itself needs. An optional prerequisite is a
 	// convenience, and pre-ticking a convenience is how a tool ends up
 	// installing things nobody asked for.
-	r.ticked = st.Requirement != domain.PrereqOptional
 	for i, c := range st.Candidates {
 		if c.Key == st.Via {
 			r.candidate = i
 		}
 	}
+	r.ticked = st.Requirement != domain.PrereqOptional && !isManual(r)
 	return r
 }
 
@@ -155,6 +151,8 @@ func (m model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case " ":
 		return m.toggleTick(), nil
+	case "?":
+		m.expanded = !m.expanded
 	case "n":
 		return m.toggleNever(), nil
 	case "left", "h":
@@ -171,6 +169,10 @@ func (m model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m model) toggleTick() model {
 	r := &m.rows[m.cursor]
+	if isManual(*r) {
+		m.note = fmt.Sprintf("haven cannot install %s for you, so there is nothing to tick: run its command yourself. It is printed again when this screen closes.", r.st.Name)
+		return m
+	}
 	r.ticked = !r.ticked
 	if r.ticked {
 		r.never = false
@@ -205,6 +207,9 @@ func (m model) cycleCandidate(delta int) model {
 // tick is about this run, and never-ask-again is not.
 func (m model) tickAll(on bool) model {
 	for i := range m.rows {
+		if isManual(m.rows[i]) {
+			continue
+		}
 		m.rows[i].ticked = on
 		if on {
 			m.rows[i].never = false
@@ -220,7 +225,9 @@ func (m model) result() Result {
 	res := Result{Confirmed: true}
 	for _, r := range m.rows {
 		switch {
-		case r.ticked:
+		// A manual entry is handed on untouched by a tick: installing it
+		// prints its command after the picker closes, where it can be copied.
+		case r.ticked && !isManual(r), isManual(r) && !r.never:
 			res.Install = append(res.Install, domain.Chosen{
 				Key:       r.st.Key,
 				Candidate: r.st.Candidates[r.candidate].Key,
@@ -240,9 +247,27 @@ func (m model) View() string {
 		b.WriteString(m.renderRow(i, r))
 	}
 	b.WriteString(m.renderSettled())
-	b.WriteString(m.renderDetail())
 	b.WriteString(m.renderFooter())
-	return havenui.Clamp(b.String(), m.width)
+	return b.String()
+}
+
+// rowIndent is where a row's text starts: past the cursor and the mark column.
+const rowIndent = 9
+
+// wrap fits plain text to the screen after an indent, then styles each line,
+// so no line is ever cut off and the styling never counts towards the width.
+func (m model) wrap(text string, indent int, s lipgloss.Style) string {
+	pad := strings.Repeat(" ", indent)
+	var out []string
+	for _, para := range strings.Split(text, "\n") {
+		if m.width > 0 {
+			para = lipgloss.NewStyle().Width(max(m.width-indent, 20)).Render(para)
+		}
+		for _, line := range strings.Split(para, "\n") {
+			out = append(out, pad+s.Render(strings.TrimRight(line, " ")))
+		}
+	}
+	return strings.Join(out, "\n") + "\n"
 }
 
 func (m model) renderHeader() string {
@@ -251,116 +276,125 @@ func (m model) renderHeader() string {
 		missing = "one thing this machine is missing"
 	}
 	return havenui.Title.Render("haven install") + "\n" +
-		havenui.Muted.Render("  "+missing+" — nothing is installed unless it is ticked") + "\n\n"
+		m.wrap(missing+" "+havenui.Bullet+" enter installs what is ticked", 2, havenui.Muted) + "\n"
 }
 
-// renderRow is cursor, checkbox, name, requirement, and what will happen to
-// it. Not what STATE it is in: every row here is missing, which is why it is
-// on the screen, so repeating that against each one is nine words that
-// distinguish nothing.
+// renderRow is one missing entry as a block: its mark, name and requirement,
+// one sentence of why, and what enter does about it. The long explanation
+// shows only under the cursor, and only after ?.
 func (m model) renderRow(i int, r row) string {
 	cursor := "  "
-	name := havenui.Pad(r.st.Name, nameWidth)
+	name := havenui.Pad(r.st.Name, m.nameWidth())
 	if i == m.cursor {
 		cursor = havenui.Selected.Render(havenui.Cursor + " ")
 		name = havenui.Selected.Render(name)
 	}
-	return cursor + m.box(r) + " " + name +
-		havenui.Muted.Render(havenui.Pad(r.st.Requirement.String(), requirementWidth)) +
-		m.outcome(r) + "\n"
+	var b strings.Builder
+	b.WriteString(cursor + m.mark(r) + name + havenui.Muted.Render(r.st.Requirement.String()) + "\n")
+	if r.st.Summary != "" {
+		b.WriteString(m.wrap(r.st.Summary, rowIndent, havenui.Muted))
+	}
+	b.WriteString(m.outcome(r))
+	if i == m.cursor && m.expanded {
+		// The catalogue indents its continuation lines for the plain-text
+		// listings; wrap does the indenting here, so undo it.
+		if para := strings.ReplaceAll(r.st.Detail, "\n    ", "\n"); para != "" {
+			b.WriteString(m.wrap(para, rowIndent, havenui.Muted))
+		}
+	}
+	return b.String() + "\n"
 }
 
-// box is the row's answer at a glance: what happens when enter is pressed.
-func (m model) box(r row) string {
+// mark is the row's answer at a glance, padded as plain text before styling
+// (havenui.Pad). A manual entry gets a word, not a box: there is nothing to tick.
+func (m model) mark(r row) string {
+	const width = rowIndent - 2
 	switch {
 	case r.never:
-		return havenui.Absent.Render("[" + havenui.Skip + "]")
+		return havenui.Absent.Render(havenui.Pad("["+havenui.Skip+"]", width))
+	case isManual(r):
+		return havenui.Aging.Render(havenui.Pad("manual", width))
 	case r.ticked:
-		return havenui.Selected.Render("[x]")
+		return havenui.Selected.Render(havenui.Pad("[x]", width))
 	default:
-		return "[ ]"
+		return havenui.Pad("[ ]", width)
 	}
 }
 
-// outcome is the consequence of this row's current answer, in the words of
-// what will actually run.
+// isManual reports whether haven cannot run the row's chosen candidate here.
+func isManual(r row) bool {
+	c := r.st.Candidates[r.candidate]
+	command, _ := c.InstallOn(runtime.GOOS)
+	return !c.Declines && command == ""
+}
+
+// outcome is what enter does with this row, in the words of what will run. A
+// manual command sits alone on its own line, wrapped and never cut.
 func (m model) outcome(r row) string {
 	if r.never {
-		return havenui.Absent.Render("never ask again")
+		return m.wrap("never ask again", rowIndent, havenui.Absent)
 	}
 	// An upgrade is the one case where the state is news: the thing is there,
 	// and installing it replaces it rather than adding it.
 	prefix := ""
 	if r.st.State == domain.PrereqOutdated {
-		prefix = havenui.Aging.Render("have "+r.st.Observed) + havenui.Muted.Render(" "+havenui.Bullet+" ")
+		prefix = "have " + r.st.Observed + " " + havenui.Bullet + " "
 	}
 	candidate := r.st.Candidates[r.candidate]
-	if candidate.Declines {
-		// Not an install and not a refusal to install — a decision, which
-		// enter records.
-		return prefix + havenui.Absent.Render("record this choice")
+	command, manual := candidate.InstallOn(runtime.GOOS)
+	choices := ""
+	if len(r.st.Candidates) > 1 {
+		choices = "  (←/→ other choices)"
 	}
-	command, _ := candidate.InstallOn(runtime.GOOS)
 	switch {
+	case candidate.Declines:
+		return m.wrap(prefix+"enter records this choice; nothing is installed"+choices, rowIndent, havenui.Absent)
 	case command == "":
-		return prefix + havenui.Muted.Render("install it yourself")
+		return m.wrap(prefix+"you run this (printed again when this screen closes):"+choices, rowIndent, havenui.Aging) +
+			m.wrap(manual, rowIndent+2, lipgloss.NewStyle())
 	case !r.ticked:
-		return prefix + havenui.Muted.Render("not now")
-	case len(r.st.Candidates) > 1:
-		return prefix + command + havenui.Muted.Render("  ←/→")
+		return m.wrap(prefix+"not now (space to tick)"+choices, rowIndent, havenui.Muted)
 	}
 	// A missing entry's Observed is empty for everything probed by looking,
-	// so this only ever carries the extra a self-answered row needs — the
-	// shell config the PATH row is about to append one line to.
-	if r.st.Observed != "" {
-		return prefix + command + havenui.Muted.Render("  "+r.st.Observed)
+	// so this only ever carries the shell config the PATH row appends to.
+	if r.st.Observed != "" && r.st.State != domain.PrereqOutdated {
+		command += " in " + r.st.Observed
 	}
-	return prefix + command
+	return m.wrap(prefix+"haven installs it: "+command+choices, rowIndent, lipgloss.NewStyle())
 }
 
-// renderSettled names what needed no answer. One line, quiet, and never a
-// list of rows: it is reassurance, not a decision.
+// renderSettled names what needed no answer: a count, then the names dimmed
+// and wrapped. Reassurance, not a decision.
 func (m model) renderSettled() string {
 	var b strings.Builder
 	if len(m.installed) > 0 {
-		b.WriteString("\n" + havenui.Muted.Render("  "+havenui.Yes+" already here: "+strings.Join(m.installed, ", ")) + "\n")
+		b.WriteString(havenui.Good.Render("  "+havenui.Yes) + fmt.Sprintf(" %d already here\n", len(m.installed)))
+		b.WriteString(m.wrap(strings.Join(m.installed, ", "), 4, havenui.Muted))
 	}
 	if len(m.skipped) > 0 {
-		b.WriteString(havenui.Muted.Render("  "+havenui.Skip+" not asking about: "+strings.Join(m.skipped, ", ")) + "\n")
-	}
-	return b.String()
-}
-
-// renderDetail is the pane under the list: what the highlighted entry is for.
-// The command is already on its row, so this is the why, not the how.
-func (m model) renderDetail() string {
-	if m.cursor >= len(m.rows) {
-		return ""
-	}
-	r := m.rows[m.cursor]
-	detail := havenui.Muted.PaddingLeft(6)
-
-	var b strings.Builder
-	b.WriteString("\n" + detail.Render(r.st.Summary) + "\n")
-	// The catalogue indents its continuation lines for the plain-text
-	// listings; here the padding is the style's job, so undo it rather than
-	// let the two stack up.
-	if para := strings.ReplaceAll(r.st.Prereq.Detail, "\n    ", "\n"); para != "" {
-		b.WriteString(detail.Render(para) + "\n")
-	}
-	if c := r.st.Candidates[r.candidate]; c.Declines {
-		b.WriteString("\n" + detail.Render("nothing is installed; haven records the choice and stops asking.") + "\n")
-	} else if command, manual := c.InstallOn(runtime.GOOS); command == "" {
-		b.WriteString("\n" + detail.Render("haven will not run this one for you:\n"+manual) + "\n")
+		b.WriteString(havenui.Muted.Render("  "+havenui.Skip) + fmt.Sprintf(" %d not asked about\n", len(m.skipped)))
+		b.WriteString(m.wrap(strings.Join(m.skipped, ", "), 4, havenui.Muted))
 	}
 	return b.String()
 }
 
 func (m model) renderFooter() string {
 	if m.note != "" {
-		return "\n" + havenui.Warn.Render("  "+m.note) + "\n"
+		return "\n" + m.wrap(m.note, 2, havenui.Warn)
 	}
-	return "\n" + havenui.Keys(
-		"space tick", "n never ask again", "a all", "d none", "enter install", "q quit",
-	) + "\n"
+	more := "? why"
+	if m.expanded {
+		more = "? less"
+	}
+	hints := []string{"space tick", "n never ask again", more, "a all", "d none", "enter install ticked", "q quit"}
+	return "\n" + m.wrap(strings.Join(hints, " "+havenui.Bullet+" "), 2, havenui.Muted)
+}
+
+// nameWidth is the longest row name plus a two-space gutter.
+func (m model) nameWidth() int {
+	w := 0
+	for i := range m.rows {
+		w = max(w, lipgloss.Width(m.rows[i].st.Name))
+	}
+	return w + 2
 }

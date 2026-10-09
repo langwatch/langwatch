@@ -36,6 +36,26 @@ export const messageLimitInfoSchema = z
   .strict();
 export type MessageLimitInfo = z.infer<typeof messageLimitInfoSchema>;
 
+/** Seats used against seats the plan includes, for one seat type. */
+export const seatUsageSchema = z
+  .object({ current: z.number(), max: z.number(), exceeded: z.boolean() })
+  .strict();
+export type SeatUsage = z.infer<typeof seatUsageSchema>;
+
+/**
+ * Whether the organization uses more seats than its plan includes, which a plan
+ * shrinking under a full organization leaves behind (specs/licensing/subscription-page.feature).
+ */
+export const seatLimitInfoSchema = z
+  .object({
+    status: z.enum(["ok", "exceeded"]),
+    members: seatUsageSchema,
+    membersLite: seatUsageSchema,
+    message: z.string(),
+  })
+  .strict();
+export type SeatLimitInfo = z.infer<typeof seatLimitInfoSchema>;
+
 /** One organization's usage for the current period, and the plan it is measured against. */
 export const usageStatsSchema = z
   .object({
@@ -54,6 +74,7 @@ export const usageStatsSchema = z
     /** Developer seats (ADR-171): shown beside the metered seats, never capped. */
     membersDeveloperCount: z.number(),
     messageLimitInfo: messageLimitInfoSchema,
+    seatLimitInfo: seatLimitInfoSchema,
     usageUnit: usageUnitSchema,
   })
   .strict();

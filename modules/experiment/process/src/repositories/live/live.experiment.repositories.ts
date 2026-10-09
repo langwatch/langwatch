@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ExperimentServerConfig } from "@langwatch/experiment-contract";
 import type { Cluster, Redis } from "ioredis";
 
 import { ClickHouseExperimentDspyRepository } from "../clickhouse/clickhouse.experiment-dspy.repository.ts";
@@ -34,10 +35,12 @@ export class LiveExperimentRepositories {
     prisma,
     clickhouse,
     redis,
+    config,
   }: Readonly<{
     prisma: ExperimentDatabase & ExperimentWorkflowVersionDatabase & ExperimentPeopleDatabase;
     clickhouse: ClickHouseQueryClient;
     redis: Redis | Cluster;
+    config: Pick<ExperimentServerConfig, "foldCacheTtlSeconds">;
   }>): ExperimentRepositories {
     const resolveClient = ClickHouseExperimentSession.resolverOver(clickhouse);
     const telemetry = ClickHouseExperimentRunRepository.loggedTelemetry();
@@ -61,6 +64,7 @@ export class LiveExperimentRepositories {
             resolveClient,
             defaultRetentionDays,
             redis,
+            foldCacheTtlSeconds: config.foldCacheTtlSeconds,
           });
           return {
             folds,

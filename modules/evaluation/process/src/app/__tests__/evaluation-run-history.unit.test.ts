@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
  */
@@ -6,14 +7,15 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import { memoryStores, type ObjectStorage } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -73,7 +75,7 @@ describe("given a process that installs the evaluation module over its repositor
           evaluator: createApiFixture<EvaluatorApi>(),
           monitor: createApiFixture<MonitorApi>(),
           dataset: createApiFixture<DatasetApi>(),
-          experiment: createApiFixture<ExperimentApi>(),
+          "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
           project: createApiFixture<ProjectApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
@@ -93,10 +95,6 @@ describe("given a process that installs the evaluation module over its repositor
         await expect(app.findRunsByTraceId({ tenantId: TENANT, traceId: TRACE })).resolves.toEqual([
           run(),
         ]);
-        const evaluations = await app.findTraceEvaluations({ tenantId: TENANT, traceIds: [TRACE] });
-        expect(evaluations[TRACE]).toMatchObject([
-          { evaluationId: "evaluation-1", status: "processed", inputs: { output: "hello" } },
-        ]);
         await expect(
           app.getRunByEvaluationId({ tenantId: "project-2", evaluationId: "evaluation-1" }),
         ).rejects.toMatchObject({ code: "evaluation_not_found" });
@@ -112,17 +110,18 @@ describe("given the live evaluation repositories over the process's ClickHouse m
     /** @scenario "The live tier reads run history through the process's routing ClickHouse" */
     it("names the tenant on every statement and passes only the member's settings", async () => {
       const statements: { tenantId: string; settings?: Record<string, string | number> }[] = [];
-      const clickhouse = createApiFixture<ProcessMembers["clickhouse"]>({
+      const clickhouse = createApiFixture<ClickHouseQueryClient>({
         query: async (request) => {
           statements.push({ tenantId: request.tenantId, settings: request.settings });
           return { rows: [] };
         },
       });
       const repositories = LiveEvaluationRepositories.create({
-        prisma: createApiFixture<ProcessMembers["prisma"]>(),
+        prisma: createApiFixture<PrismaClient>(),
         clickhouse,
-        redis: createApiFixture<ProcessMembers["redis"]>(),
-        objectStorage: createApiFixture<ProcessMembers["objectStorage"]>(),
+        redis: createApiFixture<RedisConnection>(),
+        objectStorage: createApiFixture<ObjectStorage>(),
+        config: { foldCacheTtlSeconds: 300 },
       });
 
       await expect(
@@ -152,16 +151,17 @@ describe("given the live run read over a tenant's retention from data retention"
   async function fallbackFloorMs(retention: Pick<DataRetentionApi, "getRetentionDays">) {
     const probes: number[] = [];
     const repositories = LiveEvaluationRepositories.create({
-      prisma: createApiFixture<ProcessMembers["prisma"]>(),
-      clickhouse: createApiFixture<ProcessMembers["clickhouse"]>({
+      prisma: createApiFixture<PrismaClient>(),
+      clickhouse: createApiFixture<ClickHouseQueryClient>({
         query: async (request) => {
           const sinceMs = request.params?.sinceMs;
           if (typeof sinceMs === "number") probes.push(sinceMs);
           return { rows: [] };
         },
       }),
-      redis: createApiFixture<ProcessMembers["redis"]>(),
-      objectStorage: createApiFixture<ProcessMembers["objectStorage"]>(),
+      redis: createApiFixture<RedisConnection>(),
+      objectStorage: createApiFixture<ObjectStorage>(),
+      config: { foldCacheTtlSeconds: 300 },
     });
     const before = nowInstant().epochMilliseconds;
     await expect(

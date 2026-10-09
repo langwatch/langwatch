@@ -16,6 +16,7 @@ import type { FuzzPlan, Navigation, Oracle } from "./protocol.ts";
 import { oracleOf, routeLabel, signatureOf, trailLine } from "./report.ts";
 import { hashSeed, mulberry32, type Rng } from "./rng.ts";
 import type { VisitSink } from "./sink.ts";
+import type { VisionCheck } from "./vision.ts";
 
 /** Collector buffers what one page reports between two looks, so a finding names its action. */
 export class Collector {
@@ -119,6 +120,8 @@ export interface Visit {
   avoid: readonly RegExp[];
   now: () => number;
   deadline: number;
+  /** vision, when the plan asks for it, judges the settled screen of a visit that found nothing. */
+  vision?: VisionCheck;
 }
 
 export interface VisitResult {
@@ -207,7 +210,10 @@ class RouteWalk {
 
   private async open(): Promise<void> {
     if (this.navigation === "in-app") {
-      if (await this.moveInApp()) return this.inspect();
+      if (await this.moveInApp()) {
+        await this.inspect();
+        return this.look();
+      }
       this.navigation = "reload";
       this.fellBack = true;
     }
@@ -219,6 +225,25 @@ class RouteWalk {
     });
     await this.settle();
     await this.inspect();
+    await this.look();
+  }
+
+  /** look asks the vision check about the opened route, once the other oracles found nothing. */
+  private async look(): Promise<void> {
+    const { vision, route } = this.visit;
+    if (vision === undefined || this.findings > 0 || this.error !== "") return;
+    const image = await bounded<Buffer | undefined>({
+      work: this.page.screenshot({ animations: "disabled", timeout: READ_TIMEOUT_MILLIS }),
+      millis: READ_TIMEOUT_MILLIS,
+      fallback: undefined,
+    });
+    if (image === undefined) return;
+    const aria = await bounded({
+      work: this.page.locator("body").ariaSnapshot({ timeout: READ_TIMEOUT_MILLIS }),
+      millis: READ_TIMEOUT_MILLIS,
+      fallback: "",
+    });
+    await this.record(await vision.check({ route, image, aria }));
   }
 
   /** step does one action; false ends the visit because the page stopped answering. */

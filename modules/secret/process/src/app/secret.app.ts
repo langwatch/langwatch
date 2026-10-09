@@ -24,12 +24,7 @@ import { OneTimeRevealService } from "../services/one-time-reveal.service.ts";
 import { SecretService } from "../services/secret.service.ts";
 
 /** The secret feature application shared by all transports; its live stores seal values. */
-type SecretSetup = FeatureSetup<
-  typeof SecretModule.dependencies,
-  never,
-  undefined,
-  SecretRepositories
->;
+type SecretSetup = FeatureSetup<typeof SecretModule.dependencies, undefined, SecretRepositories>;
 
 export class SecretModule implements SecretApiContract {
   static readonly contract = SecretApi;

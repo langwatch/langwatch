@@ -388,7 +388,9 @@ is started.
   successful build** — a broken edit prints the compile error once and leaves
   the previous process serving.
 - One knob sets both quiet periods, so they cannot drift:
-  `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`, **default 750 ms** after the last write.
+  `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`: the Node side **defaults to 2 s** after
+  the last write, at most 30 s after the first (ADR-168; 750 ms saw an agent's
+  edits as separate bursts), and air's delay to 750 ms.
   An agent writing hundreds of files across a feature package in a few seconds
   produces one restart, not hundreds of reconnects to Postgres, ClickHouse and
   Redis.
@@ -468,3 +470,5 @@ process boots, migrate, then report healthy.**
 
 Spec: `specs/setup/boot-sequence.feature`. See also
 `specs/setup/schema-migrations-on-start.feature` for the deployed start path.
+
+**Amendment 2026-10-09:** on macOS haven now runs ClickHouse natively by default; the container tier (colima) is the fallback.

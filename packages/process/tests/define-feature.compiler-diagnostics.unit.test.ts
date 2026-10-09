@@ -93,10 +93,10 @@ describe("defineProcessModule compiler diagnostics", () => {
         static readonly contract = Contract;
         static readonly dependencies = {};
         readonly value = "ok";
-        static create(setup: FeatureSetup<{}, {}, undefined>): App { return new App(); }
+        static create(setup: FeatureSetup<{}, undefined>): App { return new App(); }
       }
       const feature = defineProcessModule("annotation").withApi(App).build();
-      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
         .withModules([feature]);
     `);
     expect(diagnostics).toEqual([]);
@@ -118,13 +118,13 @@ describe("defineProcessModule compiler diagnostics", () => {
         static readonly dependencies = { projects: ProjectApi };
         readonly #projects: ProjectApi;
         private constructor(projects: ProjectApi) { this.#projects = projects; }
-        static create({ dependencies }: FeatureSetup<typeof App.dependencies, {}, undefined>): App {
+        static create({ dependencies }: FeatureSetup<typeof App.dependencies, undefined>): App {
           return new App(dependencies.projects);
         }
         projectName(): string { return this.#projects.name(); }
       }
       const feature = defineProcessModule("annotation").withApi(App).build();
-      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
         .withModules([feature]);
     `),
     ).toEqual([]);
@@ -155,7 +155,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       class App {
         static readonly contract = AnnotationApi;
         static readonly dependencies = { projects: ProjectService };
-        static create(setup: FeatureSetup<typeof App.dependencies, {}, undefined>): AnnotationApi { return { save: () => "saved" }; }
+        static create(setup: FeatureSetup<typeof App.dependencies, undefined>): AnnotationApi { return { save: () => "saved" }; }
       }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
@@ -167,7 +167,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       `
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, undefined>): App { setup.dependencies.missing; return new App(); } } // EXPECT
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined>): App { setup.dependencies.missing; return new App(); } } // EXPECT
       defineProcessModule("annotation").withApi(App).build();
     `,
     ],
@@ -178,7 +178,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       abstract class Peer { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = { peer: Peer }; readonly value = "ok"; static create(setup: FeatureSetup<{ other: typeof Peer }, undefined, undefined>): App { return new App(); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = { peer: Peer }; readonly value = "ok"; static create(setup: FeatureSetup<{ other: typeof Peer }, undefined>): App { return new App(); } }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
@@ -188,7 +188,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       `
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, { required: string }>): App { return new App(); } }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
@@ -200,7 +200,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { Config } from "__CONFIG__";
       import { z } from "__ZOD__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; static readonly config = Config.define((c) => ({ other: c.env("OTHER", z.coerce.number()) })); readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; static readonly config = Config.define((c) => ({ other: c.env("OTHER", z.coerce.number()) })); readonly value = "ok"; static create(setup: FeatureSetup<{}, { required: string }>): App { return new App(); } }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
@@ -265,7 +265,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       class App {
         static readonly contract = App;
         static readonly dependencies = {};
-        static create({ repositories }: FeatureSetup<{}, never, undefined, Repositories>) { return new App(); }
+        static create({ repositories }: FeatureSetup<{}, undefined, Repositories>) { return new App(); }
       }
       defineProcessModule("annotation").withRepositories(repositories).withApi(App); // EXPECT
     `,
@@ -285,7 +285,7 @@ describe("defineProcessModule compiler diagnostics", () => {
         static readonly dependencies = {};
         static readonly config = Config.define((c) => ({ suffix: c.env("SUFFIX", z.string()) }));
         readonly value = "ok";
-        static create(setup: FeatureSetup<{}, {}, { suffix: string }>): App { return new App(); }
+        static create(setup: FeatureSetup<{}, { suffix: string }>): App { return new App(); }
       }
       const feature = defineProcessModule("annotation").withApi(App).build();`;
 
@@ -296,7 +296,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
-      new ApplicationBuilder({ role: "api", config: { annotation: { suffix: "!" } }, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config: { annotation: { suffix: "!" } }, stores: memberSourceOf({}) })
         .withModules([feature]);
     `),
     ).toEqual([]);
@@ -310,7 +310,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
       const config: Readonly<Record<string, unknown>> = { annotation: { suffix: "!" } };
-      new ApplicationBuilder({ role: "api", config, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config, stores: memberSourceOf({}) })
         .withModules([feature]);
     `),
     ).toEqual([]);
@@ -323,7 +323,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
-      new ApplicationBuilder({ role: "api", config: { other: {} }, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config: { other: {} }, stores: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
     `,
       "TS2345",
@@ -337,27 +337,10 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
-      new ApplicationBuilder({ role: "api", config: { annotation: {} }, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config: { annotation: {} }, stores: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
     `,
       "TS2345",
-    );
-  });
-
-  /** @scenario "A pool that lacks a member an installed module names" */
-  it("rejects a module list whose members lack one a module names", () => {
-    expectOnlyDiagnostic(
-      `
-      import { ApplicationBuilder } from "__APPLICATION__";
-      import { memberSourceOf } from "__MEMBERS__";
-      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
-      abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.members.suffix); } }
-      const feature = defineProcessModule("annotation").withApi(App).build();
-      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
-        .withModules([feature]); // EXPECT
-    `,
-      "TS2322",
     );
   });
 });

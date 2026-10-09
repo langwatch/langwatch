@@ -6,6 +6,7 @@
 
 import { DrawerOffsetProvider } from "@langwatch/design-system/drawer";
 import { Center, Spinner } from "@langwatch/design-system/primitives";
+import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -18,6 +19,11 @@ import {
   splitAsPath,
   subscribeDrawerProps,
 } from "../../behavior/use-drawer.ts";
+import {
+  BrowserDrawerUndeclaredError,
+  declareDrawers,
+  isDeclaredDrawer,
+} from "../../model/drawer-declarations.ts";
 import type { UiDrawerRegistry } from "../../model/drawer-registry.ts";
 import { URL_QS_PARSE_OPTIONS } from "../../model/qs-parse-options.ts";
 
@@ -30,6 +36,18 @@ export type CurrentDrawerRestriction = {
   blocks: (drawer: string) => string | undefined;
   onBlocked?: (resource: string) => void;
 };
+
+const logger = createLogger("CurrentDrawer");
+
+/** The address with every `drawer.*` param stripped, the rest of the query kept. */
+function addressWithoutDrawer(query: Readonly<Record<string, string | undefined>>): string {
+  return (
+    "?" +
+    qs.stringify(
+      Object.fromEntries(Object.entries(query).filter(([key]) => !key.startsWith("drawer."))),
+    )
+  );
+}
 
 type QueryDrawer = {
   open: string;
@@ -83,20 +101,30 @@ export function CurrentDrawer({
     restriction?.onBlocked?.(restrictedResource);
 
     // Clear drawer from URL so it doesn't persist in browser history.
-    router.push(
-      "?" +
-        qs.stringify(
-          Object.fromEntries(
-            Object.entries(router.query).filter(([key]) => !key.startsWith("drawer.")),
-          ),
-        ),
-    );
+    router.push(addressWithoutDrawer(router.query));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restrictedResource]);
 
+  useEffect(() => declareDrawers(drawers), [drawers]);
+
+  // A stale or hand-written address naming a drawer no module declared: refused by name, the
+  // drawer params stripped, and the page under it still renders.
+  const undeclaredDrawer =
+    drawerType && !restrictedResource && !isDeclaredDrawer({ drawers, drawer: drawerType })
+      ? drawerType
+      : undefined;
+
+  useEffect(() => {
+    if (!undeclaredDrawer) return;
+    const refusal = new BrowserDrawerUndeclaredError(undeclaredDrawer);
+    logger.warn({ code: refusal.code, drawer: refusal.drawer }, refusal.message);
+    router.push(addressWithoutDrawer(router.query), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [undeclaredDrawer]);
+
   const CurrentDrawerComponent =
-    drawerType && !restrictedResource
-      ? (drawers[drawerType] as React.FC<Record<string, unknown>> | undefined)
+    drawerType && !restrictedResource && !undeclaredDrawer
+      ? (drawers[drawerType] as React.FC<Record<string, unknown>>)
       : undefined;
 
   // Dev warning: detect duplicate drawer rendering via DOM check
@@ -137,14 +165,7 @@ export function CurrentDrawer({
         resetKeys={[drawerType]}
         fallback={null}
         onError={() => {
-          router.push(
-            "?" +
-              qs.stringify(
-                Object.fromEntries(
-                  Object.entries(router.query).filter(([key]) => !key.startsWith("drawer.")),
-                ),
-              ),
-          );
+          router.push(addressWithoutDrawer(router.query));
         }}
       >
         <Suspense fallback={<DrawerLoadingFallback />}>

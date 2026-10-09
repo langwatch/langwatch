@@ -26,7 +26,7 @@ import { describe, expect, it } from "vitest";
 import {
   findEnvironmentClaimComplaints,
   type EnvironmentReader,
-} from "../environment-ownership.rules.ts";
+} from "../../features/agents/rules/environment-ownership.rules.ts";
 
 const ENVIRONMENT = "https://orgtest01.crm4.dynamics.com";
 

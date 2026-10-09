@@ -68,6 +68,7 @@ function installation() {
   const process = createApp({ role: "api" })
     .withModules([codingAgentProcessModule])
     .withStores(memoryStores())
+    .withConfig({ "coding-agent": { foldCacheTtlSeconds: 300 } })
     .provide({
       project: createApiFixture<ProjectApi>({
         listByOrganization: async ({ page, limit }) => ({

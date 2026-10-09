@@ -2,8 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import type {
   DashboardData,
   OpsMigrationOverview,
+  OpsUpgradeStatus,
   ProcessFleetSummary,
   UsageReportOpsHealth,
+  UsageReportUpgrade,
 } from "@langwatch/ops-contract";
 import { Temporal } from "@langwatch/time";
 
@@ -18,6 +20,7 @@ export interface OpsHealthReaders {
   readonly findDashboardData: () => DashboardData | null;
   readonly getFleetSummary: () => Promise<ProcessFleetSummary[]>;
   readonly listSystemMigrations: () => Promise<OpsMigrationOverview[]>;
+  readonly getUpgradeStatus: () => Promise<OpsUpgradeStatus>;
 }
 
 type PipelineHealth = NonNullable<UsageReportOpsHealth["pipelines"]>[string];
@@ -36,9 +39,10 @@ export class OpsHealthService {
 
   async read(): Promise<UsageReportOpsHealth> {
     const dashboard = this.readers.findDashboardData();
-    const [[fleet], [migrations]] = await Promise.all([
+    const [[fleet], [migrations], [upgrade]] = await Promise.all([
       findSection({ section: "fleet", read: this.readers.getFleetSummary }),
       findSection({ section: "migrations", read: this.readers.listSystemMigrations }),
+      findSection({ section: "upgrade", read: this.readers.getUpgradeStatus }),
     ]);
     return {
       snapshot_at: dashboard?.snapshot.computedAt
@@ -64,8 +68,29 @@ export class OpsHealthService {
             ]),
           )
         : null,
+      upgrade: upgrade ? upgradeOf({ status: upgrade, migrations }) : null,
     };
   }
+}
+
+/** Counts and our own release names only: never a step id, an error or a tenant. */
+function upgradeOf({
+  status,
+  migrations,
+}: {
+  status: OpsUpgradeStatus;
+  migrations: readonly OpsMigrationOverview[] | undefined;
+}): UsageReportUpgrade {
+  return {
+    state: status.state,
+    release: status.installed,
+    floor: status.floor,
+    failed_steps: status.failedStepIds.length,
+    failed_targets: status.failedTargets,
+    held_tenants: migrations
+      ? migrations.reduce((sum, migration) => sum + migration.counts.parked, 0)
+      : null,
+  };
 }
 
 function pipelinesOf({

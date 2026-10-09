@@ -21,6 +21,7 @@ import type { ScimRepository } from "../../repositories/scim.repository.ts";
 export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): ScimRepository {
   return {
     findOrganizationBySsoDomain: vi.fn(async () => null),
+    findOrganizationNames: vi.fn(async () => []),
     createToken: vi.fn(async () => ({ id: "token-1" })),
     findTokens: vi.fn(async () => []),
     findToken: vi.fn(async () => null),
@@ -29,6 +30,7 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     findTokenIdsForConnection: vi.fn(async () => []),
     moveDirectoryToConnection: vi.fn(async () => undefined),
     findTokensByHashes: vi.fn(async () => []),
+    replaceTokenDigest: vi.fn(async () => undefined),
     recordTokenUse: vi.fn(async () => undefined),
     findMembership: vi.fn(async () => null),
     findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),

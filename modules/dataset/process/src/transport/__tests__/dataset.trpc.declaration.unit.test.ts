@@ -5,8 +5,8 @@
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
 import {
-  batchRecordTrpc,
   DatasetNotReadyError,
+  datasetApiUpsertTargetInputSchema,
   datasetPageSchema,
   datasetSchema,
   datasetRecordTrpc,
@@ -16,7 +16,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
-import { batchRecordTrpcTransport } from "../batch-record.trpc.ts";
 import { datasetRecordTrpcTransport } from "../dataset-record.trpc.ts";
 import { datasetTrpcTransport } from "../dataset.trpc.ts";
 
@@ -119,42 +118,17 @@ describe("the dataset tRPC declaration", () => {
         ["deleteMany", "mutation", "datasets:delete"],
       ]);
     });
-
-    /**
-     * @scenario "The server repeats nothing the contract said"
-     * @scenario "The dataset transports move without changing who may call them"
-     */
-    it("keeps the batchRecord wire names, kinds and permissions", () => {
-      const { permissions } = mounted(batchRecordTrpcTransport, completeDatasetApi());
-      const table = Object.entries(batchRecordTrpc.members).map(([name, member], index) => [
-        name,
-        member.kind,
-        permissions[index],
-      ]);
-
-      expect(table).toEqual([
-        ["getAllByexperimentIdGroup", "query", "workflows:view"],
-        ["getAllByexperimentSlug", "query", "workflows:view"],
-      ]);
-    });
   });
 
   describe("when the caller names an experiment instead of a dataset name", () => {
-    it("forwards the experiment id to the application", async () => {
-      const upsertDataset = vi.fn(async () => ({}) as never);
-      const handlers = callable(
-        datasetTrpcTransport,
-        completeDatasetApi({ upsertDataset: upsertDataset as never }),
-      );
-
-      await handlers.upsert!({
-        ...invocation,
-        input: { projectId: "project-1", experimentId: "experiment-1", columnTypes: [] },
+    /** @scenario "A dataset upsert names its dataset outright" */
+    it("refuses the input before the application is asked", () => {
+      const parsed = datasetApiUpsertTargetInputSchema.safeParse({
+        experimentId: "experiment-1",
+        columnTypes: [],
       });
 
-      expect(upsertDataset).toHaveBeenCalledWith(
-        expect.objectContaining({ experimentId: "experiment-1", name: undefined }),
-      );
+      expect(parsed.success).toBe(false);
     });
   });
 

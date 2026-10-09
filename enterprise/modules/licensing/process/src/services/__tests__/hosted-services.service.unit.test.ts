@@ -6,7 +6,7 @@ import {
   type HostedCaller,
 } from "@langwatch/enterprise-licensing-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { InstantEvalJudgement } from "@langwatch/instant-eval-contract";
+import type { InstantEvalJudgement } from "@langwatch/instant-eval-judge-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

@@ -39,6 +39,7 @@ function unusedRepository(): EvaluatorRepository {
     findByWorkflow: notUsedHere,
     findByIdOrSlug: notUsedHere,
     findAll: notUsedHere,
+    countActiveByProjects: notUsedHere,
     findCopies: notUsedHere,
     create: notUsedHere,
     update: notUsedHere,

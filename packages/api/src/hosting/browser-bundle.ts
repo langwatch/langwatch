@@ -6,7 +6,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { publicEndpoint } from "../access-policy.ts";
 import type { SecurityHeaders } from "../policy/security-headers.ts";
+import { registerRoutePolicy } from "../route-registry.ts";
 import type { HttpFailureAnswer, HttpHandler } from "./http-mux.ts";
 import type { SessionCaller, SessionReader } from "./session-reader.ts";
 
@@ -31,8 +33,33 @@ const NO_STORE_CACHE = "no-store, max-age=0";
 // the new chunk hashes; a cached shell would reload into hashes that are gone.
 const HTML_REVALIDATE_CACHE = "no-cache";
 
+/**
+ * What /index.html answers when no build is on disk: a development api still renders the
+ * shell's public config, which the dev UI server lifts (specs/ui/dev-public-config.feature).
+ */
+const BARE_SHELL = "<!doctype html><html><head></head><body></body></html>";
+const BARE_SHELL_PATH = "/index.html";
+
 /** Where the bundle's content-hashed assets live, and are cached forever. */
 const ASSET_PREFIX = "/assets/";
+
+/** The fonts the shell's stylesheets load at startup from the bundle root (apps/ui/public). */
+const STARTUP_FONTS = ["Bold", "Extralight", "Light", "Medium", "Regular"].map(
+  (weight) => `/fonts/Sentient-${weight}.woff2`,
+);
+
+/**
+ * What the bundle serves while the installation upgrades (UIW-BUNDLE-PASS): its assets, the root
+ * files the shell loads at startup, sign-in and the Upgrades pages. Never `GET /*`.
+ */
+const SERVED_WHILE_UPGRADING: readonly { method: string; path: string }[] = [
+  { method: "HEAD", path: "/assets/*" },
+  ...["/assets/*", "/favicon.ico", "/favicon.svg", ...STARTUP_FONTS].map((path) => ({
+    method: "GET",
+    path,
+  })),
+  ...["/auth/signin", "/ops/upgrades", "/ops/upgrades/*"].map((path) => ({ method: "GET", path })),
+];
 
 /**
  * What this deployment injects into the shell's head, knowing who is asking.
@@ -64,6 +91,23 @@ export class BrowserBundle {
     authorizeDocument?: DocumentAccess;
   }): BrowserBundle {
     return new BrowserBundle(options);
+  }
+
+  /** Puts the paths it serves while upgrading in the route-policy registry. Idempotent. */
+  static registerRoutePolicies(): void {
+    for (const { method, path } of SERVED_WHILE_UPGRADING) {
+      registerRoutePolicy({
+        method,
+        path,
+        policy: publicEndpoint(
+          "a browser bundle file or the SPA shell; the shell reads the session and authorizes itself",
+        ),
+        family: "browser-bundle",
+        credentialClass: "none",
+        credential: "public",
+        servesWhileUpgrading: true,
+      });
+    }
   }
 
   private readonly dist: string | undefined;
@@ -134,7 +178,7 @@ export class BrowserBundle {
     const file = path.join(dist, relative);
 
     if (path.extname(file) === ".html" && !pathname.startsWith(ASSET_PREFIX)) {
-      const shell = await this.shell(file, request);
+      const shell = await this.shell(file, request, pathname === BARE_SHELL_PATH);
 
       if (shell) return shell;
     } else {
@@ -184,7 +228,11 @@ export class BrowserBundle {
   }
 
   /** The shell, with this deployment's configuration for whoever is asking. */
-  private async shell(file: string, request: Request): Promise<Response | undefined> {
+  private async shell(
+    file: string,
+    request: Request,
+    bareFallback = false,
+  ): Promise<Response | undefined> {
     let html: string;
 
     try {
@@ -198,8 +246,9 @@ export class BrowserBundle {
         fs.closeSync(descriptor);
       }
     } catch {
-      // Not on disk, which is this path's ordinary "try the next answer".
-      return void 0;
+      // Not on disk: the next answer, unless this is /index.html with no build to serve.
+      if (!bareFallback) return void 0;
+      html = BARE_SHELL;
     }
 
     const caller = await this.sessionReader.read(request);

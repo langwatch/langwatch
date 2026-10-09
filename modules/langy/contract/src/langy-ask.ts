@@ -1,6 +1,4 @@
-/** What Langy lends another module for asking it about that module's screen (§10.1). */
-
-import { uiTokens } from "@langwatch/module";
+/** What another module hands Langy when it asks about that module's screen (§10.1). */
 
 import type { LangyAttachedContextType } from "./langy-slice.ts";
 
@@ -18,15 +16,6 @@ export type LangyAskRequest = {
   about?: LangyDraftAbout;
   context?: readonly LangyAskContext[];
 };
-
-/** All another module may do to the panel by asking; Langy's store stays its own. */
-export type LangyAsk = {
-  ask(request: LangyAskRequest): void;
-  /** What the page shows now, null when nothing a draft can be about is on screen. */
-  onScreen(about: LangyDraftAbout | null): void;
-};
-
-export const LangyAskToken = uiTokens("langy").operations<LangyAsk>("langyAsk");
 
 /**
  * The docked panel's width on the right edge, so an asking module's own drawer can stop

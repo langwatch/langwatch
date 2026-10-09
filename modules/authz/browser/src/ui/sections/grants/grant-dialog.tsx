@@ -25,11 +25,10 @@ import {
   type GrantRow,
   permissionsBeyondReader,
   rolePermissionsAt,
+  SCOPE_TYPE_OF_TIER,
 } from "../../../model/grants/grants.ts";
 
 export type { GrantScope, GrantDraft };
-
-const SCOPE_OF_TIER = { ORGANIZATION: "organization", TEAM: "team", PROJECT: "project" } as const;
 
 export type GrantDialogProps = {
   organizationId: string;
@@ -76,7 +75,7 @@ export function GrantDialog({
   ]);
   const [day, setDay] = useState("");
 
-  const scopeType: GrantScopeType = editing?.scope.type ?? SCOPE_OF_TIER[scope[0]!.scopeType];
+  const scopeType: GrantScopeType = editing?.scope.type ?? SCOPE_TYPE_OF_TIER[scope[0]!.scopeType];
   const scopeId = editing?.scope.id ?? scope[0]!.scopeId;
 
   // A team's standing cannot be asked for, so no role is greyed out there.
@@ -176,7 +175,7 @@ export function GrantDialog({
                     const [first] = next;
                     if (!first) return;
                     setScope(next);
-                    onScopeChange({ type: SCOPE_OF_TIER[first.scopeType], id: first.scopeId });
+                    onScopeChange({ type: SCOPE_TYPE_OF_TIER[first.scopeType], id: first.scopeId });
                   }}
                   organizationId={organizationId}
                   {...(structure.organizationName

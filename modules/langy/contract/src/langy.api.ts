@@ -10,6 +10,24 @@ import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
+import type {
+  ApproveControlRequestResponse,
+  CreateControlRequestResponse,
+  ListControlRequestsResponse,
+  LangyLocalCallCancelled,
+  PollCallResponse,
+  PollWaitResponse,
+  StartCallResponse,
+  StartWaitResponse,
+  WorkspaceStatus,
+  langyLocalWorkspaceStatusSchema,
+} from "./features/local-control/langy.local-control-http.ts";
+import type {
+  CliFrame,
+  LocalControlConnectCredentials,
+  PlatformFrame,
+  RegisterFrame,
+} from "./features/local-control/langy.local-control-protocol.ts";
 import type * as jsonModule from "./json.ts";
 import type {
   LangyConversationDetail,
@@ -58,24 +76,6 @@ import type {
   LangyConversationMessagesDto,
   langyConversationUpdateFrameSchema,
 } from "./langy.dtos.ts";
-import type {
-  ApproveControlRequestResponse,
-  CreateControlRequestResponse,
-  ListControlRequestsResponse,
-  LangyLocalCallCancelled,
-  PollCallResponse,
-  PollWaitResponse,
-  StartCallResponse,
-  StartWaitResponse,
-  WorkspaceStatus,
-  langyLocalWorkspaceStatusSchema,
-} from "./langy.local-control-http.ts";
-import type {
-  CliFrame,
-  LocalControlConnectCredentials,
-  PlatformFrame,
-  RegisterFrame,
-} from "./langy.local-control-protocol.ts";
 import type { LangyStreamEntry } from "./langy.stream-entry.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 

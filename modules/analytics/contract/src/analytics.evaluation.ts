@@ -99,3 +99,10 @@ export const analyticsEvaluationRollupAppendBatchInputSchema = z.object({
 export type AnalyticsEvaluationRollupAppendBatchInput = z.infer<
   typeof analyticsEvaluationRollupAppendBatchInputSchema
 >;
+
+export interface AnalyticsEvaluationReadMetrics {
+  record(input: {
+    table: "evaluation_analytics";
+    outcome: "hit" | "windowed_empty" | "unwindowed" | "error";
+  }): void;
+}

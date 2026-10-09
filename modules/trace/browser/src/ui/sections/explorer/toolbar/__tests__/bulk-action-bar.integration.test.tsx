@@ -14,6 +14,10 @@ const langyMock = { showLangy: true, attach: vi.fn(), open: vi.fn() };
 // (`langy:create`) rather than `useShowLangy` (`langy:view`). Both read the one
 // fixture flag: which grant gates which affordance is decided in the hooks, and
 // restating it here would only give the fixture a second opinion.
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => langyMock.showLangy,
 }));
@@ -29,13 +33,13 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) =
     }) => unknown,
   ) => selector({ attachContext: langyMock.attach, openPanel: langyMock.open }),
 }));
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 vi.mock("../../../me/use-personal-feature-gate.ts", () => ({

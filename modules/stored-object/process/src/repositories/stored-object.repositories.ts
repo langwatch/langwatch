@@ -1,4 +1,5 @@
 import type { StoredObjectBytesRepository } from "./stored-object-bytes.repository.ts";
+import type { StoredObjectLegacySourceRepository } from "./stored-object-legacy-source.repository.ts";
 import type { StoredObjectLegacyStorageRepository } from "./stored-object-legacy-storage.repository.ts";
 import type { StoredObjectRateLimitRepository } from "./stored-object-rate-limit.repository.ts";
 import type { StoredObjectRecordRepository } from "./stored-object-record.repository.ts";
@@ -12,6 +13,8 @@ export interface StoredObjectRepositories {
   /** The read-only legacy ClickHouse index (ADR-158 §5), and the bytes its rows name. */
   readonly legacyIndex: StoredObjectsRepository;
   readonly legacyStorage: StoredObjectLegacyStorageRepository;
+  /** Pages the legacy index for the one-time import into `records`. */
+  readonly legacySource: StoredObjectLegacySourceRepository;
   /** The file door's per-caller read windows. */
   readonly rateLimits: StoredObjectRateLimitRepository;
   /** Seals the claims an upload or read URL carries (ADR-158 §4). */

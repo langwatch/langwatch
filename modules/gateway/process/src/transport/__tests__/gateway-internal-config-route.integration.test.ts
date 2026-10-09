@@ -13,9 +13,9 @@ import { PrismaGatewayAdapter } from "../../__tests__/support/postgres.gateway-s
 import { seededCustomKeys } from "../../__tests__/support/seeded-custom-keys.ts";
 import { PostgresVirtualKeyAdapter } from "../../__tests__/testing.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
+import type { VirtualKeyService } from "../../features/virtual-key/services/virtual-key.service.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
-import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";

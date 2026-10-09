@@ -6,12 +6,13 @@
 
 import { lazyChunk, loadChunk } from "@langwatch/browser-host/navigation";
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
+import { JoinOfferToken, type JoinOfferProps } from "@langwatch/organization-client";
 import { userWeb } from "@langwatch/user-browser/declaration";
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 
 // Fetched with the shell, not on first render: main drew the offer statically, and a
 // chunk requested only after the join queries resolve arrives seconds after sign-in.
-const joinOfferChunk = loadChunk(organizationWeb.installation.capabilities.joinOffer.load);
+const joinOfferChunk = loadChunk(loadLentJoinOffer);
 const secureAccountNudgeChunk = loadChunk(
   userWeb.installation.capabilities.secureAccountNudge.load,
 );
@@ -24,6 +25,24 @@ const organizationMfaGateChunk = loadChunk(
   userWeb.installation.capabilities.organizationMfaGate.load,
 );
 const OrganizationMfaGate = lazy(() => organizationMfaGateChunk);
+
+function isJoinOffer(loaded: unknown): loaded is { default: ComponentType<JoinOfferProps> } {
+  return (
+    typeof loaded === "object" &&
+    loaded !== null &&
+    "default" in loaded &&
+    typeof loaded.default === "function"
+  );
+}
+
+async function loadLentJoinOffer() {
+  const lend = organizationWeb.installation.lends.find(
+    ({ token }) => token.key === JoinOfferToken.key,
+  );
+  const loaded = lend !== undefined && "load" in lend ? await lend.load() : undefined;
+  if (!isJoinOffer(loaded)) throw new Error("organization lends no join offer");
+  return loaded;
+}
 
 export function joinOffer({
   currentOrganizationId,

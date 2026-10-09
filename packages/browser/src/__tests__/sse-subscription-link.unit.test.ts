@@ -8,7 +8,7 @@ import {
   type SseEventSourceConstructor,
   type SseEventSourceLike,
   sseSubscriptionLink,
-} from "../sse-subscription-link.ts";
+} from "../wire/sse-subscription-link.ts";
 
 /**
  * The link that carries every live procedure.

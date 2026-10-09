@@ -35,6 +35,9 @@
       "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -51,6 +54,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../instant-eval-judge/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
@@ -98,6 +104,9 @@
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {
@@ -114,6 +123,12 @@
     },
     {
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluation/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../instant-eval/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

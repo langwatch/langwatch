@@ -9,9 +9,10 @@ import type {
   AnnotationQueueRecord,
   AnnotationScore,
 } from "@langwatch/annotation-contract";
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { DataPrivacySnapshot } from "@langwatch/data-privacy-contract";
+import type { instantEvalTrpc } from "@langwatch/instant-eval-contract";
 import type {
   PresenceCursorEvent,
   PresenceCursorInput,
@@ -30,11 +31,7 @@ import type {
   ConversationContext,
   DerivedTraceEvent,
   DiscoverResult,
-  ExplorerInstantEvalEstimate,
-  ExplorerInstantEvalOptInAccess,
-  ExplorerInstantEvalProgress,
   ExplorerInstantEvalRuns,
-  ExplorerInstantEvalRunInput,
   ExportProgressEvent,
   FacetValuesResult,
   RouteSearchInput,
@@ -115,18 +112,13 @@ export type TraceApiMap = {
       };
     };
 
-    /** The Sessions lens: one row per conversation, rolled up in ClickHouse. */
-    sessions: {
+    /** Whether a privacy rule hides input or output from this reader, and who can see it. */
+    getFieldRedactionStatus: {
       query: {
-        input: ProjectScope & {
-          timeRange: TimeRange;
-          sort?: TraceSort;
-          pageSize?: number;
-          cursor?: string;
-          query?: string | null;
-        };
-        output: Omit<SessionGroupsResult, "sessions"> & {
-          sessions: SessionGroupPayloadItem[];
+        input: ProjectScope;
+        output: {
+          isRedacted: Record<"input" | "output", boolean>;
+          visibleTo: Record<"input" | "output", string | null>;
         };
       };
     };
@@ -173,40 +165,6 @@ export type TraceApiMap = {
     /** Pushed when a tenant's facet payload finishes its background refresh. */
     onDiscoverUpdate: {
       subscription: { input: ProjectScope; output: { projectId: string } };
-    };
-
-    /**
-     * The Explorer's Instant Eval: what a run would cost, the start, the
-     * cancel, and the counters a chip and the progress bar read back.
-     * @see specs/traces-v2/instant-eval-search.feature
-     */
-    instantEval: {
-      estimate: {
-        mutation: {
-          input: ExplorerInstantEvalRunInput;
-          output: ExplorerInstantEvalEstimate;
-        };
-      };
-      start: {
-        mutation: {
-          input: ExplorerInstantEvalRunInput;
-          output: ExplorerInstantEvalProgress;
-        };
-      };
-      cancel: {
-        mutation: {
-          input: ProjectScope & { runId: string };
-          output: ExplorerInstantEvalProgress;
-        };
-      };
-      get: {
-        query: {
-          input: ProjectScope & { runId: string };
-          output: ExplorerInstantEvalProgress;
-        };
-      };
-      access: { query: { input: ProjectScope; output: ExplorerInstantEvalOptInAccess } };
-      enable: { mutation: { input: ProjectScope; output: ExplorerInstantEvalOptInAccess } };
     };
 
     /** One facet's values, paged. */
@@ -315,14 +273,6 @@ export type TraceApiMap = {
       query: { input: TraceScope; output: Trace };
     };
 
-    /** What an evaluation was run over, for the evaluation cards. */
-    getEvaluationInputs: {
-      query: {
-        input: ProjectScope & { evaluationId: string };
-        output: Record<string, unknown> | null;
-      };
-    };
-
     /** The whole trace rendered as one readable digest. */
     getFormattedSpansDigest: {
       query: {
@@ -381,6 +331,22 @@ export type TraceApiMap = {
     /** The coding-agent transcript built from the trace's spans and logs. */
     transcript: {
       query: { input: TraceScope & SpanReadHint; output: CodingAgentTranscript };
+    };
+
+    /** The Sessions lens: one row per conversation, in ClickHouse (was `traces.sessions`). */
+    sessionGroups: {
+      query: {
+        input: ProjectScope & {
+          timeRange: TimeRange;
+          sort?: TraceSort;
+          pageSize?: number;
+          cursor?: string;
+          query?: string | null;
+        };
+        output: Omit<SessionGroupsResult, "sessions"> & {
+          sessions: SessionGroupPayloadItem[];
+        };
+      };
     };
   };
 
@@ -710,14 +676,14 @@ export type TraceApiMap = {
     getHasFirstMessage: {
       query: { input: ProjectScope; output: { firstMessage: boolean } };
     };
+  };
 
-    getFieldRedactionStatus: {
+  evaluations: {
+    /** What an evaluation was run over, for the evaluation cards; evaluation serves it. */
+    getEvaluationInputs: {
       query: {
-        input: ProjectScope;
-        output: {
-          isRedacted: Record<"input" | "output", boolean>;
-          visibleTo: Record<"input" | "output", string | null>;
-        };
+        input: ProjectScope & { evaluationId: string };
+        output: Record<string, unknown> | null;
       };
     };
   };
@@ -743,7 +709,7 @@ export type TraceApiMap = {
       query: { input: ProjectScope & { skill: string }; output: { body: string } };
     };
   };
-};
+} & ContractApiMap<typeof instantEvalTrpc>;
 
 /**
  * One annotation on a trace, with the person who wrote it and the part of the trace it

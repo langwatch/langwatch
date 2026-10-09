@@ -84,11 +84,7 @@ func (s *Server) authenticate(r *http.Request, obj object) *s3Error {
 	}
 	canonical := canonicalRequest(r, claims)
 	stringToSign := strings.Join([]string{sigV4Algorithm, claims.amzDateRaw, claims.scope, sha256Hex(canonical)}, "\n")
-	key := hmacSHA256([]byte("AWS4"+s.cfg.SecretAccessKey), claims.date)
-	for _, part := range []string{claims.region, "s3", "aws4_request"} {
-		key = hmacSHA256(key, part)
-	}
-	want := hex.EncodeToString(hmacSHA256(key, stringToSign))
+	want := s.sign(claims.date, claims.region, stringToSign)
 	if !hmac.Equal([]byte(want), []byte(strings.ToLower(claims.signature))) {
 		e := obj.fail(http.StatusForbidden, "SignatureDoesNotMatch",
 			"The request signature we calculated does not match the signature you provided. Check your key and signing method.")
@@ -248,6 +244,15 @@ func awsEscape(s string, encodeSlash bool) string {
 		}
 	}
 	return b.String()
+}
+
+// sign is SigV4's signature of stringToSign under the dev key, scoped to date and region.
+func (s *Server) sign(date, region, stringToSign string) string {
+	key := hmacSHA256([]byte("AWS4"+s.cfg.SecretAccessKey), date)
+	for _, part := range []string{region, "s3", "aws4_request"} {
+		key = hmacSHA256(key, part)
+	}
+	return hex.EncodeToString(hmacSHA256(key, stringToSign))
 }
 
 func hmacSHA256(key []byte, data string) []byte {

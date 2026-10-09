@@ -1,6 +1,6 @@
 ---
 name: haven
-description: "Daily use of thuishaven (`haven`), the dev-stack orchestrator: start, stop and inspect this worktree's stack, read logs, print the resolved env without leaking a secret, find the app and API URLs, and drive a stack as an agent. Use when someone says 'haven up', 'start the stack', 'is the stack up', 'haven logs', 'haven status', 'haven env', 'what is the app URL', 'app.<slug>.langwatch.localhost', 'haven up --agent -d', 'restart the api lane', 'reset the database', or 'try a PR locally'. When the stack will not come up, or the page is blank or the log is frozen, read troubleshooting.md beside this file."
+description: "Daily use of thuishaven (`haven`), the dev-stack orchestrator: start, stop and inspect this worktree's stack, read logs, print the resolved env without leaking a secret, find the app and API URLs, and drive a stack as an agent. Use when someone says 'haven up', 'start the stack', 'is the stack up', 'haven logs', 'haven status', 'haven env', 'what is the app URL', 'app.<slug>.langwatch.localhost', 'haven up --agent -d', 'restart the api lane', 'reset the database', 'haven install --build', 'stack home', 'haven feedback', 'the haven orb', or 'try a PR locally'. When the stack will not come up, or the page is blank or the log is frozen, read troubleshooting.md beside this file."
 user-invocable: true
 argument-hint: "[up | status | logs <service> | env | down | restart <lane> | db ...]"
 ---
@@ -14,7 +14,16 @@ reference is `tools/thuishaven/README.md`; the processes and flags are in
 guessing a flag.
 
 Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/haven.mk`);
-`make haven install` puts plain `haven` on your PATH.
+`make haven install` puts plain `haven` on your PATH and installs what the machine
+needs. With no TTY it runs `haven install --yes` (no prompts; on macOS also the
+native tier: `brew install grafana prometheus loki` and the pinned ClickHouse,
+Tempo and Alloy downloads). macOS needs no colima: the install list leaves the
+runtime off and Langy runs on the host tier by default (`up` says it is unsandboxed). A failed non-required row is
+logged and the run carries on. Re-running is a no-op;
+`haven install --list --agent` reports without installing. `haven install --build` builds the
+consoles the binary embeds in one cached, parallel `nx run-many` (the `haven-console` project tag
+is the one list) behind a single progress line, then the binary; a console that fails to build
+serves a page naming `make haven-web`. Logs go to the install log directory.
 
 ## As an agent
 
@@ -26,6 +35,11 @@ Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/hav
 | Only warnings and worse                     | `haven logs api --level warn --agent`           |
 | Last distinct failures, grouped             | `haven errors --agent`                          |
 | Recent root spans of this stack             | `haven traces --json`                           |
+| One trace's span tree                       | `haven traces <trace-id> --json`                |
+| Slow or failing traces                      | `haven traces --min-duration 500ms --errors`    |
+| Full info/debug stream from Loki            | `haven logs api --loki --since 1h --grep boom`  |
+| Logs for one trace                          | `haven logs --trace <trace-id>`                 |
+| Raw query, this worktree only               | `haven query promql 'up' --agent`               |
 
 - Bare `haven up` without a TTY never returns and dies with your shell. Always `-d`.
 - `--agent` (or `HAVEN_AGENT=1`) makes output plain: no colour, no redraws.
@@ -53,7 +67,11 @@ https://hub.langwatch.localhost               every stack on the machine
 
 `ui`, `api`, `go` (gateway and nlp), `sims`, `langy`. The api lane hosts the worker, so
 `haven logs api` and `haven logs worker` each show half of it. Under
-`LANGWATCH_DEV_ONE_PROCESS=1` ui, api and worker are one `app` lane: see `dev-runtime`.
+the default ui, api and worker are one `app` lane: see `dev-runtime`. The `go` lane
+also hosts the simulators and no `sims` lane runs; `LANGWATCH_DEV_ONE_PROCESS=0` splits
+both (`LANGWATCH_GO_ONE_PROCESS` is a deprecated alias). The Go lane rebuilds and swaps
+its child on a Go change (`haven go-watch`); `LANGWATCH_GO_WATCH=0` or `haven up --watch=false`
+turns that off; `haven logs <sim>` still reads each one. Langy stays its own lane.
 
 ```bash
 haven logs api -t                 # follow one service
@@ -62,8 +80,48 @@ haven restart sims                # bounce one lane; nothing else restarts
 haven restart api                 # restart the whole lane
 ```
 
+## The stack's own traces and logs
+
+This is the stack's OTel telemetry (Tempo, Loki), not product traces. Every read is
+filtered to this worktree and prints a Grafana deep link (a `grafana` field in `--json`).
+
+```bash
+haven traces --service api --name checkout --since 1h   # filters; also --min-duration, --errors
+haven traces <trace-id> --json                          # span tree plus the link
+haven logs api --loki --level info --grep timeout       # Loki: what the muted consoles never printed
+haven logs --trace <trace-id>                           # Loki lines carrying that trace_id
+```
+
+`--loki` and `--trace` need the observability stack (`haven up`); services match as
+substrings of the OTel service name. `--grep` also filters the plain captured read.
+`--trace` finds only lines whose structured metadata carries `trace_id`; when none do,
+it is empty, so fall back to `--since` around the trace's start time.
+
+When the flags cannot ask it, `haven query traceql|logql|promql '<query>'` sends a raw
+query (`--since` default 1h, `--limit` default 100, `--stack <slug>`, `--json`/`--agent`
+returns `{query, grafana, data}` with the backend's own answer). Every selector gets this
+worktree's filter forced in before sending, so results never mix stacks; the scoped
+query is echoed in `query`.
+
+```bash
+haven query traceql '{ status = error && duration > 1s }'
+haven query logql 'sum by (service_name) (count_over_time({service_name=~".+"} |= "timeout" [5m]))'
+haven query promql 'rate(http_server_request_duration_count[5m])' --since 30m
+```
+
 Only `haven down` followed by `haven up` reloads a changed `.env`. `haven restart` does
 not.
+
+## The stack home
+
+`https://<slug>.langwatch.localhost` (`apps/haven-web`) lists every surface with its status. A
+surface that is not live says why (what it waits for and its lane's last warning), and its row has
+Restart, or Start for a surface that was not selected. An api the stack refuses to serve because
+the database is below the LTS floor shows a database reset button. `haven db reset` migrates and
+seeds exactly the databases it dropped, also for a stack the hub does not know yet. The daemon
+trusts a pid only together with its process start time, holds its claim as a flock for its whole
+life, and writes stack records atomically, so a recycled pid or a second daemon cannot be mistaken
+for ours (`tools/thuishaven/app/identity.go`).
 
 ## The env, without leaking it
 
@@ -88,16 +146,38 @@ not.
 | Evaluators (monitors, evaluations)         | `haven up +langevals`                               |
 | Zero-cost model answers                    | `haven up +llm`                                     |
 | Try a PR in its own worktree               | `haven pr <number>`                                 |
-| Hold Vite reloads during an agent turn     | `haven hmr on --ttl 60s`, `haven hmr off`           |
 | Run a heavy command under the machine slot | `haven run`, `haven slot run -- <cmd>`              |
 
 Seed presets are in `haven help db` (`demo`, `onboarding`, `post-onboarding` and more).
+
+## Feedback from the app page (the haven orb)
+
+When haven runs the stack, the app page carries the haven orb, bottom right
+(`apps/ui/vite/haven-orb/`, `specs/setup/haven-dev-orb.feature`). A reader picks an
+element or drags a region, types a note, and it lands in this stack's store. The orb also
+pushes the page's last 200 console messages and requests: method, URL without its query,
+status, duration. Never a body, a header or a cookie.
+
+While building UI, read it before you call the work done:
+
+```bash
+haven feedback list --open --agent      # notes nobody resolved yet
+haven feedback show <id> --agent        # one note: selector or region, viewport, console, requests
+haven feedback resolve <id>             # once you fixed it
+haven feedback wait --timeout 5m        # block until the reader sends the next note
+haven page console --level error --agent
+haven page network --failed --agent
+```
+
+The page buffer is whichever tab pushed last, and is empty until someone opens the app with
+the orb showing. The files live in `.haven/logs/<slug>/orb/`; `--stack <slug>` reads another
+worktree's.
 
 ## When it will not come up
 
 `troubleshooting.md` (same folder) covers: a stack that is already up, the portless
 proxy dying or holding root-owned state, `.localhost` not resolving on WSL2, Langy
-needing `opencode` on the host, stale k8s URLs in `.env`, a frozen log, a blank page
+needing its `langy-worker` binary on the host, stale k8s URLs in `.env`, a frozen log, a blank page
 that is only Vite re-optimising, and signing in for a browser check.
 
 ## Do not

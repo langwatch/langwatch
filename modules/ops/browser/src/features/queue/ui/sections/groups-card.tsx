@@ -12,6 +12,11 @@ import {
   Table,
   Text,
 } from "@langwatch/design-system/primitives";
+import {
+  type GrafanaDeepLinkConfig,
+  grafanaGroupLogsUrl,
+  grafanaGroupTracesUrl,
+} from "@langwatch/observability/grafana-links";
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import { MoreVertical, Search } from "lucide-react";
@@ -21,11 +26,6 @@ import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import {
-  type GrafanaDeepLinkConfig,
-  grafanaGroupLogsUrl,
-  grafanaGroupTracesUrl,
-} from "../../../../model/grafana-links.ts";
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
@@ -39,6 +39,7 @@ import {
   type GroupClassification,
 } from "../../model/queue-pipeline-utils.ts";
 import { type StatusFilter } from "../../model/queue-types.ts";
+import { ReapStrandedGroupsAction } from "../blocks/reap-stranded-groups-action.tsx";
 import { GroupStateBadge } from "../elements/queue-group-state-badge.tsx";
 import { GroupDetailDrawer } from "./group-detail-drawer.tsx";
 const GROUPS_VIEWPORT_HEIGHT = 480;
@@ -121,7 +122,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const groupDetail = useOpsOverlay("group");
   const openGroup = readOverlayParts(groupDetail.value, 2);
   // One config fetch serves every row's Grafana links; the pure builders in
-  // ~/utils/grafanaLinks turn it into per-group hrefs client-side.
+  // @langwatch/observability/grafana-links turn it into per-group hrefs client-side.
   const grafanaQuery = api.ops.getGrafanaLinkConfig.useQuery(undefined, {
     staleTime: 10 * 60 * 1000,
   });
@@ -186,6 +187,12 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                 unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId })
               }
             />
+          )}
+
+          {hasAccess && (
+            <HStack paddingX={4} paddingTop={2} justify="flex-end">
+              <ReapStrandedGroupsAction />
+            </HStack>
           )}
 
           <GroupsFilterBar

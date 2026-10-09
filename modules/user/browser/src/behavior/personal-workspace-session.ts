@@ -22,7 +22,6 @@ export type PersonalScopeReading = {
   project: PersonalProject | undefined;
   /** False until the organization graph has answered. */
   isResolved: boolean;
-  hasPermission: (permission: string) => boolean;
 };
 
 export function useOrganizationTeamProject(): PersonalScopeReading {
@@ -32,7 +31,6 @@ export function useOrganizationTeamProject(): PersonalScopeReading {
       organization: host.organization(),
       project: host.project(),
       isResolved: host.isScopeResolved(),
-      hasPermission: (permission: string) => host.hasPermission(permission),
     }),
     [host],
   );

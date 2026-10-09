@@ -29,6 +29,7 @@ import { governanceProcessModule } from "@langwatch/enterprise-governance-proces
 import { hostedMcpProcessModule } from "@langwatch/hosted-mcp-process";
 import { identityProcessModule } from "@langwatch/identity-process";
 import { insightProcessModule } from "@langwatch/insight-process";
+import { instantEvalJudgeProcessModule } from "@langwatch/instant-eval-judge-process";
 import { instantEvalProcessModule } from "@langwatch/instant-eval-process";
 import { langyProcessModule } from "@langwatch/langy-process";
 import { licensingProcessModule } from "@langwatch/enterprise-licensing-process";
@@ -60,7 +61,6 @@ import { storedObjectProcessModule } from "@langwatch/stored-object-process";
 import { suiteProcessModule } from "@langwatch/suite-process";
 import { topicProcessModule } from "@langwatch/topic-process";
 import { traceProcessModule } from "@langwatch/trace-process";
-import { usageProcessModule } from "@langwatch/usage-process";
 import { userProcessModule } from "@langwatch/user-process";
 import { webhookProcessModule } from "@langwatch/webhook-process";
 import { workflowProcessModule } from "@langwatch/workflow-process";
@@ -95,6 +95,7 @@ export const processModules = [
   hostedMcpProcessModule,
   identityProcessModule,
   insightProcessModule,
+  instantEvalJudgeProcessModule,
   instantEvalProcessModule,
   langyProcessModule,
   licensingProcessModule,
@@ -126,7 +127,6 @@ export const processModules = [
   suiteProcessModule,
   topicProcessModule,
   traceProcessModule,
-  usageProcessModule,
   userProcessModule,
   webhookProcessModule,
   workflowProcessModule,

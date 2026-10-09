@@ -10,9 +10,10 @@ import type {
   PlanProviderUser,
   UsageStats,
 } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 
+import type { MemberSeatRepository } from "../repositories/member-seat.repository.ts";
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
+import { buildSeatLimitInfo } from "../rules/seat-limit.rules.ts";
 import { USAGE_UNKNOWN, type UsageCounter } from "./usage-enforcement.service.ts";
 
 /**
@@ -52,8 +53,8 @@ type UsageStatsCaller = PlanProviderUser;
 
 type UsageStatsSources = {
   membership: UsageMembershipRepository;
-  /** Seats are organization's: the same count a licence and an invitation check read. */
-  seats: Pick<OrganizationApi, "countMemberSeats">;
+  /** Seats through organization's declared shares, never OrganizationApi (R-C1f). */
+  seats: MemberSeatRepository;
   counter: UsageCounter;
   plans: PlanProvider;
 };
@@ -67,7 +68,7 @@ export class UsageStatsService {
   }
 
   private readonly membership: UsageMembershipRepository;
-  private readonly seats: Pick<OrganizationApi, "countMemberSeats">;
+  private readonly seats: MemberSeatRepository;
   private readonly counter: UsageCounter;
   private readonly planProvider: PlanProvider;
 
@@ -178,6 +179,11 @@ export class UsageStatsService {
       membersLiteCount: seats.liteMembers,
       membersDeveloperCount: seats.developers,
       messageLimitInfo,
+      seatLimitInfo: buildSeatLimitInfo({
+        plan: activePlan,
+        membersCount: seats.fullMembers,
+        membersLiteCount: seats.liteMembers,
+      }),
       usageUnit,
     };
   }

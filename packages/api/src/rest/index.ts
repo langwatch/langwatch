@@ -163,7 +163,6 @@ export {
   recordScimCredential,
   resolvePersonalCaller,
   type RestBrowserCaller,
-  type RestErrorHandler,
   type RestResolvedScimCredential,
   scimCredentialOfRequest,
 } from "./credential.ts";
@@ -289,16 +288,6 @@ export {
   undeclaredRoutes,
 } from "./security.ts";
 
-import type { Hono } from "hono";
-import { handle } from "hono/vercel";
-
-/** Converts a built app into per-file route handlers, for legacy Next-style hosts. */
-export function routeHandlers(app: Hono) {
-  const h = handle(app);
-
-  return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
-}
-
 export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-session.ts";
 
 export { bindRestCredential, type RestCredentialBinding, type RestDoor } from "./request.ts";
@@ -321,7 +310,7 @@ export {
   type RestKeyKinds,
 } from "./key-credential.ts";
 
-export type { RestDeclaredResult } from "./declaration.ts";
+export type { RestDeclaredResult, RestSharedPath } from "./declaration.ts";
 
 // Named by every declaration's inferred type, so a module's declaration emit can name them.
 export type {

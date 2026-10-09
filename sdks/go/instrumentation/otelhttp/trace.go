@@ -2,6 +2,7 @@ package otelhttp
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"path"
@@ -181,15 +182,15 @@ func (t *Tracer) Handle(req *http.Request, next func(*http.Request) (*http.Respo
 		span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
 		return resp, nil
 	}
-	// Deliberately NOT set for a streamed body — see the streaming branch below.
+	// Deliberately NOT set once a body owns the span (streamed or buffered JSON).
 	// OTel treats Ok as final and refuses to downgrade it to Error, so marking
-	// the span Ok here would swallow a failure the stream reports later.
-	setOKUnlessStreamed := func() {
-		if !streamingResp {
+	// the span Ok here would swallow a failure the body reports later.
+	setOKUnlessBodyOwnsSpan := func() {
+		if !bodyOwnsSpan {
 			span.SetStatus(codes.Ok, "")
 		}
 	}
-	defer setOKUnlessStreamed()
+	defer setOKUnlessBodyOwnsSpan()
 
 	if resp.Body == nil || resp.Body == http.NoBody {
 		recordRequest()
@@ -219,15 +220,35 @@ func (t *Tracer) Handle(req *http.Request, next func(*http.Request) (*http.Respo
 
 	resp.Body = newCapturingBody(resp.Body, func(captured []byte, truncated bool) {
 		recordRequest()
+		var bodyErr error
 		if !truncated {
 			if e := SelectResponseExtractor(t.cfg.Extractors, PeekObjectField(captured), contentType); e != nil {
 				e.ExtractNonStreaming(span, captured, t.capture)
+				if r, ok := e.(ResponseErrorReporter); ok {
+					bodyErr = r.ResponseError(captured)
+				}
 			}
 		}
+		setBodyStatus(span, bodyErr)
 		span.End()
 	})
 	bodyOwnsSpan = true
 	return resp, nil
+}
+
+// setBodyStatus sets the final status of a span whose buffered body was read:
+// Ok, or Error carrying the error an extractor found in a 2xx body.
+func setBodyStatus(span *langwatch.Span, bodyErr error) {
+	if bodyErr == nil {
+		span.SetStatus(codes.Ok, "")
+		return
+	}
+	var be *BodyError
+	if errors.As(bodyErr, &be) && be.Type != "" {
+		span.SetAttributes(semconv.ErrorTypeKey.String(be.Type))
+	}
+	span.SetStatus(codes.Error, bodyErr.Error())
+	span.RecordError(bodyErr)
 }
 
 // readRequest reads and restores the request body and selects its extractor,

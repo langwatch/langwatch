@@ -33,7 +33,8 @@ vi.mock("../automation-api.ts", () => ({
 }));
 
 // The drawer machinery is the router's, not this port's.
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: () => void 0, goBack: () => void 0 }),
 }));
 
@@ -51,10 +52,6 @@ class SignedInSession extends UiSession {
 
   isSettled(): boolean {
     return true;
-  }
-
-  featureFlag(): boolean | undefined {
-    return false;
   }
 }
 

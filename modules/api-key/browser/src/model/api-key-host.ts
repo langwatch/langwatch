@@ -1,6 +1,7 @@
 // API Keys and CLI authorize port. Screens can't reach ui, router, fetch, or session client;
 // ask this instead. Unique: CLI device flow (three REST endpoints: lookup, approve, deny).
 
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 
 /** The organization, team and project the addresses are about. */
@@ -76,9 +77,6 @@ export type ApiKeyFailureNotice = {
   description?: string;
   id?: string;
 };
-
-// Platform drawer opened by address (createProject): not deleted because DashboardLayout uses it.
-export type ApiKeyPlatformDrawer = "createProject";
 
 // CLI credential type: device_session (user-scoped, ~/.langwatch/config.json) or project_api_key
 // (SDK key, .env).
@@ -167,12 +165,8 @@ export abstract class ApiKeyHostApi {
   // campaign source.
   abstract recordLeadSourceIfAbsent(source: string): void;
 
-  // Platform drawer URL: params are drawer's own names (unprefixed). Host writes ?drawer.open +
-  // drawer.<name>. KNOWN GAP: registry unmounted until chrome layout route exists.
-  abstract openPlatformDrawer(request: {
-    drawer: ApiKeyPlatformDrawer;
-    params?: Readonly<Record<string, string | undefined>>;
-  }): void;
+  /** Opens another module's drawer by the token its client declares (§10.1). */
+  abstract openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;
 
   /** Ends the session and leaves for the sign-in door. */
   abstract signOut(): void;

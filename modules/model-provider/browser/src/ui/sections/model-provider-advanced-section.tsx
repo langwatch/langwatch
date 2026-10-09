@@ -11,10 +11,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { parseSkipListInput, skipListToInput } from "@langwatch/model-provider-contract";
-import { toEpochMs, type TimeInput } from "@langwatch/time";
+import { toEpochMs, type TimeInput, readableDate } from "@langwatch/time";
 import { LuChevronDown } from "react-icons/lu";
-
-import { readableDate } from "../../model/display-formatters.ts";
 
 /**
  * The accordion item the Advanced section renders into. Exported so the parent

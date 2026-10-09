@@ -3,6 +3,7 @@ import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import type { AuthzGrantsService, GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
 
 import type { ScimRepository } from "../repositories/scim.repository.ts";
+import { assertRemovalKeepsAnAdministrator } from "../rules/scim-last-administrator.rules.ts";
 import {
   ScimDeprovisionService,
   type ScimOrganizationAdministration,
@@ -100,7 +101,8 @@ export class ScimMembershipAccessService {
         ? [
             {
               principal: { userId },
-              role: "MEMBER" as TeamUserRole,
+              // A Lite Member seat (EXTERNAL) is granted view only, as an invitation maps it.
+              role: (membership?.role === "EXTERNAL" ? "VIEWER" : "MEMBER") as TeamUserRole,
               customRoleId: null,
               scopeType: "ORGANIZATION" as GrantScopeTier,
               scopeId: organizationId,
@@ -134,7 +136,10 @@ export class ScimMembershipAccessService {
       return;
     }
 
-    await this.organization.assertRemovalKeepsAnAdministrator({ organizationId, userId });
+    const administrators = await this.organization.findActiveOrganizationAdministrators({
+      organizationId,
+    });
+    assertRemovalKeepsAnAdministrator({ administrators, userId });
     const visibleGrants = await this.grants.findGrantRows({
       kind: "member-offboarding",
       organizationId,

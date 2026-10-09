@@ -10,8 +10,8 @@ import { Clock, Edit, LayoutDashboard, MoreVertical, Trash2 } from "lucide-react
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
 import { useFirstDashboard } from "../../behavior/use-dashboards.ts";
+import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "../../features/dashboard-widget/ui/sections/langwatch-ql-dashboard-widget.tsx";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
 
 /**
  * How each offered datapoint step is named in the menu: the noun form, because

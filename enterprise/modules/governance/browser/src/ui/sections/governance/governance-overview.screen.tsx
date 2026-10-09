@@ -1,5 +1,6 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Badge, Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
@@ -46,7 +47,9 @@ function GovernanceOverviewPage() {
   // The Insights screen rides the billed-cost flag, the same way the section
   // rail decides whether to list it. Offering the button without the flag
   // would point at a page the guard refuses.
-  const canSetUpInsights = host.isFeatureEnabled("release_ui_governance_billed_cost_enabled");
+  const canSetUpInsights = host.isFeatureEnabled(
+    FrontendFlags.release_ui_governance_billed_cost_enabled,
+  );
 
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">

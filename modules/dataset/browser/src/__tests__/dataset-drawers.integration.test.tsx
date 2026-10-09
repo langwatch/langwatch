@@ -9,7 +9,8 @@ import { screen } from "@testing-library/react";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ closeDrawer: () => void 0 }),
 }));
 
@@ -26,7 +27,8 @@ vi.mock("../behavior/dataset-api.ts", () => ({
     useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
   },
 }));
-vi.mock("@langwatch/dataset-client", () => ({
+vi.mock("@langwatch/dataset-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   datasetClient: {
     useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
     dataset: {

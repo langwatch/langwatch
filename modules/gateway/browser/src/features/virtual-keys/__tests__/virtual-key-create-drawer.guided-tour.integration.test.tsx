@@ -5,11 +5,8 @@
  * Spec: specs/features/onboarding/guided-tour.feature
  */
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import {
-  GuidedTourToken,
-  type GuidedTourActions,
-  type GuidedTourHooks,
-} from "@langwatch/onboarding-contract";
+import { GuidedTourToken } from "@langwatch/onboarding-client";
+import type { GuidedTourActions, GuidedTourHooks } from "@langwatch/onboarding-contract";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
@@ -78,8 +75,10 @@ vi.mock("../../../behavior/gateway-api.ts", () => ({
         }),
       },
     },
-    routingPolicy: { list: { useQuery: () => ({ data: [] }) } },
-    user: { personalContext: { useQuery: () => ({ data: undefined }) } },
+    routingPolicy: {
+      list: { useQuery: () => ({ data: [] }) },
+      personalContext: { useQuery: () => ({ data: undefined }) },
+    },
   },
 }));
 

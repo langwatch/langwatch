@@ -89,7 +89,9 @@ type scenarioRunner struct {
 	live      map[string]int
 	streak    *diffkit.Streak
 	stopped   atomic.Bool
-	cancel    context.CancelFunc
+	// settling orders judge-and-settle so a stop at N drops every later scenario.
+	settling sync.Mutex
+	cancel   context.CancelFunc
 	// adminAbsent is set once probeAdminKey finds the instance-admin routes 404.
 	adminAbsent bool
 	// sessionSeeding is set when every side signed the seeded admin in after
@@ -296,6 +298,8 @@ func (runner *scenarioRunner) runOne(result *scenarioResult, pick int) {
 		}()
 	}
 	sides.Wait()
+	runner.settling.Lock()
+	defer runner.settling.Unlock()
 	if runner.stopped.Load() {
 		return
 	}

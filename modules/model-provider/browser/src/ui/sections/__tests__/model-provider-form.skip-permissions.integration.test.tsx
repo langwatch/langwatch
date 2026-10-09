@@ -20,7 +20,8 @@ const {
   mockCloseDrawer: vi.fn(),
 }));
 
-vi.mock("../../../behavior/use-model-providers-settings.ts", () => ({
+vi.mock("@langwatch/model-provider-client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useModelProvidersSettings: (...args: unknown[]) => mockUseModelProvidersSettings(...args),
 }));
 
@@ -75,7 +76,6 @@ vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
         },
       ],
     },
-    hasPermission: () => true,
   }),
 }));
 
@@ -92,7 +92,7 @@ vi.mock("../../../behavior/use-model-provider-api-key-validation.ts", () => ({
 // The AI Gateway section is off, so the Advanced accordion here holds the
 // skip-permissions field alone. That is the point: the field does not belong
 // to the gateway and must not be gated behind it.
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

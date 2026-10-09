@@ -10,6 +10,7 @@ import { StatusChip } from "@langwatch/design-system/settings-card";
 import { HandledErrorAlert } from "@langwatch/error-views";
 
 import { directoryMembershipApi } from "../../behavior/scim-api.ts";
+import { useMemberProvenance } from "../../behavior/use-member-provenance.ts";
 
 /** How many are shown before the page hands over to the roster built for it. */
 const MANAGED_SHOWN = 8;
@@ -18,9 +19,7 @@ export function DirectoryMembers({ organizationId }: { organizationId: string })
   const organization = directoryMembershipApi.organization.getAllOrganizationMembers.useQuery({
     organizationId,
   });
-  const provenance = directoryMembershipApi.organization.getMemberProvenance.useQuery({
-    organizationId,
-  });
+  const provenance = useMemberProvenance({ organizationId, enabled: true });
 
   const members = organization.data ?? [];
   const managed = members.filter((member) => provenance.data?.[member.id]?.source === "directory");

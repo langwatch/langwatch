@@ -17,6 +17,7 @@ beforeEach(() => {
   useLangyStore.setState({
     isOpen: false,
     draft: "",
+    pendingPrompt: null,
     attachedContext: [],
     composerFocusRequested: false,
   });

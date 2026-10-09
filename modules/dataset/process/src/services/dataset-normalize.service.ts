@@ -266,7 +266,10 @@ const parseInto = async (params: {
  * `createDatasetFromUpload`: a column that held an inline picture is `"image"`,
  * every other one `"string"`.
  */
-const deriveColumnTypes = (headers: string[], pictureColumns: ReadonlySet<string>): DatasetColumns =>
+const deriveColumnTypes = (
+  headers: string[],
+  pictureColumns: ReadonlySet<string>,
+): DatasetColumns =>
   headers.map((name) => ({
     name,
     type: pictureColumns.has(name) ? ("image" as const) : ("string" as const),
@@ -336,7 +339,7 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
   }
 
   async normalize(payload: DatasetNormalizePayload): Promise<void> {
-    const { projectId, datasetId, filename } = payload;
+    const { projectId, datasetId } = payload;
     const staged = "stagingKey" in payload;
 
     const dataset = await this.deps.repository.findOne({ id: datasetId, projectId });
@@ -353,65 +356,9 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
     const storage = this.deps.chunks;
 
     try {
-      const { bytes, sizeBytes } = await this.openSource(payload);
-      const format = detectFileFormat(filename);
-      const limits = await this.deps.requestBounds.limits(projectId);
-      const writer = StreamingChunkWriterService.create({
-        storage,
-        projectId,
-        datasetId,
-      });
-      const pictureColumns = new Set<string>();
-      const maxBytes = onceMaxBytes(() => Promise.resolve(limits.attachmentBytes));
-      const scopeFor = (columns: DatasetColumns | null): InlineAttachmentScope => ({
-        projectId,
-        datasetId,
-        maxBytes,
-        columns: columns
-          ? { kind: "typed", columnTypes: columns }
-          : { kind: "untyped", onPictureColumn: (column) => pictureColumns.add(column) },
-      });
-
-      // ADR-032 v19: the upload's confirm step persists the user-chosen columns
-      // on the row (names + types). Honour them: rename + type-convert per
-      // record as it streams. Absent (SDK / REST / API-key callers that don't
-      // pass a schema) → null, so parseInto leaves rows as-is and the types are
-      // derived below.
-      const confirmedColumns = (dataset.columnTypes as DatasetColumns) ?? [];
-      const { headers, appliedColumnTypes } = await parseInto({
-        bytes,
-        format,
-        writer,
-        limits: {
-          rowBytes: limits.rowBytes,
-          jsonFileBytes: limits.jsonFileBytes,
-          fileBytes: limits.fileBytes,
-          rowsMax: limits.rowsMax,
-        },
-        sizeBytes,
-        targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
-        storeInlineFiles: (record, columns) =>
-          this.deps.inlineAttachments.store(scopeFor(columns), record),
-      });
-      // I-MEM: finalize returns the aggregated meta built from per-chunk
-      // metadata only — the chunk `jsonl` payloads were released at each flush,
-      // so the whole normalized file is never accumulated in heap.
-      const meta = await writer.finalize();
-      const columnTypes = appliedColumnTypes ?? deriveColumnTypes(headers, pictureColumns);
-
-      // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
-      // matches the legacy upload contract (which rejects an empty file).
-      if (meta.rowCount === 0) {
-        throw new UploadValidationError("Uploaded file is empty", "empty_file");
-      }
-
-      // I-IDEM: a re-drive that wrote fewer chunks than a crashed prior run
-      // leaves orphan `chunk-NNNNN` objects past this run's last index. Delete
-      // them before flipping to `ready` so the chunk set matches `chunkCount`.
-      await storage.deleteChunksFrom({
-        projectId,
-        datasetId,
-        fromIndex: meta.chunkCount,
+      const { meta, columnTypes } = await this.writeChunks({
+        payload,
+        columnTypes: dataset.columnTypes,
       });
 
       await this.deps.repository.update({
@@ -445,6 +392,80 @@ export class DatasetNormalizeService implements DatasetNormalize, DatasetNormali
       });
       throw error;
     }
+  }
+
+  /** Streams the source into chunk objects and returns what the dataset row records of them. */
+  private async writeChunks({
+    payload,
+    columnTypes: confirmed,
+  }: {
+    payload: DatasetNormalizePayload;
+    columnTypes: unknown;
+  }) {
+    const { projectId, datasetId, filename } = payload;
+    const storage = this.deps.chunks;
+    const { bytes, sizeBytes } = await this.openSource(payload);
+    const format = detectFileFormat(filename);
+    const limits = await this.deps.requestBounds.limits(projectId);
+    const writer = StreamingChunkWriterService.create({
+      storage,
+      projectId,
+      datasetId,
+    });
+    const pictureColumns = new Set<string>();
+    const maxBytes = onceMaxBytes(() => Promise.resolve(limits.attachmentBytes));
+    const scopeFor = (columns: DatasetColumns | null): InlineAttachmentScope => ({
+      projectId,
+      datasetId,
+      maxBytes,
+      columns: columns
+        ? { kind: "typed", columnTypes: columns }
+        : { kind: "untyped", onPictureColumn: (column) => pictureColumns.add(column) },
+    });
+
+    // ADR-032 v19: the upload's confirm step persists the user-chosen columns
+    // on the row (names + types). Honour them: rename + type-convert per
+    // record as it streams. Absent (SDK / REST / API-key callers that don't
+    // pass a schema) → null, so parseInto leaves rows as-is and the types are
+    // derived below.
+    const confirmedColumns = (confirmed as DatasetColumns) ?? [];
+    const { headers, appliedColumnTypes } = await parseInto({
+      bytes,
+      format,
+      writer,
+      limits: {
+        rowBytes: limits.rowBytes,
+        jsonFileBytes: limits.jsonFileBytes,
+        fileBytes: limits.fileBytes,
+        rowsMax: limits.rowsMax,
+      },
+      sizeBytes,
+      targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
+      storeInlineFiles: (record, columns) =>
+        this.deps.inlineAttachments.store(scopeFor(columns), record),
+    });
+    // I-MEM: finalize returns the aggregated meta built from per-chunk
+    // metadata only — the chunk `jsonl` payloads were released at each flush,
+    // so the whole normalized file is never accumulated in heap.
+    const meta = await writer.finalize();
+    const columnTypes = appliedColumnTypes ?? deriveColumnTypes(headers, pictureColumns);
+
+    // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
+    // matches the legacy upload contract (which rejects an empty file).
+    if (meta.rowCount === 0) {
+      throw new UploadValidationError("Uploaded file is empty", "empty_file");
+    }
+
+    // I-IDEM: a re-drive that wrote fewer chunks than a crashed prior run
+    // leaves orphan `chunk-NNNNN` objects past this run's last index. Delete
+    // them before flipping to `ready` so the chunk set matches `chunkCount`.
+    await storage.deleteChunksFrom({
+      projectId,
+      datasetId,
+      fromIndex: meta.chunkCount,
+    });
+
+    return { meta, columnTypes };
   }
 
   private async openSource(

@@ -29,7 +29,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { PersonalWorkspaceIdentityService } from "../../../services/personal-workspace-identity.service.ts";
+import { PersonalWorkspaceIdentityService } from "../../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -86,11 +86,10 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace",
         });
 
       const first = await ensure();
-      expect(first.created).toBe(true);
+      expect(first.kind).toBe("pending");
 
       const second = await ensure();
-      expect(second.created).toBe(false);
-      expect(second.workspace.team.id).toBe(first.workspace.team.id);
+      expect(second).toEqual(first);
 
       await expect(
         prisma!.team.count({ where: { organizationId, isPersonal: true } }),

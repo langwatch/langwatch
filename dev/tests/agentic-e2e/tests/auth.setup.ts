@@ -78,9 +78,12 @@ setup("authenticate", async ({ page, request }) => {
 
   // Same as the nudge: `JoinYourTeamTakeover` always has an offer for `@langwatch.ai` accounts, and
   // its `aria-modal` hides the page from `getByRole` in every later suite.
-  const dismissJoinOfferResponse = await page.request.post("/api/trpc/joinRequests.dismissOffer", {
-    data: {},
-  });
+  const dismissJoinOfferResponse = await page.request.post(
+    "/api/trpc/identity.joinRequests.dismissOffer",
+    {
+      data: {},
+    },
+  );
   const dismissJoinOfferData = await dismissJoinOfferResponse.json().catch(() => null);
 
   if (!dismissJoinOfferResponse.ok() || dismissJoinOfferData?.error) {

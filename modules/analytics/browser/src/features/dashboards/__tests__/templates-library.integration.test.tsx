@@ -9,7 +9,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StubAnalyticsHost } from "../../../testing.tsx";
+import { renderWithAnalyticsHost, StubAnalyticsHost } from "../../../testing.tsx";
 import {
   AGENT_KIND_CHIP_LABELS,
   CATALOGUE_TEMPLATES,
@@ -18,11 +18,13 @@ import {
 } from "../catalogue/index.ts";
 import {
   finderPool,
+  type PreviewWidget,
   TEMPLATE_LIBRARY,
   TEMPLATE_PREVIEW_IDS,
   templatePreviewSrc,
   templateSections,
 } from "../model/template-library.ts";
+import { TemplatePreview } from "../ui/blocks/template-preview.tsx";
 import TemplatesLibraryScreen from "../ui/sections/templates-library.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -340,16 +342,16 @@ describe("the templates finder", () => {
       await user.unhover(badge);
       await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
 
-      badge.focus();
+      // Tab to it: only keyboard focus opens a tooltip.
+      for (let presses = 0; presses < 40 && document.activeElement !== badge; presses++) {
+        await user.tab();
+      }
+      expect(badge).toHaveFocus();
       expect(await screen.findByRole("tooltip")).toHaveTextContent(tip);
     });
   });
 
   describe("given the cards' previews", () => {
-    const sketched = POOL.flatMap(({ board, preview }) =>
-      preview.kind === "layout" ? [{ board, widgets: preview.widgets }] : [],
-    );
-
     /** @scenario "AC107d Templates library: a card previews the template's real board" */
     it("shows the captured image of a template that has one, hidden from assistive tech", () => {
       openLibrary();
@@ -358,28 +360,43 @@ describe("the templates finder", () => {
       expect(captured.length).toBeGreaterThan(0);
       for (const { board } of captured) {
         const image = screen.getByRole("article", { name: board.name }).querySelector("img");
-        expect(image?.getAttribute("src"), board.id).toBe(templatePreviewSrc(board.id));
+        expect(image?.getAttribute("src"), board.id).toBe(
+          templatePreviewSrc({ templateId: board.id, theme: "light" }),
+        );
         expect(image?.closest("[aria-hidden='true']"), board.id).not.toBeNull();
       }
     });
 
     /** @scenario "AC107d Templates library: a card previews the template's real board" */
-    it("sketches every other template's widgets as blocks, with no image and no text", () => {
-      openLibrary();
+    it("sketches a template with no image as blocks for its widgets, with no image and no text", () => {
+      // Every template in the pool has a captured image now, so the sketch is rendered directly.
+      const widgets: PreviewWidget[] = [
+        {
+          key: "left",
+          title: "Left",
+          placeholder: "tile",
+          layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 3 },
+        },
+        {
+          key: "right",
+          title: "Right",
+          placeholder: "line",
+          layout: { gridColumn: 4, gridRow: 0, colSpan: 4, rowSpan: 3 },
+        },
+      ];
+      const { container } = renderWithAnalyticsHost(
+        <TemplatePreview preview={{ kind: "layout", widgets }} />,
+      );
 
-      expect(sketched.length).toBeGreaterThan(0);
-      for (const { board, widgets } of sketched) {
-        const card = screen.getByRole("article", { name: board.name });
-        expect(card.querySelector("img"), board.id).toBeNull();
-        const blocks = [...card.querySelectorAll("[data-sketch-widget]")];
-        expect(
-          blocks.map((block) => block.getAttribute("data-sketch-widget")),
-          board.id,
-        ).toEqual(widgets.map(({ key }) => key));
-        for (const block of blocks) {
-          expect(block.closest("[aria-hidden='true']"), board.id).not.toBeNull();
-          expect(block.textContent, board.id).toBe("");
-        }
+      expect(container.querySelector("img")).toBeNull();
+      const blocks = [...container.querySelectorAll("[data-sketch-widget]")];
+      expect(blocks.map((block) => block.getAttribute("data-sketch-widget"))).toEqual([
+        "left",
+        "right",
+      ]);
+      for (const block of blocks) {
+        expect(block.closest("[aria-hidden='true']")).not.toBeNull();
+        expect(block.textContent).toBe("");
       }
     });
   });

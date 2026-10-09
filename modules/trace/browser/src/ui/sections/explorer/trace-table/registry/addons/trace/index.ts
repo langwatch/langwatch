@@ -1,4 +1,4 @@
-import type { TraceListItem } from "../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import type { AddonDef } from "../../types.ts";
 import { ErrorDetailAddon } from "./error-detail-addon.tsx";
 import { ExpandedPeekAddon } from "./expanded-peek-addon.tsx";

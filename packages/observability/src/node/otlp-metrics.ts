@@ -76,26 +76,7 @@ export function startOtlpMetricsExport(
         options: { boundaries: [...boundaries], recordMinMax: true },
       },
     })),
-    readers: [
-      new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporterBase(
-          createOtlpHttpExportDelegate(
-            createAuthoritativeOtlpConfiguration({
-              url: `${endpoint}/v1/metrics`,
-              headers: options.headers,
-              contentType: "application/x-protobuf",
-              getDefaults: getSharedConfigurationDefaults,
-              agentFactoryFromOptions: httpAgentFactoryFromOptions,
-            }),
-            ProtobufMetricsSerializer,
-            "otlp_http_metric_exporter",
-            MetricsExporterMetricsHelper,
-            void 0,
-          ),
-        ),
-        exportIntervalMillis: EXPORT_INTERVAL_MS,
-      }),
-    ],
+    readers: [otlpMetricReader({ endpoint, headers: options.headers })],
   });
 
   metrics.setGlobalMeterProvider(meterProvider);
@@ -113,6 +94,34 @@ export function startOtlpMetricsExport(
       deactivateMetrics();
     },
   };
+}
+
+/** The OTLP push as one reader, so a provider can carry it beside a pull reader (ADR-175). */
+export function otlpMetricReader({
+  endpoint,
+  headers,
+}: {
+  endpoint: string;
+  headers: Readonly<Record<string, string>>;
+}): PeriodicExportingMetricReader {
+  return new PeriodicExportingMetricReader({
+    exporter: new OTLPMetricExporterBase(
+      createOtlpHttpExportDelegate(
+        createAuthoritativeOtlpConfiguration({
+          url: `${endpoint}/v1/metrics`,
+          headers,
+          contentType: "application/x-protobuf",
+          getDefaults: getSharedConfigurationDefaults,
+          agentFactoryFromOptions: httpAgentFactoryFromOptions,
+        }),
+        ProtobufMetricsSerializer,
+        "otlp_http_metric_exporter",
+        MetricsExporterMetricsHelper,
+        void 0,
+      ),
+    ),
+    exportIntervalMillis: EXPORT_INTERVAL_MS,
+  });
 }
 
 /**

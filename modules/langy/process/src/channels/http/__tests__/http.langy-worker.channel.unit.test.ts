@@ -1,8 +1,9 @@
 import { propagation } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HttpLangyWorkerChannel, UnavailableLangyWorkerChannel } from "../../../index.ts";
 import { LangyWorkerMetricsNullService } from "../../../services/langy-worker-metrics-null.service.ts";
+import { UnavailableLangyWorkerChannel } from "../../unavailable.langy-worker.channel.ts";
+import { HttpLangyWorkerChannel } from "../http.langy-worker.channel.ts";
 
 const tracing = vi.hoisted(() => {
   const span = {

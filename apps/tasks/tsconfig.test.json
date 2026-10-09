@@ -39,9 +39,6 @@
       "path": "../../modules/automation/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
       "path": "../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
@@ -55,6 +52,9 @@
     },
     {
       "path": "../../modules/data-privacy/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-retention/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/data-retention/process/tsconfig.build.json"
@@ -126,16 +126,13 @@
       "path": "../../modules/github/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/group-queue/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/hosted-mcp/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/identity/contract/tsconfig.build.json"
+      "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/identity/process/tsconfig.build.json"
+      "path": "../../modules/instant-eval-judge/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/insight/process/tsconfig.build.json"
@@ -237,9 +234,6 @@
       "path": "../../modules/suite/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/system-migrations/tsconfig.build.json"
-    },
-    {
       "path": "../../packages/task/tsconfig.build.json"
     },
     {
@@ -253,9 +247,6 @@
     },
     {
       "path": "../../packages/upgrade/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/usage/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/user/process/tsconfig.build.json"

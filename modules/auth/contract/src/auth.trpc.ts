@@ -5,8 +5,21 @@ import { routingDecisionSchema } from "@langwatch/identity-contract";
  * screens have always called.
  */
 import { defineTrpcContract } from "@langwatch/module";
+import {
+  createdUserSchema,
+  userApiChangePasswordInputSchema,
+  userApiRegisterInputSchema,
+  userApiSetPasswordInputSchema,
+  userApiSuccessSchema,
+  userApiUserInputSchema,
+} from "@langwatch/user-contract";
 import { z } from "zod";
 
+import {
+  browserSessionInventoryEntrySchema,
+  browserSessionsEndedSchema,
+  endBrowserSessionInputSchema,
+} from "./browser-session.ts";
 import {
   addressConfirmationSchema,
   frontDoorAskedSchema,
@@ -63,4 +76,38 @@ export const authTrpc = defineTrpcContract("auth")
   .query("priorSession")
   .withInput(z.void())
   .withOutput(priorSessionSchema)
+
+  /** Retires the named account: oneself, or anybody for a platform operator not impersonating. */
+  .mutation("deactivate")
+  .withInput(userApiUserInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  /**
+   * The caller's own browsers, and ending one of them, moved from `user.*` (D-A1U-3). The
+   * session id never names whose it is, so nothing here reaches somebody else's list.
+   */
+  .query("browserSessions")
+  .withInput(z.object({}))
+  .withOutput(browserSessionInventoryEntrySchema.array())
+
+  .mutation("endBrowserSession")
+  .withInput(endBrowserSessionInputSchema)
+  .withOutput(browserSessionsEndedSchema)
+
+  /** The caller's own password doors, moved from `user.*` with their wire (D-A1U-4). */
+  .mutation("setPassword")
+  .withInput(userApiSetPasswordInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  .mutation("changePassword")
+  .withInput(userApiChangePasswordInputSchema)
+  .withOutput(userApiSuccessSchema)
+
+  /**
+   * The signup form's backend, moved from `user.*` with its wire (D-A1U-2). The account
+   * predates itself here, so it runs with no caller at all.
+   */
+  .mutation("register")
+  .withInput(userApiRegisterInputSchema)
+  .withOutput(createdUserSchema)
   .build();

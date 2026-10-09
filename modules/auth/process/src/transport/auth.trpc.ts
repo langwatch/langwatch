@@ -5,12 +5,15 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
+  browserSessionFact,
   callerAddressFact,
   defineTrpcFact,
   defineTrpcRouter,
+  type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import { AuthApi, authTrpc, FrontDoorRateLimitedError } from "@langwatch/auth-contract";
+import type { UserCaller } from "@langwatch/user-contract";
 import { z } from "zod";
 
 /**
@@ -75,6 +78,11 @@ const OWN_SESSION_COOKIE = publicRoute({
 const OWN_ADDRESS_STATE =
   "reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable";
 
+const SELF_OR_OPERATOR =
+  "self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant";
+
+const OWN_ACCOUNT = "operates on the session user's own account, so no tenant scope applies";
+
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
 
@@ -95,6 +103,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * router itself cannot tell the two apart either (ADR-117 §2).
    */
   .procedure("route")
+  .servesWhileUpgrading()
   .withFacts(callerAddressFact)
   .withAccess(ANONYMOUS_ROUTING)
   .handle(async ({ app, input }, address) => {
@@ -205,10 +214,120 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
 
   /** Why a signed-out visitor is here: only an expired session of theirs names its address. */
   .procedure("priorSession")
+  .servesWhileUpgrading()
   .withFacts(authRequestHeadersFact)
   .withAccess(OWN_SESSION_COOKIE)
   .handle(({ app }, headers) => app.getPriorSession({ headers }))
+
+  /** Moved from `user.deactivate` with its wire (D-A1U-5): the application decides standing. */
+  .procedure("deactivate")
+  .noPermission({ reason: SELF_OR_OPERATOR })
+  .handle(async ({ app, actor, input }) => {
+    await app.deactivateAccount({ userId: input.userId, caller: callerOf(actor) });
+
+    return { success: true as const };
+  })
+
+  /** The session row travels as a fact, so the reading browser is marked and refused by name. */
+  .procedure("browserSessions")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor }, browserSession) => [
+    ...(await app.listBrowserSessions({
+      userId: actor.id,
+      currentSessionId: browserSession ?? undefined,
+    })),
+  ])
+
+  .procedure("endBrowserSession")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(({ app, actor, input }, browserSession) =>
+    app.endBrowserSession({
+      userId: actor.id,
+      sessionId: input.sessionId,
+      currentSessionId: browserSession ?? undefined,
+    }),
+  )
+
+  // `register` predates the account it creates, so it runs with no caller at all and the
+  // address it arrived from is the only thing to throttle on (D-A1U-2, wire from `user.*`).
+  .procedure("register")
+  .withFacts(callerAddressFact, authRequestHeadersFact)
+  .withAccess(
+    publicRoute({
+      reason:
+        "the signup form's own backend: it mints the account a caller would otherwise need to already hold",
+    }),
+  )
+  .handle(({ app, input }, callerAddress, headers) =>
+    app.registerCredentialAccount({
+      name: input.name ?? null,
+      email: input.email,
+      password: input.password,
+      addressProof: input.addressProof,
+      callerAddress: callerAddress ?? "unknown",
+      origin: headers.get("origin"),
+      referer: headers.get("referer"),
+    }),
+  )
+
+  // The session row travels as a fact: one person on two tabs is one actor and two sessions,
+  // so "end every session but this one" asks about the request (D-A1U-4, wire from `user.*`).
+  .procedure("setPassword")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor, input }, browserSession) => {
+    await app.setOwnFirstPassword({
+      userId: actor.id,
+      password: input.password,
+      keepSessionId: deriveKeptSession({ actor, browserSession }),
+      caller: callerOf(actor),
+    });
+
+    return { success: true as const };
+  })
+
+  .procedure("changePassword")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor, input }, browserSession) => {
+    await app.changeOwnPassword({
+      userId: actor.id,
+      currentPassword: input.currentPassword,
+      newPassword: input.newPassword,
+      keepSessionId: deriveKeptSession({ actor, browserSession }),
+      caller: callerOf(actor),
+    });
+
+    return { success: true as const };
+  })
   .build();
+
+/**
+ * Who is asking: the outer id is the subject, `operatorId` whose standing applies. They differ
+ * only while a platform operator browses as somebody.
+ */
+function callerOf(actor: TrpcHandlerActor): UserCaller {
+  const operatorId = (actor.type === "user" ? actor.impersonatorId : undefined) ?? actor.id;
+
+  return { id: actor.id, operatorId, impersonated: operatorId !== actor.id };
+}
+
+/**
+ * The session a credential write keeps. Null while an operator is impersonating: the row is
+ * the OPERATOR's, so keeping it would neither keep the subject's tab nor mean anything about
+ * the subject's devices.
+ */
+function deriveKeptSession({
+  actor,
+  browserSession,
+}: {
+  actor: TrpcHandlerActor;
+  browserSession: string | null;
+}): string | null {
+  return callerOf(actor).impersonated ? null : browserSession;
+}
 
 /**
  * One attempt against the counter keyed on the caller's address. `"unknown"`

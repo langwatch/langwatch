@@ -1,5 +1,5 @@
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventSourcing } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
@@ -69,10 +69,11 @@ async function bootTasks() {
   );
   await resolver.preflight(declared);
 
+  const stores = memoryStores();
   const eventing = new EventSourcing({
     enabled: false,
     participation: "produce",
-    processStore: InMemoryProcessStore.createForTesting(),
+    processStore: stores.processStore,
     maintenance: () => [
       createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
       createProcessManagerMaintenancePipeline({
@@ -87,7 +88,7 @@ async function bootTasks() {
   const runtime = await supply
     .withModules(processModules)
     .withConfig(config)
-    .withStores(memoryStores())
+    .withStores(stores)
     .withMembers({
       logger: createTestLogger().logger,
       clock: systemClock(),
@@ -145,31 +146,41 @@ describe("the tasks process installation", () => {
     try {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
-        "backfill-http-agent-credentials-to-secrets",
         "backfill-annotations-to-clickhouse",
-        "agent-audit-log-ids-backfill",
         "clear-stale-pending-sso-setup",
         "slack-alert",
-        "report-schedule-backfill",
+        "tiered-free-to-seat-event",
         "stripe-prices-sync",
-        "dataset-content-backfill",
         "demo-data",
         "trace-destination-report",
-        "virtual-key-config-backfill",
+        "generate-license",
         "model-registry-sync",
-        "model-provider-migrate-credentials",
         "model-provider-migrate-custom-models",
         "process-manager-purge",
+        "credentials-reseal",
         "grant-platform-operator",
         "system-migrations-pass",
         "backfill-organization-presence-setting",
         "backfill-project-created",
         "backfill-project-presence-setting",
-        "stalled-runs-backfill",
+        "backfill-project-department-assigned",
         "topic-clustering-run",
         "user-data-erase",
-        "backfill-http-credentials-to-secrets",
+        "webhook-signature-vectors",
       ]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "No module task runs a catch-up step's code" */
+  it("lists no task that runs the usage-billing or the spend catch-up step", async () => {
+    const { runtime } = await bootTasks();
+
+    try {
+      const names = runtime.tasks(isTask).map((task) => task.name);
+      expect(names).not.toContain("usage-billing-catch-up");
+      expect(names).not.toContain("instant-eval-judge-spend-catch-up");
     } finally {
       await runtime.stop();
     }

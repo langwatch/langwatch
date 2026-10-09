@@ -72,7 +72,8 @@
         function fetchedSomething() {
           var entries = performance.getEntriesByType("resource");
           for (var i = 0; i < entries.length; i++) {
-            if (entries[i].transferSize > 0 && entries[i].name.indexOf("/assets/") !== -1) return true;
+            if (entries[i].transferSize > 0 && entries[i].name.indexOf("/assets/") !== -1)
+              return true;
           }
           return false;
         }
@@ -98,7 +99,8 @@
         // "interactive", and no script of ours has run yet.
         function isBootTag(el) {
           var tag = el && el.tagName;
-          var boot = (tag === "SCRIPT" && el.src) || (tag === "LINK" && /\bstylesheet\b/.test(el.rel));
+          var boot =
+            (tag === "SCRIPT" && el.src) || (tag === "LINK" && /\bstylesheet\b/.test(el.rel));
           return Boolean(boot) && (parsed === null || parsed.indexOf(el) !== -1);
         }
         function onResourceError(event) {

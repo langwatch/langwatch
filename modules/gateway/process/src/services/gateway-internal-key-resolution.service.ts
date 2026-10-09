@@ -11,6 +11,10 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import {
+  VirtualKeyCryptoError,
+  VirtualKeyCryptoService,
+} from "../features/virtual-key/services/virtual-key-crypto.service.ts";
+import {
   answer,
   detectVirtualKeyStatusRejection,
   readJson,
@@ -18,12 +22,11 @@ import {
   type KeyAuthRejection,
 } from "../rules/gateway-internal-door.rules.ts";
 import type { GatewayAuthDecisionService } from "./gateway-auth-decision.service.ts";
-import { VirtualKeyCryptoError, VirtualKeyCryptoService } from "./virtual-key-crypto.service.ts";
 
 /** How each license-token refusal reads on the wire, exactly as main answered it. */
 const LICENSE_TOKEN_REFUSALS: Record<
   GatewayLicenseTokenRefusal,
-  { status: 400 | 401 | 403; message: string }
+  { status: 400 | 401 | 403 | 503; message: string }
 > = {
   connect_license_token_malformed: { status: 401, message: "the license token is malformed" },
   connect_instance_required: {
@@ -37,6 +40,10 @@ const LICENSE_TOKEN_REFUSALS: Record<
   connect_license_revoked: { status: 403, message: "this license is no longer active" },
   connect_license_expired: { status: 403, message: "this license has expired" },
   connect_wrong_instance: { status: 403, message: "this license is bound to another instance" },
+  connect_credential_pending: {
+    status: 503,
+    message: "this license's hosted-services key is being set up; retry shortly",
+  },
 };
 
 /**

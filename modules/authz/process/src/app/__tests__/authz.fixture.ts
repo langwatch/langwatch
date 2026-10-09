@@ -1,14 +1,11 @@
 /**
- * Test builders for the AuthZ application, composed from the two contract
- * services (`AuthzModule.create` composes from repositories): a
+ * Test builders for the AuthZ application, composed from the decision service
+ * and the contract grants service (`AuthzModule.create` composes from repositories): a
  * test states the slice it exercises, and the builder refuses the rest.
  */
-import type {
-  AuthzGrantsService,
-  AuthzServerConfig,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzServerConfig } from "@langwatch/authz-contract";
 
+import type { AuthzService } from "../../services/authz.service.ts";
 import { AuthzModule } from "../authz.app.ts";
 
 function statedOrRefusing<Service extends object>(name: string, stated: object): Service {
@@ -30,7 +27,10 @@ export function createAuthzTestApp(
   }> = {},
 ): AuthzModule {
   return AuthzModule.fromServices({
-    permissions: statedOrRefusing<AuthzService>("permissions", services.permissions ?? {}),
+    permissions: statedOrRefusing<Pick<AuthzService, keyof AuthzService>>(
+      "permissions",
+      services.permissions ?? {},
+    ),
     grants: statedOrRefusing<AuthzGrantsService>("grants", services.grants ?? {}),
     config: services.config,
   });

@@ -24,6 +24,12 @@ export const API_KEY_REVOCATION_CAUSES = [
 
 export type ApiKeyRevocationCause = (typeof API_KEY_REVOCATION_CAUSES)[number];
 
+/** What retires a whole CLI session: a person, a refused refresh, or a lost membership. */
+export type CliSessionRevocationCause = Extract<
+  ApiKeyRevocationCause,
+  "user" | "expired" | "offboarded"
+>;
+
 export function isApiKeyRevocationCause(
   value: string | null | undefined,
 ): value is ApiKeyRevocationCause {

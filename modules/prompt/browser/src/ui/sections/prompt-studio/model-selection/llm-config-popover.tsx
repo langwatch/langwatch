@@ -3,8 +3,8 @@ import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { allModelOptions } from "@langwatch/model-provider-contract";
 
 import { ModelSelector } from "../../../../behavior/lent-model-provider.tsx";
-import { useLlmConfigPopoverState } from "../../../../behavior/use-llm-config-popover-state.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
+import { useLlmConfigPopoverState } from "../../../../features/model-selection/behavior/use-llm-config-popover-state.ts";
 import { type LLMConfigValues } from "../../../../model/llm-config-values.types.ts";
 import { getParameterConfigWithModelOverrides } from "../../../../model/parameter-config.ts";
 import { getParamValue } from "../../../../model/parameter-value.utils.ts";
@@ -31,6 +31,8 @@ type LLMConfigPopoverProps = {
   onOutputsChange?: (outputs: Output[]) => void;
   /** Whether to show the structured outputs section */
   showStructuredOutputs?: boolean;
+  /** Models LangWatch serves itself, offered first even with no provider configured. */
+  builtInModels?: readonly { value: string; label: string }[];
 };
 
 // ============================================================================
@@ -49,6 +51,7 @@ export function LLMConfigPopover({
   outputs,
   onOutputsChange,
   showStructuredOutputs = false,
+  builtInModels,
 }: LLMConfigPopoverProps) {
   const { project } = usePromptProject();
   const {
@@ -92,6 +95,7 @@ export function LLMConfigPopover({
             mode="chat"
             size="full"
             showConfigureAction={true}
+            {...(builtInModels ? { builtInModels } : {})}
           />
         </Box>
 

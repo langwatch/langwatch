@@ -84,9 +84,6 @@ export abstract class ProjectHostApi {
    */
   abstract isLiteMember(): boolean;
 
-  /** Whether a feature flag is on. Fail-closed while it is still arriving. */
-  abstract isFeatureEnabled(flag: string): boolean;
-
   /**
    * The application's project switcher, or null where none is mounted. The
    * platform page puts `DashboardLayout`'s selector in its header — chrome

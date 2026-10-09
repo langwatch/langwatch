@@ -111,3 +111,18 @@ export function cutPageAtStop({
     isCutShort: lastJudged < judged.rows.length - 1,
   };
 }
+
+/** Which stop reached the page, if any. A cancel outranks the deadline. */
+export function pageStopFor({
+  watch,
+  deadline,
+}: {
+  watch: AbortSignal;
+  deadline: AbortSignal | null;
+}): {
+  stop: InstantEvalPageStop | null;
+} {
+  if (watch.aborted) return { stop: "cancelled" };
+
+  return { stop: deadline?.aborted ? "deadline" : null };
+}

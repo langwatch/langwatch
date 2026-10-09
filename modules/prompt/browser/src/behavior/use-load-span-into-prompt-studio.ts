@@ -11,13 +11,13 @@ import {
 import type { ChatMessage, PromptStudioSpanResult } from "@langwatch/trace-contract";
 import { useEffect, useRef } from "react";
 
+import { TabDataSchema, type TabData } from "../features/tabs/behavior/prompt-tabs-store.ts";
+import { useDraggableTabsBrowserStore } from "../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { DEFAULT_MODEL } from "../model/prompt-constants.ts";
 import { computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
 import { usePromptHost } from "../model/prompt-host.ts";
 import { promptApi } from "./prompt-api.ts";
-import { TabDataSchema, type TabData } from "./prompt-tabs-store.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
 const QUERY_PARAM_ACTION = "action";

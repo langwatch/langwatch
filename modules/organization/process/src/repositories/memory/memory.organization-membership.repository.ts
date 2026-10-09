@@ -11,10 +11,13 @@ import {
   OrganizationSlugTakenError,
   OrganizationUserRole,
   TeamNotFoundError,
+  type FullyLoadedOrganization,
   type OrganizationFounding,
   type OrganizationIntent,
+  type OrganizationWithMembersAndTheirTeams,
   type TeamUserRole,
   type User,
+  type OrganizationAdmission,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
@@ -33,13 +36,11 @@ import type {
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
-  FullyLoadedOrganization,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationMembershipRepository,
   OrganizationProvisioningSummary,
-  OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
@@ -527,39 +528,76 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       });
   }
 
+  async readJoinerSeat({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<"MEMBER" | "DEVELOPER"> {
+    return readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
+  }
+
   async createMembership(input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
-    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
-    seat?: "MEMBER" | "DEVELOPER";
+    seat: "MEMBER" | "DEVELOPER" | "EXTERNAL";
+    pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
-  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
-    const { organizationId, userId, pendingAdmissionId } = input;
+  }): Promise<OrganizationAdmission> {
+    const { organizationId, userId, pendingAdmissionId, seat, pending } = input;
     const existing = this.membershipRow({ organizationId, userId });
     if (existing) {
-      const seat = existing.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER";
-      return { outcome: "already-present", seat };
+      if (existing.role === OrganizationUserRole.DEVELOPER) {
+        return { outcome: "already-present", seat: "DEVELOPER", pending: false };
+      }
+      if (existing.role === OrganizationUserRole.EXTERNAL) {
+        const held = existing.disabledAt !== null;
+        return { outcome: "already-present", seat: "EXTERNAL", pending: held };
+      }
+      return { outcome: "already-present", seat: "MEMBER", pending: false };
     }
 
-    const seat =
-      input.seat ?? readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
     const now = nowInstant();
     this.memory.organizationUsers.push({
       userId,
       organizationId,
       role: seat,
+      disabledAt: pending ? now : null,
+      createdAt: now,
+      updatedAt: now,
+      pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : pendingAdmissionId,
+    });
+    return { outcome: "created", seat, pending };
+  }
+
+  async createSsoDomainMembership({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<"created" | "already-present"> {
+    if (this.membershipRow({ organizationId, userId })) return "already-present";
+    const now = nowInstant();
+    this.memory.organizationUsers.push({
+      userId,
+      organizationId,
+      role: OrganizationUserRole.MEMBER,
       disabledAt: null,
       createdAt: now,
       updatedAt: now,
-      pendingSsoGrantId: seat === "MEMBER" ? pendingAdmissionId : null,
+      pendingSsoGrantId: null,
     });
-    return { outcome: "created", seat };
+    return "created";
   }
 
-  async deleteMember(input: DeleteMemberInput): Promise<void> {
+  async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
+    return this.memory.organizationUsers.filter((row) => row.userId === userId).length;
+  }
+
+  async deleteMember(input: DeleteMemberInput): Promise<string[]> {
     const { organizationId, userId } = input;
     const row = this.membershipRow({ organizationId, userId });
     if (!row) throw new MemberNotFoundError(userId);
@@ -580,13 +618,13 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     );
 
     const archivedAt = nowInstant();
+    const archivedTeamIds: string[] = [];
     for (const team of this.teamsOf(organizationId)) {
       if (team.ownerUserId !== userId || !team.isPersonal || team.archivedAt) continue;
       team.archivedAt = archivedAt;
-      for (const project of this.memory.projects.values()) {
-        if (project.teamId === team.id && project.isPersonal) project.archivedAt = archivedAt;
-      }
+      archivedTeamIds.push(team.id);
     }
+    return archivedTeamIds;
   }
 
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {

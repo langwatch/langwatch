@@ -3,10 +3,10 @@ import type {
   CliSessionCard,
   PersonalIngestionKeyListing,
 } from "@langwatch/enterprise-governance-contract";
+import { readableDate } from "@langwatch/time";
 import { KeyRound, Laptop, Monitor, Server, Smartphone } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { readableDate } from "../../model/display-formatters.ts";
 import { formatRelativeTime } from "../../model/relative-time.ts";
 
 /**

@@ -52,6 +52,32 @@ vi.resetModules();
 const { FakeAuthzHost, renderWithAuthzHost } = await import("../../../testing.tsx");
 const { default: RolesScreen } = await import("../roles.screen.tsx");
 
+/** One assignment as `authz.listManagedGrants` sends it: Sam, Member, on team Platform. */
+function assignment(over: Record<string, unknown>) {
+  return {
+    id: "gr-1",
+    userId: "u1",
+    userName: "Sam",
+    userEmail: "sam@acme.com",
+    userImage: null,
+    groupId: null,
+    groupName: null,
+    groupScimSource: null,
+    apiKeyId: null,
+    apiKeyName: null,
+    role: "MEMBER",
+    customRoleId: null,
+    customRoleName: null,
+    scopeType: "TEAM",
+    scopeId: "team-1",
+    scopeName: "Platform",
+    memberUserIds: [],
+    createdAt: "2026-09-01T00:00:00.000Z",
+    expiresAt: null,
+    ...over,
+  };
+}
+
 beforeEach(() => {
   state.bindingReads = 0;
   state.grantReads = 0;
@@ -83,23 +109,14 @@ describe("the Roles & access page", () => {
   describe("given the address the old role bindings page forwards to", () => {
     /** @scenario "The screen says role assignment, never binding" */
     it("opens the Access tab, in the industry's words", () => {
-      state.grants = [
-        {
-          id: "gr-1",
-          principal: { type: "user", id: "u1", name: "Sam" },
-          role: { id: "member", name: "Member", builtIn: true },
-          scope: { type: "team", id: "team-1", name: "Platform" },
-          status: "active",
-          expiresAt: null,
-          createdAt: "2026-09-01T00:00:00.000Z",
-        },
-      ];
+      state.bindings = [assignment({})];
       renderWithAuthzHost(<RolesScreen />, new FakeAuthzHost({ query: { tab: "assignments" } }));
 
       expect(screen.getByRole("tab", { name: "Access" })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByText("Sam")).toBeInTheDocument();
-      expect(screen.getByText("Team · Platform")).toBeInTheDocument();
-      expect(state.grantReads).toBeGreaterThan(0);
+      expect(screen.getByText("Team Platform")).toBeInTheDocument();
+      expect(state.bindingReads).toBeGreaterThan(0);
+      expect(state.grantReads).toBe(0);
       expect(document.body.textContent).not.toMatch(/binding/i);
     });
   });
@@ -107,21 +124,11 @@ describe("the Roles & access page", () => {
   describe("given a member who holds a role on a team called Platform", () => {
     /** @scenario A scope is named in full */
     it("names the scope on the Access tab by its kind and its full name", () => {
-      state.grants = [
-        {
-          id: "gr-1",
-          principal: { type: "user", id: "u1", name: "Sam" },
-          role: { id: "member", name: "Member", builtIn: true },
-          scope: { type: "team", id: "team-1", name: "Platform" },
-          status: "active",
-          expiresAt: null,
-          createdAt: "2026-09-01T00:00:00.000Z",
-        },
-      ];
+      state.bindings = [assignment({})];
       renderWithAuthzHost(<RolesScreen />, new FakeAuthzHost({ query: { tab: "assignments" } }));
 
-      const row = within(screen.getByTestId("grant-row"));
-      expect(row.getByText("Team · Platform")).toBeInTheDocument();
+      const row = within(screen.getByTestId("role-assignment-row"));
+      expect(row.getByText("Team Platform")).toBeInTheDocument();
       expect(row.queryByText("Platform")).not.toBeInTheDocument();
     });
   });
@@ -129,25 +136,17 @@ describe("the Roles & access page", () => {
   describe("given two API keys that hold roles in the organization", () => {
     /** @scenario Every holder is named, whatever kind of holder it is */
     it("gives each key its own row, a key with no name says so, and no row is nameless", () => {
-      const keyGrant = (id: string, keyId: string, name: string | null) => ({
-        id,
-        principal: { type: "apiKey", id: keyId, name },
-        role: { id: "viewer", name: "Viewer", builtIn: true },
-        scope: { type: "organization", id: "org-1", name: "Acme" },
-        status: "active",
-        expiresAt: null,
-        createdAt: "2026-09-01T00:00:00.000Z",
-      });
-      state.grants = [keyGrant("gr-1", "key-1", "CI deploy"), keyGrant("gr-2", "key-2", null)];
+      const keyGrant = (id: string, apiKeyId: string, apiKeyName: string | null) =>
+        assignment({ id, userId: null, userName: null, userEmail: null, apiKeyId, apiKeyName });
+      state.bindings = [keyGrant("gr-1", "key-1", "CI deploy"), keyGrant("gr-2", "key-2", null)];
       renderWithAuthzHost(<RolesScreen />, new FakeAuthzHost({ query: { tab: "assignments" } }));
 
-      const rows = screen.getAllByTestId("grant-row");
+      const rows = screen.getAllByTestId("role-assignment-row");
       expect(rows).toHaveLength(2);
-      expect(within(rows[0]!).getByText("CI deploy")).toBeInTheDocument();
-      expect(within(rows[0]!).getByText("API key")).toBeInTheDocument();
-      expect(within(rows[1]!).getByText("An API key with no name yet")).toBeInTheDocument();
+      expect(within(rows[0]!).getByText("An API key with no name yet")).toBeInTheDocument();
+      expect(within(rows[1]!).getByText("CI deploy")).toBeInTheDocument();
       for (const row of rows) {
-        expect(within(row).getAllByRole("cell")[0]?.textContent?.trim()).not.toBe("");
+        expect(within(row).getByText("API key")).toBeInTheDocument();
       }
     });
   });

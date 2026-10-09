@@ -30,7 +30,7 @@ const topicQuery = vi.hoisted(() => ({
 
 vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
-    traces: {
+    topics: {
       getTopicCounts: { useQuery: () => topicQuery.current },
     },
   },

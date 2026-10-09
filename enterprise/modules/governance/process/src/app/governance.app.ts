@@ -28,7 +28,6 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * CLI without knowing which it is serving.
  */
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
@@ -121,6 +120,8 @@ import {
   type CreateIngestionTemplateInput,
   type UpdateIngestionTemplateOttlInput,
   type GovernanceActorWorkspace,
+  type MePersonalCredential,
+  type MeUsage,
   type PersonalUsageQueryInput,
   type PersonalUsageRollup,
   type PersonalUsageWindow,
@@ -150,7 +151,12 @@ import {
   EntitlementApi,
   type EntitlementOperator,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  IntentContext,
+  ProcessStore,
+} from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
@@ -158,15 +164,12 @@ import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  OrganizationApi,
-  type OrganizationService,
-  TeamNotFoundError,
-} from "@langwatch/organization-contract";
+import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
-import { UserApi } from "@langwatch/user-contract";
+import { UserApi, UserNotOrganizationMemberError } from "@langwatch/user-contract";
+import { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { GovernanceHttpClient } from "../channels/governance-http.channel.ts";
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
@@ -178,6 +181,14 @@ import { ssrfSafeFetch } from "../channels/http/http.governance-http.channel.ts"
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
+import {
+  OutboxAnomalyAlertDelivery,
+  requestAnomalyAlertDelivery,
+} from "../eventing/anomaly-alert-delivery.intent.ts";
+import {
+  ANOMALY_ALERT_EVENT_TYPE,
+  type AnomalyAlertDeliveryIntent,
+} from "../eventing/anomaly-alert-delivery.process.ts";
 import { CostRollupWatchProcess } from "../eventing/cost-rollup-watch.process.ts";
 import { GovernanceCostChargeMapProjection } from "../eventing/governance-cost-charge.projection.ts";
 import { GovernanceCostRollupFoldProjection } from "../eventing/governance-cost-rollup.projection.ts";
@@ -192,108 +203,115 @@ import {
   PulledUsageEventingAdapter,
   type PulledUsageDefinition,
 } from "../eventing/pulled-usage.pipeline.ts";
+import { AgentDiscoveryService } from "../features/agents/services/agent-discovery.service.ts";
+import { GovernanceAgentSyncService } from "../features/agents/services/governance-agent-sync.service.ts";
+import { GovernanceAgentsScreenService } from "../features/agents/services/governance-agents-screen.service.ts";
+import { cliDoorRefusal } from "../features/cli/rules/governance-cli-answer.rules.ts";
+import { DefaultGovernanceCliSessionInventoryService } from "../features/cli/services/cli-session-inventory.service.ts";
+import {
+  GovernanceCliAccessService,
+  type GovernanceCliAccessApi,
+} from "../features/cli/services/governance-cli-access.service.ts";
+import {
+  GovernanceCliActivityService,
+  type GovernanceCliActivityApi,
+} from "../features/cli/services/governance-cli-activity.service.ts";
+import {
+  GovernanceCliCredentialService,
+  type GovernanceCliCredentialApi,
+} from "../features/cli/services/governance-cli-credentials.service.ts";
+import { DefaultGovernanceCliBootstrapService } from "../features/cli/services/governance-cli-tool-bootstrap.service.ts";
+import { GovernanceCliService } from "../features/cli/services/governance-cli.service.ts";
+import { CanonicalCostExtractorService } from "../features/cost/services/canonical-cost-extractor.service.ts";
+import { CodingAssistantBillingFactService } from "../features/cost/services/coding-assistant-billing-fact.service.ts";
+import { CostRollupDayComparerService } from "../features/cost/services/cost-rollup-day-comparer.service.ts";
+import { GovernanceCostBreakdownService } from "../features/cost/services/governance-cost-breakdown.service.ts";
+import { GovernanceCostNoticesService } from "../features/cost/services/governance-cost-notices.service.ts";
+import { GovernanceCostSummaryService } from "../features/cost/services/governance-cost-summary.service.ts";
+import { DatabricksGeniePullerService } from "../features/databricks-genie/services/databricks-genie-puller.service.ts";
+import { DepartmentService } from "../features/identity/services/department.service.ts";
+import { DirectoryDepartmentSyncService } from "../features/identity/services/directory-department-sync.service.ts";
+import { ErasureSuppressionService } from "../features/identity/services/erasure-suppression.service.ts";
+import { GovernancePeopleScreenService } from "../features/identity/services/governance-people-screen.service.ts";
+import { IdentityMatchSuggestionService } from "../features/identity/services/identity-match-suggestion.service.ts";
+import { IdentityMatchService } from "../features/identity/services/identity-match.service.ts";
+import { PersonDiscoveryService } from "../features/identity/services/person-discovery.service.ts";
+import { PersonListingService } from "../features/identity/services/person-listing.service.ts";
+import { SuppressionSnapshotService } from "../features/identity/services/suppression-snapshot.service.ts";
+import { GovernanceIngestAccessService } from "../features/ingest/services/governance-ingest-access.service.ts";
+import { GovernanceIngestPrincipalService } from "../features/ingest/services/governance-ingest-principal.service.ts";
+import { GovernanceIngestReceiverService } from "../features/ingest/services/governance-ingest-receiver.service.ts";
+import { GovernanceIngestService } from "../features/ingest/services/governance-ingest.service.ts";
+import { QuarantineFillEvaluatorService } from "../features/ingest/services/quarantine-fill.service.ts";
+import { ProjectQuarantineTenantResolverService } from "../features/ingest/services/quarantine-tenant.service.ts";
+import { nextIngestionPullRunAt } from "../features/ingestion-pull/rules/ingestion-pull-schedule.rules.ts";
+import { toPullLifecycleSource } from "../features/ingestion-pull/rules/pull-schedule.rules.ts";
+import { ratePulledUsage } from "../features/ingestion-pull/rules/pulled-usage-rate.rules.ts";
+import { AnthropicAdminPullerService } from "../features/ingestion-pull/services/anthropic-admin-puller.service.ts";
+import { IngestionPullLifecycleService } from "../features/ingestion-pull/services/ingestion-pull-lifecycle.service.ts";
+import { IngestionPullListingService } from "../features/ingestion-pull/services/ingestion-pull-listing.service.ts";
+import { IngestionPullLogService } from "../features/ingestion-pull/services/ingestion-pull-log.service.ts";
+import { IngestionPullMetricsService } from "../features/ingestion-pull/services/ingestion-pull-metrics.service.ts";
+import { IngestionPullWorkerService } from "../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
+import type { PulledUsageDispatcher } from "../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
+import { IngestionPullService } from "../features/ingestion-pull/services/ingestion-pull.service.ts";
+import { OpenAiAdminPullerService } from "../features/ingestion-pull/services/openai-admin-puller.service.ts";
+import { OpenAiComplianceReferencePullerService } from "../features/ingestion-pull/services/openai-compliance-puller.service.ts";
+import { PullDestinationService } from "../features/ingestion-pull/services/pull-destination.service.ts";
+import { PulledUsagePricingService } from "../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../features/ingestion-pull/services/pulled-usage-record.service.ts";
+import { PullerRegistryService } from "../features/ingestion-pull/services/puller-registry.service.ts";
+import { S3PollingPullerService } from "../features/ingestion-pull/services/s3-puller.service.ts";
+import {
+  ActivityMonitorService,
+  type ActivityMonitorTraces,
+} from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
+import { IngestionSourceReadService } from "../features/ingestion-source/services/ingestion-source-read.service.ts";
+import {
+  IngestionSecretConfiguration,
+  IngestionSecretService,
+} from "../features/ingestion-source/services/ingestion-source-secret.service.ts";
+import { IngestionSourceService } from "../features/ingestion-source/services/ingestion-source.service.ts";
+import { IngestionTemplateService } from "../features/ingestion-source/services/ingestion-template.service.ts";
+import { SourceCredentialAccessService } from "../features/ingestion-source/services/source-credential-access.service.ts";
+import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
+import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
+import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
+import { PersonalUsageKeyService } from "../features/personal/services/personal-usage-key.service.ts";
+import { DefaultGovernancePersonalUsageService } from "../features/personal/services/personal-usage.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
-import { cliDoorRefusal } from "../rules/governance-cli-answer.rules.ts";
-import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
-import { toPullLifecycleSource } from "../rules/pull-schedule.rules.ts";
-import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
-import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
 import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
 import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.service.ts";
 import { GovernanceAiToolSlugService } from "../services/ai-tool-slug.service.ts";
 import { AnomalyAlertDispatcherService } from "../services/anomaly-alert-dispatcher.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
-import { AnthropicAdminPullerService } from "../services/anthropic-admin-puller.service.ts";
-import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
-import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
-import { CodingAssistantBillingFactService } from "../services/coding-assistant-billing-fact.service.ts";
-import { CostRollupDayComparerService } from "../services/cost-rollup-day-comparer.service.ts";
-import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
-import { DepartmentService } from "../services/department.service.ts";
-import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
-import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
-import { GovernanceAgentSyncService } from "../services/governance-agent-sync.service.ts";
-import { GovernanceAgentsScreenService } from "../services/governance-agents-screen.service.ts";
-import {
-  GovernanceCliAccessService,
-  type GovernanceCliAccessApi,
-} from "../services/governance-cli-access.service.ts";
-import {
-  GovernanceCliActivityService,
-  type GovernanceCliActivityApi,
-} from "../services/governance-cli-activity.service.ts";
-import {
-  GovernanceCliCredentialService,
-  type GovernanceCliCredentialApi,
-} from "../services/governance-cli-credentials.service.ts";
-import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service.ts";
-import { GovernanceCliService } from "../services/governance-cli.service.ts";
-import { GovernanceCostBreakdownService } from "../services/governance-cost-breakdown.service.ts";
-import { GovernanceCostNoticesService } from "../services/governance-cost-notices.service.ts";
-import { GovernanceCostSummaryService } from "../services/governance-cost-summary.service.ts";
-import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
-import { GovernanceIngestPrincipalService } from "../services/governance-ingest-principal.service.ts";
-import { GovernanceIngestReceiverService } from "../services/governance-ingest-receiver.service.ts";
-import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
+import { AnomalyWebhookDestinationMigrationService } from "../services/anomaly-webhook-destination-migration.service.ts";
 import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.service.ts";
-import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
 import { GovernancePlanGateService } from "../services/governance-plan-gate.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { GovernanceTenantHistoryService } from "../services/governance-tenant-history.service.ts";
 import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
-import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
-import { IdentityMatchService } from "../services/identity-match.service.ts";
-import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
-import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
-import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
-import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
-import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
-import type { PulledUsageDispatcher } from "../services/ingestion-pull-worker.service.ts";
-import { IngestionPullService } from "../services/ingestion-pull.service.ts";
-import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
-import { IngestionSourceReadService } from "../services/ingestion-source-read.service.ts";
-import {
-  IngestionSecretConfiguration,
-  IngestionSecretService,
-} from "../services/ingestion-source-secret.service.ts";
-import { IngestionSourceService } from "../services/ingestion-source.service.ts";
-import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
-import { OpenAiAdminPullerService } from "../services/openai-admin-puller.service.ts";
-import { OpenAiComplianceReferencePullerService } from "../services/openai-compliance-puller.service.ts";
 import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service.ts";
 import { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
-import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
-import { PersonListingService } from "../services/person-listing.service.ts";
-import { PersonaHomeService } from "../services/persona-home.service.ts";
-import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
-import { PersonalUsageDashboardService } from "../services/personal-usage-dashboard.service.ts";
-import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
-import { PullDestinationService } from "../services/pull-destination.service.ts";
-import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
-import { PullerRegistryService } from "../services/puller-registry.service.ts";
-import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.service.ts";
-import { ProjectQuarantineTenantResolverService } from "../services/quarantine-tenant.service.ts";
-import { S3PollingPullerService } from "../services/s3-puller.service.ts";
-import { SourceCredentialAccessService } from "../services/source-credential-access.service.ts";
 import {
   SpendSpikeAnomalyEvaluatorService,
   type SpendSpikeEvaluationSummary,
 } from "../services/spend-spike-anomaly-evaluator.service.ts";
-import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
 
 const logger = createLogger("langwatch:governance");
 
 type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
-export interface GovernanceAppDependencies {
+interface GovernanceAppDependencies {
+  /** Anomaly alerts to a rule's registered endpoints, and the endpoints W-11's step creates. */
+  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -316,6 +334,7 @@ export interface GovernanceAppDependencies {
     | "assignProjectDepartment"
     | "findLiveNonGovernanceIdsByOrganization"
     | "findLiveByRef"
+    | "findIdentity"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
   agents: Pick<AgentApi, "findConnectedInProjects">;
@@ -333,6 +352,7 @@ export interface GovernanceAppDependencies {
     | "findTraceCountsByAttribute"
     | "compileLangWatchQLTraceFilter"
     | "listTraceSummaries"
+    | keyof ActivityMonitorTraces
   >;
   apiKeys: Pick<
     ApiKeyApi,
@@ -369,7 +389,7 @@ export interface GovernanceAppDependencies {
     ModelProviderApi,
     "countEnabledInScopes" | "findEnabledProviderKeysInScopes" | "countInOrganization"
   >;
-  users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath">;
+  users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath" | "personalCallerFor">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
   auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
   /** Where a push source's OTLP logs and webhook envelopes are collected. */
@@ -392,7 +412,7 @@ export interface GovernanceAppDependencies {
    * The member's personal workspace: created on demand when they mint their
    * first key, read as it stands when they open their own dashboard.
    */
-  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "getPersonalWorkspace"> &
+  organizations: Pick<OrganizationApi, "ensurePersonalWorkspace" | "getPersonalWorkspace"> &
     Pick<
       OrganizationApi,
       | "isMember"
@@ -409,6 +429,8 @@ export interface GovernanceAppDependencies {
       | "getSessionPolicy"
       | "saveSessionPolicy"
       | "getSettings"
+      | "getOrganizationIdByTeamId"
+      | "listAllIds"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -417,19 +439,15 @@ export interface GovernanceAppDependencies {
    * because the one question this feature asks it — may the caller see somebody
    * else's personal keys — is a plain decision at the organization scope.
    */
-  permissions: Pick<AuthzService, "getDecision">;
+  permissions: Pick<AuthzApi, "getDecision">;
 }
 
 /** How a process installs this application: its peers, its config, its secrets, its repositories. */
 type GovernanceSetup = Readonly<{
-  dependencies: FeatureSetup<
-    typeof GovernanceModule.dependencies,
-    never,
-    undefined
-  >["dependencies"];
+  dependencies: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["dependencies"];
   config: GovernanceConfig | undefined;
-  resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
-  secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
+  resources: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["resources"];
+  secrets: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["secrets"];
   repositories: GovernanceRepositories;
 }>;
 
@@ -459,6 +477,7 @@ export class GovernanceModule implements GovernanceRestApi {
     auditLog: AuditLogApi,
     logs: LogApi,
     metrics: MetricApi,
+    webhooks: WebhookApi,
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
@@ -510,6 +529,7 @@ export class GovernanceModule implements GovernanceRestApi {
         auditLog: dependencies.auditLog,
         logs: dependencies.logs,
         metrics: dependencies.metrics,
+        webhooks: dependencies.webhooks,
       },
       repositories,
       erasureSuppression,
@@ -546,9 +566,17 @@ export class GovernanceModule implements GovernanceRestApi {
     });
     this.tenantHistory = tenantHistory;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
+    this.anomalyWebhookMigration = AnomalyWebhookDestinationMigrationService.create({
+      rules: repositories.anomalyRules,
+      organizationIds: (input) => dependencies.organizations.listAllIds(input),
+      createEndpoint: (command) => dependencies.webhooks.create(command),
+      archiveEndpoint: (input) => dependencies.webhooks.archive(input),
+      alertEventType: ANOMALY_ALERT_EVENT_TYPE,
+    });
     this.activityMonitor = ActivityMonitorService.create({
       repository: repositories.activityMonitor,
       projects: dependencies.projects,
+      traces: dependencies.traces,
     });
     this.planGate = GovernancePlanGateService.create({ entitlements: dependencies.entitlements });
     this.costAttributionPolicy = PostgresGovernancePolicyService.create(
@@ -556,8 +584,14 @@ export class GovernanceModule implements GovernanceRestApi {
     );
     this.codingAssistantBilling = CodingAssistantBillingFactService.create({
       policies: repositories.costAttributionPolicies,
-      record: (command) =>
-        this.codingAssistantBillingSender("recordCodingAssistantBilling").send(command),
+      organizationIds: (input) => dependencies.organizations.listAllIds(input),
+      // The command's schema is the event data with the envelope merged in, never a wrapper.
+      record: ({ tenantId, occurredAt, data }) =>
+        this.codingAssistantBillingSender("recordCodingAssistantBilling").send({
+          tenantId,
+          occurredAt,
+          ...data,
+        }),
     });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,
@@ -704,6 +738,7 @@ export class GovernanceModule implements GovernanceRestApi {
       spend: repositories.anomalySpend,
       dispatcher: AnomalyAlertDispatcherService.create({
         http: HttpAnomalyAlertChannel.create(),
+        outbox: () => this.#anomalyAlertOutbox,
         diagnostics: anomalyDiagnostics,
       }),
       diagnostics: anomalyDiagnostics,
@@ -782,6 +817,12 @@ export class GovernanceModule implements GovernanceRestApi {
       }),
       organizations: dependencies.organizations,
       projects: dependencies.projects,
+    });
+    this.personalUsageKeys = PersonalUsageKeyService.create({
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      users: dependencies.users,
+      rollups: this.personalUsageDashboards,
     });
     const supportContacts = OrganizationSupportContactService.create({
       repository: repositories.supportContacts,
@@ -873,6 +914,8 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly costAttributionPolicy: PostgresGovernancePolicyService;
   /** Q82: the billed facts trace folds; the backfill task records them for existing configs. */
   readonly codingAssistantBilling: CodingAssistantBillingFactService;
+  /** W-11: the deploy step moving inline anomaly webhooks onto endpoints. */
+  readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
@@ -906,6 +949,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private pulledUsageCommands: EventingSenders | undefined;
   private codingAssistantBillingCommands: EventingSenders | undefined;
   private readonly personalUsageDashboards: PersonalUsageDashboardService;
+  private readonly personalUsageKeys: PersonalUsageKeyService;
   private readonly cliBootstraps: DefaultGovernanceCliBootstrapService;
   private readonly cliAccessService: GovernanceCliAccessApi;
   /** The CLI token door `governanceCliRest` authenticates at; Auth verifies the bearer. */
@@ -966,6 +1010,25 @@ export class GovernanceModule implements GovernanceRestApi {
   /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */
   evaluateSpendSpikes(): Promise<SpendSpikeEvaluationSummary> {
     return this.spendSpikes.evaluateAll();
+  }
+
+  #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
+
+  /** A built pipeline means an outbox: endpoint deliveries are recorded in it from here on. */
+  connectAnomalyAlertOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#anomalyAlertOutbox = OutboxAnomalyAlertDelivery.create(processStore);
+  }
+
+  /** The delivery intent's handler: one WebhookApi.requestDelivery per recorded intent. */
+  requestAnomalyAlertDelivery(
+    intent: AnomalyAlertDeliveryIntent,
+    context: IntentContext,
+  ): Promise<void> {
+    return requestAnomalyAlertDelivery(this.dependencies.webhooks)(intent, context);
   }
 
   /** Main's boot reconciliation (`pipelineSet.ts:132-150`): every source's schedule sent to its pull process. */
@@ -1977,15 +2040,30 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.personalUsageDashboards.rollup(input);
   }
 
+  /** `/api/me/usage`: the rollup one personal API key may read (`personal-usage-key.service.ts`). */
+  getPersonalUsage(input: {
+    projectId: string;
+    credential: MePersonalCredential;
+    window?: { startMs: number; endMs: number };
+  }): Promise<MeUsage> {
+    return this.personalUsageKeys.read(input);
+  }
+
   /**
    * The same rollup for the caller's own /me screen, over the tenants their
    * traffic actually lands in. Zeros before their first request, so the page
-   * renders rather than refusing.
+   * renders rather than refusing; a caller outside the organization is refused.
    */
-  personalUsageDashboard(
+  async personalUsageDashboard(
     input: { organizationId: string; window?: PersonalUsageWindow },
     by: GovernanceCaller,
   ): Promise<PersonalUsageRollup> {
+    const member = await this.isOrganizationMember({
+      organizationId: input.organizationId,
+      userId: by.id,
+    });
+    if (!member) throw new UserNotOrganizationMemberError(input.organizationId);
+
     return this.personalUsageDashboards.read({
       userId: by.id,
       organizationId: input.organizationId,

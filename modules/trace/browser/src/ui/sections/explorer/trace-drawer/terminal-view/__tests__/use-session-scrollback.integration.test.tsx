@@ -40,7 +40,7 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoi
 
 vi.mock("../../../../../../behavior/trace-api.ts", () => ({ api: { useUtils: () => utils } }));
 
-vi.mock("../../../hooks/use-conversation-context.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
   useConversationContext: () => ({
     turns: conversation.turns,
     isLoading: conversation.isLoading,

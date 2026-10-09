@@ -12,7 +12,7 @@ import {
   hasDuplicateCompareRows,
   initialCompareRows,
   MAX_COMPARE_ROWS,
-} from "../../../../sections/agent-testing/run/compare-rows.ts";
+} from "../../../../sections/agent-testing/run-compare/compare-rows.ts";
 import { TARGET_COLORS, targetColor } from "../target-colors.ts";
 
 /** A scope that declares no parameter, so every typed value is an override. */

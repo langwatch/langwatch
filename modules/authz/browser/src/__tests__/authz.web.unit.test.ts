@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import { describe, expect, it } from "vitest";
 
 import { authzWeb } from "../authz.web.ts";
@@ -14,14 +15,19 @@ function browserDocument() {
 }
 
 describe("given a browser that installs authz", () => {
-  describe("when the kernel renders with only a transport supplied", () => {
-    it("installs the module", async () => {
+  describe("when the kernel renders with a transport and the page's config supplied", () => {
+    it("installs the module and projects the slice it claims", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([authzWeb] as const)
+        .withModules([hostServiceFakes(), authzWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
+        .withInjectedConfig(() => ({
+          process: { mode: "test", deployment: "self-hosted", nlp: true },
+          authz: { demoProjectSlug: "demo" },
+        }))
         .render();
 
       expect(installed.modules).toContain(authzWeb);
+      expect(installed.config).toEqual({ authz: { demoProjectSlug: "demo" } });
     });
   });
 

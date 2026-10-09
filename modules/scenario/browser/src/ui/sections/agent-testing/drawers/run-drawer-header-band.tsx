@@ -25,12 +25,12 @@ import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
 import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon.tsx";
 import { useRunStartedHandler } from "../cases/use-case-run-actions.ts";
-import { RUN_AGAIN_LABEL } from "../results/run-plan-detail-header.tsx";
+import { RUN_AGAIN_LABEL } from "../run-plan-results/run-plan-detail-header.tsx";
 import {
   canRunAgain,
   RUN_AGAIN_FROM_CODE_REASON,
   runAgainSubjectOf,
-} from "../results/use-run-plan-run-dialog.ts";
+} from "../run-plan-results/use-run-plan-run-dialog.ts";
 import { RunDialog, type RunDialogSubject } from "../run/run-dialog.tsx";
 import type {
   RunDetail,

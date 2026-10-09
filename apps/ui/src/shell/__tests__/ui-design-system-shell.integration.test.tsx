@@ -1,4 +1,4 @@
-import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
+import { UiDesignSystemShell } from "@langwatch/browser/outer-providers";
 /**
  * @vitest-environment jsdom
  * @see packages/design-system/specs/design-system-boundary.feature
@@ -7,8 +7,7 @@ import { useChakraContext } from "@langwatch/design-system/primitives";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { composeUiDesignSystem } from "../../design-system";
-import { loadUiRootCapabilities } from "../ui-root-capabilities";
+import { composeUiDesignSystem, loadUiRootCapabilities } from "../ui-root-capabilities";
 
 const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
 

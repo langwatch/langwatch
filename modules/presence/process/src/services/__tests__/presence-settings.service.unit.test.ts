@@ -1,25 +1,35 @@
 /**
- * Presence answers whether it is on from its own fold of project's and organization's
- * presence-setting facts, never from a peer.
+ * Presence answers whether it is on from the rows project and organization hold, read through
+ * their shares (R40), never from a fold of their facts.
  * @see modules/presence/specs/presence.feature
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  createPresenceTestApp,
+  createPresenceTestRepositories,
+} from "../../app/__tests__/presence.fixture.ts";
 import { MemoryPresenceSettingsRepository } from "../../repositories/memory/memory.presence-settings.repository.ts";
-import { PresenceSettingsService } from "../presence-settings.service.ts";
+import { PRESENCE_SETTINGS_TTL_MS, PresenceSettingsService } from "../presence-settings.service.ts";
 
-const PROJECT = { projectId: "project-1", organizationId: "org-1" };
+const heartbeat = {
+  projectId: "project-1",
+  sessionId: "tab-1",
+  location: { lens: "traces", route: {} },
+  user: { id: "user-1", name: "Ada", image: null },
+} as const;
 
-let settings: PresenceSettingsService;
-
-beforeEach(() => {
-  settings = PresenceSettingsService.create({
-    repository: MemoryPresenceSettingsRepository.create(),
+function ownersRows({ project, organization }: { project: boolean; organization: boolean }) {
+  const repository = MemoryPresenceSettingsRepository.create({
+    projects: new Map([["project-1", { teamId: "team-1", presenceEnabled: project }]]),
+    teams: new Map([["team-1", { organizationId: "org-1" }]]),
+    organizations: new Map([["org-1", { presenceEnabled: organization }]]),
   });
-});
+  return PresenceSettingsService.create({ repository });
+}
 
-describe("given the project's and its organization's folded presence settings", () => {
-  /** @scenario "A project is enabled only when its folded setting and its organization's are both on" */
+describe("given the project's and its organization's settings as their owners hold them", () => {
+  /** @scenario "A project is enabled only when its own setting and its organization's are both on" */
   it.each([
     { project: true, organization: true, enabled: true },
     { project: true, organization: false, enabled: false },
@@ -28,71 +38,85 @@ describe("given the project's and its organization's folded presence settings", 
   ])(
     "answers $enabled for project $project and organization $organization",
     async ({ project, organization, enabled }) => {
-      await settings.projectSettingChanged({ ...PROJECT, presenceEnabled: project, occurredAt: 1 });
-      await settings.organizationSettingChanged({
-        organizationId: PROJECT.organizationId,
-        presenceEnabled: organization,
-        occurredAt: 1,
-      });
+      const settings = ownersRows({ project, organization });
 
-      await expect(settings.isEnabledForProject({ projectId: PROJECT.projectId })).resolves.toBe(
-        enabled,
-      );
+      await expect(settings.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(enabled);
     },
   );
 });
 
-describe("given presence has folded nothing about a project", () => {
-  /** @scenario "A project presence has folded no fact for is not enabled" */
+describe("given project holds no project with that id", () => {
+  /** @scenario "A project its owner does not hold is not enabled" */
   it("answers that the project is not enabled", async () => {
+    const settings = ownersRows({ project: true, organization: true });
+
     await expect(settings.isEnabledForProject({ projectId: "project-unknown" })).resolves.toBe(
       false,
     );
   });
 });
 
-describe("given presence has folded only a project's creation", () => {
-  /** @scenario "A created project with no recorded settings is enabled, as the stored defaults are" */
-  it("answers that the project is enabled", async () => {
-    await settings.projectCreated(PROJECT);
+describe("given project holds the project in a team organization does not hold", () => {
+  /** @scenario "A project whose team its owner does not hold is not enabled" */
+  it("answers that the project is not enabled", async () => {
+    const settings = PresenceSettingsService.create({
+      repository: MemoryPresenceSettingsRepository.create({
+        projects: new Map([["project-1", { teamId: "team-gone", presenceEnabled: true }]]),
+      }),
+    });
 
-    await expect(settings.isEnabledForProject({ projectId: PROJECT.projectId })).resolves.toBe(
-      true,
-    );
+    await expect(settings.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(false);
   });
 });
 
-describe("given presence has folded the project's and organization's settings as off", () => {
-  beforeEach(async () => {
-    await settings.projectSettingChanged({ ...PROJECT, presenceEnabled: false, occurredAt: 20 });
-    await settings.organizationSettingChanged({
-      organizationId: PROJECT.organizationId,
-      presenceEnabled: false,
-      occurredAt: 20,
-    });
+describe("given presence answered that a project is enabled", () => {
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  /** @scenario "A presence setting older than the one folded does not overwrite it" */
-  it("keeps them off when older settings turning them on arrive late", async () => {
-    await settings.projectSettingChanged({ ...PROJECT, presenceEnabled: true, occurredAt: 10 });
-    await settings.organizationSettingChanged({
-      organizationId: PROJECT.organizationId,
-      presenceEnabled: true,
-      occurredAt: 10,
+  describe("when organization switches the organization's presence setting off", () => {
+    /** @scenario "A settings toggle may lag up to 30 seconds, and the next request after that sees it" */
+    it("may answer enabled within 30 s, then answers not enabled and stores no session", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: 1_000_000 });
+      const organizations = new Map([["org-1", { presenceEnabled: true }]]);
+      const presence = await createPresenceTestApp({
+        repositories: {
+          ...(await createPresenceTestRepositories()),
+          settings: MemoryPresenceSettingsRepository.create({
+            projects: new Map([["project-1", { teamId: "team-1", presenceEnabled: true }]]),
+            teams: new Map([["team-1", { organizationId: "org-1" }]]),
+            organizations,
+          }),
+        },
+      });
+      await expect(presence.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(true);
+
+      organizations.set("org-1", { presenceEnabled: false });
+      vi.setSystemTime(1_000_000 + PRESENCE_SETTINGS_TTL_MS - 1);
+      await expect(presence.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(true);
+
+      vi.setSystemTime(1_000_000 + PRESENCE_SETTINGS_TTL_MS);
+      await expect(presence.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(false);
+      await presence.update(heartbeat);
+      await expect(presence.list({ projectId: "project-1" })).resolves.toEqual([]);
     });
-    await settings.projectCreated(PROJECT);
-
-    await expect(settings.isEnabledForProject({ projectId: PROJECT.projectId })).resolves.toBe(
-      false,
-    );
   });
+});
 
-  /** @scenario "Folding the same presence-setting fact twice changes nothing" */
-  it("still answers not enabled when the same fact is delivered again", async () => {
-    await settings.projectSettingChanged({ ...PROJECT, presenceEnabled: false, occurredAt: 20 });
+describe("given presence answered whether a project is enabled", () => {
+  describe("when further requests for the project arrive within 30 seconds", () => {
+    /** @scenario "Within the window presence reads the owners' rows once per project" */
+    it("reads the owners' rows once", async () => {
+      let at = 0;
+      const repository = MemoryPresenceSettingsRepository.create();
+      const getSettings = vi.spyOn(repository, "getSettings");
+      const settings = PresenceSettingsService.create({ repository, now: () => at });
 
-    await expect(settings.isEnabledForProject({ projectId: PROJECT.projectId })).resolves.toBe(
-      false,
-    );
+      await settings.isEnabledForProject({ projectId: "project-1" });
+      at = PRESENCE_SETTINGS_TTL_MS - 1;
+      await settings.isEnabledForProject({ projectId: "project-1" });
+
+      expect(getSettings).toHaveBeenCalledTimes(1);
+    });
   });
 });

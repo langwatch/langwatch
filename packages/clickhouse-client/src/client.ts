@@ -4,8 +4,8 @@
  * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
+import type { ClickHouseStatementAdmission } from "./managed-client.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
-import type { ConcurrencyLimiter } from "./rateLimit.ts";
 import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
@@ -19,8 +19,8 @@ export interface ClickHouseQueryClientOptions {
   tenantGuard?: TenantGuard | undefined;
   /** Records a span per statement. Omit to record none. */
   tracer?: QueryTracer | undefined;
-  /** Bounds statements in flight and sheds when the wait queue is full. */
-  limiter?: ConcurrencyLimiter | undefined;
+  /** Bounds statements in flight; refuses as overloaded on a full queue or an outlasted wait. */
+  limiter?: ClickHouseStatementAdmission | undefined;
   /** Retries transient failures. Omit to try exactly once. */
   retries?: RetryPolicy | undefined;
   /** Logs and counts each read and write once its retries settle, cold scans included. */
@@ -35,7 +35,7 @@ export class ClickHouseQueryClient {
   private readonly driver: QueryDriver;
   private readonly tenantGuard: TenantGuard | undefined;
   private readonly tracer: QueryTracer | undefined;
-  private readonly limiter: ConcurrencyLimiter | undefined;
+  private readonly limiter: ClickHouseStatementAdmission | undefined;
   private readonly retries: RetryPolicy | undefined;
   private readonly reporter: StatementReporter | undefined;
   private readonly routes: ReadonlyMap<string, string>;
@@ -91,7 +91,7 @@ export class ClickHouseQueryClient {
     const withSlot = () =>
       this.limiter === undefined
         ? withReport()
-        : this.limiter.run({ task: withReport, signal: request.signal });
+        : this.limiter.run({ operation: "query", task: withReport, signal: request.signal });
 
     return this.tracer === undefined ? withSlot() : this.tracer.trace({ request, task: withSlot });
   }
@@ -124,7 +124,7 @@ export class ClickHouseQueryClient {
         : this.retries.run(runOnce, { signal: request.signal, request });
 
     if (this.limiter === undefined) return withRetries();
-    await this.limiter.run({ task: withRetries, signal: request.signal });
+    await this.limiter.run({ operation: "command", task: withRetries, signal: request.signal });
   }
 
   /**
@@ -153,7 +153,7 @@ export class ClickHouseQueryClient {
       this.reported({ operation: "insert", params: { table: request.table }, task: withRetries });
 
     if (this.limiter === undefined) return withReport();
-    await this.limiter.run({ task: withReport, signal: request.signal });
+    await this.limiter.run({ operation: "insert", task: withReport, signal: request.signal });
   }
 
   /** One statement's outcome, reported the way the vendor client policy reports it. */

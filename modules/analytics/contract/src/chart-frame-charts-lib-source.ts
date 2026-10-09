@@ -1,5 +1,5 @@
 /**
- * GENERATED — do not hand-edit. Produced by `node dev/scripts/build-charts-lib.mjs`
+ * GENERATED, do not hand-edit. Produced by `node dev/scripts/build-charts-lib.mjs`
  * from `modules/analytics/browser/src/model/dashboard-widget/chartsLib/index.ts`,
  * bundled by esbuild in IIFE format. Reads `window.React`/`window.Recharts`.
  */

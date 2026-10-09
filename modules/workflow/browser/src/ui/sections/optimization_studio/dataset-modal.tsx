@@ -1,4 +1,5 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { AddOrEditDatasetRoutedDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-client";
 import {
   datasetColumnsSchema,
   type DatasetColumns,
@@ -140,7 +141,7 @@ export function DatasetModal({
   // The workflow node needs the dataset's columns straight away, which a direct upload
   // still processing doesn't have yet, so the upload keeps the in-browser parse.
   const handleUploadCsv = () => {
-    openDrawer("uploadCSV", { enableDirectUpload: false, onSuccess: handlePick });
+    openDrawer(UploadCsvDrawerToken, { enableDirectUpload: false, onSuccess: handlePick });
   };
 
   const handleNewDraft = () => {
@@ -166,7 +167,7 @@ export function DatasetModal({
 
   const handleSaveDraftAsDataset = () => {
     if (!editingDataset?.inline) return;
-    openDrawer("addOrEditDataset", {
+    openDrawer(AddOrEditDatasetRoutedDrawerToken, {
       datasetToSave: {
         name: editingDataset.name,
         columnTypes: editingDataset.inline.columnTypes,

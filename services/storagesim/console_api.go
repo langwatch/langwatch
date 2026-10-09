@@ -22,6 +22,20 @@ type requestEntry struct {
 	Key    string    `json:"key"`
 	Status int       `json:"status"`
 	At     time.Time `json:"at"`
+	// Auth is how the request was signed: presigned, header or none.
+	Auth      string `json:"auth"`
+	RequestID string `json:"requestId"`
+}
+
+// authKind names how r carries its SigV4 signature.
+func authKind(r *http.Request) string {
+	switch {
+	case r.URL.Query().Has("X-Amz-Signature"):
+		return "presigned"
+	case r.Header.Get("Authorization") != "":
+		return "header"
+	}
+	return "none"
 }
 
 // requestLog keeps the newest requestLogSize entries.
@@ -95,6 +109,10 @@ func (s *Server) consoleAPI(urlPath string) (http.HandlerFunc, bool) {
 		return s.handleRaw, true
 	case "/_sim/api/requests":
 		return s.handleRequests, true
+	case "/_sim/api/presign":
+		return s.handlePresign, true
+	case "/_sim/api/seed":
+		return s.handleSeed, true
 	}
 	return nil, false
 }
@@ -150,7 +168,8 @@ func (s *Server) handleBuckets(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"buckets": buckets})
 }
 
-// handleObjects lists one bucket's objects, or every bucket's without ?bucket=.
+// handleObjects lists one bucket's objects, or every bucket's without ?bucket=;
+// a DELETE removes them instead and answers how many went.
 func (s *Server) handleObjects(w http.ResponseWriter, r *http.Request) {
 	bucket := r.URL.Query().Get("bucket")
 	objects := []objectInfo{}
@@ -158,6 +177,13 @@ func (s *Server) handleObjects(w http.ResponseWriter, r *http.Request) {
 		if bucket == "" || o.Bucket == bucket {
 			objects = append(objects, o)
 		}
+	}
+	if r.Method == http.MethodDelete {
+		for _, o := range objects {
+			s.deleteObject(object{bucket: o.Bucket, key: o.Key})
+		}
+		writeJSON(w, http.StatusOK, map[string]int{"deleted": len(objects)})
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"objects": objects})
 }
@@ -184,9 +210,15 @@ func (s *Server) lookup(w http.ResponseWriter, r *http.Request) (objectInfo, boo
 	return info, ok
 }
 
+// handleObject shows one object's metadata; a DELETE removes it.
 func (s *Server) handleObject(w http.ResponseWriter, r *http.Request) {
 	info, ok := s.lookup(w, r)
 	if !ok {
+		return
+	}
+	if r.Method == http.MethodDelete {
+		s.deleteObject(object{bucket: info.Bucket, key: info.Key})
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	writeJSON(w, http.StatusOK, objectDetail{objectInfo: info, Headers: map[string]string{

@@ -5,7 +5,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { UNLIMITED } from "@langwatch/plans";
 import { createApp, MissingProviderError } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 /**
  * The background worker resolves a plan through the same entitlement peer the
@@ -13,11 +12,9 @@ import { createTestLogger } from "@langwatch/test-harness";
  * @see specs/automations/worker-plan-resolution.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
-import { createEntitlementTestUsers } from "./entitlement.fixture.ts";
 
 const ORGANIZATION = "organization-1";
 
@@ -62,12 +59,9 @@ function bootOn({ role = "worker", isSaas, billing, licence = unlicensed }: Sour
     .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
-      user: createEntitlementTestUsers(),
       licensing: createApiFixture<LicensingApi>({ resolve: async () => licence }),
       billing: billing ?? createApiFixture<BillingApi>({}),
-      trace: createApiFixture<TraceApi>({}),
       organization: createApiFixture<OrganizationApi>({}),
-      project: createApiFixture<ProjectApi>({}),
     })
     .boot();
 }
@@ -184,13 +178,9 @@ describe("given the entitlement module installed on the worker role", () => {
           .withStores(memoryStores())
           .withObservability((observability) => observability.withLogging(logger))
           .provide({
-            user: createEntitlementTestUsers(),
             licensing: createApiFixture<LicensingApi>({ resolve: async () => unlicensed }),
-            trace: createApiFixture<TraceApi>({}),
             organization: createApiFixture<OrganizationApi>({}),
-            project: createApiFixture<ProjectApi>({}),
           })
-          // @ts-expect-error MissingSupply: the compiler refuses a process that supplies no billing
           .boot(),
       );
 
@@ -212,7 +202,6 @@ describe("given the entitlement module installed on the worker role", () => {
         .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(createTestLogger().logger))
         .provide({
-          user: createEntitlementTestUsers(),
           licensing: createApiFixture<LicensingApi>({
             resolve: async ({ organizationId }) => {
               asked.push(organizationId);
@@ -220,9 +209,7 @@ describe("given the entitlement module installed on the worker role", () => {
             },
           }),
           billing: createApiFixture<BillingApi>({}),
-          trace: createApiFixture<TraceApi>({}),
           organization: createApiFixture<OrganizationApi>({}),
-          project: createApiFixture<ProjectApi>({}),
         })
         .boot();
 

@@ -7,7 +7,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
@@ -20,7 +20,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 }));
 
 vi.mock("../../../../model/scenario-host.ts", () => ({
-  useScenarioHost: () => ({ hasPermission: () => true }),
+  useScenarioHost: () => ({ hasPermission: () => true, isLoading: () => false }),
 }));
 
 vi.mock("../../../../behavior/agent-testing/use-agent-testing-routing.ts", () => ({

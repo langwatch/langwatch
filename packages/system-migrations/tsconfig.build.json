@@ -25,6 +25,9 @@
   "references": [
     {
       "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

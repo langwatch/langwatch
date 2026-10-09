@@ -8,18 +8,23 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
   storedComments: [] as unknown[],
 }));
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:manage" ? mocks.canManage : true,
+  }),
+}));
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:manage" ? mocks.canManage : true,
   }),
 }));
 
@@ -28,8 +33,6 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:manage" ? mocks.canManage : true,
   }),
 }));
 

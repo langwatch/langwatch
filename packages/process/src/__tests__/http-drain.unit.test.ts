@@ -3,9 +3,9 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { drainHttpServer } from "../http-drain.ts";
+import { drainHttpServer } from "../lifecycle/http-drain.ts";
+import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "../lifecycle/shutdown-deadline.ts";
 import { Server } from "../server.ts";
-import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "../shutdown-deadline.ts";
 
 /** A listener whose `stragglers` sockets end only when destroyed, or after `settleAfterMs`. */
 function drainableServer({

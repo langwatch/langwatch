@@ -9,8 +9,8 @@ import type {
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -21,16 +21,16 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
 import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EvaluationProcessingStoresAdapter } from "../../eventing/evaluation-processing-stores.pipeline.ts";
+import type { EvaluatorEnvironmentService } from "../../features/evaluators/services/evaluator-environment.service.ts";
+import { LangevalsClusteringService } from "../../features/evaluators/services/langevals-clustering.service.ts";
+import { LangevalsPiiDetectionService } from "../../features/evaluators/services/langevals-pii-detection.service.ts";
+import type { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
+import type { EvaluationInputsOffloadService } from "../../features/execution/services/evaluation-inputs-offload.service.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
 import type { EvaluationRetentionLookup } from "../../repositories/evaluation.repository.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import type { EvaluationCommandDispatcherService } from "../../services/evaluation-command-dispatcher.service.ts";
-import type { EvaluationExecutionService } from "../../services/evaluation-execution.service.ts";
-import type { EvaluationInputsOffloadService } from "../../services/evaluation-inputs-offload.service.ts";
 import { EvaluationRunProjectionService } from "../../services/evaluation-run-projection.service.ts";
-import type { EvaluatorEnvironmentService } from "../../services/evaluator-environment.service.ts";
-import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
-import { LangevalsPiiDetectionService } from "../../services/langevals-pii-detection.service.ts";
 import {
   EvaluationModule,
   type EvaluationCustomEvaluators,
@@ -144,19 +144,9 @@ function unreachable(what: string): () => never {
 
 export function createEvaluationTestDoorInfrastructure(): Pick<
   EvaluationInfrastructure,
-  "experiments" | "experimentRuns" | "slugs" | "savedEvaluators" | "models" | "ledger" | "runner"
+  "slugs" | "savedEvaluators" | "models" | "ledger" | "runner"
 > {
   return {
-    experiments: {
-      findOrCreate: unreachable("experiment directory"),
-      findBySlug: unreachable("experiment directory"),
-    },
-    experimentRuns: {
-      startRun: unreachable("experiment run writer"),
-      recordTargetResult: unreachable("experiment run writer"),
-      recordEvaluatorResult: unreachable("experiment run writer"),
-      completeRun: unreachable("experiment run writer"),
-    },
     slugs: {
       findMonitorBySlug: unreachable("monitor directory"),
       findDatasetBySlug: unreachable("dataset directory"),
@@ -203,7 +193,7 @@ export function createEvaluationTestApp(
       monitors: MonitorApi;
       analytics: AnalyticsApi;
       datasets: DatasetApi;
-      experiments: ExperimentApi;
+      judges: InstantEvalJudgeApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -225,17 +215,19 @@ export function createEvaluationTestApp(
       monitors: input.dependencies?.monitors ?? createApiFixture<MonitorApi>(),
       analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
       datasets: input.dependencies?.datasets ?? createApiFixture<DatasetApi>(),
-      experiments: input.dependencies?.experiments ?? createApiFixture<ExperimentApi>(),
+      judges: input.dependencies?.judges ?? createApiFixture<InstantEvalJudgeApi>(),
     },
     clustering:
       input.clustering ??
       LangevalsClusteringService.create({
         endpoint: undefined,
         langevals: MemoryLangevalsChannel.create(),
+        staging: repositories.langevalsStaging,
       }),
     piiDetection: LangevalsPiiDetectionService.create({
       endpoint: undefined,
       langevals: MemoryLangevalsChannel.create(),
+      staging: repositories.langevalsStaging,
     }),
     executionIntent: {
       execute: () => Promise.reject(new Error("this test composed no evaluation execution intent")),
@@ -265,6 +257,7 @@ export const installableEvaluation: typeof evaluationProcessModule = {
 
 /** The parsed config an installation test hands the module: main's defaults, no endpoint. */
 export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
+  foldCacheTtlSeconds: 300,
   langevalsEndpoint: undefined,
   stagingThresholdBytes: undefined,
   stagingTtlSeconds: 600,

@@ -4,17 +4,13 @@
  * window and the project's privacy policy.
  * @see specs/automations/worker-automation-settlement-conversion.feature
  */
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
 } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { CLOUD_FREE_LICENSING_PLAN } from "@langwatch/plans";
 import { LocalFeatureApis } from "@langwatch/process";
@@ -22,7 +18,6 @@ import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
@@ -33,8 +28,8 @@ import type {
 } from "../../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModule } from "../trace.app.ts";
 
 const PROJECT = "project-1";
@@ -91,17 +86,7 @@ function compose({
   askedOrganizations?: string[];
 }) {
   const apis = new LocalFeatureApis();
-  for (const token of [
-    AnnotationApi,
-    AuthzApi,
-    CodingAgentApi,
-    DataRetentionApi,
-    EvaluationApi,
-    LogApi,
-    ModelProviderApi,
-    ShareApi,
-    TopicApi,
-  ]) {
+  for (const token of [AuthzApi, DataRetentionApi, ModelProviderApi, ShareApi]) {
     apis.declare(token);
   }
   const refuse = () => Promise.reject(new Error("no datastore in this test"));
@@ -122,7 +107,6 @@ function compose({
     canonicalisation: TraceCanonicalisationService.create(),
     blobStore: TraceBlobStoreService.create({
       legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-      resolveClickHouseClient: refuse,
     }),
     dedup: MemoryTraceSpanDedupRepository.create(),
     commands: {
@@ -146,15 +130,10 @@ function compose({
       dataPrivacy,
       fallbackVisibilityDays: 14,
     },
-    annotations: apis.reference(AnnotationApi),
-    codingAgents: apis.reference(CodingAgentApi),
     dataRetention: apis.reference(DataRetentionApi),
-    evaluations: apis.reference(EvaluationApi),
-    logs: apis.reference(LogApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects,
     share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
     requestBounds: countingPlans,
     exportBounds: null,
   });

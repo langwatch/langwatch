@@ -43,11 +43,6 @@ export const userApiRegisterInputSchema = z.object({
 
 export const userApiUnlinkAccountInputSchema = z.object({ accountId: z.string() });
 
-/** Which of the caller's own browser sessions to end. */
-export const userApiEndBrowserSessionInputSchema = z
-  .object({ sessionId: z.string().min(1) })
-  .strict();
-
 export const userApiSetPasswordInputSchema = z.object({ password: z.string().min(1) });
 
 export const userApiChangePasswordInputSchema = z.object({
@@ -75,17 +70,6 @@ export const userApiSetAvatarInputSchema = z.object({
 export const userApiOrganizationInputSchema = z.object({ organizationId: z.string() });
 
 /** Defaults to the start of this month through now unless both ends are given. */
-export const userApiPersonalUsageInputSchema = z.object({
-  organizationId: z.string(),
-  windowStartMs: z.number().optional(),
-  windowEndMs: z.number().optional(),
-});
-
-export const userApiBudgetOverviewInputSchema = z.object({
-  organizationId: z.string(),
-  includeTopModels: z.boolean().optional(),
-});
-
 export const userApiRequestBudgetIncreaseInputSchema = z.object({
   organizationId: z.string(),
   scope: z.string(),
@@ -108,8 +92,6 @@ export type UserApiChangePasswordInput = z.infer<typeof userApiChangePasswordInp
 export type UserApiUserInput = z.infer<typeof userApiUserInputSchema>;
 export type UserApiSetAvatarInput = z.infer<typeof userApiSetAvatarInputSchema>;
 export type UserApiOrganizationInput = z.infer<typeof userApiOrganizationInputSchema>;
-export type UserApiPersonalUsageInput = z.infer<typeof userApiPersonalUsageInputSchema>;
-export type UserApiBudgetOverviewInput = z.infer<typeof userApiBudgetOverviewInputSchema>;
 export type UserApiRequestBudgetIncreaseInput = z.infer<
   typeof userApiRequestBudgetIncreaseInputSchema
 >;

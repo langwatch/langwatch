@@ -11,7 +11,7 @@ import { identifierRowToFact } from "./prisma.identifier.mapper.ts";
  * client. Naming them here is what lets the composition root hand its typed
  * `PrismaClient` straight down with no cast at the seam.
  */
-export type PrismaIdentityHeadsDatabase = Pick<
+type PrismaIdentityHeadsDatabase = Pick<
   PrismaClient,
   "identifier" | "user" | "identityProjectionCursor"
 >;

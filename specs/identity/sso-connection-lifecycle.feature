@@ -409,8 +409,8 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And the legacy string columns are derived, no longer written
 
   @unit
-  Scenario: Backoffice edits go through commands like everyone else's
-    Given an ops user editing a connection in the backoffice
+  Scenario: Admin edits go through commands like everyone else's
+    Given an ops user editing a connection in the admin console
     When they change the connection
     Then the change is a guarded command with the actor recorded
     And no raw table edit exists on the surface

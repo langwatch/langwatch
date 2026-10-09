@@ -2,11 +2,11 @@ import { Temporal } from "@langwatch/time";
 /** @see specs/self-hosting/connected-services/connected-billing.feature */
 import { describe, expect, it } from "vitest";
 
+import { ConnectedBillingTickService } from "../../features/connected-billing/services/connected-billing-tick.service.ts";
 import type {
   ConnectedBillingAccountRecord,
   PendingRenewal,
 } from "../../repositories/connected-billing.repository.ts";
-import { ConnectedBillingTickService } from "../connected-billing-tick.service.ts";
 
 const pending: PendingRenewal = {
   commitUsdCents: 100_00,

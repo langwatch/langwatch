@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 
 export const ssoWeb = defineBrowserModule("sso")
   .withHosts({
@@ -25,6 +26,6 @@ export const ssoWeb = defineBrowserModule("sso")
     },
   })
   // How people sign in, drawn on organization's Authentication overview.
-  .withCapabilities({
-    authenticationOverviewCard: { load: () => import("./ui/sections/sso-overview-card.tsx") },
+  .lends(AuthenticationOverviewCardToken, {
+    load: () => import("./ui/sections/sso-overview-card.tsx"),
   });

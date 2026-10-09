@@ -1,7 +1,7 @@
+import { PrismaProcessPurge } from "@langwatch/eventing/server";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaProcessManagerPurgeRepository } from "../../repositories/prisma/prisma.process-manager-purge.repository.ts";
 import { purgeProcessManagerTables } from "../process-manager-purge.task.ts";
 
 /**
@@ -33,7 +33,7 @@ function fakeRepository({
       return 0;
     }),
   });
-  const repository = PrismaProcessManagerPurgeRepository.create({ database });
+  const repository = PrismaProcessPurge.create({ database });
   return { repository, statements };
 }
 

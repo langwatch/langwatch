@@ -10,7 +10,6 @@
  */
 import type { ScimCreateUserRequest } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { CannotRemoveLastAdminError } from "@langwatch/organization-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,10 +18,15 @@ import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fa
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const ORGANIZATION = "org_acme";
 const ADMIN = "user_ana";
@@ -63,16 +67,9 @@ class EnterprisePlan implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-function departments(): ScimDepartmentAssignment {
+function departments(): ScimCostCenterFacts {
   return {
-    departmentResolveByNameOrCreate: vi.fn(async () => ({
-      id: "department_1",
-      organizationId: ORGANIZATION,
-      name: "Engineering",
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-    departmentAssignUser: vi.fn(async () => undefined),
+    recordCostCenterChanged: vi.fn(async () => undefined),
   };
 }
 
@@ -101,9 +98,7 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
   const writer = new GrantsFake();
   const organization = new OrganizationAdministrationFake();
   if (refuses) {
-    organization.assertRemovalKeepsAnAdministrator.mockRejectedValue(
-      new CannotRemoveLastAdminError(),
-    );
+    organization.findActiveOrganizationAdministrators.mockResolvedValue([ADMIN]);
   }
 
   return {
@@ -116,12 +111,13 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
       prisma: repository,
       writer,
       users: userService,
-      governance: departments(),
+      costCenterFacts: departments(),
       organization,
       entitlements: new EnterprisePlan(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     }),
   };
 }
@@ -200,9 +196,8 @@ describe("given somebody whose removal costs the organization no administrator",
       connectionId: CONNECTION,
     });
 
-    expect(organization.assertRemovalKeepsAnAdministrator).toHaveBeenCalledWith({
+    expect(organization.findActiveOrganizationAdministrators).toHaveBeenCalledWith({
       organizationId: ORGANIZATION,
-      userId: ADMIN,
     });
     expect(repository.removeMembership).toHaveBeenCalled();
   });

@@ -18,7 +18,7 @@ const langyMock = {
 };
 // The Instant Evals gate reads this flag; stub it enabled so nothing here
 // depends on the tRPC provider this suite doesn't mount.
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
@@ -57,7 +57,7 @@ vi.mock("../../../use-model-providers-settings.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
@@ -65,14 +65,14 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
 // top level. These smoke tests don't wrap with a tRPC provider, so stub the
 // hook out — its server search is covered by
 // TokenValuePicker.serverSearch.integration.test.tsx.
-vi.mock("../../hooks/use-facet-search.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
 // The cost rule's estimate and start are tRPC mutations; these smoke tests
 // mount no provider, and the rule itself is covered by
 // use-instant-eval-route.integration.test.tsx.
-vi.mock("../../hooks/use-instant-eval-access.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-access.ts", () => ({
   useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: undefined }),
 }));
 

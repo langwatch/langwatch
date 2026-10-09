@@ -23,7 +23,7 @@ import { SsoApi, ssoConnectionTrpc, type SsoOperator } from "@langwatch/enterpri
  * org-scoped permission, so no org role widens who may attest a domain.
  */
 const STAFF_LIST_REASON =
-  "back-office surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design";
+  "admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design";
 
 /**
  * The id is NOT what decides the caller's reach. An operator holding the platform-operator grant

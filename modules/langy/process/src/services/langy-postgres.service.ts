@@ -9,10 +9,16 @@ import type {
 } from "@langwatch/langy-contract";
 
 import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
+import { LangyConversationService } from "../features/conversation/services/langy-conversation.service.ts";
+import type { LangySessionKeyMetrics } from "../features/session-key/services/langy-session-key.service.ts";
+import { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
+import {
+  LangyTurnService,
+  type LangyTurnTechnicalMembers,
+} from "../features/turn/services/langy-turn.service.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import type { LangyBlockMetrics } from "./langy-block-metrics-otel.service.ts";
-import { LangyConversationService } from "./langy-conversation.service.ts";
 import {
   LangyCredentialService,
   type LangyCredentialErrorReporter,
@@ -24,9 +30,6 @@ import {
 import { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
 import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import { LangyMessageService } from "./langy-message.service.ts";
-import type { LangySessionKeyMetrics } from "./langy-session-key.service.ts";
-import { LangySessionKeyService } from "./langy-session-key.service.ts";
-import { LangyTurnService, type LangyTurnTechnicalMembers } from "./langy-turn.service.ts";
 import {
   LangyService,
   type OpenLangyRelay,

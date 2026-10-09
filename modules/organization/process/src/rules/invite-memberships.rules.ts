@@ -1,5 +1,11 @@
-import { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
+import {
+  DeveloperSeatNoSharedAccessError,
+  LiteMemberViewerOnlyError,
+  OrganizationUserRole,
+  TeamUserRole,
+} from "@langwatch/organization-contract";
 
+import type { TeamAssignmentInput } from "./invite-contracts.rules.ts";
 import {
   holdsSharedAccess,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
@@ -115,4 +121,28 @@ export function classifyInvitesByMemberType({
   }
 
   return { fullMembers, liteMembers };
+}
+
+/**
+ * A Lite Member seat allows only the Viewer team role, and a custom role needs a full seat, so
+ * an invitation can't promise more. Refused here, where the admin can act on it.
+ */
+export function assertAssignmentsWithinInvitedSeat({
+  role,
+  teamAssignments,
+}: {
+  role: OrganizationUserRole;
+  teamAssignments?: TeamAssignmentInput[];
+}): void {
+  if (role === OrganizationUserRole.DEVELOPER) {
+    if ((teamAssignments ?? []).length > 0) throw new DeveloperSeatNoSharedAccessError();
+    return;
+  }
+  if (role !== OrganizationUserRole.EXTERNAL) return;
+
+  for (const assignment of teamAssignments ?? []) {
+    if (assignment.customRoleId || assignment.role !== TeamUserRole.VIEWER) {
+      throw new LiteMemberViewerOnlyError();
+    }
+  }
 }

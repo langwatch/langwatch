@@ -57,6 +57,8 @@ type Options struct {
 	// Fast renders on a lean Chromium (no GPU, no anti-aliasing), so its
 	// pixels are never cached as a baseline or published (runner/src/capture.ts).
 	Fast bool
+	// Judge asks a vision model about each flagged pair (judge.go).
+	Judge bool
 	// Resume continues a -keep run in RunDir: its prepared worktrees and
 	// running stacks are reused, and its fixtures are not seeded twice.
 	Resume bool
@@ -84,6 +86,12 @@ type Options struct {
 	MaxConsecutiveErrors int
 	// BatchSize seals a review batch every this many routes or flows (batches.go); 0 never does.
 	BatchSize int
+	// Shard is the slice of routes and flows this run renders (plan.go); zero is all of them.
+	Shard Shard
+	// Deadline stops capture this long after the run started, at StopAt, and
+	// reports what was captured as a partial run; zero never stops it.
+	Deadline time.Duration
+	StopAt   time.Time
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -153,6 +161,8 @@ type Result struct {
 	Plan      Plan
 	Coverage  *Coverage
 	Summary   string
+	// Partial says why the run captured less than it planned; empty when it did not.
+	Partial string
 }
 
 // Exit codes, matching apidiff: 0 clean, 1 differences worth a person's
@@ -280,6 +290,9 @@ func (options *Options) fill(now func() time.Time) {
 		options.Editions = []Edition{EditionEnterprise}
 	}
 	options.Identity = options.Identity.withSeededDefaults()
+	if options.Deadline > 0 && options.StopAt.IsZero() {
+		options.StopAt = now().Add(options.Deadline)
+	}
 }
 
 // Execute is the whole run. Teardown is deferred before the first worktree
@@ -334,7 +347,10 @@ func (execution *execution) planRun(ctx context.Context) error {
 		request.Done = append(request.Done, skipWorks(ctx, *request, streams)...)
 	}
 	plan := buildPlan(options, config)
-	execution.result = Result{Plan: plan, Coverage: runCoverage(ctx, *request, streams.Err)}
+	execution.result = Result{Plan: plan}
+	if options.Shard.OwnsCoverage() {
+		execution.result.Coverage = runCoverage(ctx, *request, streams.Err)
+	}
 	baselines, err := planBaselines(ctx, baselineInputs{options: options, config: config, deps: deps, done: request.Done}, streams.Err)
 	if err != nil {
 		return err
@@ -346,8 +362,9 @@ func (execution *execution) planRun(ctx context.Context) error {
 		writePlan(streams.Out, plan, options.RoutesOnly)
 		request.Done.writeSkips(streams.Out, config, options.Editions)
 		writeBaselinePlan(streams.Out, options.Editions, baselines)
+		return nil
 	}
-	return nil
+	return WriteOutcome(options.RunDir, plannedOutcome(plan, options.Shard))
 }
 
 // captureRun readies the ports and worktrees, boots both stacks, captures
@@ -390,7 +407,12 @@ func (execution *execution) captureRun(ctx context.Context) (Result, error) {
 	captured.Coverage = result.Coverage
 	var stopped *diffkit.Stopped
 	if errors.As(err, &stopped) {
-		return run.finishStopped(captured, err)
+		captured.Partial = stopped.Reason
+		finished, err := run.finishStopped(captured, err)
+		if stopped.Reason == DeadlineReason {
+			return finished, nil
+		}
+		return finished, err
 	}
 	if err != nil {
 		return captured, err
@@ -463,8 +485,8 @@ func buildPlan(options Options, config *Config) Plan {
 	}
 	plan := Plan{
 		Base: base, Candidate: candidate, Viewport: options.Viewport, RunDir: options.RunDir,
-		RoutesOnly: options.RoutesOnly, RouteCount: len(config.Routes), FlowIDs: flowIDs(config),
-		UseHaven: options.UseHaven, RunID: runID,
+		RoutesOnly: options.RoutesOnly, RouteCount: len(config.Routes), Routes: config.Routes, FlowIDs: flowIDs(config),
+		UseHaven: options.UseHaven, RunID: runID, Shard: options.Shard,
 	}
 	if options.RoutesOnly {
 		plan.FlowIDs = nil
@@ -837,6 +859,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	if !options.RoutesOnly {
 		runnerPlan.Flows = config.Flows
 	}
+	runnerPlan.Judge = judgeFor(options)
 	var arrived <-chan baseArrival
 	if run.baseArrival != nil && !baseline.Cached {
 		pending := filepath.Join(options.RunDir, PendingBaseFile)
@@ -846,7 +869,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	findingsPath := filepath.Join(options.RunDir, FindingsFile)
 	started := time.Now()
 	stream, err := runWithFindings(ctx, findingsRunInputs{
-		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err, MaxConsecutiveErrors: options.MaxConsecutiveErrors},
+		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err, MaxConsecutiveErrors: options.MaxConsecutiveErrors, StopAt: options.StopAt},
 		FindingsPath: findingsPath, CatalogueRoot: options.Root, Edition: edition,
 		Out: run.streams.Out, BatchSize: options.BatchSize,
 	})
@@ -889,10 +912,17 @@ func (run *session) report(stream RunnerStream, edition Edition) ([]Row, error) 
 	return rows, nil
 }
 
-// finish records every uncovered route as a finding, then writes
-// summary.txt and prints it.
+// finish applies the judge's verdicts to the rows, records every uncovered
+// route as a finding, then writes summary.txt, works.json and verdict.md from
+// the same judged rows and prints the summary.
 func (run *session) finish(result Result) (Result, error) {
 	options := run.request.Options
+	judged, ledgers, err := judgeRows(options.RunDir, result.Rows)
+	if err != nil {
+		return result, err
+	}
+	result.Findings += CountFindings(judged) - CountFindings(result.Rows)
+	result.Rows = judged
 	if result.Coverage != nil {
 		uncovered := result.Coverage.Uncovered()
 		if err := appendUncovered(filepath.Join(options.RunDir, FindingsFile), uncovered, run.request.Deps.Now()); err != nil {
@@ -902,13 +932,16 @@ func (run *session) finish(result Result) (Result, error) {
 	}
 	summary := RenderSummary(SummaryInputs{
 		BaseRef: options.BaseRef, CandidateRef: options.CandidateRef, Editions: options.Editions,
-		Rows: result.Rows, Coverage: result.Coverage,
+		Rows: result.Rows, Coverage: result.Coverage, Partial: nonEmpty(result.Partial),
 	})
 	if err := WriteSummaryFile(options.RunDir, summary); err != nil {
 		return result, fmt.Errorf("write summary: %w", err)
 	}
+	if err := WriteOutcome(options.RunDir, finishedOutcome(run.plan, options.Shard, result)); err != nil {
+		fmt.Fprintf(run.streams.Err, "outcome: %v\n", err)
+	}
 	run.recordWorks(result.Rows)
-	if err := WriteVerdictFile(options.RunDir, result.Rows, run.request.Done.skipLines(run.request.Config, options.Editions)); err != nil {
+	if err := writeVerdict(options.RunDir, result.Rows, ledgers, run.request.Done.skipLines(run.request.Config, options.Editions)); err != nil {
 		return result, fmt.Errorf("write verdict: %w", err)
 	}
 	if err := diffkit.WriteSignaturesFile(options.RunDir); err != nil {
@@ -972,7 +1005,10 @@ func writePlan(stdout io.Writer, plan Plan, routesOnly bool) {
 		fmt.Fprintf(stdout, "  %-9s %s — ui :%d, api :%d, worker :%d, redis db %s\n",
 			stack.Name, stack.Ref, stack.Ports.UI, stack.Ports.API, stack.Ports.Worker, stack.RedisDBIndex)
 	}
-	fmt.Fprintf(stdout, "  routes    %d\n", plan.RouteCount)
+	if plan.Shard.Sharded() {
+		fmt.Fprintf(stdout, "  shard     %s\n", plan.Shard)
+	}
+	fmt.Fprintf(stdout, "  routes    %d: %s\n", plan.RouteCount, strings.Join(plan.Routes, ", "))
 	if routesOnly {
 		fmt.Fprintf(stdout, "  flows     none (-routes-only)\n")
 		return
@@ -1101,6 +1137,8 @@ type CaptureOptions struct {
 	// MaxConsecutiveErrors stops the runner after this many harness errors in a
 	// row on one side (streaks.go); 0 never stops it.
 	MaxConsecutiveErrors int
+	// StopAt stops the runner at this time, the run's -deadline; zero never does.
+	StopAt time.Time
 }
 
 // runnerWaitDelay is how long the runner's pipes may outlive its process.
@@ -1132,6 +1170,7 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 		return RunnerStream{}, err
 	}
 	stopped := stopOnErrorStreak(&options, command)
+	defer stopAtDeadline(options.StopAt, command, stopped)()
 	stream, parseErr := ParseRunnerStreamLive(stdout, options)
 	// Parsing stops at the runner's error line; unread, its last writes block it from exiting.
 	_, _ = io.Copy(io.Discard, stdout)
@@ -1174,12 +1213,29 @@ func stopOnErrorStreak(options *CaptureOptions, command *exec.Cmd) *atomic.Point
 		if onCapture != nil {
 			onCapture(capture)
 		}
-		if reason := streaks.file(capture); reason != nil {
-			stopped.Store(reason)
+		if reason := streaks.file(capture); reason != nil && stopped.CompareAndSwap(nil, reason) {
 			killTree(command.Process.Pid)
 		}
 	}
 	return &stopped
+}
+
+// DeadlineReason is why a run stopped at its -deadline. Such a run reports
+// what it captured, marked partial, and exits on its findings like any other.
+const DeadlineReason = "the -deadline passed before every screen was captured"
+
+// stopAtDeadline kills the runner at stopAt, unless something stopped it
+// first, and answers the function that cancels the timer.
+func stopAtDeadline(stopAt time.Time, command *exec.Cmd, stopped *atomic.Pointer[diffkit.Stopped]) func() {
+	if stopAt.IsZero() {
+		return func() {}
+	}
+	timer := time.AfterFunc(time.Until(stopAt), func() {
+		if stopped.CompareAndSwap(nil, &diffkit.Stopped{Reason: DeadlineReason}) {
+			killTree(command.Process.Pid)
+		}
+	})
+	return func() { timer.Stop() }
 }
 
 // RunnerPreflight launches and closes the runner's browser; its stderr names

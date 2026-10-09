@@ -1,6 +1,5 @@
+import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 import { CLOUD_FREE_LICENSING_PLAN, OPEN_SOURCE_LICENSING_PLAN, UNLIMITED } from "@langwatch/plans";
-
-import type { PlanInfo } from "./license-plan.ts";
 
 export const LICENSING_FEATURE_ID = "licensing" as const;
 
@@ -78,3 +77,9 @@ iQIDAQAB
  * minute, and an unlicensed install reads the store about once a minute.
  */
 export const DENIED_SSO_GATE_TTL_MS = 60_000;
+
+/**
+ * Compatibility export. The provider-neutral plan contract is owned by the
+ * core Entitlements feature; Licensing only supplies one possible source.
+ */
+export type { PlanInfo };

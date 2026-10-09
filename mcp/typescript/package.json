@@ -49,7 +49,6 @@
   "devDependencies": {
     "@ai-sdk/anthropic": "catalog:",
     "@anthropic-ai/claude-code": "2.1.228",
-    "@eslint/js": "^10.0.1",
     "@langwatch/egress": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/redaction": "workspace:*",
@@ -63,12 +62,10 @@
     "chalk": "catalog:",
     "dotenv": "catalog:",
     "esbuild": "catalog:",
-    "eslint": "^10.2.1",
     "express": "^5.2.1",
     "node-pty": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:sdk-toolchain",
-    "typescript-eslint": "catalog:",
     "vitest": "catalog:",
     "yargs": "^18.0.0",
     "zod-validation-error": "catalog:"

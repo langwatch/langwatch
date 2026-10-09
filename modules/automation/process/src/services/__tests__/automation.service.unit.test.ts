@@ -17,6 +17,9 @@ import {
   createAutomationTestRuntime,
   createTestSlackConnections,
 } from "../../__tests__/testing.ts";
+import { AutomationGraphService } from "../../features/graph-alert/services/trigger-graph.service.ts";
+import { ReportScheduleService } from "../../features/report/services/report-schedule.service.ts";
+import { AutomationPersistCapService } from "../../features/runaway/services/persist-cap.service.ts";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
 import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
@@ -28,9 +31,6 @@ import type { ReportScheduleTarget } from "../../repositories/trigger.repository
 import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationService } from "../automation.service.ts";
-import { AutomationPersistCapService } from "../persist-cap.service.ts";
-import { ReportScheduleService } from "../report-schedule.service.ts";
-import { AutomationGraphService } from "../trigger-graph.service.ts";
 
 class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
   findProjectsWithGraphTriggers = async () => [];
@@ -154,6 +154,9 @@ class Triggers extends TriggerRepository {
     return Promise.resolve(false);
   }
   findSlackTriggers(): Promise<Trigger[]> {
+    return Promise.resolve([]);
+  }
+  findActiveSlackTriggerPage(): Promise<Trigger[]> {
     return Promise.resolve([]);
   }
   replaceActionParamsIfUnchanged(): Promise<boolean> {

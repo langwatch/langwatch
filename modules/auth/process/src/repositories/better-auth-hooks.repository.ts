@@ -6,17 +6,12 @@ export type BetterAuthHookUser = {
   email: string | null;
   /** What an admitted arrival is announced under; absent on older rows. */
   name: string | null;
+  /** Whether the account's own address was ever confirmed. */
+  emailVerified: boolean;
   deactivatedAt: Instant | null;
   pendingSsoSetup: boolean;
   /** A password sign-up still awaiting its emailed proof: no session until it lands. */
   signupConfirmationPending: boolean;
-};
-
-/** An SSO-domain-matched organization, the fields the hooks act on. */
-export type BetterAuthHookOrganization = {
-  id: string;
-  name: string;
-  ssoProvider: string | null;
 };
 
 /** One federated account row, with the id a retirement deletes it by. */
@@ -30,15 +25,11 @@ export type FederatedAccountRow = {
 /**
  * Private persistence boundary for the Better Auth database hooks — ADR-027
  * SSO gate, ADR-101 identifier reconciliation, ADR-116 SSO auto-join. One
- * boundary since every hook reads/writes the same rows (User, Org, Account).
+ * boundary since every hook reads/writes the same rows (User, Account).
  */
 export abstract class BetterAuthHooksRepository {
   /** Throws `UserNotFoundError`. */
   abstract getUserForHooks(input: { userId: string }): Promise<BetterAuthHookUser>;
-  /** Throws `OrganizationNotFoundError` when no organization claims the domain. */
-  abstract getOrganizationBySsoDomain(input: {
-    domain: string;
-  }): Promise<BetterAuthHookOrganization>;
   abstract countAccountsForUser(input: { userId: string }): Promise<number>;
   /**
    * The federated accounts this person holds, credential rows excluded. Read
@@ -59,15 +50,6 @@ export abstract class BetterAuthHooksRepository {
   abstract deleteAccounts(input: { accountRowIds: readonly string[] }): Promise<number>;
   abstract flagPendingSsoSetup(input: { userId: string }): Promise<void>;
   /**
-   * Creates the default MEMBER membership row. Returns `"already-exists"`
-   * rather than throwing on a concurrent duplicate (unique-constraint), which
-   * the caller treats as success.
-   */
-  abstract createOrganizationMembership(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<"created" | "already-exists">;
-  /**
    * Atomically deletes every OAuth account row for the user EXCEPT the one
    * being linked/refreshed, and clears `pendingSsoSetup`.
    */
@@ -77,5 +59,4 @@ export abstract class BetterAuthHooksRepository {
     accountId: string;
   }): Promise<void>;
   abstract recordLastLogin(input: { userId: string }): Promise<void>;
-  abstract countOrgMembershipsForUser(input: { userId: string }): Promise<number>;
 }

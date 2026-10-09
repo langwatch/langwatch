@@ -15,8 +15,15 @@ import {
 } from "@langwatch/user-contract";
 
 import type { IdentityModule } from "../app/identity.app.ts";
-import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import { runBreakGlassExpiryWarn } from "./break-glass-expiry-warn.intent.ts";
+import {
+  JOIN_REQUEST_INVITE_ACCEPTED_SUBSCRIBER_NAME,
+  joinRequestInviteAcceptedSubscriber,
+} from "../features/join-request/eventing/join-request-invite-accepted.subscriber.ts";
+import {
+  JOIN_REQUEST_MEMBERS_INVITED_SUBSCRIBER_NAME,
+  joinRequestMembersInvitedSubscriber,
+} from "../features/join-request/eventing/join-request-members-invited.subscriber.ts";
+import { runBreakGlassExpiryWarn } from "../features/sso-arrival/eventing/break-glass-expiry-warn.intent.ts";
 import {
   BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE,
   BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS,
@@ -24,8 +31,8 @@ import {
   breakGlassExpiryWarnStateSchema,
   breakGlassExpiryWarnSchema,
   breakGlassExpiryWarnWake,
-} from "./break-glass-expiry-warn.process.ts";
-import { runSsoDomainReproofSweep } from "./sso-domain-reproof-sweep.intent.ts";
+} from "../features/sso-arrival/eventing/break-glass-expiry-warn.process.ts";
+import { runSsoDomainReproofSweep } from "../features/sso-domain/eventing/sso-domain-reproof-sweep.intent.ts";
 import {
   SSO_DOMAIN_REPROOF_SWEEP_INITIAL_STATE,
   SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS,
@@ -33,7 +40,8 @@ import {
   ssoDomainReproofSweepStateSchema,
   ssoDomainReproofSweepSchema,
   ssoDomainReproofSweepWake,
-} from "./sso-domain-reproof-sweep.process.ts";
+} from "../features/sso-domain/eventing/sso-domain-reproof-sweep.process.ts";
+import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 
 export const IDENTITY_MAINTENANCE_PIPELINE_NAME = "identity_maintenance";
 
@@ -52,6 +60,14 @@ export const identityEventing = defineEventingModule({
         data: userRegisteredEventDataSchema,
         handle: (registration) => app.signUpIdentifiers().attachRegistered({ registration }),
       })
+      .withPeerSubscriber(
+        JOIN_REQUEST_INVITE_ACCEPTED_SUBSCRIBER_NAME,
+        joinRequestInviteAcceptedSubscriber({ joinRequests: () => app.joinRequests() }),
+      )
+      .withPeerSubscriber(
+        JOIN_REQUEST_MEMBERS_INVITED_SUBSCRIBER_NAME,
+        joinRequestMembersInvitedSubscriber({ joinRequests: () => app.joinRequests() }),
+      )
       .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
         pm
           .state(breakGlassExpiryWarnStateSchema, BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE)

@@ -1,3 +1,4 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -19,7 +20,9 @@ describe("given the memory automation repositories", () => {
 
   describe("when a trigger is written", () => {
     it("reads it back through the trigger row", async () => {
-      const repositories = MemoryAutomationRepositories.create();
+      const repositories = MemoryAutomationRepositories.create({
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
       const created = await repositories.triggers.create(trigger);
 
       const found = await repositories.triggers.findById({
@@ -31,7 +34,9 @@ describe("given the memory automation repositories", () => {
     });
 
     it("names it from the suppression-name row, which shares the store", async () => {
-      const repositories = MemoryAutomationRepositories.create();
+      const repositories = MemoryAutomationRepositories.create({
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
       const created = await repositories.triggers.create(trigger);
 
       const names = await repositories.names.findTriggerNames({
@@ -43,7 +48,9 @@ describe("given the memory automation repositories", () => {
     });
 
     it("counts its fires through the history row", async () => {
-      const repositories = MemoryAutomationRepositories.create();
+      const repositories = MemoryAutomationRepositories.create({
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
       const created = await repositories.triggers.create(trigger);
       await repositories.history.create({
         projectId: "project-1",
@@ -72,7 +79,9 @@ describe("given the memory automation repositories", () => {
 
   describe("when the usage report counts triggers", () => {
     it("counts the named projects only and dates the first", async () => {
-      const repositories = MemoryAutomationRepositories.create();
+      const repositories = MemoryAutomationRepositories.create({
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
       const created = await repositories.triggers.create(trigger);
 
       const counted = await repositories.triggers.countUsage({ projectIds: [created.projectId] });
@@ -85,7 +94,9 @@ describe("given the memory automation repositories", () => {
 
   describe("when a send is claimed twice", () => {
     it("refuses the second claim", async () => {
-      const repositories = MemoryAutomationRepositories.create();
+      const repositories = MemoryAutomationRepositories.create({
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
       const claim = { triggerId: "trigger-1", traceId: "trace-1", projectId: "project-1" };
 
       expect(await repositories.triggers.claimSend(claim)).toBe(true);

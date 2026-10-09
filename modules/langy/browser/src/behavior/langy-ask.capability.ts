@@ -1,4 +1,5 @@
-import type { LangyAsk, LangyAskRequest, LangyDraftAbout } from "@langwatch/langy-contract";
+import type { LangyAsk } from "@langwatch/langy-client";
+import type { LangyAskRequest, LangyDraftAbout } from "@langwatch/langy-contract";
 
 import { followScreen, isOnScreen, maySeed, type SeededDraft } from "../model/langy-draft-scope.ts";
 import { useLangyStore } from "./langy.store.ts";

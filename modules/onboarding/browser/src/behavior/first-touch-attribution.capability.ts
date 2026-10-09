@@ -3,7 +3,7 @@
  * its outermost provider position and reads the properties for the events it
  * sends about the signed-in reader.
  */
-import type { UiFirstTouchAttribution } from "@langwatch/browser-host/declarations";
+import type { FirstTouchAttribution } from "@langwatch/onboarding-client";
 import { toAttributionProperties } from "@langwatch/onboarding-contract";
 
 import { type AttributionField, readAttribution, URL_PARAM_TO_FIELD } from "./attribution.ts";
@@ -30,7 +30,7 @@ function attributionEventProperties(): Readonly<Record<string, string>> {
   return toAttributionProperties(Object.keys(fromUrl).length > 0 ? fromUrl : readAttribution());
 }
 
-export const onboardingFirstTouchAttribution: UiFirstTouchAttribution = {
+export const onboardingFirstTouchAttribution: FirstTouchAttribution = {
   useCapture: useAttributionCapture,
   eventProperties: attributionEventProperties,
 };

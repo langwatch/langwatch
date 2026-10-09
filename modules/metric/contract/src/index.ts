@@ -35,8 +35,6 @@ export {
   type MetricKind,
   type MetricRollupRow,
   type MetricTraceCorrelation,
-  type MetricUsageEstimate,
-  type MetricUsageEstimateQuery,
 } from "./schemas/metric-processing/metric-data-point.ts";
 export { affectedRollupBuckets, buildMetricRollups } from "./metric-rollup/metric-rollup.ts";
 export { MAX_DENSE_BUCKET_SPAN } from "./metric-rollup/exponential-bucket.ts";
@@ -45,3 +43,4 @@ export {
   type MetricRollupSourcePoint,
   type MetricSequencePoint,
 } from "./metric-rollup/sequence.ts";
+export * from "./metric.config.ts";

@@ -15,14 +15,17 @@ import { GroupingSelector } from "../grouping-selector.tsx";
 import { TimeRangePicker } from "../time-range-picker.tsx";
 import "@testing-library/jest-dom/vitest";
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
-    hasPermission: () => true,
   }),
 }));
 
-vi.mock("../../hooks/use-evaluator-options.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 

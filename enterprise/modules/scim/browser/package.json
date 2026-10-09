@@ -25,8 +25,13 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/enterprise-scim-client": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/error-views": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/identity-client": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/organization-client": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:"

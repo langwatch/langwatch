@@ -14,24 +14,29 @@ const mocks = vi.hoisted(() => ({
   comments: [] as unknown[],
 }));
 
-vi.mock(
-  "../../../../../../behavior/lent-annotation-form.tsx",
-  () => import("../../../../__tests__/lent-annotation-form.stand-in.tsx"),
-);
-
-vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1" },
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
     hasPermission: (permission: string) =>
       permission === "annotations:manage"
         ? mocks.canManageAnnotations
         : permission === "annotations:view",
   }),
 }));
+vi.mock(
+  "../../../../../../features/annotation/behavior/lent-annotation-form.tsx",
+  () => import("../../../../__tests__/lent-annotation-form.stand-in.tsx"),
+);
 
-vi.mock("../../../hooks/use-anchored-annotations.ts", async () => {
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1" },
+  }),
+}));
+
+vi.mock("../../../../../../features/annotation/behavior/use-anchored-annotations.ts", async () => {
   const actual = await vi.importActual<typeof useAnchoredAnnotationsModule>(
-    "../../../hooks/use-anchored-annotations",
+    "../../../../../../features/annotation/behavior/use-anchored-annotations.ts",
   );
   return {
     ...actual,
@@ -96,11 +101,11 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 import { withBlockKeys } from "@langwatch/trace-contract/transcript";
 import type { ContentBlock } from "@langwatch/trace-contract/transcript";
 
+import type * as useAnchoredAnnotationsModule from "../../../../../../features/annotation/behavior/use-anchored-annotations.ts";
 import { TerminalOutput } from "../../../../../elements/coding-agent/trace/terminal-output.tsx";
 import { TranscriptRenderProvider } from "../../../../../elements/transcript-render-ports.tsx";
 import { TraceMediaPart } from "../../../../traces/trace-media-part.tsx";
 import { BlockStack } from "../../../../transcript/block-stack.tsx";
-import type * as useAnchoredAnnotationsModule from "../../../hooks/use-anchored-annotations.ts";
 import { MessageCommentScope } from "../message-comments.tsx";
 
 const TRACE_ID = "trace-1";

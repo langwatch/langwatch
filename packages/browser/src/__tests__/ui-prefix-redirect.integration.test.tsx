@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { UiPrefixRedirect } from "../ui-prefix-redirect.tsx";
+import { UiPrefixRedirect } from "../page/ui-prefix-redirect.tsx";
 
 function renderAt(initialEntry: string, element: ReactElement) {
   const routes: RouteObject[] = [

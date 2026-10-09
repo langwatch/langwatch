@@ -7,7 +7,7 @@
     "src"
   ],
   "type": "module",
-  "types": "./dist/online-evaluations.d.ts",
+  "types": "./dist/monitor.web.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/monitor.web.ts",

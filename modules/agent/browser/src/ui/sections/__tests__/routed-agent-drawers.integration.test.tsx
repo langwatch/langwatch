@@ -41,6 +41,22 @@ vi.mock("../../../model/agent-management-host.ts", () => ({
   }),
 }));
 
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    scenarios: {
+      testAgentTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
+      testHttpAgent: {
+        useMutation: () => ({
+          mutateAsync: () => Promise.resolve({ success: true }),
+          mutate: vi.fn(),
+          isPending: false,
+          error: null,
+        }),
+      },
+    },
+  },
+}));
+
 vi.mock("../../../behavior/agent-api.ts", () => {
   const mutation = (mutateAsync: (input: unknown) => Promise<unknown>) => ({
     useMutation: () => ({ mutateAsync, mutate: vi.fn(), isPending: false, error: null }),
@@ -60,14 +76,12 @@ vi.mock("../../../behavior/agent-api.ts", () => {
       agents: {
         getAll: { useQuery: () => ({ data: listed.rows, isLoading: false }) },
         getById: { useQuery: () => ({ data: fetched.agent, isLoading: false, isError: false }) },
-        testTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
         create: mutation((input) => {
           calls.agentCreated.push(input);
           return Promise.resolve({ id: "agent_new" });
         }),
         update: mutation(() => Promise.resolve({})),
       },
-      httpProxy: { execute: mutation(() => Promise.resolve({ success: true })) },
       workflow: {
         getById: {
           useQuery: () => ({ data: fetched.workflow, isLoading: false, isError: false }),
@@ -216,6 +230,16 @@ describe("the agent editors opened by address", () => {
 
     expect(screen.getByRole("heading", { name: "New HTTP Agent" })).toBeInTheDocument();
     expect(screen.getByTestId("agent-name-input")).toBeInTheDocument();
+  });
+
+  /** @scenario "HTTP agent editor renders Scenario Mappings section" */
+  it("draws the Scenario Mappings section with a row per scenario field", () => {
+    render(<RoutedAgentHttpEditorDrawer />, { wrapper });
+
+    expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+    for (const field of ["input", "messages", "threadId", "session"]) {
+      expect(screen.getAllByText(field).length).toBeGreaterThan(0);
+    }
   });
 
   /** @scenario "Clicking Code Agent in the type selector opens the code editor drawer" */

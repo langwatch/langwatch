@@ -5,6 +5,7 @@
  */
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { APIError } from "better-auth/api";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,7 +13,6 @@ import type {
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
   BetterAuthAccountPin,
-  BetterAuthStorage,
 } from "../../channels/better-auth.channel.ts";
 import {
   createAuthOptions,
@@ -59,12 +59,6 @@ class StubShadow implements SignInRouterShadow {
   }
 }
 
-class StubStorage implements BetterAuthStorage {
-  adapter(): unknown {
-    return {};
-  }
-}
-
 class StubIdentity implements BetterAuthIdentityCeremonies {
   beforeUserDelete(): Promise<void> {
     return Promise.reject(new Error("unused"));
@@ -100,7 +94,7 @@ function buildOptions(
   return createAuthOptions({
     repo: {} as never,
     deployment,
-    storage: new StubStorage(),
+    storage: memoryAdapter({}),
     federation,
     identity: new StubIdentity(),
     shadow: new StubShadow(),

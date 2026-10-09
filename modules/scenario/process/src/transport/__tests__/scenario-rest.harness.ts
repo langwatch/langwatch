@@ -9,15 +9,15 @@ import {
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type SimulationService } from "@langwatch/scenario-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -33,7 +33,20 @@ import {
   simulationSendersOver,
 } from "../../__tests__/support/simulation-service-fake.fixture.ts";
 import { ScenarioModule, type ScenarioTabStore } from "../../app/scenario.app.ts";
+import { MemoryScenarioChannels } from "../../channels/memory/memory.scenario.channels.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
+
+const UNCAPPED_PLAN: Plan = {
+  planSource: "subscription",
+  type: "LAUNCH",
+  name: "Launch",
+  free: false,
+  maxMembers: 10,
+  maxMembersLite: 10,
+  maxMessagesPerMonth: 1_000_000,
+  canPublish: true,
+  prices: { USD: 0, EUR: 0 },
+};
 
 export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
@@ -53,6 +66,7 @@ export async function createScenarioRestTestApp(
   const simulations = options.simulations ?? {};
 
   const app = await ScenarioModule.create({
+    channels: MemoryScenarioChannels.create(),
     repositories: {
       ...MemoryScenarioRepositories.create(),
       simulations: simulationRepositoryOver(simulations),
@@ -65,11 +79,16 @@ export async function createScenarioRestTestApp(
       evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(
-        options.projects ?? { getOrganizationId: async () => ORGANIZATION_ID },
+        { getOrganizationId: async () => ORGANIZATION_ID, ...options.projects },
         "Project API",
       ),
       plans: createApiFixture<EntitlementApi>(
-        options.plans ?? { assertWithinUsageLimit: async () => {} },
+        {
+          assertWithinUsageLimit: async () => {},
+          // A plan with no creation caps, so a create never counts here.
+          getActivePlan: async () => UNCAPPED_PLAN,
+          ...options.plans,
+        },
         "Entitlement API",
       ),
       modelProviders: createApiFixture<ModelProviderApi>(),
@@ -81,7 +100,7 @@ export async function createScenarioRestTestApp(
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
       retention: createApiFixture<DataRetentionApi>(),
-      suites: createApiFixture<SuiteApi>(),
+      evaluators: createApiFixture<EvaluatorApi>(),
       ...scenarioExecutorPeers(),
       ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(

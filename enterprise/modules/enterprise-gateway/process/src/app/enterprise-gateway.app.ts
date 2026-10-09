@@ -17,6 +17,7 @@ import {
   type ListPersonalVirtualKeysInput,
   type ListRoutingPoliciesInput,
   type ResolveDefaultRoutingPolicyInput,
+  type PersonalContext,
   type PersonalVirtualKey,
   type RoutingPolicy,
   RoutingPolicyModelMustBeConcreteError,
@@ -38,8 +39,10 @@ import {
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
+import { UserApi } from "@langwatch/user-contract";
 
 import type { EnterpriseGatewayRepositories } from "../repositories/routing-policy.repository.ts";
+import { PersonalContextService } from "../services/personal-context.service.ts";
 import { PersonalVirtualKeyAccessService } from "../services/personal-virtual-key-access.service.ts";
 import { PersonalVirtualKeyIssuerService } from "../services/personal-virtual-key-issuer.service.ts";
 import { PersonalVirtualKeyService } from "../services/personal-virtual-key.service.ts";
@@ -47,7 +50,6 @@ import { RoutingPolicyService } from "../services/routing-policy.service.ts";
 
 type EnterpriseGatewaySetup = FeatureSetup<
   typeof EnterpriseGatewayModule.dependencies,
-  never,
   EnterpriseGatewayConfig | undefined,
   EnterpriseGatewayRepositories
 >;
@@ -62,20 +64,24 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
     organizations: OrganizationApi,
     authz: AuthzApi,
     modelProviders: ModelProviderApi,
+    users: UserApi,
   };
 
   readonly #policies: RoutingPolicyService;
   readonly #personalKeys: PersonalVirtualKeyService;
   readonly #personalKeyDoors: PersonalVirtualKeyAccessService;
+  readonly #personalContexts: PersonalContextService;
 
   private constructor(parts: {
     policies: RoutingPolicyService;
     personalKeys: PersonalVirtualKeyService;
     personalKeyDoors: PersonalVirtualKeyAccessService;
+    personalContexts: PersonalContextService;
   }) {
     this.#policies = parts.policies;
     this.#personalKeys = parts.personalKeys;
     this.#personalKeyDoors = parts.personalKeyDoors;
+    this.#personalContexts = parts.personalContexts;
   }
 
   static create({
@@ -104,6 +110,11 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
         members: dependencies.organizations,
         permissions: dependencies.authz,
       }),
+      personalContexts: PersonalContextService.create({
+        members: dependencies.organizations,
+        users: dependencies.users,
+        policies,
+      }),
     });
   }
 
@@ -121,6 +132,10 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
 
   countRoutingPolicies(input: { organizationId: string }): Promise<number> {
     return this.#policies.count(input);
+  }
+
+  getPersonalContext(input: { userId: string; organizationId: string }): Promise<PersonalContext> {
+    return this.#personalContexts.get(input);
   }
 
   routingPolicyTierSuggestions(

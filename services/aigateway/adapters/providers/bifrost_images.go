@@ -167,7 +167,7 @@ func (r *BifrostRouter) dispatchImageGeneration(
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
@@ -222,7 +222,7 @@ func (r *BifrostRouter) dispatchImageEdit(
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,

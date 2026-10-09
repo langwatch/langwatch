@@ -19,19 +19,22 @@ import {
   LuMessageCircle,
 } from "react-icons/lu";
 
-import { getDrawerDensityTokens, useDensityStore } from "../../../../behavior/density.store.ts";
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
-import { useDisplayRoleVisuals } from "../../../../behavior/scenario-role.store.tsx";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
-import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
-import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
-import { RedactedInline } from "../../redacted-field.tsx";
-import { useConversationContext } from "../hooks/use-conversation-context.ts";
+import { useConversationContext } from "../../../../features/conversation/behavior/use-conversation-context.ts";
+import {
+  getDrawerDensityTokens,
+  useDensityStore,
+} from "../../../../features/explorer/behavior/density.store.ts";
+import { useDisplayRoleVisuals } from "../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import {
   type UseTextTranslationResult,
   useTextTranslation,
-} from "../hooks/use-text-translation.ts";
-import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation.ts";
+} from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
+import { useTraceDrawerNavigation } from "../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts";
+import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
+import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
+import { RedactedInline } from "../../redacted-field.tsx";
 
 interface ConversationContextProps {
   conversationId: string | null;

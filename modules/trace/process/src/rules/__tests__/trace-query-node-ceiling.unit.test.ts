@@ -10,10 +10,10 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { translateFilter } from "../trace-query.rules.ts";
+import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 
 const compile = (queryText: string) =>
-  translateFilter({
+  traceQueryTranslation.translateFilter({
     queryText,
     tenantId: "project-1",
     timeRange: { from: 1_000, to: 2_000 },

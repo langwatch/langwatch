@@ -21,6 +21,8 @@ export interface RegisteredFoldProjection extends SealedFoldProjection<Event> {
   kind: "fold";
   /** ClickHouse table name for OPTIMIZE after replay. Omit for non-CH stores. */
   targetTable?: string;
+  /** The declaring pipeline's `.withRetention`, preferred to the runtime's as live does (§9). */
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 export interface RegisteredMapProjection extends SealedMapProjection<Event> {
@@ -36,6 +38,8 @@ export interface RegisteredMapProjection extends SealedMapProjection<Event> {
   kind: "map";
   /** ClickHouse table name for OPTIMIZE after replay. Omit for non-CH stores. */
   targetTable?: string;
+  /** The declaring pipeline's `.withRetention`, preferred to the runtime's as live does (§9). */
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 /**
@@ -55,6 +59,8 @@ export interface RegisteredStateProjection extends SealedStateProjection<Event> 
    */
   pauseKey: string;
   kind: "state";
+  /** The declaring pipeline's `.withRetention`, preferred to the runtime's as live does (§9). */
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 export type ProjectionKind = "fold" | "map" | "state";
@@ -121,6 +127,8 @@ export interface ReplayConfig {
 export interface ReplayCallbacks {
   onProgress?: (progress: ReplayProgress) => void;
   onBatchComplete?: (info: BatchCompleteInfo) => void;
+  /** Aborted by a worker stop: no batch starts after it, and the run rethrows its reason. */
+  signal?: AbortSignal;
 }
 
 export interface ReplayResult {

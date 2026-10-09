@@ -29,16 +29,6 @@ export {
   useOptionalNavigationHost,
   type NavigationAccountMenu,
   type NavigationCommandBar,
-  type NavigationDeployment,
-  type NavigationFlagReading,
-  type NavigationOpsAccess,
-  type NavigationOrganization,
-  type NavigationPlanReading,
-  type NavigationProject,
-  type NavigationScopeWrite,
-  type NavigationSupportChat,
-  type NavigationTeam,
-  type NavigationUser,
 } from "../model/navigation-host.ts";
 export { useNavigationMode } from "../behavior/use-navigation-mode.ts";
 export { useNavigationTracking } from "../behavior/use-navigation-tracking.ts";

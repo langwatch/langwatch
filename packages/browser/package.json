@@ -19,6 +19,10 @@
       "types": "./dist/ui-supply.d.ts",
       "default": "./src/ui-supply.ts"
     },
+    "./testing": {
+      "types": "./dist/module/ui-host-service-fakes.d.ts",
+      "default": "./src/module/ui-host-service-fakes.ts"
+    },
     "./application": {
       "types": "./dist/ui-application.d.ts",
       "default": "./src/ui-application.tsx"
@@ -44,28 +48,28 @@
       "default": "./src/ui-feature-shell.tsx"
     },
     "./route-objects": {
-      "types": "./dist/ui-route-objects.d.ts",
-      "default": "./src/ui-route-objects.tsx"
+      "types": "./dist/page/ui-route-objects.d.ts",
+      "default": "./src/page/ui-route-objects.tsx"
     },
     "./page": {
-      "types": "./dist/ui-page.d.ts",
-      "default": "./src/ui-page.tsx"
+      "types": "./dist/page/ui-page.d.ts",
+      "default": "./src/page/ui-page.tsx"
     },
     "./page-guard": {
-      "types": "./dist/ui-page-guard.d.ts",
-      "default": "./src/ui-page-guard.tsx"
+      "types": "./dist/page/ui-page-guard.d.ts",
+      "default": "./src/page/ui-page-guard.tsx"
     },
     "./page-fallbacks": {
-      "types": "./dist/ui-page-fallbacks.d.ts",
-      "default": "./src/ui-page-fallbacks.tsx"
+      "types": "./dist/page/ui-page-fallbacks.d.ts",
+      "default": "./src/page/ui-page-fallbacks.tsx"
     },
     "./prefix-redirect": {
-      "types": "./dist/ui-prefix-redirect.d.ts",
-      "default": "./src/ui-prefix-redirect.tsx"
+      "types": "./dist/page/ui-prefix-redirect.d.ts",
+      "default": "./src/page/ui-prefix-redirect.tsx"
     },
     "./drawer-address": {
-      "types": "./dist/ui-drawer-address.d.ts",
-      "default": "./src/ui-drawer-address.tsx"
+      "types": "./dist/page/ui-drawer-address.d.ts",
+      "default": "./src/page/ui-drawer-address.tsx"
     },
     "./error-toaster": {
       "types": "./dist/ui-error-toaster.d.ts",
@@ -75,21 +79,17 @@
       "types": "./dist/ui-error-actions.d.ts",
       "default": "./src/ui-error-actions.tsx"
     },
-    "./design-system-shell": {
-      "types": "./dist/ui-design-system-shell.d.ts",
-      "default": "./src/ui-design-system-shell.tsx"
-    },
     "./web-installation": {
       "types": "./dist/ui-web-installation.d.ts",
       "default": "./src/ui-web-installation.ts"
     },
     "./module-screens": {
-      "types": "./dist/ui-module-screens.d.ts",
-      "default": "./src/ui-module-screens.ts"
+      "types": "./dist/module/ui-module-screens.d.ts",
+      "default": "./src/module/ui-module-screens.ts"
     },
     "./module-drawers": {
-      "types": "./dist/ui-module-drawers.d.ts",
-      "default": "./src/ui-module-drawers.ts"
+      "types": "./dist/module/ui-module-drawers.d.ts",
+      "default": "./src/module/ui-module-drawers.ts"
     },
     "./graphics-quality-provider": {
       "types": "./dist/graphics-quality-provider.d.ts",
@@ -108,12 +108,12 @@
       "default": "./src/ui-feature-install.ts"
     },
     "./route-descriptor": {
-      "types": "./dist/ui-route-descriptor.d.ts",
-      "default": "./src/ui-route-descriptor.ts"
+      "types": "./dist/page/ui-route-descriptor.d.ts",
+      "default": "./src/page/ui-route-descriptor.ts"
     },
     "./public-config": {
-      "types": "./dist/public-config.d.ts",
-      "default": "./src/public-config.ts"
+      "types": "./dist/wire/public-config.d.ts",
+      "default": "./src/wire/public-config.ts"
     },
     "./shell": {
       "types": "./dist/ui-shell.d.ts",
@@ -124,32 +124,32 @@
       "default": "./src/ui.runtime.ts"
     },
     "./module-apis": {
-      "types": "./dist/ui-module-apis.d.ts",
-      "default": "./src/ui-module-apis.ts"
+      "types": "./dist/module/ui-module-apis.d.ts",
+      "default": "./src/module/ui-module-apis.ts"
     },
     "./transport": {
-      "types": "./dist/transport.d.ts",
-      "default": "./src/transport.ts"
+      "types": "./dist/wire/transport.d.ts",
+      "default": "./src/wire/transport.ts"
     },
     "./testing-transport": {
       "types": "./dist/testing-transport.d.ts",
       "default": "./src/testing-transport.ts"
     },
     "./browser-rpc": {
-      "types": "./dist/browser-rpc.d.ts",
-      "default": "./src/browser-rpc.ts"
+      "types": "./dist/wire/browser-rpc.d.ts",
+      "default": "./src/wire/browser-rpc.ts"
     },
     "./query-client": {
-      "types": "./dist/query-client.d.ts",
-      "default": "./src/query-client.ts"
+      "types": "./dist/wire/query-client.d.ts",
+      "default": "./src/wire/query-client.ts"
     },
     "./sse-subscription-link": {
-      "types": "./dist/sse-subscription-link.d.ts",
-      "default": "./src/sse-subscription-link.ts"
+      "types": "./dist/wire/sse-subscription-link.d.ts",
+      "default": "./src/wire/sse-subscription-link.ts"
     },
     "./module-hosts": {
-      "types": "./dist/ui-host-mounts.d.ts",
-      "default": "./src/ui-host-mounts.ts"
+      "types": "./dist/module/ui-host-mounts.d.ts",
+      "default": "./src/module/ui-host-mounts.ts"
     }
   },
   "scripts": {
@@ -162,6 +162,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-views": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
@@ -195,5 +196,8 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "^8.0.1"
+  },
+  "langwatch": {
+    "group": "browser"
   }
 }

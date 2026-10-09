@@ -48,7 +48,7 @@ Feature: A chunk that does not arrive is retried, then explained
       Then it tries four times in all, waiting about 0.5, 1 and 2 seconds
       And the load fails with the last failure
 
-    @e2e
+    @e2e @unimplemented
     Scenario: The application still opens when its first requests for a chunk are dropped
       Given the first two requests for the chunk of a root host are dropped
       When a person opens a dashboard

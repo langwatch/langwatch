@@ -45,10 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: the changed paths come
+          # from git trees (.github/actions/detect-changes),
+          # and every file this job needs on disk lives under .github/.
+          # Checking out the rest of the tree is pure runner time.
           sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
@@ -220,6 +220,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # This job boots no licence and no Connect, so it runs as sh-free. The mode
+      # file answers LANGWATCH_DEPLOYMENT_MODE; $GITHUB_ENV takes assignments only.
+      - name: Load the deployment mode
+        run: grep -E '^[A-Z_]+=' dev/tests/modes/sh-free.env >> "$GITHUB_ENV"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
@@ -282,12 +287,11 @@ jobs:
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
 
-      - name: Setup database
-        run: pnpm prisma:migrate
-
-      - name: Setup ClickHouse
-        working-directory: apps/tasks
-        run: pnpm task clickhouse-migrate
+      # The api and the worker never migrate and refuse to serve until the
+      # upgrade has run: the preparation script, `upgrade` then the
+      # system-migrations pass (specs/upgrade/entry-points.feature).
+      - name: Upgrade the databases
+        run: pnpm start:prepare:db
 
       # The browser bundle only. apps/api and apps/worker run from source
       # through node and have no build of their own.
@@ -298,11 +302,11 @@ jobs:
       - name: Build browser bundle
         run: pnpm exec nx run workspace:build:types --outputStyle=static && pnpm exec nx run @langwatch/ui:build --outputStyle=static
 
+      - name: Unit-test the e2e guard
+        run: pnpm --filter langwatch-e2e-tests test:unit
+
       - name: Run E2E tests
         env:
-          # Migrations already ran in earlier steps; skip them during pnpm start
-          SKIP_PRISMA_MIGRATE: "true"
-          SKIP_CLICKHOUSE_MIGRATE: "true"
           # Launch the runner's preinstalled Google Chrome (no browser download)
           E2E_BROWSER_CHANNEL: chrome
           # The api started below serves the suite; the e2e stack borrows it instead of booting its own.
@@ -320,8 +324,8 @@ jobs:
           # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
           sleep 5
 
-          # Run tests from the self-contained e2e package
-          cd dev/tests/agentic-e2e && pnpm test
+          # Run tests from the self-contained e2e package; the sso and licence journeys need their own modes
+          cd dev/tests/agentic-e2e && pnpm test --project=unit --project=journey --project=chromium
           TEST_EXIT=$?
 
           # Cleanup

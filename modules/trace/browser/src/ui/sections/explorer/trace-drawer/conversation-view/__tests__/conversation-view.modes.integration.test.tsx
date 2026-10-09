@@ -33,14 +33,14 @@ function turn(traceId: string, timestamp: number): TraceListItem {
 
 const turns: TraceListItem[] = [turn("trace-1", 1), turn("trace-2", 2)];
 
-vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({
     data: { items: turns },
     isLoading: false,
   }),
 }));
 
-vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -50,11 +50,11 @@ vi.mock("../../../hooks/use-conversation-annotations.ts", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turn-events.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
@@ -68,8 +68,8 @@ vi.mock("../annotated-turn-row.tsx", () => ({
   ),
 }));
 
-import type { TraceListItem } from "../../../types/trace.ts";
-import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../behavior/explorer/types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../../behavior/explorer/types/trace.ts";
 import { ConversationView } from "../conversation-view.tsx";
 
 function renderView({

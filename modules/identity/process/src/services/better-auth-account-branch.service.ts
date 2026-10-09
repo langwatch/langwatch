@@ -29,7 +29,7 @@ import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
-export interface AccountBranchDeps {
+interface AccountBranchDeps {
   /** better-auth's stock engine, bound to this instance's options. */
   legacy: DBAdapter;
   accounts: IdentityAccounts;

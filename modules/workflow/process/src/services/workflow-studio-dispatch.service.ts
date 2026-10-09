@@ -31,7 +31,7 @@ const ABORT_POLL_INTERVAL_MS = 1000;
 type StreamRead = { done: boolean; value?: Uint8Array | undefined };
 
 /** One studio event, dispatched and streamed. */
-export type WorkflowStudioDispatchInput = Readonly<{
+type WorkflowStudioDispatchInput = Readonly<{
   projectId: string;
   event: StudioClientEvent;
   onEvent(event: StudioServerEvent): void;

@@ -175,9 +175,9 @@ func (o *Orchestrator) runSeedIngest(ctx context.Context, p UpParams, pre seedPr
 
 // managedStackEnv builds the environment a database-rebuilding child runs
 // with: the managed servers are ensured (recreating this slug's freshly
-// dropped databases empty), then the registered stack's full overlay is
-// preferred when one exists — it carries the same database URLs plus
-// everything else a seeder might dial. Unlike `up`'s warn-and-continue
+// dropped databases empty), then the registered stack's overlay supplies
+// everything else a seeder might dial, its database URLs replaced by the
+// ones just ensured. Unlike `up`'s warn-and-continue
 // ensures, an unavailable managed server is a hard error here: there is no
 // .env fallback that could make "reset the managed database" mean anything.
 func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]string, error) {
@@ -191,31 +191,34 @@ func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]stri
 	if o.cfg.ShouldManagePostgres && st.PostgresDatabase == "" {
 		return nil, fmt.Errorf("managed postgres is unavailable — cannot rebuild database %q", domain.DatabaseForSlug(slug))
 	}
-	ensured := st.OverlayEnv()
 	if reg, ok := o.stackBySlug(slug); ok {
-		// A registered stack's overlay wins where it has a value — it describes
-		// the ports the running stack actually bound. But it only carries a
-		// database URL if it recorded one, so a stack registered while haven was
-		// not managing that server has none, and the child would fall through to
-		// whatever `.env` names: the guards above would have vouched for `st`
-		// while the seed ran somewhere else entirely. Fill those gaps from the
-		// endpoints just ensured.
-		return devNodeEnv(append(withMissingEnv(reg.OverlayEnv(), ensured), o.credentialEnv(slug, reg.WorktreeDir)...)), nil
+		// The registered overlay keeps the ports the running stack bound, but its
+		// database endpoints are whatever its last `up` recorded (a native server
+		// since swapped for the container, say). The reset dropped on the servers
+		// just ensured, so the child migrates and seeds exactly those.
+		return devNodeEnv(append(withDatabasesOf(reg, st).OverlayEnv(), o.credentialEnv(slug, reg.WorktreeDir)...)), nil
 	}
-	return devNodeEnv(ensured), nil
+	// No running stack: name the app origin `up` would, or sign-in refuses to load.
+	proxyScheme, proxyPort := o.proxy.Endpoint()
+	scheme, port := o.serviceEndpoint(proxyScheme, proxyPort, 0)
+	st.Services = append(st.Services, domain.Service{Name: "app", URL: o.cfg.Naming.URL("app", slug, scheme, port)})
+	return devNodeEnv(st.OverlayEnv()), nil
 }
 
-// withMissingEnv appends any KEY=… from extra whose KEY is absent from base.
-// Order matters to the children: earlier assignments win, so base is authoritative.
-func withMissingEnv(base, extra []string) []string {
-	for _, kv := range extra {
-		key, _, ok := strings.Cut(kv, "=")
-		if !ok || hasEnvKey(base, key) {
-			continue
-		}
-		base = append(base, kv)
+// withDatabasesOf points reg at every endpoint ensured holds; an unmanaged
+// server (empty in ensured) keeps whatever reg recorded.
+func withDatabasesOf(reg, ensured domain.Stack) domain.Stack {
+	if ensured.ClickHouseDatabase != "" {
+		reg.ClickHouseHTTPPort, reg.ClickHouseDatabase = ensured.ClickHouseHTTPPort, ensured.ClickHouseDatabase
+		reg.ClickHousePostgresHost = ensured.ClickHousePostgresHost
 	}
-	return base
+	if ensured.PostgresDatabase != "" {
+		reg.PostgresPort, reg.PostgresDatabase = ensured.PostgresPort, ensured.PostgresDatabase
+	}
+	if ensured.RedisPort != 0 {
+		reg.RedisPort, reg.RedisDB = ensured.RedisPort, ensured.RedisDB
+	}
+	return reg
 }
 
 // devNodeEnv marks the one-shot lanes (prepare, seed, codegen) as development.
@@ -347,7 +350,7 @@ func (o *Orchestrator) DBURL(ctx context.Context, p UpParams, engine string) err
 func (o *Orchestrator) DownAll(ctx context.Context) error {
 	var stopped []int
 	for _, st := range o.store.Stacks() {
-		if o.sys.ProcessAlive(st.LauncherPID) {
+		if o.launcherIsOurs(st) {
 			stopped = append(stopped, st.LauncherPID)
 		}
 		if err := o.DownStack(ctx, st.Slug); err != nil {
@@ -369,7 +372,7 @@ func (o *Orchestrator) DownAll(ctx context.Context) error {
 		o.ch.Stop()
 		fmt.Println("stopped managed clickhouse-server (data kept)")
 	}
-	if info, ok := o.store.Daemon(); ok && o.sys.ProcessAlive(info.PID) {
+	if info, ok := o.store.Daemon(); ok && o.pidIsOurs(info.PID, info.Start) {
 		o.sys.Terminate(info.PID)
 		o.store.ClearDaemon()
 		fmt.Printf("stopped haven daemon (pid %d)\n", info.PID)

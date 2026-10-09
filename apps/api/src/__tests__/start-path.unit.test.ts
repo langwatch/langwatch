@@ -7,26 +7,35 @@ function readFromRoot(relative: string): string {
   return readFileSync(fileURLToPath(new URL(`../../../../${relative}`, import.meta.url)), "utf8");
 }
 
-const scripts: Record<string, string> = JSON.parse(readFromRoot("apps/api/package.json")).scripts;
-const PREPARE = "pnpm --silent run start:prepare:db";
+function scriptsOf(app: string): Record<string, string> {
+  return JSON.parse(readFromRoot(`apps/${app}/package.json`)).scripts;
+}
+
+const scripts = scriptsOf("api");
+const MIGRATES =
+  /start:prepare:db|prisma-migrate|clickhouse-migrate|lwql-provision|system-migrations-pass|task upgrade|migrate deploy/;
+const ENTRY = /^node --experimental-transform-types .*src\/main\.ts$/;
 
 describe("the API start path", () => {
-  describe("given the production start command", () => {
-    /** @scenario "The API process applies pending schema migrations before it serves" */
-    it("runs the migration tasks in their order, and only then the entry point", () => {
-      expect(scripts["start:prepare:db"]).toMatch(
-        /task prisma-migrate clickhouse-migrate lwql-provision/,
-      );
-      expect(scripts["start"]?.startsWith(`${PREPARE} && node `)).toBe(true);
-      expect(scripts["start"]?.endsWith("src/main.ts")).toBe(true);
+  describe("given the production start commands of the api and the worker", () => {
+    /** @scenario "Serving processes never migrate; they refuse by name when behind" */
+    /** @scenario "The API listens only after its upgrade gate admitted it" */
+    it("runs only the entry point, which composes the upgrade gate before it serves", () => {
+      for (const app of ["api", "worker"]) {
+        const start = scriptsOf(app)["start"] ?? "";
+        expect(start).toMatch(ENTRY);
+        expect(start).not.toMatch(MIGRATES);
+        expect(readFromRoot(`apps/${app}/src/main.ts`)).toContain(
+          `.withUpgradeGate({ role: "${app}", gate: servingUpgradeGate })`,
+        );
+      }
     });
+  });
 
-    /** @scenario "The API listens only after preparation succeeded" */
-    /** @scenario "A failed migration stops the boot instead of serving" */
-    it("chains the entry point behind preparation with &&, so a failed preparation never reaches it", () => {
-      const start = scripts["start"] ?? "";
-      expect(start.indexOf(" && ")).toBe(PREPARE.length);
-      expect(start.slice(PREPARE.length + 4)).toMatch(/^node .*src\/main\.ts$/);
+  describe("given the preparation script", () => {
+    /** @scenario "A failed upgrade stops the preparation" */
+    it("is the upgrade alone, so a failure fails the preparation", () => {
+      expect(scripts["start:prepare:db"]).toBe("cd ../tasks && pnpm --silent task upgrade");
     });
   });
 
@@ -40,7 +49,7 @@ describe("the API start path", () => {
   });
 
   describe("given the production image", () => {
-    /** @scenario "The image migrates once, through the same script" */
+    /** @scenario "The image serves without migrating, and the preparation is written once" */
     it("starts the API through its own start script and writes no migration step of its own", () => {
       const steps = readFromRoot("infra/docker/Dockerfile")
         .split("\n")
@@ -49,33 +58,21 @@ describe("the API start path", () => {
       expect(steps.filter((line) => line.startsWith("CMD "))).toEqual([
         "CMD cd /app/apps/api && pnpm --silent run start",
       ]);
-      expect(
-        steps.filter((line) =>
-          /prisma\s+migrate|migrate deploy|prisma-migrate|clickhouse-migrate|start:prepare:db/.test(
-            line,
-          ),
-        ),
-      ).toEqual([]);
+      expect(steps.filter((line) => MIGRATES.test(line))).toEqual([]);
     });
   });
 
   describe("given the worker and the browser application", () => {
-    /** @scenario "The worker and the browser application never migrate" */
-    it("starts neither of them through preparation, leaving the API as the one migrator", () => {
-      const migrates =
-        /start:prepare|prisma-migrate|clickhouse-migrate|lwql-provision|system-migrations-pass/;
-      const apps = ["worker", "ui"].map(
-        (app) =>
-          JSON.parse(readFromRoot(`apps/${app}/package.json`)).scripts as Record<string, string>,
-      );
+    /** @scenario "The browser application and the worker never migrate" */
+    it("starts neither through a preparation, and the worker behind the same gate", () => {
+      const [worker, ui] = ["worker", "ui"].map(scriptsOf);
 
-      for (const appScripts of apps) {
-        for (const name of ["predev", "dev", "build", "start"]) {
-          expect(appScripts[name] ?? "").not.toMatch(migrates);
-        }
+      for (const name of ["predev", "dev", "build", "start"]) {
+        expect(ui?.[name] ?? "").not.toMatch(MIGRATES);
+        expect(worker?.[name] ?? "").not.toMatch(MIGRATES);
       }
-      expect(apps[0]?.["start"]).toMatch(/^node .*src\/main\.ts$/);
-      expect(scripts["start"]).toContain(PREPARE);
+      expect(worker?.["start:prepare:db"]).toBeUndefined();
+      expect(readFromRoot("apps/worker/src/main.ts")).toContain("servingUpgradeGate");
     });
   });
 });

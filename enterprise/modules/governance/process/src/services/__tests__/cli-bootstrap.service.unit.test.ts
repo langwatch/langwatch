@@ -1,9 +1,9 @@
 import { PLATFORM_TOOL_POLICY_DEFAULTS } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CliAdminContactReader } from "../cli-admin-contact.service.ts";
-import type { CliBudgetOverviewReader } from "../governance-cli-tool-bootstrap.service.ts";
-import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service.ts";
+import type { CliAdminContactReader } from "../../features/cli/services/cli-admin-contact.service.ts";
+import type { CliBudgetOverviewReader } from "../../features/cli/services/governance-cli-tool-bootstrap.service.ts";
+import { DefaultGovernanceCliBootstrapService } from "../../features/cli/services/governance-cli-tool-bootstrap.service.ts";
 
 class MemoryCatalog {
   listForUser = vi.fn();

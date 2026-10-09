@@ -12,8 +12,10 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLentOperations } from "@langwatch/browser-host/lent";
-import { LangyAskToken, type LangyAsk } from "@langwatch/langy-contract";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { LangyAskToken, type LangyAsk } from "@langwatch/langy-client";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -24,6 +26,7 @@ import {
   type AnalyticsHostProject,
   type AnalyticsLangyAskRequest,
   type AnalyticsLangyDraftAbout,
+  type AnalyticsReleaseFlag,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
 } from "../model/analytics-host.ts";
@@ -34,6 +37,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
   private readonly organizationId_: string | undefined;
   private readonly session: UiSession;
+  private readonly flags: Readonly<Record<AnalyticsReleaseFlag, boolean | undefined>>;
   private readonly routeCapability: UiRoute;
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
@@ -43,6 +47,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     project_,
     organizationId_,
     session,
+    flags,
     routeCapability,
     navigationCapability,
     feedback,
@@ -51,6 +56,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
     session: UiSession;
+    flags: Readonly<Record<AnalyticsReleaseFlag, boolean | undefined>>;
     routeCapability: UiRoute;
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
@@ -60,6 +66,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.project_ = project_;
     this.organizationId_ = organizationId_;
     this.session = session;
+    this.flags = flags;
     this.routeCapability = routeCapability;
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
@@ -86,8 +93,8 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     return this.session.isSettled();
   }
 
-  featureFlag(flag: string): boolean | undefined {
-    return this.session.featureFlag(flag);
+  featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined {
+    return this.flags[flag];
   }
 
   route(): AnalyticsRouteReading {
@@ -140,6 +147,10 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const langy = useLentOperations(LangyAskToken);
+  // Read as primitives: the flags service hands a new object on every render.
+  const uiFlags = useUiFlags();
+  const dashboardsFlag = uiFlags.flag(FrontendFlags.release_dashboards);
+  const langyFlag = uiFlags.flag(FrontendFlags.release_langy_enabled);
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeProject = session.snapshot().scope.project;
   const scopeProjectId = scopeProject?.id;
@@ -169,6 +180,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
             : void 0,
         organizationId_: organizationId ?? void 0,
         session,
+        flags: { release_dashboards: dashboardsFlag, release_langy_enabled: langyFlag },
         routeCapability: route,
         navigationCapability: navigation,
         feedback,
@@ -182,6 +194,8 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       projectId,
       organizationId,
       session,
+      dashboardsFlag,
+      langyFlag,
       route,
       navigation,
       feedback,

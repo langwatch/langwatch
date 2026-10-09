@@ -3,7 +3,6 @@ import {
   AgentCopySelectionError,
   AgentIsNotCopyError,
   AgentRegisterOnlyError,
-  findLinkedWorkflowIds,
   type CopyAgentCommand,
   type PushAgentCopiesInput,
   type AgentReferenceInput,
@@ -12,8 +11,6 @@ import {
   type AgentPushToCopies,
   type AgentSyncFromSource,
 } from "@langwatch/agent-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { AgentRepository, AgentCopyRecord } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
@@ -22,40 +19,28 @@ import type { AgentVoiceReleaseService } from "./agent-voice-release.service.ts"
 
 export class AgentCopyService {
   #repository: AgentRepository;
-  #workflows: WorkflowApi;
   #voiceRelease: AgentVoiceReleaseService;
-  #logger: Logger;
 
   private constructor({
     repository,
-    workflows,
     voiceRelease,
-    logger,
   }: {
     repository: AgentRepository;
-    workflows: WorkflowApi;
     voiceRelease: AgentVoiceReleaseService;
-    logger: Logger;
   }) {
     this.#repository = repository;
-    this.#workflows = workflows;
     this.#voiceRelease = voiceRelease;
-    this.#logger = logger;
   }
 
   static create({
     repository,
-    workflows,
     voiceRelease,
-    logger = createLogger("langwatch:agent:copy"),
   }: {
     repository: AgentRepository;
-    workflows: WorkflowApi;
     /** A voice source lands in no receiving project whose voice flag is off. */
     voiceRelease: AgentVoiceReleaseService;
-    logger?: Logger;
   }): AgentCopyService {
-    return new AgentCopyService({ repository, workflows, voiceRelease, logger });
+    return new AgentCopyService({ repository, voiceRelease });
   }
 
   getCopies(input: {
@@ -71,7 +56,8 @@ export class AgentCopyService {
       );
   }
 
-  async copy(input: CopyAgentCommand): Promise<AgentCopyCreated> {
+  /** Writes the copy's row; a workflow agent's graph was copied by workflow beforehand. */
+  async createCopy(input: CopyAgentCommand): Promise<AgentCopyCreated> {
     const source = await this.#repository.getById({
       id: input.sourceAgentId,
       projectId: input.sourceProjectId,
@@ -82,44 +68,15 @@ export class AgentCopyService {
       projectIds: [input.targetProjectId],
     });
 
-    const [sourceWorkflowId] = findLinkedWorkflowIds(source);
-    let workflowId: string | undefined;
-    if (source.type === "workflow" && sourceWorkflowId) {
-      const copied = await this.#workflows.copy(
-        {
-          sourceWorkflowId,
-          sourceProjectId: input.sourceProjectId,
-          targetProjectId: input.targetProjectId,
-          copiedFromWorkflowId: sourceWorkflowId,
-        },
-        { id: input.actorUserId },
-      );
-      workflowId = copied.workflow.id;
-    }
-
-    const copy = await this.#repository
-      .create({
-        id: input.newAgentId ?? nextAgentId(),
-        projectId: input.targetProjectId,
-        name: source.name,
-        type: source.type,
-        config: configForCopy({ source, targetProjectId: input.targetProjectId }),
-        workflowId,
-        copiedFromAgentId: source.id,
-      })
-      .catch(async (error: unknown) => {
-        if (workflowId) {
-          await this.#workflows
-            .deleteUncommitted({ workflowId, projectId: input.targetProjectId })
-            .catch((rollbackError: unknown) =>
-              this.#logger.error(
-                { error: rollbackError, workflowId },
-                "Failed to remove uncommitted workflow copy",
-              ),
-            );
-        }
-        throw error;
-      });
+    const copy = await this.#repository.create({
+      id: input.newAgentId ?? nextAgentId(),
+      projectId: input.targetProjectId,
+      name: source.name,
+      type: source.type,
+      config: configForCopy({ source, targetProjectId: input.targetProjectId }),
+      workflowId: input.workflowId,
+      copiedFromAgentId: source.id,
+    });
 
     return {
       id: copy.id,

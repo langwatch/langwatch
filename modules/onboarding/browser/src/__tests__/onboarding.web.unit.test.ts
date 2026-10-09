@@ -1,11 +1,11 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
-import { GuidedTourToken } from "@langwatch/onboarding-contract";
+import { hostServiceFakes } from "@langwatch/browser/testing";
+import { FirstTouchAttributionToken, GuidedTourToken } from "@langwatch/onboarding-client";
 import { describe, expect, it } from "vitest";
 
 import { onboardingFirstTouchAttribution } from "../behavior/first-touch-attribution.capability.ts";
-import { onboardingGuidedPath } from "../features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingGuidedTourHooks } from "../features/guided-onboarding/behavior/guided-tour.lend.ts";
 import { onboardingWeb } from "../onboarding.web.ts";
 
@@ -21,7 +21,7 @@ describe("given a browser that installs onboarding", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([onboardingWeb] as const)
+        .withModules([hostServiceFakes(), onboardingWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 
@@ -85,16 +85,12 @@ describe("given a browser that installs onboarding", () => {
   });
 
   describe("when the shell reads first-touch attribution", () => {
-    it("lends the capture and the event properties as firstTouchAttribution", () => {
-      expect(onboardingWeb.installation.capabilities.firstTouchAttribution).toBe(
-        onboardingFirstTouchAttribution,
+    it("lends the capture and the event properties under the first-touch attribution token", () => {
+      const lend = onboardingWeb.installation.lends.find(
+        ({ token }) => token.key === FirstTouchAttributionToken.key,
       );
-    });
-  });
 
-  describe("when a peer reads whether a guided path is active", () => {
-    it("lends the guided path as guidedPathActive", () => {
-      expect(onboardingWeb.installation.capabilities.guidedPathActive).toBe(onboardingGuidedPath);
+      expect(lend).toMatchObject({ value: onboardingFirstTouchAttribution });
     });
   });
 });

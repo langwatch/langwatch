@@ -22,7 +22,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd, type GatewayBudgetDetailResponse } from "@langwatch/gateway-contract";
-import { toEpochMs } from "@langwatch/time";
+import { toEpochMs, readableDate } from "@langwatch/time";
 import { Archive, FileClock, Gauge, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
 
@@ -31,7 +31,7 @@ import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { BudgetEditDrawer } from "../../../features/budgets/ui/sections/budget-edit-drawer.tsx";
-import { readableDate } from "../../../model/readable-date.ts";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
@@ -122,7 +122,8 @@ function budgetStanding(
 
 function BudgetDetailPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const router = useGatewayRouter();
   const budgetId = typeof router.query.id === "string" ? router.query.id : "";
 
@@ -149,8 +150,8 @@ function BudgetDetailPage() {
   const [archiving, setArchiving] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  const canUpdate = hasPermission("gatewayBudgets:update");
-  const canDelete = hasPermission("gatewayBudgets:delete");
+  const canUpdate = host.hasPermission("gatewayBudgets:update");
+  const canDelete = host.hasPermission("gatewayBudgets:delete");
 
   const budget = detailQuery.data;
 

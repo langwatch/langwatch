@@ -8,6 +8,7 @@ import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { WHOLE_RUN_COMPLETENESS } from "../../../../__tests__/run-completeness.fixture.ts";
 import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
 import { BatchEvaluationResultsTable } from "../../batch-results/batch-evaluation-results-table.tsx";
 
@@ -17,7 +18,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 
 // TraceIdPeek (rendered transitively) calls useFeatureFlag → tRPC, which has
 // no withTRPC wrapper in these tests.
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
@@ -26,6 +27,7 @@ const runWithTargetNames = (names: string[]): ExperimentRunWithItems => ({
   experimentId: "exp-1",
   runId: "run-1",
   projectId: "proj-1",
+  completeness: WHOLE_RUN_COMPLETENESS,
   targets: names.map((name, index) => ({
     id: `target-${index + 1}`,
     name,

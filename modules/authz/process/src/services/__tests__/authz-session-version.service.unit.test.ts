@@ -15,7 +15,7 @@ import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/su
 import type { AuthzGrantPrincipalRow } from "../../repositories/authz-managed-grant.repository.ts";
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzManagedGrantRepository } from "../../repositories/memory/memory.authz-managed-grant.repository.ts";
-import { MemoryAuthzSessionVersionRepository } from "../../repositories/memory/memory.authz-session-version.repository.ts";
+import { MemoryAuthzSessionVersionRepository } from "../../repositories/memory/memory.authz.repositories.ts";
 import { AuthzSessionVersionService } from "../authz-session-version.service.ts";
 
 const ORG = "org_acme";

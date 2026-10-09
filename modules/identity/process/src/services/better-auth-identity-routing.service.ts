@@ -1,7 +1,13 @@
-import { IdentityUnsupportedStorageQueryError } from "@langwatch/identity-contract";
+import {
+  IdentityUnsupportedStorageQueryError,
+  looksLikeSsoConnectionId,
+} from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
 import type { CleanedWhere, CustomAdapter, DBAdapter } from "better-auth/adapters";
 import { APIError } from "better-auth/api";
 
+import type { IdentityConnectionIssuersRepository } from "../repositories/identity-connection-issuers.repository.ts";
+import type { IdentityPasskeyRemovalRepository } from "../repositories/identity-passkey-removal.repository.ts";
 import {
   type AccountWhere,
   issuerForProviderId,
@@ -20,17 +26,20 @@ import {
 import type { IdentityAccountRow, IdentityAccounts } from "../rules/identity-storage.rules.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 import { BetterAuthAccountBranchService } from "./better-auth-account-branch.service.ts";
-import type { PasskeyRemoval } from "./better-auth-identity-storage.service.ts";
 import type { BetterAuthUserBranchService } from "./better-auth-user-branch.service.ts";
+
+const logger = createLogger("langwatch:identity:connection-issuers");
 
 /** One instance per better-auth options: `legacy` and `naming` are bound at adapter-factory
  *  time, so app/ composes this and both branches inside the factory it hands the storage. */
-export interface IdentityStorageRoutingDeps {
+interface IdentityStorageRoutingDeps {
   legacy: DBAdapter;
   naming: AdapterNaming;
   accounts: IdentityAccounts;
   isUserOnIdentityWrites: IdentityUserGate;
-  passkeyRemoval: PasskeyRemoval;
+  passkeyRemoval: IdentityPasskeyRemovalRepository;
+  /** The issuer each SSO connection registered, both ways; the legacy branch's only source. */
+  connectionIssuers: IdentityConnectionIssuersRepository;
   accountBranch: BetterAuthAccountBranchService;
   userBranch: BetterAuthUserBranchService;
 }
@@ -125,14 +134,28 @@ export class BetterAuthIdentityRoutingService {
       const providerId = providerClause.value;
       if (typeof providerId !== "string") return null;
       if (derived.minted && derived.providerId === providerId) return rest;
-      // A real connection issuer beside a providerId that does not decode
-      // to it is ordinary single sign-on, not a contradiction — see the
-      // upstream note this mirrors. Refusing every such pair refused every
-      // RETURNING connection sign-in.
+      // A connection's real issuer beside its own id is ordinary single sign-on; a built-in
+      // provider beside a foreign issuer stays unanswerable.
+      if (!derived.minted && looksLikeSsoConnectionId(providerId)) return rest;
       return null;
     }
-    if (!derived.minted) return [...where];
-    return [{ ...issuerClause, field: "providerId", value: derived.providerId }];
+    // An issuer alone: a synthetic one decodes, a connection's real one is looked up.
+    const registered = derived.minted ? derived.providerId : await this.connectionFor(issuer);
+    if (registered === null) return [...where];
+    return [...rest, { ...issuerClause, field: "providerId", value: registered }];
+  };
+
+  /** The one connection registering this issuer. Several share one on a multi-tenant endpoint,
+   *  and ambiguity answers none rather than another tenant's account row. */
+  private readonly connectionFor = async (issuer: string): Promise<string | null> => {
+    const matches = await this.deps.connectionIssuers.findProviderIdsForIssuer({ issuer });
+    if (matches.length > 1) {
+      logger.warn(
+        { issuer, connections: matches.length },
+        "more than one connection registers this issuer; refusing to pick one",
+      );
+    }
+    return matches.length === 1 ? (matches[0] ?? null) : null;
   };
 
   /**
@@ -145,10 +168,9 @@ export class BetterAuthIdentityRoutingService {
     if (row.issuer != null) return row;
     const providerId = row.providerId;
     if (typeof providerId !== "string") return row;
-    return {
-      ...row,
-      issuer: issuerForProviderId(providerId),
-    };
+    // A connection gets the issuer it registered: 1.7 compares it against the ceremony's.
+    const [registered] = await this.deps.connectionIssuers.findRegisteredIssuers({ providerId });
+    return { ...row, issuer: registered ?? issuerForProviderId(providerId) };
   };
 
   create: CustomAdapter["create"] = async ({ model, data, select }) => {
@@ -222,7 +244,11 @@ export class BetterAuthIdentityRoutingService {
         // Refused only once the query is known to be the identity
         // branch's. The legacy engine has always served sorts and offsets,
         // and a fleet nobody has enrolled must keep getting that answer.
-        refuseOrderedAccountRead({ sorted: sortBy !== undefined, offset });
+        try {
+          refuseOrderedAccountRead({ sorted: sortBy !== undefined, offset });
+        } catch (error) {
+          throw BetterAuthAccountBranchService.refused(error);
+        }
         return rows
           .slice(0, limit)
           .map((row) => this.toStorageKeys(model, toBetterAuthAccount(row))) as never;
@@ -390,7 +416,10 @@ export class BetterAuthIdentityRoutingService {
           ),
         );
       }
-      const outcome = await this.deps.passkeyRemoval.deleteIfAnotherWayInRemains({ passkeyId });
+      const outcome = await this.deps.passkeyRemoval.deleteIfAnotherWayInRemains({
+        passkeyId,
+        routesToIdentity: this.routesToIdentity,
+      });
       if (outcome === "would_strand_user") {
         throw APIError.from("BAD_REQUEST", {
           code: "LAST_WAY_IN",

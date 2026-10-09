@@ -6,9 +6,13 @@ import { trpcQueryKey } from "@langwatch/api/web";
 import { focusManager, hashKey, QueryClient, QueryObserver } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
-import type { UiCachePlan } from "../cache-tiers.ts";
-import { sealedUiQueryStore, storedQueryKey, type UiQueryStore } from "../query-persistence.ts";
-import { digestOf, startUiQuerySync, uiQuerySyncChannelName } from "../query-sync.ts";
+import type { UiCachePlan } from "../query/cache-tiers.ts";
+import {
+  sealedUiQueryStore,
+  storedQueryKey,
+  type UiQueryStore,
+} from "../query/query-persistence.ts";
+import { digestOf, startUiQuerySync, uiQuerySyncChannelName } from "../query/query-sync.ts";
 
 const plan: UiCachePlan = {
   persisted: new Set(["organization.getScopeGraph"]),

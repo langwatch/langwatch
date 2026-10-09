@@ -26,3 +26,11 @@ Scenario: A failed group membership read hides group-restricted trace content
     Given a person's project-bound access token, which has no key row
     When it reads a trace over REST
     Then cost visibility is asked of that person's user principal at the project
+
+  # Moved from project.getFieldRedactionStatus: the door moves with the protections' owner
+  # (peer-cycles plan 2026-10-08 T2b, R36; namespace moves with its owner, CD-2).
+  @unit
+  Scenario: The field redaction status answers from the reader's own protections
+    Given trace input on a project is hidden from a reader and visible to "Admins"
+    When the reader asks traces for the project's field redaction status
+    Then the input reads as redacted and visible to "Admins", and the output reads as visible

@@ -1,3 +1,4 @@
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 /**
  * Mounted once above every guided landing: docks the panel, runs or skips
  * the current path's tour, records the outcome and queues the kickoff.
@@ -26,17 +27,18 @@ import { useRegisterTourActions } from "./tour-registry.ts";
 import { useGuidedOnboarding } from "./use-guided-onboarding.ts";
 
 /**
- * Keeps posthog-js's experiment property in step with the organization the
+ * Keeps the analytics experiment property in step with the organization the
  * guided onboarding host is mounted for, so every browser-captured event
  * carries it the way the server's events do.
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
 function useOnboardingExperimentRegistration(): void {
   const { variant, organizationId } = useGuidedOnboarding();
+  const analytics = useUiAnalytics();
 
   useEffect(() => {
-    registerOnboardingExperiment(variant);
-  }, [organizationId, variant]);
+    registerOnboardingExperiment({ analytics, variant });
+  }, [analytics, organizationId, variant]);
 }
 
 /** A release to run when the component unmounts, set by whoever waits. */

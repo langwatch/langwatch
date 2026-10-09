@@ -8,7 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const childScript = vi.hoisted(() => ({ current: "" }));
-vi.mock("../child-process-spawn.service.ts", () => ({
+vi.mock("../../features/child/services/child-process-spawn.service.ts", () => ({
   ChildProcessSpawnService: {
     create: () => ({
       resolve: () => ({
@@ -23,12 +23,12 @@ import type {
   CancellationSubscriber,
   ScenarioProcessorServiceMetrics,
 } from "../../app/scenario.app.ts";
+import { NodeScenarioChildService } from "../../features/child/services/node-scenario-child.service.ts";
+import { VoiceNonceRegistryService } from "../../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryVoiceNonceRepository } from "../../repositories/memory/memory.voice-nonce.repository.ts";
-import { NodeScenarioChildService } from "../node-scenario-child.service.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
 import { ScenarioProcessorService } from "../scenario-processor.service.ts";
-import { VoiceNonceRegistryService } from "../voice-nonce-registry.service.ts";
 
 const JOB: ExecutionJobData = {
   projectId: "proj_served",

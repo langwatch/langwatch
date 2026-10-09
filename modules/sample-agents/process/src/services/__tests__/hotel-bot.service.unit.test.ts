@@ -3,7 +3,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import { MemoryOpenAiChatChannel } from "../../channels/memory/memory.openai-chat.channel.ts";
-import { MemoryTraceCollectorChannel } from "../../channels/memory/memory.trace-collector.channel.ts";
+import { MemoryTraceCollectorChannel } from "../../channels/memory/memory.sample-agents.channels.ts";
 import { HOTEL_BOT_MODEL } from "../../rules/hotel-bot.rules.ts";
 import { HotelBotService } from "../hotel-bot.service.ts";
 

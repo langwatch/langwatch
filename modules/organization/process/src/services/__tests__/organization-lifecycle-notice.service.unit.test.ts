@@ -18,11 +18,18 @@ function notices(
   const service = OrganizationLifecycleNoticeService.create({ reportError });
   service.connect({
     recordSignedUp,
+    recordCreated: idle,
     recordMembersInvited: idle,
     recordInviteAccepted: idle,
+    recordPersonalTeamCreated: idle,
+    recordPersonalWorkspaceArchived: idle,
+    recordPersonalWorkspaceRevived: idle,
+    recordPersonalWorkspaceFeaturesChanged: idle,
     recordIntegrationMethodChosen,
     recordPersonalWorkspaceProvisioned,
     recordPresenceSettingChanged: idle,
+    recordTraceSharingDisabled: idle,
+    recordMemberDisabled: idle,
   });
   return { service, reportError };
 }
@@ -115,5 +122,29 @@ describe("organization's lifecycle notices", () => {
 
     expect(reportError).toHaveBeenCalledOnce();
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("throws, rather than reports, when trace sharing disabled cannot be recorded", async () => {
+    const service = OrganizationLifecycleNoticeService.create({ reportError: vi.fn() });
+
+    await expect(
+      service.traceSharingDisabled({
+        organizationId: "org_acme",
+        projectIds: ["project-1"],
+        changedByUserId: "user_admin",
+      }),
+    ).rejects.toThrow("organization_lifecycle is not registered in this process");
+  });
+
+  it("throws, rather than reports, when a member disabled cannot be recorded", async () => {
+    const service = OrganizationLifecycleNoticeService.create({ reportError: vi.fn() });
+
+    await expect(
+      service.memberDisabled({
+        organizationId: "org_acme",
+        userId: "user_member",
+        disabledByUserId: "user_admin",
+      }),
+    ).rejects.toThrow("organization_lifecycle is not registered in this process");
   });
 });

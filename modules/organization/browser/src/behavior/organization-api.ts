@@ -23,21 +23,14 @@ import type {
   GrantRevoked,
 } from "@langwatch/authz-contract";
 import type { Plan } from "@langwatch/entitlement-contract";
-import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import type {
   EnrichedAuditLog,
   groupTrpc,
   licenseEnforcementTrpc,
-  JoinRequestAdmitted,
-  JoinRequestApiOrigin,
-  JoinRequestAutomaticJoins,
-  JoinRequestJoining,
-  JoinRequestMine,
-  JoinRequestPending,
   OrganizationDirectoryCounts,
   OrganizationInvite,
   OrganizationMemberDirectory,
-  OrganizationMemberProvenance,
+  OrganizationInvitedMemberIds,
   OrganizationMemberRecord,
   OrganizationMemberUser,
   PendingInvitationsForCaller,
@@ -201,24 +194,6 @@ export type DepartmentAssignments = {
   projects: DepartmentAssignment[];
 };
 
-/** How an organization treats somebody arriving from a domain it verified. */
-export type DomainJoinSetting = "off" | "request" | "auto";
-
-/**
- * The DOMAIN is on the row rather than derived from the address: an
- * organization can verify more than one, so the table needs to say which.
- */
-export type JoinRequestReading = {
-  joinRequestId: string;
-  email: string;
-  name: string | null;
-  domain: string;
-  requestedAt: JoinRequestPending[number]["requestedAt"];
-  expiresAt: NonNullable<JoinRequestPending[number]["expiresAt"]>;
-  /** The seat approval lands (ADR-171 v6). */
-  seat: JoinRequestPending[number]["seat"];
-};
-
 /** `licenseEnforcement.*` and `group.*` derive from organization contracts; the rest is here. */
 export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
   ContractApiMap<typeof groupTrpc> & {
@@ -290,11 +265,11 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
         };
       };
 
-      /** Why each member is here, keyed by user id; asked apart so failing costs only the chips. */
-      getMemberProvenance: {
+      /** Organization's half of provenance: its members and whom an invitation brought. */
+      getInvitedMemberIds: {
         query: {
           input: { organizationId: string };
-          output: Record<string, OrganizationMemberProvenance>;
+          output: OrganizationInvitedMemberIds;
         };
       };
 
@@ -557,59 +532,6 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       };
     };
 
-    joinRequests: {
-      /** The post-login offer: the lookup minus the domains this person dismissed. */
-      offer: { query: { input: void; output: JoinLookupDecision } };
-      /** Everything this person is waiting on. */
-      mine: { query: { input: void; output: JoinRequestMine } };
-      dismissOffer: {
-        mutation: { input: Record<string, never>; output: { success: true } };
-      };
-      /** Walks through an automatic door; `cli` lands a Developer (ADR-171 v6). */
-      admitAutomatically: {
-        mutation: { input: { origin?: JoinRequestApiOrigin }; output: JoinRequestAdmitted };
-      };
-      request: {
-        mutation: {
-          input: { organizationId: string; origin?: JoinRequestApiOrigin };
-          output: { joinRequestId: string; state: "PENDING" | "APPROVED" };
-        };
-      };
-      automaticJoins: {
-        query: { input: { organizationId: string }; output: JoinRequestAutomaticJoins };
-      };
-      /**
-       * Three settings, not a boolean: `off` refuses, `request` queues for an
-       * administrator, `auto` lets them in. The domains travel with it, since
-       * an organization can verify more than one.
-       */
-      joining: {
-        query: {
-          input: { organizationId: string };
-          output: JoinRequestJoining;
-        };
-      };
-      setJoining: {
-        mutation: {
-          input: {
-            organizationId: string;
-            domainJoin: DomainJoinSetting;
-            domains: string[];
-            joinerRole?: JoinRequestJoining["joinerRole"];
-          };
-          output: { next: DomainJoinSetting };
-        };
-      };
-      pending: {
-        query: { input: { organizationId: string }; output: JoinRequestReading[] };
-      };
-      approve: {
-        mutation: { input: { organizationId: string; joinRequestId: string }; output: unknown };
-      };
-      reject: {
-        mutation: { input: { organizationId: string; joinRequestId: string }; output: unknown };
-      };
-    };
     /** Billing's seat expansion, borrowed until a capability offers it; mounted on SaaS. */
     subscription: {
       addTeamMemberOrEvents: {

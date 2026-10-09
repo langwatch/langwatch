@@ -4,8 +4,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { FieldMapping } from "../field-mapping.ts";
-import { isScenarioMappingValid, resolveFieldMappings } from "../resolve-field-mappings.ts";
+import {
+  type FieldMapping,
+  isScenarioMappingValid,
+  resolveFieldMappings,
+} from "../resolve-field-mappings.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

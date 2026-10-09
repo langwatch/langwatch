@@ -94,14 +94,18 @@ Never grep or `sed` for a symbol you intend to rename or move. From the package
 directory holding the `tsconfig.json`:
 
 ```
-npx --no-install @0xdeafcafe/tslsp-cli references --symbol Name --summary
-npx --no-install @0xdeafcafe/tslsp-cli rename --symbol Old --new-name New --dry-run
-npx --no-install @0xdeafcafe/tslsp-cli rename-file OLD NEW    # rewrites imports
-npx --no-install @0xdeafcafe/tslsp-cli diagnostics --file F
+pnpm exec tslsp-cli references --symbol Name --summary
+pnpm exec tslsp-cli rename --symbol Old --new-name New --dry-run
+pnpm exec tslsp-cli rename-file OLD NEW    # rewrites imports
+pnpm exec tslsp-cli diagnostics --file F
 ```
 
 A package's program sees its own files and its workspace dependencies, so run
 the same command from `apps/api` or `apps/worker` to find consumers there.
+
+Memory: run one rename lane at a time. tsgo needs several GB on a large
+package and is OOM-killed on a small host. The TypeScript language service
+`findRenameLocations` is the allowed fallback, never grep or sed.
 
 Two things the language server cannot see, so check them by hand after any
 rename or move: `vi.mock("<path>")` strings, and tests that read source files as

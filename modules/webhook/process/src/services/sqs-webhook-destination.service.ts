@@ -14,11 +14,6 @@ import { WEBHOOK_DELIVERY_ID_HEADER } from "../rules/webhook-delivery-classifica
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../rules/webhook-signature.rules.ts";
 import { type WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
 
-export type {
-  AwsClientConfigResolver,
-  SqsDestinationConfig,
-} from "../channels/webhook-destination.channel.ts";
-
 /**
  * The Amazon SQS destination: the same batch, the same bytes, the same signature, put on a
  * queue instead of posted to a URL.

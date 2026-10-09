@@ -6,8 +6,8 @@ import type { IntentExecutor } from "@langwatch/eventing";
 import { ExperimentCellLostError } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { ExperimentRunBoardWriteBackService } from "../services/experiment-run-board-write-back.service.ts";
-import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunBoardWriteBackService } from "../features/run/services/experiment-run-board-write-back.service.ts";
+import type { ExperimentRunCommandDispatcherService } from "../features/run/services/experiment-run-command-dispatcher.service.ts";
 import {
   type CompleteRunIntent,
   EXPERIMENT_RUN_INTENT_ATTEMPTS,

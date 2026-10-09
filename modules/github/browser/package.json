@@ -2,7 +2,7 @@
   "name": "@langwatch/github-browser",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe GitHub integration: the install popup ceremony langy mounts.",
+  "description": "Browser-safe GitHub integration: the install popup it lends langy by token.",
   "files": [
     "src"
   ],
@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@langwatch/browser": "workspace:*",
+    "@langwatch/github-client": "workspace:*",
     "react": "catalog:",
     "zod": "catalog:"
   },

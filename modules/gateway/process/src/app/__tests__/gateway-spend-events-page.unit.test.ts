@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * `GatewayModule.listSpendEventsPage`: ledger read, filter/cursor passthrough,
- * virtual-key display-name resolution — moved here so REST and tRPC agree.
- */
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -12,6 +7,12 @@ import {
   memorySpendStateSeed,
   memoryVirtualKeySeed,
 } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
+/**
+ * @vitest-environment node
+ * `GatewayModule.listSpendEventsPage`: ledger read, filter/cursor passthrough,
+ * virtual-key display-name resolution — moved here so REST and tRPC agree.
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
@@ -61,6 +62,7 @@ async function gatewayAppStub({ virtualKeyId = "vk_1" }: { virtualKeyId?: string
   const pageReads = vi.spyOn(repositories.spendEvents, "readSpendEventsPage");
   const nameReads = vi.spyOn(repositories.virtualKeys, "findMetaByIds");
   const app = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: peer("authz"),
       projects: projectsStub({ findOrganizationId }),
@@ -76,6 +78,7 @@ async function gatewayAppStub({ virtualKeyId = "vk_1" }: { virtualKeyId?: string
     },
     repositories,
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,

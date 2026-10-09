@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 
-import type { SsoMigrationBlockerView } from "./sso-migration.ts";
+import type { SsoMigrationBlockerView } from "./features/sso-arrival/sso-migration.ts";
 
 /**
  * Every identity refusal in one place (ADR-045: handled since the cause is

@@ -18,6 +18,7 @@ import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { signUpHref } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
+import { JOIN_BEFORE_CREATE_PATH } from "../../model/join-before-create.ts";
 import {
   promotePendingMethod,
   readLastUsedMethodId,
@@ -28,7 +29,6 @@ import { shouldStartPasskeyOnArrival } from "../../model/method-ranking.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
-import { JOIN_BEFORE_CREATE_PATH } from "../../model/sign-up-destination.ts";
 import {
   rememberSoleConnectionAutoDial,
   soleConnectionAutoDialAllowed,
@@ -36,6 +36,7 @@ import {
 import { useTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
@@ -463,13 +464,12 @@ function NoAccountYet({
           fallbackTitle="Couldn't start your sign-up"
           className="lw-front-door-alert"
         />
-        <Button
-          colorPalette="orange"
-          loading={requestVerification.isPending}
+        <FrontDoorPrimaryButton
+          isBusy={requestVerification.isPending}
           onClick={() => void beginSignUp()}
         >
           Send confirmation link
-        </Button>
+        </FrontDoorPrimaryButton>
         <Button variant="outline" onClick={onUseDifferentEmail}>
           Use a different email
         </Button>
@@ -569,9 +569,9 @@ export function RoutedToConnection({
             : `Log in with ${signInMethodLabel(method)} to continue.`}
         </Text>
       </HStack>
-      <Button colorPalette="orange" onClick={() => onContinue(method)}>
+      <FrontDoorPrimaryButton onClick={() => onContinue(method)}>
         {signInMethodActionLabel(method)}
-      </Button>
+      </FrontDoorPrimaryButton>
       {/* The way to the other screen, on this stage as on every other. */}
       {footer ?? <SignUpLink callbackUrl={callbackUrl} label="Or create an account instead" />}
     </AuthCard>

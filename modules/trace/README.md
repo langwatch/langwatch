@@ -1,49 +1,55 @@
-# Trace
+# trace
 
-Trace owns portable read contracts and the live server implementation for the
-viewer-safe, cursor-paged span tree and row-version delta. Both read
-`stored_spans`; `trace_summaries` supplies other trace lookup/summary data,
-`trace_analytics` remains the lighter analytical source, and
-`trace_analytics_rollup` the time-series source.
+Traces: ingestion and canonicalisation of spans, the projections built from them, and the reads, renderings and exports other modules ask for.
 
-Raw spans and logs pass through one deterministic canonicalisation service
-before the pipeline derives four deliberately different projection shapes:
-trace summaries, trace analytics, stored spans and timeseries rollups. The app
-keeps process composition and transport adapters; it does not implement a
-second canonicalisation path.
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-## Journey
+## At a glance
 
-1. A transport authenticates the project and resolves viewer capabilities.
-2. `TraceService` reads tenant-scoped projected span summaries.
-3. The service calculates or withholds cost, validates the portable DTO, and
-   returns a keyset cursor.
+|                |                                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                 |
+| Subjects       | trace, trace-ingestion                                                                          |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)     |
+| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:905` (140 operations) |
+| Other token    | `CollectorApi`, `process/src/transport/collector.rest.ts:93`                                    |
+| Other token    | `TrackedEventApi`, `process/src/transport/tracked-event.rest.ts:36`                             |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                      |
 
-Full trace detail is still legacy. It couples the full `Trace`/`Span` models,
-visibility protections, annotations, evaluations, coding-agent enrichment,
-event/link mapping, offloaded event-log resolution, and the IO extractor. The
-next move must compose all of those once behind the same `TraceService`; it
-must not point a route at a partial replacement.
+## What trace owns
 
-The span-storage repository (`process/src/repositories/span-storage.repository.ts`) remains the single full-span and
-whole-tree-anchor reader until that complete migration. It no longer owns the
-paged tree or row-version delta queries.
+| Kind                           | Name                                                                                                                                                                                                                                                                                                                                                                      | Declared at                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Postgres, accessed not claimed | `Annotation`, `AnnotationScore`, `Topic`                                                                                                                                                                                                                                                                                                                                  | `process/src/repositories/prisma/prisma.trace-annotations.repository.ts:24`                   |
+| ClickHouse table (writes)      | `trace_summaries`                                                                                                                                                                                                                                                                                                                                                         | `process/src/repositories/clickhouse/clickhouse.trace-index-materialisation.repository.ts:64` |
+| ClickHouse table (writes)      | `stored_spans`                                                                                                                                                                                                                                                                                                                                                            | `process/src/repositories/clickhouse/span-storage.repository.ts:674`                          |
+| ClickHouse table (writes)      | `trace_analytics_rollup`                                                                                                                                                                                                                                                                                                                                                  | `process/src/repositories/clickhouse/trace-analytics-rollup.repository.ts:92`                 |
+| ClickHouse table (writes)      | `trace_analytics`                                                                                                                                                                                                                                                                                                                                                         | `process/src/repositories/clickhouse/trace-metrics-analytics.repository.ts:126`               |
+| Stores required                | prisma, clickhouse, redis, rateLimiter, eventReadSeat                                                                                                                                                                                                                                                                                                                     | `process/src/repositories/live/live.trace.repositories.ts:22`                                 |
+| Stores required                | prisma, clickhouse                                                                                                                                                                                                                                                                                                                                                        | `process/src/repositories/prisma/prisma.trace.repositories.ts:37`                             |
+| Config                         | `spanProcessingShards` (TRACE_SPAN_PROCESSING_SHARDS), `tokenizer.bpeDirectory` (TIKTOKENS_PATH), `tokenizer.fetchTimeoutMs` (TIKTOKEN_FETCH_TIMEOUT_MS), `tokenizer.disabled` (DISABLE_TOKENIZATION), `disableCodingAgentSpanFilter` (LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER), `foldCacheTtlSeconds` (LANGWATCH_FOLD_CACHE_TTL_SECONDS), `publicBaseUrl` (BASE_HOST) | `contract/src/trace.config.ts:9`                                                              |
 
-## Browser display toolkit
+Anything else trace needs belongs to another module and is reached through its `*Api`.
 
-`web` owns browser-safe trace presentation components and helpers: ANSI and
-preview formatting, prompt/SDK/origin labels, time and URL display state, the
-input/output and media-strip views, and the billed-versus-bundled cost split.
-It also owns the loaded-trace find index, match cycling, browser highlighting,
-and find-bar presentation, plus the controlled flame-graph presentation and
-viewport/tree behaviour. The app keeps thin compatibility adapters while
-page composition, authentication, data fetching, and every trace transport
-response remain in the app.
+## Peers (static dependencies)
 
-The browser package also owns the reusable transcript parser and presentation
-stack: turn grouping, role visuals, reasoning/tool cards, and virtualization.
-App-owned media, terminal, and anchored-comment widgets enter through named
-render ports; the transcript never fetches or authorizes.
+| Name             | Token              | Module                                        |
+| ---------------- | ------------------ | --------------------------------------------- |
+| `apiKeys`        | `ApiKeyApi`        | [api-key](../api-key/README.md)               |
+| `authz`          | `AuthzApi`         | [authz](../authz/README.md)                   |
+| `dataPrivacy`    | `DataPrivacyApi`   | [data-privacy](../data-privacy/README.md)     |
+| `dataRetention`  | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
+| `evaluators`     | `EvaluatorApi`     | [evaluator](../evaluator/README.md)           |
+| `featureFlags`   | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)     |
+| `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
+| `plans`          | `EntitlementApi`   | [entitlement](../entitlement/README.md)       |
+| `presence`       | `PresenceApi`      | [presence](../presence/README.md)             |
+| `projects`       | `ProjectApi`       | [project](../project/README.md)               |
+| `share`          | `ShareApi`         | [share](../share/README.md)                   |
+| `storedObjects`  | `StoredObjectApi`  | [stored-object](../stored-object/README.md)   |
 
-See [ADR-001](./adrs/001-trace-read-boundary.md) and the
-[read contract](./specs/trace-read-service.feature).
+## Who depends on trace
+
+[analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
+
+<!-- readme:generated:end -->

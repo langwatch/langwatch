@@ -26,8 +26,6 @@ import (
 // OTEL_EXPORTER_OTLP_* namespace: in a dev shell that namespace points
 // every service's OWN telemetry at the local observability stack, and
 // reading it here would silently divert customer studio traces into it.
-// The deprecated `OTEL_OTLP_ENDPOINT` fallback is kept for environments
-// that predate LANGWATCH_ENDPOINT wiring.
 func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelsetup.Provider, error) {
 	// LANGWATCH_ENDPOINT is the ONLY source for the customer router. The
 	// pre-unification fallback to OTEL_OTLP_ENDPOINT was removed when that

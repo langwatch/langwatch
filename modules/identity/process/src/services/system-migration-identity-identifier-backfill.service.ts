@@ -20,14 +20,11 @@ export class IdentityIdentifierBackfillMigrationService implements SystemMigrati
   // Dark preparation: finalization opens event EMISSION for the user; no
   // decision, no sign-in behavior and nothing customer-visible changes.
   readonly requiresOperatorConfirmation = false;
-  // Ships inert on self-hosted until a release flips this after the cloud
-  // rollout has soaked (the in-place doctrine's release act).
-  readonly runsAutomaticallyOnSelfHosted = false;
-  // Still soaking on cloud: the identity rollout is paced by enrollment, so
-  // deploying this changes nothing until an operator enrolls an
-  // organization. Flip it only once the rollout is finished and the
-  // remaining question is reaching tenants created since.
-  readonly enrolledAutomatically = false;
+  // The release act the in-place doctrine calls for: the front door depends
+  // on an identity history, so every self-hosted user gets one.
+  readonly runsAutomaticallyOnSelfHosted = true;
+  // Cloud startup includes every user without operator enrollment.
+  readonly enrolledAutomatically = true;
 
   static create(
     backfill: Pick<IdentityBackfillService, "migrateUser">,

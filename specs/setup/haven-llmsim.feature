@@ -76,6 +76,26 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the console's calls list shows it with its model, mode and tokens, and its detail shows the request and reply
     And a forced error set in the console answers every later call with that status
 
+  @integration
+  Scenario: The console clears and filters recent calls
+    Given the console lists recent calls
+    When the operator types a model name into the filter
+    Then only calls whose model, path, mode, dialect or status match stay listed
+    And confirming "Clear calls" deletes every recorded call and empties the list
+
+  @integration
+  Scenario: The console sets any 4xx or 5xx forced error and explains per-call overrides
+    When the operator opens the settings tab
+    Then the forced error offers 400, 401, 403, 404, 429, 500, 502, 503 and 529
+    And a panel names the X-Llmsim-Seed, X-Llmsim-Mode and X-Llmsim-Error headers, the "error-<status>" model name and the "langy-echo" model
+
+  @unit
+  Scenario: haven llm calls filters by model and failure
+    Given llmsim has answered calls to two models, one of them failing
+    When an agent runs "haven llm calls --model <name>" or "haven llm calls --failed"
+    Then only the matching calls are listed, with their dialect and mode, in text and in --json
+    And "haven llm info" prints how many calls the sim keeps
+
   Scenario: haven +llm points the OpenAI and Anthropic providers at llmsim
     Given a worktree that has never been up
     Then llm is off in its selection

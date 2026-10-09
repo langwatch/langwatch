@@ -1,10 +1,8 @@
 /** Host port for organization screens: sealed imports (ui, router, session) routed here. */
 
-import type {
-  UiAuthenticationOverviewCardProps,
-  UiDirectorySummaryProps,
-  UiDrawerToken,
-} from "@langwatch/browser-host/declarations";
+import type { ReleaseFlagToken, UiDrawerToken } from "@langwatch/browser-host/declarations";
+import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
+import type { AuthenticationOverviewCardProps } from "@langwatch/organization-client";
 import { createContext, useContext } from "react";
 import type { ComponentType, ReactNode } from "react";
 
@@ -85,11 +83,11 @@ export type OrganizationDownload = {
 /** A card another module declares for the Authentication overview (sso, scim). */
 export type AuthenticationOverviewCard = {
   key: string;
-  Card: ComponentType<UiAuthenticationOverviewCardProps>;
+  Card: ComponentType<AuthenticationOverviewCardProps>;
 };
 
 /** The directory status band a peer lends the Directory page (scim). */
-export type DirectorySummaryBand = ComponentType<UiDirectorySummaryProps>;
+export type DirectorySummaryBand = ComponentType<DirectorySummaryProps>;
 
 /** The one thing a screen is handed. */
 export abstract class OrganizationHostApi {
@@ -132,7 +130,7 @@ export abstract class OrganizationHostApi {
   abstract hasEmailProvider(): boolean;
 
   /** Whether a feature flag is on. Fail-closed while it is still arriving. */
-  abstract isFeatureEnabled(flag: string): boolean;
+  abstract isFeatureEnabled(flag: ReleaseFlagToken): boolean;
 
   /** Opens an overlay by its owner's token; the address carries the token's wire name. */
   abstract openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;

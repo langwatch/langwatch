@@ -95,8 +95,6 @@ vi.mock("../../../behavior/gateway-api.ts", () => ({
           data: [{ id: "policy-eu", name: "EU providers only" }],
         }),
       },
-    },
-    user: {
       personalContext: {
         useQuery: (_input: unknown, opts?: { enabled?: boolean }) => ({
           data:

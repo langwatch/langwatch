@@ -54,6 +54,24 @@ func (System) ProcessAlive(pid int) bool {
 	return p.Signal(syscall.Signal(0)) == nil
 }
 
+// ProcessStart is pid's start time as ps prints it, or "" when ps cannot say.
+// With the pid it is a process's identity (D6): a pid whose start differs is a
+// stranger the kernel reused it for. C locale and UTC make it a stable string.
+func (System) ProcessStart(pid int) string {
+	if pid <= 0 {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ps", "-o", "lstart=", "-p", strconv.Itoa(pid)) //nolint:gosec // G204: a fixed binary and an integer pid
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "TZ=UTC")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // Terminate sends SIGTERM so a launcher can clean up its own children.
 func (System) Terminate(pid int) {
 	if p, err := os.FindProcess(pid); err == nil {
@@ -131,8 +149,10 @@ func (System) SpawnDetached(argv []string, dir, logPath string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
-	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	// Owner-only: a keeper's or an up's output carries seed secrets.
+	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if ferr == nil {
+		_ = f.Chmod(0o600)
 		cmd.Stdout, cmd.Stderr = f, f
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

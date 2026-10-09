@@ -2,9 +2,9 @@ import { differenceInDays, isToday, isYesterday, nowInstant } from "@langwatch/t
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 
-import { MAX_RECENT_ITEMS } from "../model/command-bar-constants.ts";
-import type { RecentItem } from "../model/command-bar-types.ts";
-import { RecentItemSchema } from "../model/command-bar-types.ts";
+import { MAX_RECENT_ITEMS } from "../features/command-bar/model/command-bar-constants.ts";
+import type { RecentItem } from "../features/command-bar/model/command-bar-types.ts";
+import { RecentItemSchema } from "../features/command-bar/model/command-bar-types.ts";
 
 const STORAGE_KEY = "langwatch-recent-items";
 

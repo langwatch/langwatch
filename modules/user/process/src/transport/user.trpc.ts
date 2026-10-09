@@ -1,4 +1,3 @@
-import { publicRoute } from "@langwatch/api/access";
 /**
  * The server half of `user.*`, acting on the session's own account — most
  * ask no permission; the organization-scoped ones take `organization:view`.
@@ -6,14 +5,11 @@ import { publicRoute } from "@langwatch/api/access";
  */
 import {
   browserSessionFact,
-  callerAddressFact,
-  defineTrpcFact,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import { UserApi, userTrpc, type UserCaller } from "@langwatch/user-contract";
-import { z } from "zod";
 
 /** Why every account procedure below asks for no permission. */
 const OWN_ACCOUNT = "operates on the session user's own account, so no tenant scope applies";
@@ -22,9 +18,9 @@ const OWN_ACCOUNT = "operates on the session user's own account, so no tenant sc
 const ANY_SIGNED_IN =
   "a photo shows wherever a person is shown, across organizations; the object's purpose and owner kind gate it";
 
-/** Why the two lifecycle procedures decide standing in the application. */
-const SELF_OR_OPERATOR =
-  "self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant";
+/** Why reactivation decides standing in the application. */
+const OPERATOR_ONLY =
+  "operator-only for the named account; the application enforces operator standing itself, against the platform operator list rather than a tenant";
 
 /**
  * Who is asking. The outer id is the SUBJECT — the account being read and
@@ -37,38 +33,10 @@ function callerOf(actor: TrpcHandlerActor): UserCaller {
   return { id: actor.id, operatorId, impersonated: operatorId !== actor.id };
 }
 
-/** The web address a sign-up was sent from, bound by user's own install, as auth's headers are. */
-export const signUpOriginFact = defineTrpcFact(
-  "signUpOrigin",
-  z.object({ origin: z.string().nullable(), referer: z.string().nullable() }).strict(),
-);
-
 export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> = defineTrpcRouter(
   UserApi,
   userTrpc,
 )
-  // `register` predates the account it creates, so it runs with no caller at
-  // all and the address it arrived from is the only thing to throttle on.
-  .procedure("register")
-  .withFacts(callerAddressFact, signUpOriginFact)
-  .withAccess(
-    publicRoute({
-      reason:
-        "the signup form's own backend: it mints the account a caller would otherwise need to already hold",
-    }),
-  )
-  .handle(({ app, input }, callerAddress, signUpOrigin) =>
-    app.registerCredentialAccount({
-      name: input.name ?? null,
-      email: input.email,
-      password: input.password,
-      addressProof: input.addressProof,
-      callerAddress: callerAddress ?? "unknown",
-      origin: signUpOrigin.origin,
-      referer: signUpOrigin.referer,
-    }),
-  )
-
   .procedure("getAvatarUrl")
   .noPermission({ reason: ANY_SIGNED_IN })
   .handle(({ app, input }) => app.getAvatarUrl(input))
@@ -154,75 +122,12 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     return { name: input.name };
   })
 
-  // The session row travels as a fact so the list can say which entry is the
-  // browser doing the reading, and so ending that one is refused by name.
-  .procedure("browserSessions")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(({ app, actor }, browserSession) =>
-    app.listBrowserSessions({
-      userId: actor.id,
-      currentSessionId: browserSession ?? undefined,
-    }),
-  )
-
-  .procedure("endBrowserSession")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(({ app, actor, input }, browserSession) =>
-    app.endBrowserSession({
-      userId: actor.id,
-      sessionId: input.sessionId,
-      currentSessionId: browserSession ?? undefined,
-    }),
-  )
-
   .procedure("hasPassword")
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor }) => ({ hasPassword: await app.hasPassword({ id: actor.id }) }))
 
-  // The session row travels as a fact: one person on two tabs is one actor and
-  // two sessions, so "end every session but this one" is a question about the
-  // request rather than about who asked.
-  .procedure("setPassword")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(async ({ app, actor, input }, browserSession) => {
-    await app.setOwnFirstPassword({
-      userId: actor.id,
-      password: input.password,
-      keepSessionId: deriveKeptSession({ actor, browserSession }),
-      caller: callerOf(actor),
-    });
-
-    return { success: true as const };
-  })
-
-  .procedure("changePassword")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(async ({ app, actor, input }, browserSession) => {
-    await app.changeOwnPassword({
-      userId: actor.id,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
-      keepSessionId: deriveKeptSession({ actor, browserSession }),
-      caller: callerOf(actor),
-    });
-
-    return { success: true as const };
-  })
-
-  .procedure("deactivate")
-  .noPermission({ reason: SELF_OR_OPERATOR })
-  .handle(async ({ app, actor, input }) => {
-    await app.deactivateAccount({ userId: input.userId, caller: callerOf(actor) });
-
-    return { success: true as const };
-  })
-
   .procedure("reactivate")
-  .noPermission({ reason: SELF_OR_OPERATOR })
+  .noPermission({ reason: OPERATOR_ONLY })
   .handle(async ({ app, actor, input }) => {
     await app.reactivateAccount({ userId: input.userId, caller: callerOf(actor) });
 
@@ -249,18 +154,6 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     return { success: true as const };
   })
 
-  .procedure("personalContext")
-  .withPermission("organization:view")
-  .handle(({ app, actor, input }) =>
-    app.getPersonalContext({ userId: actor.id, organizationId: input.organizationId }),
-  )
-
-  .procedure("personalBudget")
-  .withPermission("organization:view")
-  .handle(({ app, actor, input }) =>
-    app.getPersonalBudget({ userId: actor.id, organizationId: input.organizationId }),
-  )
-
   .procedure("requestBudgetIncrease")
   .withPermission("organization:view")
   .handle(({ app, actor, input }) => app.requestBudgetIncrease({ ...input, userId: actor.id }))
@@ -278,33 +171,4 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
   .handle(({ app, actor, input }) =>
     app.getHomePagePickerState({ userId: actor.id, organizationId: input.organizationId }),
   )
-
-  .procedure("personalUsage")
-  .withPermission("organization:view")
-  .handle(({ app, actor, input }) => app.getPersonalUsageRollup({ ...input, userId: actor.id }))
-
-  .procedure("budgetOverview")
-  .withPermission("organization:view")
-  .handle(({ app, actor, input }) => app.getBudgetOverview({ ...input, userId: actor.id }))
-
-  .procedure("cliBootstrap")
-  .withPermission("organization:view")
-  .handle(({ app, actor, input }) =>
-    app.getCliBootstrap({ userId: actor.id, organizationId: input.organizationId }),
-  )
   .build();
-
-/**
- * The session a credential write keeps. Null while an operator is
- * impersonating: the row is the OPERATOR's, so keeping it would neither keep
- * the subject's tab nor mean anything about the subject's devices.
- */
-function deriveKeptSession({
-  actor,
-  browserSession,
-}: {
-  actor: TrpcHandlerActor;
-  browserSession: string | null;
-}): string | null {
-  return callerOf(actor).impersonated ? null : browserSession;
-}

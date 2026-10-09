@@ -5,10 +5,14 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
-import type { InstantEvalJudgement, InstantEvalQuestion } from "@langwatch/instant-eval-contract";
+import type {
+  InstantEvalClassifierLimits,
+  InstantEvalJudgement,
+  InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
+import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 
-import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "../rules/instant-eval-pricing.rules.ts";
+import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
 
 export class InstantEvalClassifyService {
   private constructor(private readonly judge: InstantEvalJudgeChannel) {}
@@ -40,5 +44,10 @@ export class InstantEvalClassifyService {
     const costUsd = instantEvalCostUsd({ inputTokens, pricing: this.judge.pricing });
 
     return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing: this.judge.pricing }) };
+  }
+
+  /** The limits this judge publishes, which a query judged through it is trimmed to. */
+  getJudgeLimits(): InstantEvalClassifierLimits {
+    return this.judge.limits;
   }
 }

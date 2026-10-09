@@ -6,7 +6,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ImpersonationBanner } from "../index.ts";
+import { ImpersonationBanner } from "../impersonation-banner.tsx";
 
 describe("ImpersonationBanner", () => {
   beforeEach(() => {

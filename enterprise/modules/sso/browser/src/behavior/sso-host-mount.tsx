@@ -18,7 +18,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useLentOperations } from "@langwatch/browser-host/lent";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -39,6 +39,7 @@ const INERT_TEST_SIGN_IN: SsoTestSignIn = () => {
 
 /** Every control on the page, as ADR-122 gates them. */
 const SSO_MANAGE_PERMISSION = "sso:manage";
+const SSO_VIEW_PERMISSION = "sso:view";
 
 class CapabilitySsoHost extends SsoHostApi {
   constructor(
@@ -68,6 +69,10 @@ class CapabilitySsoHost extends SsoHostApi {
 
   canManage(): boolean {
     return this.deps.session.hasPermission(SSO_MANAGE_PERMISSION);
+  }
+
+  canView(): boolean {
+    return this.deps.session.hasPermission(SSO_VIEW_PERMISSION);
   }
 
   currentUserAddress(): string | undefined {

@@ -34,6 +34,8 @@ export class FakeSsoHost extends SsoHostApi {
       currentUserAddress?: string | null;
       /** Whether the reader holds `sso:manage`; they do unless a test says not. */
       canManage?: boolean;
+      /** Whether the reader holds `sso:view`; they do unless a test says not. */
+      canView?: boolean;
       query?: Record<string, string | undefined>;
       /** What the sign-in answers, or throws when it is an error. */
       testSignIn?: SsoTestSignInResult | Error;
@@ -58,6 +60,10 @@ export class FakeSsoHost extends SsoHostApi {
 
   canManage(): boolean {
     return this.options.canManage ?? true;
+  }
+
+  canView(): boolean {
+    return this.options.canView ?? true;
   }
 
   currentUserAddress(): string | undefined {

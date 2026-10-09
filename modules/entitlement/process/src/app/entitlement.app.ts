@@ -23,9 +23,8 @@ import {
   type PricingModel,
   PlanLimitExceededError,
 } from "@langwatch/entitlement-contract";
-import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   deriveDatasetBounds,
   effectiveDatasetAttachmentMaxBytes,
@@ -35,18 +34,24 @@ import {
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
-import { UserApi } from "@langwatch/user-contract";
 
 import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
+import { CountMonthCommand } from "../eventing/usage.commands.ts";
+import {
+  buildUsagePipeline,
+  type UsagePipelineDefinition,
+  type UsageSenders,
+} from "../eventing/usage.pipeline.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { coreBaselinePlan } from "../rules/plan-baseline.rules.ts";
+import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { PlanNextStepService } from "../services/plan-next-step.service.ts";
 import { SelfServePlanCatalogueService } from "../services/self-serve-plan-catalogue.service.ts";
 import { SubscriptionPlanService } from "../services/subscription-plan.service.ts";
+import { TraceMeterAppendService } from "../services/trace-meter-append.service.ts";
+import { UsageCountingService } from "../services/usage-counting.service.ts";
 import { UsageService, type UsageCounter } from "../services/usage-enforcement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
 import { UsageWarningService, type UsageWarning } from "../services/usage-warning.service.ts";
@@ -100,12 +105,14 @@ export type EntitlementInfrastructure = Readonly<{
 
 const logger = createLogger("langwatch:usage");
 
+/** Organization stores the per-file dataset limit in MiB; the bounds are in bytes. */
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
 /** How recent an end date has to be for the rollup to read it as "up to now". */
 const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
 type EntitlementSetup = FeatureSetup<
   typeof EntitlementModule.dependencies,
-  never,
   EntitlementConfig,
   EntitlementRepositories
 >;
@@ -114,22 +121,27 @@ type EntitlementSetup = FeatureSetup<
 type EntitlementDependencies = EntitlementSetup["dependencies"];
 
 /**
- * What the constructor actually reads off `dependencies`: the caller
- * directory alone. `license` is consumed once, by `create`, to build
- * {@link EntitlementInfrastructure} — a hand-built test app needs no license source.
+ * What the constructor actually reads off `dependencies`: the pricing model from billing.
+ * `license` is consumed once, by `create`, to build {@link EntitlementInfrastructure}; a
+ * hand-built test app needs no license source.
  */
-type EntitlementCallerLookup = Pick<EntitlementDependencies, "users" | "organizations">;
+type EntitlementCallerLookup = Pick<EntitlementDependencies, "billing">;
+
+/** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
+type EntitlementReadRepositories = Pick<
+  EntitlementRepositories,
+  "membership" | "seats" | "spend" | "tenancy"
+>;
+
+/** The usage pipeline over the senders its process manager and subscriber call back through. */
+type UsagePipelineBuild = (send: () => UsageSenders) => UsagePipelineDefinition;
 
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementModule implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
   static readonly dependencies = {
-    users: UserApi,
     license: LicensingApi,
     billing: BillingApi,
-    traces: TraceApi,
-    organizations: OrganizationApi,
-    projects: ProjectApi,
   };
   static readonly config = entitlementConfig;
 
@@ -139,25 +151,29 @@ export class EntitlementModule implements EntitlementApiContract {
   #nextStep: PlanNextStepService;
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
-  #users: UserApi;
-  #organizations: OrganizationApi;
+  #tenancy: EntitlementRepositories["tenancy"];
+  #pricing: EntitlementCallerLookup["billing"];
   #requestBoundOverrides: RequestBoundsOverrides;
+  #buildUsagePipeline: UsagePipelineBuild | undefined;
+  #usageSenders: UsageSenders | undefined;
 
   private constructor({
     repositories,
     infrastructure,
     dependencies,
     config,
+    usagePipeline,
   }: {
-    repositories: EntitlementRepositories;
+    repositories: EntitlementReadRepositories;
     infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
     config: Pick<EntitlementConfig, "requestBounds">;
+    usagePipeline?: UsagePipelineBuild;
   }) {
     this.#plans = EntitlementService.create(infrastructure);
     this.#usage = UsageStatsService.create({
       membership: repositories.membership,
-      seats: dependencies.organizations,
+      seats: repositories.seats,
       counter: infrastructure.counter,
       plans: this.#plans,
     });
@@ -167,9 +183,10 @@ export class EntitlementModule implements EntitlementApiContract {
     });
     this.#warnings = infrastructure.warnings;
     this.#spend = repositories.spend;
-    this.#users = dependencies.users;
-    this.#organizations = dependencies.organizations;
+    this.#tenancy = repositories.tenancy;
+    this.#pricing = dependencies.billing;
     this.#requestBoundOverrides = config.requestBounds ?? {};
+    this.#buildUsagePipeline = usagePipeline;
   }
 
   static create({ repositories, dependencies, config }: EntitlementSetup): EntitlementModule {
@@ -189,22 +206,54 @@ export class EntitlementModule implements EntitlementApiContract {
       isSaas: config.isSaas,
       planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
       peers: dependencies,
+      tenancy: repositories.tenancy,
+      meter: repositories.billableEvents,
+      traceMeter: repositories.traces,
     });
     const warnings = UsageWarningService.create({
-      billing: dependencies.billing,
+      // The module is built below; the warning records only once its pipeline is connected.
+      record: (data) =>
+        entitlement.#senders().recordUsageWarning({ ...data, tenantId: data.organizationId }),
       counter,
       plans,
-      peers: dependencies,
+      tenancy: repositories.tenancy,
       isSaas: config.isSaas,
       logger: createLogger("langwatch:entitlement:usage-warning"),
     });
 
-    return new EntitlementModule({
+    const counting = UsageCountingService.create({
+      meter: repositories.billableEvents,
+      traceMeter: repositories.traces,
+      plans,
+      billing: dependencies.billing,
+    });
+    // The trace meter is appended everywhere (round 22); the billable-events meter on Cloud only.
+    const traceMeter = TraceMeterAppendService.create({
+      meter: repositories.traces,
+      projects: repositories.tenancy,
+    });
+    const billableEventsMeter = config.isSaas
+      ? BillableEventsMeterAppendService.create({
+          meter: repositories.billableEvents,
+          projects: repositories.tenancy,
+        })
+      : undefined;
+
+    const entitlement: EntitlementModule = new EntitlementModule({
       repositories,
       infrastructure: { ...sources, counter, warnings },
       dependencies,
       config,
+      usagePipeline: (send) =>
+        buildUsagePipeline({
+          countMonth: CountMonthCommand.create({ counting }),
+          traceMeter,
+          billableEventsMeter,
+          projects: repositories.tenancy,
+          send,
+        }),
     });
+    return entitlement;
   }
 
   /**
@@ -213,7 +262,7 @@ export class EntitlementModule implements EntitlementApiContract {
    * production always goes through `create`, exercising every collaborator the same way.
    */
   static createForTesting(setup: {
-    repositories: EntitlementRepositories;
+    repositories: EntitlementReadRepositories;
     infrastructure: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
     config?: Pick<EntitlementConfig, "requestBounds">;
@@ -229,7 +278,7 @@ export class EntitlementModule implements EntitlementApiContract {
   async getActivePlan(input: ResolvePlanInput): Promise<Plan> {
     return this.#plans.getActivePlan({
       organizationId: input.organizationId,
-      user: await this.#resolveCaller(input),
+      user: this.#resolveCaller(input),
     });
   }
 
@@ -242,12 +291,14 @@ export class EntitlementModule implements EntitlementApiContract {
     const deploymentBound = await this.#deploymentRequestBound(input);
     if (!isDatasetDerivedBoundKey(input.key)) return deploymentBound;
 
-    const { attachmentMaxBytes } = await this.#organizations.getDatasetLimits({
+    const { attachmentMaxMb } = await this.#tenancy.getDatasetLimits({
       organizationId: input.organizationId,
     });
-    if (attachmentMaxBytes === null) return deploymentBound;
+    if (attachmentMaxMb === null) return deploymentBound;
 
-    const raised = deriveDatasetBounds(effectiveDatasetAttachmentMaxBytes(attachmentMaxBytes));
+    const raised = deriveDatasetBounds(
+      effectiveDatasetAttachmentMaxBytes(attachmentMaxMb * BYTES_PER_MEBIBYTE),
+    );
 
     return Math.max(deploymentBound, raised[input.key]);
   }
@@ -272,15 +323,16 @@ export class EntitlementModule implements EntitlementApiContract {
   async resolvePlanNextStep(
     input: Readonly<{ plan: Plan; organizationId: string }>,
   ): Promise<PlanNextStep> {
-    const { pricingModel, currency } = await this.#organizations.getPricing({
-      organizationId: input.organizationId,
-    });
+    const [{ pricingModel }, currency] = await Promise.all([
+      this.#pricing.getPricingModel({ organizationId: input.organizationId }),
+      this.#tenancy.getCurrency({ organizationId: input.organizationId }),
+    ]);
 
     return this.#nextStep.resolve({ plan: input.plan, pricingModel, currency });
   }
 
   async getUsage(input: GetUsageInput): Promise<UsageStats> {
-    const user = await this.#resolveCaller(input);
+    const user = this.#resolveCaller(input);
 
     return this.#usage.getUsageStats(input.organizationId, user);
   }
@@ -320,6 +372,28 @@ export class EntitlementModule implements EntitlementApiContract {
     });
   }
 
+  /** The metering pipeline: the meters, the month's count and the limit decisions. */
+  usagePipeline(): UsagePipelineDefinition {
+    const build = this.#buildUsagePipeline;
+    if (!build) throw new Error("Entitlement was composed without its usage pipeline.");
+    return build(() => this.#senders());
+  }
+
+  #senders(): UsageSenders {
+    if (!this.#usageSenders) {
+      throw new Error("Entitlement cannot send usage commands before its pipeline is registered.");
+    }
+    return this.#usageSenders;
+  }
+
+  connectUsageCommands(commands: EventingCommands<UsagePipelineDefinition>): void {
+    this.#usageSenders = {
+      countMonth: (data) => commands.countMonth.send(data),
+      recordLimitDecision: (data) => commands.recordLimitDecision.send(data),
+      recordUsageWarning: (data) => commands.recordUsageWarning.send(data),
+    };
+  }
+
   /**
    * An end date inside the last hour means "up to now" — the caller's clock was
    * read when the screen rendered and rows have landed since.
@@ -332,28 +406,17 @@ export class EntitlementModule implements EntitlementApiContract {
   }
 
   /**
-   * The person a plan is resolved for. A door names them by identifier alone,
-   * and the subscription source reads an email off the operator impersonating
-   * them, so the directory lookup happens here rather than in a transport.
+   * The person a plan is resolved for. A door names them by identifier alone, and the only
+   * reader downstream, billing's subscription source, decides the override from the
+   * impersonator's id, so no directory lookup is needed (peer cut, round 22).
    */
-  async #resolveCaller(
+  #resolveCaller(
     input: Readonly<{ user?: PlanProviderUser; operator?: EntitlementOperator }>,
-  ): Promise<PlanProviderUser | undefined> {
+  ): PlanProviderUser | undefined {
     if (input.user) return input.user;
     if (!input.operator) return undefined;
+    const { id, impersonatorId } = input.operator;
 
-    const [caller, impersonator] = await Promise.all([
-      this.#users.findById({ id: input.operator.id }),
-      input.operator.impersonatorId
-        ? this.#users.findById({ id: input.operator.impersonatorId })
-        : Promise.resolve(null),
-    ]);
-
-    return {
-      id: input.operator.id,
-      email: caller?.email ?? null,
-      name: caller?.name ?? null,
-      ...(impersonator ? { impersonator: { id: impersonator.id, email: impersonator.email } } : {}),
-    };
+    return { id, ...(impersonatorId ? { impersonator: { id: impersonatorId } } : {}) };
   }
 }

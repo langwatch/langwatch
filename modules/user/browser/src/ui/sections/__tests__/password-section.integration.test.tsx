@@ -45,15 +45,7 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
         useQuery: () => ({ data: state.identifiers, isPending: false, error: null }),
       },
     },
-    user: {
-      unlinkAccount: mutation((input) => {
-        calls.unlinkAccount(input);
-        return { ok: true };
-      }),
-      hasPassword: {
-        useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
-      },
-      getLinkedAccounts: { useQuery: () => ({ data: state.accounts }) },
+    auth: {
       changePassword: mutation((input) => {
         calls.changePassword(input);
         if (state.changeRejectsWith) throw state.changeRejectsWith;
@@ -63,6 +55,16 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
         calls.setPassword(input);
         return { ok: true };
       }),
+    },
+    user: {
+      unlinkAccount: mutation((input) => {
+        calls.unlinkAccount(input);
+        return { ok: true };
+      }),
+      hasPassword: {
+        useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
+      },
+      getLinkedAccounts: { useQuery: () => ({ data: state.accounts }) },
     },
   };
   return { personalWorkspaceApi: api, api };

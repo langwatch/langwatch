@@ -30,9 +30,6 @@ class StubDirectory implements DataRetentionDirectoryReader {
   async findOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
     return { teams: [], projects: [] };
   }
-  async findScopeOrganizationId(): Promise<string | null> {
-    return this.organizationId;
-  }
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [];
   }
@@ -73,78 +70,7 @@ function refusalOf(run: () => void): { code?: unknown; httpStatus?: unknown } {
   throw new Error("expected the gate to refuse, but it returned");
 }
 
-describe("given the permission a scope write demands", () => {
-  it("asks a project for project:update rather than project:manage", () => {
-    expect(DataRetentionPolicyService.requiredWritePermission("PROJECT")).toBe("project:update");
-    expect(DataRetentionPolicyService.requiredWritePermission("TEAM")).toBe("team:manage");
-    expect(DataRetentionPolicyService.requiredWritePermission("ORGANIZATION")).toBe(
-      "organization:manage",
-    );
-  });
-});
-
-describe("given a caller writing a retention override", () => {
-  describe("when they hold the scope's permission", () => {
-    it("allows the write", async () => {
-      await expect(
-        policy({}).assertCanWriteScope({
-          actor: ACTOR,
-          scope: { scopeType: "TEAM", scopeId: "team_1" },
-        }),
-      ).resolves.toBeUndefined();
-    });
-  });
-
-  describe("when they hold only the project's permission and aim at the organization", () => {
-    /** @scenario "A project admin cannot set an organization-wide override" */
-    it("refuses by name, asking for organization:manage", async () => {
-      await expect(
-        policy({ allow: false }).assertCanWriteScope({
-          actor: ACTOR,
-          scope: { scopeType: "ORGANIZATION", scopeId: "org_1" },
-        }),
-      ).rejects.toMatchObject({
-        code: "data_retention_scope_write_forbidden",
-        httpStatus: 403,
-        meta: { requiredPermission: "organization:manage" },
-      });
-    });
-  });
-
-  describe("when they do not", () => {
-    /** @scenario "A retention rule a caller has no standing to write is refused by name" */
-    it("refuses by name, carrying the permission the scope needs", async () => {
-      await expect(
-        policy({ allow: false }).assertCanWriteScope({
-          actor: ACTOR,
-          scope: { scopeType: "TEAM", scopeId: "team_1" },
-        }),
-      ).rejects.toMatchObject({
-        code: "data_retention_scope_write_forbidden",
-        httpStatus: 403,
-        meta: { requiredPermission: "team:manage" },
-      });
-    });
-  });
-});
-
 describe("given a plan-gated write", () => {
-  describe("when the scope does not resolve to an organization", () => {
-    /** @scenario "Reject a missing write target" */
-    it("refuses the write rather than gating on the caller's project", async () => {
-      await expect(
-        policy({ organizationId: null }).assertWriteAllowed({
-          actor: ACTOR,
-          scope: { scopeType: "TEAM", scopeId: "team_elsewhere" },
-          retentionDays: 63,
-        }),
-      ).rejects.toMatchObject({
-        code: "data_retention_scope_target_not_found",
-        httpStatus: 404,
-      });
-    });
-  });
-
   describe("when the organization is on a free plan", () => {
     /** @scenario "A retention rule saved on a free plan is refused by name" */
     it("refuses by name", async () => {

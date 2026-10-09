@@ -7,12 +7,15 @@
 import {
   useUiCapabilities,
   useUiScope,
+  useUiTraceFilters,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
   type UiSession,
+  type UiTraceFilters,
 } from "@langwatch/browser-host/capabilities";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import type { UiScopeStatus } from "@langwatch/browser-host/session";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -23,6 +26,7 @@ import {
   type AnnotationHostUser,
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
+  type AnnotationTraceFilters,
 } from "../model/annotation-host.ts";
 import { isOwnPersonalWorkspace } from "../model/annotation-personal-workspace.ts";
 import { annotationApi } from "./annotation-api.ts";
@@ -32,12 +36,15 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     private readonly deps: {
       organizationId: string | undefined;
       project: AnnotationHostProject | undefined;
+      scopeStatus: UiScopeStatus;
       isLiteMember: boolean;
       isOwnPersonalWorkspace: boolean;
       session: UiSession;
       navigation: UiNavigation;
       route: UiRoute;
       feedback: UiFeedback;
+      /** Undefined where no module lent it: no filters applied. */
+      traceFilters: UiTraceFilters | undefined;
       drawers: {
         openDrawer: (drawer: string, props?: Record<string, unknown>) => void;
         drawerOpen: (drawer: string) => boolean;
@@ -49,6 +56,10 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
 
   project(): AnnotationHostProject | undefined {
     return this.deps.project;
+  }
+
+  scopeStatus(): UiScopeStatus {
+    return this.deps.scopeStatus;
   }
 
   organizationId(): string | undefined {
@@ -77,6 +88,11 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     const reading = this.deps.route.reading();
 
     return { params: reading.params, query: reading.query };
+  }
+
+  /** What analytics lends through the shell; undefined while nothing narrows the read. */
+  traceFilters(): AnnotationTraceFilters | undefined {
+    return this.deps.traceFilters?.applied();
   }
 
   setQuery(
@@ -118,10 +134,12 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
 export default function AnnotationHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const uiScope = useUiScope();
+  const traceFilters = useUiTraceFilters();
   const { organizationId } = uiScope.activeScope();
   const scopeHost = uiScope.scopeHost();
   const hostProject = scopeHost?.project();
   const isLiteMember = scopeHost?.organizationRole() === "EXTERNAL";
+  const scopeStatus = session.snapshot().scope.status;
   const { openDrawer, drawerOpen } = useDrawer();
   const userId = session.currentUser()?.id;
   const scopeGraph = annotationApi.organization.getScopeGraph.useQuery({}, { enabled: !!userId });
@@ -138,23 +156,27 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
         project: hostProject
           ? { id: hostProject.id, slug: hostProject.slug, name: hostProject.name }
           : void 0,
+        scopeStatus,
         isLiteMember,
         isOwnPersonalWorkspace: ownPersonal,
         session,
         navigation,
         route,
         feedback,
+        traceFilters,
         drawers: { openDrawer, drawerOpen },
       }),
     [
       organizationId,
       hostProject,
+      scopeStatus,
       isLiteMember,
       ownPersonal,
       session,
       navigation,
       route,
       feedback,
+      traceFilters,
       openDrawer,
       drawerOpen,
     ],

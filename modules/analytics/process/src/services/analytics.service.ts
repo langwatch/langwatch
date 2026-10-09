@@ -1,11 +1,9 @@
 import {
   analyticsMetricAggregations,
   analyticsTimeseriesInputSchema,
-  AnalyticsService as AnalyticsServiceContract,
   type AnalyticsFeedbacksResult,
   type AnalyticsReadInput,
   type AnalyticsTopDocumentsResult,
-  type AnalyticsTripwire,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
@@ -16,6 +14,7 @@ import {
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import type { TenantStatementLimiter } from "@langwatch/limiter";
 import {
   addDays,
   differenceInCalendarDays,
@@ -27,7 +26,11 @@ import {
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 
 import type { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
-import type { AnalyticsRepository } from "../repositories/analytics.repository.ts";
+import type {
+  AnalyticsRepository,
+  AnalyticsTimeseriesQuery,
+} from "../repositories/analytics.repository.ts";
+import type { LoggingAnalyticsTripwireService } from "./analytics-tripwire.service.ts";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;
@@ -62,26 +65,12 @@ function currentAndPreviousDates({
     periodInDays,
     differenceInCalendarDays(endDate.epochMilliseconds, startDate.epochMilliseconds) + 1,
   );
-  // Skipping the previous period collapses its window to [startDate,
-  // startDate): every builder's previous-period predicate then matches no row
-  // and prunes no extra partition, so the scan covers the current window only.
+  // Skipping collapses the previous window to [startDate, startDate): it matches no row.
   const previousPeriodStartDate = shouldSkipPreviousPeriod
     ? startDate
     : fromDate(addDays(startDate.epochMilliseconds, -days));
 
   return { startDate, endDate, previousPeriodStartDate };
-}
-
-function withoutEmptySeriesKeys(input: AnalyticsTimeseriesInput): AnalyticsTimeseriesInput {
-  if (!input.series.some((s) => s.key === "" || s.subkey === "")) return input;
-  return {
-    ...input,
-    series: input.series.map((s) => ({
-      ...s,
-      key: s.key === "" ? undefined : s.key,
-      subkey: s.subkey === "" ? undefined : s.subkey,
-    })),
-  };
 }
 
 /**
@@ -109,6 +98,19 @@ function adjustTimeScaleForBucketCap({
     (endDate.epochMilliseconds - startDate.epochMilliseconds) / MS_PER_MINUTE / timeScale;
 
   return estimatedBuckets > MAX_TIMESERIES_BUCKETS ? MINUTES_PER_DAY : timeScale;
+}
+
+/** An empty series key means "every evaluator / event", like an absent one; routing agrees. */
+function withoutEmptySeriesKeys(input: AnalyticsTimeseriesInput): AnalyticsTimeseriesInput {
+  if (!input.series.some((s) => s.key === "" || s.subkey === "")) return input;
+  return {
+    ...input,
+    series: input.series.map((s) => ({
+      ...s,
+      key: s.key === "" ? undefined : s.key,
+      subkey: s.subkey === "" ? undefined : s.subkey,
+    })),
+  };
 }
 
 /** Refused before any cache or repository read; ClickHouse would crash on the SQL (#8009). */
@@ -145,28 +147,31 @@ function refuseDisallowedSeriesAggregations(input: AnalyticsTimeseriesInput): vo
   }
 }
 
-export class AnalyticsService extends AnalyticsServiceContract {
+export class AnalyticsService {
   static create(options: {
     repository: AnalyticsRepository;
     evaluationRepository: AnalyticsEvaluationRepository;
-    tripwire?: AnalyticsTripwire;
+    tenantLimiter: TenantStatementLimiter;
+    tripwire?: LoggingAnalyticsTripwireService;
   }): AnalyticsService {
     return new AnalyticsService(options);
   }
 
   private readonly repository: AnalyticsRepository;
   private readonly evaluationRepository: AnalyticsEvaluationRepository;
-  private readonly tripwire?: AnalyticsTripwire;
+  private readonly tenantLimiter: TenantStatementLimiter;
+  private readonly tripwire?: LoggingAnalyticsTripwireService;
   private readonly cache = new Map<string, CacheEntry>();
 
   private constructor(deps: {
     repository: AnalyticsRepository;
     evaluationRepository: AnalyticsEvaluationRepository;
-    tripwire?: AnalyticsTripwire;
+    tenantLimiter: TenantStatementLimiter;
+    tripwire?: LoggingAnalyticsTripwireService;
   }) {
-    super();
     this.repository = deps.repository;
     this.evaluationRepository = deps.evaluationRepository;
+    this.tenantLimiter = deps.tenantLimiter;
     this.tripwire = deps.tripwire;
   }
 
@@ -227,10 +232,6 @@ export class AnalyticsService extends AnalyticsServiceContract {
       startDate,
       endDate,
     });
-    // An empty series key ("") means "every evaluator / event", exactly like
-    // an absent one, and the legacy builder already reads it that way. Routing
-    // must too: counted as keyed, it sent the dashboard's evaluations summary
-    // past the evaluation rollup to `evaluation_runs`.
     const routedInput = withoutEmptySeriesKeys(parsed);
     const table = this.repository.tableFor(routedInput);
     const query = {
@@ -248,14 +249,14 @@ export class AnalyticsService extends AnalyticsServiceContract {
       table === "evaluation_runs" ||
       !(await this.tripwire?.isEnabled(parsed.projectId))
     ) {
-      return this.repository.runTimeseries(query);
+      return this.limitedTimeseries(query);
     }
 
     const isEvaluationSeries = Boolean(parsed.series[0]?.metric.startsWith("evaluations."));
     const legacyTable = isEvaluationSeries ? "evaluation_runs" : "trace_summaries";
     const [result, legacy] = await Promise.all([
-      this.repository.runTimeseries(query),
-      this.repository.runTimeseries({ ...query, table: legacyTable }),
+      this.limitedTimeseries(query),
+      this.limitedTimeseries({ ...query, table: legacyTable }),
     ]);
     this.tripwire?.compare({
       projectId: parsed.projectId,
@@ -265,6 +266,14 @@ export class AnalyticsService extends AnalyticsServiceContract {
     });
 
     return result;
+  }
+
+  /** A dashboard queues its panels behind its tenant's share rather than running them at once. */
+  private limitedTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
+    return this.tenantLimiter.run({
+      tenantId: query.tenantId,
+      task: () => this.repository.runTimeseries(query),
+    });
   }
 
   async getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult> {
@@ -310,7 +319,10 @@ export class AnalyticsService extends AnalyticsServiceContract {
 
     return context.with(activeContext, async () => {
       try {
-        const result = await this.repository.findTopDocuments(parsed);
+        const result = await this.tenantLimiter.run({
+          tenantId: parsed.projectId,
+          task: () => this.repository.findTopDocuments(parsed),
+        });
         span.setAttribute("document.count", result.topDocuments.length);
 
         return result;

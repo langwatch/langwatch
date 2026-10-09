@@ -137,12 +137,13 @@ describe("starting a board from a template", () => {
         { projectId: "proj-1", dashboardId: "board-1", description: "Two widgets side by side." },
       ]);
       expect(inputsTo(server, "dashboardWidgets.create")).toEqual(
-        TEMPLATE.widgets.map(({ name, definition: { code, queries } }) => ({
+        TEMPLATE.widgets.map(({ key, name, definition: { code, queries } }) => ({
           projectId: "proj-1",
           dashboardId: "board-1",
           name,
           code,
           queries,
+          source: { kind: "catalogue", catalogueId: key },
         })),
       );
       const byName = new Map(server.state.widgets.map(({ id, name }) => [name, id]));

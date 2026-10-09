@@ -15,11 +15,9 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { formatDistanceToNow } from "@langwatch/time";
+import { formatDistanceToNow, readableDate } from "@langwatch/time";
 import { Database, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-
-import { readableDate } from "../../model/readable-date.ts";
 
 export type DatasetPickerSelection = {
   datasetId: string;

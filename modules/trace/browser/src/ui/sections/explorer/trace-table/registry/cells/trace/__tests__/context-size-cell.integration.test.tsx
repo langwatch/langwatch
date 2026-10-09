@@ -7,7 +7,10 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { ContextSizeCell } from "../context-size-cell.tsx";
 
 afterEach(cleanup);

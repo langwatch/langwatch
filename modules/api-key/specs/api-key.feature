@@ -133,6 +133,16 @@ Feature: API key lifecycle
     When the sweep runs
     Then it answers three
 
+  # The Langy session key is minted per turn and revoked when the turn ends, but a
+  # manager that is killed outright revokes nothing, so the same sweep retires it.
+
+  @unit
+  Scenario: The sweep retires elapsed Langy session keys
+    Given a Langy session key whose lifetime has passed
+    When the sweep runs
+    Then the key is revoked as of the moment the sweep read the clock
+    And only keys carrying the reserved Langy session name are considered
+
   @unit
   Scenario: The worker composes the sandbox sweep from the feature package
     Given a worker graph composed with the process database

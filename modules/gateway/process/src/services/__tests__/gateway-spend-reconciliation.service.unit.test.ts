@@ -9,12 +9,12 @@ import {
 } from "@langwatch/gateway-contract";
 import { describe, expect, it } from "vitest";
 
-import { encodeSpendSummariesCursor } from "../../rules/gateway-spend-cursor.rules.ts";
-import { FixedGatewaySettlementPolicyService } from "../fixed-gateway-settlement-policy.service.ts";
+import { FixedGatewaySettlementPolicyService } from "../../features/spend/services/fixed-gateway-settlement-policy.service.ts";
 import {
   type GatewaySpendApp,
   GatewaySpendReconciliationService,
-} from "../gateway-spend-reconciliation.service.ts";
+} from "../../features/spend/services/gateway-spend-reconciliation.service.ts";
+import { encodeSpendSummariesCursor } from "../../rules/gateway-spend-cursor.rules.ts";
 
 const NOW = Date.now();
 const SETTLED_TO = NOW - 24 * 60 * 60 * 1000;

@@ -1,6 +1,6 @@
 import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -12,14 +12,14 @@ import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form.ts";
 import { authFailureMessage } from "../../model/auth-failure-message.ts";
 import { credentialSignInFailure } from "../../model/credential-sign-in.ts";
-import { SHAPE } from "../../model/front-door-theme.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { EmailPill } from "../elements/email-pill.tsx";
+import { FormServerError } from "../elements/form-server-error.tsx";
 
 import "../elements/auth-front-door.css";
-import { FormServerError } from "../elements/form-server-error.tsx";
 import { FrontDoorField } from "../elements/front-door-field.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { PasswordInput } from "../elements/password-input.tsx";
 import { PasskeySignUpButton } from "./passkey-sign-up-button.tsx";
@@ -100,7 +100,7 @@ export function SignUpCredentialForm({
       else form.clearErrors(field);
     },
   });
-  const register = api.user.register.useMutation();
+  const register = api.auth.register.useMutation();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
@@ -264,21 +264,9 @@ export function SignUpCredentialForm({
             the call to action, and a second primary button under an empty
             field only competes with it. */}
         {isChoosingPassword ? (
-          <Button
-            className="lw-front-door-primary"
-            type="submit"
-            width="full"
-            minHeight="44px"
-            marginTop={2}
-            fontWeight={600}
-            borderRadius={SHAPE.action}
-            backgroundColor={"frontDoor.action"}
-            color={"frontDoor.onAction"}
-            _hover={{ backgroundColor: "frontDoor.actionHover" }}
-            loading={register.isPending || isSigningIn}
-          >
+          <FrontDoorPrimaryButton type="submit" isBusy={register.isPending || isSigningIn}>
             Create account
-          </Button>
+          </FrontDoorPrimaryButton>
         ) : null}
       </VStack>
     </form>

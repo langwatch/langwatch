@@ -1,4 +1,10 @@
-import { IconButton, IconRefresh, Panel, Section } from "@langwatch/design-system-internal";
+import {
+  ConfirmButton,
+  IconButton,
+  IconRefresh,
+  Panel,
+  Section,
+} from "@langwatch/design-system-internal";
 import {
   SimConsole,
   SimEmpty,
@@ -11,7 +17,7 @@ import {
 import { useState } from "react";
 
 import { CallTimeline } from "./call-timeline.tsx";
-import { fetchCalls, fetchStatus } from "./voice-api.ts";
+import { clearCalls, fetchCalls, fetchStatus } from "./voice-api.ts";
 
 /** The voice simulator's console: recent simulated calls, each with its conversation. */
 export const CallsConsole = () => {
@@ -21,6 +27,10 @@ export const CallsConsole = () => {
   const items = calls.data ?? [];
   const selected = items.find((call) => call.id === selectedId) ?? items[0];
   const failure = status.error ?? calls.error;
+  const clear = async () => {
+    await clearCalls().catch(() => undefined);
+    await Promise.all([calls.refresh(), status.refresh()]);
+  };
 
   return (
     <SimConsole
@@ -33,12 +43,23 @@ export const CallsConsole = () => {
       status={
         failure
           ? { tone: "error", text: failure.message }
-          : { tone: "ok", text: `ElevenLabs at ${status.data?.elevenLabsBaseUrl ?? "…"}` }
+          : {
+              tone: "ok",
+              text: `ElevenLabs at ${status.data?.elevenLabsBaseUrl ?? "…"} · OpenAI at ${status.data?.openaiBaseUrl ?? "…"}`,
+            }
       }
     >
       <Section
         title="Calls"
         description="Every voice-agent call this stack places is answered here by a scripted agent; nothing reaches ElevenLabs or OpenAI."
+        actions={
+          <ConfirmButton
+            label="Clear calls"
+            confirmLabel="Clear all"
+            disabled={items.length === 0}
+            onConfirm={() => void clear()}
+          />
+        }
       >
         {calls.error ? (
           <SimRefusal message={calls.error.message} />

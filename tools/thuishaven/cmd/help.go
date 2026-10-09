@@ -34,6 +34,9 @@ EXAMPLES
     haven up +langevals          # run the evaluators monitors and evaluations call
     haven up +llm                # answer every model call from llmsim, at no cost
     haven up +analytics          # catch PostHog and Customer.io calls in analyticssim
+    haven up +outbound           # catch Slack, webhook and SQS sends in outboundsim
+    haven up +telemetry          # send, load or fuzz OTLP traffic with telemetrysim
+    haven sims --json            # every simulator: running here, console, verbs, skill
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
@@ -60,11 +63,14 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-The six simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
-idp and storage run by default; llm, voice and analytics come with "haven up +llm
-+voice +analytics". Read one's output with "haven logs <name>".
+The eight simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp and storage run by default; llm, voice, analytics, outbound and telemetry come with
+"haven up +llm +voice +analytics +outbound +telemetry". "haven sims --json" lists every one: running
+here or not, its console, its verbs and its skill. Read one's output with "haven logs
+<name>". Drive one from a terminal with "haven mail|idp|llm|analytics|outbound|storage|voice|telemetry
+<verb>" (--json on every read).
 
-    mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
+    mail|idp|storage|llm|voice|analytics|outbound|telemetry.portless.langwatch.localhost
 
 Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 
@@ -172,9 +178,15 @@ var envHelpText = `Environment variables.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.
-    LANGWATCH_GO_WATCH=1         Hot-reload the Go services via air (else go run).
-    LANGWATCH_DEV_ONE_PROCESS=1  Run ui + api + worker as one app lane (ADR-168);
+    LANGWATCH_GO_WATCH=0         Turn off the Go watcher (default on: haven rebuilds
+                                 and swaps the Go child on a change); also
+                                 haven up --watch=false.
+    LANGWATCH_DEV_ONE_PROCESS=0  Split both defaults: the app lane (ui + api +
+                                 worker, ADR-168) into ui and api lanes, and the
+                                 go lane (data plane + sims) into go and sims.
                                  haven up -f switches a running stack.
+                                 LANGWATCH_GO_ONE_PROCESS is a deprecated alias,
+                                 refused when it disagrees.
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_LOCAL_API_KEY      Stable local dev API key haven seeds + injects
@@ -189,6 +201,7 @@ var envHelpText = `Environment variables.
     LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH container when no stacks run.
     LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 3/64 of RAM, 1536-4096).
     HAVEN_CH_IMAGE=<image>       Override the pinned Altinity ClickHouse image.
+    HAVEN_CH_RUNTIME=native|container  Where ClickHouse runs (default native on macOS, container elsewhere).
     HAVEN_CLICKHOUSE_FULL_LOGS=1 Keep ClickHouse's stock logging. By default
                                  haven disables the high-volume system logs
                                  (text_log, trace_log, the metric logs), caps
@@ -228,26 +241,35 @@ var envHelpText = `Environment variables.
     (also LANGWATCH_HAVEN_CH_MEMORY_MB and HAVEN_REDIS_MAXMEMORY_MB, above.)
 
   Containers, langy and observability
-    HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
+    HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + container-tier obs run on
                                  (default: default). A profile haven creates is
                                  capped; one that already exists is never resized.
     LANGWATCH_HAVEN_OBS=0        Skip starting the observability stack on "up".
-                                 On by default: it shares ClickHouse's colima VM,
-                                 which is already paying for itself.
+                                 On by default. On macOS it runs natively (brew
+                                 grafana, prometheus, loki plus Tempo 3.1.0,
+                                 Alloy 1.20.1 and Pyroscope 2.3.2, which haven fetches and
+                                 sha256-checks into its home); no VM.
+    LANGWATCH_HAVEN_OBS_TIER=x   native | container. Default native on macOS,
+                                 container (the LGTM image on colima) elsewhere.
+    HAVEN_OBS_TEMPO_BIN=<path>   Tempo binary for the native tier, instead of the
+                                 pinned download (PATH when none is pinned).
+    HAVEN_OBS_ALLOY_BIN=<path>   Alloy binary for the native tier, likewise.
+    HAVEN_OBS_PYROSCOPE_BIN=<p>  Pyroscope binary for the native tier, likewise.
     HAVEN_OBS_IMAGE=<image>      Override the pinned LGTM bundle image.
     LW_OBS_GRAFANA_PORT=3000     Grafana port (also LW_OBS_OTLP_HTTP_PORT=4318,
                                  LW_OBS_OTLP_GRPC_PORT=4317).
     LANGY_UNSAFE_CONTAINER=1     Run the langyagent worker in colima with the
                                  per-worker UID sandbox off. Default (neither
-                                 flag) keeps the sandbox on, mirroring production.
+                                 flag) keeps the sandbox on off macOS; on macOS
+                                 the default is the host tier, no colima.
     LANGY_UNSAFE_HOST_ACCESS=1   Run the langyagent worker as a bare host process
                                  with no colima and no VM boundary, so it has
                                  full host access. The fast-iteration tier.
-                                 A development stack with no container runtime
-                                 resolves to it on its own and says so on "up";
-                                 LANGY_UNSAFE_HOST_ACCESS=0 refuses that and
-                                 keeps the sandboxed tier (langy then does not
-                                 start without a runtime).
+                                 A development stack on macOS, or with no
+                                 container runtime, resolves to it on its own
+                                 and says so on "up"; LANGY_UNSAFE_HOST_ACCESS=0
+                                 refuses that and keeps the sandboxed tier in
+                                 colima (langy does not start without a runtime).
     HAVEN_LANGY_IMAGE_REGISTRY   Registry ref (e.g. ghcr.io/langwatch/langyagent)
                                  to pull a CI-published langy image for the
                                  current content hash instead of building.

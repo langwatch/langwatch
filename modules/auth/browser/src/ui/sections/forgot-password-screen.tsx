@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
 import { SecondaryActionLink } from "../../ui/elements/secondary-action-link.tsx";
+import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
@@ -134,20 +135,9 @@ function ForgotPasswordForm() {
               />
             )}
           </FrontDoorField>
-          <Button
-            className="lw-front-door-primary"
-            type="submit"
-            width="full"
-            minHeight="44px"
-            fontSize="14px"
-            fontWeight={600}
-            backgroundColor="frontDoor.action"
-            color="frontDoor.onAction"
-            _hover={{ backgroundColor: "frontDoor.actionHover" }}
-            loading={isLoading}
-          >
+          <FrontDoorPrimaryButton type="submit" isBusy={isLoading}>
             Send reset link
-          </Button>
+          </FrontDoorPrimaryButton>
           <BackToSignInLink />
         </VStack>
       </form>

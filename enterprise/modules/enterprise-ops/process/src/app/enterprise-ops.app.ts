@@ -11,7 +11,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { LicenseRegistryAuditService } from "../services/license-registry-audit.service.ts";
 import { SelfHostedInstanceAuditService } from "../services/self-hosted-instance-audit.service.ts";
 
-type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsModule.dependencies, never, undefined>;
+type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsModule.dependencies, undefined>;
 
 /** Admits Cloud admin staff through ops, then forwards to licensing with the staff member recorded. */
 export class EnterpriseOpsModule implements EnterpriseOpsApiContract {

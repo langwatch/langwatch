@@ -7,6 +7,7 @@
  * @see specs/webhooks/webhook-endpoints.feature
  * @see modules/webhook/specs/webhooks.feature
  */
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import {
@@ -20,88 +21,41 @@ import {
 import { describe, expect, it } from "vitest";
 
 import type { WebhookAppDependencies } from "../../app/webhook.app.ts";
-import {
-  WebhookEventsRepository,
-  type WebhookEventsPage,
-} from "../../repositories/webhook-events.repository.ts";
 import { WebhookEnvelopeService } from "../../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../../services/webhook-events.service.ts";
 import { mountWebhookRest, ORGANIZATION_ID } from "./webhook-rest.harness.ts";
 
 const PROJECT_ID = "proj-events-1";
 
-/** Every status the fake dataset can carry, mapped the way the real families are. */
-function statusesFor(types: string[] | undefined): string[] {
-  if (!types) return ["confirmed", "failed", "settled"];
-  return [
-    ...new Set(
-      types.flatMap((type) => {
-        if (type === "gateway.request.completed") return ["confirmed", "failed"];
-        if (type === "gateway.request.settled") return ["settled"];
-        return [];
-      }),
-    ),
-  ];
-}
-
-/** The statuses one `gatewayRequestId:suffix` id can resolve to, by its suffix. */
-function statusesForSuffix(suffix: string): string[] {
-  if (suffix === "completed") return ["confirmed", "failed"];
-  if (suffix === "settled") return ["settled"];
-  return [];
-}
-
 /**
- * An in-memory stand-in for the ClickHouse-backed repository. Same contract:
- * never serves an `admitted` row (those are in-flight requests, not emitted
- * events), and an unrecognised `type` yields an empty page rather than an
- * error.
+ * An in-memory stand-in for gateway's spend reads. Webhook names the statuses (so an
+ * `admitted` row is never asked for, and an unknown `type` asks for none); this answers
+ * the matching rows newest first, as gateway does.
  */
-class FakeWebhookEventsRepository extends WebhookEventsRepository {
-  constructor(private readonly rows: WebhookSpendEventRow[]) {
-    super();
-  }
-
-  async readEmittedEventsPage(input: {
-    tenantIds: string[];
-    fromMs?: number;
-    toMs?: number;
-    cursor?: string | null;
-    limit: number;
-    types?: string[];
-  }): Promise<WebhookEventsPage> {
-    const statuses = statusesFor(input.types);
-    const rows = this.rows
-      .filter((row) => input.tenantIds.includes(row.tenantId))
-      .filter((row) => statuses.includes(row.status))
-      .filter(
-        (row) => input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs,
-      )
-      .filter((row) => input.toMs === undefined || row.occurredAt.epochMilliseconds < input.toMs)
-      .toSorted((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
-      .slice(0, input.limit);
-    return { rows, nextCursor: null };
-  }
-
-  async findEmittedEventById(input: {
-    tenantIds: string[];
-    id: string;
-  }): Promise<WebhookSpendEventRow | null> {
-    const separator = input.id.lastIndexOf(":");
-    if (separator <= 0 || separator === input.id.length - 1) return null;
-    const gatewayRequestId = input.id.slice(0, separator);
-    const suffix = input.id.slice(separator + 1);
-    const statuses = statusesForSuffix(suffix);
-    if (statuses.length === 0) return null;
-    return (
-      this.rows.find(
+function fakeGatewaySpend(
+  rows: WebhookSpendEventRow[],
+): Pick<GatewayApi, "listSpendEventsAcrossTenants" | "findSpendEventAcrossTenants"> {
+  return {
+    listSpendEventsAcrossTenants: async (input) => ({
+      rows: rows
+        .filter((row) => input.tenantIds.includes(row.tenantId))
+        .filter((row) => input.statuses.includes(row.status))
+        .filter(
+          (row) => input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs,
+        )
+        .filter((row) => input.toMs === undefined || row.occurredAt.epochMilliseconds < input.toMs)
+        .toSorted((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
+        .slice(0, input.limit),
+      nextCursor: null,
+    }),
+    findSpendEventAcrossTenants: async (input) =>
+      rows.find(
         (row) =>
           input.tenantIds.includes(row.tenantId) &&
-          row.gatewayRequestId === gatewayRequestId &&
-          statuses.includes(row.status),
-      ) ?? null
-    );
-  }
+          row.gatewayRequestId === input.gatewayRequestId &&
+          input.statuses.includes(row.status),
+      ) ?? null,
+  };
 }
 
 function spendRow(overrides: Partial<WebhookSpendEventRow>): WebhookSpendEventRow {
@@ -145,7 +99,7 @@ function eventsDependencies(rows: WebhookSpendEventRow[]): Pick<WebhookAppDepend
   return {
     events: WebhookEventsService.create({
       projects: { listIdsByOrganization: async () => [PROJECT_ID] },
-      events: new FakeWebhookEventsRepository(rows),
+      spend: fakeGatewaySpend(rows),
       envelopes: WebhookEnvelopeService.create(),
     }),
   };
@@ -304,6 +258,7 @@ describe("the /api/webhooks/v1 door", () => {
     });
 
     /** @scenario "Emitted events are tenant scoped" */
+    /** @scenario "The webhook events listing answers the same envelopes through gateway" */
     it("maps only rows from the organization's own tenants into envelopes", async () => {
       const { request } = mountWebhookRest(
         eventsDependencies([

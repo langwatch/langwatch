@@ -1,7 +1,7 @@
 /**
- * "Add a widget", laid out like the templates finder: one search, category and agent-type chips
- * over the built widgets in question-tree branch sections. A pick adds the widget and drafts its
- * prompt in Langy (AC141); "I'll build it myself" goes to the widget editor instead.
+ * "Add a widget": the board's ask bar as its search, then the templates finder's category and
+ * agent-type chips over the built widgets in question-tree branch sections. A pick adds the widget
+ * and drafts its prompt in Langy (AC141); "I'll build it myself" goes to the widget editor instead.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -34,6 +34,8 @@ import {
   boardQuestion,
   widgetPromptDraft,
 } from "../../langy/model/board-langy.ts";
+import { AskField } from "../../langy/ui/blocks/ask-field.tsx";
+import { LANGY_EDGE } from "../../langy/ui/elements/ask-bar-shell.tsx";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import {
   type CatalogueFilters,
@@ -44,7 +46,6 @@ import {
 import type { WidgetQuestion, WidgetQuestionIcon } from "../../model/widget-questions.ts";
 import {
   AgentKindChips,
-  CatalogueSearch,
   TRUNK_ICONS,
   TRUNK_PALETTES,
   TrunkChips,
@@ -122,11 +123,13 @@ export function BlockPickerDialog({
       onOpenChange={({ open }) => !open && onClose()}
     >
       {/* Solid, over a dimmed page: the shared see-through surface is unreadable over a board
-          in dark mode. */}
+          in dark mode. Clipped: the footer and the list's scrollbar are square, and would
+          paint past the rounded corners. */}
       <Dialog.Content
         maxHeight="76vh"
         maxWidth="800px"
         borderRadius="xl"
+        overflow="hidden"
         background="bg.panel"
         backdropFilter="none"
         backdropProps={{ backdropFilter: "blur(2px) brightness(0.45)" }}
@@ -143,15 +146,18 @@ export function BlockPickerDialog({
           </HStack>
         </Dialog.Header>
         <VStack gap={3} paddingX={5} paddingY={4} borderBottomWidth="1px">
-          <CatalogueSearch
-            inputRef={searchRef}
-            placeholder="Search widgets"
-            value={filters.search}
-            onChange={(search) => setFilters({ ...filters, search })}
-            onEnter={
-              langy.enabled && !hasMatches && typed.length > 0 ? () => askLangy(typed) : void 0
-            }
-          />
+          {/* As wide as the bar on the board, so the modal's field reads as the bar clicked. */}
+          <Box width="full" maxWidth="640px">
+            <AskField
+              inputRef={searchRef}
+              value={filters.search}
+              onChange={(search) => setFilters({ ...filters, search })}
+              onEnter={
+                langy.enabled && !hasMatches && typed.length > 0 ? () => askLangy(typed) : void 0
+              }
+              onAsk={langy.enabled ? () => askLangy(filters.search) : void 0}
+            />
+          </Box>
           <TrunkChips
             picked={filters.trunk}
             counts={trunkCounts({ items: pool, search: filters.search })}
@@ -191,20 +197,21 @@ export function BlockPickerDialog({
           </VStack>
         </Dialog.Body>
         {langy.enabled && (
-          <Dialog.Footer borderTopWidth="1px" paddingX={5} paddingY={3} background="bg.subtle">
-            <HStack width="full" gap={3}>
+          // Langy's edge as the top line, and a trace of it through the panel behind the words.
+          <Dialog.Footer padding={0} paddingTop="1px" {...LANGY_EDGE}>
+            <HStack width="full" gap={3} paddingX={5} paddingY={3} background="bg.panel/85">
               <Text flex={1} minWidth={0} truncate fontSize="13px" color="fg.muted">
                 Can't find what you're looking for?
               </Text>
               <Button
                 size="sm"
-                variant="outline"
+                variant="surface"
+                colorPalette="purple"
+                borderRadius="full"
                 flexShrink={0}
                 onClick={() => askLangy(filters.search)}
               >
-                <Box as="span" display="inline-flex" colorPalette="purple" color="colorPalette.fg">
-                  <Sparkles size={14} aria-hidden />
-                </Box>
+                <Sparkles size={14} aria-hidden />
                 Ask Langy
               </Button>
             </HStack>

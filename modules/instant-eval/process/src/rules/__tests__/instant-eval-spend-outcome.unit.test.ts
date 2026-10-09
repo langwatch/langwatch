@@ -1,11 +1,13 @@
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_REQUEST_TYPE,
+  INSTANT_EVAL_SPEND_MODEL,
+  instantEvalRateVersion,
+} from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
-  INSTANT_EVAL_SPEND_MODEL,
   instantEvalPricedSpend,
-  instantEvalRateVersion,
   instantEvalSpendMetadata,
   instantEvalSpendRequestId,
   usdToNanoUsd,

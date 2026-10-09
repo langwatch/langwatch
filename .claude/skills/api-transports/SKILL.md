@@ -1,6 +1,6 @@
 ---
 name: api-transports
-description: "Declare a REST route, a tRPC procedure or an SSE/subscription stream on a module: defineRestRouter, defineTrpcRouter, defineTrpcContract, .withInput/.withOutput/.withPermission/.withDocs, /api/<x> paths (/v1 optional), framework-owned validation (malformed_request 400 vs validation_error 422), throwing a HandledError, why a handler returns a plain value, invalidatedBy read hints and fromProjection cursor reads. Use when someone says 'add a route', 'add an endpoint', 'add a procedure', 'new tRPC query', 'REST handler', 'OpenAPI docs for a route', 'withDocs', 'validate the body', 'return a 404', 'streaming endpoint', 'subscription', 'read hint', 'why is my read stale', or opens a *.rest.ts / *.trpc.ts file."
+description: "Declare a REST route, a tRPC procedure or an SSE/subscription stream on a module: defineRestRouter, defineTrpcRouter, defineTrpcContract, .withInput/.withOutput/.withPermission/.withDocs, /api/<x> paths (/v1 optional), framework-owned validation (malformed_request 400 vs validation_error 422), throwing a HandledError, why a handler returns a plain value, invalidatedBy read hints and fromProjection cursor reads. Use when someone says 'add a route', 'add an endpoint', 'add a procedure', 'new tRPC query', 'REST handler', 'OpenAPI docs for a route', 'withDocs', 'servesWhileUpgrading', 'validate the body', 'return a 404', 'streaming endpoint', 'subscription', 'read hint', 'why is my read stale', or opens a *.rest.ts / *.trpc.ts file."
 user-invocable: true
 ---
 
@@ -39,9 +39,22 @@ anything; the process mounts every installed module's declarations.
 6. **Every wire schema imports from the module's own contract.** No schema declared in the transport file.
 7. **Docs live on the route.** `.withDocs({ tags, description, errors? })` in the same `*.rest.ts` file.
    Never a `*-openapi.rules.ts`. An extra status or non-JSON body goes through `documentedResponses()`.
+7a. **Serving while the installation upgrades is declared.** `.servesWhileUpgrading()` on a REST route
+   or a tRPC procedure (`packages/api`, UIW-6); the api in upgrading mode answers only those, and a
+   tRPC batch only if every procedure declares it. The door still asks the declared permission. Only
+   sign-in, the permission and scope reads and the Ops Upgrades procedures do (`upgrade` skill); never
+   a route that reads a table a blocking step touches.
 8. **Paths are `/api/<x>`; `/api/v1/<x>` also answers.** Dated and `latest` versions exist but stay
    hidden (ADR `packages/api/adrs/004-public-rest-v1-and-date-negotiation.md`). A path parameter is named
    for what it identifies (`:triggerId`, never `:id`), except a route main already publishes.
+   **A path in another module's namespace is declared, never borrowed** (record §8, R10, Alex
+   2026-10-06). When a door moves owner with its path unchanged, the new owner serves it from a
+   literal family and declares `.withSharedPath({ owner: "project", reason, deprecate })`: the module
+   whose namespace it is, why, and the plan or release that retires it. A blank reason or plan is
+   refused, a family claiming `/api/<x>` may not carry one, and a second module claiming a namespace is
+   refused at mount. The route registry lists every shared path (`packages/api/specs/shared-path.feature`).
+   `withSharedPath` takes `permanent: true` instead of `deprecate` only for a ruled-permanent
+   path; the owner must be the namespace's owner in modules/catalogue.json `restNamespaces`.
 9. **Auth is the process's.** REST authenticates with API keys, tRPC with the session. A route names a
    permission (`.withPermission("triggers:view")`), never a credential source. The caller arrives as
    `actor`/`scope`; no handler reads headers or looks the key's owner up.
@@ -61,7 +74,7 @@ anything; the process mounts every installed module's declarations.
    and E10 (below) are built (record §8).
    **The audit is declared too.** A mutation whose row names the organization holding the project its
    input names declares `.withAudit({ target: "organization", via: "projectId" })` (record §8, E10,
-   Alex 2026-10-05; `modules/trace/process/src/transport/traces-instant-eval.trpc.ts`). The door resolves
+   Alex 2026-10-05; `modules/instant-eval/process/src/transport/instant-eval.trpc.ts`). The door resolves
    the organization; never write an audit row by hand.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
 
@@ -145,21 +158,27 @@ code slug. Register the code in `packages/handled-error/src/app-codes.ts` and it
 
 ## Traps
 
-| Trap                                                 | Instead                                                |
-| ---------------------------------------------------- | ------------------------------------------------------ |
-| `c.json(...)`, `try/catch` into a status             | return the value; throw a HandledError                 |
-| checking `typeof body.x` in a handler                | tighten the Zod schema in the contract                 |
-| `:id` on a new route                                 | `:<thing>Id`                                           |
-| a docs object in `*-openapi.rules.ts` (deleted, §15) | `.withDocs()` on the route                             |
-| a handler calling two `*Api` operations              | one operation that carries both                        |
-| a new procedure name chosen casually                 | the wire name is the browser's cache key; choose once  |
-| a secret in a query output                           | a mutation returns it once; forms read blank           |
-| a raw `/api/cron/*` route                            | a scheduled process manager (`eventing-and-worker`)    |
-| REST route for the UI                                | the UI uses tRPC; REST is key-authenticated public API |
+| Trap                                                                      | Instead                                                           |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `c.json(...)`, `try/catch` into a status                                  | return the value; throw a HandledError                            |
+| checking `typeof body.x` in a handler                                     | tighten the Zod schema in the contract                            |
+| `:id` on a new route                                                      | `:<thing>Id`                                                      |
+| a docs object in `*-openapi.rules.ts` (deleted, §15)                      | `.withDocs()` on the route                                        |
+| a handler calling two `*Api` operations                                   | one operation that carries both                                   |
+| a new procedure name chosen casually                                      | the wire name is the browser's cache key; choose once             |
+| a secret in a query output                                                | a mutation returns it once; forms read blank                      |
+| a raw `/api/cron/*` route                                                 | a scheduled process manager (`eventing-and-worker`)               |
+| REST route for the UI                                                     | the UI uses tRPC; REST is key-authenticated public API            |
+| a route escaping access without a reason (`langwatch/access-escape-kind`) | `.withPermission(...)`, or pass `{ reason }` to the escape        |
+| reading the auth header in a handler (`langwatch/auth-header-read`)       | take `actor` and `scope` from the handler the door resolved       |
+| a hand-rolled credential reader (`langwatch/credential-reader-owner`)     | declare `.withPermission(...)` or `.withAccess(...)` on the route |
+| reading the raw body (`langwatch/raw-body-bypass`)                        | `.withInput(schema)`; `.withRawBody` needs `{ because }`          |
 
 ## Tests
 
 Mount the real router on a real runtime and assert status, body and `code`:
 `modules/automation/process/src/transport/__tests__/automation.rest.integration.test.ts` and
 `automation.trpc.unit.test.ts`. See the `testing` skill. A changed route, name, status or permission is a
-wire change: diff the served surface against `origin/main` and record every difference.
+wire change: diff the served surface against `origin/main` and record every difference. After adding
+or changing a route, procedure or socket, run `pnpm generate:readmes`: the module's `process/README.md`
+is the review artefact (`readmes` skill).

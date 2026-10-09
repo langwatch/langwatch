@@ -85,12 +85,6 @@ export interface TraceLegacyRead {
     protections: unknown,
   ): Promise<Record<string, Evaluation[]>>;
 
-  /** One evaluation's inputs, resolved lazily when its card is expanded. */
-  findEvaluationInputs(input: {
-    projectId: string;
-    evaluationId: string;
-  }): Promise<Record<string, unknown> | null>;
-
   /** Topic and subtopic counts for the filtered window. */
   getTopicCounts(input: TraceLegacyFilterInput): Promise<TopicCountsResult>;
 

@@ -24,6 +24,7 @@ import type {
   AutomationProviderSecrets,
   AutomationTraceFilterCompiler,
 } from "../app/automation.app.ts";
+import type { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
 import {
   createdKind,
   findGraphAlertRule,
@@ -42,7 +43,6 @@ import {
   resolveCredentialPlaceholders,
   splitStoredRuleFromDelivery,
 } from "../rules/trigger-redaction.rules.ts";
-import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationLogger, AutomationService } from "./automation.service.ts";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service.ts";
 

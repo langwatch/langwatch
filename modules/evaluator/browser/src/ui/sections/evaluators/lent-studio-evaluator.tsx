@@ -1,11 +1,11 @@
 /** Evaluator's editor and settings form, lent to the studio (ARCHITECTURE.md §3.4, rule 7). */
 
-import type {
-  UiEvaluatorEditorValues,
-  UiEvaluatorSettingsFormProps,
-  UiStudioEvaluatorEditorProps,
-} from "@langwatch/browser-host/declarations";
 import { VStack } from "@langwatch/design-system/primitives";
+import type {
+  EvaluatorEditorValues,
+  EvaluatorSettingsFormProps,
+  StudioEvaluatorEditorProps,
+} from "@langwatch/evaluator-client";
 import { evaluatorSettingsSchemaFor } from "@langwatch/evaluator-contract";
 import { useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -30,8 +30,8 @@ function useLatest<Value>(value: Value) {
   return ref;
 }
 
-export function LentStudioEvaluatorEditor(props: UiStudioEvaluatorEditorProps) {
-  const form = useForm<UiEvaluatorEditorValues>({ defaultValues: props.initialValues });
+export function LentStudioEvaluatorEditor(props: StudioEvaluatorEditorProps) {
+  const form = useForm<EvaluatorEditorValues>({ defaultValues: props.initialValues });
   const onChangeRef = useLatest(props.onChange);
   useEffect(() => {
     const subscription = form.watch(() => onChangeRef.current(form.getValues()));
@@ -64,7 +64,7 @@ export function LentEvaluatorSettingsForm({
   initialSettings,
   applyDefaults,
   onChange,
-}: UiEvaluatorSettingsFormProps) {
+}: EvaluatorSettingsFormProps) {
   const form = useForm<SettingsValues>({ defaultValues: { settings: initialSettings } });
   const onChangeRef = useLatest(onChange);
   useEffect(() => {

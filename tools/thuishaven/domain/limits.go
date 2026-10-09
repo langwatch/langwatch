@@ -43,6 +43,7 @@ const (
 // Limits is the catalog, in the order `haven limits` prints it.
 var Limits = []Limit{
 	{
+		// Native tier: max_server_memory_usage soft cap. Container tier: cgroup limit.
 		Name: LimitClickHouseMemory, Env: "LANGWATCH_HAVEN_CH_MEMORY_MB", Unit: "MB", Min: 1024,
 		def: func(m LimitMachine) int { return DefaultClickHouseLimits(m.TotalRAMBytes).ContainerMemoryMB },
 		max: LimitMachine.ramMB,
@@ -179,9 +180,9 @@ func ColimaRestartCommand(profile string, cpus, memoryGiB int) string {
 func limitApplies(name, profile string, values map[string]int) string {
 	switch name {
 	case LimitClickHouseMemory:
-		return "next `haven up`: it re-renders the config, and a changed config recreates the container"
+		return "next `haven up`: the native tier restarts ClickHouse with the new max_server_memory_usage soft cap; the container tier re-renders the config and recreates the container (cgroup limit)"
 	case LimitObservability:
-		return "when the observability container is next recreated (an image bump, or remove it and run `haven up`)"
+		return "when the observability stack next restarts (native: `haven down` then `haven up`; container: when it is recreated)"
 	case LimitRedisMaxMemory:
 		return "next `haven up`, which runs `config set maxmemory`"
 	case LimitInstantEvalMockJudge:

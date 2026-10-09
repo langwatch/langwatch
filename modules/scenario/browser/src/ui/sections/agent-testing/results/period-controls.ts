@@ -3,7 +3,7 @@
  * reads and moves the same window.
  */
 
-import type { RunPlanDetailProps } from "./run-plan-detail.tsx";
+import type { RunPlanDetailProps } from "../run-plan-results/run-plan-detail.tsx";
 
 export type PeriodControls = Pick<
   RunPlanDetailProps,

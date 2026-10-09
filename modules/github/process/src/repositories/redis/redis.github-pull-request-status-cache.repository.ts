@@ -1,4 +1,4 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type {
   GithubPullRequestRef,
@@ -11,11 +11,11 @@ const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
 
 /** The Redis tier. A Redis that cannot answer misses, which is what a cold cache does anyway. */
 export class GithubPullRequestStatusCacheRedisRepository extends GithubPullRequestStatusCacheRepository {
-  static create(redis: ProcessMembers["redis"]): GithubPullRequestStatusCacheRedisRepository {
+  static create(redis: RedisConnection): GithubPullRequestStatusCacheRedisRepository {
     return new GithubPullRequestStatusCacheRedisRepository(redis);
   }
 
-  private constructor(private readonly redis: ProcessMembers["redis"]) {
+  private constructor(private readonly redis: RedisConnection) {
     super();
   }
 

@@ -1,7 +1,10 @@
 import {
   datasetColumnsSchema,
   datasetSchema,
+  datasetStorageEntrySchema,
   type Dataset,
+  type DatasetStorageEntry,
+  type DatasetStoragePageInput,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
@@ -60,6 +63,19 @@ export class PrismaDatasetRepository
       },
     });
     return row ? toDataset(row) : null;
+  }
+
+  async findStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]> {
+    const rows = await this.database.dataset.findMany({
+      where: {
+        projectId: input.projectId,
+        ...(input.afterId ? { id: { gt: input.afterId } } : {}),
+      },
+      orderBy: { id: "asc" },
+      take: input.limit,
+      select: { id: true, projectId: true, contentLayout: true, status: true, chunkCount: true },
+    });
+    return rows.map((row) => datasetStorageEntrySchema.parse(row));
   }
 
   async findAll(input: {

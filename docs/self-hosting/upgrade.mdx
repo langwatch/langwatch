@@ -8,30 +8,34 @@ description: "How to upgrade LangWatch to the latest version"
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
-4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. See [Credentials secret](/self-hosting/security#credentials-secret)
+4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
+5. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
 
 ## Automatic identity and access migration
 
-Identity and access migrations run automatically during startup, organization
-by organization. A tenant whose authorization, identifier, and existing SSO
-data migrate cleanly is switched over. No preparatory release or manual
-migration pass is required.
+Identity and access migrations run automatically after each upgrade,
+organization by organization: the preparation step runs them right after
+`pnpm task upgrade`, and the workers run them again every hour. A tenant whose
+authorization, identifier, and existing SSO data migrate cleanly is switched
+over. No preparatory release or manual migration pass is required.
 
 A tenant whose historical data disagrees with the migrated result is **held**
 on its existing legacy sign-in path: the migration leaves that tenant's data
 untouched, and the app still starts and serves it as before. A tenant whose
 migration throws is **parked** the same way, also without blocking startup.
 
-Both are retried automatically. The next restart re-drives them from the
-start of its own preflight, and an operator can also trigger a pass, or
-target one organization, without waiting for a restart. See
+Both are retried automatically. The next upgrade and the workers' hourly pass
+re-drive them, and an operator can also trigger a pass, or target one
+organization, without waiting. See
 [Check the migration results](#check-the-migration-results) below.
 
-Startup still refuses to serve traffic in three cases: the migration runner
-itself fails outright, the queue behind it fails to drain, or the fleet makes
-no progress for 25 passes (about two minutes: for example because Redis is
-unreachable, or another process holds every claim). In all three the process
-exits non-zero and the next start retries from scratch.
+The preparation step still fails in three cases: the migration runner itself
+fails outright, the queue behind it fails to drain, or the fleet makes no
+progress for 25 passes (about two minutes: for example because Redis is
+unreachable, or another process holds every claim). It exits non-zero, which
+fails the upgrade (the Helm pre-upgrade Job where one renders, otherwise the
+workers), and the new api is not ready until the installation is current, so
+the previous version keeps serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
@@ -134,7 +138,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on startup.
+The workers run the upgrade when they start, and the app does not report ready until it has completed (see [Run the upgrade](#run-the-upgrade)). Compose has no separate `migrate` service; if your compose file predates this, copy the current one from [`infra/compose.yml`](https://github.com/langwatch/langwatch/blob/main/infra/compose.yml). The workers must be enabled.
 
 ## Helm Chart
 
@@ -146,8 +150,10 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
+
+The upgrade can run for up to 35 minutes on a large installation, in the pre-upgrade Job where one renders (see [Run the upgrade](#run-the-upgrade)) and otherwise in the new worker pods. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
 
 ### Pin a Specific Version
 
@@ -164,26 +170,159 @@ helm upgrade langwatch langwatch/langwatch \
 # x-release-please-end
 ```
 
-## Database Migrations
+## Run the upgrade
 
-### PostgreSQL
+<Warning>
+The **api never migrates the database itself**. The workers run the upgrade when they start; until the installation is current the api reports **not ready**, and a process started on an installation that has not been upgraded to its release **refuses to serve** and logs which steps are outstanding:
 
-On a Helm upgrade, a pre-upgrade Job runs the migrations on the new image before any pod rolls; the app and worker containers also run them on start, where they are a no-op. `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more. For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications).
-
-To disable the Prisma step (e.g., if you run migrations separately):
-
-```yaml
-app:
-  extraEnvs:
-    - name: SKIP_PRISMA_MIGRATE
-      value: "true"
+```text
+langwatch-api (api) refuses to serve: the installation is behind this image: blocking steps not done: prisma:20261006180000_..., clickhouse:00042. Run `pnpm task upgrade` from this image, then start it again.
 ```
 
-### ClickHouse
+Starting the workers on the **new** image runs the upgrade for you. To run it yourself, use the **new** image, then start the app again.
+</Warning>
 
-The application runs schema migrations on startup. No manual intervention is required.
+Each way of running LangWatch runs the upgrade for you:
+
+| How you run LangWatch | Who runs the upgrade |
+| --- | --- |
+| Helm, `helm upgrade` with upgrades serialised (`serializeUpgrades` on and no `app.dataplane`) | the pre-upgrade Job, on the new image, before any pod rolls |
+| Helm, `helm upgrade` otherwise | the new worker pods, on start; the new api pods are not ready until it is done |
+| Helm, first install | the worker's first boot, once, on the empty database |
+| Helm with serialised upgrades and `app.migrations.preRoll: false` | **you**, before `helm upgrade` (below) |
+| Docker Compose | the workers, on every `docker compose up`; the app is not ready until it is done |
+| `npx @langwatch/server` | the workers the CLI starts; the CLI has no migration phase of its own |
+
+To run it yourself, from the new image with the app's environment (`DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`):
+
+```bash
+cd /app/apps/api && pnpm --silent run start:prepare:db
+```
+
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first). It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
+
+### Exit codes and what to do
+
+`pnpm task upgrade` exits `0` when it is done and otherwise one of three non-zero codes, and its last two log lines name the cause and the next action. A refused or failed run is recorded, so **Ops > Upgrades** and `upgrade status` show it.
+
+| Exit | Outcome code | Meaning | What to do |
+| --- | --- | --- | --- |
+| `0` | `done` | Every step the image needs is applied | Start or restart the app and the workers |
+| `1` | `failed_prisma_migration` | A PostgreSQL migration failed and cannot be retried by the upgrade (written before re-runnable migrations became the rule, or not shipped in this image) | Run the `prisma migrate resolve` command the message names, then run the upgrade again |
+| `1` | `rerunnable_migration_failed` | A re-runnable migration still failed on its last attempt | Fix what its error names (often a lock another session holds), then run the upgrade again. No resolve command is needed |
+| `1` | `schema_failed` | A PostgreSQL or ClickHouse target could not be applied, or the ledger schema could not be created | Check the named target is reachable (`DATABASE_URL`, `CLICKHOUSE_URL`) and that the `DATABASE_URL` user has `CREATE` on the database, then run the upgrade again |
+| `1` | `step_failed` | A blocking data step failed | Read its error with `pnpm task upgrade status`, fix the cause, then run the upgrade again. The step resumes from its checkpoint |
+| `1` | `reconciler_failed` | The ClickHouse TTL or LangWatchQL reconciler failed | Fix the store it names (`CLICKHOUSE_URL`), then run the upgrade again |
+| `1` | `lease_lost` | This run lost the upgrade lease part-way (it stopped renewing it) | Run the upgrade again. It resumes from the ledger |
+| `1` | `failed` | Any other failure | Read the error and `upgrade status`, fix the cause, then run it again |
+| `2` | `refused_below_floor` | The installation is older than the long-term-support floor | Run the floor release the message names first, then this image |
+| `2` | `refused_image_below_floor` | This image is older than the floor the database was already upgraded to | Deploy an image at or above that floor, then run the upgrade |
+| `3` | `lease_not_acquired` | Another upgrade holds the lease and did not finish within 10 minutes | Wait for it (`upgrade status` shows its run), then run the upgrade again. A dead holder's lease expires by itself after 60 seconds |
+
+Every `1` is safe to retry: the ledger remembers what is done.
+
+### When a PostgreSQL migration fails
+
+PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 10 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
+
+A failed row an earlier run left is cleared the same way before the schema is applied.
+
+An older migration, or a failed one this image does not ship, stops the run with `failed_prisma_migration`. Check what it left behind, run `prisma migrate resolve --rolled-back <migration>` if none of it remains (or `--applied <migration>` if you finished it by hand) with the app's `DATABASE_URL`, then run the upgrade again. No migration has rolled forward, so the previous version keeps serving.
+
+### Large tables: build indexes ahead of the upgrade
+
+Two schema changes touch a whole large table while the upgrade runs.
+
+- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 10 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
+- **ClickHouse `trace_summaries` index** (`00103_trace_summaries_updated_at_index`): the index is added and then materialised over every existing row. The mutation runs in the background and competes with merges for IO, and later `ALTER` statements on that table queue behind it. Watch `system.mutations` and run the upgrade at a quiet time on a large table.
+
+### What the upgrade does
+
+- **In release order.** From the release the ledger records to the release of the image, the upgrade plans each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. An upgrade by one release applies its schema in one pass, then its blocking steps, as before.
+
+  An upgrade across several releases steps through them: it says so, then for each release it names the release, applies the PostgreSQL migrations up to and including it, says how many it applied, and runs that release's blocking steps before it moves on, so a blocking step sees the PostgreSQL schema of its own release.
+
+  While stepping, Prisma's own output is shown only when a migration fails. ClickHouse migrations step the same way: each release applies them on every ClickHouse target up to its own last one.
+
+  Migrations the image ships that no release lists yet are applied in one pass at the end. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
+- **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
+- **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one. [Releases and support](/self-hosting/releases) explains the LTS schedule and which LTS to stop at.
+- **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
+- **One run at a time.** The upgrade holds a lease in its ledger, renews it every 15 seconds and loses it after 60 seconds without a renewal. A second run waits up to 10 minutes for a live holder, saying so every 30 seconds, then exits `3`.
+- **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
+
+### ClickHouse is required
+
+The app and the workers refuse to start without ClickHouse. An installation with no `CLICKHOUSE_URL`, or one where the upgrade never applied the ClickHouse migrations, stays refused by name until `pnpm task upgrade` has run against a reachable ClickHouse.
+
+### While it runs, and after
+
+Every running app and worker records itself in the upgrade ledger's serving roster as it starts, refreshes that record every 15 seconds, and removes it on a graceful stop. A record not refreshed for 60 seconds counts as gone. The upgrade uses these records to tell when every older version has stopped. A process that cannot refresh its own record for 60 seconds stops serving until a refresh succeeds again, so it never keeps writing unseen.
+
+To follow an upgrade:
+
+| Where | What it shows |
+| --- | --- |
+| **Ops > Upgrades** (`/ops/upgrades`) | The installation's state, each release's steps with their status and a one-line description, every run with its phases and error. It refreshes while a run is in progress. Platform operators only (`ADMIN_EMAILS`). |
+| `pnpm task upgrade status` | The same state and steps, in the terminal, from the app image (`--json` for scripts) |
+| **Settings, Checkup**, `langwatch doctor` | The **Postgres migrations** and **ClickHouse migrations** rows: Fail for a pending or failed migration, with the fix; Not checked when no upgrade is recorded yet or the ledger cannot be read |
+| `npx @langwatch/server doctor` | The same output as `upgrade status`, for a local install |
+
+The installation is in one of eight states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps), **Needs attention** (a step or run failed) and **Unsupported** (below the floor).
+
+### Reading the console
+
+The upgrade logs as `langwatch:tasks:upgrade`. Every progress line carries four fields next to its message: `phase`, `waitingOn` (what it is blocked on, with a placeholder word when the run is not waiting), `elapsedMs` since the run began, and `next` (what you can do). A password, token or connection-string credential is masked in every line. These are the line families, in the order a run writes them:
+
+| Line starts with | When | What it tells you |
+| --- | --- | --- |
+| `first run: this database holds no LangWatch schema` | The database is empty | The upgrade creates its ledger, applies every migration, then exits so the app can serve |
+| `no ClickHouse target is configured` (warning) | `CLICKHOUSE_URL` and every private route are unset | The upgrade applies PostgreSQL only; the app and workers refuse to serve until you set it |
+| `upgrade ledger ready in Postgres schema <schema> after N ms` | Start of every run | Where the ledger lives. `the upgrade ledger could not be created` (warning) ends the run with `schema_failed` |
+| `waiting for the upgrade lease held by <owner> on <host> (<image>)` | Another run holds the lease | Who holds it and how long you have waited, every 30 seconds |
+| `upgrade planned from <release>: N schema migrations (a Postgres, b ClickHouse) and N blocking steps across <releases>` | After the plan | What this run will do. A line that says the ledger is current means it will do none |
+| `phase <name> started: waiting on ...`, then `succeeded in N ms` or `failed after N ms` (warning) | Each phase | The phases are `preflight`, `postgres-schema`, `clickhouse-schema` (per release) and `reconcile` |
+| `blocking step <id> started (from the start \| resuming from its checkpoint): <description>`, then `done in N ms` or `failed after N ms: <error>` | Each blocking data step | The step's id and its one-line description |
+| `Prisma migration <name> failed ... and is re-runnable: marked it rolled back` (warning), then `applied on attempt N` | A migration cancelled by a lock | Which migration, which attempt of 3, and the wait before the next. `schema apply failed without a failed migration; retrying in N ms` is the same retry for a transient failure |
+| `upgrade finished in N ms` or `first run finished in N ms`; or `upgrade stopped after N ms (<outcome code>)` (warning) | End of the run | The outcome code from the table above |
+| `upgrade complete; the UI is at <BASE_HOST> ...` or `upgrade exited <code>; ...` | Last line | Where the UI is, and that `pnpm task upgrade status` shows every step and run. With `BASE_HOST` unset it says so |
+
+A serving app or worker writes its own lines before it serves:
+
+| Line | Meaning |
+| --- | --- |
+| `<app> (<role>) refuses to serve: the installation is behind this image: blocking steps not done: <ids>. Run `pnpm task upgrade` ...` | The upgrade has not run for this image |
+| `... refuses to serve: release <x> is below the installation's floor <y>` | This image is older than the floor the database was upgraded to |
+| `... refuses to serve: ClickHouse is required and no ClickHouse target is configured` | Set `CLICKHOUSE_URL`, run the upgrade, start again |
+| `first install: the ledger and the schema are empty, so this api runs `pnpm task upgrade` once before it serves` | The Helm first-install path; the upgrade's lines follow |
+| `roster entry lapsed past 60000 ms: <process> stops serving; readiness answers 503 until a roster write succeeds` | The process cannot write to PostgreSQL. Check `DATABASE_URL`. `roster entry written again: <process> serves again` reports the recovery |
+
+A serving process that cannot read the ledger names `DATABASE_URL` in its refusal.
+
+### Upgrade settings
+
+| Variable or value | Effect |
+| --- | --- |
+| `app.migrations.preRoll` (Helm, default `true`) | Renders the pre-upgrade Job, only when upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`); otherwise the new worker pods run the upgrade. `false` with serialised upgrades leaves it to you; until you run it, the new api is not ready. |
+| `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. A value that is not a number of seconds, 0 or more, is refused with `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS`. |
+| `SKIP_PRISMA_MIGRATE` (`1` or `true`) | The upgrade leaves PostgreSQL alone, and cannot mark a failed migration rolled back. The app and the workers then refuse to start until an upgrade runs without it. |
+| `SKIP_CLICKHOUSE_MIGRATE` (`true` only) | The upgrade leaves ClickHouse alone, with the same consequence. |
+| `SKIP_LWQL_PROVISION` (`1` or `true`) | The upgrade skips LangWatchQL provisioning. |
+| `CLICKHOUSE_CLUSTER` | Names the ClickHouse cluster. When set, the upgrade creates Replicated engines and replicates DDL across nodes. |
+| `CLICKHOUSE_COLD_STORAGE_ENABLED` (`true`) | The reconcile phase writes table TTLs that move aged data to the cold volume. Hot days come from `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS`, else `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS`, else the table's built-in default. |
+| `BASE_HOST` | Only the upgrade's last log line reads it, to say where the UI is. |
+| `BUILD_TIME` | Set while building an image: the upgrade finds no ClickHouse target and applies no migration there. Leave it unset at runtime. |
+
+For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications). `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more.
 
 ## Rollback
+
+A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job, where one renders, runs on `helm upgrade` only, never on `helm rollback`.
+
+- A version at or above the installation's floor starts on the newer schema. One below the floor refuses by name.
+- The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
+- Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
 
 ### Helm
 

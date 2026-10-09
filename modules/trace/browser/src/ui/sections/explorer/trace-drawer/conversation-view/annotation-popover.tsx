@@ -7,7 +7,7 @@ import {
   AnnotateBody,
   FormFooter,
   SuggestBody,
-} from "../../../../../behavior/lent-annotation-form.tsx";
+} from "../../../../../features/annotation/behavior/lent-annotation-form.tsx";
 import { usePopoverAnnotationForm } from "./use-annotation-form.ts";
 
 interface AnnotationPopoverProps extends PopoverAnnotationFormInput {

@@ -46,14 +46,16 @@ import {
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
-import { registerRoutePolicy } from "../route-registry.ts";
+import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
 import {
   addressesOf,
   basePathOf,
   canonicalV1Path,
+  claimsNoPrefix,
   isDateVersion,
   middlewareScopesOf,
   undescribedStack,
+  VERSION_NAMESPACE,
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
@@ -80,6 +82,7 @@ import {
   keyCredentialOfDoor,
   type RestKeyCredential,
 } from "./key-credential.ts";
+import { legacyErrorScopes, withLegacyError } from "./legacy-error.ts";
 import {
   CREDENTIAL_CLASS_BY_DOOR as CREDENTIAL_CLASS,
   deprecatedAlias,
@@ -102,6 +105,7 @@ import {
   tracerMiddleware,
   type RestDoor,
   type RestRawAnswer,
+  type RestInputMediaType,
   type RestRawBody,
   type RestTransportMiddlewareBinding,
   type RestTransportMiddleware,
@@ -254,12 +258,52 @@ function mountFamilyRoutes<Api>({
             : CREDENTIAL_CLASS[routeCredential(route, credential)],
         credential: route.access?.kind === "public" ? "public" : routeCredential(route, credential),
         family: declaration.namespace,
+        ...(route.sharedPath
+          ? { sharedPath: { ...route.sharedPath, servedBy: declaration.api.name } }
+          : {}),
         served,
       });
     }
   }
 
   return served;
+}
+
+/**
+ * A shared path names an owner other than its server, in a family claiming no prefix: a literal
+ * one, or a dated one whose every route shares one owner's namespace (§8, R10).
+ */
+function assertSharedPaths<Api>(declaration: RestTransportDeclaration<Api>): void {
+  const owners = new Set<string>();
+
+  for (const route of declaration.routes) {
+    if (!route.sharedPath) continue;
+
+    const where = `REST ${route.method.toUpperCase()} ${route.path} of ${declaration.api.name}`;
+
+    if (route.sharedPath.owner === declaration.api.name) {
+      throw new Error(`${where} declares a shared path with its own module; drop withSharedPath`);
+    }
+
+    if (declaration.addressing !== "literal" && declaration.addressing !== "dated") {
+      throw new Error(
+        `${where} declares a shared path in the "${declaration.addressing}" family ` +
+          `"${declaration.namespace}"; serve it from a literal or a dated family`,
+      );
+    }
+
+    owners.add(route.sharedPath.owner);
+  }
+
+  if (declaration.addressing !== "dated" || owners.size === 0) return;
+
+  if (owners.size > 1 || !claimsNoPrefix(declaration)) {
+    throw new Error(
+      `REST dated family "${declaration.namespace}" of ${declaration.api.name} both owns and ` +
+        `shares a namespace (${[...owners].join(", ")}); serve the shared routes, all naming ` +
+        "one owner, from a dated family of their own",
+    );
+  }
 }
 
 export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
@@ -272,6 +316,7 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
       const facts = factBindings({ declaration, options });
       const credential = mountCredential({ declaration, options });
 
+      assertSharedPaths(declaration);
       assertPortsBound({ declaration, ports });
 
       for (const middleware of [
@@ -296,7 +341,7 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
 
       if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
 
-      app.onError(withRetryAfter(protocolRefusals(options.onError)));
+      app.onError(withRetryAfter(protocolRefusals(withLegacyError(options.onError))));
 
       return app;
     },
@@ -671,13 +716,18 @@ function routeStack<Api>({
     : [];
 
   const raw = route.rawBody ? [rawBodyMiddleware(route.rawBody)] : [];
-  const mismatch = route.rawBody?.mismatch;
+  const named = route.rawBody ?? route.inputMediaType;
+  const mismatch = named?.mismatch;
   const media =
-    route.rawBody && mismatch !== undefined && mismatch !== "accepted"
-      ? [mediaTypeMiddleware(route.rawBody)]
+    named && mismatch !== undefined && mismatch !== "accepted" ? [mediaTypeMiddleware(named)] : [];
+  const refuses = route.rawBody?.refuses;
+  const refused =
+    route.rawBody && refuses
+      ? [refusedMediaTypeMiddleware({ refuses, expected: route.rawBody.mediaType })]
       : [];
 
   return [
+    ...legacyErrorScopes(route),
     ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
     versionContext({ route, family, version, status }),
     ...(documents
@@ -698,8 +748,8 @@ function routeStack<Api>({
     // body: then the capped bytes are read once, exactly as sent, and it verifies those.
     // The media type is asked after the door either way (E9): a missing credential answers 401.
     ...(doorReadsBody(route)
-      ? [...cap, ...raw, door, ...media]
-      : [door, ...credentialFacts({ route, facts }), ...media, ...cap, ...raw]),
+      ? [...cap, ...raw, door, ...media, ...refused]
+      : [door, ...credentialFacts({ route, facts }), ...media, ...refused, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -840,16 +890,38 @@ function mediaTypeEssence(contentType: string | undefined): string | null {
 }
 
 /** Refuses a body sent under a media type its route did not declare; reads one header, no bytes. */
-function mediaTypeMiddleware(rawBody: RestRawBody): MiddlewareHandler {
+function mediaTypeMiddleware(declared: RestRawBody | RestInputMediaType): MiddlewareHandler {
   return async (context, next) => {
     const received = mediaTypeEssence(context.req.header("content-type"));
 
-    if (received !== rawBody.mediaType) {
-      const refusal = { received, expected: rawBody.mediaType };
+    if (received !== declared.mediaType) {
+      const refusal = { received, expected: declared.mediaType };
 
-      throw rawBody.mismatch === "malformed_request"
+      throw declared.mismatch === "malformed_request"
         ? new MediaTypeMalformedRequestError(refusal)
         : new UnsupportedMediaTypeError(refusal);
+    }
+
+    await next();
+  };
+}
+
+/** Refuses a body sent under a media type its route names, or that type with a `+suffix`. */
+function refusedMediaTypeMiddleware({
+  refuses,
+  expected,
+}: {
+  refuses: readonly string[];
+  expected: string;
+}): MiddlewareHandler {
+  return async (context, next) => {
+    const received = mediaTypeEssence(context.req.header("content-type"));
+    const isRefused = refuses.some(
+      (refused) => received === refused || received?.startsWith(`${refused}+`),
+    );
+
+    if (received !== null && isRefused) {
+      throw new UnsupportedMediaTypeError({ received, expected });
     }
 
     await next();
@@ -1073,7 +1145,9 @@ function inputMiddleware({
     const sent = route.arrayBody ? { [route.arrayBody.as]: json } : json;
     const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : sent;
 
-    context.set(ROUTE_INPUT, mergeInput({ params, query, body }));
+    const bodyTarget = route.multipart ? "form" : "json";
+
+    context.set(ROUTE_INPUT, mergeInput({ params, query, body, bodyTarget }));
     await next();
   };
 }
@@ -1082,10 +1156,12 @@ function mergeInput({
   params,
   query,
   body,
+  bodyTarget,
 }: {
   params: unknown;
   query: unknown;
   body: unknown;
+  bodyTarget: "form" | "json";
 }): Record<string, unknown> | undefined {
   if (params === undefined && query === undefined && body === undefined) return undefined;
 
@@ -1102,16 +1178,36 @@ function mergeInput({
       throw new TypeError(`REST ${source} schemas must produce an object`);
     }
 
-    for (const [key, value] of Object.entries(part)) {
-      if (Object.hasOwn(input, key)) {
-        throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
-      }
+    for (const key of Object.keys(part)) refuseRepeatedKey({ input, key, source, bodyTarget });
 
-      input[key] = value;
-    }
+    Object.assign(input, part);
   }
 
   return input;
+}
+
+/** Declared sources never overlap (declaration.ts), so a body key that does was sent. */
+function refuseRepeatedKey({
+  input,
+  key,
+  source,
+  bodyTarget,
+}: {
+  input: Record<string, unknown>;
+  key: string;
+  source: "path" | "query" | "body";
+  bodyTarget: "form" | "json";
+}): void {
+  if (!Object.hasOwn(input, key)) return;
+
+  if (source === "body") {
+    throw new MalformedRequestError({
+      target: bodyTarget,
+      detail: `The body field "${key}" repeats a path or query field of the same name`,
+    });
+  }
+
+  throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
 }
 
 /** Authenticate, decide, handle, check the answer, respond. */
@@ -2350,7 +2446,7 @@ function mountVersionGuards<Api>({
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): void {
-  const namespace = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+  const namespace = VERSION_NAMESPACE;
   const fallback = dateFallback({ basePath, declaration, ports, options, facts });
   const notFound: MiddlewareHandler = async (context, next) =>
     anotherFamilyServesTheVersion(context) ? next() : context.notFound();
@@ -2615,6 +2711,7 @@ function mountRoute({
   credentialClass,
   credential,
   family,
+  sharedPath,
   served,
 }: {
   app: Hono;
@@ -2627,6 +2724,7 @@ function mountRoute({
   credentialClass: CredentialClass;
   credential: Credential;
   family: string;
+  sharedPath?: RegisteredSharedPath;
   served: Map<string, Set<HttpMethod>>;
 }): void {
   // A literal family has no base to merge: its route path is the address.
@@ -2648,6 +2746,8 @@ function mountRoute({
       family,
       credentialClass,
       credential,
+      ...(sharedPath ? { sharedPath } : {}),
+      ...upgradingFlag(route),
     });
   }
 
@@ -2826,4 +2926,9 @@ function mountCredential<Api>({
   }
 
   return named;
+}
+
+/** UIW-6: the registry records a route declared to serve while upgrading. */
+function upgradingFlag<Api>(route: RestTransportRoute<Api>): { servesWhileUpgrading?: true } {
+  return route.servesWhileUpgrading ? { servesWhileUpgrading: true } : {};
 }

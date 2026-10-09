@@ -5,8 +5,8 @@ import {
   PLATFORM_OPERATOR_SEED_RECORDED_EVENT_TYPE,
   PLATFORM_OPERATOR_SEED_RECORDED_EVENT_VERSION,
   platformOperatorSeedRecordedEventDataSchema,
-} from "./ops-platform-operator-seed.events.ts";
-import { PLATFORM_OPERATOR_SEED_PROCESS_NAME } from "./ops-platform-operator-seed.process.ts";
+  PLATFORM_OPERATOR_SEED_PROCESS_NAME,
+} from "./ops-platform-operator-seed.process.ts";
 
 /**
  * Records the seed's one decision. Aggregate id is the process name and the tenant the

@@ -6,7 +6,7 @@ import { AuthzLineageEpochRepository } from "../authz-lineage-epoch.repository.t
 const logger = createLogger("langwatch:authz:lineage-epoch");
 const LINEAGE_EPOCH_KEY_PREFIX = "authz:lineage-epoch:";
 
-export type AuthzLineageEpochRedis = Pick<RedisConnection, "get" | "incr">;
+type AuthzLineageEpochRedis = Pick<RedisConnection, "get" | "incr">;
 
 /** Redis-backed lineage signal; a never-moved organization reads 0, an unreadable one null. */
 export class RedisAuthzLineageEpochRepository extends AuthzLineageEpochRepository {

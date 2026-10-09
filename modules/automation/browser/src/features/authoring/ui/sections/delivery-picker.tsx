@@ -5,8 +5,11 @@ import { Settings2 } from "lucide-react";
 
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
-import { useConfigComplete, useConfigurationSummary } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
+import {
+  useConfigComplete,
+  useConfigurationSummary,
+  useAutomationStore,
+} from "./automation-selectors.ts";
 import { CLIENT_PROVIDERS, type AutomationProviderRegistry } from "./client-providers.ts";
 import type { ConditionSource } from "./draft-model.ts";
 

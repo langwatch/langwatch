@@ -2,7 +2,7 @@
 /**
  * The organization's view of its directory sync (ADR-122).
  *
- * Composed from four owners rather than queried: identity answers which
+ * Composed rather than queried: SCIM's fold of identity's facts answers which
  * connections exist, authz answers what the directory changed, the user
  * module answers who those people are, and each sync and the directory
  * ownership rows are this module's own. Nothing here reads a table another module
@@ -23,10 +23,9 @@ import {
   type ScimDirectoryActivityEntry,
   type ScimReconciliationChange,
   type ScimReconciliationFailure,
-  type ScimService,
   type ScimSyncState,
 } from "@langwatch/enterprise-scim-contract";
-import type { IdentityApi, OrganizationSsoConnection } from "@langwatch/identity-contract";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -37,12 +36,14 @@ import {
   directoryFailureCopy,
   scimSyncStatusCopy,
 } from "../rules/scim-reconciliation-copy.rules.ts";
+import type { ScimConnectionsService } from "./scim-connections.service.ts";
 import type { ScimSyncReadsService } from "./scim-sync-reads.service.ts";
+import type { ScimService } from "./scim.service.ts";
 
 /** Every answer this view is assembled from, each from the module that owns it. */
 export type ScimReconciliationReads = {
-  /** The organization's connections. Identity owns those rows. */
-  identity: Pick<IdentityApi, "ssoConnectionReads">;
+  /** The organization's connections, as this module folded identity's facts. */
+  connections: Pick<ScimConnectionsService, "findHeldConnections">;
   /** Where each connection's sync stands. This module's own fold. */
   syncs: Pick<ScimSyncReadsService, "findForOrganization" | "findByConnection" | "findActivity">;
   /** What the directory attached and took back. Authz owns those rows. */
@@ -66,7 +67,7 @@ export class ScimReconciliationService {
     organizationId: string;
   }): Promise<OrganizationReconciliation> {
     const [connections, syncs] = await Promise.all([
-      this.reads.identity.ssoConnectionReads().findForOrganization({ organizationId }),
+      this.reads.connections.findHeldConnections({ organizationId }),
       this.reads.syncs.findForOrganization({ organizationId }),
     ]);
     const syncOf = new Map(syncs.map((sync) => [sync.connectionId, sync]));
@@ -97,9 +98,7 @@ export class ScimReconciliationService {
     organizationId: string;
     connectionId: string;
   }): Promise<ConnectionReconciliation[]> {
-    const connections = await this.reads.identity
-      .ssoConnectionReads()
-      .findForOrganization({ organizationId });
+    const connections = await this.reads.connections.findHeldConnections({ organizationId });
     const connection = connections.find((candidate) => candidate.connectionId === connectionId);
     if (!connection) return [];
 

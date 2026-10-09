@@ -12,6 +12,20 @@ import Authorize from "../authorize-screen.tsx";
 
 afterEach(() => cleanup());
 
+const mintButton = () =>
+  screen.getByRole("button", { name: "Create and copy a personal access token" });
+
+async function chooseExpiration({
+  user,
+  label,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  label: string;
+}) {
+  await user.click(screen.getByText("Choose when this token expires"));
+  await user.click(await screen.findByRole("option", { name: label }));
+}
+
 describe("given a reader who may mint a personal access token", () => {
   describe("when the page opens", () => {
     it("offers a create button and shows no token", () => {
@@ -31,13 +45,64 @@ describe("given a reader who may mint a personal access token", () => {
     it("copies the minted token and says the tab can be closed", async () => {
       const host = new FakeAuthorizeHost({ token: "lw-pat-123" });
       renderWithAuthorizeHost(<Authorize />, host);
+      const user = userEvent.setup();
 
-      await userEvent
-        .setup()
-        .click(screen.getByRole("button", { name: "Create and copy a personal access token" }));
+      await chooseExpiration({ user, label: "No expiration" });
+      await user.click(mintButton());
 
       await waitFor(() => expect(screen.getByText(/You can close this tab/)).toBeInTheDocument());
       expect(host.copies).toEqual(["lw-pat-123"]);
+    });
+  });
+});
+
+describe("given a reader who has not chosen an expiry", () => {
+  describe("when the page opens", () => {
+    /** @scenario "The authorize page mints nothing until an expiry is chosen" */
+    it("offers the create drawer's choices, preselects none, and keeps the mint disabled", async () => {
+      const host = new FakeAuthorizeHost({ token: "lw-pat-123" });
+      renderWithAuthorizeHost(<Authorize />, host);
+      const user = userEvent.setup();
+
+      expect(screen.getByTestId("authorize-expiration-hint")).toHaveTextContent(
+        "Choose when this token expires",
+      );
+      expect(mintButton()).toBeDisabled();
+      await user.click(mintButton());
+      expect(host.mints).toEqual([]);
+
+      await user.click(screen.getByText("Choose when this token expires"));
+      const offered = (await screen.findAllByRole("option")).map((option) => option.textContent);
+      expect(offered).toEqual([
+        "No expiration",
+        "7 days",
+        "30 days",
+        "60 days",
+        "90 days",
+        "Custom...",
+      ]);
+      await user.click(screen.getByRole("option", { name: "No expiration" }));
+
+      expect(screen.queryByTestId("authorize-expiration-hint")).toBeNull();
+      expect(mintButton()).toBeEnabled();
+    });
+  });
+
+  describe("when they choose a preset and mint", () => {
+    /** @scenario "The authorize page mints nothing until an expiry is chosen" */
+    it("mints with the chosen expiry, and with none for No expiration", async () => {
+      const host = new FakeAuthorizeHost({ token: "lw-pat-123" });
+      renderWithAuthorizeHost(<Authorize />, host);
+      const user = userEvent.setup();
+      const before = Date.now();
+
+      await chooseExpiration({ user, label: "30 days" });
+      await user.click(mintButton());
+
+      await waitFor(() => expect(host.mints).toHaveLength(1));
+      const days = ((host.mints[0]?.epochMilliseconds ?? 0) - before) / 86_400_000;
+      expect(days).toBeGreaterThanOrEqual(30);
+      expect(days).toBeLessThan(30.01);
     });
   });
 });
@@ -49,10 +114,10 @@ describe("given a browser that refuses the clipboard write", () => {
         <Authorize />,
         new FakeAuthorizeHost({ token: "lw-pat-123", copyFails: true }),
       );
+      const user = userEvent.setup();
 
-      await userEvent
-        .setup()
-        .click(screen.getByRole("button", { name: "Create and copy a personal access token" }));
+      await chooseExpiration({ user, label: "No expiration" });
+      await user.click(mintButton());
 
       await waitFor(() =>
         expect(

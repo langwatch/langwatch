@@ -23,7 +23,9 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
 }
 
 vi.mock("../../elements/langy-model-pill.tsx", () => ({
-  LangyModelPill: () => <div data-testid="model-pill" />,
+  LangyModelPill: ({ disabledReason }: { disabledReason?: string }) => (
+    <div data-testid="model-pill" data-disabled-reason={disabledReason} />
+  ),
 }));
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
@@ -61,6 +63,20 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+describe("given the turn has ended", () => {
+  /** @scenario "A card left from a finished turn does not lock the message field" */
+  it("reads the idle placeholder even while a card entry still reads pending", () => {
+    useLangyStore.setState({ turnPhase: "idle" });
+    renderComposer(() => {}, { awaitingAnswer: true, terminalConnected: true });
+
+    expect(screen.getByPlaceholderText(IDLE_PLACEHOLDER)).toBeTruthy();
+    expect(
+      screen.queryByPlaceholderText("Answer on the card above or in the terminal."),
+    ).toBeNull();
+    expect(screen.queryByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeNull();
+  });
+});
+
 describe("given a Langy turn is in flight", () => {
   describe("when the user reads the composer", () => {
     /** @scenario The message field says a message waits while Langy works */
@@ -70,6 +86,15 @@ describe("given a Langy turn is in flight", () => {
 
       expect(screen.getByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeTruthy();
       expect(screen.queryByPlaceholderText(IDLE_PLACEHOLDER)).toBeNull();
+    });
+
+    it("tells the model pill the lock is the turn, so it can say so on hover", () => {
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer(() => {});
+
+      expect(screen.getByTestId("model-pill").getAttribute("data-disabled-reason")).toBe(
+        "turn-active",
+      );
     });
 
     /** @scenario The message field says the same while the turn is stopping */

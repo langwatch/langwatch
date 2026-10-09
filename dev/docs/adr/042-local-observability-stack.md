@@ -80,8 +80,9 @@ metrics/traces query`) and the **Grafana skills** plugins
 ## Amendment: haven owns the stack and auto-wires the split
 
 The stack's lifecycle moved from the `dev/compose.dev.yml` `observability` profile to
-**haven** (`tools/thuishaven`, the `otellgtm` adapter): it defaults on, shares
-ClickHouse's colima VM, and `make haven doctor` reports its health. `make
+**haven** (`tools/thuishaven`): it defaults on and `make haven doctor` reports
+its health. On macOS it now runs natively (see the 2026-10-09 amendment below);
+the `otellgtm` container on ClickHouse's colima VM is the fallback tier. `make
 observability{,-connect,-down}` still work; they now front haven.
 
 Because haven already knows when the stack is up, it stops making the developer
@@ -103,3 +104,41 @@ carries:
 
 See `specs/ops/local-observability-stack.feature` (the "console stays quiet" and
 "error links straight to its trace" scenarios) and ADR-003.
+
+## Amendment (2026-10-09): native on macOS, container as the fallback
+
+The stack stays on by default, because it is what makes agent debugging work,
+but on macOS it no longer holds a colima VM open. haven's `otelnative` adapter
+starts the same components the `grafana/otel-lgtm` bundle carries as host
+processes: Grafana, Prometheus and Loki from Homebrew core, Grafana Alloy 1.20.1
+(the Grafana OpenTelemetry Collector distribution) as the OTLP collector from its
+official darwin release zip (the `grafana/grafana/alloy` tap builds from source and
+needs current Command Line Tools; `HAVEN_OBS_ALLOY_BIN` overrides), and Tempo 3.1.0 from its official darwin release tarball (Tempo
+has no Homebrew formula). haven fetches that tarball itself with the same pinned,
+sha256-checked downloader as the native ClickHouse binary (`adapters/pinnedrelease`;
+digests from GitHub's recorded release-asset digests) and keeps it under
+`observability/bin`; `HAVEN_OBS_TEMPO_BIN` overrides it. 3.1.0 is pinned because no
+later 2.x release ships darwin builds and 2.7.2's assets carry no digest; its
+config is the 3.x monolithic schema (`backend_worker.compaction`, `live_store`).
+Pyroscope 2.3.2 comes the same way, from its darwin release tarball
+(`HAVEN_OBS_PYROSCOPE_BIN` overrides), running the bundle's v2-storage config
+on the container's profiling port 4040.
+
+- **Same surface.** OTLP on `:4317`/`:4318`, Grafana on `:3000` behind
+  `observability.langwatch.localhost`, datasource uids `prometheus`, `loki`,
+  `tempo` and `pyroscope`, `langwatch.worktree` promoted to a metric label. Everything binds
+  loopback only, as before, because anonymous Grafana access is Admin.
+- **Bounded.** Configs, data and logs live under haven's home
+  (`observability/{config,data,logs}`); the same retention window and Loki
+  ingestion cap apply; each process gets an even share of the memory budget as
+  `GOMEMLIMIT` (a soft cap: there is no cgroup without a VM); a log past the
+  rotation size starts afresh. `haven observability down` stops the processes
+  and discards the data, as removing the container did.
+- **Never blocks boot.** A missing binary prints its install line. Without the
+  collector or Grafana the stack comes up unobserved, as it did when the
+  container failed.
+- **Fallback.** `LANGWATCH_HAVEN_OBS_TIER=container` selects the LGTM container
+  on colima; it is the default off macOS. `LANGWATCH_HAVEN_OBS=0` still turns
+  observability off.
+
+See `specs/setup/haven-observability-native.feature`.

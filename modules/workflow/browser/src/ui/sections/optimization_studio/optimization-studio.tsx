@@ -1,14 +1,14 @@
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   useColorMode,
   useColorModeValue,
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
+import { LogoIcon } from "@langwatch/design-system/logo-icon";
 
 import "@xyflow/react/dist/style.css";
-import { LogoIcon } from "@langwatch/design-system/logo-icon";
 import {
   Box,
   Button,
@@ -22,6 +22,7 @@ import {
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import { PromptListDrawerToken } from "@langwatch/prompt-client";
 import {
   fieldSchema,
   getInputsOutputs,
@@ -412,7 +413,7 @@ export default function OptimizationStudio() {
 
         <StudioWorkflowRunUntilHereDialog />
         {/*
-        Global mounts (CurrentDrawer, GlobalTraceV2DrawerMount, GlobalUpgradeModal) not ported:
+        Global mounts (CurrentDrawer with the routed trace drawer, GlobalUpgradeModal) not ported:
         studio has no layout/overlay slot. Breaks drawers, traces, and upgrade dialog.
         Pending app-level overlay slot in apps/ui.
       */}
@@ -529,13 +530,16 @@ function StudioWorkflowNodeSelectionPanel({
   const workflowId = useWorkflowStore((state) => state.workflow_id);
   const { openDrawer, closeDrawer } = useDrawer();
   const pickers = useMemo(() => {
-    const openList = (list: "agentList" | "evaluatorList" | "promptList") => () => {
+    const openList = (list: "agentList" | "evaluatorList") => () => {
       setTimeout(() => openDrawer(list, void 0, { resetStack: true }), 0);
+    };
+    const openPromptList = () => {
+      setTimeout(() => openDrawer(PromptListDrawerToken, void 0, { resetStack: true }), 0);
     };
     return {
       prompt: {
-        register: (callbacks) => setFlowCallbacks("promptList", callbacks),
-        open: openList("promptList"),
+        register: (callbacks) => setFlowCallbacks(PromptListDrawerToken, callbacks),
+        open: openPromptList,
         close: closeDrawer,
       } satisfies PromptPickerController,
       evaluator: {

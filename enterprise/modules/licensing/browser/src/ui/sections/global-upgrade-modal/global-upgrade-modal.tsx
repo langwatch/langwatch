@@ -1,10 +1,10 @@
 import { useLent } from "@langwatch/browser-host/lent";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Text } from "@langwatch/design-system/primitives";
-import { SeatProrationPreviewToken } from "@langwatch/enterprise-billing-contract";
+import { SeatProrationPreviewToken } from "@langwatch/enterprise-billing-client";
 import { Suspense } from "react";
 
+import { useUpgradeModalStore } from "../../../model/upgrade-modal-store.ts";
 import { LimitContent } from "./limit-content.tsx";
 import { LiteMemberRestrictionContent } from "./lite-member-restriction-content.tsx";
 

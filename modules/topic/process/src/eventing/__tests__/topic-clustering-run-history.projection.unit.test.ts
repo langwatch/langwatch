@@ -6,15 +6,15 @@ import {
 } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
-import type {
-  TopicClusteringRunCompletedEvent,
-  TopicClusteringRunFailedEvent,
-  TopicClusteringRunStartedEvent,
-} from "../../rules/topic-clustering-events.rules.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
 } from "../topic-clustering-run-history.projection.ts";
+import type {
+  TopicClusteringRunCompletedEvent,
+  TopicClusteringRunFailedEvent,
+  TopicClusteringRunStartedEvent,
+} from "../topic-clustering.events.ts";
 
 const stubStore: StateProjectionStore<TopicClusteringRunHistoryData> = {
   get: async () => ({ kind: "empty" as const }),
@@ -91,6 +91,7 @@ function initState(): TopicClusteringRunHistoryData {
 
 describe("TopicClusteringRunHistoryFoldProjection", () => {
   describe("when a run announces its start", () => {
+    /** @scenario "A run that is still working appears as running" */
     it("opens a running entry dated from the announcement", () => {
       const state = projection.handleTopicClusteringRunStarted(
         startedEvent({ runId: "20260720T093000", occurredAt: 5_000 }),
@@ -144,6 +145,7 @@ describe("TopicClusteringRunHistoryFoldProjection", () => {
   });
 
   describe("when a run walks its backlog across pages", () => {
+    /** @scenario "A multi-page run is one history entry" */
     it("accumulates every page into a single entry and settles on the final page", () => {
       let state = projection.handleTopicClusteringRunStarted(
         startedEvent({ runId: "run-1", occurredAt: 1_000 }),
@@ -214,6 +216,7 @@ describe("TopicClusteringRunHistoryFoldProjection", () => {
   });
 
   describe("when a run fails", () => {
+    /** @scenario "A failed run keeps its guidance without raw error detail" */
     it("keeps the guidance code but never the raw error text or stale counts", () => {
       let state = projection.handleTopicClusteringRunStarted(
         startedEvent({ runId: "run-1", occurredAt: 1_000 }),
@@ -248,6 +251,7 @@ describe("TopicClusteringRunHistoryFoldProjection", () => {
   });
 
   describe("when a new run starts while an old one never finished", () => {
+    /** @scenario "A run abandoned by the scheduler is not shown as running forever" */
     it("settles the superseded run as abandoned", () => {
       let state = projection.handleTopicClusteringRunStarted(
         startedEvent({ runId: "run-old", occurredAt: 1_000 }),
@@ -271,6 +275,7 @@ describe("TopicClusteringRunHistoryFoldProjection", () => {
   });
 
   describe("when more runs finish than the history keeps", () => {
+    /** @scenario "History is bounded" */
     it("drops the oldest entries past the bound", () => {
       let state = initState();
       const total = TOPIC_CLUSTERING_RUN_HISTORY_LIMIT + 5;

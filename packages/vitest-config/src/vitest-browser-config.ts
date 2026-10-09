@@ -1,14 +1,14 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 
+import { BROWSER_TEST_GLOB } from "./vitest-config.ts";
+
 /**
  * The real-browser lane. Its own module so the jsdom builder every package
  * imports does not name the Playwright provider on all of their installs.
  * See dev/docs/best_practices/browser-test-lane.md for when to reach for it.
  */
 
-/** Where the lane's files live. Kept in one place so CI and the guard agree. */
-export const BROWSER_TEST_GLOB = "**/*.browser.test.{ts,tsx}";
 
 /** The npm script every package declaring the lane exposes. CI reads it. */
 export const BROWSER_TEST_SCRIPT = "test:browser";

@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
-import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-contract";
+import { hostServiceFakes } from "@langwatch/browser/testing";
+import { HeroAskFieldToken, ProjectSwitcherToken } from "@langwatch/project-client";
 import { describe, expect, it } from "vitest";
 
 import { projectWeb } from "../project.web.ts";
@@ -18,7 +19,7 @@ describe("given a browser that installs project", () => {
   describe("when the kernel renders with only a transport supplied", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([projectWeb] as const)
+        .withModules([hostServiceFakes(), projectWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .render();
 

@@ -32,7 +32,7 @@ Feature: The worker hosts the simulation processing pipeline
     @unit
     Scenario: The worker hosts the subscriber that reports a run into its suite run
       When the process boots in the worker role
-      Then the suite run sync subscriber is among the keys it claims
+      Then suite's peer lanes on scenario's run facts are among the lanes it hosts
 
   Rule: The run executes where the queue drains
 

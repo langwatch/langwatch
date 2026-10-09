@@ -5,7 +5,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -23,8 +22,13 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"issuer":                                t.BaseURL,
+	writeJSON(w, http.StatusOK, discoveryDocument(t))
+}
+
+// discoveryDocument is the metadata; a provider-shaped tenant's issuer has its provider's shape.
+func discoveryDocument(t *Tenant) map[string]any {
+	doc := map[string]any{
+		"issuer":                                t.Issuer(),
 		"authorization_endpoint":                t.BaseURL + "/oauth/authorize",
 		"token_endpoint":                        t.BaseURL + "/oauth/token",
 		"userinfo_endpoint":                     t.BaseURL + "/oauth/userinfo",
@@ -40,26 +44,34 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 			"sub", "email", "email_verified", "name", "given_name", "family_name",
 			"nickname", "preferred_username", "picture", "groups",
 		},
-	})
+	}
+	if t.LegacyProvider() == LegacyProviderAzure {
+		azureDiscovery(t, doc)
+	}
+	return doc
 }
 
-// handleJWKS publishes the tenant's signing key.
+// handleJWKS publishes the tenant's signing keys: the current one, and the
+// previous one while a rotation has not dropped it.
 func (s *Server) handleJWKS(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"keys": []map[string]any{{
+	signing := t.SigningKeys()
+	keys := make([]map[string]any, 0, len(signing))
+	for _, k := range signing {
+		keys = append(keys, map[string]any{
 			"kty": "RSA",
 			"use": "sig",
 			"alg": "RS256",
-			"kid": t.KeyID(),
-			"n":   base64.RawURLEncoding.EncodeToString(t.Key.N.Bytes()),
-			"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(t.Key.E)).Bytes()),
-		}},
-	})
+			"kid": k.KID,
+			"n":   base64.RawURLEncoding.EncodeToString(k.Key.N.Bytes()),
+			"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(k.Key.E)).Bytes()),
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"keys": keys})
 }
 
 // handleAuthorize implements the authorization endpoint. With a login hint
@@ -414,30 +426,32 @@ type audience struct{ ClientID, Nonce string }
 // mintIDToken signs the tenant's ID token with the standard claims the app's
 // profile mapping reads (email, picture, and the name-fallback family).
 func (s *Server) mintIDToken(t *Tenant, user *User, aud audience) (string, error) {
-	clientID, nonce := aud.ClientID, aud.Nonce
-	now := s.now()
-	claims := jwt.MapClaims{
-		"iss":                t.BaseURL,
-		"sub":                t.Subject(user),
-		"aud":                clientID,
-		"iat":                now.Unix(),
-		"exp":                now.Add(time.Hour).Unix(),
-		"email":              user.Email,
-		"email_verified":     true,
-		"name":               user.DisplayName(),
-		"given_name":         user.GivenName,
-		"family_name":        user.FamilyName,
-		"nickname":           user.UserName,
-		"preferred_username": user.UserName,
-		"picture":            fmt.Sprintf("%s/avatar/%s.png", t.BaseURL, user.ID),
-		"groups":             user.Groups,
+	now := s.now().Add(t.Skew())
+	claims := t.profileClaims(user, now)
+	claims["iss"] = t.Issuer()
+	claims["aud"] = aud.ClientID
+	claims["iat"] = now.Unix()
+	claims["exp"] = now.Add(time.Hour).Unix()
+	if aud.Nonce != "" {
+		claims["nonce"] = aud.Nonce
 	}
-	if nonce != "" {
-		claims["nonce"] = nonce
-	}
+	tamper, previousNonce := t.takeTamper(aud.Nonce)
+	breakClaims(claims, tokenBreak{Mode: tamper, PreviousNonce: previousNonce, Now: now})
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = t.KeyID()
-	return token.SignedString(t.Key)
+	current := t.currentKey()
+	token.Header["kid"] = current.KID
+	signed, err := token.SignedString(current.Key)
+	if err != nil || tamper == TamperNone {
+		return signed, err
+	}
+	s.record(t, Event{
+		Kind: "oidc.token", Outcome: OutcomeOK, Client: aud.ClientID, Subject: user.Email,
+		Detail: "deliberately broke this ID token: " + string(tamper),
+	})
+	if tamper == TamperBadSignature {
+		return corruptSignature(signed), nil
+	}
+	return signed, nil
 }
 
 // handleUserinfo returns the claims for a bearer access token.
@@ -469,18 +483,7 @@ func (s *Server) handleUserinfo(w http.ResponseWriter, r *http.Request) {
 		Subject: user.Email,
 		Detail:  "returned the profile claims for " + user.Email,
 	})
-	writeJSON(w, http.StatusOK, map[string]any{
-		"sub":                t.Subject(user),
-		"email":              user.Email,
-		"email_verified":     true,
-		"name":               user.DisplayName(),
-		"given_name":         user.GivenName,
-		"family_name":        user.FamilyName,
-		"nickname":           user.UserName,
-		"preferred_username": user.UserName,
-		"picture":            fmt.Sprintf("%s/avatar/%s.png", t.BaseURL, user.ID),
-		"groups":             user.Groups,
-	})
+	writeJSON(w, http.StatusOK, t.profileClaims(user, s.now()))
 }
 
 // oauthError is the RFC 6749 token-endpoint error shape.

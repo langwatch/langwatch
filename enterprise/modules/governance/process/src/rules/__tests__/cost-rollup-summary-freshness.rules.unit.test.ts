@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { describe, expect, it } from "vitest";
 
-import { cellsBehindTheirEvents } from "../cost-rollup-summary-freshness.rules.ts";
+import { cellsBehindTheirEvents } from "../../features/cost/rules/cost-rollup-summary-freshness.rules.ts";
 
 const KEY = "2026-09-20|pulled|src_1|openai|gpt-5";
 const at = (LastEventOccurredAt: number) => new Map([[KEY, { LastEventOccurredAt }]]);

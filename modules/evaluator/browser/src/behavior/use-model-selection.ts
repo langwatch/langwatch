@@ -1,18 +1,23 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { modelSelectionFrom } from "@langwatch/model-provider-contract";
+import { type BuiltInModel, modelSelectionFrom } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
 import { evaluatorApi } from "./evaluator-api.ts";
+
+const NO_BUILT_IN_MODELS: readonly BuiltInModel[] = [];
 
 /** The project's pickable models for `mode`, and the chosen one among them. */
 export function useModelSelection({
   options,
   model,
   mode,
+  builtInModels = NO_BUILT_IN_MODELS,
 }: {
   options: string[];
   model: string;
   mode: "chat" | "embedding";
+  /** Models LangWatch serves itself, pickable with no provider configured. */
+  builtInModels?: readonly BuiltInModel[];
 }) {
   const { project } = useOrganizationTeamProject();
   const providers = evaluatorApi.modelProvider.listAllForProjectForFrontend.useQuery(
@@ -21,8 +26,14 @@ export function useModelSelection({
   );
   const { selectOptions } = useMemo(
     () =>
-      modelSelectionFrom({ providers: providers.data ?? [], options, mode, featureKey: undefined }),
-    [providers.data, options, mode],
+      modelSelectionFrom({
+        providers: providers.data ?? [],
+        options,
+        mode,
+        featureKey: undefined,
+        builtInModels,
+      }),
+    [providers.data, options, mode, builtInModels],
   );
   return {
     modelOption: selectOptions.find((option) => option.value === model),

@@ -70,10 +70,6 @@ class AdminSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-
-  featureFlag(): boolean | undefined {
-    return false;
-  }
 }
 
 function harness(scope: UiActiveScope, gatewayBaseUrl?: string) {

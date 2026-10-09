@@ -1,4 +1,12 @@
-import { Config, type ConfigOf, isSaas, publicBaseUrl } from "@langwatch/config";
+import {
+  Config,
+  type ConfigOf,
+  isSaas,
+  localPasswords,
+  mfaEnrollmentOpen,
+  passkeysEnabled,
+  publicBaseUrl,
+} from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -22,6 +30,10 @@ export const identityConfig = Config.define((c) => ({
   isSaas,
   /** The shared deployment origin: what a SAML identity provider is told LangWatch is called. */
   publicBaseUrl,
+  /** The sign-in capability switches auth also reads (round 48, A1-a). */
+  passkeysEnabled,
+  mfaEnrollmentOpen,
+  localPasswords,
 }));
 
 export type IdentityServerConfig = ConfigOf<typeof identityConfig>;

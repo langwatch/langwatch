@@ -161,17 +161,12 @@ export type SignupNotificationPayload = {
 /** The counter cannot always answer; an unknown count is not a zero one. */
 export const USAGE_UNKNOWN = "unknown" as const;
 
-export interface UsageLimitData {
-  organizationId: string;
-  currentMonthMessagesCount: number;
-  maxMonthlyUsageLimit: number;
-}
-
 /**
- * How an organization is billed, restated as a literal type rather than
+ * How an organization is billed, restated as a literal schema rather than
  * imported: this contract does not depend on `@langwatch/entitlement-contract`.
  */
-export type BillingPricingModel = "TIERED" | "SEAT_EVENT";
+export const billingPricingModelSchema = z.enum(["TIERED", "SEAT_EVENT"]);
+export type BillingPricingModel = z.infer<typeof billingPricingModelSchema>;
 
 export interface BillingUsageLimitOrganization {
   findWithAdmins(organizationId: string): Promise<{
@@ -182,12 +177,6 @@ export interface BillingUsageLimitOrganization {
   } | null>;
   updateSentPlanLimitAlert(organizationId: string, timestamp: Instant): Promise<void>;
   findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]>;
-}
-
-/** The warning entitlement decided: the threshold crossed and the month's count per project. */
-export interface UsageWarningDecision extends UsageLimitData {
-  crossedThreshold: number;
-  projectCounts: { projectId: string; count: number }[];
 }
 
 export interface BillingPlanResolver {

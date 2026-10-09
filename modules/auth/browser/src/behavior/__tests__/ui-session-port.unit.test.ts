@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BrowserUiSession, UiFeatureFlagRequests } from "../ui-session";
+import { BrowserUiSession } from "../ui-session";
 
 /** A granted set that says whether the port consulted it, or a copy of it. */
 class CountingSet extends Set<string> {
@@ -16,21 +16,11 @@ class CountingSet extends Set<string> {
   }
 }
 
-function sessionWith({
-  permissions,
-  flags = new Map<string, boolean>(),
-  askFlag = () => void 0,
-}: {
-  permissions: ReadonlySet<string> | undefined;
-  flags?: ReadonlyMap<string, boolean>;
-  askFlag?: (flag: string) => void;
-}) {
+function sessionWith({ permissions }: { permissions: ReadonlySet<string> | undefined }) {
   return BrowserUiSession.create({
     actor: { id: "user-jane", name: "Jane", email: null, image: null },
     permissions,
     settled: permissions !== void 0,
-    flags,
-    askFlag,
   });
 }
 
@@ -42,8 +32,6 @@ describe("given a screen changed who the reader is", () => {
         actor: null,
         permissions: void 0,
         settled: false,
-        flags: new Map(),
-        askFlag: () => void 0,
         refresh: async () => {
           reads += 1;
         },
@@ -104,68 +92,6 @@ describe("given the session port over a resolved scope", () => {
       // Every question went to the one set the scope resolved. A port that
       // rebuilt its own would answer the same and consult this one never.
       expect(granted.reads).toBeGreaterThanOrEqual(3);
-    });
-  });
-});
-
-describe("given a screen that asks about a feature flag", () => {
-  describe("when the flag has no answer yet", () => {
-    it("answers no and registers the flag to be read", () => {
-      const asked: string[] = [];
-      const session = sessionWith({
-        permissions: new Set(),
-        askFlag: (flag) => asked.push(flag),
-      });
-
-      expect(session.isFeatureEnabled("release_new_thing")).toBe(false);
-      expect(asked).toEqual(["release_new_thing"]);
-    });
-  });
-
-  describe("when the answer has arrived", () => {
-    it("answers with it, and asks for nothing further", () => {
-      const asked: string[] = [];
-      const session = sessionWith({
-        permissions: new Set(),
-        flags: new Map([
-          ["release_new_thing", true],
-          ["release_other_thing", false],
-        ]),
-        askFlag: (flag) => asked.push(flag),
-      });
-
-      expect(session.isFeatureEnabled("release_new_thing")).toBe(true);
-      expect(session.isFeatureEnabled("release_other_thing")).toBe(false);
-      expect(asked).toEqual([]);
-    });
-  });
-});
-
-describe("given the register of flags screens have asked about", () => {
-  describe("when the same flag is asked for repeatedly", () => {
-    it("records it once, in ask order", () => {
-      const requests = new UiFeatureFlagRequests();
-
-      requests.ask("second");
-      requests.ask("first");
-      requests.ask("second");
-
-      expect(requests.requested()).toEqual(["second", "first"]);
-    });
-
-    it("tells its readers once per new flag, and never for a repeat", async () => {
-      const requests = new UiFeatureFlagRequests();
-      let told = 0;
-      const stop = requests.subscribe(() => {
-        told += 1;
-      });
-
-      requests.ask("first");
-      requests.ask("first");
-      await Promise.resolve();
-
-      expect(told).toBe(1);
-      stop();
     });
   });
 });

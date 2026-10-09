@@ -25,6 +25,7 @@ import type { Agent as TypedAgent, CallOutcome } from "@langwatch/agent-contract
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 
+import { ExperimentWorkbenchPipelineRunService } from "../../features/workbench/services/experiment-workbench-pipeline-run.service.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
@@ -35,7 +36,6 @@ import {
   ExperimentConnectedCellService,
 } from "../experiment-connected-cell.service.ts";
 import type { ExecutionDataServices } from "../experiment-execution-data.service.ts";
-import { ExperimentWorkbenchPipelineRunService } from "../experiment-workbench-pipeline-run.service.ts";
 import type { ExperimentService } from "../experiment.service.ts";
 
 /**

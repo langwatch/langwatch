@@ -566,6 +566,19 @@ const count = z.number().int().nonnegative();
 const byOwnName = <T extends z.ZodType>(entry: T) =>
   z.record(z.string().max(200), entry).nullable();
 
+/** The upgrade ledger's summary: our own release names and counts, never a step id or tenant. */
+export const usageReportUpgradeSchema = z.object({
+  state: z.string().max(50).describe("The installation state the upgrade reader names."),
+  release: z.string().max(100).nullable().describe("The release the ledger records as installed."),
+  floor: z.string().max(100).nullable().describe("The oldest release this install may run."),
+  failed_steps: count.describe("Upgrade steps that failed."),
+  failed_targets: count.describe("Targets a failed step failed on."),
+  held_tenants: count
+    .nullable()
+    .describe("Organizations held on an error by an in-place migration. Null where unread."),
+});
+export type UsageReportUpgrade = z.infer<typeof usageReportUpgradeSchema>;
+
 /**
  * The install's ops health: counts the ops dashboard, the process explorer and the
  * migrations page already read. Optional category; a null section is "could not read".
@@ -600,6 +613,13 @@ export const usageReportOpsHealthSchema = z.object({
   migrations: byOwnName(z.object({ parked: count, rolled_back: count })).describe(
     "Per in-place data migration with a problem: organizations parked on an error, and organizations rolled back.",
   ),
+  // A sender older than the summary leaves it out: modules/ops/specs/usage-report-upgrade.feature
+  upgrade: usageReportUpgradeSchema
+    .nullable()
+    .optional()
+    .describe(
+      "Where the install's release upgrade stands, for the one fleet page. Null where the upgrade ledger could not be read.",
+    ),
 });
 export type UsageReportOpsHealth = z.infer<typeof usageReportOpsHealthSchema>;
 

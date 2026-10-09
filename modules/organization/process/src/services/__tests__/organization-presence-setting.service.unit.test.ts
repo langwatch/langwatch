@@ -9,15 +9,15 @@ import { nowInstant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { RecordPresenceSettingChangedCommandData } from "../../eventing/organization-lifecycle.events.ts";
+import type { GroupIdentity } from "../../features/group/services/group-identity.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import type { GroupRepository } from "../../repositories/group.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import type { TeamRepository } from "../../repositories/team.repository.ts";
 import { OrganizationPresenceSettingBackfillTask } from "../../tasks/organization-presence-setting-backfill.task.ts";
-import type { GroupIdentity } from "../group-identity.service.ts";
 import { OrganizationLifecycleNoticeService } from "../organization-lifecycle-notice.service.ts";
 import { OrganizationService, type OrganizationSettingsNotices } from "../organization.service.ts";
-import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 const ADMIN = { id: "user_admin" };
@@ -124,11 +124,18 @@ describe("given two organizations whose presence settings were stored before the
       });
       const idle = { send: async () => undefined };
       notices.connect({
+        recordCreated: { send: async () => undefined },
         recordSignedUp: idle,
         recordMembersInvited: idle,
         recordInviteAccepted: idle,
+        recordPersonalTeamCreated: idle,
+        recordPersonalWorkspaceArchived: idle,
+        recordPersonalWorkspaceRevived: idle,
+        recordPersonalWorkspaceFeaturesChanged: idle,
         recordIntegrationMethodChosen: idle,
         recordPersonalWorkspaceProvisioned: idle,
+        recordTraceSharingDisabled: idle,
+        recordMemberDisabled: idle,
         recordPresenceSettingChanged: {
           send: async (data) => {
             sent.push(data);
@@ -139,7 +146,7 @@ describe("given two organizations whose presence settings were stored before the
       const repository = MemoryOrganizationRepository.create({ memory: database });
       const task = OrganizationPresenceSettingBackfillTask.create({
         organizations: {
-          findAllIds: () => repository.findAllIds(),
+          listAllIds: (input) => repository.listAllIds(input),
           recordStoredPresenceSetting: (input) => service.recordStoredPresenceSetting(input),
         },
       });

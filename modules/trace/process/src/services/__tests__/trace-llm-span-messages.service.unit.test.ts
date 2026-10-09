@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import * as TraceLlmSpanMessagesService from "../../rules/trace-llm-span-messages.rules.ts";
+import * as TraceLlmSpanMessagesService from "../../features/conversation/rules/trace-llm-span-messages.rules.ts";
 
 describe("TraceLlmSpanMessagesService.parseLLMSpanMessages()", () => {
   describe("when input carries the TypedValueJson chat_messages wrapper", () => {

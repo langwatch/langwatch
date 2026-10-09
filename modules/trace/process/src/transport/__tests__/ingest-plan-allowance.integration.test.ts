@@ -12,9 +12,9 @@ import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createTraceAppHarness } from "../../app/__tests__/support/trace-app.harness.ts";
-import { TraceIngestAllowanceService } from "../../services/trace-ingest-allowance.service.ts";
-import type { TraceIngestCredentialService } from "../../services/trace-ingest-credential.service.ts";
-import type { TraceIngestionService } from "../../services/trace-ingestion.service.ts";
+import { TraceIngestAllowanceService } from "../../features/ingestion/services/trace-ingest-allowance.service.ts";
+import type { TraceIngestCredentialService } from "../../features/ingestion/services/trace-ingest-credential.service.ts";
+import type { TraceIngestionService } from "../../features/ingestion/services/trace-ingestion.service.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
 import { otlpIngestRest } from "../otlp-ingest.rest.ts";
 

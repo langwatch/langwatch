@@ -182,6 +182,51 @@ describe("GatewayGuardrailEvaluationService", () => {
     });
   });
 
+  describe("when the gateway checks a chunk of a streamed reply", () => {
+    /** @scenario "A guardrail passes its direction to the evaluation" */
+    it("hands the stream chunk direction to the evaluation", async () => {
+      const seen: GuardrailCheckInput[] = [];
+      const { service } = serviceWith({
+        runs: {
+          judge: async (input) => {
+            seen.push(input);
+            return passing;
+          },
+        },
+      });
+
+      await service.check({
+        projectId: PROJECT_ID,
+        guardrailIds: ["gr-judge"],
+        direction: "stream_chunk",
+        content: { chunk: "a chunk" },
+      });
+
+      expect(seen.map((input) => input.direction)).toEqual(["stream_chunk"]);
+    });
+
+    it("allows a chunk the evaluation skipped, even on a fail-closed guardrail", async () => {
+      const { service } = serviceWith({
+        runs: {
+          judge: async () => ({
+            status: "skipped",
+            // As the evaluation's one skip wording writes it.
+            details: "Instant Evals skipped this evaluation: guardrail_stream_chunk",
+          }),
+        },
+      });
+
+      await expect(
+        service.check({
+          projectId: PROJECT_ID,
+          guardrailIds: ["gr-judge"],
+          direction: "stream_chunk",
+          content: { chunk: "a chunk" },
+        }),
+      ).resolves.toMatchObject({ status: "evaluated", verdict: { decision: "allow" } });
+    });
+  });
+
   describe("when every guardrail passes", () => {
     it("allows", async () => {
       const { service } = serviceWith({

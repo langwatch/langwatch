@@ -14,24 +14,30 @@ const mocks = vi.hoisted(() => ({
   openDrawer: vi.fn(),
 }));
 
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) =>
+      permission === "annotations:update" ? mocks.canUpdateAnnotations : true,
+  }),
+}));
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: mocks.openDrawer }),
 }));
 
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: (permission: string) =>
-      permission === "annotations:update" ? mocks.canUpdateAnnotations : true,
   }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: undefined }),
 }));
 

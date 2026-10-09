@@ -8,7 +8,7 @@ export const TRACE_LOG_READ_CAP = 2000;
 
 export abstract class LogRecordStorageRepository {
   /**
-   * Reads every log record correlated to one trace, oldest first, capped at
+   * Reads every legacy `stored_log_records` row correlated to one trace, oldest first, capped at
    * {@link TRACE_LOG_READ_CAP} unless narrowed. Optional occurredAtMs hint enables
    * partition pruning on TimeUnixMs.
    */
@@ -23,6 +23,18 @@ export abstract class LogRecordStorageRepository {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]>;
+
+  /**
+   * The same read over log's `log_records`, which log shares for reading with trace
+   * (clickhouse-table-ownership). Spec: modules/trace/specs/trace-log-record-read.feature
+   */
+  abstract findLogRecordsByTraceId(params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]>;
+
   /**
    * Dedup and time-order rows read from both log stores during canonical cutover.
    * Attribute keys are sorted before serializing to ensure consistent identity.
@@ -52,6 +64,15 @@ export abstract class LogRecordStorageRepository {
 
 export class NullLogRecordStorageRepository implements LogRecordStorageRepository {
   async findLogsByTraceId(_params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    return [];
+  }
+
+  async findLogRecordsByTraceId(_params: {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;

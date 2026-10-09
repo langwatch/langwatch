@@ -3,7 +3,9 @@
  * key is separate to avoid spreading credentials across unrelated surfaces.
  */
 
-import type { UiJoinOfferProps, UiLangyKickoff } from "@langwatch/browser-host/declarations";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import type { LangyKickoffBrief } from "@langwatch/langy-contract";
+import type { JoinOfferProps } from "@langwatch/organization-client";
 import type { TimeInput } from "@langwatch/time";
 import { createContext, useContext, type ComponentType } from "react";
 
@@ -72,7 +74,7 @@ export type OnboardingSuccessNotice = {
 };
 
 /** A landing's kickoff: the brief, the typed parts beside it and who hears the conversation. */
-export type OnboardingLangyKickoff = UiLangyKickoff;
+export type OnboardingLangyKickoff = LangyKickoffBrief;
 
 /**
  * Langy panel operations, so no screen imports `modules/langy/browser`
@@ -120,7 +122,7 @@ export type OnboardingFailureNotice = {
 /** A join offer a peer declared (organization's), keyed by the module that declared it. */
 export type OnboardingJoinOffer = {
   readonly key: string;
-  readonly JoinOffer: ComponentType<UiJoinOfferProps>;
+  readonly JoinOffer: ComponentType<JoinOfferProps>;
 };
 
 export abstract class OnboardingHostApi {
@@ -153,7 +155,7 @@ export abstract class OnboardingHostApi {
 
   /** Deployment config is not here: it is the shell's `useUiDeployment()` capability. */
 
-  abstract featureFlag(flag: string): OnboardingFlagReading;
+  abstract featureFlag(flag: ReleaseFlagToken): OnboardingFlagReading;
 
   abstract signOut(): void;
 

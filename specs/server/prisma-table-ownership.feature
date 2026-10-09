@@ -75,3 +75,64 @@ Feature: Private Prisma table ownership
     And the foreign table retains its single original owner
 
   # Audit writes ride the producer's outbox after commit (Alex, Q72): modules/audit-log/specs/audit-log.feature.
+
+  # Shared reads over copies (R40): an owner shares a model for reading; writes stay its own.
+  @unit @architecture
+  Scenario: A module reading a Prisma table its owner shares with it passes
+    Given project claims Project and shares it for reading with entitlement
+    When entitlement reads Project through a delegate and raw SQL from a class that claims nothing
+    Then no finding names entitlement or a second owner of Project
+
+  @unit @architecture
+  Scenario: A declared reader that claims the shared Prisma table is reported
+    Given project claims Project and shares it for reading with entitlement
+    When entitlement claims Project with .for(...) or static tables
+    Then the policy reports the claim and names the unclaimed reader class to use instead
+
+  @unit @architecture
+  Scenario: A module the owner did not name still may not claim a shared Prisma table
+    Given project shares Project for reading with entitlement only
+    When experiment claims Project
+    Then the policy reports Project as claimed by experiment and project
+
+  @unit @architecture
+  Scenario: A named reader writing a shared Prisma table is reported
+    Given project shares Project for reading with entitlement
+    When entitlement updates Project through a delegate or raw SQL
+    Then the policy reports each write as reading-only access misused
+
+  # A ruled write on a share is named by file with its reason (R42: authz's admission and offboarding writes).
+  @unit @architecture
+  Scenario: A named reader's write a share admits by file passes
+    Given project shares Project for reading with entitlement
+    And the share admits entitlement's writes in one named file, with a reason
+    When entitlement updates Project in that file
+    Then no finding names that write
+    And a write by entitlement in any other file is still reported
+
+  @unit @architecture
+  Scenario: A share's write exception that matches no write is reported
+    Given the Project share admits a write in a named file
+    And that file no longer writes Project, or the exception names a module that is not a reader
+    When the policy runs
+    Then the policy asks for the write exception to be deleted
+
+  @unit @architecture
+  Scenario: A shared Prisma table declared by a module that does not own it is reported
+    Given the policy declares Project shared by organization
+    And project is the module that claims Project
+    When the policy runs
+    Then the policy reports the declaration as naming the wrong owner
+
+  @unit @architecture
+  Scenario: A shared Prisma reader that no longer reads the table is reported
+    Given project shares Project for reading with entitlement
+    And entitlement no longer reads Project
+    When the policy runs
+    Then the policy asks for entitlement to be deleted from the declaration
+
+  @unit @architecture
+  Scenario: Every shared Prisma table carries a reason
+    When the declared Prisma shares are read
+    Then each one has a non-empty reason
+    And each write exception on a share has a non-empty reason

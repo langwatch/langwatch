@@ -4,7 +4,8 @@ name: visualdiff
 # (base) and this PR (candidate) and reports every screen that differs. How it
 # boots on a runner, publishes and fails: tools/visualdiff/README.md, "Running
 # in CI". Findings are for review and never fail the job; only exit 2 (the run
-# itself broke) does, the same ladder as apidiff.yml.
+# itself broke) does, the same ladder as apidiff.yml. The run is split over
+# SHARDS jobs (`run -shard i/n`); `report` merges them into one comment.
 
 on:
   pull_request:
@@ -62,9 +63,18 @@ jobs:
     needs: changes
     # `heavy` is false on a draft, so a draft waits for ready_for_review.
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
+    name: run (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
+    # 167 routes took 27 min and 468 flows run at 3 to 7 min per 20 on one job,
+    # about 190 min of capture at worst; eight shards hold about 24 min each,
+    # beside about 7 min of setup and 25 of boot. Keep SHARDS and the list equal.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     timeout-minutes: 75
     env:
+      SHARDS: "8"
       # Both stacks share these stores (-no-haven); visualdiff sets each stack's
       # ports, origin and Redis index itself (tools/visualdiff/plan.go).
       DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
@@ -150,10 +160,16 @@ jobs:
 
       # The candidate's schema and seed, the state a developer's own stack is in:
       # the base boots on it with its migrations skipped (README, "Running in CI").
+      # The candidate's api and worker refuse to serve until its upgrade has run.
+      # Its system-migrations pass boots the modules, which refuse a deployment
+      # with no origin (auth: NEXTAUTH_URL, hosted-mcp: BASE_HOST). The stacks
+      # still get their own origins (tools/visualdiff/plan.go).
       - name: Migrate and seed the shared databases
+        env:
+          BASE_HOST: "http://localhost:5560"
+          NEXTAUTH_URL: "http://localhost:5560"
         run: |
-          pnpm prisma:migrate
-          pnpm clickhouse:migrate
+          pnpm start:prepare:db
           pnpm prisma:seed
 
       - name: Read the runner's Playwright version
@@ -170,19 +186,32 @@ jobs:
       - name: Install Playwright's Chromium
         run: pnpm --filter @langwatch/visual-diff-runner exec playwright install --with-deps chromium
 
+      # -deadline stops capture 50 min in and still writes the report, marked
+      # partial; `timeout` is the backstop when finishing hangs. Both leave the
+      # job time to upload before its 75 min limit.
       - name: Run visualdiff
         id: run
         run: |
           set +e
           run_dir="$RUNNER_TEMP/visualdiff-run"
+          mkdir -p "$run_dir"
           # Built, not `go run`, which reports every non-zero exit as 1.
-          go build -o "$RUNNER_TEMP/visualdiff" ./cmd/visualdiff || { echo "exit_code=2" >> "$GITHUB_OUTPUT"; exit 0; }
-          "$RUNNER_TEMP/visualdiff" run -no-haven -no-publish -no-baseline -agent \
-            -base origin/main -candidate HEAD -run-dir "$run_dir" -boot-timeout 20m
+          if ! go build -o "$RUNNER_TEMP/visualdiff" ./cmd/visualdiff; then
+            echo 2 > "$run_dir/exit_code"
+            echo "exit_code=2" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          timeout --kill-after=2m 58m "$RUNNER_TEMP/visualdiff" run -no-haven -no-publish -no-baseline -agent \
+            -base origin/main -candidate HEAD -run-dir "$run_dir" -boot-timeout 20m \
+            -shard "${{ matrix.shard }}/$SHARDS" -deadline 50m
           code=$?
+          echo "$code" > "$run_dir/exit_code"
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          echo "visualdiff exited $code (0 no findings, 1 findings, 2 the run could not complete)"
-          if [ "$code" = 2 ]; then
+          echo "visualdiff exited $code (0 no findings, 1 findings, 2 the run could not complete, 3 an error streak, 124 timed out)"
+          if [ "$code" = 124 ] || [ "$code" = 137 ]; then
+            echo "::warning::shard ${{ matrix.shard }}/$SHARDS outlived its timeout; the merged report marks it partial"
+          fi
+          if [ "$code" = 2 ] || [ "$code" = 3 ]; then
             for log in "$run_dir"/logs/*.log; do
               [ -f "$log" ] || continue
               echo "::group::$(basename "$log"), last 150 lines"
@@ -190,16 +219,19 @@ jobs:
               echo "::endgroup::"
             done
           fi
+          [ -f "$run_dir/summary.txt" ] && cat "$run_dir/summary.txt"
           exit 0
 
       # report.html addresses its screenshots relative to itself, so shots/ rides along.
-      - name: Upload the report
-        id: upload
+      # `report` downloads every shard's artifact and merges them.
+      - name: Upload the shard
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: visualdiff-report
+          name: visualdiff-shard-${{ matrix.shard }}
           path: |
+            ${{ runner.temp }}/visualdiff-run/exit_code
+            ${{ runner.temp }}/visualdiff-run/outcome.json
             ${{ runner.temp }}/visualdiff-run/run.log
             ${{ runner.temp }}/visualdiff-run/summary.txt
             ${{ runner.temp }}/visualdiff-run/findings.jsonl
@@ -207,12 +239,76 @@ jobs:
             ${{ runner.temp }}/visualdiff-run/shots/
             ${{ runner.temp }}/visualdiff-run/logs/
           if-no-files-found: warn
+          retention-days: 2
+
+  report:
+    needs: [changes, run]
+    # Runs when a shard failed or timed out too, so a partial run still reports.
+    if: ${{ !cancelled() && needs.run.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SHARDS: "8"
+    steps:
+      # publish resolves origin/main and HEAD for the comment's header.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # Each shard lands in shards/visualdiff-shard-<i>, where merge looks for it.
+      # No shard artifact at all is not this step's failure: merge then exits 2.
+      - name: Download the shards
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: visualdiff-shard-*
+          path: ${{ runner.temp }}/visualdiff-run/shards
+
+      - name: Merge the shards
+        id: run
+        run: |
+          set +e
+          run_dir="$RUNNER_TEMP/visualdiff-run"
+          mkdir -p "$run_dir/shards"
+          if ! go build -o "$RUNNER_TEMP/visualdiff" ./cmd/visualdiff; then
+            echo "exit_code=2" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          "$RUNNER_TEMP/visualdiff" merge -run-dir "$run_dir" -shards "$SHARDS" -base origin/main -candidate HEAD
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "visualdiff merge exited $code (0 no findings, 1 findings, 2 a shard broke or none left a report)"
+          if grep -q '^PARTIAL RUN' "$run_dir/summary.txt" 2>/dev/null; then
+            echo "partial=true" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: Upload the report
+        id: upload
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visualdiff-report
+          path: |
+            ${{ runner.temp }}/visualdiff-run/summary.txt
+            ${{ runner.temp }}/visualdiff-run/outcome.json
+            ${{ runner.temp }}/visualdiff-run/findings.jsonl
+            ${{ runner.temp }}/visualdiff-run/report/
+            ${{ runner.temp }}/visualdiff-run/shards/
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Write the job summary
         if: ${{ !cancelled() }}
         env:
           EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+          PARTIAL: ${{ steps.run.outputs.partial }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
           run_dir="$RUNNER_TEMP/visualdiff-run"
@@ -222,17 +318,13 @@ jobs:
             2) headline="The run could not complete" ;;
             *) headline="visualdiff did not run: a step before it failed" ;;
           esac
+          [ "$PARTIAL" = true ] && headline="$headline (partial run: not every screen was captured)"
           {
             echo "## visualdiff: $headline"
             echo
             if [ -f "$run_dir/summary.txt" ]; then
               echo '````text'
               cat "$run_dir/summary.txt"
-              echo '````'
-            elif [ -f "$run_dir/run.log" ]; then
-              echo "No summary was written. The end of run.log:"
-              echo '````text'
-              tail -n 40 "$run_dir/run.log"
               echo '````'
             fi
             if [ -n "$ARTIFACT_URL" ]; then
@@ -247,11 +339,14 @@ jobs:
           echo "publish: skipped, a fork's pull request gets a read-only token; the report is in the workflow's artifact"
 
       # Edits the PR's one <!-- visualdiff:screens --> comment in place; a dispatch
-      # publishes to its branch's open PR, when there is one.
+      # publishes to its branch's open PR, when there is one. A skipped merge's
+      # unset exit_code compares equal to '0', so the merge's outcome is asked first.
+      # A partial run publishes too; the comment says it is partial (outcome.json).
       - name: Publish the screens to the pull request
         id: publish
         if: >-
-          !cancelled() && (steps.run.outputs.exit_code == '0' || steps.run.outputs.exit_code == '1')
+          !cancelled() && steps.run.outcome == 'success'
+          && (steps.run.outputs.exit_code == '0' || steps.run.outputs.exit_code == '1')
           && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -271,6 +366,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+          PARTIAL: ${{ steps.run.outputs.partial }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
           SUMMARY_FILE: ${{ runner.temp }}/visualdiff-run/summary.txt
         with:
@@ -283,7 +379,8 @@ jobs:
               "2": "the run could not complete",
             };
             const exitCode = process.env.EXIT_CODE ?? "";
-            const headline = HEADLINES[exitCode] ?? "did not run, a step before it failed";
+            let headline = HEADLINES[exitCode] ?? "did not run, a step before it failed";
+            if (process.env.PARTIAL === "true") headline += " (partial run: not every screen was captured)";
             const pr = context.payload.pull_request;
             const { owner, repo } = context.repo;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
@@ -312,5 +409,5 @@ jobs:
       - name: Fail when the run itself broke
         if: ${{ !cancelled() && steps.run.outputs.exit_code != '0' && steps.run.outputs.exit_code != '1' }}
         run: |
-          echo "::error::visualdiff exited '${{ steps.run.outputs.exit_code }}': the run could not complete, which is not a finding. See the step logs and the job summary."
+          echo "::error::visualdiff exited '${{ steps.run.outputs.exit_code }}': the run could not complete, which is not a finding. See the shard jobs' logs and the job summary."
           exit 1

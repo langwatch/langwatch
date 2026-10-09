@@ -1,20 +1,17 @@
 /**
  * The small pieces every Agent Testing surface shares: last-run result,
- * cost, scenario version, and the row that opens a test suite.
+ * cost and scenario version.
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/cases-table.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { cleanup, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { CaseVersionChip } from "../case-version-chip.tsx";
 import { LastResultLabel } from "../last-result-label.tsx";
 import { ResultMetricsInline } from "../result-metrics-inline.tsx";
-import { TestSuiteHeaderRow } from "../test-suite-header-row.tsx";
 
 describe("<LastResultLabel/>", () => {
   afterEach(cleanup);
@@ -89,60 +86,5 @@ describe("<CaseVersionChip/>", () => {
     const { container } = renderWithDesignSystem(<CaseVersionChip />);
 
     expect(container.textContent).toBe("");
-  });
-});
-
-describe("<TestSuiteHeaderRow/>", () => {
-  afterEach(cleanup);
-
-  const renderRow = (props: Partial<React.ComponentProps<typeof TestSuiteHeaderRow>> = {}) =>
-    renderWithDesignSystem(
-      <TestSuiteHeaderRow
-        name="Checkout"
-        caseCount={4}
-        templateColumns="minmax(0,1fr) auto"
-        {...props}
-      />,
-    );
-
-  it("names the test suite and how many scenarios it holds", () => {
-    renderRow();
-
-    expect(screen.getByText("Checkout")).toBeInTheDocument();
-    expect(screen.getByLabelText("4 scenarios")).toBeInTheDocument();
-  });
-
-  it("counts one scenario as one", () => {
-    renderRow({ caseCount: 1 });
-
-    expect(screen.getByLabelText("1 scenario")).toBeInTheDocument();
-  });
-
-  it("carries no result summary beside the name", () => {
-    renderRow();
-
-    expect(screen.queryByText(/pass/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId("run-metrics-summary")).not.toBeInTheDocument();
-  });
-
-  it("opens the test suite when the row is chosen", async () => {
-    const user = userEvent.setup();
-    const onClick = vi.fn();
-    renderRow({ onClick });
-
-    await user.click(screen.getByText("Checkout"));
-
-    expect(onClick).toHaveBeenCalledOnce();
-  });
-
-  it("opens the test suite from the keyboard", async () => {
-    const user = userEvent.setup();
-    const onClick = vi.fn();
-    renderRow({ onClick });
-
-    await user.tab();
-    await user.keyboard("{Enter}");
-
-    expect(onClick).toHaveBeenCalledOnce();
   });
 });

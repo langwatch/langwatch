@@ -4,12 +4,22 @@
  * a reload resumes from the organization's state.
  * Spec: specs/features/onboarding/guided-welcome-takeover.feature
  */
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentType, createElement, forwardRef, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
+const flags = vi.hoisted((): Record<string, boolean> => ({}));
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name }: { name: string }) => ({
+    enabled: flags[name] ?? false,
+    isLoading: false,
+  }),
+}));
 
 vi.mock("react-contextual-analytics", () => ({
   AnalyticsBoundary: ({ children }: { children: ReactNode }) => children,
@@ -70,6 +80,11 @@ type MutateOptions = {
 const initializeOrganization =
   vi.fn<(input: Record<string, unknown>, options: MutateOptions) => void>();
 const invalidateOrganizations = vi.fn();
+/** What the join lookup answers for the reader's own verified address. */
+let joinLookup: unknown;
+vi.mock("../../../behavior/use-join-lookup.ts", () => ({
+  useJoinLookup: () => ({ data: joinLookup }),
+}));
 vi.mock("../../../behavior/onboarding-api.ts", () => {
   const api = {
     onboarding: {
@@ -77,19 +92,11 @@ vi.mock("../../../behavior/onboarding-api.ts", () => {
         useMutation: () => ({ mutate: initializeOrganization, isPending: false, isSuccess: false }),
       },
     },
-    joinRequests: {
-      lookup: { useQuery: () => ({ data: undefined }) },
-      offer: { useQuery: () => ({ data: undefined }) },
-      mine: { useQuery: () => ({ data: undefined }) },
-      request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      dismissOffer: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-    },
     useUtils: () => ({
       organization: {
         getAll: { invalidate: invalidateOrganizations },
         getScopeGraph: { invalidate: vi.fn() },
       },
-      joinRequests: { mine: { invalidate: vi.fn() }, offer: { invalidate: vi.fn() } },
     }),
   };
   return { api, onboardingApi: api };
@@ -142,7 +149,6 @@ const SAAS_DEPLOYMENT: UiDeployment = {
   hasEmailProvider: true,
 };
 
-const flags: Record<string, boolean> = {};
 const failures: OnboardingFailureNotice[] = [];
 const hardRedirects: string[] = [];
 let organizations: OnboardingOrganization[] = [];
@@ -171,8 +177,8 @@ class WelcomeTestHost extends OnboardingHostApi {
     hardRedirects.push(to);
   }
   setQuery() {}
-  featureFlag(flag: string): OnboardingFlagReading {
-    return { enabled: flags[flag] ?? false, isLoading: false };
+  featureFlag({ name }: ReleaseFlagToken): OnboardingFlagReading {
+    return { enabled: flags[name] ?? false, isLoading: false };
   }
   signOut() {}
   succeeded() {}
@@ -326,7 +332,9 @@ describe("WelcomeScreen in the guided variant", () => {
           terms: true,
         }),
       });
-      expect(registerExperiment).toHaveBeenCalledWith("guided");
+      expect(registerExperiment).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "guided" }),
+      );
       expect(invalidateOrganizations).toHaveBeenCalledTimes(1);
 
       const takeover = await screen.findByTestId("guided-takeover");
@@ -455,6 +463,7 @@ describe("WelcomeScreen in the classic variant", () => {
     organizations = [];
     routerState.query = {};
     hardRedirects.length = 0;
+    joinLookup = undefined;
     initializeOrganization.mockReset();
     initializeOrganization.mockImplementation((_input, options) =>
       options.onSuccess?.({ organizationId: "org_new", projectSlug: "acme-proj" }),
@@ -472,6 +481,31 @@ describe("WelcomeScreen in the classic variant", () => {
     await waitFor(() => expect(finish).toBeEnabled());
     fireEvent.click(finish);
   }
+
+  describe("given the reader's domain matches an organization already on LangWatch", () => {
+    /** @scenario "Creating an organization on a matching domain is nudged, never blocked" */
+    it("offers joining in a notice and still creates the organization", async () => {
+      joinLookup = {
+        outcome: "ask",
+        organizations: [{ organizationId: "org_acme", name: "Acme", colleagueCount: 3 }],
+      };
+      renderWelcome();
+
+      const notice = await screen.findByTestId("join-instead-notice");
+      expect(notice).toHaveTextContent("Acme is already on LangWatch");
+      expect(screen.getByRole("link", { name: "Join instead" })).toHaveAttribute(
+        "href",
+        "/auth/join",
+      );
+      expect(screen.getByLabelText("Organization name")).toBeEnabled();
+      cleanup();
+
+      await finishClassicFlow();
+
+      expect(initializeOrganization).toHaveBeenCalledTimes(1);
+      expect(hardRedirects).toEqual(["/onboarding/product?projectSlug=acme-proj"]);
+    });
+  });
 
   describe("when the last screen is finished", () => {
     it("creates the organization with the full sign-up answers and lands on the product step", async () => {

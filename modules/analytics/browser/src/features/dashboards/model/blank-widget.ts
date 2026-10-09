@@ -9,7 +9,7 @@ import {
   chartGridBottomRow,
   type ChartGridPlacement,
 } from "../../../model/chart-grid.ts";
-import type { DashboardWidgetDraft } from "../../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDraft } from "../../../model/dashboard-widget-draft.ts";
 import {
   STARTER_WIDGET_CODE,
   STARTER_WIDGET_QUERIES,

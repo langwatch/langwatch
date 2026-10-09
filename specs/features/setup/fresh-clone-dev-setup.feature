@@ -1,6 +1,6 @@
 Feature: Fresh-clone dev setup friction removal
   As a developer cloning LangWatch for the first time
-  I want package overrides and gateway secret placeholders to not block first-run
+  I want package overrides and empty gateway secrets to not block first-run
   So that "fresh clone → green app" succeeds in one cycle instead of six
 
   # Scope: tracks frictions #1 and #2 from issue #3903.
@@ -16,27 +16,27 @@ Feature: Fresh-clone dev setup friction removal
   # --- Friction #2: empty gateway secrets fail Zod cryptically ---
 
   @unit
-  Scenario: .env.example ships a sentinel placeholder for LW_GATEWAY_INTERNAL_SECRET
+  Scenario: .env.example ships an empty value for LW_GATEWAY_INTERNAL_SECRET
     Given the file ".env.example"
     When the line declaring "LW_GATEWAY_INTERNAL_SECRET" is read
-    Then the value is a non-empty sentinel string naming the generation command
+    Then the value is empty, so a fresh clone runs without the gateway
     And the preceding comment block instructs the reader to run "openssl rand -hex 32"
 
   @unit
-  Scenario: .env.example ships a sentinel placeholder for LW_GATEWAY_JWT_SECRET
+  Scenario: .env.example ships an empty value for LW_GATEWAY_JWT_SECRET
     Given the file ".env.example"
     When the line declaring "LW_GATEWAY_JWT_SECRET" is read
-    Then the value is a non-empty sentinel string naming the generation command
+    Then the value is empty, so a fresh clone runs without the gateway
     And the preceding comment block instructs the reader to run "openssl rand -hex 32"
 
   @unit
-  Scenario: .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER
+  Scenario: .env.example ships an empty value for LW_VIRTUAL_KEY_PEPPER
     Given the file ".env.example"
     When the line declaring "LW_VIRTUAL_KEY_PEPPER" is read
-    Then the value is a non-empty sentinel string naming the generation command
+    Then the value is empty, so a fresh clone runs without the gateway
     And the preceding comment block instructs the reader to run "openssl rand -hex 32"
 
-  @integration
+  @unit
   Scenario: A fresh clone with no gateway secrets set boots clean
     Given a fresh ".env" created from ".env.example" with no manual edits
     When the app boots and validates the environment

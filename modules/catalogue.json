@@ -5,25 +5,29 @@
       "id": "agent",
       "root": "modules/agent",
       "classification": "core",
-      "subjects": ["agent"]
+      "subjects": ["agent"],
+      "restNamespaces": ["agents"]
     },
     {
       "id": "analytics",
       "root": "modules/analytics",
       "classification": "core",
-      "subjects": ["analytics"]
+      "subjects": ["analytics"],
+      "restNamespaces": ["analytics", "query"]
     },
     {
       "id": "annotation",
       "root": "modules/annotation",
       "classification": "core",
-      "subjects": ["annotation"]
+      "subjects": ["annotation"],
+      "restNamespaces": ["annotations"]
     },
     {
       "id": "api-key",
       "root": "modules/api-key",
       "classification": "core",
-      "subjects": ["api-key"]
+      "subjects": ["api-key"],
+      "restNamespaces": ["api-keys"]
     },
     {
       "id": "audit-log",
@@ -41,7 +45,8 @@
       "id": "authz",
       "root": "modules/authz",
       "classification": "core",
-      "subjects": ["authz", "authz-grant"]
+      "subjects": ["authz", "authz-grant"],
+      "restNamespaces": ["grants", "role-bindings"]
     },
     {
       "id": "automation",
@@ -53,19 +58,22 @@
         "report-schedule",
         "trigger",
         "trigger-fire-history"
-      ]
+      ],
+      "restNamespaces": ["trigger", "triggers", "unsubscribe"]
     },
     {
       "id": "coding-agent",
       "root": "modules/coding-agent",
       "classification": "core",
-      "subjects": ["coding-agent"]
+      "subjects": ["coding-agent"],
+      "restNamespaces": ["coding-agent"]
     },
     {
       "id": "dashboard",
       "root": "modules/dashboard",
       "classification": "core",
-      "subjects": ["dashboard", "graph", "saved-workbench-chart"]
+      "subjects": ["dashboard", "graph", "saved-workbench-chart"],
+      "restNamespaces": ["dashboards", "graphs"]
     },
     {
       "id": "data-privacy",
@@ -83,31 +91,35 @@
       "id": "dataset",
       "root": "modules/dataset",
       "classification": "core",
-      "subjects": ["dataset", "dataset-record"]
+      "subjects": ["dataset", "dataset-record"],
+      "restNamespaces": ["dataset"]
     },
     {
       "id": "entitlement",
       "root": "modules/entitlement",
       "classification": "core",
-      "subjects": ["entitlement"]
+      "subjects": ["entitlement", "usage"]
     },
     {
       "id": "evaluation",
       "root": "modules/evaluation",
       "classification": "core",
-      "subjects": ["evaluation"]
+      "subjects": ["evaluation"],
+      "restNamespaces": ["guardrails"]
     },
     {
       "id": "evaluator",
       "root": "modules/evaluator",
       "classification": "core",
-      "subjects": ["evaluator"]
+      "subjects": ["evaluator"],
+      "restNamespaces": ["evaluators"]
     },
     {
       "id": "experiment",
       "root": "modules/experiment",
       "classification": "core",
-      "subjects": ["experiment"]
+      "subjects": ["experiment"],
+      "restNamespaces": ["dspy", "evaluations", "experiment", "experiments"]
     },
     {
       "id": "feature-flag",
@@ -119,19 +131,22 @@
       "id": "gateway",
       "root": "modules/gateway",
       "classification": "core",
-      "subjects": ["gateway", "gateway-debit", "virtual-key"]
+      "subjects": ["gateway", "gateway-debit", "virtual-key"],
+      "restNamespaces": ["agent-cache", "elevenlabs", "gateway"]
     },
     {
       "id": "github",
       "root": "modules/github",
       "classification": "core",
-      "subjects": ["github", "github-installation", "github-pull-request"]
+      "subjects": ["github", "github-installation", "github-pull-request"],
+      "restNamespaces": ["github", "github-langy"]
     },
     {
       "id": "hosted-mcp",
       "root": "modules/hosted-mcp",
       "classification": "core",
-      "subjects": ["hosted-mcp", "mcp-oauth"]
+      "subjects": ["hosted-mcp", "mcp-oauth"],
+      "restNamespaces": ["mcp"]
     },
     {
       "id": "identity",
@@ -149,7 +164,14 @@
       "id": "instant-eval",
       "root": "modules/instant-eval",
       "classification": "core",
-      "subjects": ["instant-eval"]
+      "subjects": ["instant-eval"],
+      "restNamespaces": ["instant-evals"]
+    },
+    {
+      "id": "instant-eval-judge",
+      "root": "modules/instant-eval-judge",
+      "classification": "core",
+      "subjects": ["instant-eval-judge"]
     },
     {
       "id": "integration",
@@ -161,7 +183,8 @@
       "id": "langy",
       "root": "modules/langy",
       "classification": "core",
-      "subjects": ["conversation", "credential", "langy", "message", "relay", "turn"]
+      "subjects": ["conversation", "credential", "langy", "message", "relay", "turn"],
+      "restNamespaces": ["langy"]
     },
     {
       "id": "log",
@@ -179,13 +202,15 @@
       "id": "model-provider",
       "root": "modules/model-provider",
       "classification": "core",
-      "subjects": ["model-provider"]
+      "subjects": ["model-provider"],
+      "restNamespaces": ["model-defaults", "model-providers", "playground"]
     },
     {
       "id": "monitor",
       "root": "modules/monitor",
       "classification": "core",
-      "subjects": ["monitor"]
+      "subjects": ["monitor"],
+      "restNamespaces": ["monitors"]
     },
     {
       "id": "navigation",
@@ -203,13 +228,15 @@
       "id": "onboarding",
       "root": "modules/onboarding",
       "classification": "core",
-      "subjects": ["onboarding"]
+      "subjects": ["onboarding"],
+      "restNamespaces": ["onboarding"]
     },
     {
       "id": "ops",
       "root": "modules/ops",
       "classification": "core",
-      "subjects": ["admin", "impersonation", "ops"]
+      "subjects": ["admin", "impersonation", "ops"],
+      "restNamespaces": ["admin", "bug-reports", "checkup", "ops"]
     },
     {
       "id": "organization",
@@ -223,13 +250,15 @@
         "personal-workspace",
         "personal-workspace-features",
         "team"
-      ]
+      ],
+      "restNamespaces": ["groups", "organization", "organizations", "teams"]
     },
     {
       "id": "platform-health",
       "root": "modules/platform-health",
       "classification": "core",
-      "subjects": ["platform-health"]
+      "subjects": ["platform-health"],
+      "restNamespaces": ["health", "platform-health"]
     },
     {
       "id": "presence",
@@ -241,43 +270,50 @@
       "id": "project",
       "root": "modules/project",
       "classification": "core",
-      "subjects": ["project"]
+      "subjects": ["project"],
+      "restNamespaces": ["projects"]
     },
     {
       "id": "prompt",
       "root": "modules/prompt",
       "classification": "core",
-      "subjects": ["prompt", "prompt-tag", "prompt-version"]
+      "subjects": ["prompt", "prompt-tag", "prompt-version"],
+      "restNamespaces": ["prompt-playground", "prompts"]
     },
     {
       "id": "role",
       "root": "modules/role",
       "classification": "core",
-      "subjects": ["custom-role", "role"]
+      "subjects": ["custom-role", "role"],
+      "restNamespaces": ["roles"]
     },
     {
       "id": "rum",
       "root": "modules/rum",
       "classification": "core",
-      "subjects": ["rum"]
+      "subjects": ["rum"],
+      "restNamespaces": ["rum"]
     },
     {
       "id": "sample-agents",
       "root": "modules/sample-agents",
       "classification": "core",
-      "subjects": ["sample-agents"]
+      "subjects": ["sample-agents"],
+      "restNamespaces": ["demo"]
     },
     {
       "id": "scenario",
       "root": "modules/scenario",
       "classification": "core",
-      "subjects": ["scenario", "simulation"]
+      "subjects": ["scenario", "simulation"],
+      "restNamespaces": ["scenario-events", "scenarios", "simulation-runs", "voice"]
     },
     {
       "id": "secret",
       "root": "modules/secret",
       "classification": "core",
-      "subjects": ["secret"]
+      "subjects": ["secret"],
+      "restNamespaces": ["secrets"]
     },
     {
       "id": "share",
@@ -289,19 +325,22 @@
       "id": "slack",
       "root": "modules/slack",
       "classification": "core",
-      "subjects": ["slack", "slack-integration"]
+      "subjects": ["slack", "slack-integration"],
+      "restNamespaces": ["slack-connections"]
     },
     {
       "id": "stored-object",
       "root": "modules/stored-object",
       "classification": "core",
-      "subjects": ["stored-object"]
+      "subjects": ["stored-object"],
+      "restNamespaces": ["files", "image-proxy", "stored-objects"]
     },
     {
       "id": "suite",
       "root": "modules/suite",
       "classification": "core",
-      "subjects": ["suite"]
+      "subjects": ["suite"],
+      "restNamespaces": ["run-plans", "suites", "test-suites"]
     },
     {
       "id": "topic",
@@ -313,19 +352,15 @@
       "id": "trace",
       "root": "modules/trace",
       "classification": "core",
-      "subjects": ["trace", "trace-ingestion"]
-    },
-    {
-      "id": "usage",
-      "root": "modules/usage",
-      "classification": "core",
-      "subjects": ["usage"]
+      "subjects": ["trace", "trace-ingestion"],
+      "restNamespaces": ["collector", "events", "thread", "trace", "traces", "track_event"]
     },
     {
       "id": "user",
       "root": "modules/user",
       "classification": "core",
-      "subjects": ["user", "user-avatar"]
+      "subjects": ["user", "user-avatar"],
+      "restNamespaces": ["me", "user-avatar"]
     },
     {
       "id": "webhook",
@@ -337,7 +372,8 @@
       "id": "workflow",
       "root": "modules/workflow",
       "classification": "core",
-      "subjects": ["workflow"]
+      "subjects": ["workflow"],
+      "restNamespaces": ["optimization", "workflows"]
     },
     {
       "id": "billing",
@@ -396,7 +432,8 @@
         "quarantine-fill",
         "session-policy",
         "spend-spike-anomaly"
-      ]
+      ],
+      "restNamespaces": ["governance", "ingest"]
     },
     {
       "id": "licensing",
@@ -420,13 +457,15 @@
       "id": "saas",
       "root": "enterprise/modules/saas",
       "classification": "enterprise",
-      "subjects": ["saas"]
+      "subjects": ["saas"],
+      "restNamespaces": ["track_usage"]
     },
     {
       "id": "scim",
       "root": "enterprise/modules/scim",
       "classification": "enterprise",
-      "subjects": ["scim", "scim-sync"]
+      "subjects": ["scim", "scim-sync"],
+      "restNamespaces": ["scim", "scim-tokens"]
     },
     {
       "id": "sso",

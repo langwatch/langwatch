@@ -5,11 +5,7 @@ import {
   injectPublicAppConfigIntoHtml,
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
-// The resolver reads the server environment, so it deliberately lives on the
-// projection module rather than being re-exported to browser code.
-import { resolveUiPublicBootstrap } from "@langwatch/config/public-app-config/projection";
 import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
-import { pickMailGateway } from "@langwatch/notification-contract";
 import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
@@ -19,7 +15,10 @@ import { chunkImportRetry } from "./vite/chunk-import-retry";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { entryCoreChunkGroup, hostMountsChunkGroup } from "./vite/entry-core-chunks";
+import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
 import { havenHmrGate } from "./vite/havenHmrGate";
+import { mailPreview } from "./vite/mail-preview";
+import { fetchPublicConfigFromApi } from "./vite/public-config-from-api";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
@@ -195,12 +194,23 @@ function patchObjectInspectBrowserStub(): Plugin {
  * HTML shell. In development and `vite preview` (the build job's boot smoke)
  * Vite owns the shell, so it performs the same explicit boot mapping itself.
  */
-function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
+function injectDevelopmentPublicConfig({ apiUrl }: { apiUrl: string }): Plugin {
+  let last: PublicAppConfig | undefined;
+  // The api may boot after this server and reloads on its own: read it per page, waiting only
+  // for the first answer, then keeping the last one while a reload has it briefly down.
+  const current = async (): Promise<PublicAppConfig> => {
+    try {
+      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: last ? 0 : 30_000 });
+    } catch (failure) {
+      if (!last) throw failure;
+    }
+    return last;
+  };
   return {
     name: "inject-development-public-config",
     apply: "serve",
-    transformIndexHtml(html) {
-      return injectPublicAppConfigIntoHtml({ html, config });
+    async transformIndexHtml(html) {
+      return injectPublicAppConfigIntoHtml({ html, config: await current() });
     },
     configurePreviewServer(server) {
       const shellPath = path.resolve(server.config.root, server.config.build.outDir, "index.html");
@@ -209,8 +219,10 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
         const isShell = pathname.endsWith(".html") || !path.extname(pathname);
         if (request.method !== "GET" || !isShell || !existsSync(shellPath)) return next();
         const html = readFileSync(shellPath, "utf8");
-        response.setHeader("Content-Type", "text/html");
-        response.end(injectPublicAppConfigIntoHtml({ html, config }));
+        void current().then((config) => {
+          response.setHeader("Content-Type", "text/html");
+          response.end(injectPublicAppConfigIntoHtml({ html, config }));
+        }, next);
       });
     },
   };
@@ -237,35 +249,8 @@ function logDevelopmentTlsState(
   devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
-/** The dev server cannot ask the running module, so it feeds the module's own pick from env. */
-function devMailAvailable(env: NodeJS.ProcessEnv): boolean {
-  const pick = pickMailGateway({
-    provider: env.EMAIL_PROVIDER,
-    available: {
-      ses: Boolean(env.USE_AWS_SES && env.AWS_REGION),
-      sendgrid: Boolean(env.SENDGRID_API_KEY),
-      smtp: Boolean(env.SMTP_URL || env.SMTP_HOST),
-      resend: Boolean(env.RESEND_API_KEY),
-    },
-  });
-  return "gateway" in pick && pick.gateway !== null;
-}
-
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
-  // The dev server is its own public address. `dev-stack.sh` aligns BASE_HOST
-  // to PORT for the whole stack; a lone `pnpm dev:ui` with no `.env` gets the
-  // same answer here instead of a boot refusal naming an env var.
-  const publicConfig =
-    command === "serve"
-      ? resolveUiPublicBootstrap(
-          {
-            ...process.env,
-            BASE_HOST: process.env.BASE_HOST ?? `http://localhost:${FRONTEND_PORT}`,
-          },
-          { mailAvailable: devMailAvailable(process.env) },
-        ).publicConfig
-      : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server listening,
@@ -279,9 +264,12 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     plugins: [
       react(),
       patchObjectInspectBrowserStub(),
-      ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
+      // The api renders the page's public config; the dev server lifts it from the api's shell.
+      ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
+      havenOrb({ slug: process.env[HAVEN_SLUG_ENV] }),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
+      mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
       pushServiceWorker(),
       shikiReachGuard(),

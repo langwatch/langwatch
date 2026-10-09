@@ -4,14 +4,16 @@
  * turn sees no entry rather than one that refuses when pressed.
  */
 
-import type { NavigationOpsAccess } from "@langwatch/navigation-browser/navigation";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import type { NavigationOpsAccess } from "@langwatch/navigation-contract";
 
 /**
  * `langy:create`, not `langy:view`: the palette hand-off queues an auto-send,
  * so offering it on the read grant would invite a 403.
  */
 const LANGY_CREATE_PERMISSION = "langy:create";
-const LANGY_RELEASE_FLAG = "release_langy_enabled";
+const LANGY_RELEASE_FLAG = FrontendFlags.release_langy_enabled;
 
 /** Presence is broadcast from the Trace Explorer and nowhere else. */
 const TRACES_ROUTE_PATTERN = "/:project/traces";
@@ -26,7 +28,7 @@ export function offersLangyAsk({
   demoProjectSlug,
 }: {
   hasPermission: (permission: string) => boolean;
-  isFeatureEnabled: (flag: string) => boolean;
+  isFeatureEnabled: (flag: ReleaseFlagToken) => boolean;
   projectSlug: string | undefined;
   demoProjectSlug: string | undefined;
 }): boolean {

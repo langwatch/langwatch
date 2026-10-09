@@ -5,6 +5,7 @@ import {
   Config,
   isSaas,
   langwatchDefaultModel,
+  logSettings,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
   nodeEnvironment,
@@ -15,12 +16,12 @@ import {
 import { nlpFetchMaxTimeoutMs } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
-import { SCENARIO_WORKER } from "./scenario-execution.constants.ts";
+import { SCENARIO_WORKER } from "./features/execution/scenario-execution.constants.ts";
 import {
   isScenarioResourceClass,
   SCENARIO_RESOURCE_CLASSES,
   type ScenarioResourceClass,
-} from "./scenario-resource-class.ts";
+} from "./features/execution/scenario-resource-class.ts";
 
 const trimmedOptional = z
   .string()
@@ -42,6 +43,15 @@ const offUnlessTrue = z
   .string()
   .optional()
   .transform((value) => (value ?? "").trim().toLowerCase() === "true");
+
+/** Main's scenario-generate cap: a positive number of milliseconds, else 30 seconds. */
+const generateTimeoutMs = z
+  .string()
+  .optional()
+  .transform((value) => {
+    const override = Number(value);
+    return Number.isFinite(override) && override > 0 ? override : 30_000;
+  });
 
 const allResourceClasses = Object.keys(SCENARIO_RESOURCE_CLASSES).filter(isScenarioResourceClass);
 /** A comma list of runtime classes; unset means every class, an unknown name is refused. */
@@ -97,6 +107,8 @@ export const scenarioConfig = Config.define((c) => ({
   consumedResourceClasses: c.env("SCENARIO_CONSUMED_RESOURCE_CLASSES", resourceClassSet),
   /** The slots this worker's execution pool holds; a run takes its class's weight. */
   slotBudget: c.env("SCENARIO_SLOT_BUDGET", slotBudget),
+  /** How long one scenario-generate model call may run before it aborts. */
+  generateTimeoutMs: c.env("SCENARIO_GENERATE_TIMEOUT_MS", generateTimeoutMs),
   /** The browser call's length cap in seconds; unusable values fall back to the default. */
   voiceCallMaxSeconds: c.env("VOICE_CALL_MAX_SECONDS", passthrough),
   /** Dev only: a loopback voice stand-in's signed URL passes the check. */
@@ -127,6 +139,8 @@ export const scenarioConfig = Config.define((c) => ({
     nodeCompileCache: c.env("NODE_COMPILE_CACHE", passthrough),
     corepackEnableDownloadPrompt: c.env("COREPACK_ENABLE_DOWNLOAD_PROMPT", passthrough),
     nodeExtraCaCerts: c.env("NODE_EXTRA_CA_CERTS", passthrough),
+    /** Level and format only (TEL-CHILD-ENV): never an endpoint, header or credential. */
+    logSettings,
   },
 }));
 

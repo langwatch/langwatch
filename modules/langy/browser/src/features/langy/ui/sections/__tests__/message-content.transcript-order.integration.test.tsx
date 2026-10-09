@@ -19,7 +19,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../ui/sections/derived-cards/langy-code-access-card.tsx", () => ({
+vi.mock("../../../../tools/ui/sections/langy-code-access-card.tsx", () => ({
   LangyCodeAccessCard: ({ callId }: { callId: string }) => (
     <div data-testid="code-access-card">{callId}</div>
   ),
@@ -211,5 +211,51 @@ describe("given a turn that ran two calls with no prose between them", () => {
 
     expect(screen.getAllByLabelText("Langy activity")).toHaveLength(1);
     expect(inOrder(screen.getByLabelText("Langy activity"), screen.getByText(SECOND))).toBe(true);
+  });
+});
+
+function failedPart(command: string, id: string) {
+  return {
+    type: "tool-bash",
+    toolCallId: id,
+    state: "output-error",
+    input: { command },
+    errorText: "error: unknown option '--format'",
+  };
+}
+
+describe("given a turn whose third step failed", () => {
+  /** @scenario "A failure appears where it happened" */
+  it("draws the failure after the receipt of the two steps before it", () => {
+    renderMessage(
+      assistantMessage([
+        toolPart("ls modules", "c1"),
+        toolPart("cat README.md", "c2"),
+        failedPart("langwatch docs --format json", "c3"),
+      ] as UIMessage["parts"]),
+    );
+
+    const receipt = blockHolding("2 tool calls");
+    const failure = blockHolding("This step couldn't be completed.");
+    expect(inOrder(receipt, blockHolding("cat README.md"), failure)).toBe(true);
+  });
+});
+
+describe("given a turn whose first step failed", () => {
+  /** @scenario "A turn that failed immediately still leads with the failure" */
+  it("draws the failure first, above the later steps and the reply", () => {
+    renderMessage(
+      assistantMessage([
+        failedPart("langwatch docs --format json", "c1"),
+        toolPart("ls modules", "c2"),
+        { type: "text", text: CLOSING },
+      ] as UIMessage["parts"]),
+    );
+
+    const failure = blockHolding("and Langy carried on");
+    expect(screen.getByLabelText("Langy activity").firstElementChild?.textContent).toContain(
+      "and Langy carried on",
+    );
+    expect(inOrder(failure, blockHolding("ls modules"), screen.getByText(CLOSING))).toBe(true);
   });
 });

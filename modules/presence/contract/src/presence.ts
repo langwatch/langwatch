@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-export const PRESENCE_FEATURE_ID = "presence" as const;
-
 export const presenceLensSchema = z.enum([
   "traces",
   "evaluations",

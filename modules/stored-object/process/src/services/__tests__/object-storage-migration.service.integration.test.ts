@@ -20,7 +20,6 @@ import {
   ObjectStorageMigrationService,
   type QueueMigrationBlocker,
 } from "../object-storage-migration.service.ts";
-import { StoredObjectStorageRegistryService } from "../stored-object-storage-registry.service.ts";
 
 class MemoryDriver implements StoredObjectBlobRepository {
   readonly objects = new Map<string, Buffer>();
@@ -502,22 +501,17 @@ describe("Feature: Object storage provider parity and migration", () => {
       }
 
       const result = await state.migration.finalize();
-      const activeRegistry = StoredObjectStorageRegistryService.create({
-        s3: destinationProvider === "s3" ? state.destinationDriver : state.sourceDriver,
-        file: new MemoryDriver(),
-        "azure-blob":
-          destinationProvider === "azure" ? state.destinationDriver : state.sourceDriver,
-      });
+      const destinationStore = state.destinationDriver;
       const publishedRow = state.rows.get("project-1")?.[0];
       const newBytes = Buffer.from("post-cutover-write");
       const newUri = state.destination.storedObjectUri("project-1", digest(newBytes));
-      await activeRegistry.put(newUri, newBytes, "application/octet-stream");
+      await destinationStore.put(newUri, newBytes);
 
       expect(result.destinationProvider).toBe(destinationProvider);
       expect(publishedRow?.storage_uri).toBe(
         state.destination.storedObjectUri(row.project_id, row.sha256),
       );
-      expect(await readBuffer(await activeRegistry.get(publishedRow!.storage_uri))).toEqual(
+      expect(await readBuffer(await destinationStore.get(publishedRow!.storage_uri))).toEqual(
         Buffer.from("stored-object"),
       );
       expect(
@@ -527,7 +521,7 @@ describe("Feature: Object storage provider parity and migration", () => {
           ),
         ),
       ).toEqual(Buffer.from("chunk-1"));
-      expect(await readBuffer(await activeRegistry.get(newUri))).toEqual(newBytes);
+      expect(await readBuffer(await destinationStore.get(newUri))).toEqual(newBytes);
     },
   );
 

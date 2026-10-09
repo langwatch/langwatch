@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MAX_BLOB_BYTES } from "../blobConstants.ts";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../jobEnvelope.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 /**
  * Decode failures: classification comes from error TYPE, never message text,
@@ -19,9 +19,6 @@ import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.t
 describe("jobEnvelope decode failures", () => {
   const projectId = createTenantId("project_5538");
 
-  beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-  });
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -32,6 +29,7 @@ describe("jobEnvelope decode failures", () => {
     const tieredBlobs = new TieredBlobStore({
       redisBlobs,
       objectStoreFor: () => objectStore,
+      mintUri: mintTestUri,
       resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
       s3ThresholdBytes,
     });

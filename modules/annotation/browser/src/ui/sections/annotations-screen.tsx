@@ -7,16 +7,19 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Flex, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { toEpochMs } from "@langwatch/time";
 import { Inbox } from "lucide-react";
 import { useMemo } from "react";
 
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
 import {
   useAllAnnotations,
+  useAnnotationsByTraceIds,
   useAnnotationQueue,
   useAnnotationSidebarCounts,
   useAnnotationTraces,
 } from "../../behavior/use-annotation-reads.ts";
+import { useTraceIdsAcrossPages } from "../../behavior/use-trace-ids-across-pages.ts";
 import { allAnnotationsExport, csvFileName } from "../../model/annotation-export.ts";
 import { useAnnotationHost } from "../../model/annotation-host.ts";
 import type { AnnotationHostApi } from "../../model/annotation-host.ts";
@@ -168,26 +171,66 @@ function QueueList({ host }: { host: AnnotationHostApi }) {
   );
 }
 
+/** Main's page size for the walk; the free plan's list bound refuses anything larger. */
+const TRACE_WALK_PAGE_SIZE = 1000;
+
+/** Keeps main's 10 000-trace ceiling while every request stays at the page cap. */
+const TRACE_WALK_MAX_PAGES = 10;
+
 function AllAnnotationsList({ host }: { host: AnnotationHostApi }) {
   const project = host.project();
-  const { period } = useAnnotationPeriod(host.route().query);
+  const { query } = host.route();
+  const { period } = useAnnotationPeriod(query);
+  const traceFilters = host.traceFilters();
+  const filtered = traceFilters !== void 0;
 
-  const annotations = useAllAnnotations({
+  const walk = useTraceIdsAcrossPages({
+    input: {
+      ...traceFilters,
+      projectId: project?.id ?? "",
+      startDate: traceFilters?.startDate ?? toEpochMs(period.startDate),
+      endDate: traceFilters?.endDate ?? toEpochMs(period.endDate),
+      groupBy: "none",
+      pageOffset: 0,
+      pageSize: TRACE_WALK_PAGE_SIZE,
+      ...(query.sortBy ? { sortBy: query.sortBy } : {}),
+      ...(query.orderBy ? { sortDirection: query.orderBy } : {}),
+    },
+    enabled: filtered && !!project,
+    maxPages: TRACE_WALK_MAX_PAGES,
+  });
+
+  const filteredAnnotations = useAnnotationsByTraceIds({
+    projectId: project?.id,
+    traceIds: walk.traceIds,
+    enabled: filtered,
+  });
+
+  const allAnnotations = useAllAnnotations({
     projectId: project?.id,
     startDate: period.startDate,
     endDate: period.endDate,
+    enabled: !filtered,
   });
 
+  const annotations: readonly AnnotationWithUser[] = useMemo(
+    () => (filtered ? filteredAnnotations.data : (allAnnotations.data ?? [])),
+    [filtered, filteredAnnotations.data, allAnnotations.data],
+  );
+  const annotationsLoading = filtered
+    ? walk.isLoading || filteredAnnotations.isLoading
+    : allAnnotations.isLoading;
+
   const traceIds = useMemo(
-    () => Array.from(new Set((annotations.data ?? []).map((one) => one.traceId))),
-    [annotations.data],
+    () => Array.from(new Set(annotations.map((one) => one.traceId))),
+    [annotations],
   );
 
   const traces = useAnnotationTraces({ projectId: project?.id, traceIds });
 
   const rows: AnnotationRow[] = useMemo(
-    () => groupedAnnotationsToRows(groupByTrace(annotations.data ?? [], traces.data ?? [])),
-    [annotations.data, traces.data],
+    () => groupedAnnotationsToRows(groupByTrace(annotations, traces.data ?? [])),
+    [annotations, traces.data],
   );
 
   return (
@@ -195,11 +238,20 @@ function AllAnnotationsList({ host }: { host: AnnotationHostApi }) {
       view="all"
       host={host}
       rows={rows}
-      rowsLoading={annotations.isLoading || traces.isLoading}
+      rowsLoading={annotationsLoading || traces.isLoading}
       exportLabel="Export all"
+      {...(filtered && walk.isError
+        ? {
+            emptyNotice: {
+              title: "Couldn't load the annotations for these filters",
+              description:
+                "Something went wrong while loading matching traces. Reload the page to try again.",
+            },
+          }
+        : {})}
       onExport={() => {
         const { fields, rows: exportRows } = allAnnotationsExport({
-          annotations: annotations.data ?? [],
+          annotations,
           traces: traces.data ?? [],
         });
 

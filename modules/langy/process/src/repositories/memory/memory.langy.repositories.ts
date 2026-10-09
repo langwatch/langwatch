@@ -19,7 +19,6 @@ import { LangyLocalPresenceMemoryRepository } from "./memory.langy-local-presenc
 import { MemoryLangyMessageProjectionRepository } from "./memory.langy-message-projection.repository.ts";
 import { MemoryLangyMessageRepository } from "./memory.langy-message.repository.ts";
 import { MemoryLangyRateLimitRepository } from "./memory.langy-rate-limit.repository.ts";
-import { MemoryLangySessionKeyReapRepository } from "./memory.langy-session-key-reap.repository.ts";
 import { MemoryLangySessionKeyRepository } from "./memory.langy-session-key.repository.ts";
 import { LangyTokenBufferMemoryRepository } from "./memory.langy-token-buffer.repository.ts";
 import { MemoryLangyTurnAdmissionRepository } from "./memory.langy-turn-admission.repository.ts";
@@ -44,7 +43,6 @@ export class MemoryLangyRepositories {
       conversationTurnState: MemoryLangyConversationTurnProjectionRepository.create(store),
       messageStorage: MemoryLangyMessageProjectionRepository.create(store),
       sessionKeys: MemoryLangySessionKeyRepository.create(store),
-      sessionKeyReap: MemoryLangySessionKeyReapRepository.create(store),
       turnAccess: LangyTurnAccessMemoryRepository.create(store),
       turnHandoff: LangyTurnHandoffMemoryRepository.create(store),
       frameDedup: LangyFrameDedupMemoryRepository.create(store),

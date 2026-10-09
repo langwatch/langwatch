@@ -5,7 +5,6 @@ import {
   ForbiddenError,
 } from "@langwatch/api/rest";
 import {
-  InstantEvalFreeBudgetExhaustedError,
   InstantEvalQueryInvalidError,
   InstantEvalRunNotFoundError,
   instantEvalRestCredential,
@@ -13,6 +12,7 @@ import {
   type InstantEvalJudgmentWire,
   type InstantEvalRunWire,
 } from "@langwatch/instant-eval-contract";
+import { InstantEvalFreeBudgetExhaustedError } from "@langwatch/instant-eval-judge-contract";
 /**
  * `/api/v1/instant-evals` over the real REST runtime and the canonical error
  * envelope, with only `InstantEvalApi` a double: what the boundary parses,

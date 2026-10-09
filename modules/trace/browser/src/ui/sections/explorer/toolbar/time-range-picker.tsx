@@ -12,7 +12,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { format, Temporal, toEpochMs } from "@langwatch/time";
+import { format, Temporal, toEpochMs, readableDate } from "@langwatch/time";
 import type { TimeRangePreset } from "@langwatch/trace-contract";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
@@ -26,7 +26,6 @@ import {
   PRESET_GROUPS,
   useCopyToClipboard,
 } from "../../../../index.ts";
-import { readableDate } from "../../../../model/display-formatters.ts";
 
 export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const timeRange = useFilterStore((s) => s.timeRange);

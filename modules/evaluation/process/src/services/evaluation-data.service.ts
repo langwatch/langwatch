@@ -24,6 +24,10 @@ import {
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import type { Protections, Trace } from "@langwatch/trace-contract";
 
+import type {
+  DataForEvaluation,
+  EvaluationExecutionDeps,
+} from "../features/execution/services/evaluation-execution.service.ts";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
@@ -32,7 +36,6 @@ import {
   findUnavailability,
   unavailableEvaluatorMessage,
 } from "../rules/evaluator-availability-service.rules.ts";
-import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 /** The three redactions a trace read honours. */

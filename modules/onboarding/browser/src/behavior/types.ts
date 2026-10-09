@@ -117,13 +117,6 @@ export interface OnboardingFlowState {
   direction: number;
 }
 
-export interface OnboardingNavigation {
-  nextScreen: () => void;
-  prevScreen: () => void;
-  skipScreen: () => void;
-  canProceed: () => boolean;
-}
-
 export type OnboardingFlowVariant = "full" | "self_hosted" | "guided";
 
 export interface OnboardingFlowConfig {

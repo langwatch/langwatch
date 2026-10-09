@@ -1,3 +1,4 @@
+import { identityClient } from "@langwatch/identity-client";
 import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity-contract";
 import { useCallback, useMemo, useState } from "react";
 
@@ -21,7 +22,7 @@ function useAutomaticJoins({
   organizationId: string;
   canManage: boolean;
 }) {
-  const automaticJoins = api.joinRequests.automaticJoins.useQuery(
+  const automaticJoins = identityClient.identity.joinRequests.automaticJoins.useQuery(
     { organizationId },
     { enabled: !!organizationId && canManage },
   );
@@ -49,6 +50,7 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
   const queryClient = api.useUtils();
+  const joinUtils = identityClient.useUtils();
   const [answeringId, setAnsweringId] = useState<string | null>(null);
 
   const answer = useCallback(
@@ -59,7 +61,7 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
       title,
     }: {
       joinRequestId: string;
-      run: ReturnType<typeof api.joinRequests.approve.useMutation>;
+      run: ReturnType<typeof identityClient.identity.joinRequests.approve.useMutation>;
       description: string;
       title: string;
     }) => {
@@ -74,7 +76,7 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
               type: "success",
               duration: 5000,
             });
-            void queryClient.joinRequests.pending.invalidate();
+            void joinUtils.identity.joinRequests.pending.invalidate();
             // An approval adds a member, so the members list is stale too.
             void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
             void queryClient.organization.getDirectoryCounts.invalidate();
@@ -89,7 +91,7 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
         },
       );
     },
-    [organizationId, queryClient, toaster, showErrorToast],
+    [organizationId, queryClient, toaster, showErrorToast, joinUtils],
   );
 
   return { answeringId, answer };
@@ -105,12 +107,12 @@ function usePendingJoinRequests({
 }) {
   // Only an admin ever asks. With the flag off the procedure answers an empty
   // list, so the panel simply does not render — no branch here needed.
-  const pending = api.joinRequests.pending.useQuery(
+  const pending = identityClient.identity.joinRequests.pending.useQuery(
     { organizationId },
     { enabled: !!organizationId && canManage },
   );
-  const approveMutation = api.joinRequests.approve.useMutation();
-  const rejectMutation = api.joinRequests.reject.useMutation();
+  const approveMutation = identityClient.identity.joinRequests.approve.useMutation();
+  const rejectMutation = identityClient.identity.joinRequests.reject.useMutation();
   const { answeringId, answer } = useAnswerJoinRequest({ organizationId });
 
   const requests: PendingJoinRequest[] = useMemo(
@@ -119,7 +121,7 @@ function usePendingJoinRequests({
         joinRequestId: request.joinRequestId,
         // Who is asking and when. The address is not in the payload at all —
         // the domain is what was matched.
-        name: request.name ?? request.email,
+        name: request.name,
         domain: request.domain,
         requestedAt: request.requestedAt,
         expiresAt: request.expiresAt,
@@ -165,12 +167,12 @@ function useDomainJoinSetting({
 }) {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
-  const queryClient = api.useUtils();
-  const joining = api.joinRequests.joining.useQuery(
+  const joinUtils = identityClient.useUtils();
+  const joining = identityClient.identity.joinRequests.joining.useQuery(
     { organizationId },
     { enabled: !!organizationId && canManage },
   );
-  const setJoiningMutation = api.joinRequests.setJoining.useMutation();
+  const setJoiningMutation = identityClient.identity.joinRequests.setJoining.useMutation();
 
   const setJoining = useCallback(
     (next: {
@@ -189,7 +191,7 @@ function useDomainJoinSetting({
               type: "success",
               duration: 5000,
             });
-            void queryClient.joinRequests.joining.invalidate();
+            void joinUtils.identity.joinRequests.joining.invalidate();
           },
           // The three refusals here — no licence, an unproven domain, an
           // identity provider that already admits it — each have their own
@@ -202,7 +204,7 @@ function useDomainJoinSetting({
         },
       );
     },
-    [organizationId, queryClient, setJoiningMutation, toaster, showErrorToast],
+    [organizationId, setJoiningMutation, toaster, showErrorToast, joinUtils],
   );
 
   return {

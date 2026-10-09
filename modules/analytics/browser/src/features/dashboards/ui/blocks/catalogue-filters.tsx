@@ -1,13 +1,13 @@
 /**
- * The catalogue's search and chips, shared by the templates finder and the "Add a widget"
- * picker: one centred search, category chips in their trunk's colour, and agent-type chips.
- * Each row picks one value; clicking the picked chip again clears it.
+ * The catalogue's chips, shared by the templates finder and the "Add a widget" picker: category
+ * chips in their trunk's colour, and agent-type chips. Each row picks one value; clicking the
+ * picked chip again clears it. With them, the finder's plain search; the picker has the ask bar.
  */
 
 import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Activity, BadgeCheck, DollarSign, type LucideIcon, ShieldCheck } from "lucide-react";
-import type { ReactNode, Ref } from "react";
+import type { ReactNode } from "react";
 
 import {
   AGENT_KIND_CHIP_LABELS,
@@ -36,26 +36,21 @@ export const TRUNK_ICONS: Readonly<Record<Trunk, LucideIcon>> = {
 /** The agent types a chip row offers; coding-agent boards and widgets live elsewhere. */
 const CHIP_KINDS = AGENT_KINDS.filter((kind) => kind !== "coding");
 
-/** The one plain, centred search box. */
+/** The finder's plain, centred search box. */
 export function CatalogueSearch({
   value,
   placeholder,
-  inputRef,
   onChange,
-  onEnter,
 }: {
   value: string;
   /** Also the box's accessible name. */
   placeholder: string;
-  inputRef?: Ref<HTMLInputElement>;
   onChange: (next: string) => void;
-  onEnter?: () => void;
 }) {
   return (
     // A grid stretches the inline search group, so the whole placeholder shows.
     <Box display="grid" width="full" maxWidth="640px">
       <SearchInput
-        ref={inputRef}
         aria-label={placeholder}
         placeholder={placeholder}
         height="40px"
@@ -63,11 +58,6 @@ export function CatalogueSearch({
         fontSize="14px"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" || !onEnter) return;
-          event.preventDefault();
-          onEnter();
-        }}
       />
     </Box>
   );

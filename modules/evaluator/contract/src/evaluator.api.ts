@@ -1,4 +1,3 @@
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 /**
  * Everything a door may ask about a project's evaluators. Two doors
  * reach it — `evaluators.*` tRPC and `/api/evaluators` REST — so a rule
@@ -94,7 +93,7 @@ export interface EvaluatorApi {
   listByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator[]>;
   /** The entry-node fields a workflow evaluator maps trace data onto. */
   getWorkflowFields(input: EvaluatorScope): Promise<EvaluatorWorkflowFields>;
-  /** The workflow and monitors a cascade archive would take with the evaluator. */
+  /** The workflow a cascade archive would take with the evaluator. */
   getRelatedEntities(input: EvaluatorScope): Promise<EvaluatorRelatedEntities>;
   /** The replicas of this evaluator the caller may read. */
   getCopies(input: EvaluatorLineageScope & { actorId: string }): Promise<EvaluatorCopy[]>;
@@ -118,7 +117,7 @@ export interface EvaluatorApi {
   update(input: EvaluatorUpdateInput): Promise<Evaluator>;
   /** Soft-deletes an evaluator. */
   archive(input: EvaluatorScope): Promise<Evaluator>;
-  /** Archives the evaluator, archives its workflow and deletes its monitors. */
+  /** Archives the evaluator and its workflow, and records `lw.evaluator.deleted`. */
   cascadeArchive(input: EvaluatorScope): Promise<EvaluatorCascadeArchive>;
   /** Replicates the evaluator, and the workflow backing it, into another project. */
   copy(input: {
@@ -127,6 +126,11 @@ export interface EvaluatorApi {
     sourceProjectId: string;
     newEvaluatorId: string;
     actorId: string;
+    /**
+     * Copying a library evaluator counts against the plan's evaluator cap; an
+     * online evaluation's copy brings its evaluator along uncapped, so it passes false.
+     */
+    shouldCheckEvaluatorCap?: boolean;
   }): Promise<Evaluator>;
   /** Pushes the source evaluator's config onto the replicas the caller may write. */
   pushToCopies(
@@ -154,8 +158,3 @@ export interface EvaluatorApi {
 }
 
 export const EvaluatorApi = moduleApi<EvaluatorApi>()("evaluator");
-
-/** Evaluator's settings: only the shared deployment origin its platform URLs are built on. */
-export const evaluatorConfig = Config.define(() => ({ publicBaseUrl }));
-
-export type EvaluatorServerConfig = ConfigOf<typeof evaluatorConfig>;

@@ -16,8 +16,12 @@ import {
   type RoutingPolicyScopeLevel,
 } from "../../../features/routing-policies/ui/blocks/routing-policies-table.tsx";
 import { useGatewayHost } from "../../../model/gateway-host.ts";
+import { isPermissionRefusal } from "../../../model/permission-refusal.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import {
+  PermissionRefusedNotice,
+  PermissionRequiredNotice,
+} from "../../../ui/elements/permission-required-notice.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
@@ -32,15 +36,16 @@ const ROUTING_POLICY_DRAWER = "routingPolicy" as const;
  * flag and permission policy the route table now states around it.
  */
 export function RoutingPoliciesPage() {
-  const { organization, hasAnyPermission } = useOrganizationTeamProject();
-  const organizationId = organization?.id ?? "";
+  const { organization } = useOrganizationTeamProject();
   const host = useGatewayHost();
-  const canManage = hasAnyPermission("routingPolicies:manage");
+  const organizationId = organization?.id ?? "";
+  const canManage = host.hasPermission("routingPolicies:manage");
 
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
     { enabled: !!organizationId, refetchOnWindowFocus: false },
   );
+  const cannotRead = isPermissionRefusal(policiesQuery.error);
 
   const [policyToDelete, setPolicyToDelete] = useState<RoutingPolicyRow | null>(null);
 
@@ -73,23 +78,18 @@ export function RoutingPoliciesPage() {
 
           {policiesQuery.isLoading && <ListSkeleton />}
 
-          {policiesQuery.error ? (
-            <HandledErrorAlert
-              error={policiesQuery.error}
-              fallbackTitle="Couldn't load routing policies"
-            />
-          ) : null}
+          {policiesQuery.error ? <PolicyListFailure error={policiesQuery.error} /> : null}
 
           {/* "Publish a default policy" is an instruction, so it is only shown
             to whoever can carry it out. */}
-          {canManage && !policiesQuery.isLoading && !hasAnyDefault && (
+          {canManage && !cannotRead && !policiesQuery.isLoading && !hasAnyDefault && (
             <NoDefaultNotice
               hasPolicies={policies.length > 0}
               onAddOrganizationPolicy={() => openNew("organization", true)}
             />
           )}
 
-          {!policiesQuery.isLoading && (
+          {!cannotRead && !policiesQuery.isLoading && (
             <RoutingPoliciesTable
               policies={policies}
               resolveScopeNames={resolveScopeNames}
@@ -106,7 +106,7 @@ export function RoutingPoliciesPage() {
             />
           )}
 
-          {!canManage && (
+          {!canManage && !cannotRead && (
             <PermissionRequiredNotice
               permission="routingPolicies:manage"
               detail="You can read the policies and the tiers they publish. Creating, editing, and deleting need this grant."
@@ -271,4 +271,17 @@ function NoDefaultNotice({
 /**
  * RBAC: routingPolicies:view opens page, routingPolicies:manage shows authoring controls.
  */
+/** A refusal is not a failed load: it reads as no access. Any other failure keeps its error. */
+function PolicyListFailure({ error }: { error: unknown }) {
+  if (isPermissionRefusal(error)) {
+    return (
+      <PermissionRefusedNotice
+        error={error}
+        detail="Routing policies are read at the organization level."
+      />
+    );
+  }
+  return <HandledErrorAlert error={error} fallbackTitle="Couldn't load routing policies" />;
+}
+
 export default RoutingPoliciesPage;

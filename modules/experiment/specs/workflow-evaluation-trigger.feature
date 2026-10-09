@@ -6,6 +6,13 @@ Feature: A workflow evaluation is requested by the api and run by the worker
   See specs/workflows/evaluate-via-api.feature for the public contract.
 
   @unit
+  Scenario: The workflow evaluate door keeps its wire after the move
+    Given the workflow evaluate REST family mounted by experiment
+    When the declaration is read
+    Then it answers POST /api/workflows/:id/evaluate at its dated address and its /api/v1 twin, in workflow's namespace
+    And it keeps the operation id postApiWorkflowsByIdEvaluate and asks workflows:create and evaluations:view
+
+  @unit
   Scenario: The evaluation runs on the worker under the run id it answered with
     Given a workflow with a committed version
     When an evaluation is triggered

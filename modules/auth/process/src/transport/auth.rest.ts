@@ -104,6 +104,7 @@ export const authRest = defineRestRouter(AuthDoorApi)
 
   .get("/api/auth/session", "readBrowserAuthSession")
   .withAccess(AUTH_DOOR)
+  .servesWhileUpgrading()
   .withHeaders(COOKIE_HEADERS)
   .withResponse("protocol", { produces: JSON_MEDIA_TYPE, because: SESSION_POLL_WIRE })
   .handle(async ({ app, response }, headers) =>
@@ -112,11 +113,13 @@ export const authRest = defineRestRouter(AuthDoorApi)
 
   .get("/api/auth/logout", "endBrowserSessionAndRedirect")
   .withAccess(AUTH_DOOR)
+  .servesWhileUpgrading()
   .withResponse("forwarded", { produces: AUTH_ANSWER, because: BETTER_AUTH_FORWARDS })
   .handle(async ({ app, request, response }) => response.pass(await endSession({ app, request })))
 
   .post("/api/auth/logout", "endBrowserSession")
   .withAccess(AUTH_DOOR)
+  .servesWhileUpgrading()
   .withResponse("forwarded", { produces: JSON_MEDIA_TYPE, because: BETTER_AUTH_FORWARDS })
   .handle(async ({ app, request, response }) => response.pass(await endSession({ app, request })))
 
@@ -127,6 +130,7 @@ export const authRest = defineRestRouter(AuthDoorApi)
    */
   .get("/api/auth/*", "betterAuthHandshake")
   .withAccess(AUTH_DOOR)
+  .servesWhileUpgrading()
   .withResponse("forwarded", { produces: AUTH_ANSWER, because: BETTER_AUTH_FORWARDS })
   .anyMethod()
   .handle(async ({ app, request, response }) =>

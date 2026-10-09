@@ -271,6 +271,20 @@ async def async_evaluate(
     raise ValueError("Async evaluate failed due to issue creating span")
 
 
+def _merge_keyword_data(
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
+    **fields: Any,
+) -> Dict[str, Any]:
+    """Fold keyword fields (input=, output=, ...) into one data dict; None fields are skipped."""
+    merged: Dict[str, Any] = (
+        data.model_dump(exclude_unset=True, exclude_none=True)
+        if isinstance(data, BasicEvaluateData)
+        else dict(data or {})
+    )
+    merged.update({key: value for key, value in fields.items() if value is not None})
+    return merged
+
+
 def _prepare_data(
     slug: str,
     name: Optional[str],

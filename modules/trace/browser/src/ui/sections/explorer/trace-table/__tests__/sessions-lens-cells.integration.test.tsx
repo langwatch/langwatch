@@ -7,13 +7,13 @@ import { cleanup, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { truncateId } from "../../../../../model/display-formatters.ts";
+import type { ConversationGroup } from "../../../../../behavior/explorer/trace-table/conversation-groups.ts";
 import "@testing-library/jest-dom/vitest";
 
+import { mapSessionGroupToConversationGroup } from "../../../../../behavior/explorer/utils/map-session-groups-payload.ts";
+import { truncateId } from "../../../../../model/display-formatters.ts";
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
 import { getCapability } from "../../../../../model/lens-capabilities.ts";
-import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
-import type { ConversationGroup } from "../conversation-groups.ts";
 import { ConversationSummaryDetail } from "../registry/addons/conversation/conversation-summary.tsx";
 import { sessionLabelOf } from "../registry/cells/conversation/conversation-cell.tsx";
 import { conversationCells } from "../registry/cells/conversation/index.ts";

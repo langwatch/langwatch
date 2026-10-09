@@ -114,10 +114,10 @@ func (c mailClient) do(ctx context.Context, r mailRequest) error {
 	}
 }
 
-// mailFilter narrows a list or a wait to a recipient and a subject; empty
-// fields match everything.
+// mailFilter narrows a list or a wait to a recipient and a subject (a wait
+// also to mail newer than an id); empty fields match everything.
 type mailFilter struct {
-	to, subject string
+	to, subject, after string
 }
 
 // addTo sets the filter's non-empty fields on q.
@@ -127,6 +127,9 @@ func (f mailFilter) addTo(q url.Values) url.Values {
 	}
 	if f.subject != "" {
 		q.Set("subject", f.subject)
+	}
+	if f.after != "" {
+		q.Set("after", f.after)
 	}
 	return q
 }
@@ -213,9 +216,9 @@ func (c mailClient) getHTML(ctx context.Context, id string) (string, error) {
 }
 
 // mailUsage is printed on a missing or unknown subcommand.
-const mailUsage = "usage: haven mail <address|list [--to] [--subject]|get <id> [--html]|wait [--to] [--subject] [--timeout]|clear> [--json]"
+const mailUsage = "usage: haven mail <address|inbox|list [--to] [--subject]|get <id> [--html]|links <id>|wait [--to] [--subject] [--after <id>] [--timeout]|delete <id>|clear> [--json]"
 
-// runMail is `haven mail <address|list|get|wait|clear>`.
+// runMail is `haven mail <address|inbox|list|get|links|wait|delete|clear>`.
 func runMail(ctx context.Context, d deps, inv invocation) error {
 	if len(inv.args) == 0 {
 		return errors.New(mailUsage)
@@ -257,10 +260,16 @@ func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error
 		return cmd.list(ctx, inv)
 	case "get":
 		return cmd.get(ctx, inv)
+	case "links":
+		return cmd.links(ctx, inv)
 	case "wait":
 		return cmd.wait(ctx, inv)
+	case "delete":
+		return cmd.delete(ctx, inv)
 	case "clear":
 		return cmd.clear(ctx)
+	case "inbox":
+		return cmd.inbox(ctx)
 	default:
 		return fmt.Errorf("unknown `haven mail` subcommand %q — %s", inv.args[0], mailUsage)
 	}
@@ -313,7 +322,8 @@ func (cmd mailCommand) wait(ctx context.Context, inv invocation) error {
 		}
 		timeout = dur
 	}
-	msg, matched, err := cmd.client.wait(ctx, mailFilter{to: inv.value("--to"), subject: inv.value("--subject")}, timeout)
+	filter := mailFilter{to: inv.value("--to"), subject: inv.value("--subject"), after: inv.value("--after")}
+	msg, matched, err := cmd.client.wait(ctx, filter, timeout)
 	if err != nil {
 		return err
 	}
@@ -321,6 +331,67 @@ func (cmd mailCommand) wait(ctx context.Context, inv invocation) error {
 		return fmt.Errorf("no message matched within %s", timeout)
 	}
 	return cmd.printMessage(msg)
+}
+
+// links prints the links found in one message, one per line.
+func (cmd mailCommand) links(ctx context.Context, inv invocation) error {
+	if len(inv.args) < 2 {
+		return errors.New("usage: haven mail links <id>")
+	}
+	msg, err := cmd.client.get(ctx, inv.args[1])
+	if err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(append([]string{}, msg.Links...))
+	}
+	for _, link := range msg.Links {
+		fmt.Println(link)
+	}
+	return nil
+}
+
+// delete removes one message from the inbox.
+func (cmd mailCommand) delete(ctx context.Context, inv invocation) error {
+	if len(inv.args) < 2 {
+		return errors.New("usage: haven mail delete <id>")
+	}
+	id := inv.args[1]
+	notFound := fmt.Errorf("message %q is not in this stack's inbox", id)
+	if err := cmd.client.do(ctx, mailRequest{method: http.MethodDelete, path: "/api/messages/" + url.PathEscape(id), notFound: notFound}); err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(map[string]bool{"deleted": true})
+	}
+	fmt.Println("message deleted")
+	return nil
+}
+
+// mailInbox is the sink's own account of itself, as GET /api/inbox reports it.
+type mailInbox struct {
+	Stack      string `json:"stack"`
+	SMTPAddr   string `json:"smtpAddr"`
+	BaseURL    string `json:"baseUrl"`
+	Persistent bool   `json:"persistent"`
+	Address    string `json:"address"`
+}
+
+// inbox prints what the console's "This inbox" panel shows.
+func (cmd mailCommand) inbox(ctx context.Context) error {
+	var info mailInbox
+	if err := cmd.client.do(ctx, mailRequest{method: http.MethodGet, path: "/api/inbox", into: &info}); err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(info)
+	}
+	fmt.Printf("stack:      %s\n", info.Stack)
+	fmt.Printf("address:    %s\n", info.Address)
+	fmt.Printf("smtp:       %s\n", info.SMTPAddr)
+	fmt.Printf("console:    %s\n", info.BaseURL)
+	fmt.Printf("persistent: %t\n", info.Persistent)
+	return nil
 }
 
 func (cmd mailCommand) clear(ctx context.Context) error {

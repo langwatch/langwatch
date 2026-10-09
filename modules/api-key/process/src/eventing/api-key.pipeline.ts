@@ -1,6 +1,6 @@
 /**
- * Two hourly sweeps retire credentials nothing else revokes: an abandoned
- * sandbox key, and a stale CLI login key with its cascaded ingest keys. Built
+ * Two hourly sweeps retire credentials nothing else revokes: an abandoned sandbox,
+ * run or Langy session key, and a stale CLI login key with its ingest keys. Built
  * against the installing graph's own store and app, so each reap prunes and revokes through it.
  */
 
@@ -16,6 +16,7 @@ import type { ApiKeyModule } from "../app/api-key.app.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { AgentSandboxKeyReapService } from "../services/agent-sandbox-key-reap.service.ts";
 import { CliLoginKeyReapService } from "../services/cli-login-key-reap.service.ts";
+import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { WorkflowRunKeyReapService } from "../services/workflow-run-key-reap.service.ts";
 import {
   type AgentSandboxKeyReapDeps,
@@ -44,6 +45,9 @@ export const apiKeyEventing = defineEventingModule({
   build: ({ repositories, app, processStore }: EventingSetup<ApiKeyRepositories, ApiKeyModule>) => {
     const reap = AgentSandboxKeyReapService.create({ repository: repositories.apiKeys });
     const workflowRunReap = WorkflowRunKeyReapService.create({ repository: repositories.apiKeys });
+    const langySessionReap = LangySessionKeyReapService.create({
+      repository: repositories.apiKeys,
+    });
     const loginKeyReap = CliLoginKeyReapService.create({
       repository: repositories.apiKeys,
       revoke: ({ id, organizationId, userId }) =>
@@ -57,7 +61,8 @@ export const apiKeyEventing = defineEventingModule({
     });
     return buildAgentSandboxMaintenancePipeline({
       sandboxKeyReap: {
-        reap: async () => (await reap.reap()) + (await workflowRunReap.reap()),
+        reap: async () =>
+          (await reap.reap()) + (await workflowRunReap.reap()) + (await langySessionReap.reap()),
         deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
       },
       cliLoginKeyReap: {
@@ -68,17 +73,17 @@ export const apiKeyEventing = defineEventingModule({
   },
 });
 
-export interface AgentSandboxMaintenancePipelineDeps {
+interface AgentSandboxMaintenancePipelineDeps {
   sandboxKeyReap: AgentSandboxKeyReapDeps;
   /** The hourly sweep over CLI login keys whose session ran out. */
   cliLoginKeyReap: CliLoginKeyReapDeps;
 }
 
-// Credential maintenance the API-key feature owns end to end: the sandbox key a code agent run
+// Credential maintenance the API-key feature owns end to end: the system keys a run or a Langy turn
 // left behind, and the CLI login key a device session stopped refreshing. Neither is retired by
 // anything else, so both are scheduled sweeps rather than event-driven. No events; costs nothing
 // beyond scheduled wake.
-export function buildAgentSandboxMaintenancePipeline({
+function buildAgentSandboxMaintenancePipeline({
   sandboxKeyReap,
   cliLoginKeyReap,
 }: AgentSandboxMaintenancePipelineDeps): StaticPipelineDefinition<never> {

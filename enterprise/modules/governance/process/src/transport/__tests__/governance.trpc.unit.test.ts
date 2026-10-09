@@ -1,4 +1,14 @@
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import {
+  cliBootstrapResultSchema,
+  governanceBudgetOverviewForUserSchema,
+  governanceTrpc,
+  personalUsageRollupSchema,
+  type CliBootstrapResult,
+  type GovernanceBudgetOverviewForUser,
+  type GovernanceRestApi,
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+  type PersonalUsageRollup,
+} from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -41,6 +51,28 @@ const home = {
   firstProjectSlug: "acme",
 };
 const emptyPage = { events: [], nextCursor: null, nextCursorCompound: null };
+const rollup: PersonalUsageRollup = {
+  summary: {
+    spentUsd: 0,
+    billedUsd: 0,
+    requests: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    mostUsedModel: null,
+  },
+  dailyBuckets: [],
+  breakdownByModel: [],
+};
+const overview: GovernanceBudgetOverviewForUser = { gatewayAccess: true, budgets: [] };
+const bootstrap: CliBootstrapResult = {
+  tools: [],
+  providers: [],
+  gatewayProviders: [],
+  budget: { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" },
+  gatewayUrl: "https://gateway.example.com",
+  adminEmail: null,
+  toolPolicies: PLATFORM_TOOL_POLICY_DEFAULTS,
+};
 
 function mount(answer: typeof workspace | null) {
   const asked: string[] = [];
@@ -62,6 +94,18 @@ function mount(answer: typeof workspace | null) {
     governanceRecordWorkspaceView: async (input) => {
       calls.push(input);
       return { recorded: true, auditLogId: "audit_1" };
+    },
+    personalUsageDashboard: async (input, by) => {
+      calls.push([input, by]);
+      return rollup;
+    },
+    personalBudgetOverview: async (input, by) => {
+      calls.push([input, by]);
+      return overview;
+    },
+    cliBootstrap: async (input, by) => {
+      calls.push([input, by]);
+      return bootstrap;
     },
     governanceQuarantineFillStats: async (input) => {
       calls.push(input);
@@ -92,6 +136,9 @@ describe("the governance tRPC namespace", () => {
       ocsfExport: "query",
       quarantineFillStats: "query",
       recordWorkspaceView: "mutation",
+      personalUsage: "query",
+      budgetOverview: "query",
+      cliBootstrap: "query",
     });
   });
 
@@ -155,5 +202,73 @@ describe("the governance tRPC namespace", () => {
     expect(calls).toEqual([
       { organizationId: "org_1", targetTeamId: "team_2", kind: "team", actorUserId: "user_1" },
     ]);
+  });
+
+  describe("given the caller's own /me reads, moved from user.* with main's permission", () => {
+    it("keeps the moved /me reads' wire shapes", () => {
+      const { personalUsage, budgetOverview, cliBootstrap } = governanceTrpc.members;
+
+      expect([personalUsage?.kind, budgetOverview?.kind, cliBootstrap?.kind]).toEqual([
+        "query",
+        "query",
+        "query",
+      ]);
+      expect(personalUsage?.output).toBe(personalUsageRollupSchema);
+      expect(budgetOverview?.output).toBe(governanceBudgetOverviewForUserSchema);
+      expect(cliBootstrap?.output).toBe(cliBootstrapResultSchema);
+      expect(
+        personalUsage?.input.validate({
+          organizationId: "org-1",
+          windowStartMs: 1,
+          windowEndMs: 2,
+        }),
+      ).toBe(true);
+      expect(
+        budgetOverview?.input.validate({ organizationId: "org-1", includeTopModels: true }),
+      ).toBe(true);
+      expect(cliBootstrap?.input.validate({ organizationId: "org-1" })).toBe(true);
+    });
+
+    /** @scenario "A member's personal usage reads their own rollup over the window they gave" */
+    it("reads the caller's own rollup over the given window under organization:view", async () => {
+      const { caller, asked, calls } = mount(null);
+
+      await expect(
+        caller.personalUsage({ organizationId: "org_1", windowStartMs: 1, windowEndMs: 2 }),
+      ).resolves.toEqual(rollup);
+      expect(asked).toEqual(["organization:view"]);
+      expect(calls).toEqual([
+        [{ organizationId: "org_1", window: { startMs: 1, endMs: 2 } }, { id: "user_1" }],
+      ]);
+    });
+
+    it("leaves the window to governance when only one end is given", async () => {
+      const { caller, calls } = mount(null);
+
+      await caller.personalUsage({ organizationId: "org_1", windowStartMs: 1 });
+      expect(calls).toEqual([[{ organizationId: "org_1" }, { id: "user_1" }]]);
+    });
+
+    /** @scenario "A member's budget overview lists their own budgets with top models when asked" */
+    it("reads the caller's own budget overview with top models under organization:view", async () => {
+      const { caller, asked, calls } = mount(null);
+
+      await expect(
+        caller.budgetOverview({ organizationId: "org_1", includeTopModels: true }),
+      ).resolves.toEqual(overview);
+      expect(asked).toEqual(["organization:view"]);
+      expect(calls).toEqual([
+        [{ organizationId: "org_1", includeTopModels: true }, { id: "user_1" }],
+      ]);
+    });
+
+    /** @scenario "The CLI login ceremony reads the caller's own bootstrap" */
+    it("resolves the caller's own CLI bootstrap under organization:view", async () => {
+      const { caller, asked, calls } = mount(null);
+
+      await expect(caller.cliBootstrap({ organizationId: "org_1" })).resolves.toEqual(bootstrap);
+      expect(asked).toEqual(["organization:view"]);
+      expect(calls).toEqual([[{ organizationId: "org_1" }, { id: "user_1" }]]);
+    });
   });
 });

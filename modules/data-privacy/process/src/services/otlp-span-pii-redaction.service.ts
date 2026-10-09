@@ -13,6 +13,7 @@ import {
   redactStringNative,
   reservesModelOrToolName,
 } from "@langwatch/redaction/pii";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type {
   PIIRedactionLevel,
   OtlpAnyValue,
@@ -20,7 +21,6 @@ import type {
   OtlpResource,
   OtlpSpan,
 } from "@langwatch/trace-contract";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service.ts";
 import {

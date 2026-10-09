@@ -31,6 +31,7 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import type { TraceApi } from "@langwatch/trace-contract";
 import {
   parseStudioWorkflow,
   type WorkflowApi,
@@ -105,10 +106,12 @@ async function bootWorker({
     .withEventing(eventing)
     .withConfig({
       experiment: {
+        foldCacheTtlSeconds: 300,
         blockLocalHttpCalls: false,
         allowedProxyHosts: [],
         runConcurrency: 10,
         publicBaseUrl: undefined,
+        legacyPublicBaseUrl: undefined,
         isSaas: false,
       },
     })
@@ -127,6 +130,7 @@ async function bootWorker({
       evaluation: createApiFixture<EvaluationApi>({}),
       "api-key": createApiFixture<ApiKeyApi>({}),
       "stored-object": createApiFixture<StoredObjectApi>({}),
+      trace: createApiFixture<TraceApi>({}),
       "model-provider": createApiFixture<ModelProviderApi>({
         listCosts: () => Promise.resolve([customCost]),
       }),
@@ -209,21 +213,6 @@ describe("experiment installed in the worker", () => {
       expect(driver.inserts.flatMap((insert) => insert.rows)).toEqual([
         expect.objectContaining({ _retention_days: RETAINED.traces }),
       ]);
-    } finally {
-      await runtime.stop();
-    }
-  });
-
-  /** @scenario "A run no experiment recorded answers not recorded" */
-  it("answers a run no experiment recorded as not recorded", async () => {
-    const { runtime } = await bootWorker();
-
-    try {
-      await expect(
-        runtime
-          .service(ExperimentApi)
-          .lookupExperimentId({ tenantId: "project_1", runId: "run_1" }),
-      ).resolves.toEqual({ kind: "not_recorded" });
     } finally {
       await runtime.stop();
     }

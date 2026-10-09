@@ -1,6 +1,7 @@
 // What the SCIM screen asks of its host application: organization tokens and the
 // base URL for IdP posts, which must come from the deployment, not window.location.
 
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 
 export type ScimSuccessNotice = {
@@ -33,7 +34,7 @@ export abstract class ScimHostApi {
   abstract hasPermission(permission: string): boolean;
 
   /** Whether a feature flag is on for the organization in scope. */
-  abstract isFeatureEnabled(flag: string): boolean;
+  abstract isFeatureEnabled(flag: ReleaseFlagToken): boolean;
 
   abstract succeeded(notice: ScimSuccessNotice): void;
 

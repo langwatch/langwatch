@@ -51,12 +51,18 @@ describe("<ScenarioTargetRow/>", () => {
     /** @scenario "List row shows status label with latency and cost" */
     it("shows Passed beside its latency and cost", () => {
       const row = renderRow(
-        runOf({ status: ScenarioRunStatus.SUCCESS, durationInMs: 1200, totalCost: 0.003 }),
+        runOf({
+          status: ScenarioRunStatus.SUCCESS,
+          durationInMs: 9000,
+          roleLatencies: { Agent: [1000, 1400], User: [300] },
+          totalCost: 0.003,
+        }),
       );
       const listRow = row.parentElement!;
 
       expect(within(listRow).getByText("Passed")).toBeInTheDocument();
       expect(within(listRow).getByText("1.2s")).toBeInTheDocument();
+      expect(within(listRow).queryByText("9.0s")).not.toBeInTheDocument();
       expect(within(listRow).getByText("$0.003")).toBeInTheDocument();
     });
   });
@@ -75,7 +81,7 @@ describe("<ScenarioTargetRow/>", () => {
 
   describe("given a scenario run with null cost and no latency", () => {
     /** @scenario "List row without metrics shows only status label" */
-    it("shows the status label and the duration, and no cost", () => {
+    it("falls back to the run duration, and shows no cost", () => {
       const row = renderRow(runOf({ durationInMs: 2300, totalCost: undefined }));
       const listRow = row.parentElement!;
 

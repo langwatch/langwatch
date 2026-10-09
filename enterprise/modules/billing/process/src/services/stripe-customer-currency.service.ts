@@ -5,8 +5,11 @@ import {
   UnsupportedBillingCurrencyError,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import type Stripe from "stripe";
 
+import type {
+  StripeCustomer,
+  StripeCustomersChannel,
+} from "../channels/stripe-customers.channel.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
@@ -23,26 +26,30 @@ export type CheckoutCurrencyResolution =
  * Establish the currency a checkout session must be created in.
  */
 export class StripeCustomerCurrencyService {
-  private constructor(private readonly stripeErrors: StripeErrorTranslator) {}
+  private constructor(
+    private readonly customers: StripeCustomersChannel,
+    private readonly stripeErrors: StripeErrorTranslator,
+  ) {}
 
-  static create(stripeErrors: StripeErrorTranslator): StripeCustomerCurrencyService {
-    return new StripeCustomerCurrencyService(stripeErrors);
+  static create(options: {
+    customers: StripeCustomersChannel;
+    stripeErrors: StripeErrorTranslator;
+  }): StripeCustomerCurrencyService {
+    return new StripeCustomerCurrencyService(options.customers, options.stripeErrors);
   }
 
   async resolve({
-    stripe,
     customerId,
     organizationId,
     requestedCurrency,
   }: {
-    stripe: Stripe;
     customerId: string;
     organizationId: string;
     requestedCurrency: CurrencyType;
   }): Promise<CheckoutCurrencyResolution> {
-    let customer: Stripe.Customer | Stripe.DeletedCustomer;
+    let customer: StripeCustomer;
     try {
-      customer = await stripe.customers.retrieve(customerId);
+      customer = await this.customers.getCustomer({ customerId });
     } catch (error) {
       // Only rate limiting and an unreachable provider are causes we can name.
       // Anything else we genuinely do not understand, so it is rethrown as-is and

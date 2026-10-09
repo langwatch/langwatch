@@ -5,6 +5,7 @@
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { PromptListDrawerToken } from "@langwatch/prompt-client";
 import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
@@ -113,7 +114,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
       onSelect(type);
     } else if (type === "prompt") {
       // Use drawer navigation
-      openDrawer("promptList", {}, { replace: true });
+      openDrawer(PromptListDrawerToken, {}, { replace: true });
     } else if (type === "agent") {
       openDrawer("agentList", {}, { replace: true });
     } else if (type === "evaluator") {

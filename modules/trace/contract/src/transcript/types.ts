@@ -1,4 +1,4 @@
-import type { MediaPartData } from "../trace-media-part.collector.ts";
+import type { MediaPartData } from "../features/content/trace-media-part.collector.ts";
 
 export type { MediaPartData };
 

@@ -1,5 +1,6 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
 
@@ -19,6 +20,11 @@ const SOURCE_FILE = /\.[cm]?tsx?$/;
 const DECLARES_DEPENDENCIES = /\bstatic\s+(?:readonly\s+)?dependencies\b/;
 const ALLOWED =
   "Cut the back edge from the reactor's side: the module being told reacts to the other's event and the teller drops its dependency. See dev/docs/ARCHITECTURE.md §5.";
+const EXCEPTION_ALLOWED =
+  "A named exception holds one two-module cycle Alex kept, with an owner among the two, a reason and the ruling; the list only shrinks. See dev/docs/ARCHITECTURE.md §5.";
+const EXCEPTIONS_FILE = fileURLToPath(import.meta.url);
+/** The repository the named exceptions describe; a fixture tree is held to none of them. */
+const REPOSITORY_ROOT = realpathSync(resolve(dirname(EXCEPTIONS_FILE), "../../../../.."));
 
 /** One peer a module's `static dependencies` names, and where it names it. */
 export type PeerEdge = { from: string; to: string; file: string; line: number };
@@ -26,7 +32,7 @@ export type PeerEdge = { from: string; to: string; file: string; line: number };
 /** A peer edge whose peer reaches back, with the shortest way back. */
 export type PeerCycleEdge = PeerEdge & { back: readonly string[] };
 
-type Located = { literal: ts.ObjectLiteralExpression; source: ts.SourceFile };
+export type Located = { literal: ts.ObjectLiteralExpression; source: ts.SourceFile };
 
 function unwrap(expression: ts.Expression): ts.Expression {
   if (ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression))
@@ -48,7 +54,7 @@ function dependencyInitialiser(node: ts.Node): ts.Expression | undefined {
 }
 
 /** The initialiser of every class's `static dependencies` in this file. */
-function dependencyInitialisers(source: ts.SourceFile): ts.Expression[] {
+export function dependencyInitialisers(source: ts.SourceFile): ts.Expression[] {
   const found: ts.Expression[] = [];
   const visit = (node: ts.Node): void => {
     const initialiser = dependencyInitialiser(node);
@@ -79,7 +85,9 @@ function topLevelConstant({
 }
 
 /** Local name -> module specifier, for every named import in the file. */
-function importedNames(source: ts.SourceFile): Map<string, { specifier: string; name: string }> {
+export function importedNames(
+  source: ts.SourceFile,
+): Map<string, { specifier: string; name: string }> {
   const names = new Map<string, { specifier: string; name: string }>();
 
   for (const statement of source.statements.filter(ts.isImportDeclaration)) {
@@ -114,7 +122,7 @@ function relativeFile({
 }
 
 /** The object literal a dependency map is, following constants and relative imports. */
-function locate({
+export function locate({
   expression,
   source,
 }: {
@@ -148,7 +156,7 @@ function rootIdentifier(expression: ts.Expression): ts.Identifier | undefined {
 }
 
 /** Every token a dependency map names, spreads followed. */
-function tokens(located: Located): { token: ts.Identifier; source: ts.SourceFile }[] {
+export function tokens(located: Located): { token: ts.Identifier; source: ts.SourceFile }[] {
   const found: { token: ts.Identifier; source: ts.SourceFile }[] = [];
 
   for (const property of located.literal.properties) {
@@ -277,31 +285,209 @@ function shortestPath({
   return path;
 }
 
-/** Every peer edge whose peer can reach back to the module that declared it. */
-export function peerCycleEdges({
+/** A two-module cycle Alex kept on purpose (§5): who answers for it, why, and the ruling. */
+export type PeerCycleException = Readonly<{
+  between: readonly [string, string];
+  owner: string;
+  reason: string;
+  ruling: string;
+}>;
+
+/** Shrink-only: an entry whose cycle is gone is reported for deletion, never kept. */
+export const PEER_CYCLE_EXCEPTIONS: readonly PeerCycleException[] = [
+  {
+    between: ["identity", "organization"],
+    owner: "organization",
+    reason:
+      "organization asks identity for the SSO-test guard (D2) and verified addresses (D4); identity reads membership, administrators, domains and invites from organization",
+    ruling: "Alex, 2026-10-08, round 29 PC-1",
+  },
+];
+
+/** A peer edge a named exception keeps, with the exception that keeps it. */
+export type KeptPeerEdge = PeerEdge & { exception: PeerCycleException };
+
+/** The pair's spelling in a report: both modules, sorted, joined by `<->`. */
+export function exceptionKey(between: readonly [string, string]): string {
+  return between.toSorted().join(" <-> ");
+}
+
+function exceptionFor({
+  edge,
+  exceptions,
+}: {
+  edge: PeerEdge;
+  exceptions: readonly PeerCycleException[];
+}): PeerCycleException | undefined {
+  const key = exceptionKey([edge.from, edge.to]);
+
+  return exceptions.find((item) => exceptionKey(item.between) === key);
+}
+
+function withoutEdge({
+  graph,
+  from,
+  to,
+}: {
+  graph: ReadonlyMap<string, readonly string[]>;
+  from: string;
+  to: string;
+}): Map<string, readonly string[]> {
+  const copy = new Map(graph);
+  copy.set(
+    from,
+    (graph.get(from) ?? []).filter((next) => next !== to),
+  );
+
+  return copy;
+}
+
+type Classified = { reported: PeerCycleEdge[]; kept: KeptPeerEdge[] };
+
+/** Splits the cycle edges into the reported and the kept; a kept pair never hides a longer loop. */
+function classify({
   packages,
+  exceptions,
 }: {
   packages: readonly ClassifiedPackage[];
-}): PeerCycleEdge[] {
+  exceptions: readonly PeerCycleException[];
+}): Classified {
   const edges = peerEdges({ packages });
   const graph = new Map<string, string[]>();
-
   for (const edge of edges) graph.set(edge.from, [...(graph.get(edge.from) ?? []), edge.to]);
 
-  return edges.flatMap((edge) => {
+  const classified: Classified = { reported: [], kept: [] };
+  for (const edge of edges) {
     const back = shortestPath({ graph, start: edge.to, goal: edge.from });
+    if (!back) continue;
 
-    return back ? [{ ...edge, back }] : [];
+    const exception = exceptionFor({ edge, exceptions });
+    const longer =
+      exception &&
+      shortestPath({
+        graph: withoutEdge({ graph, from: edge.to, to: edge.from }),
+        start: edge.to,
+        goal: edge.from,
+      });
+    if (exception && !longer) classified.kept.push({ ...edge, exception });
+    else classified.reported.push({ ...edge, back: longer ?? back });
+  }
+
+  return classified;
+}
+
+/** Every peer edge whose peer can reach back, but for a named exception's own two-module loop. */
+export function peerCycleEdges({
+  packages,
+  exceptions = PEER_CYCLE_EXCEPTIONS,
+}: {
+  packages: readonly ClassifiedPackage[];
+  exceptions?: readonly PeerCycleException[];
+}): PeerCycleEdge[] {
+  return classify({ packages, exceptions }).reported;
+}
+
+/** The peer edges a named exception keeps. */
+export function keptPeerCycleEdges({
+  packages,
+  exceptions = PEER_CYCLE_EXCEPTIONS,
+}: {
+  packages: readonly ClassifiedPackage[];
+  exceptions?: readonly PeerCycleException[];
+}): KeptPeerEdge[] {
+  return classify({ packages, exceptions }).kept;
+}
+
+/** The named exceptions, one line each, for the policy's output. */
+export function formatPeerCycleExceptions(
+  exceptions: readonly PeerCycleException[] = PEER_CYCLE_EXCEPTIONS,
+): string {
+  return exceptions
+    .map(
+      (item) =>
+        `peer-cycles: kept by named exception: ${exceptionKey(item.between)} (owner ${item.owner}; ${item.ruling}): ${item.reason}.\n`,
+    )
+    .join("");
+}
+
+function malformed({
+  item,
+  features,
+}: {
+  item: PeerCycleException;
+  features: ReadonlySet<string>;
+}): string | undefined {
+  const [left, right] = item.between;
+  if (left === right) return "names one module twice";
+  if (!features.has(left) || !features.has(right)) return "names a module the tree does not have";
+  if (!item.between.includes(item.owner)) return "has no owner among its two modules";
+  if (!item.reason.trim()) return "states no reason";
+
+  return item.ruling.trim() ? void 0 : "cites no ruling";
+}
+
+/** A named exception that is malformed, repeated, or whose modules no longer name each other. */
+export function peerCycleExceptionFindings({
+  packages,
+  exceptions = PEER_CYCLE_EXCEPTIONS,
+}: {
+  packages: readonly ClassifiedPackage[];
+  exceptions?: readonly PeerCycleException[];
+}): ArchitectureViolation[] {
+  const declared = new Set(peerEdges({ packages }).map((edge) => `${edge.from} -> ${edge.to}`));
+  const features = new Set(packages.flatMap((pkg) => (pkg.feature ? [pkg.feature] : [])));
+  const seen = new Set<string>();
+
+  return exceptions.flatMap((item): ArchitectureViolation[] => {
+    const key = exceptionKey(item.between);
+    const repeated = seen.has(key);
+    seen.add(key);
+    const [left, right] = item.between;
+    const stale = !declared.has(`${left} -> ${right}`) || !declared.has(`${right} -> ${left}`);
+    const problem = [
+      malformed({ item, features }),
+      repeated ? "is listed twice" : void 0,
+      stale ? "no longer names a two-module cycle; delete it" : void 0,
+    ].find((text) => text !== void 0);
+
+    return problem
+      ? [
+          {
+            policy: POLICY,
+            file: EXCEPTIONS_FILE,
+            message: `The named exception ${key} ${problem}.`,
+            allowed: EXCEPTION_ALLOWED,
+          },
+        ]
+      : [];
   });
 }
 
-/** A peer dependency that closes a loop is a violation. */
-export function lintPeerCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
-  return peerCycleEdges({ packages: snapshot.packages }).map((edge) => ({
+/** The policy's findings over the given exceptions; the live repository passes the named list. */
+export function peerCycleFindings({
+  packages,
+  exceptions = PEER_CYCLE_EXCEPTIONS,
+}: {
+  packages: readonly ClassifiedPackage[];
+  exceptions?: readonly PeerCycleException[];
+}): ArchitectureViolation[] {
+  const cycles = peerCycleEdges({ packages, exceptions }).map((edge) => ({
     policy: POLICY,
     file: edge.file,
     line: edge.line,
     message: `${edge.from} depends on ${edge.to}'s Api, and ${edge.to} reaches back: ${edge.back.join(" -> ")}.`,
     allowed: ALLOWED,
   }));
+
+  return [...cycles, ...peerCycleExceptionFindings({ packages, exceptions })];
+}
+
+/** A peer dependency that closes a loop is a violation, but for a named exception's own loop. */
+export function lintPeerCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const live = existsSync(snapshot.root) && realpathSync(snapshot.root) === REPOSITORY_ROOT;
+
+  return peerCycleFindings({
+    packages: snapshot.packages,
+    exceptions: live ? PEER_CYCLE_EXCEPTIONS : [],
+  });
 }

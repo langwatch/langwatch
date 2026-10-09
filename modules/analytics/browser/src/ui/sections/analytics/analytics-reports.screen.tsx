@@ -1,4 +1,3 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Alert,
@@ -9,6 +8,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -25,12 +26,12 @@ import {
   useFirstDashboard,
 } from "../../../behavior/use-dashboards.ts";
 import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
-import { useWidgetGranularity } from "../../../behavior/use-widget-granularity.ts";
+import { useWidgetGranularity } from "../../../features/dashboard-widget/behavior/use-widget-granularity.ts";
+import { CreateDashboardWidgetDrawer } from "../../../features/dashboard-widget/ui/sections/create-dashboard-widget-drawer.tsx";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import { Link } from "../../elements/analytics-link.tsx";
 import AnalyticsLayout from "../analytics-layout.tsx";
-import { CreateDashboardWidgetDrawer } from "../create-dashboard-widget-drawer.tsx";
 import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
 import { FilterSidebar } from "../filter-sidebar.tsx";
 import { ReportGrid } from "../report-grid.tsx";
@@ -57,7 +58,7 @@ function ReportsContent() {
   // (enforceCustomChartPlaygroundEnabled): `enabled` defaults false while
   // loading, so the button starts as the legacy link, never flashing open.
   const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
-    "release_custom_chart_playground",
+    FrontendFlags.release_custom_chart_playground,
     {
       projectId: project?.id,
       organizationId: organization?.id,

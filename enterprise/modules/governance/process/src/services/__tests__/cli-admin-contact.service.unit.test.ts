@@ -3,7 +3,7 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { OrganizationCliAdminContactService } from "../cli-admin-contact.service.ts";
+import { OrganizationCliAdminContactService } from "../../features/cli/services/cli-admin-contact.service.ts";
 
 describe("OrganizationCliAdminContactService", () => {
   describe("when the organization has an enabled admin with an email", () => {

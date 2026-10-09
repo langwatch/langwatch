@@ -7,7 +7,7 @@ import {
   type AttributeKey,
   type FacetValueState,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
-import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../behavior/facet-constants.ts";
+import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../features/facet/behavior/facet-constants.ts";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 import { AttributeKeyRow } from "./attribute-key-row.tsx";
 

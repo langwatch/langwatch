@@ -1,0 +1,422 @@
+[
+  {
+    "round": 1,
+    "group": "held (security, stopped lanes)",
+    "ids": [
+      "auth-32 (release order)",
+      "r-ops-registry-seams (replay runtime)",
+      "a-signin-access-screens (Access tab)",
+      "ent-merge M2"
+    ],
+    "questions": [
+      {
+        "question": "Security: the auth adoption slice relies on the identity sweep identity:reopen-unproven-accounts, a declared code step, but no app runs code steps yet. Shipped now, it could adopt a still-finalized unproven account and leave its pre-proof password live. When does the slice ship? (auth-32: release order)",
+        "header": "Ship order",
+        "options": [
+          {
+            "label": "Ship once steps run (Recommended)",
+            "description": "Commit the slice now; deploy it only when the tasks container runs code steps, so the sweep has run first."
+          },
+          {
+            "label": "Run sweep SQL by hand",
+            "description": "Run the sweep's SQL on cloud before the slice deploys; ships sooner, with one manual step."
+          },
+          {
+            "label": "Ship now, accept window",
+            "description": "Only enrolled backfill cohorts are exposed until the sweep runs."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "In a memory-store stack, ops' event replay has no ClickHouse event log and no Redis markers. Slice 4 of the ops store-seams lane stops here, and the Upgrades page lane waits behind it. Should a memory replay refuse each run by name, or replay over eventing's in-memory store? (r-ops-registry-seams: replay runtime)",
+        "header": "Ops replay",
+        "options": [
+          {
+            "label": "Refuse by name (Recommended)",
+            "description": "Memory stacks name replay as unavailable and slice 4 lands now. Real installs always have ClickHouse (your round 20 ruling)."
+          },
+          {
+            "label": "Replay in memory",
+            "description": "A memory event source and markers over eventing's memory store; a larger lane before slice 4 can land."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "You ruled main's Access tab restored (grants gathered per holder, with counts). It contradicts two bound rows: roles-and-access-ui :32 (each grant is one row) and :39 (cursor paging). Which shape? Main's tests are ready to port. (a-signin-access-screens: org-access-cluster :35 :47 :54 :70)",
+        "header": "Access tab",
+        "options": [
+          {
+            "label": "Main's view only (Recommended)",
+            "description": "Holders gathered over the existing listManagedGrants; change and revoke inside each holder; status filtered in the browser; :32 and :39 reworded."
+          },
+          {
+            "label": "Both, with a toggle",
+            "description": "Main's gathered view by default, today's per-grant paged list one click away; :32 and :39 stay."
+          },
+          {
+            "label": "Current page only",
+            "description": "Gather only the loaded page; counts are not real, so :70 still fails."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Entitlement's migration step (merge slice M2) is built with defineMigrationStep from @langwatch/upgrade, but entitlement-process does not depend on that package and the lane was barred from adding it. M2 is stopped. Add the dependency? (ent-merge M2)",
+        "header": "Upgrade dep",
+        "options": [
+          {
+            "label": "Add the dependency (Recommended)",
+            "description": "One package.json line; the lockfile and tsconfig reference follow. Every module that declares steps does the same."
+          },
+          {
+            "label": "Re-export from process",
+            "description": "packages/process re-exports the step contract, so modules need no new dependency."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 2,
+    "group": "held (stopped restore slices)",
+    "ids": [
+      "a-product-restore (audit-log :371)",
+      "a-auth-process-rows (scim-sso-signin :28)",
+      "a-signin-access-screens (organization-authentication-settings :36)",
+      "a-product-restore (license-registry :64)"
+    ],
+    "questions": [
+      {
+        "question": "audit-log :371: main recorded at most 200 refused tRPC calls per caller per hour in the audit trail, failing open. Proposed: an optional admitsRefusal on the policy's audit port, fed by the process rate limiter. The patch is written and waits only on you. (a-product-restore: audit-log :371)",
+        "header": "Refusal cap",
+        "options": [
+          {
+            "label": "Apply as proposed (Recommended)",
+            "description": "Port main's budget and its test; REST refusals stay unbudgeted, as on main."
+          },
+          {
+            "label": "Record as a gap",
+            "description": "Every refusal is recorded; :371 is tagged @unimplemented."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "scim-sso-signin :28: on SSO sign-in, identity's resolveUser reads membership across the IdentityApi boundary, so it cannot see the membership auth's callback just wrote in its open transaction. Main shared that transaction ambiently. How should it work? (a-auth-process-rows: scim-sso-signin :28)",
+        "header": "SCIM login",
+        "options": [
+          {
+            "label": "Auth passes membership in (Recommended)",
+            "description": "The callback hands the membership it wrote to resolveUser as an argument; no framework change, no new edge."
+          },
+          {
+            "label": "Ambient transaction",
+            "description": "A framework transaction that crosses an *Api call (packages/prisma-client); a record change."
+          },
+          {
+            "label": "Reword the scenario",
+            "description": "Identity re-reads committed membership only; :28 is reworded to that."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "organization-authentication-settings :36: a reader without sso:view sees a load failure on the sign-on card instead of being told who can help. Main gated on a canView flag. Add canView() to SsoHostApi, mirroring canManage()? (a-signin-access-screens: :36)",
+        "header": "SSO card",
+        "options": [
+          {
+            "label": "Add canView() (Recommended)",
+            "description": "A new host method in sso's browser; the card tells the reader who can help."
+          },
+          {
+            "label": "Read the refusal",
+            "description": "sso-browser takes @langwatch/handled-error as a dependency and reads permission_denied."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "license-registry :64: main's generate-license script writes the registry row and the organisation's licence together. As a licensing task that needs one new licensing repository method spanning both in one transaction, with a memory twin. Build it? (a-product-restore: license-registry :64)",
+        "header": "License task",
+        "options": [
+          {
+            "label": "One repository method (Recommended)",
+            "description": "Atomic, as main; the task reads the organisation's name and slug through its Api."
+          },
+          {
+            "label": "Two writes, no transaction",
+            "description": "Existing repositories; a failure can leave a registry row without a licence."
+          },
+          {
+            "label": "Record as a gap",
+            "description": "No task; :64 is tagged @unimplemented."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 3,
+    "group": "held + C (restore, spec batches)",
+    "ids": [
+      "a-product-restore (credential-validation :482)",
+      "audit-log:91",
+      "audit-log:177",
+      "authz package-boundary:125",
+      "Q172",
+      "Q62 (binds)",
+      "Q62 (sso-onboarding-tiers:85)",
+      "shared-scope-host:82",
+      "guided-onboarding-offer:39",
+      "guided-onboarding-offer:109",
+      "Q167(1)",
+      "Q167(2)",
+      "Q53",
+      "github-branch-maintenance:90",
+      "Q146",
+      "strict-feature-layout:92",
+      "feature-package-boundaries:9",
+      "Q68",
+      "invitations:123",
+      "system-migrations-runner:151",
+      "Q168 (agent type-select)",
+      "Q55",
+      "audit-log:83",
+      "ui-contract:314"
+    ],
+    "questions": [
+      {
+        "question": "credential-validation :482: testing a Codex provider needs a handle main built from Langy's per-project virtual key and the gateway URL. Langy and gateway both depend on model-provider, so a peer call adds a cycle. Allow one named cycle, like the judge cycle? (a-product-restore: credential-validation :482)",
+        "header": "Codex ping",
+        "options": [
+          {
+            "label": "Langy op, named cycle (Recommended)",
+            "description": "Model-provider asks a LangyApi operation for the handle; one named cycle finding; behaves as main."
+          },
+          {
+            "label": "Composed handle",
+            "description": "The process wires the handle in at boot; no module edge, but a shape the record does not list."
+          },
+          {
+            "label": "Record as a gap",
+            "description": "Codex stays untestable; :482 is tagged @unimplemented."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Take the proposed rewordings and binds for eleven rows: audit-log :91 :177, authz boundary :125, cli-login guard (view, not write), sso-onboarding-tiers :85 and two weak binds, shared-scope-host :82, guided-onboarding-offer :39 :109, typed-permissions :208, and keep the live route sweep? One bind lane starts. (Q62, Q167, Q172, rows)",
+        "header": "Bind rows",
+        "options": [
+          {
+            "label": "Take all (Recommended)",
+            "description": "Each row reads what its test proves; about ten unbound rows become bound."
+          },
+          {
+            "label": "Ask per row",
+            "description": "I rule each one in a later round."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Tidy nine rows: tag platform-health :95 and github-branch-maintenance :90 @unimplemented; retire feature-package-boundaries :9 and strict-feature-layout :92; delete invitations :123 with its dead branches; split system-migrations-runner :151 and the agent type-select row; move two credential rows to auth; add audit-log :83's host test. Do all? (Q53, Q146, Q68, Q168, Q55, rows)",
+        "header": "Spec tidy",
+        "options": [
+          {
+            "label": "Do all (Recommended)",
+            "description": "One spec lane; gaps are recorded, dead rows and dead code go."
+          },
+          {
+            "label": "Ask per row",
+            "description": "I rule each one in a later round."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "ui-contract :314 names a cross-module leak test that does not exist; per-module tests cover the hidden governance project. Three project finders still list it, one feeding /api/v1/projects, while main's listings hid it. Reword :314 and add the filters? (ui-contract:314)",
+        "header": "Project leak",
+        "options": [
+          {
+            "label": "Reword and add filters (Recommended)",
+            "description": "Closes the public listing leak, as main did and as your leak-gate ruling restored elsewhere."
+          },
+          {
+            "label": "Reword only",
+            "description": "The scenario matches the per-module tests; the three finders keep listing it."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 4,
+    "group": "C + held (fixes, framework shapes)",
+    "ids": [
+      "Q121",
+      "fresh-clone-dev-setup:40",
+      "Q220",
+      "Q199(3)",
+      "Q166(1)",
+      "browser-supply BS-2",
+      "browser-supply BS-3",
+      "Q210(1)"
+    ],
+    "questions": [
+      {
+        "question": "Five small fixes: the SCIM copy field's raw error toast (then re-guard the tree), .env.example placeholders long enough for a fresh clone to boot, delete governance's unused puller service, assert Prisma's FK error code not its prose, and type 402 refusals payment_required (a small wire change). Do all five? (Q121, fresh-clone:40, Q220, Q199, Q166)",
+        "header": "Small fixes",
+        "options": [
+          {
+            "label": "Do all five (Recommended)",
+            "description": "Small lanes; the 402 body's type changes from internal_error to payment_required."
+          },
+          {
+            "label": "All but the 402",
+            "description": "402 keeps internal_error, as main."
+          },
+          {
+            "label": "Ask per item",
+            "description": "I rule each one in a later round."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "The api injects rum and evaluation config slices that no web module claims, so a strict ui config envelope would refuse every deployment and strictness waits. Move those reads into web declarations first (evaluator claims evaluation; rum needs a claimant), with a strict schema in the composition meanwhile? (browser-supply BS-2)",
+        "header": "UI config",
+        "options": [
+          {
+            "label": "Declarations first (Recommended)",
+            "description": "Owners claim their slices; the composition's strict schema bridges until they do."
+          },
+          {
+            "label": "Composition counts claims",
+            "description": "A new createUi chain call counts the composition's own reads as claims."
+          },
+          {
+            "label": "Composition schema only",
+            "description": "apps/ui imports all eight contract schemas into one strict object."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Typing the browser's public config: owner schemas live in contracts, so PublicAppConfig cannot be closed without restating them. Proposed: withConfig(schema, project), where project reads only the slices the module names, so runtime claims and types come from one declaration. Take it? (browser-supply BS-3)",
+        "header": "Config type",
+        "options": [
+          {
+            "label": "withConfig projection (Recommended)",
+            "description": "Closed by construction; departs from the two-argument spelling."
+          },
+          {
+            "label": "Declaration merging",
+            "description": "One declare-module line per contract; a new pattern across eight files."
+          },
+          {
+            "label": "Loose type",
+            "description": "Only the process fields are checked at build."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Ten channel-registry findings need .withChannels / defineChannels, which packages/process lacks; hand-calling registry.live.create is a deleted spelling. Proposed: build the framework piece first, with the names the record states, then convert all ten. (Q210)",
+        "header": "Channels",
+        "options": [
+          {
+            "label": "Framework first (Recommended)",
+            "description": "One correct shape for all ten; a framework lane, then conversions."
+          },
+          {
+            "label": "Plain registries now",
+            "description": "Unwired plain registries now, wired later."
+          },
+          {
+            "label": "Defer",
+            "description": "Leave the findings for now."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  {
+    "round": 5,
+    "group": "C + held (record direction, seams, deploy safety)",
+    "ids": [
+      "Q210(5)",
+      "r-ops-registry-seams (audit trail reads)",
+      "Q210(2)",
+      "ent-merge M-R (rolling deploy)"
+    ],
+    "questions": [
+      {
+        "question": "Eight modules (enterprise-gateway, governance, licensing, saas, instant-eval, log, metric, usage) still lack real memory twins. Proposed: build real twins, as the record requires, one lane per free module. (Q210)",
+        "header": "Memory twins",
+        "options": [
+          {
+            "label": "Real twins (Recommended)",
+            "description": "The memory tier behaves like live; up to eight lanes can start."
+          },
+          {
+            "label": "Baseline them",
+            "description": "Accept the findings for now."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Ops' audit trail screens still query audit-log's and user's tables from ops repositories, against table ownership, and a memory stack shows an empty trail. Fixing it needs an AuditLogApi list-by-target operation and a user-name lookup. Add both? (r-ops-registry-seams: audit trail reads)",
+        "header": "Ops audit",
+        "options": [
+          {
+            "label": "Add both reads (Recommended)",
+            "description": "Ops reads through the owners' Api; memory stacks show the trail."
+          },
+          {
+            "label": "Named exception",
+            "description": "Keep the direct reads as a linted exception with a written reason."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "Five abstract contract services cannot be deleted because other modules type against Pick<XService> instead of calling the owner's *Api. Proposed: convert those consumers to the *Api first, then delete the services. (Q210)",
+        "header": "Pick types",
+        "options": [
+          {
+            "label": "Convert, then delete (Recommended)",
+            "description": "Consumers use the public Api."
+          },
+          {
+            "label": "Leave them",
+            "description": "The findings stay."
+          }
+        ],
+        "multiSelect": false
+      },
+      {
+        "question": "During a rolling deploy of the entitlement merge, an old pod that dequeues a new lw.entitlement.* event cannot parse it and dead-letters the job, so one usage-limit alert can be lost. Make an undeclared queued type retryable during a drain window, or accept? (ent-merge M-R rolling deploy)",
+        "header": "Old pods",
+        "options": [
+          {
+            "label": "Retry while draining (Recommended)",
+            "description": "Eventing retries an undeclared type during the drain window; no job is lost."
+          },
+          {
+            "label": "Accept the window",
+            "description": "month_counted re-emits on the next count; one limit alert may be missed."
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  }
+]

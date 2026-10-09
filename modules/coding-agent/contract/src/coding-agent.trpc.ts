@@ -4,6 +4,7 @@
  * usage card and the pull-request drawer have always called.
  */
 import { defineTrpcContract } from "@langwatch/module";
+import { traceSessionGroupsInputSchema, tracesSessionsPageSchema } from "@langwatch/trace-contract";
 
 import { codingAgentTranscriptSchema } from "./coding-agent-transcript.ts";
 import {
@@ -61,4 +62,9 @@ export const codingAgentTrpc = defineTrpcContract("codingAgents")
   .query("transcript")
   .withInput(codingAgentTrpcTraceScopeSchema)
   .withOutput(codingAgentTranscriptSchema)
+
+  // The Sessions lens page, its coding-agent sessions enriched. Main: `traces.sessions`.
+  .query("sessionGroups")
+  .withInput(traceSessionGroupsInputSchema)
+  .withOutput(tracesSessionsPageSchema)
   .build();

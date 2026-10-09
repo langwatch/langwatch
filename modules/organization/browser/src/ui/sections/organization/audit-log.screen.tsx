@@ -19,13 +19,13 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
-import { formatDistanceToNow, nowInstant } from "@langwatch/time";
+import { formatDistanceToNow, nowInstant, readableDate } from "@langwatch/time";
 import { ArrowLeft, Download, ScrollText, Search } from "lucide-react";
 import Parse from "papaparse";
 import { useMemo, useState } from "react";
@@ -53,7 +53,6 @@ import {
   readAuditPeriod,
 } from "../../../model/audit-period.ts";
 import { disambiguateLabels } from "../../../model/disambiguate-labels.ts";
-import { readableDate } from "../../../model/display-formatters.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
 import { AuditPaginationFooter } from "../../../ui/elements/audit-pagination-footer.tsx";
 import { AuditPeriodPicker } from "../../../ui/elements/audit-period-picker.tsx";

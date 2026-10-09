@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -460,6 +460,38 @@ describe("the repo is a single pnpm workspace", () => {
       expect(scripts["start:prepare:files"]).not.toMatch(/--filter\s+langwatch\s+build/);
       expect(scripts["start:prepare:files"]).not.toMatch(/mcp-server\s+build/);
       expect(scripts["ensure:built"]).toContain(ensureBuilt);
+    });
+
+    /** @scenario A fresh worktree prepares its databases without a manual bundle build */
+    it("builds every dist bundle before the root database preparation, which production does not run", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      expect(scripts["start:prepare:db"]).toMatch(new RegExp(`^bash ${ensureBuilt} && `));
+      const apiScripts = readJson("apps/api/package.json").scripts as Record<string, string>;
+      expect(apiScripts["start:prepare:db"]).not.toContain("ensure-built");
+    });
+
+    /** @scenario A fresh worktree prepares its databases without a manual bundle build */
+    it("builds the bundles before every root entry to the migration tasks, never in the tasks app", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      for (const name of ["task", "prisma:migrate", "clickhouse:migrate"]) {
+        expect(scripts[name]).toMatch(new RegExp(`^bash ${ensureBuilt} && `));
+      }
+      const tasksScripts = readJson("apps/tasks/package.json").scripts as Record<string, string>;
+      expect(JSON.stringify(tasksScripts)).not.toContain("ensure-built");
+    });
+
+    /** @scenario "The root migrate scripts are aliases of the upgrade command" */
+    it("makes the root migrate scripts aliases of the upgrade command whose tasks no workflow runs", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      for (const name of ["prisma:migrate", "clickhouse:migrate"]) {
+        expect(scripts[name]).toMatch(new RegExp(`^bash ${ensureBuilt} && .*task upgrade$`));
+        expect(scripts[name]).not.toMatch(/prisma-migrate|clickhouse-migrate/);
+      }
+      const workflows = join(repoRoot, ".github/workflows");
+      for (const file of readdirSync(workflows)) {
+        const source = readFileSync(join(workflows, file), "utf8");
+        expect(source, file).not.toMatch(/task\s+(prisma|clickhouse)-migrate/);
+      }
     });
 
     /** @scenario A stale SDK build is rebuilt before the browser application starts */

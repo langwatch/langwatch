@@ -27,7 +27,7 @@ vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
 }));
 
 import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
-import type { UiAuthClient } from "@langwatch/auth-browser/session";
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import {
   UiFeedback,
   type UiFailureNotice,
@@ -196,7 +196,7 @@ function renderShell({
       });
       return {
         session,
-        scope: root.scope.createBrowserUiScope({ reading: scopeReading, session }),
+        scope: root.scope.createBrowserUiScope({ reading: scopeReading }),
       };
     },
   });

@@ -11,12 +11,12 @@ import type {
   TraceSummaryData,
 } from "@langwatch/trace-contract";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { TraceIoExtractionAdapterService } from "../../services/trace-io-extraction-adapter.service.ts";
-import { TraceMediaReferenceService } from "../../services/trace-media-reference.service.ts";
-import { TraceModelCostService } from "../../services/trace-model-cost.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceIoExtractionAdapterService } from "../../features/derivation/services/trace-io-extraction-adapter.service.ts";
+import { TraceMediaReferenceService } from "../../features/media/services/trace-media-reference.service.ts";
+import { TraceModelCostService } from "../../features/derivation/services/trace-model-cost.service.ts";
 import { TraceProjectionRuntimeService } from "../../services/trace-projection-runtime.service.ts";
-import { TraceSpanNormalizationAdapterService } from "../../services/trace-span-normalization-adapter.service.ts";
+import { TraceSpanNormalizationAdapterService } from "../../features/span/services/trace-span-normalization-adapter.service.ts";
 
 /**
  * The deterministic, no-I/O runtime the trace-summary fold projection folds

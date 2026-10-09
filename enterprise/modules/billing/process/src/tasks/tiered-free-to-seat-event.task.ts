@@ -1,20 +1,25 @@
+import type { BillingPricingModel } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
+import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
+
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import type { BillingSubscriptionRepository } from "../repositories/subscription.repository.ts";
 
 const logger = createLogger("langwatch:task:tiered-free-to-seat-event");
 
-/** Exactly the operations this migration performs, and nothing else. */
-export type TieredFreeToSeatEventMigrationDatabase = {
-  organization: {
-    findMany: (args: {
-      where: { pricingModel: "TIERED"; subscriptions: { none: object } };
-      select: { id: true; name: true; slug: true; pricingModel: true };
-    }) => Promise<{ id: string; name: string; slug: string; pricingModel: string }[]>;
-    updateMany: (args: {
-      where: { id: { in: string[] }; pricingModel: "TIERED" };
-      data: { pricingModel: "SEAT_EVENT" };
-    }) => Promise<{ count: number }>;
-  };
+/** The reads this migration makes: organisation ids through organization's share (C2 B). */
+export type TieredFreeToSeatEventMigrationPeers = Readonly<{
+  organizations: Pick<BillingAccountFactsRepository, "listIds" | "findPricingModel">;
+  subscriptions: Pick<BillingSubscriptionRepository, "hasAnyForOrganization">;
+}>;
+
+/** Where the move is recorded: billing's fact, which organization applies to its row (R42). */
+export type TieredFreeToSeatEventMigrationFacts = {
+  pricingModelChanged(input: {
+    organizationId: string;
+    pricingModel: BillingPricingModel;
+  }): Promise<void>;
 };
 
 export type TieredFreeToSeatEventMigrationOutcome = {
@@ -23,43 +28,48 @@ export type TieredFreeToSeatEventMigrationOutcome = {
 };
 
 /**
- * Moves every TIERED-pricing organization with no subscription at all onto
- * SEAT_EVENT. `--execute` is required to write; without it this only lists
- * the organizations that would move.
+ * Moves every TIERED-pricing organization with no subscription at all onto SEAT_EVENT by
+ * recording a fact per organisation. `--execute` is required to record; without it this only
+ * lists the organizations that would move.
  */
 export async function runTieredFreeToSeatEventMigration({
-  database,
+  peers,
+  facts,
   execute,
+  pageSize = ORGANIZATION_ID_PAGE_LIMIT,
 }: {
-  database: TieredFreeToSeatEventMigrationDatabase;
+  peers: TieredFreeToSeatEventMigrationPeers;
+  facts: TieredFreeToSeatEventMigrationFacts;
   execute: boolean;
+  pageSize?: number;
 }): Promise<TieredFreeToSeatEventMigrationOutcome> {
   logger.info(
     { execute },
     `Migrate TIERED free-plan orgs to SEAT_EVENT (${execute ? "EXECUTE" : "DRY RUN"})`,
   );
 
-  const orgs = await database.organization.findMany({
-    where: { pricingModel: "TIERED", subscriptions: { none: {} } },
-    select: { id: true, name: true, slug: true, pricingModel: true },
-  });
-
-  logger.info({ count: orgs.length, orgs }, `Found ${orgs.length} organization(s) to migrate`);
-
-  if (orgs.length === 0 || !execute) {
-    if (orgs.length > 0) {
-      logger.info("This is a dry run. Re-run with --execute to apply changes.");
+  let found = 0;
+  let updated = 0;
+  let after: string | undefined;
+  do {
+    const page = await peers.organizations.listIds({ after, limit: pageSize });
+    for (const organizationId of page.ids) {
+      if ((await peers.organizations.findPricingModel(organizationId)) !== "TIERED") continue;
+      if (await peers.subscriptions.hasAnyForOrganization(organizationId)) continue;
+      found += 1;
+      logger.info({ organizationId }, "Found an organization to move");
+      if (!execute) continue;
+      await facts.pricingModelChanged({ organizationId, pricingModel: "SEAT_EVENT" });
+      updated += 1;
     }
-    return { found: orgs.length, updated: 0 };
+    after = page.next ?? undefined;
+  } while (after !== undefined);
+
+  if (!execute && found > 0) {
+    logger.info("This is a dry run. Re-run with --execute to apply changes.");
   }
-
-  const result = await database.organization.updateMany({
-    where: { id: { in: orgs.map((org) => org.id) }, pricingModel: "TIERED" },
-    data: { pricingModel: "SEAT_EVENT" },
-  });
-
-  logger.info({ count: result.count }, `Updated ${result.count} organization(s) to SEAT_EVENT.`);
-  return { found: orgs.length, updated: result.count };
+  logger.info({ count: updated }, `Recorded ${updated} organization(s) moving to SEAT_EVENT.`);
+  return { found, updated };
 }
 
 /**
@@ -69,23 +79,28 @@ export async function runTieredFreeToSeatEventMigration({
 export class TieredFreeToSeatEventMigrateTask extends Task {
   readonly name = "tiered-free-to-seat-event";
   readonly description =
-    "Moves TIERED-pricing organizations with no subscription onto SEAT_EVENT. Pass --execute to write.";
+    "Moves TIERED-pricing organizations with no subscription onto SEAT_EVENT. Pass --execute to record.";
 
-  private constructor(private readonly database: () => TieredFreeToSeatEventMigrationDatabase) {
+  private constructor(
+    private readonly deps: {
+      peers: TieredFreeToSeatEventMigrationPeers;
+      facts: TieredFreeToSeatEventMigrationFacts;
+    },
+  ) {
     super();
   }
 
-  static create({
-    database,
-  }: {
-    database: () => TieredFreeToSeatEventMigrationDatabase;
+  static create(deps: {
+    peers: TieredFreeToSeatEventMigrationPeers;
+    facts: TieredFreeToSeatEventMigrationFacts;
   }): TieredFreeToSeatEventMigrateTask {
-    return new TieredFreeToSeatEventMigrateTask(database);
+    return new TieredFreeToSeatEventMigrateTask(deps);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     await runTieredFreeToSeatEventMigration({
-      database: this.database(),
+      peers: this.deps.peers,
+      facts: this.deps.facts,
       execute: args.includes("--execute"),
     });
   }

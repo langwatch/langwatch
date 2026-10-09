@@ -24,13 +24,13 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
   useTraceDrawer: (selector: (s: typeof storeState) => unknown) => selector(storeState),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
 // The panel-level translate toggle dispatches through tRPC; stub it to an
 // identity passthrough so these tests don't need a tRPC client.
-vi.mock("../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -39,7 +39,7 @@ vi.mock("../../hooks/use-text-translation.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-conversation-context.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
   useConversationContext: (conversationId: string | null, traceId: string) => ({
     conversationId,
     total: 2,

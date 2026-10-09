@@ -1,9 +1,3 @@
-/**
- * A key's spend read over REST on the real application and its memory twins, with the trace
- * module answering from the traces it holds: the route and the keys table take one figure.
- * @vitest-environment node
- * @see specs/ai-gateway/public-rest-api.feature
- */
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -24,6 +18,13 @@ import { z } from "zod";
 
 import { memoryVirtualKeySeed } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../app/gateway.app.ts";
+/**
+ * A key's spend read over REST on the real application and its memory twins, with the trace
+ * module answering from the traces it holds: the route and the keys table take one figure.
+ * @vitest-environment node
+ * @see specs/ai-gateway/public-rest-api.feature
+ */
+import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import {
@@ -53,21 +54,33 @@ const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
   return { isReplayed: false, status: response.status, response };
 };
 
-/** The traces in trace_summaries: each costs what it costs and carries the key's id. */
-function traceSummaries(costs: string[]) {
-  const findSpendByAttributeValue = vi.fn<TraceApi["findSpendByAttributeValue"]>(
-    async ({ projectId, attributeKey, values }) => {
-      if (projectId !== PROJECT_ID || attributeKey !== VIRTUAL_KEY_ATTRIBUTE) return [];
-      if (!values.includes(KEY_ID)) return [];
-      const cents = costs.reduce((sum, cost) => sum + Math.round(Number(cost) * 100), 0);
-      return [{ value: KEY_ID, spentUsd: (cents / 100).toString(), requests: costs.length }];
+/** The traces in trace_summaries per project: each costs what it costs and carries the key id. */
+function traceSummaries(costsByProject: Record<string, string[]>) {
+  const findSpendByProjectAndValue = vi.fn<TraceApi["findSpendByProjectAndValue"]>(
+    async ({ projectIds, valueKey }) => {
+      if (valueKey !== VIRTUAL_KEY_ATTRIBUTE) return [];
+      return projectIds.flatMap((projectId) => {
+        const costs = costsByProject[projectId] ?? [];
+        if (costs.length === 0) return [];
+        const cents = costs.reduce((sum, cost) => sum + Math.round(Number(cost) * 100), 0);
+        const spentUsd = (cents / 100).toString();
+        return [
+          { projectId, value: KEY_ID, spentUsd, requests: costs.length, lastOccurredAtMs: 0 },
+        ];
+      });
     },
   );
-  return { findSpendByAttributeValue };
+  return { findSpendByProjectAndValue };
 }
 
-async function mountedSpendRead({ costs }: { costs: string[] }) {
-  const { findSpendByAttributeValue } = traceSummaries(costs);
+async function mountedSpendRead({
+  costsByProject,
+  projectIds = [PROJECT_ID],
+}: {
+  costsByProject: Record<string, string[]>;
+  projectIds?: string[];
+}) {
+  const { findSpendByProjectAndValue } = traceSummaries(costsByProject);
   const store = MemoryGatewayStore.create({
     teams: [{ id: "team_1", organizationId: ORGANIZATION_ID, name: "Platform", slug: "platform" }],
   });
@@ -76,10 +89,11 @@ async function mountedSpendRead({ costs }: { costs: string[] }) {
     memoryVirtualKeySeed({ id: KEY_ID, name: "demo", organizationId: ORGANIZATION_ID }),
   );
   const real = await GatewayModule.create({
+    channels: MemoryGatewayChannels.create(),
     dependencies: {
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({
-        listIdsByOrganization: async () => [PROJECT_ID],
+        listIdsByOrganization: async () => projectIds,
       }),
       evaluators: createApiFixture({}),
       evaluations: createApiFixture({}),
@@ -99,12 +113,13 @@ async function mountedSpendRead({ costs }: { costs: string[] }) {
       }),
       featureFlags: createApiFixture({}),
       modelProviders: createApiFixture({}),
-      traces: createApiFixture<TraceApi>({ findSpendByAttributeValue }),
+      traces: createApiFixture<TraceApi>({ findSpendByProjectAndValue }),
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
     },
     repositories,
     config: {
+      foldCacheTtlSeconds: 300,
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
@@ -161,14 +176,14 @@ async function mountedSpendRead({ costs }: { costs: string[] }) {
     });
     return { status: response.status, body: wire.parse(await response.json()) };
   };
-  return { readSpend, real, findSpendByAttributeValue };
+  return { readSpend, real, findSpendByProjectAndValue };
 }
 
 describe("given two traces for the key in trace_summaries costing 0.75 and 0.50", () => {
   /** @scenario Key spend over REST reads the same trace_summaries the UI reads */
   it("answers their sum and count, the figure the keys table shows for the same key", async () => {
-    const { readSpend, real, findSpendByAttributeValue } = await mountedSpendRead({
-      costs: ["0.75", "0.50"],
+    const { readSpend, real, findSpendByProjectAndValue } = await mountedSpendRead({
+      costsByProject: { [PROJECT_ID]: ["0.75", "0.50"] },
     });
 
     const answer = await readSpend();
@@ -179,11 +194,32 @@ describe("given two traces for the key in trace_summaries costing 0.75 and 0.50"
 
     expect(answer.status).toBe(200);
     expect(answer.body).toMatchObject({ virtual_key_id: KEY_ID, spent_usd: "1.25", requests: 2 });
-    expect(findSpendByAttributeValue).toHaveBeenCalledWith(
-      expect.objectContaining({ attributeKey: VIRTUAL_KEY_ATTRIBUTE, values: [KEY_ID] }),
+    expect(findSpendByProjectAndValue).toHaveBeenCalledWith(
+      expect.objectContaining({ projectIds: [PROJECT_ID], valueKey: VIRTUAL_KEY_ATTRIBUTE }),
     );
     expect(keysTable).toEqual([
       expect.objectContaining({ virtualKeyId: KEY_ID, spentUsd: "1.25", requests: 2 }),
     ]);
+  });
+});
+
+describe("given an organization with 400 projects and the key's traces in two of them", () => {
+  const projectIds = Array.from({ length: 400 }, (_, index) => `project_${index}`);
+
+  /** @scenario "A key's spend is read in one statement however many projects the organization has" */
+  it("answers their sum from one trace read over every project", async () => {
+    const { readSpend, findSpendByProjectAndValue } = await mountedSpendRead({
+      projectIds,
+      costsByProject: { project_7: ["0.75"], project_391: ["0.50"] },
+    });
+
+    const answer = await readSpend();
+
+    expect(answer.status).toBe(200);
+    expect(answer.body).toMatchObject({ virtual_key_id: KEY_ID, spent_usd: "1.25", requests: 2 });
+    expect(findSpendByProjectAndValue).toHaveBeenCalledOnce();
+    expect(findSpendByProjectAndValue).toHaveBeenCalledWith(
+      expect.objectContaining({ projectIds, valueKey: VIRTUAL_KEY_ATTRIBUTE }),
+    );
   });
 });

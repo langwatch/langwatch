@@ -12,7 +12,12 @@ const NOW = Temporal.Instant.from("2026-09-22T12:00:00Z");
 const OPTIONAL_KEYS = new Set(["user_email_domains", "hostname", "active_users_28d"]);
 
 type Recorded = {
-  slack: { headline: string; organizationName: string | null; leadingDomain: string | null }[];
+  slack: {
+    headline: string;
+    organizationName: string | null;
+    leadingDomain: string | null;
+    instanceUrl: string;
+  }[];
   groups: { groupId: string; traits: SelfHostedOrgTraits }[];
   events: string[];
   domainLookups: string[];
@@ -237,6 +242,7 @@ describe("SelfHostedInstanceService", () => {
         {
           headline: "A self-hosted install is run by a company we already know",
           leadingDomain: "acme.com",
+          instanceUrl: "https://app.langwatch.ai/ops/cloud/self-hosted-instances",
         },
       ]);
     });

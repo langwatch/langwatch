@@ -54,6 +54,7 @@ export {
   ClickHouseManagedClientLogger,
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
+  ClickHouseStatementAdmission,
   ClickHouseVendorClientFactory,
   createVendorClientResiliencePolicy,
   createResilientVendorClient,
@@ -66,10 +67,15 @@ export {
   DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS,
   DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
   DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT,
+  DEFAULT_STATEMENT_LANE_RESERVE_SHARE,
   DEFAULT_STATEMENT_WAIT_TIMEOUT_MS,
+  statementLaneCaps,
 } from "./managed-client.ts";
 export type {
+  ClickHouseLaneStats,
   ClickHouseManagedClientOptions,
+  ClickHouseStatementAdmissionOptions,
+  ClickHouseStatementLane,
   ClickHouseStatementLimitOptions,
   ClickHouseStatementOperation,
   ClickHouseVendorClient,
@@ -91,8 +97,6 @@ export {
   poolSizingFromEnv,
   resolvePoolSize,
 } from "./pool.ts";
-export type { ConcurrencyLimiterOptions, LimiterStats } from "./rateLimit.ts";
-export { AcquireAbortedError, ConcurrencyLimiter, QueueFullError } from "./rateLimit.ts";
 export type { BackoffInput, TransientClassificationInput } from "./resilience.ts";
 export {
   isTransientClickHouseError,
@@ -125,8 +129,6 @@ export {
   parseRoutingTable,
   UnknownTenantError,
 } from "./tenancy.ts";
-export type { TenantStatementLimiterOptions } from "./tenantStatementLimit.ts";
-export { TenantStatementLimiter } from "./tenantStatementLimit.ts";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard.ts";
 export {
   StatementReporter,
@@ -164,10 +166,6 @@ export {
   DEFAULT_RETENTION_FLOOR_MARGIN_MS,
   RetentionFloorService,
 } from "./retentionFloor.ts";
-
-/** The `CLICKHOUSE_URL__<label>__<org>` private-route key grammar.
- * Was `platform/app/src/server/clickhouse/privateRouteKey.ts`. */
-export * from "./privateRouteKey.ts";
 
 /** The ClickHouse schema migration task — goose runner, TTL reconciliation,
  * and the `@langwatch/task` catalogue entry that runs both. */

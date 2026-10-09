@@ -2,7 +2,6 @@ import type { AgentApi, AgentOverview } from "@langwatch/agent-contract";
 import { AgentNotFoundError } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import {
@@ -14,8 +13,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import { promptServiceFixture } from "@langwatch/prompt-process/testing";
+import type { PromptApi, VersionedPrompt } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
@@ -137,7 +135,6 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
 
   const cleanupAgentIds: string[] = [];
   const cleanupWorkflowIds: string[] = [];
-  const cleanupPromptIds: string[] = [];
 
   beforeAll(async () => {
     connection = PrismaConnectionService.create({
@@ -175,8 +172,6 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       ["agent", { id: { in: cleanupAgentIds }, projectId: PROJECT_ID }],
       ["workflowVersion", { workflowId: { in: cleanupWorkflowIds }, projectId: PROJECT_ID }],
       ["workflow", { id: { in: cleanupWorkflowIds }, projectId: PROJECT_ID }],
-      ["llmPromptConfigVersion", { configId: { in: cleanupPromptIds }, projectId: PROJECT_ID }],
-      ["llmPromptConfig", { id: { in: cleanupPromptIds }, projectId: PROJECT_ID }],
       ["user", { id: authorId }],
       ["project", { id: PROJECT_ID }],
       ["team", { id: TEAM_ID }],
@@ -185,18 +180,44 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
     await prisma.$disconnect();
   });
 
-  const createPromptService = (): PromptApi => {
-    const prompts = promptServiceFixture({
-      database: prisma!,
-      modelProviders: createApiFixture<ModelProviderApi>(),
-    });
+  const versionOf = ({
+    id,
+    version,
+    prompt,
+  }: {
+    id: string;
+    version: number;
+    prompt: string;
+  }): VersionedPrompt => ({
+    id,
+    name: id,
+    handle: id,
+    scope: "PROJECT",
+    version,
+    versionId: `${id}_v${version}`,
+    versionCreatedAt: new Date(),
+    model: "openai/gpt-5-mini",
+    prompt,
+    projectId: PROJECT_ID,
+    organizationId: ORG_ID,
+    messages: [],
+    authorId: null,
+    inputs: [],
+    outputs: [],
+    updatedAt: new Date(),
+    createdAt: new Date(),
+    tags: [],
+    parameters: {},
+  });
 
-    return createApiFixture<PromptApi>({
-      createPrompt: (input) => prompts.createPrompt(input),
-      updatePrompt: (input) => prompts.updatePrompt(input),
-      findByIdOrHandle: (input) => prompts.getPromptByIdOrHandle(input),
+  const createPromptService = (versions: VersionedPrompt[] = []): PromptApi =>
+    createApiFixture<PromptApi>({
+      findByIdOrHandle: async ({ idOrHandle, version }) =>
+        versions
+          .filter((candidate) => candidate.id === idOrHandle)
+          .toSorted((a, b) => b.version - a.version)
+          .find((candidate) => version === undefined || candidate.version === version) ?? null,
     });
-  };
 
   const agentApi = (agents: FakeAgentApi): AgentApi =>
     createApiFixture<AgentApi>({
@@ -381,22 +402,12 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
     describe("when the execution data is loaded", () => {
       /** @scenario "Two columns pinned to different versions of one prompt each run their own version" */
       it("loads both versions instead of letting the last one win", async () => {
-        const promptService = createPromptService();
-        const created = await promptService.createPrompt({
-          projectId: PROJECT_ID,
-          organizationId: ORG_ID,
-          handle: `two-versions-${nanoid(8)}`,
-          prompt: "version one",
-          model: "openai/gpt-5-mini",
-        });
-        cleanupPromptIds.push(created.id);
-
-        const second = await promptService.updatePrompt({
-          idOrHandle: created.id,
-          projectId: PROJECT_ID,
-          data: { commitMessage: "second", prompt: "version two" },
-        });
-        expect(second.version).toBe(2);
+        const promptId = `two-versions-${nanoid(8)}`;
+        const promptService = createPromptService([
+          versionOf({ id: promptId, version: 1, prompt: "version one" }),
+          versionOf({ id: promptId, version: 2, prompt: "version two" }),
+        ]);
+        const created = { id: promptId };
 
         const result = await ExperimentExecutionDataService.create().loadExecutionData({
           projectId: PROJECT_ID,

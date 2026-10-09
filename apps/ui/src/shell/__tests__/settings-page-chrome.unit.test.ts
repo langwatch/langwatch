@@ -14,7 +14,7 @@ const { settingsMenu, isSettingsShellRoute } =
 
 const CHROME = "chrome";
 /** The frames a project or settings page legitimately nests under, below the chrome. */
-const SHARED_FRAMES = new Set(["layouts/trace-drawer", "layouts/project-langy"]);
+const SHARED_FRAMES = new Set(["layouts/project-langy"]);
 
 type Placement = { pattern: string; frames: string[] };
 
@@ -89,11 +89,7 @@ describe("given every page the route table serves under a settings section", () 
 
   it("finds the settings pages, framed as the table nests them", () => {
     expect(settingsPages.length).toBeGreaterThanOrEqual(20);
-    expect(placementOf("/settings/roles")?.frames).toEqual([
-      CHROME,
-      "layouts/trace-drawer",
-      "layouts/project-langy",
-    ]);
+    expect(placementOf("/settings/roles")?.frames).toEqual([CHROME, "layouts/project-langy"]);
   });
 
   describe("when the layouts above each are read", () => {

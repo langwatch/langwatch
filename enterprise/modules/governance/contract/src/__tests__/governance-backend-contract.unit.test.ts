@@ -7,11 +7,17 @@ import {
   assertThresholdConfig,
 } from "../anomaly-rule.ts";
 import { departmentSchema } from "../department.ts";
+import {
+  getStarterTemplate,
+  isOttlEnabledSourceType,
+} from "../features/ingestion/ingestion-source.ts";
+import {
+  ottlTransformInputSchema,
+  ottlValidationResultSchema,
+} from "../features/ingestion/ottl.ts";
+import { normalizedPullEventSchema, pulledUsageHintSchema } from "../features/ingestion/puller.ts";
+import { quarantineFillInputSchema } from "../features/ingestion/quarantine-fill.ts";
 import { isGovernanceOriginTrace } from "../governance.ts";
-import { getStarterTemplate, isOttlEnabledSourceType } from "../ingestion-source.ts";
-import { ottlTransformInputSchema, ottlValidationResultSchema } from "../ottl.ts";
-import { normalizedPullEventSchema, pulledUsageHintSchema } from "../puller.ts";
-import { quarantineFillInputSchema } from "../quarantine-fill.ts";
 
 describe("governance backend contract", () => {
   it("accepts HTTPS destinations and quarantines malformed legacy rows", () => {

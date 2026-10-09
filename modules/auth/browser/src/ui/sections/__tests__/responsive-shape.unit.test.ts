@@ -31,12 +31,20 @@ describe("given the front door on a small viewport", () => {
 
   describe("when the primary action is rendered", () => {
     it("spans the column, so it is reachable with a thumb", () => {
+      const button = sourceOf("ui/elements/front-door-primary-button.tsx");
+
+      expect(button).toMatch(/width:\s*"full"[\s\S]{0,200}minHeight:\s*"44px"/);
+    });
+
+    /** A form that gave its button up must render the shared one, or the check above is empty. */
+    it("is the shared button wherever a screen gave its own up", () => {
       for (const file of [
         "ui/sections/identifier-step-form.tsx",
         "ui/sections/credential-sign-in-form.tsx",
         "ui/sections/sign-up-credential-form.tsx",
+        "ui/sections/two-step-challenge-panel.tsx",
       ]) {
-        expect(sourceOf(file)).toMatch(/width="full"[\s\S]{0,120}minHeight="44px"/);
+        expect(sourceOf(file), file).toContain("<FrontDoorPrimaryButton");
       }
     });
   });

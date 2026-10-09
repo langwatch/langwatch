@@ -1,4 +1,3 @@
-import { VOICE_AGENTS_FLAG_KEY } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   parseScenarioParameterDefinitions,
@@ -10,11 +9,7 @@ import {
  * to the execution port. The suite's own CRUD stays on `SuiteService`, which composes this one.
  */
 import {
-  AllScenariosArchivedError,
-  AllTargetsArchivedError,
   declaredDefaults,
-  InvalidScenarioReferencesError,
-  InvalidTargetReferencesError,
   isDynamicScope,
   parseSuiteScope,
   RUN_ALL_SUITE_LABEL,
@@ -36,7 +31,6 @@ import {
   type SuiteRunPlanResult,
   type SuiteScope,
   type SuiteTarget,
-  VoiceAgentsDisabledError,
 } from "@langwatch/suite-contract";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
@@ -45,9 +39,8 @@ import {
   TARGET_SECRET_REFUSAL,
   targetsOverrideASecret,
 } from "../rules/suite-target.rules.ts";
-import { AgentOwnerNamesService } from "./agent-owner-names.service.ts";
-import { ConnectedTargetService } from "./connected-target.service.ts";
 import { SuiteRunMappingService } from "./suite-run-mapping.service.ts";
+import { SuiteRunReferencesService } from "./suite-run-references.service.ts";
 import { SuiteRunScopeService } from "./suite-run-scope.service.ts";
 import type { SuiteServiceOptions } from "./suite.service.ts";
 
@@ -72,10 +65,12 @@ export class SuiteRunService {
 
   private readonly scope: SuiteRunScopeService;
   private readonly mappings: SuiteRunMappingService;
+  private readonly references: SuiteRunReferencesService;
 
   private constructor(private readonly deps: SuiteRunServiceOptions) {
     this.scope = SuiteRunScopeService.create(deps.options);
     this.mappings = SuiteRunMappingService.create(deps.options);
+    this.references = SuiteRunReferencesService.create(deps.options);
   }
 
   private get options(): SuiteServiceOptions {
@@ -86,7 +81,7 @@ export class SuiteRunService {
     return this.deps.get(input);
   }
 
-  async run(input: SuiteRunInput): Promise<SuiteRunResult> {
+  async run(input: SuiteRunInput): Promise<SuiteRunResult & { planSlug: string }> {
     const parsed = suiteRunInputSchema.parse(input);
     const suite = await this.get({
       id: parsed.id,
@@ -96,7 +91,7 @@ export class SuiteRunService {
     if (suite.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
-    await this.assertVoiceTargetsAllowed({
+    await this.references.assertVoiceTargetsAllowed({
       targets: suite.targets,
       projectId: parsed.projectId,
       organizationId: parsed.organizationId,
@@ -112,7 +107,7 @@ export class SuiteRunService {
       throw new SuiteScopeEmptyError();
     }
 
-    const { scenarioResolution, targetResolution } = await this.resolveRunReferences({
+    const { scenarioResolution, targetResolution } = await this.references.resolveRunReferences({
       scenarioIds,
       targets: suite.targets,
       projectId: parsed.projectId,
@@ -138,7 +133,7 @@ export class SuiteRunService {
       }),
     });
 
-    return this.execute({
+    const result = await this.execute({
       suite,
       parsed,
       scenarioResolution,
@@ -146,6 +141,8 @@ export class SuiteRunService {
       scenarioConfigs,
       activeTargets: targetResolution.active,
     });
+
+    return { ...result, planSlug: suite.slug };
   }
 
   /**
@@ -155,12 +152,12 @@ export class SuiteRunService {
    */
   async runPlan(input: SuiteRunPlanInput): Promise<SuiteRunPlanResult> {
     const parsed = suiteRunPlanInputSchema.parse(input);
-    const { scenarios, repository } = this.options;
+    const { repository } = this.options;
 
     if (parsed.config.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
-    await this.assertVoiceTargetsAllowed({
+    await this.references.assertVoiceTargetsAllowed({
       targets: parsed.config.targets,
       projectId: parsed.projectId,
       organizationId: parsed.organizationId,
@@ -168,30 +165,17 @@ export class SuiteRunService {
 
     const { scope, scenarioIds } = await this.planScope(parsed);
 
-    const { scenarioResolution, targetResolution, namedTargets } = await this.resolveRunReferences({
-      scenarioIds,
-      targets: parsed.config.targets,
-      sortTargets: true,
-      projectId: parsed.projectId,
-      organizationId: parsed.organizationId,
-      actor: parsed.actor,
-    });
+    const { scenarioResolution, targetResolution, namedTargets } =
+      await this.references.resolveRunReferences({
+        scenarioIds,
+        targets: parsed.config.targets,
+        sortTargets: true,
+        projectId: parsed.projectId,
+        organizationId: parsed.organizationId,
+        actor: parsed.actor,
+      });
 
-    const scenarioConfigs = await scenarios.getRunConfigs({
-      ids: scenarioResolution.active,
-      projectId: parsed.projectId,
-    });
-    // A refusal here (e.g. a missing secret) must throw before the plan row
-    // is touched, matching `prepareRun` on main: nothing is written for a run
-    // that will not hold up.
-    await scenarios.resolveRunParametersForScenarios({
-      scenarios: scenarioConfigs,
-      values: parsed.parameters,
-    });
-    SuiteRunService.assertNoSecretOverrides({
-      scenarios: scenarioConfigs,
-      targets: parsed.config.targets,
-    });
+    const scenarioConfigs = await this.checkedPlanConfigs({ parsed, scenarioResolution });
 
     const { targets, activeTargets } = this.canonicalPlanTargets({
       scenarioConfigs,
@@ -237,6 +221,34 @@ export class SuiteRunService {
     });
 
     return { ...result, suiteId: suite.id, planName: suite.name, planSlug: suite.slug, created };
+  }
+
+  /**
+   * A refusal here (e.g. a missing secret) must throw before the plan row is touched,
+   * matching `prepareRun` on main: nothing is written for a run that will not hold up.
+   */
+  private async checkedPlanConfigs({
+    parsed,
+    scenarioResolution,
+  }: {
+    parsed: SuiteRunPlanInput;
+    scenarioResolution: { active: string[] };
+  }) {
+    const { scenarios } = this.options;
+    const scenarioConfigs = await scenarios.getRunConfigs({
+      ids: scenarioResolution.active,
+      projectId: parsed.projectId,
+    });
+    await scenarios.resolveRunParametersForScenarios({
+      scenarios: scenarioConfigs,
+      values: parsed.parameters,
+    });
+    SuiteRunService.assertNoSecretOverrides({
+      scenarios: scenarioConfigs,
+      targets: parsed.config.targets,
+    });
+
+    return scenarioConfigs;
   }
 
   /** The plan's own evaluators, read once its scope's mappings are known to hold. */
@@ -345,11 +357,6 @@ export class SuiteRunService {
   }
 
   /**
-   * A value equal to a declared default is no override: the key, the sort, the name and the
-   * stored targets all read the canonical set.
-   */
-
-  /**
    * Refuses a target whose overrides name a secret parameter, before the run
    * is scheduled and before a plan row is written.
    */
@@ -385,102 +392,10 @@ export class SuiteRunService {
     };
   }
 
-  /**
-   * A voice target reaches the call panel and the ElevenLabs adapter, both behind
-   * `release_voice_agents_enabled` (AC29); a run naming one is refused while it is off.
-   */
-  private async assertVoiceTargetsAllowed({
-    targets,
-    projectId,
-    organizationId,
-  }: {
-    targets: readonly SuiteTarget[];
-    projectId: string;
-    organizationId: string;
-  }): Promise<void> {
-    if (!targets.some((target) => target.type === "voice")) return;
-    const enabled = await this.options.featureFlags.isEnabled(VOICE_AGENTS_FLAG_KEY, {
-      kind: "project",
-      projectId,
-      organizationId,
-    });
-    if (!enabled) throw new VoiceAgentsDisabledError();
-  }
-
-  /**
-   * The scenarios and targets a run actually covers, with every refusal raised before anything
-   * is stored: a missing or fully archived reference, and a connected agent nobody may run.
-   */
-  private async resolveRunReferences({
-    scenarioIds,
-    targets,
-    sortTargets = false,
-    projectId,
-    organizationId,
-    actor,
-  }: {
-    scenarioIds: string[];
-    targets: SuiteTarget[];
-    sortTargets?: boolean;
-    projectId: string;
-    organizationId: string;
-    actor: SuiteRunInput["actor"];
-  }): Promise<{
-    scenarioResolution: Awaited<ReturnType<SuiteRunScopeService["resolveScenarioReferences"]>>;
-    targetResolution: Awaited<ReturnType<SuiteRunScopeService["resolveTargetReferences"]>>;
-    namedTargets: SuiteTarget[];
-  }> {
-    const { scenarios, agents, prompts } = this.options;
-    const scenarioResolution = await this.scope.resolveScenarioReferences({
-      scenarioIds,
-      projectId,
-      scenarios,
-    });
-    if (scenarioResolution.missing.length > 0) {
-      throw new InvalidScenarioReferencesError({ invalidIds: scenarioResolution.missing });
-    }
-
-    if (scenarioResolution.active.length === 0) {
-      throw new AllScenariosArchivedError();
-    }
-
-    // A connected target may be named `<name>@<environment>`; from here on
-    // every target names an id, so two spellings of one agent fold together.
-    const connected = ConnectedTargetService.create({
-      agents,
-      owners: AgentOwnerNamesService.create(agents),
-      ...(this.options.connectedPresence ? { presence: this.options.connectedPresence } : {}),
-    });
-    const namedTargets = await connected.resolveConnectedReferences({ targets, projectId, actor });
-    const targetResolution = await this.scope.resolveTargetReferences({
-      targets: sortTargets ? sortSuiteTargets(namedTargets) : namedTargets,
-      projectId,
-      organizationId,
-      agents,
-      prompts,
-    });
-    if (targetResolution.missing.length > 0) {
-      throw new InvalidTargetReferencesError({
-        invalidIds: targetResolution.missing.map((target) => target.referenceId),
-      });
-    }
-
-    if (targetResolution.active.length === 0) {
-      throw new AllTargetsArchivedError();
-    }
-
-    await connected.assertConnectedAgentsRunnable({
-      agents: targetResolution.connectedAgents,
-      actor,
-    });
-
-    return { scenarioResolution, targetResolution, namedTargets };
-  }
-
   async runAll(input: SuiteRunAllInput): Promise<SuiteRunAllResult> {
     const parsed = suiteRunAllInputSchema.parse(input);
     // Refused before the managed Run-all row is written; `run` asks again for the stored targets.
-    await this.assertVoiceTargetsAllowed({
+    await this.references.assertVoiceTargetsAllowed({
       targets: parsed.targets ?? [],
       projectId: parsed.projectId,
       organizationId: parsed.organizationId,

@@ -4,7 +4,8 @@ import {
   organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import type { CodingAgentApi, CodingAgentServerConfig } from "@langwatch/coding-agent-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { CodingAgentModule } from "./app/coding-agent.app.ts";
 import { codingAgentEventing } from "./eventing/coding-agent-processing.pipeline.ts";
@@ -17,7 +18,11 @@ import {
 } from "./transport/coding-agent.rest.ts";
 import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 
-export const codingAgentProcessModule = defineProcessModule("coding-agent")
+export const codingAgentProcessModule: PublishedProcessModule<
+  "coding-agent",
+  CodingAgentApi,
+  CodingAgentServerConfig
+> = defineProcessModule("coding-agent")
   .withRepositories(codingAgentRepositories)
   .withApi(CodingAgentModule)
   .withTransports(

@@ -1,20 +1,23 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyConfig, DataPrivacyScope } from "@langwatch/data-privacy-contract";
-import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createDataPrivacyTestProjects,
+  createDataPrivacyTestScopes,
   dataPrivacyTestGraph,
   dataPrivacyTestTeam,
 } from "../../app/__tests__/data-privacy.fixture.ts";
+import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyPolicyRepository } from "../../repositories/memory/memory.data-privacy.repository.ts";
+import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { DataPrivacyService } from "../data-privacy.service.ts";
 
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 
-const projects = createDataPrivacyTestProjects();
+const scopes = DataPrivacyProjectScopeService.create({
+  repository: createDataPrivacyTestScopes(),
+});
 
 /** Authz's lineage check over the test graph: consistent only inside the scope's organization. */
 type LineageResult = Awaited<ReturnType<AuthzApi["checkScopeLineage"]>>;
@@ -33,14 +36,16 @@ const lineage = createApiFixture<AuthzApi>({
   },
 });
 
-function build({ projectDirectory = projects }: { projectDirectory?: ProjectApi } = {}) {
+function build({
+  projectScopes = scopes,
+}: { projectScopes?: DataPrivacyProjectScopeService } = {}) {
   const repository = MemoryDataPrivacyPolicyRepository.create();
 
   return {
     repository,
     service: DataPrivacyService.create({
       repository,
-      projects: projectDirectory,
+      scopes: projectScopes,
       lineage,
     }),
     stored: () => repository.findAllInOrganization({ organizationId: ORGANIZATION_ID }),
@@ -318,10 +323,8 @@ describe("DataPrivacyService", () => {
     /** @scenario "A level written for a project that is gone is refused by name" */
     it("refuses a project that is gone and writes nothing", async () => {
       const { service, stored } = build({
-        projectDirectory: createApiFixture<ProjectApi>({
-          getWithTeam: async () => {
-            throw new ProjectNotFoundError();
-          },
+        projectScopes: DataPrivacyProjectScopeService.create({
+          repository: MemoryDataPrivacyProjectScopeRepository.create(),
         }),
       });
 

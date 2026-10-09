@@ -8,8 +8,16 @@ import {
   definePipeline,
   type EventingSetup,
   type FoldProjectionStore,
+  type LaneAlias,
+  type PeerSubscriberContext,
   type RetentionPolicyResolver,
 } from "@langwatch/eventing";
+import {
+  SIMULATION_RUN_EVENT_TYPES,
+  simulationRunEvaluatedEventDataSchema,
+  simulationRunFinishedEventDataSchema,
+  simulationRunStartedEventDataSchema,
+} from "@langwatch/scenario-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import {
   SuiteRunStartedEventSchema,
@@ -20,6 +28,10 @@ import {
 
 import type { SuiteModule } from "../app/suite.app.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
+import {
+  type ScenarioRunFactContext,
+  SuiteRunScenarioFactsService,
+} from "../services/suite-run-scenario-facts.service.ts";
 import { SuiteRunStateFoldProjection } from "./suite-run-state.projection.ts";
 import {
   CompleteSuiteRunItemCommand,
@@ -32,6 +44,8 @@ interface SuiteRunProcessingPipelineDeps {
   suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData>;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
+  /** Moves a suite run's items as scenario's run facts arrive (peer subscriber, §9). */
+  scenarioRunFacts: SuiteRunScenarioFactsService;
 }
 
 /**
@@ -53,6 +67,27 @@ function jobId<TPayload>(
   }
   return makeJobId;
 }
+
+/** The tenant, instant and id a scenario fact landed with. */
+function factContext(context: PeerSubscriberContext): ScenarioRunFactContext {
+  return {
+    tenantId: String(context.tenantId),
+    occurredAt: context.occurredAt,
+    eventId: context.eventId,
+  };
+}
+
+/** Main's suiteRunSync subscriber (simulation pipeline), now one peer subscriber per event type. */
+const MAIN_SUITE_RUN_SYNC_ALIASES: readonly LaneAlias[] = [
+  { eventType: SIMULATION_RUN_EVENT_TYPES.STARTED, lane: "scenarioRunStarted" },
+  { eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED, lane: "scenarioRunFinished" },
+  { eventType: SIMULATION_RUN_EVENT_TYPES.EVALUATED, lane: "scenarioRunEvaluated" },
+].map(({ eventType, lane }) => ({
+  from: "simulation_processing:subscriber:suiteRunSync",
+  to: { jobType: "subscriber", lane },
+  eventTypes: [eventType],
+  removeAfter: "3.21.0",
+}));
 
 /**
  * Creates the suite run processing pipeline definition.
@@ -109,7 +144,26 @@ const defineSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) 
         makeId: jobId("regradeSuiteRunItem", commands.regradeSuiteRunItem.makeJobId),
         ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
       },
-    });
+    })
+    .withPeerSubscriber("scenarioRunStarted", {
+      eventType: SIMULATION_RUN_EVENT_TYPES.STARTED,
+      data: simulationRunStartedEventDataSchema,
+      options: { enqueue: { filter: (data) => SuiteRunScenarioFactsService.belongsToSuite(data) } },
+      handle: (data, context) => deps.scenarioRunFacts.recordStarted(data, factContext(context)),
+    })
+    .withPeerSubscriber("scenarioRunFinished", {
+      eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      data: simulationRunFinishedEventDataSchema,
+      options: { enqueue: { filter: (data) => SuiteRunScenarioFactsService.belongsToSuite(data) } },
+      handle: (data, context) => deps.scenarioRunFacts.recordFinished(data, factContext(context)),
+    })
+    .withPeerSubscriber("scenarioRunEvaluated", {
+      eventType: SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+      data: simulationRunEvaluatedEventDataSchema,
+      options: { enqueue: { filter: (data) => SuiteRunScenarioFactsService.belongsToSuite(data) } },
+      handle: (data, context) => deps.scenarioRunFacts.recordEvaluated(data, factContext(context)),
+    })
+    .withLaneAliases(MAIN_SUITE_RUN_SYNC_ALIASES);
   return (deps.retention ? pipeline.withRetention(deps.retention) : pipeline).build();
 };
 

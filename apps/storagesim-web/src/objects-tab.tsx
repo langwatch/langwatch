@@ -1,4 +1,12 @@
-import { Inline, Input, List, ListItem, Panel, Select } from "@langwatch/design-system-internal";
+import {
+  ConfirmButton,
+  Inline,
+  Input,
+  List,
+  ListItem,
+  Panel,
+  Select,
+} from "@langwatch/design-system-internal";
 import { SimEmpty, SimSplit, SimTime } from "@langwatch/sim-console";
 import { useState } from "react";
 
@@ -13,11 +21,15 @@ export const ObjectsTab = ({
   buckets,
   bucket,
   onBucket,
+  onClear,
+  onDelete,
 }: {
   objects: StoredObject[];
   buckets: string[];
   bucket: string;
   onBucket: (bucket: string) => void;
+  onClear: (bucket: string) => void;
+  onDelete: (object: StoredObject) => void;
 }) => {
   const [selected, setSelected] = useState("");
   const [query, setQuery] = useState("");
@@ -61,6 +73,15 @@ export const ObjectsTab = ({
           <Panel
             title="Objects"
             meta={filtered ? `${shown.length} of ${objects.length}` : String(objects.length)}
+            actions={
+              <ConfirmButton
+                size="sm"
+                label={bucket === "" ? "Clear all" : `Clear ${bucket}`}
+                confirmLabel="Delete objects"
+                disabled={objects.length === 0}
+                onConfirm={() => onClear(bucket)}
+              />
+            }
           >
             {shown.length === 0 ? (
               <SimEmpty
@@ -87,7 +108,7 @@ export const ObjectsTab = ({
             )}
           </Panel>
         }
-        detail={open ? <ObjectDetail object={open} /> : null}
+        detail={open ? <ObjectDetail object={open} onDelete={() => onDelete(open)} /> : null}
         emptyDetail={
           <Panel>
             <SimEmpty

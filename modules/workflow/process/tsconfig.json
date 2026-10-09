@@ -33,13 +33,7 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
-      "path": "../../evaluator/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/eventing/tsconfig.build.json"
-    },
-    {
-      "path": "../../experiment/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -52,9 +46,6 @@
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
@@ -88,6 +79,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

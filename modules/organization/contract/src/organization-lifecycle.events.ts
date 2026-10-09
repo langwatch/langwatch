@@ -2,6 +2,8 @@ import { z } from "zod";
 
 /** An organization's membership milestones, which peers react to from their own side (§9). */
 export const ORGANIZATION_SIGNED_UP_EVENT_TYPE = "lw.organization.signed_up" as const;
+export const ORGANIZATION_CREATED_EVENT_TYPE = "lw.organization.created" as const;
+export const ORGANIZATION_CREATED_EVENT_VERSION = "2026-10-09" as const;
 export const MEMBERS_INVITED_EVENT_TYPE = "lw.organization.members_invited" as const;
 export const INVITE_ACCEPTED_EVENT_TYPE = "lw.organization.invite_accepted" as const;
 export const INTEGRATION_METHOD_CHOSEN_EVENT_TYPE =
@@ -58,6 +60,10 @@ export const membersInvitedEventDataSchema = z.object({
   inviteIds: z.array(z.string().min(1)).min(1),
   roles: z.array(z.string()).min(1),
   teamMemberCount: z.number().int().nonnegative(),
+  /** Invitees who already hold an account; identity closes their open join requests from this. */
+  invitees: z
+    .array(z.object({ inviteId: z.string().min(1), userId: z.string().min(1) }))
+    .optional(),
 });
 export type MembersInvitedEventData = z.infer<typeof membersInvitedEventDataSchema>;
 
@@ -82,3 +88,25 @@ export const integrationMethodChosenEventDataSchema = z.object({
 export type IntegrationMethodChosenEventData = z.infer<
   typeof integrationMethodChosenEventDataSchema
 >;
+
+export const ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE = "lw.organization.member_disabled" as const;
+export const ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION = "2026-10-08" as const;
+
+/** A seat was taken away; user ends the person's browser sessions on its side (§9, R7). */
+export const organizationMemberDisabledEventDataSchema = z.object({
+  ...envelope,
+  /** Who disabled the seat; absent for an organization key with no member. */
+  disabledByUserId: z.string().min(1).nullish(),
+});
+export type OrganizationMemberDisabledEventData = z.infer<
+  typeof organizationMemberDisabledEventDataSchema
+>;
+
+/** An organization now exists, on every creation path; peers seed their own defaults (§9). */
+export const organizationCreatedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  organizationName: z.string(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type OrganizationCreatedEventData = z.infer<typeof organizationCreatedEventDataSchema>;

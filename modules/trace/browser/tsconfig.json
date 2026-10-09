@@ -18,6 +18,9 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../annotation/client/tsconfig.build.json"
+    },
+    {
       "path": "../../annotation/contract/tsconfig.build.json"
     },
     {
@@ -48,6 +51,9 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-views/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -57,10 +63,16 @@
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
+      "path": "../../feature-flag/client/tsconfig.build.json"
+    },
+    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../instant-eval/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
@@ -73,6 +85,9 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../onboarding/client/tsconfig.build.json"
     },
     {
       "path": "../../presence/contract/tsconfig.build.json"
@@ -96,10 +111,16 @@
       "path": "../../share/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
+    },
+    {
       "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

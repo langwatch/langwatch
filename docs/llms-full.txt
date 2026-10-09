@@ -346,7 +346,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 The two URLs are split for **auth + routing convenience**, not for architectural reasons. Internally they share everything that matters:
 
-- **Same hardened OTLP parser**: `packages/otlp/src/body.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
+- **Same hardened OTLP parser**: `packages/otlp/src/body.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli and zstd decompression (gzip and zstd are also detected from the body's leading bytes), JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
 - **Same trace pipeline**: both URLs hand off to the existing `traces.collection.handleOtlpTraceRequest` (or `traces.logCollection.handleOtlpLogRequest` for log-shaped sources) that powers `/api/otel/v1/traces`. No parallel write path. No parallel storage.
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
@@ -1028,6 +1028,10 @@ provider:
 
 Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that can be added to shared teams and projects) or **Developer** (a project of their own, with access to no shared team or project). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
 
+Somebody who signs up from the terminal, by running `langwatch login` and creating their account on the page it opens, lands on a **Developer** seat whichever option is chosen here, both when you approve their request and when the door is automatic. The pending requests list shows the seat each request will land on. Raising them to a Member seat afterwards is done from the member dialog, as for anyone else.
+
+When a person reaches the welcome screen with an invitation already waiting on their verified address, accepting that invitation is offered first and asking to join is not. The seat is the one the invitation names.
+
 The **Account lockout** and **Session limits** cards in the same section apply
 to password sign-in for the organization. They remain available when you stop
 using single sign-on. Changing a policy requires `organization:manage`.
@@ -1044,7 +1048,7 @@ A Developer cannot open, be invited to, or be added to any shared team or projec
 
 Moving a member to a Developer seat removes their bindings on every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat grants no team access on its own; add teams afterwards.
 
-The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one.
+The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one, and `langwatch instrument <tool> --project` cannot pin a coding agent to a shared project. A person who joins the organization by domain after signing up from `langwatch login` lands on this seat regardless of the **Seat for people who join** setting (see [Let colleagues join by domain](#let-colleagues-join-by-domain)).
 
 ## Teams
 
@@ -2441,7 +2445,7 @@ Authorization: Bearer vk-lw-<ULID>
 
 Both take OpenAI's request shape and are served by an OpenAI or an ElevenLabs credential, whichever the model resolves to. Any client that speaks OpenAI's audio API works by pointing its base URL at the gateway and its API key at a virtual key.
 
-For ElevenLabs' own paths (`/v1/text-to-speech/{voice_id}`, `/v1/speech-to-text`) and the post-call webhook, see [ElevenLabs](/ai-gateway/api/elevenlabs). For OpenAI Realtime and ElevenLabs Conversational AI, see [Realtime voice](/ai-gateway/api/realtime).
+For ElevenLabs' own paths (`/v1/text-to-speech/{voice_id}` and its `/stream` variants, `/v1/speech-to-text`) and the post-call webhook, see [ElevenLabs](/ai-gateway/api/elevenlabs). For OpenAI Realtime and ElevenLabs Conversational AI, see [Realtime voice](/ai-gateway/api/realtime).
 
 ## Text to speech
 
@@ -2457,7 +2461,7 @@ curl https://gateway.langwatch.ai/v1/audio/speech \
   }' --output hello.mp3
 ```
 
-The response body is the audio bytes, with no JSON envelope. `Content-Type` follows `response_format`:
+The response body is the audio bytes, with no JSON envelope, sent as the provider produces them. `Content-Type` follows `response_format`:
 
 | `response_format` | `Content-Type` |
 | ----------------- | -------------- |
@@ -2470,6 +2474,8 @@ The response body is the audio bytes, with no JSON envelope. `Content-Type` foll
 
 For an ElevenLabs model, put the ElevenLabs voice id in `voice`. `pcm` on ElevenLabs is requested as `pcm_24000`, which matches OpenAI's raw PCM16 at 24 kHz.
 
+OpenAI shuts down `tts-1`, `tts-1-hd` and the dated `gpt-4o-mini-tts` snapshots on 2027-01-06.
+
 ### Parameters the gateway changes or refuses
 
 | Parameter                                           | What the gateway does                                                                                                                           |
@@ -2477,14 +2483,15 @@ For an ElevenLabs model, put the ElevenLabs voice id in `voice`. `pcm` on Eleven
 | `model`                                             | Resolved through the key's aliases, allowlist and routing policy. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
 | `input`                                             | Required. Missing: `400 bad_request`.                                                                                                           |
 | `voice`, `instructions`, `response_format`, `speed` | Forwarded.                                                                                                                                      |
-| Every other field                                   | Not forwarded.                                                                                                                                  |
+| `stream_format`                                     | `audio` (default) or `sse`. `sse` is served on OpenAI and Azure OpenAI credentials only; elsewhere: `400 unsupported_parameter`. See [Streaming](#streaming). |
+| Every other field                                   | Forwarded as written on OpenAI and Azure OpenAI credentials. Not forwarded on other providers.                                                  |
 
 ## Transcription
 
 ```bash
 curl https://gateway.langwatch.ai/v1/audio/transcriptions \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
-  -F "model=openai/whisper-1" \
+  -F "model=openai/gpt-transcribe" \
   -F "file=@call-recording.wav"
 ```
 
@@ -2494,26 +2501,135 @@ curl https://gateway.langwatch.ai/v1/audio/transcriptions \
 
 The response is JSON with `text`, plus the duration or token usage the provider reports.
 
+OpenAI shuts down `whisper-1` and the `gpt-4o-transcribe` family on 2027-02-26. `gpt-transcribe` is the replacement on this route.
+
 ### Parameters the gateway changes or refuses
 
-| Form part                                              | What the gateway does                                                                                                                                                                                            |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `file`                                                 | Required. Missing: `400 bad_request`. The whole upload is capped at 26 MB, which is OpenAI's 25 MB audio limit plus the multipart framing; over the cap: `413 payload_too_large`, before any provider is called. |
-| `model`                                                | Required, as a form part. Missing: `400 missing_model`. Resolved through the key's aliases and allowlist.                                                                                                        |
-| `language`, `prompt`, `response_format`, `temperature` | Forwarded.                                                                                                                                                                                                       |
-| Every other part                                       | Not forwarded.                                                                                                                                                                                                   |
+| Form part        | What the gateway does                                                                                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`           | Required. Missing: `400 bad_request`. The whole upload is capped at 26 MB, which is OpenAI's 25 MB audio limit plus the multipart framing; over the cap: `413 payload_too_large`, before any provider is called. |
+| `model`          | Required, as a form part. Missing: `400 missing_model`. Resolved through the key's aliases and allowlist.                                                                                                        |
+| `stream`         | `true` streams the transcript as events. Served on OpenAI and Azure OpenAI credentials only; elsewhere: `400 unsupported_parameter`. See [Streaming](#streaming).                                                |
+| Every other part | Forwarded as written on OpenAI and Azure OpenAI credentials, repeated parts included, in the order you sent them.                                                                                                |
+
+On OpenAI and Azure OpenAI credentials the gateway does not keep a list of accepted parts. `chunking_strategy`, `include[]`, `timestamp_granularities[]`, `languages[]`, `keywords[]`, `known_speaker_names[]`, `known_speaker_references[]` and any part the provider adds later reach the provider unchanged.
+
+On other providers the gateway forwards `language`, `prompt`, `response_format`, `temperature`, `include[]` and `timestamp_granularities[]`.
+
+### Response formats
+
+On OpenAI and Azure OpenAI credentials the provider's body and `Content-Type` are returned unchanged for every `response_format`: `json`, `verbose_json`, `diarized_json`, `text`, `srt` and `vtt`.
+
+```bash
+curl https://gateway.langwatch.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -F "model=openai/gpt-4o-transcribe-diarize" \
+  -F "response_format=diarized_json" \
+  -F "chunking_strategy=auto" \
+  -F "known_speaker_names[]=agent" \
+  --form-string "known_speaker_references[]=data:audio/wav;base64,$(base64 < agent.wav | tr -d '\n')" \
+  -F "file=@call-recording.wav"
+```
+
+```json
+{
+  "task": "transcribe",
+  "duration": 4.25,
+  "text": "Hello there. This is a short test of speaker labels.",
+  "segments": [
+    { "type": "transcript.text.segment", "id": "seg_0", "speaker": "agent", "start": 0.0, "end": 0.5, "text": " Hello there." }
+  ],
+  "usage": { "type": "tokens", "input_tokens": 42, "output_tokens": 164, "total_tokens": 206 }
+}
+```
+
+`gpt-4o-transcribe-diarize` requires `chunking_strategy` for audio longer than 30 seconds.
 
 ## Request and response headers
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 
-Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
+Both routes return the response headers listed on [Chat Completions](/ai-gateway/api/chat-completions#response-headers):
+
+- `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning` and `Traceparent` on every response.
+- `X-LangWatch-Provider` on a forwarded provider error.
+- `X-LangWatch-Handled-Error` with the `error.code`, when the gateway wrote the error itself.
+- `X-LangWatch-Heartbeat-Active` on a transcription that does not stream and asks for a JSON format.
+
+You also receive the provider's `Content-Type` and its request id header. No other provider header is passed on.
 
 ## Streaming
 
-Neither route streams. The audio bytes and the transcript are returned complete.
+### Speech
+
+`POST /v1/audio/speech` always answers with a chunked body. Each chunk is written and flushed as the provider sends it, so playback can start before synthesis ends. Read the body as a stream:
+
+```bash
+curl -N https://gateway.langwatch.ai/v1/audio/speech \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4o-mini-tts",
+    "voice": "nova",
+    "input": "Hello from the gateway.",
+    "response_format": "pcm"
+  }' --output - | ffplay -f s16le -ar 24000 -i -
+```
+
+OpenAI, Azure OpenAI (API key credentials) and ElevenLabs stream. Other providers return the audio in one chunk once synthesis is complete.
+
+With `"stream_format": "sse"` the response is `text/event-stream`. The provider's `speech.audio.delta` and `speech.audio.done` events are relayed unchanged; the audio is base64 in each delta. OpenAI does not serve `sse` on `tts-1` or `tts-1-hd`.
+
+```bash
+curl -N https://gateway.langwatch.ai/v1/audio/speech \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "openai/gpt-4o-mini-tts", "voice": "nova", "input": "Hello.", "stream_format": "sse"}'
+```
+
+```
+data: {"type":"speech.audio.delta","audio":"//PkxAAAAAAAAAAA..."}
+
+data: {"type":"speech.audio.done","usage":{"input_tokens":14,"output_tokens":101,"total_tokens":115}}
+```
+
+### Transcription
+
+With `stream=true` the response is `text/event-stream`. The provider's `transcript.text.delta`, `transcript.text.segment` and `transcript.text.done` events are relayed unchanged.
+
+```bash
+curl -N https://gateway.langwatch.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -F "model=openai/gpt-transcribe" \
+  -F "stream=true" \
+  -F "file=@call-recording.wav"
+```
+
+```
+data: {"type":"transcript.text.delta","delta":"Hello"}
+
+data: {"type":"transcript.text.done","text":"Hello from the gateway.","usage":{"type":"duration","seconds":2}}
+```
+
+A model that ignores `stream` (`whisper-1`) answers with the usual JSON body.
+
+### When a stream ends early
+
+If the provider stops an event stream before its final event, the gateway appends an `event: error` frame. A raw audio stream that fails is closed without the terminating chunk, so the HTTP client reports a truncated body.
 
 ## Metering
+
+| Call | Charged by |
+| --- | --- |
+| Speech, raw audio | Unicode characters of `input`. The provider states no usage with raw audio. |
+| Speech, `stream_format: "sse"` | Characters of `input`, plus the token usage on `speech.audio.done`. |
+| Transcription | The seconds or tokens the provider reports, on the JSON body or on `transcript.text.done`. |
+| Transcription with `response_format` `text`, `srt` or `vtt` | The duration of the uploaded file. These bodies state no usage. |
+| Transcription stream that ends before `transcript.text.done` | The duration of the uploaded file. |
+
+You are charged for the characters once the provider accepts the request. If you disconnect mid-stream, you still pay for the full text, because the provider bills it.
+
+The gateway reads the duration of an upload from WAV, FLAC, Ogg, MP4 and M4A headers, and from an MP3's Xing header or constant bitrate. For any other container, WebM included, it estimates the duration from the file size at 64 kbps.
 
 Providers that report token usage fill the standard `gen_ai.usage.*` token attributes on the trace. Character-priced synthesis and duration-priced transcription are measured by two attributes:
 
@@ -2524,7 +2640,7 @@ Providers that report token usage fill the standard `gen_ai.usage.*` token attri
 
 ## Errors
 
-Codes these routes raise before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `bad_request` (all `400`) and `payload_too_large` (`413`). A provider's own error, for example an unknown voice id, is forwarded with its status and body. The full table is on [Errors](/ai-gateway/api/errors).
+Codes these routes raise before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `unsupported_parameter`, `bad_request` (all `400`) and `payload_too_large` (`413`). A provider's own error, for example an unknown voice id, is forwarded with its status and body. The full table is on [Errors](/ai-gateway/api/errors).
 
 ---
 
@@ -2656,7 +2772,7 @@ A provider's own error is forwarded with the provider's status and body, under `
 
 ---
 title: ElevenLabs API paths
-description: ElevenLabs' own synthesis, transcription and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
+description: ElevenLabs' own synthesis, transcription, single-use token and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
 sidebarTitle: ElevenLabs
 ---
 
@@ -2664,16 +2780,19 @@ sidebarTitle: ElevenLabs
 
 ```
 POST /v1/text-to-speech/{voice_id}
+POST /v1/text-to-speech/{voice_id}/stream
+POST /v1/text-to-speech/{voice_id}/stream/with-timestamps
 POST /v1/speech-to-text
+POST /v1/single-use-token/{token_type}
 POST /v1/convai/webhook/{model_provider_id}
 xi-api-key: vk-lw-<ULID>
 ```
 
-The two audio paths mirror ElevenLabs' own, with ElevenLabs' own request bodies. Point the ElevenLabs SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key in place of the ElevenLabs key. The key goes in the `xi-api-key` header the SDK already sends.
+The audio paths mirror ElevenLabs' own, with ElevenLabs' own request bodies. Point the ElevenLabs SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key in place of the ElevenLabs key. The key goes in the `xi-api-key` header the SDK already sends.
 
 The ElevenLabs key itself stays on the organization's ElevenLabs model provider. An SDK that still sends it gets `401 invalid_api_key`, because the gateway reads that header as a virtual key.
 
-Both audio paths are served only by an ElevenLabs credential. A key that cannot reach ElevenLabs answers `400 model_provider_not_bound` and no provider is called. There is no fallback to another provider.
+The audio paths are served only by an ElevenLabs credential. A key that cannot reach ElevenLabs answers `400 model_provider_not_bound` and no provider is called. There is no fallback to another provider.
 
 ## Text to speech
 
@@ -2685,16 +2804,36 @@ curl "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL?output
   --output hello.mp3
 ```
 
-The response is ElevenLabs' audio bytes and headers, unchanged.
+The response is ElevenLabs' audio bytes and headers, unchanged, relayed as ElevenLabs sends them.
+
+`/stream` and `/stream/with-timestamps` take the same body and query string and reach the same paths on ElevenLabs. They are gated and metered exactly like the plain path.
+
+```bash
+curl -N "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream?output_format=mp3_44100_128" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the gateway.", "model_id": "eleven_flash_v2_5"}' \
+  --output - | ffplay -i -
+```
+
+`/stream/with-timestamps` answers with a stream of JSON objects, each carrying `audio_base64`, `alignment` and `normalized_alignment`:
+
+```bash
+curl -N "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream/with-timestamps" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the gateway.", "model_id": "eleven_flash_v2_5"}' \
+  --output -
+```
 
 | Parameter | What the gateway does |
 |---|---|
-| `text` | Required. Missing: `400 bad_request`. Metered as Unicode characters. |
+| `text` | Required. Missing: `400 bad_request`. Metered as Unicode characters, from the moment ElevenLabs accepts the request. A caller that disconnects mid-stream is still charged the full text. |
 | `model_id` | Resolved through the key's aliases and allowlist, then rewritten to the bare model id ElevenLabs knows. Absent: billed and gated as `eleven_multilingual_v2`, the vendor's own default. Outside the allowlist: `400 model_not_allowed`. |
 | Query string (`output_format`, `enable_logging`, latency settings) | Forwarded as written. |
 | Every other body field (voice settings, and the rest) | Forwarded as written. |
 
-The body is capped at 1 MB; over the cap: `413 payload_too_large`.
+The request body is capped at 1 MB; over the cap: `413 payload_too_large`. The audio response is capped at 32 MiB, counted as it is relayed: a longer response is cut at the cap.
 
 ## Speech to text
 
@@ -2718,11 +2857,131 @@ The response is ElevenLabs' transcript JSON, unchanged. Transcription is metered
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 
-Both audio paths return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers), plus ElevenLabs' own response headers. A forwarded ElevenLabs error carries `X-LangWatch-Provider: elevenlabs` and the vendor's `Retry-After` when it sent one.
+The audio paths return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers), plus ElevenLabs' own response headers. A forwarded ElevenLabs error carries `X-LangWatch-Provider: elevenlabs` and the vendor's `Retry-After` when it sent one.
 
 ## Streaming
 
-Neither audio path streams. The audio bytes and the transcript are returned complete.
+All three text to speech paths answer with a chunked body that is written and flushed as ElevenLabs sends it. If ElevenLabs fails mid-stream the connection is closed without the terminating chunk, so the HTTP client reports a truncated body.
+
+Speech to text does not stream. The transcript is returned complete.
+
+## Single-use tokens
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/single-use-token/tts_websocket?model_id=eleven_flash_v2_5" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+```
+
+```json
+{
+  "token": "sutkn_...",
+  "langwatch": { "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A" }
+}
+```
+
+The path is ElevenLabs' own. The gateway checks the key's budgets and its open-session cap, mints the token with the stored ElevenLabs key, and returns ElevenLabs' body with `langwatch.session_id` added. The same id is on the `X-LangWatch-Session-Id` response header. A token is valid for 15 minutes and opens one socket.
+
+The socket runs from your client to ElevenLabs and does not pass through the gateway. The gateway does not see what the socket used, so your client reports it.
+
+| `token_type` | Opens | Default `model_id` |
+|---|---|---|
+| `tts_websocket` | A text to speech socket (`stream-input`, `multi-stream-input`) | `eleven_multilingual_v2` |
+| `ttd_websocket` | The Text to Dialogue socket | `eleven_v3_conversational` |
+| `realtime_scribe` | The realtime speech to text socket | `scribe_v2_realtime` |
+| `batch_scribe` | One `POST /v1/speech-to-text` call made directly to ElevenLabs | `scribe_v2` |
+
+Any other `token_type` answers `400 bad_request`.
+
+ElevenLabs' token route takes no model, so the gateway reads one from the `model_id` query parameter. It is resolved through the key's aliases and allowlist and is the model the session is billed under. Pass the model your socket will use. Outside the allowlist: `400 model_not_allowed`. `model_id` is not forwarded to ElevenLabs.
+
+The route is served only by an ElevenLabs credential, and a customer on a residency host is minted on that host.
+
+### Opening the socket
+
+The query parameter that carries the token differs per socket.
+
+| Socket | Token type | Query parameter |
+|---|---|---|
+| `wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input` | `tts_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/multi-stream-input` | `tts_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/text-to-dialogue/stream-input` | `ttd_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/speech-to-text/realtime` | `realtime_scribe` | `token` |
+| `POST https://api.elevenlabs.io/v1/speech-to-text` | `batch_scribe` | `token` |
+
+```js
+const ws = new WebSocket(
+  `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input` +
+    `?model_id=eleven_flash_v2_5&single_use_token=${token}`,
+);
+```
+
+`eleven_v3` and `eleven_v4` models run on the Text to Dialogue socket, not on `stream-input`. Mint a `ttd_websocket` token for it. ElevenLabs' reference does not list that token type, and the Text to Dialogue socket accepts no other: a `tts_websocket` token is refused with close code `1008` and `invalid_token_type`.
+
+### Reporting usage and closing
+
+ElevenLabs sockets send no usage. Count it in your client and post it to the session:
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "flush-1", "usage": {"characters": 123}}'
+```
+
+| Socket | Usage to report |
+|---|---|
+| Text to speech | `{"usage":{"characters":N}}`: the characters of text sent for synthesis. |
+| Speech to text | `{"usage":{"audio_seconds":N}}`: the seconds of audio sent. |
+
+`id` names the report. Reports with different ids add up, and a report resent with the same id is recorded once. A report with no `id` and no `final` is read as the session total and closes the session. Add `"final": true` to any report to close the session after it is recorded.
+
+To close without usage:
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/close" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+```
+
+The response body and the charge for a session that never reports are described on [Realtime voice](/ai-gateway/api/realtime#the-usage-response).
+
+## Relayed sockets
+
+The gateway also serves the ElevenLabs sockets itself. The client opens the socket on the gateway with its virtual key, the gateway opens the same path at ElevenLabs with the stored key and passes frames both ways. Use this when the client should hold no ElevenLabs credential at all and should not report its own usage. A single-use token keeps the socket client to ElevenLabs and saves the hop.
+
+| Route (WebSocket upgrade) | Default `model_id` | Metered by |
+|---|---|---|
+| `GET /v1/text-to-speech/{voice_id}/stream-input` | `eleven_multilingual_v2` | Characters |
+| `GET /v1/text-to-speech/{voice_id}/multi-stream-input` | `eleven_multilingual_v2` | Characters |
+| `GET /v1/text-to-dialogue/stream-input` | `eleven_v3_conversational` | Characters |
+| `GET /v1/speech-to-text/realtime` | `scribe_v2_realtime` | Audio seconds |
+
+Pass the virtual key as `Authorization: Bearer`, as the `xi-api-key` header, or as the `xi-api-key` or `authorization` query parameter. The gateway removes the key parameters from the query string and forwards the rest as written (`output_format`, `audio_format`, `language_code` and so on). `model_id` goes through the key's aliases and allowlist; outside the allowlist the request answers `400 model_not_allowed` before the upgrade.
+
+```bash
+wscat -c "wss://gateway.langwatch.ai/v1/text-to-speech/$VOICE_ID/stream-input?model_id=eleven_flash_v2_5" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+> {"text":" "}
+> {"text":"Hello from the gateway. "}
+> {"text":""}
+```
+
+```bash
+websocat "wss://gateway.langwatch.ai/v1/speech-to-text/realtime?audio_format=pcm_16000&xi-api-key=$LANGWATCH_VIRTUAL_KEY"
+{"message_type":"input_audio_chunk","audio_base_64":"<base64 PCM>","commit":false,"sample_rate":16000}
+```
+
+If the first frame carries `xi-api-key`, `xi_api_key` or `authorization`, the gateway strips those fields from that frame. Every other frame is forwarded byte for byte, in both directions.
+
+### How relayed sockets are metered
+
+ElevenLabs sockets state no usage, so the gateway counts what the client sends.
+
+- **Speech.** The characters of every `text` field the client sends: `text` on `stream-input` and on each context of `multi-stream-input`, and each `inputs[].text` on Text to Dialogue. The keep-alive `" "` counts one character and the closing `""` counts none.
+- **Transcription.** The seconds of audio sent: the decoded length of each `audio_base_64` chunk divided by the byte rate of `audio_format`. `pcm_16000`, the default, is 32,000 bytes per second, and `ulaw_8000` is 8,000.
+
+The gateway reads client text frames for those fields only. Usage is recorded at most every 10 seconds while the socket runs and once more when it closes. Do not post usage for a relayed socket.
+
+A relayed socket is closed by the gateway on an exhausted budget (`1008`), a revoked key (`1008`) and a deploy (`1012`). The codes and what the client should do are on [Realtime voice](/ai-gateway/api/realtime#when-the-relay-closes-the-socket).
 
 ## Post-call webhook
 
@@ -2925,6 +3184,7 @@ Ignore fields you do not recognize. New ones are added over time and none of the
 | `request_abandoned`              | 499  | The caller disconnected, or its deadline expired before the provider answered.                                                                             | Send the request again if you still need the answer.                                            |
 | `auth_upstream_unavailable`      | 503  | The gateway could not reach the LangWatch control plane to resolve the key.                                                                                | Retry.                                                                                          |
 | `realtime_registry_unavailable`  | 503  | The control plane could not record a realtime voice session, so the gateway did not mint a session.                                                        | Retry.                                                                                          |
+| `voice_broker_unavailable`       | 503  | The gateway instance is at its limit of supervised voice calls, or is shutting down. No call was created.                                                  | Retry after the `Retry-After` header.                                                           |
 | `internal_error`                 | 500  | An unclassified gateway failure.                                                                                                                           | Retry, and quote `trace_id` in a support ticket.                                                |
 
 ## Provider errors
@@ -3899,12 +4159,18 @@ The gateway mints the vendor's own session credential. Your client asks the gate
 
 The audio never passes through the gateway. The media socket runs from your client straight to the vendor, so the gateway does not add to turn latency and cannot see, record or end a call in progress.
 
-One session is one spend record: admitted at the mint, settled when the call's usage arrives.
+A session is admitted at the mint. Its spend is recorded as usage arrives: one record per report your client posts, or one at the end when the vendor reports the call.
 
 <Note>
   Because the gateway is not in the audio path, a voice budget admits at session start and
   reconciles when the call ends. Overshoot on voice is bounded by the length of a call.
 </Note>
+
+### End users
+
+Send `X-LangWatch-End-User-Id` on the request that creates the session (the mint, or the session create of a gateway-metered call). `X-Litellm-End-User-Id` is accepted as an alias. The gateway stores the id on the session, so every usage report, the closing record and an estimated settlement are attributed to that end user and count against a [per-end-user budget](/ai-gateway/budgets). A usage report does not take the header: the session's end user is fixed when it is created.
+
+A session request has no `user` body field, so the header is the only source. On a key with an active per-end-user budget, a session request without the header answers `400 end_user_required`. When a report takes that end user's allowance to its limit, the usage response answers `budget.exceeded: true` with scope `attributed_user`.
 
 ## ElevenLabs Conversational AI
 
@@ -3941,6 +4207,10 @@ A session neither of them closes settles as cost unknown, and a report arriving 
 
 Only the `post_call_transcription` event is applied. `post_call_audio` and `call_initiation_failure` are acknowledged and not applied: they name the conversation and carry no duration.
 
+## ElevenLabs speech and transcription sockets
+
+`POST /v1/single-use-token/{token_type}` mints a token that opens one ElevenLabs speech or transcription socket. See [ElevenLabs](/ai-gateway/api/elevenlabs#single-use-tokens) for the mint and for how each socket takes the token. Usage is reported and the session is closed with the same two routes as an OpenAI session, described below.
+
 ## OpenAI Realtime
 
 Mint an ephemeral client secret.
@@ -3949,13 +4219,15 @@ Mint an ephemeral client secret.
 curl -X POST "https://gateway.langwatch.ai/v1/realtime/client_secrets" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"session":{"type":"realtime","model":"gpt-realtime"},
+  -d '{"session":{"type":"realtime","model":"gpt-realtime-2.1"},
        "expires_after":{"anchor":"created_at","seconds":600}}'
 ```
 
 This is OpenAI's own path and its own body. The gateway reads `session.model` as the model and forwards your declaration as you wrote it, with two edits: the resolved model is written back into `session.model`, and `expires_after.seconds` is held between 10 and 7200. A body that names no expiry is forwarded untouched, so OpenAI's own default applies. The voice, the tools, the turn detection and the audio formats reach OpenAI unchanged. The request body is capped at 256 KiB.
 
 The answer is OpenAI's own body plus `langwatch.session_id`, and the same id is on `X-LangWatch-Session-Id`.
+
+If the session declares input transcription at `session.audio.input.transcription.model`, the gateway records that model at the mint. Transcription usage you report later is priced under it.
 
 Open the socket with the returned secret. Which form you use depends on where the code runs, because a browser `WebSocket` takes only a URL and a subprotocol list and cannot set request headers.
 
@@ -3964,7 +4236,7 @@ From a server, with the `ws` package or any Node websocket client that accepts h
 ```js
 import WebSocket from "ws";
 
-const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", {
+const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime-2.1", {
   headers: { Authorization: `Bearer ${clientSecret.value}` },
 });
 ```
@@ -3972,44 +4244,258 @@ const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", 
 From a browser, as a subprotocol:
 
 ```js
-const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", [
+const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime-2.1", [
   "realtime",
   `openai-insecure-api-key.${clientSecret.value}`,
 ]);
 ```
 
-### Closing an OpenAI session
+### Reporting OpenAI usage
 
-OpenAI reports usage over the socket, in `response.done`, and that socket does not pass through the gateway. Post what you read back:
+OpenAI reports usage over the socket, and that socket does not pass through the gateway. Post what you read back to the session. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint.
+
+Forward each `response.done` event as it arrives:
 
 ```bash
 curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"usage":{"input_tokens":1204,"output_tokens":318,
-       "input_token_details":{"cached_tokens":900,"text_tokens":104,"audio_tokens":1100},
-       "output_token_details":{"text_tokens":18,"audio_tokens":300}}}'
+  -d '{"type":"response.done","response":{"id":"resp_001",
+       "usage":{"input_tokens":132,"output_tokens":121,
+         "input_token_details":{"text_tokens":119,"audio_tokens":13,"cached_tokens":64,
+           "cached_tokens_details":{"text_tokens":64,"audio_tokens":0}},
+         "output_token_details":{"text_tokens":30,"audio_tokens":91}}}}'
 ```
 
 ```json
-{ "received": true }
+{
+  "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A",
+  "status": "recorded",
+  "cost_usd": 0.007206,
+  "session_cost_usd": 0.0412,
+  "budget": { "exceeded": false }
+}
 ```
 
-The status is `202`. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. Three body shapes are accepted, so you can forward the frame unchanged: the bare usage object, an object with a `usage` key, and the whole `response.done` event. The rest of the event is not read, and no transcript content is looked at. The body is capped at 64 KiB.
+Each report is its own spend record, so the key's budgets see the call while it runs. The session stays open until you close it.
 
-Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost.
+A report key is stored as letters, digits, `_` and `-`, up to 128 characters. OpenAI's response and item ids fit as they are.
 
-A session that never reports settles as cost unknown when the settlement grace expires, and a report arriving after that replaces the settled record.
+| Body | Report key | What it does |
+|---|---|---|
+| A whole `response.done` event | `response.id` | Records that response. Sending it again is not recorded twice. |
+| A whole `conversation.item.input_audio_transcription.completed` event | `item_id` | Records input transcription, priced under the session's transcription model. Its `usage` may be `{"type":"tokens", ...}` or `{"type":"duration","seconds":N}`. An event with no `usage` answers `200` with status `no_usage`. |
+| `{"events":[ ... ]}` | One per event | A batch of the two events above, at most 100, recorded in order. A `response.done` in a batch must carry `response.id`. |
+| A usage object, or `{"usage":{...}}`, with no `id` | None | The session total. Closes the session. If keyed reports came first, only the part they did not cover is charged. |
+| `{"id":"...","usage":{...}}` | Your `id` | Records one report under an id you choose. |
+
+Add `"final": true` at the top level of any body to close the session after it is recorded. Add `"duration_ms"` beside it to state how long the call ran. A usage object with no `id` and `"final": true` is recorded as one more amount on top of the earlier reports, not as the session total.
+
+Only ids and usage counts are read. Transcripts and prompts on a forwarded event are not looked at. The body is capped at 1 MiB.
+
+Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost. When the usage carries `cached_tokens_details`, cached text tokens are priced at the cache-read rate and cached audio tokens are priced at the full audio input rate.
+
+### The usage response
+
+Every usage post and every close answers `200` with this body:
+
+| Field | Meaning |
+|---|---|
+| `session_id` | The session the report was recorded against. |
+| `status` | `recorded`, `duplicate` (that report key was already recorded), `closed` (the report closed the session), `already_closed` (the session was closed before and this post was not recorded), or `no_usage` (the body carried no usage). For a batch, the status of its last report. |
+| `cost_usd` | What this post added, in US dollars. For a batch, the sum. |
+| `session_cost_usd` | Everything recorded for the session so far. |
+| `budget.exceeded` | `true` when a blocking budget on the key is at or past its limit, counting this session. `budget.scope` and `budget.budget_id` name it. |
+| `budget.unknown` | Present and `true` when the budgets could not be read. `exceeded` is then `false` and means no verdict, not within budget. |
+
+The gateway cannot end a call. When `budget.exceeded` is `true`, close the socket from your client.
+
+### Closing a session
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/close" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"duration_ms": 42000}'
+```
+
+The body is optional. A close records no usage: what the reports already recorded stands. Closing frees the key's open-session slot.
+
+### Sessions that never report
+
+A session past its open window with no close is settled by LangWatch:
+
+- **It sent reports.** It is closed and the reported usage stands.
+- **It sent none.** It is charged an estimate and closed. The assumed duration is the credential's lifetime, or the default below when the lifetime is not known, held between 60 seconds and 60 minutes.
+
+| Session | Estimate | Default duration |
+|---|---|---|
+| OpenAI Realtime | 10 input audio tokens per second, plus 20 output audio tokens per second for half the duration | 600 s |
+| ElevenLabs speech socket | 15 characters per second | 300 s |
+| ElevenLabs transcription socket or batch | Audio for the whole duration | 300 s |
+
+An ElevenLabs Conversational AI session is not estimated. It settles from the vendor's own report, or as cost unknown.
+
+## OpenAI Live
+
+`POST /v1/live/sessions` creates an OpenAI Live session over WebRTC. Send the body you would send to OpenAI: the `session`, and a `transport` of type `webrtc` carrying your SDP offer. The gateway resolves `session.model`, creates the session with the provider key and returns OpenAI's answer with its own status.
+
+```bash
+curl -X POST "$LANGWATCH_GATEWAY_URL/v1/live/sessions" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": { "model": "openai/gpt-live-1", "audio": { "output": { "voice": "marin" } } },
+    "transport": { "type": "webrtc", "sdp": "v=0..." }
+  }'
+```
+
+The answer is OpenAI's body with `langwatch.session_id` added. The same id is on the `X-LangWatch-Session-Id` header. Set `transport.sdp` from the answer as the remote description. Audio then runs from the browser to OpenAI and does not pass through the gateway.
+
+The gateway meters this session itself. It attaches to the session's event socket at OpenAI with the provider key and records usage while the call runs:
+
+- **Duration.** OpenAI states the session's cumulative seconds. The gateway reports the difference since its last report, at most every 10 seconds and once more when the session closes.
+- **Delegated responses.** A session that sets `session.delegation.responses.model` runs those responses on another model. Each completed response is recorded once, under that model's token prices.
+
+Your client sends no usage report and does not close the session.
+
+Only the `webrtc` transport is served; any other `transport.type` answers `400 bad_request`. The model in `session.delegation.responses.model` has to pass the key's allowed models and policy rules, or the request answers `400 model_not_allowed`.
+
+## WebRTC calls with gateway-side metering
+
+`POST /v1/realtime/calls` creates an OpenAI Realtime call the same way. Use it in place of a client secret when the gateway should meter the call and be able to end it. The route takes both forms OpenAI's own route takes.
+
+Multipart, with the offer and the session declaration:
+
+```bash
+curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/calls" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -F "sdp=<offer.sdp;type=application/sdp" \
+  -F 'session={"type":"realtime","model":"openai/gpt-realtime-2.1"};type=application/json'
+```
+
+Raw SDP, with the model in the query string:
+
+```bash
+curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/calls?model=openai/gpt-realtime-2.1" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/sdp" \
+  --data-binary @offer.sdp
+```
+
+The response is OpenAI's SDP answer, unchanged, with OpenAI's `Location` header (`/v1/realtime/calls/{call_id}`) and `X-LangWatch-Session-Id`.
+
+The gateway records every `response.done` and every input transcription the call produces, each once. Do not post these to `/v1/realtime/sessions/{session_id}/usage` as well. The session closes when OpenAI ends the call.
+
+### When the gateway ends a call
+
+The gateway ends a call it created on either route, without the client, when:
+
+| Reason            | Trigger                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `budget_exceeded` | A budget that applies to the key is over its limit. Checked on every usage report and every 30 seconds.      |
+| `key_revoked`     | The virtual key was revoked, deleted or expired. Noticed within 60 seconds.                                   |
+| `sideband_lost`   | The gateway lost its event socket and could not attach again within 2 minutes, so it can no longer meter.     |
+| `drain`           | The gateway instance is shutting down and the call outlived its drain time.                                   |
+| `session_closed`  | LangWatch already closed the session, for example because it passed the open session window.                  |
+
+A Live session is asked to close on its socket, then hung up if OpenAI does not confirm. A Realtime call is hung up on `/v1/realtime/calls/{call_id}/hangup`. The usage recorded up to that point stands. A Live session whose event socket never attached is charged 15 seconds.
+
+A Live client receives `session.closed` with reason `close_requested` on its data channel. A Realtime client sees its data channel close. Neither is told why the gateway ended the call; the reason is on the `gateway_voice_sessions_ended_total` metric and in the gateway log (`voice_session_ended`).
+
+Each gateway instance supervises a bounded number of calls (`LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS`, default 2000). A request to an instance that is full or shutting down answers `503 voice_broker_unavailable` with `Retry-After`, before anything is booked. On shutdown an instance keeps metering its calls for `LW_GATEWAY_VOICE_DRAIN_SECONDS` (default 570; the Helm chart sets `shutdown.voiceDrainSeconds`), then ends the ones still open.
+
+## WebSocket relay
+
+OpenAI's WebSocket transport needs the real API key on the socket, so a client on that transport cannot dial OpenAI with a virtual key. For it the gateway relays: the client opens the socket on the gateway with its virtual key, the gateway opens the vendor's socket with the provider key and passes frames both ways.
+
+WebRTC through `/v1/live/sessions` and `/v1/realtime/calls` stays the default, because media then runs client to OpenAI. The relay adds one hop to every frame. Measured on loopback, that hop costs about 11 microseconds per frame at the median and 20 at the 95th percentile, before network distance to the gateway.
+
+The relay meters the session itself, like a brokered call. Your client sends no usage report.
+
+### OpenAI Realtime
+
+`GET /v1/realtime?model=...` with a WebSocket upgrade. The model is resolved through the key's aliases and allowlist before the upgrade, so a refused request answers over HTTP.
+
+```bash
+wscat -c "wss://gateway.langwatch.ai/v1/realtime?model=openai/gpt-realtime-2.1" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
+> {"type":"response.create","response":{"output_modalities":["text"],"instructions":"Say hello."}}
+```
+
+A browser cannot set headers on a WebSocket. It passes the virtual key as a subprotocol, the way OpenAI's own browser clients pass a key:
+
+```js
+const ws = new WebSocket(
+  "wss://gateway.langwatch.ai/v1/realtime?model=openai/gpt-realtime-2.1",
+  ["realtime", `openai-insecure-api-key.${virtualKey}`],
+);
+```
+
+The gateway answers the `realtime` subprotocol and never the key one. The key subprotocol, and any `openai-organization.` or `openai-project.` subprotocol, is not sent to OpenAI.
+
+Every `response.done` and every input transcription is recorded once, as on a brokered call. The route is served by an OpenAI credential. A key with only an Azure OpenAI credential answers `400 model_provider_not_bound`.
+
+### OpenAI Live
+
+`GET /v1/live/sessions` with a WebSocket upgrade. OpenAI takes the model in the first frame, so the client's first frame must be `session.start`:
+
+```bash
+wscat -c "wss://gateway.langwatch.ai/v1/live/sessions" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
+> {"type":"session.start","session":{"model":"openai/gpt-live-1","audio":{"format":{"type":"audio/pcm","rate":24000}}}}
+```
+
+A browser passes the virtual key as a subprotocol, as on the Realtime socket. The gateway answers `realtime` to the browser and opens OpenAI's socket with no subprotocol:
+
+```js
+const ws = new WebSocket("wss://gateway.langwatch.ai/v1/live/sessions", ["realtime", `openai-insecure-api-key.${virtualKey}`]);
+```
+
+The gateway reads that one frame, resolves `session.model`, checks `session.delegation.responses.model` against the allowlist, writes the resolved model back and sends the frame to OpenAI. A first frame that is not `session.start`, names no model, or names a model the key does not allow gets an error frame and close `1008`. The client has 15 seconds to send it.
+
+Duration is reported from OpenAI's cumulative seconds and delegated responses under their own model, as on the WebRTC route. When the client leaves without `session.close`, the gateway sends it, so the final duration is the one OpenAI states.
+
+### What the relay reads
+
+| Frames | What the gateway does |
+| ------ | --------------------- |
+| Client to vendor | Passed on with the same type and the same bytes. Not parsed. The one exception is the `session.start` frame of a Live socket. |
+| Vendor to client | Passed on with the same type and the same bytes. Text frames are read for the event type, and usage events (`response.done`, input transcription completed, `session.usage.updated`, `session.closed`, a delegated `response.completed`) for their ids and usage numbers. |
+
+Audio and transcripts are not logged or stored. A message can be up to 16 MiB.
+
+### When the relay closes the socket
+
+A close from OpenAI reaches the client with OpenAI's code and reason, and a close from the client reaches OpenAI the same way. The gateway closes the socket itself in these cases:
+
+| Close code | Reason             | Meaning                                                                                              | What the client should do                      |
+| ---------- | ------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `1008`     | `budget_exceeded`  | A budget that applies to the key is over its limit. Checked after every usage report and every 30 seconds. | Stop. A new socket answers `402` until the budget has room. |
+| `1008`     | `key_revoked`      | The virtual key was revoked, disabled, deleted or expired. Noticed within 60 seconds.                 | Stop. The key no longer works.                 |
+| `1008`     | `session_closed`   | LangWatch already closed the session.                                                                  | Open a new socket.                             |
+| `1012`     | `service_restart`  | The gateway instance is being replaced by a deploy.                                                    | Open a new socket at once. Another instance answers. |
+| `1011`     | `provider_connection_lost` | The vendor socket dropped without a close frame.                                              | Open a new socket.                             |
+
+Before a budget close the client receives one text frame:
+
+```json
+{"type":"error","error":{"type":"budget_exceeded","code":"budget_exceeded","message":"The budget on this key is exhausted, so the gateway is closing this session."}}
+```
+
+On a deploy the instance stops taking upgrades and answers `503 voice_broker_unavailable` with `Retry-After`. Open sockets keep running for `LW_GATEWAY_VOICE_DRAIN_SECONDS`, then close with `1012`. A voice session does not carry over to another instance, so the client starts a new one and resends its session configuration.
+
+Relayed sockets count toward `LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS` and toward the key's max open sessions.
 
 ## Limiting how many calls a key runs at once
 
 Set **max open sessions** on the virtual key. The request-rate limits do not bound voice: one mint is a single request that opens a call billing for as long as it runs, so a key at 60 requests per minute can hold sixty ten-minute calls without tripping anything.
 
-A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the call's report arrives. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
+A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the session closes. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
 
 ## What the broker does not do
 
-- **It does not proxy the voice socket.** There is no frame-level tracing, and no way to end a call in progress.
+- **It does not proxy the voice socket of a minted or WebRTC session.** Only the [WebSocket relay](#websocket-relay) carries frames, and it records usage, not content. There is no frame-level tracing. A session minted as a client secret, signed URL or single-use token cannot be ended in progress; a call created on `/v1/live/sessions` or `/v1/realtime/calls` can.
 - **It does not enforce the session's tools.** A hosted agent's tools live at the vendor, and an OpenAI session declares its own.
 - **Guardrails do not run on a mint.** The body is a session declaration, not a prompt, and the conversation never reaches the gateway. The response says so on `X-LangWatch-Guardrails-Not-Applied: realtime_session` instead of reporting a check that could not mean anything.
 
@@ -4019,13 +4505,16 @@ Turn-level transcripts and latency reach LangWatch through the SDK in your own a
 
 | Code                            | Status | Cause                                                                                                                        |
 | ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `bad_request`                   | 400    | `agent_id` is missing on the ElevenLabs mint, a session id is missing on the usage report, or the usage body does not parse. |
+| `bad_request`                   | 400    | `agent_id` is missing on the ElevenLabs mint, the token type is unknown, or the usage body is not one of the accepted shapes. |
+| `not_found`                     | 404    | No session with that id belongs to this key.                                                                                 |
 | `model_provider_not_bound`      | 400    | The key has no credential for the vendor this route serves.                                                                  |
 | `budget_exceeded`               | 402    | A budget that applies to the key is over its limit.                                                                          |
 | `realtime_session_limit`        | 429    | The key holds its maximum of open voice sessions. Retry when a call ends.                                                    |
 | `realtime_registry_unavailable` | 503    | LangWatch could not record the session, so no session was minted. Retry.                                                     |
+| `model_not_allowed`             | 400    | The session model, or the model a Live session delegates responses to, is outside the key's allowed models.                  |
+| `voice_broker_unavailable`      | 503    | The gateway instance is full or shutting down. No call was created. Retry after `Retry-After`.                               |
 
-Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` needs an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
+Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` and `/v1/single-use-token/{token_type}` need an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
 
 **Also check:** [ElevenLabs](/ai-gateway/api/elevenlabs), [Budgets](/ai-gateway/budgets), [Errors](/ai-gateway/api/errors).
 
@@ -4288,7 +4777,7 @@ Webhook deliveries and the REST routes carry the same envelope: `{ "id", "type",
 | `organization_id`, `project_id`                      | The organization, and the trace project of the virtual key.                                                                                                                                                                                                |
 | `virtual_key_id`, `principal_user_id`, `end_user_id` | The key, the person behind a personal key or `null`, the end user of your product or `null`.                                                                                                                                                               |
 | `trace_id`                                           | The trace in Trace Explorer.                                                                                                                                                                                                                               |
-| `model`, `model_provider_id`, `request_type`         | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `image_generation`, `image_edit`, `realtime_session` or `passthrough`.                              |
+| `model`, `model_provider_id`, `request_type`         | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `image_generation`, `image_edit`, `realtime_session`, `realtime_response` or `passthrough`. A voice session emits one `realtime_response` event per usage report and one `realtime_session` event when it closes.                              |
 | `usage`                                              | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`, `input_image_tokens`, `output_image_tokens`, `image_count`, always present and 0 when unused. Each priced quantity is charged once at its own rate, and `input_tokens` excludes the cached, audio and image tokens. `reasoning_tokens` is a subset of `output_tokens`, and `image_count` counts images, so no rate prices either and neither belongs in a cost sum. An `image_generation` row reports `output_tokens` 0 with its render under `output_image_tokens`. `null` on `settled` and `admitted`. |
 | `cost`                                               | `total_usd` as a decimal string, `nano_usd` as an integer (1 USD is 1,000,000,000 nano USD), and `rate_version`, for example `registry@2026-08-01`. `null` on `settled` and `admitted`.                                                                    |
 | `status`                                             | `success`, `error`, `settled` or `admitted`.                                                                                                                                                                                                               |
@@ -4464,7 +4953,7 @@ Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fie
   />
 </Frame>
 
-The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
+The budget is in force at once: the next request counts against it. See [How far past a limit spend can go](#how-far-past-a-limit-spend-can-go).
 
 For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
 
@@ -4503,7 +4992,7 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
   }'
 ```
 
-The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
+The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. A voice session keeps the end user of the request that created it, and every usage report of that session counts against that end user. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
 
 Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
 
@@ -4538,6 +5027,28 @@ The warning header lists every budget at or past 80 percent as `scope:percent`, 
 A `block` budget with a **Provider** filter removes that provider from the request's provider chain instead of rejecting the request. The request is rejected only when no provider is left.
 
 Two webhook events fire once per period: `gateway.budget.threshold_crossed` at 80 percent and `gateway.budget.breached` at the limit, on `warn` budgets too. See [Webhooks](/features/webhooks).
+
+## How far past a limit spend can go
+
+A budget is checked before a request and debited after it, so spend can pass the limit by a bounded amount:
+
+- **One request.** A request admitted under the limit is served in full, whatever it costs.
+- **Requests in flight.** Requests admitted at the same moment are each checked against the spend recorded so far.
+- **The refresh.** The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
+
+### Voice and realtime sessions
+
+A voice call is one admission that bills for as long as it runs. It is checked when the session is created and debited while it runs: each usage report is its own debit, so budgets see a call in progress.
+
+| Session | Created on | At the limit | Overshoot bound |
+| ------- | ---------- | ------------ | --------------- |
+| Metered by the gateway | `/v1/live/sessions`, `/v1/realtime/calls` | The gateway ends the call. It checks on every usage report and every 30 seconds. | About one minute of the call. |
+| Metered by the client | `/v1/realtime/client_secrets`, `/v1/single-use-token/{token_type}` | The usage answer carries `budget.exceeded: true`. The client closes the socket. The gateway cannot. | The rest of the call, at most the vendor's session length. |
+| Never reported | Either client-metered route | LangWatch charges an estimate when the open window passes. | The estimate. See [Sessions that never report](/ai-gateway/api/realtime#sessions-that-never-report). |
+
+The next session create on a key past its limit answers HTTP 402 in all three cases.
+
+Two settings keep a client-metered session small: a short credential lifetime on the mint (`expires_after.seconds` for OpenAI; an ElevenLabs token lasts 15 minutes and opens one socket) and **max open sessions** on the key, which caps how many calls it holds at once. See [Realtime voice](/ai-gateway/api/realtime#limiting-how-many-calls-a-key-runs-at-once).
 
 ## Windows and cycles
 
@@ -4978,6 +5489,161 @@ Run this more often than you read `/readyz`. The probe reports process state onl
 
 ---
 
+# FILE: ./ai-gateway/cookbooks/consumer-voice-app.mdx
+
+---
+title: "Voice in a consumer app: one budget per end user"
+description: Give each end user of a voice app a spend cap, keep the audio path client to vendor, and let the gateway mint the credentials, meter the calls and stop them at the limit.
+sidebarTitle: Consumer voice app
+keywords: voice, realtime, webrtc, text to speech, speech to text, per-user budget, end users, virtual keys
+---
+
+This page is for an app where each signed-in person talks to a voice model: a phone or browser client, a monthly allowance per person, and a cap on the whole product. The audio runs from the client to the vendor. The gateway holds the provider keys, admits each call against the budgets, meters it and stops it at the limit.
+
+## Pick how you cap each person
+
+There are two ways to give each end user an allowance. Both work on every route on this page.
+
+| | One virtual key per end user | One key, one per-end-user budget |
+|---|---|---|
+| What you create | A virtual key with a `budget` for each person, when they sign up | One virtual key and one `attributed_user` budget, once |
+| What the client sends | Its own key | The shared key, held by your backend, plus `X-LangWatch-End-User-Id` |
+| Where the key can live | On the device | On your backend only |
+| Revoke one person | Revoke their key | Block them in your backend |
+| Cap on concurrent calls | Per person (`max open sessions` on the key) | Shared by everyone on the key |
+| Needs | No extra service | The ClickHouse spend ledger |
+
+Use a key per end user when the client calls the gateway directly. The key is the person's credential: it carries their budget and their concurrency cap, and it is revoked alone.
+
+Use the per-end-user budget when every request already passes through your backend. Your backend holds one key and names the person on each request.
+
+The product-wide cap is a `project` budget in both cases. A request is checked against every budget that applies, so a person at 5 USD is stopped by their own cap and the product at 50 USD is stopped by the project's.
+
+## Set up a key per end user
+
+Create the project budget once:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": { "kind": "project", "project_id": "'$PROJECT_ID'" },
+    "name": "voice app monthly cap",
+    "window": "month",
+    "limit_usd": "50",
+    "on_breach": "block"
+  }'
+```
+
+Create a key when a person signs up. Send an `Idempotency-Key` so a retry returns the same key:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Idempotency-Key: signup-$USER_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "user-'$USER_ID'",
+    "budget": { "limit_usd": "5", "window": "month", "on_breach": "block" },
+    "config": { "realtime": { "maxOpenSessions": 1 } }
+  }'
+```
+
+The response carries the secret once. Hand it to that person's client over your own authenticated channel and store it in the platform keychain. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) for the full body.
+
+## Set up one per-end-user budget
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": { "kind": "attributed_user", "anchor_virtual_key_id": "vk_..." },
+    "name": "per person monthly cap",
+    "window": "month",
+    "limit_usd": "5",
+    "on_breach": "block"
+  }'
+```
+
+Your backend sends `X-LangWatch-End-User-Id: <your user id>` on every request, voice session creates included. A voice session keeps the end user it was created with: every usage report of that session counts against that person's bucket. See [Budgets](/ai-gateway/budgets#per-end-user).
+
+## Which route for which feature
+
+| Feature | Route | Audio path | Who meters |
+|---|---|---|---|
+| Speech in, speech out, lowest latency | [`POST /v1/live/sessions`](/ai-gateway/api/realtime#openai-live) or [`POST /v1/realtime/calls`](/ai-gateway/api/realtime#webrtc-calls-with-gateway-side-metering) | WebRTC, client to OpenAI | The gateway |
+| OpenAI Realtime over a WebSocket from the client | [`POST /v1/realtime/client_secrets`](/ai-gateway/api/realtime#openai-realtime) | Client to OpenAI | Your client reports each `response.done` |
+| ElevenLabs speech or transcription socket | [`POST /v1/single-use-token/{token_type}`](/ai-gateway/api/elevenlabs#single-use-tokens) | Client to ElevenLabs | Your client reports characters or seconds |
+| Speak a reply as it is generated | [`POST /v1/audio/speech`](/ai-gateway/api/audio#speech) or [`POST /v1/text-to-speech/{voice_id}/stream`](/ai-gateway/api/elevenlabs#streaming) | Through the gateway, streamed | The gateway |
+| Transcribe a recording | [`POST /v1/audio/transcriptions`](/ai-gateway/api/audio#transcription) | Through the gateway | The gateway |
+
+Prefer the routes the gateway meters. A client that reports its own usage can stop reporting, and the gateway then charges an estimate for the session instead of what it used.
+
+## A call, end to end
+
+To call from a browser, list your page's origin in `LW_GATEWAY_CORS_ALLOWED_ORIGINS` on the gateway. See [Calling the gateway from a browser](/ai-gateway/security#calling-the-gateway-from-a-browser).
+
+The client creates its WebRTC offer and posts it to the gateway with its key:
+
+```js
+const pc = new RTCPeerConnection();
+pc.addTrack((await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks()[0]);
+pc.ontrack = (event) => (audioElement.srcObject = event.streams[0]);
+const events = pc.createDataChannel("oai-events");
+await pc.setLocalDescription(await pc.createOffer());
+
+const response = await fetch(`${GATEWAY_URL}/v1/live/sessions`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${virtualKey}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    session: { model: "openai/gpt-live-1", audio: { output: { voice: "marin" } } },
+    transport: { type: "webrtc", sdp: pc.localDescription.sdp },
+  }),
+});
+
+if (response.status === 402) return showOutOfCredit(await response.json());
+if (response.status === 429) return showAlreadyInACall();
+
+const { transport } = await response.json();
+await pc.setRemoteDescription({ type: "answer", sdp: transport.sdp });
+```
+
+The gateway adds one HTTP round trip before the call starts. The audio does not pass through it, so the call itself gains no latency.
+
+What the client has to handle:
+
+| Signal | Meaning | What to do |
+|---|---|---|
+| `402 budget_exceeded` on the create | A budget is at its limit. `error.meta.budget_scope` says which: `virtual_key` or `attributed_user` is the person's own, `project` is the product's. | Show the out of credit screen. |
+| `429 realtime_session_limit` | The key already has its maximum open calls. | Offer to end the other call. |
+| `503 voice_broker_unavailable` | That gateway instance is full or restarting. | Retry after `Retry-After`. |
+| The `oai-events` data channel closes during a call (a Live call receives `session.closed` on it first). The peer connection itself can stay `connected` for some seconds more, so watch the data channel. | The call was ended: by the vendor, or by the gateway because the budget ran out, the key was revoked or the instance was replaced. | Create a new session. A `402` on that create means the budget ended the call. |
+
+## How far past the limit a call can go
+
+A budget is checked when the call is created and again while it runs.
+
+- **Calls the gateway meters** are ended by the gateway. It checks on every usage report and every 30 seconds, so a call runs at most about one minute past the limit.
+- **Sessions the client meters** cannot be ended by the gateway. Each usage report answers with `budget.exceeded`; close the socket when it is `true`. A client that ignores it is bounded by the credential lifetime and the vendor's maximum session length, and the next mint answers `402`.
+
+See [Budgets](/ai-gateway/budgets#voice-and-realtime-sessions).
+
+## See what each person spent
+
+```bash
+langwatch virtual-keys spend <vk_id>
+langwatch gateway-budgets list --scope-type virtual_key
+```
+
+With the per-end-user budget, read one person's spend with `GET /api/gateway/v1/end-users/:id/spend`. Signed spend events for your own ledger are described in [Metering and rebilling](/ai-gateway/cookbooks/metering-and-rebilling).
+
+---
+
 # FILE: ./ai-gateway/cookbooks/credential-leak-incident.mdx
 
 ---
@@ -5142,7 +5808,7 @@ description: An importable Grafana dashboard for the LangWatch AI Gateway, cover
 sidebarTitle: Grafana dashboard
 ---
 
-The JSON below builds nine rows that an on-call engineer reads top down, from caller impact to the cause. Every panel reads a metric the gateway registers, so it works against any Prometheus that scrapes `/metrics`.
+The JSON below builds nine rows that an on-call engineer reads top down, from caller impact to the cause. Every panel reads a metric the gateway registers, so it works against any Prometheus that scrapes the gateway's `/metrics` on the metrics port.
 
 Pair it with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for the paging rules, and [Troubleshooting](/ai-gateway/troubleshooting) for the fix behind each row.
 
@@ -5165,7 +5831,7 @@ Nine rows, top to bottom:
 ## Prerequisites
 
 - Grafana 10.0 or later. The JSON uses time series panels and `$__rate_interval`.
-- A Prometheus data source that scrapes the gateway's `/metrics`.
+- A Prometheus data source that scrapes the gateway's metrics port (`9464`) with the bearer `METRICS_API_KEY`.
 - `kube-state-metrics` and cAdvisor for the infrastructure row. Skip that row without them.
 
 ## Import
@@ -6217,7 +6883,7 @@ description: A PromQL ruleset for the LangWatch AI Gateway, covering reliability
 sidebarTitle: Prometheus alerts
 ---
 
-The gateway serves `/metrics` on its own port for any Prometheus setup to scrape. Copy the ruleset below into `alerts/langwatch-gateway.yml`, or into a `PrometheusRule` resource if you run the Prometheus Operator, then reload Prometheus.
+The gateway serves `/metrics` on its own metrics port (`9464` by default) for any Prometheus setup to scrape. Send the bearer `METRICS_API_KEY` as `Authorization: Bearer <key>` in the scrape job's `authorization` block. Copy the ruleset below into `alerts/langwatch-gateway.yml`, or into a `PrometheusRule` resource if you run the Prometheus Operator, then reload Prometheus.
 
 Every metric name and label here comes from the gateway's registry. See [Observability](/ai-gateway/observability#metrics-prometheus) for the full list.
 
@@ -6730,7 +7396,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 | Component | Where it runs | What it does |
 |---|---|---|
-| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics`. |
+| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics` of the metrics listener (port `9464`, bearer `METRICS_API_KEY`, opt-in). |
 | Request pipeline | Inside the gateway service | Runs each request through interceptors in this order: spend admission, rate limit, policy rules, model resolution, cache rules, budget precheck, guardrails, trace span, then the provider dispatch. |
 | Provider dispatch | Inside the gateway service | Sends the request to the first credential in the routing chain through Bifrost and falls through to the next credential on a provider failure. A per-credential circuit breaker opens after 10 failures in 30 seconds and lets one probe through every 60 seconds. |
 | Auth cache | Inside the gateway service | Caches resolved virtual keys in an in-memory LRU of 10,000 entries. See [Auth cache](#auth-cache). |
@@ -6778,7 +7444,7 @@ The gateway never writes spend on the request path. The spend interceptor append
 
 Records seal into segments every second. A drainer ships sealed segments oldest first to `POST /api/internal/gateway/spend-commands`, at least once: a segment is deleted only after the control plane acknowledges it. On a failed ship the drainer retries with a backoff from 1 second doubling to 60 seconds.
 
-On the control plane, the spend processing pipeline turns the commands into ledger rows in `gateway_budget_ledger_events` and appends a `BUDGET_UPDATED` change event for each budget it debited. The gateway then re-fetches the key config and sees the new spend on its next precheck.
+On the control plane, the spend processing pipeline turns the commands into ledger rows in `gateway_budget_ledger_events` and appends a `BUDGET_UPDATED` change event for each budget it debited. The gateway then re-fetches the key config in the background, without holding a request for it, and enforces the new spend once the fetch lands.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -7591,7 +8257,7 @@ Every request through `/v1` produces three things you can read. The one exceptio
 | ------------------ | --------------------------------------------------------------------------------------------- |
 | Trace span         | Trace Explorer, in the project the virtual key writes its traces to                           |
 | Response headers   | On the HTTP response your client already receives                                             |
-| Prometheus metrics | `GET /metrics` on the gateway port (`5563` by default), the same listener that serves `/v1/*` |
+| Prometheus metrics | `GET /metrics` on the metrics port (`9464` by default), when enabled. See [Metrics](#metrics-prometheus) |
 
 The gateway starts one span per dispatched request and exports it to the project the virtual key names. The span is named `gen_ai.<operation>`, for example `gen_ai.chat`.
 
@@ -7676,7 +8342,7 @@ The `Traceparent` response header names that span. Forward it to the next hop in
 
 ## Metrics (Prometheus)
 
-`GET /metrics` needs no authentication and runs on the same port as the API. Scrape it with a `ServiceMonitor` or a plain scrape config. See [Self-hosting: Helm](/ai-gateway/self-hosting/helm).
+The gateway serves `GET /metrics` on its own listener, separate from the API port. Set `OTEL_METRICS_EXPORTER=otlp,prometheus` and `METRICS_API_KEY` to turn it on. The listener binds `OTEL_EXPORTER_PROMETHEUS_HOST:OTEL_EXPORTER_PROMETHEUS_PORT`, which default to every interface and `9464`. Each scrape sends `Authorization: Bearer <METRICS_API_KEY>`. Without `METRICS_API_KEY` the listener does not start and the gateway logs `aigateway_metrics_door_unmounted`. In the Helm chart, set `metrics.enabled=true` and keep the key in a Secret. See [Self-hosting: Helm](/ai-gateway/self-hosting/helm).
 
 ### Traffic and lifecycle
 
@@ -7747,6 +8413,9 @@ sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 | `gateway_realtime_mints_total`                | counter | `vendor`, `outcome` | Voice session mint attempts. `outcome` is `minted`, `session_limit`, `registry_unavailable` or `provider_error`. `minted` counts sessions admitted at mint time; the vendor's later report decides what a session cost |
 | `gateway_realtime_session_limit_blocks_total` | counter | none                | Mints refused because a key already held its maximum open sessions. A rise means the cap is too low for the key's traffic, or its sessions stay open. The key is in the trace and the log line                         |
 | `gateway_realtime_registry_errors_total`      | counter | `operation`         | Failed calls to the voice-session record, by `reserve`, `correlate`, `release` or `usage`. A `reserve` failure refuses the mint; a `correlate` failure costs the session its exact join to the vendor's report         |
+| `gateway_voice_sessions_supervised`           | gauge   | `kind`              | Brokered voice calls this pod meters from its own server-side socket, by `live` or `realtime`. Media does not pass through the pod |
+| `gateway_voice_sessions_ended_total`          | counter | `kind`, `reason`    | Supervised calls that ended. `reason` is `vendor_closed`, `budget_exceeded`, `key_revoked`, `sideband_lost`, `drain` or `session_closed`. Every reason but `vendor_closed` is the gateway ending the call |
+| `gateway_voice_usage_reports_total`           | counter | `outcome`           | Usage reports sent for supervised calls. `outcome` is `recorded`, `duplicate`, `closed`, `already_closed`, `error` or `dropped`. `error` is retried; `dropped` is usage lost because one call's retry queue was full |
 
 ### Control plane
 
@@ -9921,6 +10590,35 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
 | `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
 
+## Calling the gateway from a browser
+
+The gateway sends no CORS headers by default, so a browser page cannot call it. Set `LW_GATEWAY_CORS_ALLOWED_ORIGINS` (chart value `security.corsAllowedOrigins`) to allow it.
+
+| Value                                               | Effect                                                    |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| empty                                               | No CORS headers. The default                              |
+| `https://app.example.com,https://beta.example.com`  | Those exact origins may call `/v1`                        |
+| `*`                                                 | Any origin may call `/v1`. It cannot be mixed with a list |
+
+An origin is `scheme://host[:port]` with no path and no trailing slash. The gateway refuses to start on any other form.
+
+With the setting on, the gateway answers requests to `/v1` as follows:
+
+| Request                               | Answer                                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| From an allowed origin                | `Access-Control-Allow-Origin` with that origin, on success and on refusals such as `401`, `402`, `429` |
+| Preflight `OPTIONS`, allowed origin   | `204` with the allowed methods and the requested headers. No key is needed                            |
+| From any other origin                 | No CORS headers, so the browser blocks the call                                                       |
+| WebSocket connection                  | Unchanged. Browsers do not apply CORS to WebSockets                                                   |
+
+Your page can read these response headers: `X-LangWatch-Session-Id`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Guardrails-Not-Applied`, `Location` and `Retry-After`. Health, metrics and internal routes never send CORS headers.
+
+The gateway never sends `Access-Control-Allow-Credentials`. It authenticates by the key in the request, not by cookies, so an allowed origin cannot call the gateway without a key.
+
+The person using a page can read any virtual key that page holds. Give each end user their own virtual key with its own budget. Never put a key shared by several users, or a key with a project-wide budget, in browser code.
+
+CORS limits which pages a browser lets call the gateway. A person can still use their own key outside the browser, so the key's budget is the limit that counts.
+
 ## Network policy on Kubernetes
 
 The gateway Helm chart ships a deny-by-default `NetworkPolicy`. Turn it on with `networkPolicy.enabled: true`.
@@ -9969,7 +10667,9 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 | Var                                        | Default             | Purpose                                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SERVER_ADDR`                              | `:5563`             | HTTP listen address for the API, the probes and `/metrics`                                                                                                                                                                                                                                                                                                                      |
+| `SERVER_ADDR`                              | `:5563`             | HTTP listen address for the API and the probes                                                                                                                                                                                                                                                                                                                      |
+| `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_PROMETHEUS_PORT` | `otlp,prometheus` and `metrics.port`, only when `metrics.enabled` is `true` | Metrics listener, default port 9464 |
+| `METRICS_API_KEY`                                      | Secret key `metrics.apiKey.secretKey` (default `METRICS_API_KEY`), in `metrics.apiKey.existingSecretName` or else `secrets.existingSecretName`, only when `metrics.enabled` is `true` | Bearer a scrape sends |
 | `SERVER_MAX_REQUEST_BODY_BYTES`            | `33554432` (32 MiB) | Request body cap. A larger body answers `413 payload_too_large` before any provider is contacted. The `/v1/audio/transcriptions` and `/v1/speech-to-text` uploads have their own fixed cap of 26 MB                                                                                                                                                                             |
 | `SERVER_DRAIN_DELAY_SECONDS`               | `3`                 | Wait between flipping `/readyz` to 503 and closing the listener. Must be zero or positive. The chart sets it from `shutdown.preDrainWaitSeconds`                                                                                                                                                                                                                                |
 | `SERVER_GRACEFUL_SECONDS`                  | `900`               | Budget for in-flight requests after the listener closes. Starts after the drain delay, so size the pod grace period above the sum of the two. Must be zero or positive. The chart sets it from `shutdown.timeoutSeconds`. Below 45 the gateway logs `graceful_shutdown_shorter_than_heartbeat_interval`; below 840 it logs `graceful_shutdown_shorter_than_max_stream_duration` |
@@ -9985,6 +10685,12 @@ These apply to the base URLs customers configure on their own provider credentia
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
 | `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
+
+## Browser access
+
+| Var                               | Default | Purpose                                                                                                                                                                                                                                              |
+| --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LW_GATEWAY_CORS_ALLOWED_ORIGINS` | empty   | Comma-separated exact origins (`https://app.example.com`) allowed to call `/v1` from a browser, or `*` alone for any origin. Empty sends no CORS headers. A malformed origin stops the gateway at boot. See [Security](/ai-gateway/security#calling-the-gateway-from-a-browser) |
 
 ## Auth cache
 
@@ -10054,6 +10760,10 @@ These variables configure the gateway's own spans and metrics. Customer traces g
 | `OTEL_TRACES_SAMPLER`                 | `parentbased_always_on` | One of `always_on`, `always_off`, `traceidratio`, `parentbased_always_on`, `parentbased_always_off`, `parentbased_traceidratio`                                   |
 | `OTEL_TRACES_SAMPLER_ARG`             | empty                   | Ratio between 0 and 1. Required by the two `traceidratio` samplers                                                                                                |
 | `OTEL_SDK_DISABLED`                   | `false`                 | `true` turns every exporter off                                                                                                                                   |
+| `OTEL_METRICS_EXPORTER`               | empty                   | Comma list. `prometheus` turns on the metrics listener, which also needs `METRICS_API_KEY`                                          |
+| `OTEL_EXPORTER_PROMETHEUS_HOST`       | every interface        | Address the metrics listener binds                                                                                                  |
+| `OTEL_EXPORTER_PROMETHEUS_PORT`       | `9464`                  | Port the metrics listener binds                                                                                                     |
+| `METRICS_API_KEY`                     | empty                   | Bearer a scrape sends to `/metrics`. Empty leaves the metrics listener off                                                          |
 | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | empty                   | Read only to warn. Metrics always go to the base endpoint plus `/v1/metrics`                                                                                      |
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`    | empty                   | Read only to warn. OTLP logs go to the debug collector only                                                                                                       |
 | `OTEL_DEBUG_COLLECTOR_ENDPOINT`       | empty                   | Second collector for local development. Must resolve to this machine (`localhost`, `127.0.0.1`, `::1`, `*.localhost` or `host.docker.internal`), or startup stops |
@@ -10215,7 +10925,7 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 | `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
 | `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
+`/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` stay in-cluster. Metrics are on their own port (`9464`). The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
@@ -10261,7 +10971,7 @@ kubectl -n langwatch get svc langwatch-gateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-A Service of type `LoadBalancer` publishes every route, including `/metrics`, the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
+A Service of type `LoadBalancer` publishes every route, including the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
 
 ## Other ingress controllers
 
@@ -10332,7 +11042,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/readyz`              | `readinessProbe`                     | The pod is not draining                                                                                                                                 |
 | `/startupz`            | `startupProbe`                       | Startup is complete. The process marks startup complete before it opens the listener, so this endpoint answers 200 on the first request that reaches it |
 | `/health`              | Uptime monitors, through the ingress | The process is up and the control plane answered the signed probe within the last 60 seconds                                                            |
-| `/metrics`             | Prometheus                           | Always. See [Observability](/ai-gateway/observability#metrics-prometheus)                                                                               |
+| `/metrics` on port 9464 | Prometheus                          | When the metrics listener is enabled, with the bearer `METRICS_API_KEY`. See [Observability](/ai-gateway/observability#metrics-prometheus)               |
 | `/debug/control-plane` | Operators, in-cluster                | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL`                                                                  |
 
 None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
@@ -10530,6 +11240,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
   otel:
@@ -10556,7 +11267,7 @@ helm repo update
 helm upgrade --install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace \
   -f values.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
 
 The umbrella chart bundles the gateway sub-chart, so one `helm upgrade` rolls the app and the gateway together. The gateway Deployment uses a `RollingUpdate` with `maxSurge: 1` and `maxUnavailable: 0`.
@@ -10592,12 +11303,15 @@ The chart passes these environment variables to the container. Every other key i
 | `LW_GATEWAY_BASE_URL`                                  | `controlPlane.baseUrl`, else `http://<release>-app:5560`             | Control plane URL                              |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_OTLP_ENDPOINT` | `otel.endpoint`, only when set                                       | OTLP/HTTP endpoint for the gateway's own spans |
 | `LW_GATEWAY_SPEND_ENABLED`                             | `spend.enabled`                                                      | Spend record emission                          |
+| `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_PROMETHEUS_PORT` | `otlp,prometheus` and `metrics.port`, only when `metrics.enabled` is `true` | Metrics listener, default port 9464 |
+| `METRICS_API_KEY`                                      | Secret key `metrics.apiKey.secretKey` (default `METRICS_API_KEY`), in `metrics.apiKey.existingSecretName` or else `secrets.existingSecretName`, only when `metrics.enabled` is `true` | Bearer a scrape sends |
 | `SERVER_MAX_REQUEST_BODY_BYTES`                        | `security.maxRequestBodyBytes`                                       | Request body cap                               |
 | `SERVER_DRAIN_DELAY_SECONDS`                           | `shutdown.preDrainWaitSeconds`                                       | Wait after `/readyz` flips to 503              |
 | `SERVER_GRACEFUL_SECONDS`                              | `shutdown.timeoutSeconds`                                            | In-flight request budget on shutdown           |
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS`                       | Secret, key `secrets.jwtSecretPreviousKey`, only when set            | Previous JWT secret during rotation            |
@@ -10653,7 +11367,8 @@ Watch `gateway_draining` together with `gateway_in_flight_requests`. During a he
 
 | Direction | Allowed                                                                                                | Value                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| Ingress   | Pods in the `ingress-nginx` namespace, and Prometheus pods in the `monitoring` namespace, to port 5563 | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Pods in the `ingress-nginx` namespace, to port 5563                                                    | `networkPolicy.ingressFrom`                                            |
+| Ingress   | Prometheus pods in the `monitoring` namespace, to the metrics port, only when `metrics.enabled` is `true` | `networkPolicy.metricsFrom`                                         |
 | Egress    | DNS to `kube-system` on TCP and UDP 53                                                                 | fixed                                                                  |
 | Egress    | Pods labelled `app.kubernetes.io/name: langwatch-app` on port 5560                                     | `networkPolicy.egressToControlPlane`, `networkPolicy.controlPlanePort` |
 | Egress    | OTLP collector on port 4318, only when the list is non-empty                                           | `networkPolicy.egressToOTLP`                                           |
@@ -10812,8 +11527,8 @@ Expected: a `chat.completion` object from the provider. The response carries `X-
 Then confirm the request produced a spend record:
 
 ```bash
-kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
-  -- curl -sS http://langwatch-gateway/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
+kubectl -n langwatch port-forward deploy/langwatch-gateway 9464:9464 &
+curl -sS -H "Authorization: Bearer $METRICS_API_KEY" http://localhost:9464/metrics | grep -E 'gateway_spend_spool_appended_total|gateway_spend_spool_dropped_total'
 ```
 
 Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_spool_dropped_total` is 0.
@@ -10892,7 +11607,7 @@ gateway:
 
 Start with CPU alone. It needs no Prometheus and it cannot create a loop between the metrics pipeline and the autoscaler.
 
-Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gateway's `/metrics`. Without the adapter the HPA ignores that line. `kubectl describe hpa langwatch-gateway` reports the metric as not active when the adapter is missing.
+Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gateway's metrics listener (port `9464`, bearer `METRICS_API_KEY`). Without the adapter the HPA ignores that line. `kubectl describe hpa langwatch-gateway` reports the metric as not active when the adapter is missing.
 
 Use `behavior` for scale-up and scale-down stabilization when the traffic shape needs it. It is passed to the HPA as written.
 
@@ -13346,7 +14061,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 
 - **Receiver:** `POST /api/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-governance/ingestion-sources/otel-generic).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
-- **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
+- **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli, zstd per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
 - **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline. Cowork tool-call spans land as the OCSF "Action = tool_call"; model-call spans land as "Action = chat" via the governance fold's heuristic.
 - **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
@@ -13794,7 +14509,7 @@ If a field doesn't resolve from the precedence list, the fold projection stores 
 
 ## What is still envelope-only, follow-up work
 
-- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli accepted via the shared parser). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
+- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli and zstd accepted via the shared parser; gzip and zstd bodies are recognised even without a correct Content-Encoding). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
 - **Span events, span links.** Not extracted into separate fold dimensions in this slice; the parent span's data is surfaced. Span events appear in the trace viewer's drill-down.
 
 ## Verify with CLI + web
@@ -18513,6 +19228,8 @@ langwatch instrument claude --project acme-app
 ```
 
 This mints an ingest key for this device, scoped to the project, and pins the tool to the project. LangWatch creates one key per device and never replaces another device's key, so any number of machines can report to one project at the same time. You need a login and the `traces:create` permission on the project.
+
+A member on a [Developer seat](/platform/members-and-teams#developers) holds no permission on any shared project, so the pin is refused and the device keeps its current connection. Ask an administrator to move you to a Member seat and add you to the team that owns the project.
 
 The wrapper takes the same flag and then starts the agent:
 
@@ -40416,7 +41133,7 @@ completeness: {
 }
 ```
 
-- `state`: `no_traffic` means nothing arrived in the period. `missing` means a
+- `state`: `no_traffic` means no rows arrived in the period. `missing` means a
   field the query reads is on no row: show a setup step that names the field
   to send. `partial` means some rows lack a field, or some cost has no price.
 - `fields`: one entry per field the query reads that can be empty, with how
@@ -57036,6 +57753,7 @@ langwatch experiment results <slug> --run-id <id> --limit 50 -o json
 ```
 
 - `--filter failed` keeps only the rows that failed at least one evaluator. Start there, not with the full result set.
+- `--wait <seconds>` keeps reading until the run has ended and every result it reported is stored. Results are stored after the run reports them, so a read taken straight after a large run holds only part of it; the CLI warns on stderr when that happens. Pass `--run-id <id> --wait 600` after a run you just started, and treat exit status 2 as "still partial".
 - `--evaluator <name>` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
 
 For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
@@ -61361,7 +62079,7 @@ Organization members can read the page. Running the checks behind the buttons ne
 
 | Section | What it checks | When it runs |
 |---------|----------------|--------------|
-| Install | The release, Postgres, ClickHouse, their migrations, Redis and the AI Gateway | When the page opens |
+| Install | The release, Postgres, ClickHouse, the **Postgres migrations** and **ClickHouse migrations** rows (read from the upgrade ledger), Redis and the AI Gateway | When the page opens |
 | LangWatch | The license, the connect host, the daily usage report, and whether the gateway reports this install as its control plane | **Run connection checks** |
 | Integrations | Object storage, email and model providers, plus a write to storage, an SMTP connection and a call to each model provider | Basic rows when the page opens, the rest with **Run integration checks** |
 | Pipelines | Canaries that send one real trace, evaluation, scenario run or Langy turn through the install | **Run canaries** |
@@ -61383,6 +62101,8 @@ The last section shows the exact usage report the install sends to LangWatch onc
 | Reach the connect host | Fail | The install cannot open `connect.langwatch.ai:443`. It needs that only with a license that names hosted services. See [Connect](/self-hosting/connect). |
 | AI Gateway control plane | Fail | The gateway reports a control plane that is not this install. Point `GATEWAY_CONTROL_PLANE_URL` on the gateway at this app and restart it. |
 | Model provider connection | Not checked | No stored key could be tested. The row names the reason for each provider. |
+| Postgres migrations, ClickHouse migrations | Fail | A migration is pending or failed. Run `pnpm task upgrade` from the app image, then restart; the failed row names the step. Follow it on **Ops > Upgrades** (`/ops/upgrades`). See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade). |
+| Postgres migrations, ClickHouse migrations | Not checked | No upgrade is recorded yet, or the upgrade ledger could not be read. Run `pnpm task upgrade` (or `pnpm task upgrade status` to read the ledger). The ClickHouse row is also Not checked when ClickHouse is not configured. |
 | Scenarios | Not checked | Enter a run plan id or slug and run the canaries again. |
 
 For errors outside the checkup, see [Troubleshooting](/self-hosting/troubleshooting).
@@ -62057,8 +62777,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                          | Description                                                                                                                             | Required | Default                       |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------- |
 | `DATABASE_URL`                    | PostgreSQL connection string                                                                                                            | Yes      | -                             |
-| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`)                                                         | Yes      | -                             |
-| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection         | No       | `180`                         |
+| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`). Without it the app and workers refuse to start| Yes      | -                             |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds `pnpm task upgrade` waits for ClickHouse to accept connections before failing. `0` fails on the first refused connection     | No       | `180`                         |
 | `REDIS_URL`                       | Redis connection string                                                                                                                 | Yes      | -                             |
 | `NODE_ENV`                        | Environment (`production`, `development`)                                                                                               | No       | `production`                  |
 | `BASE_HOST`                       | Public URL of the application, used in invite links, emails and the links the app hands out                                             | Yes      | -                             |
@@ -62076,7 +62796,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                              | Description                                                                                                                                                                                                                                                                                                                                                                                                           | Required           |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | `NEXTAUTH_SECRET`                     | Signs sessions, keys the sign-in lock-out records and unsubscribe links, and encrypts two-step verification backup codes. Changing it signs every user out                                                                                                                                                                                                                                                            | Yes                |
-| `CREDENTIALS_SECRET`                  | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes                |
+| `CREDENTIALS_SECRET`                  | AES-256-GCM key for stored credentials (model provider keys, webhook signing secrets, SSO credentials) and the pepper for API key hashes. Must be exactly 64 hex characters (`openssl rand -hex 32`). Falls back to `NEXTAUTH_SECRET` when unset. Changing it without a rotation makes stored credentials unreadable and invalidates every API key except legacy project keys. See [Security](/self-hosting/security#credentials-secret) | Yes                |
+| `CREDENTIALS_SECRET_PREVIOUS`         | The old `CREDENTIALS_SECRET` during a rotation. Read-only: values encrypted or hashed with it are still accepted, and new writes use `CREDENTIALS_SECRET`. Same 64 hex format. Unset it when the rotation is done. See [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) | No                 |
 | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | Key for the stand-in that replaces an erased identifier. At least 32 characters. Needed once anyone is erased, with the same value on the app and the workers (Helm: `app.extraEnvs` and `workers.extraEnvs`). Never change it after the first erasure                                                                                                                                                                | For erasure        |
 | `LANGWATCH_INSTANCE_ADMIN_API_KEY`    | Bearer credential for the organization provisioning API (`/api/organizations`). At least 32 characters. Unset, that API answers 404                                                                                                                                                                                                                                                                                   | No                 |
 | `API_TOKEN_JWT_SECRET`                | Not used by any feature. No code reads it; it can be left unset                                                                                                                                                                                                                                                                                                                                                       | No                 |
@@ -62193,6 +62914,8 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | - |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
+| `OBJECT_RETENTION_CONFIRMED` | Set to `true` to confirm that the container has a lifecycle rule for every prefix in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle). Azure refuses oversized writes until it is set; the local filesystem always refuses them | `false` |
+| `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | Earlier, spool-only spelling of `OBJECT_RETENTION_CONFIRMED`. Still confirms when `OBJECT_RETENTION_CONFIRMED` is unset | `false` |
 
 <Warning>
 When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below).
@@ -62371,11 +63094,23 @@ Model providers for evaluators, including Azure OpenAI, are configured per proje
 | `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. Phone runs fail when `VOICE_PUBLIC_BASE_URL` is unset and no tunnel is open. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
 | `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
-## Feature Flags
+## Upgrade
 
-| Variable              | Description                                     | Default |
-| --------------------- | ----------------------------------------------- | ------- |
-| `SKIP_PRISMA_MIGRATE` | `true` skips PostgreSQL migrations on startup | `false` |
+The app and the workers never migrate on startup: `pnpm task upgrade` does, before they start, and they refuse to start until it has run. See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade).
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SKIP_PRISMA_MIGRATE` | `1` or `true` makes `pnpm task upgrade` leave PostgreSQL alone, and unable to mark a failed migration rolled back. The app and workers refuse to start until an upgrade runs without it | `false` |
+| `SKIP_CLICKHOUSE_MIGRATE` | `true` (only) makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence | `false` |
+| `SKIP_LWQL_PROVISION` | `1` or `true` makes `pnpm task upgrade` skip LangWatchQL provisioning | `false` |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Listed under [Core Configuration](#core-configuration) | `180` |
+| `CLICKHOUSE_CLUSTER` | Cluster name. When set, the upgrade creates Replicated engines and replicates DDL across nodes | - |
+| `CLICKHOUSE_COLD_STORAGE_ENABLED` | `true` makes the upgrade's reconcile phase write TTLs that move aged data to the cold volume | `false` |
+| `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` | Hot days for every table without its own `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS` | each table's built-in default |
+| `BASE_HOST` | The upgrade's last log line reads it to say where the UI is | - |
+| `BUILD_TIME` | Set while building an image: the upgrade applies no ClickHouse migration. Leave unset at runtime | unset |
+
+Exit codes, outcome codes and the log lines are in [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ## Cloud admin
 
@@ -62388,8 +63123,8 @@ Model providers for evaluators, including Azure OpenAI, are configured per proje
 | Variable              | Description                       | Default |
 | --------------------- | --------------------------------- | ------- |
 | `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
-| `LANGWATCH_METRICS_MODE` | `otlp` pushes metrics to `OTEL_EXPORTER_OTLP_ENDPOINT`; `prometheus` serves a `/metrics` scrape endpoint instead. The Helm chart sets `prometheus` when `app.telemetry.metrics.enabled` is true | `otlp` |
-| `LANGWATCH_METRICS_TOKEN` | Bearer token a Prometheus scrape must send. In production, `/metrics` is not served without it | -       |
+| `OTEL_METRICS_EXPORTER` | `otlp` pushes metrics to `OTEL_EXPORTER_OTLP_ENDPOINT`; `prometheus` serves a scrape listener on `OTEL_EXPORTER_PROMETHEUS_PORT` (default `9464`) instead. The Helm chart sets `prometheus` when `app.telemetry.metrics.enabled` is true | `otlp` |
+| `METRICS_API_KEY` | Bearer token a Prometheus scrape must send. The metrics endpoint is only mounted when it is set | -       |
 
 ## Langy (optional)
 
@@ -62416,6 +63151,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.signUp.allowedDomains` | `SIGN_UP_ALLOWED_DOMAINS` (joined with commas) |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
+| `app.credentialsEncryptionKey.previous.value` | `CREDENTIALS_SECRET_PREVIOUS`, only when set. With `secrets.existingSecret`, name its key in `secrets.secretKeys.credentialsEncryptionKeyPrevious` instead |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
 | `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
@@ -62427,11 +63163,10 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.email.providers.smtp.user` | `SMTP_USER` |
 | `app.email.providers.smtp.password.value` | `SMTP_PASSWORD` |
 | `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
-| `app.evaluators.azureOpenAI.endpoint.value` / `.apiKey.value` | `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY` when `app.evaluators.azureOpenAI.enabled` is on. The app does not read them; configure Azure OpenAI in **Settings > Model Providers** |
 | `app.evaluators.google.credentials.value` | `GOOGLE_APPLICATION_CREDENTIALS` when `app.evaluators.google.enabled` is on |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.telemetry.metrics.apiKey.value` | `METRICS_API_KEY` when `app.telemetry.metrics.enabled` is on |
-| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
+| `app.telemetry.metrics.apiKey.value` | `METRICS_API_KEY`, with `OTEL_METRICS_EXPORTER=prometheus` on port `9464`, when `app.telemetry.metrics.enabled` is on |
+| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
 | `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
@@ -62439,6 +63174,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.objectRetentionConfirmed` | `OBJECT_RETENTION_CONFIRMED`. Confirms the lifecycle rules in the [lifecycle table](/self-hosting/configuration/object-storage-lifecycle) |
+| `app.dataplane.providers.azureBlob.spoolRetentionConfirmed` | Earlier spelling; either value sets `OBJECT_RETENTION_CONFIRMED=true` |
 | `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST`. Required alongside a sovereign endpoint in a token-based mode |
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
@@ -62460,6 +63197,48 @@ app:
 ```
 
 </Tip>
+
+---
+
+# FILE: ./self-hosting/configuration/object-storage-lifecycle.mdx
+
+---
+title: Object Storage Lifecycle
+description: "The lifecycle rules to create on your bucket or container, and the one setting that confirms them"
+---
+
+LangWatch writes some payloads to object storage only for a short time, or only because they are too large to travel inline through a queue or an event. It deletes what it can straight away. A crash, or an object that is never read again, leaves the rest behind, and the only thing that removes it is a lifecycle rule on the bucket or container. LangWatch cannot create that rule for you.
+
+## Lifecycle table
+
+Create one rule per row. Each rule matches the prefix and expires objects after the stated period. Do not set a period shorter than the one shown, and do not leave a row without a rule.
+
+| Prefix | Written by | Eager delete | Lifecycle rule |
+| --- | --- | --- | --- |
+| `trace-blobs/spool/` | Trace spool (ADR-022) | Yes | Expire after 3 days |
+| `langevals-staging/` | Evaluation, oversized langevals request bodies | Yes | Expire after 3 days |
+| `studio-staging/` | Workflow studio payloads | Yes | Expire after 3 days |
+| `group-queue/` | Group-queue S3 tier | No | Expire after 7 days |
+| `evaluation-inputs/r<days>/` | Evaluation inputs | No | One rule per retention class: `r90` after 90 days, `r180` after 180, `r365` after 365, `r730` after 730 |
+| `evaluation-inputs/r-indefinite/` | Evaluation inputs | No | None. Kept for ever |
+
+Prefixes are matched from the start of the key, so each one is the first segment of the object key. Existing prefixes are unchanged: if you already hold rules for the three older ones, they keep working.
+
+## Which destinations accept oversized writes
+
+- **S3 and compatible stores** accept oversized writes.
+- **Azure Blob** needs you to confirm the rules exist. Today the trace spool refuses oversized writes until you do, and the other kinds will follow. LangWatch holds a data-plane key and cannot read a management-plane lifecycle policy back, so the confirmation is your statement, not a check.
+- **The local filesystem** always refuses oversized writes. A filesystem cannot expire objects.
+
+A refused payload stays bounded: the trace keeps its payload inline and an evaluation keeps its preview. No data is lost, and no orphaned object is left behind.
+
+## Confirming the rules on Azure
+
+Set `OBJECT_RETENTION_CONFIRMED=true` once every row above has a rule on the container. With Helm, set `app.dataplane.objectRetentionConfirmed: true`.
+
+`AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` (Helm `app.dataplane.providers.azureBlob.spoolRetentionConfirmed`) was the earlier setting, which covered only the trace spool. It still confirms when `OBJECT_RETENTION_CONFIRMED` is unset, so an installation that set it keeps working. A value of `false` on `OBJECT_RETENTION_CONFIRMED` takes precedence over it. Move to the new name when convenient; the old one will be retired in a later release.
+
+See [Environment Variables](/self-hosting/configuration/environment-variables) for the Azure Blob settings.
 
 ---
 
@@ -62502,7 +63281,9 @@ prometheus:
 | App       | 5560 | `/metrics` | Trace ingestion, ClickHouse query latency, event loop lag     |
 | Workers   | 2999 | `/metrics` | Queue backlog, job processing time, job success/failure rates |
 
-Both scrape jobs keep only pods annotated `prometheus.io/scrape: "true"`. The chart adds that annotation to the app pods when `app.telemetry.metrics.enabled` is `true`, and never to the workers pods. Without it the chart-managed Prometheus does not reach the workers' `/metrics`. Both `/metrics` endpoints answer 500 until `app.telemetry.metrics.enabled` is on with an API key, and then require that key as a bearer token.
+Each component has its own scrape job. A job keeps only pods annotated `prometheus.io/scrape: "true"` whose `app.kubernetes.io/name` label is that component's (`<release>-app` or `<release>-workers`). The chart adds the annotation to the app and workers pods when `app.telemetry.metrics.enabled` is `true`. Neither component serves `/metrics` until `app.telemetry.metrics.enabled` is on with an API key, and then both require that key as a bearer token.
+
+The chart-managed Prometheus sends the key only when it is set through `app.telemetry.metrics.apiKey.value`. With `apiKey.secretKeyRef`, the pods get the key but the scrape config does not, and both jobs are answered with 401.
 
 ### Access Prometheus
 
@@ -62536,7 +63317,14 @@ prometheus.io/scrape: "true"
 prometheus.io/port: "5560"
 ```
 
-The workers pods carry no scrape annotations. Scrape them on port `2999`, path `/metrics`, or add annotations through `workers.pod.annotations`.
+The workers pods are annotated with:
+
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "2999"
+```
+
+Both serve the metrics on the path `/metrics`.
 
 ## Grafana
 
@@ -62581,7 +63369,7 @@ histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_buc
 The Helm chart configures probes automatically. The app probes `/api/health` on port 5560:
 
 ```yaml
-# Startup probe (allows up to 40 minutes for migrations)
+# Startup probe (allows up to 40 minutes: on a first install the app runs the upgrade before it serves)
 startupProbe:
   httpGet:
     path: /api/health
@@ -63009,7 +63797,7 @@ address is confirmed and the provider sends `email_verified: true`.
 
 ## Upgrading an existing installation
 
-Identity and access migrations run automatically as the app starts, one
+Identity and access migrations run automatically after each upgrade, one
 organization at a time. Each organization switches over as soon as it migrates
 cleanly. When an organization's historical data needs attention, it stays on
 its existing sign-in path and the deployment starts anyway. See the
@@ -63063,7 +63851,7 @@ LangWatch evaluators use external LLM providers for model-based evaluations (LLM
 
 ### Azure OpenAI
 
-Configure Azure OpenAI for evaluators in **Settings > Model Providers**. The chart still accepts `app.evaluators.azureOpenAI`, which sets `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_KEY` on the app and workers, but the app does not read them.
+Configure Azure OpenAI for evaluators in **Settings > Model Providers**. The Helm chart has no value for it.
 
 ### Google Cloud DLP
 
@@ -63246,9 +64034,20 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 ## Instant Evals through Connect
 
-An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
+An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. A self-hosted install cannot judge with a key of its own, so without Connect its eval functions are published as unavailable. Judging on your own infrastructure is planned for a later release. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
 
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+When a sentence typed in trace search can't be judged, the popover under the search bar says why:
+
+| The popover says | What to do |
+| --- | --- |
+| Your license doesn't include Instant Evals | Contact us to add them to your license. |
+| Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
+| This install isn't connected to LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
+| Instant Evals are off on this install | The install has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
+
+On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
+
+With `RELEASE_INSTANT_EVALS=1` set, the four popovers above never show: a sentence that can't be judged gets "Instant Evals can't run right now" instead, whatever the reason. An install that judges through LangWatch needs no flag, so remove it there to get the popover that says why.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
@@ -63369,7 +64168,6 @@ With a license that names hosted services, the install also runs the daily licen
 | Host | Component | When | What it carries | How to stop it |
 |---|---|---|---|---|
 | Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others) | AI Gateway, NLP, LangEvals; App when it validates a key | A feature uses a provider you configured | Content: prompts and completions | Remove the provider |
-| `api.typesafe.ai`, or `JEV_BASE_URL` | App, Workers | `JEV_API_KEY` is set. Instant Evals then use your own key and skip `gateway.langwatch.ai` | Content: the text being judged and the questions | Unset `JEV_API_KEY` |
 | `dlp.googleapis.com` | App, Workers | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) | Content: span text to redact | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
 | `api.github.com`, or `GITHUB_LANGY_HOST` | App | The Langy GitHub App is configured | Repository and installation metadata, token requests | Leave the GitHub App unset |
 | `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list | Langy agent | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default | git clone and push, `gh`, `npm` | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
@@ -63385,7 +64183,7 @@ Libraries inside the images can call third parties on their own. A self-hosted i
 | Host | Component | What it would do | Default | How to turn it on |
 |---|---|---|---|---|
 | `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google` | Workers | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
-| `checkpoint.prisma.io` | App, Workers | Prisma's version check during the migration at each start: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
+| `checkpoint.prisma.io` | App (the upgrade Job, or the app's first boot) | Prisma's version check while `pnpm task upgrade` applies migrations: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
 | `openaipublic.blob.core.windows.net` | App, Workers, LangEvals | Download a tokenizer file for token counting | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache | No switch |
 | `raw.githubusercontent.com` | LangEvals | Download the LiteLLM model price list at startup | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM | No switch |
 | `t.explodinggradients.com` | LangEvals | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` | `RAGAS_DO_NOT_TRACK=false` |
@@ -63414,7 +64212,7 @@ Both services run only when three things hold: the license names the service, no
 
 Instant Evals judge rows of an LWQL query or a trace search with a hosted model. The App or the Workers send the text being judged (a rendered trace or conversation) and the questions to `gateway.langwatch.ai/v1/instant-evals/classify`. Trace search also sends a typed sentence, the active query and the field list, to route the sentence to a filter.
 
-With `JEV_API_KEY` set, the same calls go to `api.typesafe.ai` with your own key instead, and no Instant Evals call goes to LangWatch. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
+A self-hosted install never judges with a key of its own, so no Instant Evals call goes anywhere else. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
 
 ### Managed models
 
@@ -63766,7 +64564,7 @@ LANGWATCH_NLP_INTERNAL_SECRET=
 LANGWATCH_LICENSE_KEY=
 ```
 
-See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. See [Security](/self-hosting/security#credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. To replace it, see [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
@@ -63798,6 +64596,8 @@ docker compose -f infra/compose.yml --project-directory . down
 docker compose -f infra/compose.yml --project-directory . pull
 docker compose -f infra/compose.yml --project-directory . up -d
 ```
+
+The workers run `pnpm task upgrade` on the new image when they start, and the app does not report ready until it completes. On a current installation it applies no step. If it fails, read `docker compose logs workers`; the exit code is explained in the [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ### Reset data
 
@@ -64450,6 +65250,8 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 | `size-prod.yaml`        | Production, single-node CH    | ~8.9 CPU, ~23 Gi            |
 | `size-ha.yaml`          | HA production, replicated CH  | ~23 CPU, ~85 Gi             |
 
+`size-prod.yaml` and `size-ha.yaml` run more than one replica, so they need `app.dataplane` (S3 or Azure Blob) for stored objects. `cold-storage-s3.yaml` covers ClickHouse only.
+
 ### Access Overlays
 
 | Overlay                | Description                          |
@@ -64521,8 +65323,8 @@ clickhouse:
 The chart-managed ClickHouse is pinned to a version the release is tested
 against. An external instance is yours, so the version is your choice.
 LangWatch supports ClickHouse 25.8 and later, including 26.x and ClickHouse
-Cloud. The app runs its ClickHouse migrations at startup, so the version has to
-accept every migration in the release you deploy.
+Cloud. The upgrade applies the release's ClickHouse migrations before the app
+starts, so the version has to accept every migration in the release you deploy.
 
 ### Auto-Tuning
 
@@ -64555,7 +65357,7 @@ Three things to know when running it:
 
    The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
-3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. The workers also run the upgrade, so the chart refuses `workers.enabled=false`.
 
 ## Upgrade
 
@@ -64564,10 +65366,12 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
 
-Database migrations run automatically on startup. Set `SKIP_PRISMA_MIGRATE=true` to disable PostgreSQL migrations if needed.
+The new worker pods run `pnpm task upgrade` on start, and the new api pods are not ready until it completes, so the previous version keeps serving meanwhile and if it fails. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), a pre-upgrade Job runs it on the new image before any pod rolls instead, and a failure fails the `helm upgrade`. On a first install the worker runs it once on its first boot.
+
+Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. With serialised upgrades, to run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new api pods are not ready.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 
@@ -64832,7 +65636,7 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 
 `<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
 
-Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
 
 `/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
 
@@ -64998,51 +65802,10 @@ A self-hosted LangWatch deployment runs the app, the workers, the AI Gateway, th
 
 ## System Overview
 
-```mermaid
----
-config:
-  layout: elk
----
-architecture-beta
-    service llmApp(internet)[Your LLM App]
-
-    group platform(cloud)[Your Infrastructure]
-
-    service app(server)[LangWatch App] in platform
-    service postgres(database)[PostgreSQL] in platform
-    service redis(database)[Redis BullMQ] in platform
-
-    group eventSourcing(server)[Event Sourcing Pipeline] in platform
-    service spanPipe(disk)[Ingestion and Enrichment] in eventSourcing
-    service evalPipe(disk)[Evaluations and Experiments] in eventSourcing
-    service reactionPipe(disk)[Reactions and Triggers] in eventSourcing
-
-    group dataLayer(database)[Data Layer] in platform
-    service clickhouse(database)[ClickHouse] in dataLayer
-    service s3(disk)[S3 Cold Storage] in dataLayer
-
-    service nlp(server)[LangWatch NLP] in platform
-    service langevals(server)[LangEvals] in platform
-    service gateway(server)[AI Gateway] in platform
-    service langy(server)[Langy Agent] in platform
-
-    service llmProviders(cloud)[External LLMs]
-    service notify(internet)[Slack Email Webhooks]
-
-    llmApp:B --> T:app
-    app:B --> T:redis
-    app:R --> L:postgres
-    redis:B --> T:spanPipe
-    spanPipe:R --> L:clickhouse
-    evalPipe:B --> T:langevals
-    langevals:R --> L:llmProviders
-    nlp:R --> L:llmProviders
-    gateway:R --> L:llmProviders
-    app:L --> R:langy
-    langy:B --> T:gateway
-    reactionPipe:B --> T:notify
-    clickhouse:R --> L:s3
-```
+<Frame caption="Every component runs in your environment. The dashed line is the only connection to LangWatch, and each part of it has a switch.">
+  <img src="/images/self-hosting/self-hosting-overview-light.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-overview-dark.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="hidden dark:block" />
+</Frame>
 
 <CardGroup cols={3}>
 <Card title="API Layer" icon="globe">
@@ -65074,7 +65837,7 @@ Runs the in-product assistant's workers. Internal only, reached by the App and W
 <Card title="Control Plane" icon="database">
 **PostgreSQL**
 
-Users, teams, projects, configurations, prompt versions. Managed via Prisma with auto-migrations.
+Users, teams, projects, configurations, prompt versions. Managed via Prisma; migrations are applied by the upgrade before the app starts.
 
 </Card>
 <Card title="Data Plane" icon="chart-bar">
@@ -65156,7 +65919,7 @@ The worker manager behind the in-product assistant (image `langwatch/langyagent`
 
 ### PostgreSQL: Control Plane
 
-Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM with auto-migrations on startup.
+Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM; `pnpm task upgrade` applies its migrations before the app and workers start, and they refuse to start until it has.
 
 ### ClickHouse: Data Plane
 
@@ -65268,27 +66031,18 @@ The pipeline produces three types of output:
 
 ## Data Flow
 
-```mermaid
-sequenceDiagram
-    participant App as Your LLM App
-    participant LW as LangWatch App
-    participant Redis as Redis (BullMQ)
-    participant W as Workers
-    participant CH as ClickHouse
-    participant LE as LangEvals
-    participant Browser as Browser (UI)
+<Frame caption="The path of one trace. PII redaction runs on the Workers before the trace is written to ClickHouse.">
+  <img src="/images/self-hosting/self-hosting-trace-flow-light.svg" alt="The path of one trace: agent, App, Redis queue, Workers, ClickHouse and object storage, with LangEvals and the model provider below" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-trace-flow-dark.svg" alt="The path of one trace: agent, App, Redis queue, Workers, ClickHouse and object storage, with LangEvals and the model provider below" className="hidden dark:block" />
+</Frame>
 
-    App->>LW: Send spans (OTel / REST)
-    LW->>Redis: Enqueue span ingestion job
-    Redis->>W: Worker picks up job
-    W->>W: Pipeline steps (enrich, evaluate, etc.)
-    W->>CH: Write events + projections
-    W->>LE: Request evaluation (if configured)
-    LE-->>W: Evaluation scores
-    W->>CH: Write evaluation results
-    W->>LW: SSE broadcast
-    LW->>Browser: Real-time update
-```
+1. Your application sends spans to the App over OTLP or REST.
+2. The App enqueues a span ingestion job in Redis (BullMQ).
+3. A Worker picks up the job.
+4. The Worker runs the pipeline steps (enrichment, PII redaction) and writes events and projections to ClickHouse.
+5. When evaluators are configured, the Worker requests the evaluation from LangEvals and writes the scores to ClickHouse.
+6. The Worker broadcasts the change. The App reads ClickHouse and pushes the update to connected browsers over SSE.
+7. After the hot-storage TTL, ClickHouse moves data to object storage.
 
 Periodic work (topic clustering, alert triggers, webhook delivery log pruning) is scheduled on the Workers. The chart ships no Kubernetes CronJobs; `cronjobs.jobs` stays empty unless you add your own.
 
@@ -66813,6 +67567,7 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 | Need to debug a specific trace or aggregate    | [Deja View](/self-hosting/ops/dejaview): time-travel through the event stream                                |
 | Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces                                    |
 | SSO setup or directory sync needs investigation | The identity and directory Backoffice pages below                                                            |
+| An upgrade is running, behind or failed       | `/ops/upgrades`: the installation's state, each release's steps and every run ([Upgrade Guide](/self-hosting/upgrade#while-it-runs-and-after)) |
 | An upgrade is waiting on an organization migration | `/ops/migrations`: inspect its result and report                                                          |
 | Failed jobs need reprocessing                  | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ                                 |
 
@@ -66871,6 +67626,7 @@ across organizations.
 | `/ops/backoffice/identity-lookup` | Find an account, inspect its identity state and sign it out everywhere when required. |
 | `/ops/backoffice/sso-connections` | Inspect connection state and domain evidence, investigate setup, or pause and resume a connection. |
 | `/ops/backoffice/directory-sync` | Inspect SCIM sync failures, provisioning attempts and external user mappings. Retry a retired apply after fixing its cause. |
+| `/ops/upgrades` | Follow an upgrade: the installation's state, each release's steps and every run with its phases and error. |
 | `/ops/migrations` | Inspect migration progress and reports, or run a targeted migration for an organization. |
 
 Pausing SSO stops new sign-ins through the connection. It leaves existing
@@ -66886,11 +67642,11 @@ and will be retried. **Finalized** means the organization completed that
 migration. A run that is waiting for an earlier migration has not changed the
 organization yet. Do not treat starting a migration as proof it finished.
 
-For an identity and access upgrade, follow the
-[two-stage migration checklist](/self-hosting/upgrade#complete-identity-and-access-migrations-first)
-before deploying the new version. Check every required migration, including
-users as well as organizations. Credential repair is recurring and does not
-finalize; the one-time backfills must finalize.
+Identity and access migrations run automatically after each upgrade; see
+[Automatic identity and access migration](/self-hosting/upgrade#automatic-identity-and-access-migration).
+Check every required migration, including users as well as organizations.
+Credential repair is recurring and does not finalize; the one-time backfills
+must finalize.
 
 ## Architecture Context
 
@@ -67208,22 +67964,12 @@ Langy, the AI assistant, is part of this install and runs on the node's normal c
 
 ## Architecture at a Glance
 
-```mermaid
-graph LR
-    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
-    Client["LLM Client / IDE"] -->|"virtual key"| Gateway["AI Gateway<br/>(optional)"]
-    Gateway -->|"resolve VK<br/>+ budget check<br/>+ OTel"| App
-    Gateway -->|"completions"| Providers["LLM Providers<br/>(OpenAI / Anthropic / Bedrock / …)"]
-    App -->|"enqueue"| Redis["Redis"]
-    Redis -->|"consume"| Workers["LangWatch Workers"]
-    Workers -->|"events &<br/>projections"| CH["ClickHouse"]
-    Workers -->|"evals"| Evals["LangEvals"]
-    Workers -->|"NLP"| NLP["LangWatch NLP"]
-    App -->|"queries"| CH
-    App -->|"control plane"| PG["PostgreSQL"]
-    App -->|"externalized byte content<br/>(scenario media, datasets, …)"| S3["S3"]
-    CH -->|"cold storage"| S3
-```
+<Frame caption="Every component runs in your environment. The dashed line is the only connection to LangWatch, and each part of it has a switch.">
+  <img src="/images/self-hosting/self-hosting-overview-light.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-overview-dark.svg" alt="Architecture of a self-hosted LangWatch install: agents, coding tools and the team on the left, the Kubernetes cluster with the LangWatch services and data stores in the middle, model providers on the right, and one optional dashed connection to LangWatch cloud" className="hidden dark:block" />
+</Frame>
+
+Your agents send traces to the App over OpenTelemetry. The App and the Workers store them in ClickHouse, with PostgreSQL for configuration, Redis for the queue and object storage for older data. Model calls go to the providers you configure, with your keys. The AI Gateway and Langy are optional.
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
@@ -67234,6 +67980,11 @@ See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) f
 </Note>
 
 ## Deployment Models
+
+<Frame caption="What LangWatch runs and what you run in each model. Cloud Enterprise is LangWatch Cloud on dedicated, single-tenant instances in the region you choose.">
+  <img src="/images/self-hosting/self-hosting-deployment-models-light.svg" alt="Four deployment models side by side, showing what LangWatch runs and what you run: LangWatch Cloud, Hybrid, Self-managed, and Self-managed with managed databases" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-deployment-models-dark.svg" alt="Four deployment models side by side, showing what LangWatch runs and what you run: LangWatch Cloud, Hybrid, Self-managed, and Self-managed with managed databases" className="hidden dark:block" />
+</Frame>
 
 <CardGroup cols={2}>
 <Card title="LangWatch Cloud" icon="cloud">
@@ -67272,7 +68023,7 @@ LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide 
 | You manage infrastructure  |           |       Yes        |                      |            |
 | You manage data storage    |           |       Yes        |         Yes          |    Yes     |
 | LangWatch manages app      |    Yes    |                  |         Yes          |    Yes     |
-| Data stays in your network |           |       Yes        |         Yes          |    Yes     |
+| Data stored in your network |           |       Yes        |         Yes          |    Yes     |
 | Setup time                 |  Minutes  |      Hours       |         Days         |    Days    |
 
 ## Quick Start
@@ -67332,6 +68083,62 @@ Enterprise capabilities include:
 
 ---
 
+# FILE: ./self-hosting/releases.mdx
+
+---
+title: Releases and support
+description: "How LangWatch is versioned, when a long-term-support release is named, which releases get fixes and how far you can upgrade in one step."
+---
+
+## Versioning
+
+LangWatch is released from one line. Every release has a version number such as `3.20.1`, and the images and the Helm chart carry the same number. A higher number is always a newer release on that line. A patch number (the last digit) is a smaller release on the same line, not a fix to an older one.
+
+## Only the latest release gets fixes
+
+Fixes, security fixes included, ship in the next release and only there. No older release, long-term-support releases included, is ever patched. To get a fix, upgrade to the latest release.
+
+## Long-term-support releases
+
+A long-term-support (LTS) release is named every **April** and **October**. An LTS is an **upgrade stop**, not a maintained branch: it is the release an older installation upgrades to before it moves on to the latest one.
+
+| LTS release | Named | Oldest release the latest version upgrades from (the floor) |
+| --- | --- | --- |
+| `3.20.1` | October 2026 | `3.20.1` |
+| to be named | April 2027 | `3.20.1` |
+
+## The floor
+
+Every release names a **floor**: the oldest release it upgrades from. When a new LTS is named, the floor moves up to the LTS before it. So:
+
+- An installation on the newest LTS, or on any release at or above the floor, upgrades **straight to the latest release**.
+- An installation below the floor is refused before anything changes. The upgrade exits with code `2` and names the LTS to install first. See [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do).
+- Because an LTS image accepts installations from two LTS releases back, an installation that upgrades at least once a year needs **at most one stop**.
+
+### Worked example
+
+Suppose an LTS is named each April and October as planned:
+
+| When | Newest LTS | Floor of the latest release |
+| --- | --- | --- |
+| October 2026 | `3.20.1` | `3.20.1` |
+| April 2027 | the April 2027 LTS | `3.20.1` |
+| October 2027 | the October 2027 LTS | the April 2027 LTS |
+
+You run `3.20.1` and leave it until December 2027. The latest release's floor is now the April 2027 LTS, so upgrading straight to it is refused, and the message names the April 2027 LTS. Upgrade to the April 2027 LTS first (its floor is `3.20.1`, so it accepts you), then to the latest release. That is one stop.
+
+Had you upgraded to the April 2027 LTS, or anything newer, in the summer of 2027, you would go straight to the latest release in December.
+
+## Which LTS you need
+
+1. Find the release you run now. **Ops > Upgrades** shows the installed release, the release of the image and the floor; `pnpm task upgrade status` shows the installed release in the terminal.
+2. If the release you run is at or above the floor of the release you want, upgrade straight to it.
+3. If it is below, run the upgrade anyway: it refuses before changing anything and names the LTS to install first. Upgrade to that LTS, then to the release you want.
+
+An installation that is below the floor shows as **Unsupported** on **Ops > Upgrades**. The [upgrade guide](/self-hosting/upgrade) covers how to run each upgrade.
+
+---
+
 # FILE: ./self-hosting/security.mdx
 
 ---
@@ -67340,6 +68147,11 @@ description: "Security model, encryption, secrets management, and hardening for 
 ---
 
 Self-hosted LangWatch authenticates users, encrypts stored credentials, isolates tenants at the query layer, and hardens every pod it authors by default. Three bundled components cannot meet [strict admission control](#strict-admission-control) and must be disabled or replaced there.
+
+<Frame caption="Identity, keys, secrets and network exposure of a self-hosted install.">
+  <img src="/images/self-hosting/self-hosting-security-light.svg" alt="Security view of a self-hosted install: sign-in through your identity provider, API keys for agents, TLS at the ingress with only the App exposed, internal services and data stores, and Kubernetes Secrets synced from your secret manager" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-security-dark.svg" alt="Security view of a self-hosted install: sign-in through your identity provider, API keys for agents, TLS at the ingress with only the App exposed, internal services and data stores, and Kubernetes Secrets synced from your secret manager" className="hidden dark:block" />
+</Frame>
 
 ## Authentication & Authorization
 
@@ -67389,15 +68201,64 @@ Two exceptions: `pat-lw-` keys created before the HMAC upgrade keep a plain SHA-
 
 **What else it keys.** The same value is the HMAC pepper for API keys (see Authentication & Authorization above) and signs short-lived tokens (voice session tokens, GitHub App install state).
 
-**Changing it.** There is no key rotation or re-encryption path. Data written under the old value cannot be read under the new one:
+**Changing it without the old value.** Data written under the old value cannot be read under a new one:
 
 - Model provider keys, project secrets, S3 credentials, SSO credentials and integration secrets have to be entered again. Checkup reports model providers whose keys no longer decrypt.
-- Every API key in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
+- Every API key and SCIM token in the current format stops authenticating and has to be recreated. Older project keys, and `pat-lw-` keys still on a plain SHA-256 hash, keep working.
 - In-flight signed tokens are rejected and the user starts that flow again.
 
-The rows are not deleted, so setting the previous value back makes them readable again, except for anything already re-entered under the new value.
+The rows are not deleted, so setting the old value back makes them readable again, except for anything already re-entered under the new value.
 
-Keep the value stable across upgrades, restores and migrations to a new cluster, and back it up together with your PostgreSQL backups. A database restored without its `CREDENTIALS_SECRET` comes back with none of its stored credentials usable.
+Keep the value stable across upgrades, restores and migrations to a new cluster, and back it up together with your PostgreSQL backups. A database restored without its `CREDENTIALS_SECRET` comes back with none of its stored credentials usable. To replace the value while keeping the data, follow the rotation procedure below.
+
+### Rotating the credentials secret
+
+Rotation needs the old value. `CREDENTIALS_SECRET_PREVIOUS` holds it while data moves to the new one. The app and workers write only with `CREDENTIALS_SECRET`. They read with `CREDENTIALS_SECRET` first and fall back to `CREDENTIALS_SECRET_PREVIOUS`.
+
+<Steps>
+  <Step title="Set both values">
+    Generate a new value with `openssl rand -hex 32`. Set it as `CREDENTIALS_SECRET` and set the old value as `CREDENTIALS_SECRET_PREVIOUS`. On Helm the old value goes in `app.credentialsEncryptionKey.previous.value` or `app.credentialsEncryptionKey.previous.secretKeyRef`. With `secrets.existingSecret`, add it to that Secret and name its key in `secrets.secretKeys.credentialsEncryptionKeyPrevious`.
+
+    An install that never set `CREDENTIALS_SECRET` encrypts with `NEXTAUTH_SECRET`. Use that value as `CREDENTIALS_SECRET_PREVIOUS`.
+  </Step>
+  <Step title="Roll every app and worker pod">
+    Wait until no pod is left on the old configuration. A pod that has only the old value cannot read what a pod with the new value writes.
+  </Step>
+  <Step title="Re-encrypt stored credentials">
+    Run the `credentials-reseal` task from a workers pod, first as a dry run:
+
+    ```bash
+    kubectl -n langwatch exec deploy/langwatch-workers -- \
+      sh -c 'cd /app/apps/tasks && HOME=/tmp pnpm run task credentials-reseal --dry-run'
+    ```
+
+    On Docker Compose:
+
+    ```bash
+    docker compose -f infra/compose.yml --project-directory . exec workers \
+      sh -c 'cd /app/apps/tasks && HOME=/tmp pnpm run task credentials-reseal --dry-run'
+    ```
+
+    Run it again without `--dry-run` to write. The task scans the text and JSON columns in PostgreSQL and rewrites each value encrypted with the old secret. It logs one line per column with the counts `resealed`, `alreadyCurrent` and `undecryptable`, then the totals.
+  </Step>
+  <Step title="Let API keys and SCIM tokens move">
+    API key and SCIM token hashes cannot be recomputed from the database. Each one moves to the new secret the next time it is used while `CREDENTIALS_SECRET_PREVIOUS` is set. Keep both values in place long enough for every key in use to make one request.
+  </Step>
+  <Step title="Remove the old value">
+    Run the task once more. When it reports `resealed: 0`, unset `CREDENTIALS_SECRET_PREVIOUS` and roll the pods.
+  </Step>
+</Steps>
+
+The task is safe to run again and safe to interrupt. A value the new secret already opens is left alone. An `undecryptable` count is not a failure: it covers values encrypted with a secret older than both, and unrelated data that has the same shape. The task logs the primary keys of those rows, never their content.
+
+After the old value is removed:
+
+- An API key or SCIM token that made no request during the overlap stops authenticating and has to be issued again.
+- A Slack connection that was not used during the overlap keeps working, but LangWatch no longer recognises its token as already connected, so the same token can be added a second time.
+- Encrypted values held in Redis are read with the old value during the overlap and are not rewritten. They are short-lived caches and queued jobs, so let the queues drain before removing the old value.
+- Signed tokens in flight at the moment of the first roll (voice sessions, GitHub App install state) are rejected and the user starts that flow again.
+
+When `API_KEY_PEPPER` is set, API key hashes use it instead of `CREDENTIALS_SECRET`, so rotating `CREDENTIALS_SECRET` leaves API keys untouched.
 
 ### In Transit
 
@@ -67751,7 +68612,7 @@ Common causes:
 First startup is slower because:
 
 - Docker pulls all images
-- PostgreSQL runs initial migrations
+- The workers run the upgrade (PostgreSQL and ClickHouse migrations), and the app is not ready until it is done
 - OpenSearch initializes its cluster
 
 Subsequent starts are faster. If it remains slow, check Docker resource allocation.
@@ -67903,26 +68764,33 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ## PostgreSQL Issues
 
-### Migration failures on startup
+### The app refuses to start: the installation is behind
 
-If Prisma migrations fail, the app pod crashes. Check logs:
+The api never migrates; the workers run the upgrade when they start. The api logs `refuses to serve: the installation is behind this image` with the outstanding steps and is not ready while the upgrade has not run for its version. Check the workers' log for why the upgrade did not finish, or run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)).
+
+The refusal names the cause: outstanding steps, a release below the installation's floor, or no ClickHouse configured (set `CLICKHOUSE_URL`, run the upgrade, start again). **Ops > Upgrades** and `pnpm task upgrade status` show the state.
+
+On Helm, read the workers' log. When upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`), the pre-upgrade Job runs it instead:
 
 ```bash
-kubectl -n langwatch logs deploy/langwatch-app --tail=100 | grep -i prisma
+kubectl -n langwatch logs deploy/<release>-workers --tail=100
+kubectl -n langwatch get jobs | grep migrate-pre-roll
+kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 ```
 
-To skip migrations temporarily (for debugging):
+On Docker Compose, read the `workers` service:
 
-```yaml
-app:
-  extraEnvs:
-    - name: SKIP_PRISMA_MIGRATE
-      value: "true"
+```bash
+docker compose -f infra/compose.yml --project-directory . logs workers
 ```
 
-<Warning>
-  Only skip migrations for debugging. Running with pending migrations can cause application errors.
-</Warning>
+### The upgrade failed
+
+A failed upgrade in the pre-upgrade Job fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. When the new workers run it instead, the new api pods never become ready and the previous version keeps serving. On Docker Compose, the failure is in the `workers` log and the app does not become ready.
+
+The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's or the workers' log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
+
+`SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the api is not ready until the upgrade has applied every migration its version needs.
 
 ### Connection refused
 
@@ -68626,30 +69494,34 @@ description: "How to upgrade LangWatch to the latest version"
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
-4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. See [Credentials secret](/self-hosting/security#credentials-secret)
+4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
+5. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
 
 ## Automatic identity and access migration
 
-Identity and access migrations run automatically during startup, organization
-by organization. A tenant whose authorization, identifier, and existing SSO
-data migrate cleanly is switched over. No preparatory release or manual
-migration pass is required.
+Identity and access migrations run automatically after each upgrade,
+organization by organization: the preparation step runs them right after
+`pnpm task upgrade`, and the workers run them again every hour. A tenant whose
+authorization, identifier, and existing SSO data migrate cleanly is switched
+over. No preparatory release or manual migration pass is required.
 
 A tenant whose historical data disagrees with the migrated result is **held**
 on its existing legacy sign-in path: the migration leaves that tenant's data
 untouched, and the app still starts and serves it as before. A tenant whose
 migration throws is **parked** the same way, also without blocking startup.
 
-Both are retried automatically. The next restart re-drives them from the
-start of its own preflight, and an operator can also trigger a pass, or
-target one organization, without waiting for a restart. See
+Both are retried automatically. The next upgrade and the workers' hourly pass
+re-drive them, and an operator can also trigger a pass, or target one
+organization, without waiting. See
 [Check the migration results](#check-the-migration-results) below.
 
-Startup still refuses to serve traffic in three cases: the migration runner
-itself fails outright, the queue behind it fails to drain, or the fleet makes
-no progress for 25 passes (about two minutes: for example because Redis is
-unreachable, or another process holds every claim). In all three the process
-exits non-zero and the next start retries from scratch.
+The preparation step still fails in three cases: the migration runner itself
+fails outright, the queue behind it fails to drain, or the fleet makes no
+progress for 25 passes (about two minutes: for example because Redis is
+unreachable, or another process holds every claim). It exits non-zero, which
+fails the upgrade (the Helm pre-upgrade Job where one renders, otherwise the
+workers), and the new api is not ready until the installation is current, so
+the previous version keeps serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
@@ -68752,7 +69624,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on startup.
+The workers run the upgrade when they start, and the app does not report ready until it has completed (see [Run the upgrade](#run-the-upgrade)). Compose has no separate `migrate` service; if your compose file predates this, copy the current one from [`infra/compose.yml`](https://github.com/langwatch/langwatch/blob/main/infra/compose.yml). The workers must be enabled.
 
 ## Helm Chart
 
@@ -68764,8 +69636,10 @@ helm repo update
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   -f values-production.yaml \
-  --wait --timeout 10m
+  --wait --timeout 45m
 ```
+
+The upgrade can run for up to 35 minutes on a large installation, in the pre-upgrade Job where one renders (see [Run the upgrade](#run-the-upgrade)) and otherwise in the new worker pods. Helm's default hook timeout is 5 minutes, and a shorter `--timeout` fails the release part-way through a migration.
 
 ### Pin a Specific Version
 
@@ -68782,26 +69656,159 @@ helm upgrade langwatch langwatch/langwatch \
 # x-release-please-end
 ```
 
-## Database Migrations
+## Run the upgrade
 
-### PostgreSQL
+<Warning>
+The **api never migrates the database itself**. The workers run the upgrade when they start; until the installation is current the api reports **not ready**, and a process started on an installation that has not been upgraded to its release **refuses to serve** and logs which steps are outstanding:
 
-On a Helm upgrade, a pre-upgrade Job runs the migrations on the new image before any pod rolls; the app and worker containers also run them on start, where they are a no-op. `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more. For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications).
-
-To disable the Prisma step (e.g., if you run migrations separately):
-
-```yaml
-app:
-  extraEnvs:
-    - name: SKIP_PRISMA_MIGRATE
-      value: "true"
+```text
+langwatch-api (api) refuses to serve: the installation is behind this image: blocking steps not done: prisma:20261006180000_..., clickhouse:00042. Run `pnpm task upgrade` from this image, then start it again.
 ```
 
-### ClickHouse
+Starting the workers on the **new** image runs the upgrade for you. To run it yourself, use the **new** image, then start the app again.
+</Warning>
 
-The application runs schema migrations on startup. No manual intervention is required.
+Each way of running LangWatch runs the upgrade for you:
+
+| How you run LangWatch | Who runs the upgrade |
+| --- | --- |
+| Helm, `helm upgrade` with upgrades serialised (`serializeUpgrades` on and no `app.dataplane`) | the pre-upgrade Job, on the new image, before any pod rolls |
+| Helm, `helm upgrade` otherwise | the new worker pods, on start; the new api pods are not ready until it is done |
+| Helm, first install | the worker's first boot, once, on the empty database |
+| Helm with serialised upgrades and `app.migrations.preRoll: false` | **you**, before `helm upgrade` (below) |
+| Docker Compose | the workers, on every `docker compose up`; the app is not ready until it is done |
+| `npx @langwatch/server` | the workers the CLI starts; the CLI has no migration phase of its own |
+
+To run it yourself, from the new image with the app's environment (`DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`):
+
+```bash
+cd /app/apps/api && pnpm --silent run start:prepare:db
+```
+
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first). It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
+
+### Exit codes and what to do
+
+`pnpm task upgrade` exits `0` when it is done and otherwise one of three non-zero codes, and its last two log lines name the cause and the next action. A refused or failed run is recorded, so **Ops > Upgrades** and `upgrade status` show it.
+
+| Exit | Outcome code | Meaning | What to do |
+| --- | --- | --- | --- |
+| `0` | `done` | Every step the image needs is applied | Start or restart the app and the workers |
+| `1` | `failed_prisma_migration` | A PostgreSQL migration failed and cannot be retried by the upgrade (written before re-runnable migrations became the rule, or not shipped in this image) | Run the `prisma migrate resolve` command the message names, then run the upgrade again |
+| `1` | `rerunnable_migration_failed` | A re-runnable migration still failed on its last attempt | Fix what its error names (often a lock another session holds), then run the upgrade again. No resolve command is needed |
+| `1` | `schema_failed` | A PostgreSQL or ClickHouse target could not be applied, or the ledger schema could not be created | Check the named target is reachable (`DATABASE_URL`, `CLICKHOUSE_URL`) and that the `DATABASE_URL` user has `CREATE` on the database, then run the upgrade again |
+| `1` | `step_failed` | A blocking data step failed | Read its error with `pnpm task upgrade status`, fix the cause, then run the upgrade again. The step resumes from its checkpoint |
+| `1` | `reconciler_failed` | The ClickHouse TTL or LangWatchQL reconciler failed | Fix the store it names (`CLICKHOUSE_URL`), then run the upgrade again |
+| `1` | `lease_lost` | This run lost the upgrade lease part-way (it stopped renewing it) | Run the upgrade again. It resumes from the ledger |
+| `1` | `failed` | Any other failure | Read the error and `upgrade status`, fix the cause, then run it again |
+| `2` | `refused_below_floor` | The installation is older than the long-term-support floor | Run the floor release the message names first, then this image |
+| `2` | `refused_image_below_floor` | This image is older than the floor the database was already upgraded to | Deploy an image at or above that floor, then run the upgrade |
+| `3` | `lease_not_acquired` | Another upgrade holds the lease and did not finish within 10 minutes | Wait for it (`upgrade status` shows its run), then run the upgrade again. A dead holder's lease expires by itself after 60 seconds |
+
+Every `1` is safe to retry: the ledger remembers what is done.
+
+### When a PostgreSQL migration fails
+
+PostgreSQL applies a migration one statement at a time, so a statement cancelled by the 10 second `lock_timeout` leaves its earlier statements applied and a failed row in `_prisma_migrations`. Every migration written after `20261006180001_gateway_realtime_session_metering` is written to survive a second run. For those, `upgrade` marks the failed row rolled back itself (`prisma migrate resolve --rolled-back <migration>`), waits and applies it again, up to 3 attempts with a 2 second then 4 second wait.
+
+A failed row an earlier run left is cleared the same way before the schema is applied.
+
+An older migration, or a failed one this image does not ship, stops the run with `failed_prisma_migration`. Check what it left behind, run `prisma migrate resolve --rolled-back <migration>` if none of it remains (or `--applied <migration>` if you finished it by hand) with the app's `DATABASE_URL`, then run the upgrade again. No migration has rolled forward, so the previous version keeps serving.
+
+### Large tables: build indexes ahead of the upgrade
+
+Two schema changes touch a whole large table while the upgrade runs.
+
+- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 10 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
+- **ClickHouse `trace_summaries` index** (`00103_trace_summaries_updated_at_index`): the index is added and then materialised over every existing row. The mutation runs in the background and competes with merges for IO, and later `ALTER` statements on that table queue behind it. Watch `system.mutations` and run the upgrade at a quiet time on a large table.
+
+### What the upgrade does
+
+- **In release order.** From the release the ledger records to the release of the image, the upgrade plans each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. An upgrade by one release applies its schema in one pass, then its blocking steps, as before.
+
+  An upgrade across several releases steps through them: it says so, then for each release it names the release, applies the PostgreSQL migrations up to and including it, says how many it applied, and runs that release's blocking steps before it moves on, so a blocking step sees the PostgreSQL schema of its own release.
+
+  While stepping, Prisma's own output is shown only when a migration fails. ClickHouse migrations step the same way: each release applies them on every ClickHouse target up to its own last one.
+
+  Migrations the image ships that no release lists yet are applied in one pass at the end. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
+- **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
+- **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one. [Releases and support](/self-hosting/releases) explains the LTS schedule and which LTS to stop at.
+- **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.
+- **One run at a time.** The upgrade holds a lease in its ledger, renews it every 15 seconds and loses it after 60 seconds without a renewal. A second run waits up to 10 minutes for a live holder, saying so every 30 seconds, then exits `3`.
+- **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
+
+### ClickHouse is required
+
+The app and the workers refuse to start without ClickHouse. An installation with no `CLICKHOUSE_URL`, or one where the upgrade never applied the ClickHouse migrations, stays refused by name until `pnpm task upgrade` has run against a reachable ClickHouse.
+
+### While it runs, and after
+
+Every running app and worker records itself in the upgrade ledger's serving roster as it starts, refreshes that record every 15 seconds, and removes it on a graceful stop. A record not refreshed for 60 seconds counts as gone. The upgrade uses these records to tell when every older version has stopped. A process that cannot refresh its own record for 60 seconds stops serving until a refresh succeeds again, so it never keeps writing unseen.
+
+To follow an upgrade:
+
+| Where | What it shows |
+| --- | --- |
+| **Ops > Upgrades** (`/ops/upgrades`) | The installation's state, each release's steps with their status and a one-line description, every run with its phases and error. It refreshes while a run is in progress. Platform operators only (`ADMIN_EMAILS`). |
+| `pnpm task upgrade status` | The same state and steps, in the terminal, from the app image (`--json` for scripts) |
+| **Settings, Checkup**, `langwatch doctor` | The **Postgres migrations** and **ClickHouse migrations** rows: Fail for a pending or failed migration, with the fix; Not checked when no upgrade is recorded yet or the ledger cannot be read |
+| `npx @langwatch/server doctor` | The same output as `upgrade status`, for a local install |
+
+The installation is in one of eight states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps), **Needs attention** (a step or run failed) and **Unsupported** (below the floor).
+
+### Reading the console
+
+The upgrade logs as `langwatch:tasks:upgrade`. Every progress line carries four fields next to its message: `phase`, `waitingOn` (what it is blocked on, with a placeholder word when the run is not waiting), `elapsedMs` since the run began, and `next` (what you can do). A password, token or connection-string credential is masked in every line. These are the line families, in the order a run writes them:
+
+| Line starts with | When | What it tells you |
+| --- | --- | --- |
+| `first run: this database holds no LangWatch schema` | The database is empty | The upgrade creates its ledger, applies every migration, then exits so the app can serve |
+| `no ClickHouse target is configured` (warning) | `CLICKHOUSE_URL` and every private route are unset | The upgrade applies PostgreSQL only; the app and workers refuse to serve until you set it |
+| `upgrade ledger ready in Postgres schema <schema> after N ms` | Start of every run | Where the ledger lives. `the upgrade ledger could not be created` (warning) ends the run with `schema_failed` |
+| `waiting for the upgrade lease held by <owner> on <host> (<image>)` | Another run holds the lease | Who holds it and how long you have waited, every 30 seconds |
+| `upgrade planned from <release>: N schema migrations (a Postgres, b ClickHouse) and N blocking steps across <releases>` | After the plan | What this run will do. A line that says the ledger is current means it will do none |
+| `phase <name> started: waiting on ...`, then `succeeded in N ms` or `failed after N ms` (warning) | Each phase | The phases are `preflight`, `postgres-schema`, `clickhouse-schema` (per release) and `reconcile` |
+| `blocking step <id> started (from the start \| resuming from its checkpoint): <description>`, then `done in N ms` or `failed after N ms: <error>` | Each blocking data step | The step's id and its one-line description |
+| `Prisma migration <name> failed ... and is re-runnable: marked it rolled back` (warning), then `applied on attempt N` | A migration cancelled by a lock | Which migration, which attempt of 3, and the wait before the next. `schema apply failed without a failed migration; retrying in N ms` is the same retry for a transient failure |
+| `upgrade finished in N ms` or `first run finished in N ms`; or `upgrade stopped after N ms (<outcome code>)` (warning) | End of the run | The outcome code from the table above |
+| `upgrade complete; the UI is at <BASE_HOST> ...` or `upgrade exited <code>; ...` | Last line | Where the UI is, and that `pnpm task upgrade status` shows every step and run. With `BASE_HOST` unset it says so |
+
+A serving app or worker writes its own lines before it serves:
+
+| Line | Meaning |
+| --- | --- |
+| `<app> (<role>) refuses to serve: the installation is behind this image: blocking steps not done: <ids>. Run `pnpm task upgrade` ...` | The upgrade has not run for this image |
+| `... refuses to serve: release <x> is below the installation's floor <y>` | This image is older than the floor the database was upgraded to |
+| `... refuses to serve: ClickHouse is required and no ClickHouse target is configured` | Set `CLICKHOUSE_URL`, run the upgrade, start again |
+| `first install: the ledger and the schema are empty, so this api runs `pnpm task upgrade` once before it serves` | The Helm first-install path; the upgrade's lines follow |
+| `roster entry lapsed past 60000 ms: <process> stops serving; readiness answers 503 until a roster write succeeds` | The process cannot write to PostgreSQL. Check `DATABASE_URL`. `roster entry written again: <process> serves again` reports the recovery |
+
+A serving process that cannot read the ledger names `DATABASE_URL` in its refusal.
+
+### Upgrade settings
+
+| Variable or value | Effect |
+| --- | --- |
+| `app.migrations.preRoll` (Helm, default `true`) | Renders the pre-upgrade Job, only when upgrades are serialised (`serializeUpgrades` on and no `app.dataplane`); otherwise the new worker pods run the upgrade. `false` with serialised upgrades leaves it to you; until you run it, the new api is not ready. |
+| `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. A value that is not a number of seconds, 0 or more, is refused with `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS`. |
+| `SKIP_PRISMA_MIGRATE` (`1` or `true`) | The upgrade leaves PostgreSQL alone, and cannot mark a failed migration rolled back. The app and the workers then refuse to start until an upgrade runs without it. |
+| `SKIP_CLICKHOUSE_MIGRATE` (`true` only) | The upgrade leaves ClickHouse alone, with the same consequence. |
+| `SKIP_LWQL_PROVISION` (`1` or `true`) | The upgrade skips LangWatchQL provisioning. |
+| `CLICKHOUSE_CLUSTER` | Names the ClickHouse cluster. When set, the upgrade creates Replicated engines and replicates DDL across nodes. |
+| `CLICKHOUSE_COLD_STORAGE_ENABLED` (`true`) | The reconcile phase writes table TTLs that move aged data to the cold volume. Hot days come from `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS`, else `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS`, else the table's built-in default. |
+| `BASE_HOST` | Only the upgrade's last log line reads it, to say where the UI is. |
+| `BUILD_TIME` | Set while building an image: the upgrade finds no ClickHouse target and applies no migration there. Leave it unset at runtime. |
+
+For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications). `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more.
 
 ## Rollback
+
+A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job, where one renders, runs on `helm upgrade` only, never on `helm rollback`.
+
+- A version at or above the installation's floor starts on the newer schema. One below the floor refuses by name.
+- The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
+- Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
 
 ### Helm
 
@@ -68997,7 +70004,7 @@ Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
 | `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER |
 | `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
 | `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
-| `license_key_source` | at the time of the report | Whether licenses are verified against the key LangWatch builds into the release or one the operator named instead, so an install trusting its own signer is not mistaken for a licensed one. | LANGWATCH_LICENSE_PUBLIC_KEY, set or not |
+| `license_key_source` | at the time of the report | Whether licenses are verified against the key LangWatch builds into the release or one a development build was given instead. Release builds verify against the embedded key only, so they always report `embedded`. | the build, then LANGWATCH_LICENSE_PUBLIC_KEY on a development build |
 | `license_key_fingerprint` | at the time of the report | The first 16 hex characters of the SHA-256 of the verifying public key, which tells a development key from a self-made one. Never the key. | the verifying public key |
 | `license_id` | at the time of the report | The license this install runs on, so a report can be matched to the license it claims. Null on an install holding none. | LANGWATCH_LICENSE_KEY, else the first organization's license |
 | `license_verified` | at the time of the report | Whether that license's signature verified against the key, so a license that does not verify is told apart from one that does. Null on an install holding none. | the signed license |
@@ -69118,6 +70125,7 @@ Optional, like the rest of this category. Counts only, keyed by LangWatch's own 
 | `queues` | Per queue with anything waiting or dead: jobs waiting, and jobs moved to its dead-letter queue. |
 | `pipelines` | Per pipeline with anything waiting, failing or stuck: jobs waiting, groups blocked on a failing projection or subscriber, process messages waiting and dead, and processes whose wake is overdue or whose lease lapsed. |
 | `migrations` | Per in-place data migration with a problem: organizations parked on an error, and organizations rolled back. |
+| `upgrade` | Where the install's release upgrade stands, for the one fleet page. Null where the upgrade ledger could not be read. |
 
 ## Never collected
 

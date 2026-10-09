@@ -3,29 +3,24 @@
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * Spec: modules/trace/specs/large-trace-blob-offload.feature
  */
-import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceModule } from "../trace.app.ts";
 
 const PNG_DATA_URI =
@@ -47,7 +42,6 @@ function compose({
   const plans = createApiFixture<EntitlementApi>();
   const blobStore = TraceBlobStoreService.create({
     legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-    resolveClickHouseClient: refuse,
   });
   const deps = TraceModule.composeDependencies({
     repositories: MemoryTraceRepositories.create(),
@@ -78,15 +72,10 @@ function compose({
       }),
       fallbackVisibilityDays: 14,
     },
-    annotations: createApiFixture<AnnotationApi>(),
-    codingAgents: createApiFixture<CodingAgentApi>({ shouldFilterSpan: () => false }),
     dataRetention: createApiFixture<DataRetentionApi>(),
-    evaluations: createApiFixture<EvaluationApi>(),
-    logs: createApiFixture<LogApi>(),
     modelProviders: createApiFixture<ModelProviderApi>(),
     projects: createApiFixture<ProjectApi>(),
     share: createApiFixture<ShareApi>(),
-    topics: createApiFixture<TopicApi>(),
     requestBounds: plans,
     exportBounds: null,
     ...(featureFlags ? { featureFlags } : {}),

@@ -1,11 +1,11 @@
 import { Box, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import { useRetryFailedAnalytics } from "../../behavior/analytics-feedback.ts";
 import {
   type TopUsedDocumentsParams,
   useTopUsedDocuments,
 } from "../../behavior/use-analytics-documents.ts";
+import { useRetryFailedAnalytics } from "../../behavior/use-retry-failed-analytics.ts";
 import { ChartErrorIndicator, ChartErrorState } from "../elements/chart-error-state.tsx";
 import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 

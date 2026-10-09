@@ -15,7 +15,7 @@ import type {
   RestResolvedProjectCredential,
 } from "@langwatch/authorization";
 import { HandledError, remediation } from "@langwatch/handled-error";
-import type { Context, ErrorHandler } from "hono";
+import type { Context } from "hono";
 
 import { ProjectInvalidCredentialsError } from "../errors.ts";
 import type { EndpointVariables, ServiceContext } from "./response.ts";
@@ -338,13 +338,6 @@ export function organizationOf(
 
   return organization;
 }
-
-/**
- * A family's own `onError`, and the boundary one is handed — Hono's shape,
- * re-exported so a feature package needs no dependency on Hono to name the
- * argument its `errorHandler` takes.
- */
-export type RestErrorHandler = ErrorHandler;
 
 // Personal-workspace API key checks: `/api/me/usage` and PR usage both need the same
 // two guards. A legacy key carries no user (IS the workspace key), while a modern key with

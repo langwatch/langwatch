@@ -18,7 +18,7 @@ import type { GovernanceCostRollupFoldProjection } from "./governance-cost-rollu
 
 const events = [pulledUsageObservedEventSchema, pulledUsageRetractedEventSchema] as const;
 
-const GOVERNANCE_COST_CHARGE_PROJECTION_NAME = "governanceCostCharges";
+export const GOVERNANCE_COST_CHARGE_PROJECTION_NAME = "governanceCostCharges";
 
 /** The cell comes from the fold's own `cellOf`, so both records file a charge under one key. */
 export class GovernanceCostChargeMapProjection

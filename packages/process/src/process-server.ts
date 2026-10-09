@@ -1,22 +1,26 @@
-import { RawHttpHost, RawSocketHost, type TransportPeers, WebSocketHost } from "@langwatch/api";
-import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
-import { releaseVersionOf } from "@langwatch/config";
-import { ModuleApiToken } from "@langwatch/module";
-import { otlpHeadersFrom } from "@langwatch/observability/node";
-import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import {
-  MEMBER_NAMES,
-  hostedMembers,
-  openStores,
-  type ProcessMemberSource,
-} from "@langwatch/process-stores";
+  RawHttpHost,
+  RawSocketHost,
+  routesServingWhileUpgrading,
+  type TransportPeers,
+  WebSocketHost,
+} from "@langwatch/api";
+import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
+import { ModuleApiToken } from "@langwatch/module";
+import { OperatorReadsResolver } from "@langwatch/prisma-client";
+import { hostedStores, openStores, type ProcessMemberSource } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
 import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
-import { storesBackedMembers } from "./module-members.ts";
-import { observabilityOwner } from "./observability-owner.ts";
+import { UPGRADING_PHASE } from "./lifecycle/liveness-thread.ts";
+import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
+import {
+  type UpgradeGate,
+  upgradeGateComponent,
+  type UpgradeGatedRole,
+} from "./migration/upgrade-gate.ts";
 import {
   ApiProcessContainer,
   TasksProcessContainer,
@@ -33,11 +37,14 @@ import {
   type ServerContribution,
   type ServerLogger,
 } from "./server.ts";
-import { processShutdownDeadlineMs } from "./shutdown-deadline.ts";
 import { assetBaseOrigin, normalizeAssetBase } from "./transport/asset-base.ts";
 import { projectPublicConfig } from "./transport/bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./transport/config-owner.ts";
 import { processSurface } from "./transport/process-surface.ts";
+
+/** What `run` may be handed: a booted worker also lists its steps. */
+type RunnableApplication = ServedApplication &
+  Partial<Pick<BootedApplication, "migrationSteps" | "role">>;
 
 type ParsedConfig = Readonly<Record<string, unknown>>;
 
@@ -76,6 +83,7 @@ export class ProcessServer implements ProcessBoot {
   readonly config: ParsedConfig;
   private readonly resolver: SecretsResolver;
   private readonly settings: z.infer<typeof processSettings>;
+  private upgradeGate: UpgradeGate | undefined;
 
   private constructor(deps: {
     server: Server;
@@ -131,11 +139,6 @@ export class ProcessServer implements ProcessBoot {
     let members: ProcessMemberSource | undefined;
     let operatorReads: OperatorReadsResolver | undefined;
     try {
-      const telemetryExporter = await this.resolver
-        .scopeTo(observabilityOwner.name, Object.values(observabilityOwner.secrets))
-        .into(observabilityOwner.secrets.otlpHeaders, (rawHeaders) =>
-          telemetryExporterOf({ observability: this.config.observability, rawHeaders }),
-        );
       const stores = await openStores({
         name: this.server.name,
         config,
@@ -188,34 +191,15 @@ export class ProcessServer implements ProcessBoot {
         // refuses every resolve attempted after boot.
         secrets: (owner, declared) => this.resolver.scopeTo(owner, declared),
         operatorReads: (scope) => operatorReadsResolver.scopeTo(scope),
-        // The stores answer the declared members; the process facts below extend them
-        // until the last module reading members takes each from its config slice (§3.3).
-        members: {
-          ...storesBackedMembers(
-            {
-              // The opened stores state their tier; boot selects every registry from it (§7).
-              ...(opened.tier === void 0 ? {} : { tier: opened.tier }),
-              order: MEMBER_NAMES,
-              read(name) {
-                const member = MEMBER_NAMES.find((candidate) => candidate === name);
-                if (!member) throw new Error(`No process member named "${name}" is declared.`);
-                return opened.read(member);
-              },
-            },
-            {
-              // A process fact, not a module one: every module that links back
-              // to the product reads it here rather than declaring `BASE_HOST`.
-              publicBaseUrl: this.settings.baseHost,
-              serviceVersion: serviceVersionOf(this.config.observability),
-              // Observability's OTLP collector, for the module still forwarding to it (rum).
-              telemetryExporter,
-              nodeEnvironment: this.settings.nodeEnvironment,
-              isSaas: this.settings.isSaas ?? false,
-              // Role facts: the composition's word, never a deployment's.
-              processName: this.server.name,
-            },
-          ),
-          close: () => opened.close(),
+        // The opened stores state their tier; boot selects every registry from it (§7).
+        stores: {
+          ...(opened.tier === void 0 ? {} : { tier: opened.tier }),
+          order: opened.order,
+          read(name) {
+            const member = opened.order.find((candidate) => candidate === name);
+            if (!member) throw new Error(`The opened stores answer no "${name}".`);
+            return opened.read(member);
+          },
         },
         ...(surface ? { surface } : {}),
       });
@@ -230,7 +214,7 @@ export class ProcessServer implements ProcessBoot {
           }),
         );
       }
-      this.server.with(hostedMembers(members));
+      this.server.with(hostedStores(members));
       // Hosted after the members, so the doors close their sessions while the stores are open.
       const hosted = doors;
       if (hosted) this.server.with({ name: "raw http doors", stop: () => hosted.close() });
@@ -252,50 +236,61 @@ export class ProcessServer implements ProcessBoot {
   serve(application: ServedApplication): Promise<void> {
     return this.server.serve(application);
   }
-  run(application: ServedApplication): Promise<void> {
-    return this.server.run(application);
+  run(application: RunnableApplication): Promise<void> {
+    return this.server.run(this.withBackgroundSteps(application));
+  }
+
+  /** The serving gate (D5), hosted before boot's components. */
+  hostUpgradeGate({
+    role,
+    gate,
+    logger,
+  }: {
+    role: UpgradeGatedRole;
+    gate: UpgradeGate;
+    logger: ServerLogger;
+  }): void {
+    this.upgradeGate = gate;
+    this.server.with(
+      upgradeGateComponent({
+        server: this.server.name,
+        role,
+        gate,
+        logger,
+        onHolding: (holding) =>
+          this.server.holdForUpgrade(
+            holding,
+            holding?.phase === UPGRADING_PHASE ? routesServingWhileUpgrading() : [],
+          ),
+        onFailed: (upgradeConsole) => this.server.consoleForUpgrade(upgradeConsole),
+      }),
+    );
+  }
+
+  /** A gated worker runs its modules' background steps inside its runtime (round 14). */
+  private withBackgroundSteps(application: RunnableApplication): ServedApplication {
+    const background = this.upgradeGate?.backgroundSteps;
+    if (!background || application.role !== "worker" || !application.migrationSteps) {
+      return application;
+    }
+    const steps = application.migrationSteps(background.isStep);
+    let running: Readonly<{ stop: () => Promise<void> }> | undefined;
+    return {
+      name: application.name,
+      handler: application.handler,
+      start: async () => {
+        await application.start();
+        running = background.start(steps);
+      },
+      stop: async () => {
+        await running?.stop();
+        await application.stop();
+      },
+    };
   }
   close(): Promise<void> {
     return this.server.close();
   }
-}
-
-const releaseSettings = z.object({
-  serviceVersion: z.string().optional(),
-  resourceAttributes: z.string().optional(),
-});
-
-/** The release this install runs, read from observability's slice of the shared leaves. */
-export function serviceVersionOf(observability: unknown): string {
-  const settings = releaseSettings.parse(observability ?? {});
-  return releaseVersionOf({
-    serviceVersion: settings.serviceVersion,
-    otelResourceAttributes: settings.resourceAttributes,
-  });
-}
-
-const exporterSettings = z.object({ otlpEndpoint: z.string().optional() });
-
-/** OTLP collector headers, applied inside a build and never handed out as a value (ADR-132). */
-type TelemetryExporterHeaders = <Out>(
-  build: (headers: Readonly<Record<string, string>>) => Out,
-) => Out;
-
-/** Where this process exports OTLP, as observability owns it: `OTEL_EXPORTER_OTLP_*`. */
-type TelemetryExporter = Readonly<{
-  endpoint: string | undefined;
-  withHeaders: TelemetryExporterHeaders;
-}>;
-
-export function telemetryExporterOf({
-  observability,
-  rawHeaders,
-}: Readonly<{ observability: unknown; rawHeaders: string | undefined }>): TelemetryExporter {
-  const headers = otlpHeadersFrom(rawHeaders);
-  return {
-    endpoint: exporterSettings.parse(observability ?? {}).otlpEndpoint,
-    withHeaders: (build) => build(headers),
-  };
 }
 
 const processSettings = z.object({

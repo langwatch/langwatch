@@ -21,7 +21,7 @@ import type { JobRegistryEntry } from "./queues/queueManager.ts";
 /**
  * Options for configuring event sourcing behavior.
  */
-export interface EventSourcingOptions<EventType extends Event = Event> {
+export interface EventOrderingOptions<EventType extends Event = Event> {
   /**
    * Strategy for ordering events when building projections.
    * Defaults to "createdAt" (chronological order).
@@ -63,7 +63,7 @@ export interface EventSourcingServiceOptions<
   /**
    * Service-level options (e.g., event ordering strategy).
    */
-  serviceOptions?: EventSourcingOptions<EventType>;
+  serviceOptions?: EventOrderingOptions<EventType>;
   /**
    * Optional logger for logging events and errors.
    */

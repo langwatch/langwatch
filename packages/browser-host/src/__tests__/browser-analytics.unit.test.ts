@@ -7,7 +7,7 @@
 import type { PostHog } from "posthog-js";
 import { describe, expect, it, vi } from "vitest";
 
-import { createBrowserUiAnalytics } from "../browser-analytics.ts";
+import { createBrowserUiAnalytics } from "../telemetry/browser-analytics.ts";
 
 function fakePostHog(overrides: Partial<PostHog> = {}): PostHog {
   return overrides as PostHog;

@@ -91,7 +91,8 @@ Feature: One platform health answer for an external monitor
     When a subsystem probe posts its canary back through the public boundary
     Then the canary names that project alongside the token
 
-  @unit
+  # Gap: a blank key is not refused at validation; it answers 500 per request (platform-health.app.ts:155-157).
+  @unit @unimplemented
   Scenario: A blank key is refused rather than read as unconfigured
     Given a deployment that exported the platform health key with no value
     When its configuration is validated

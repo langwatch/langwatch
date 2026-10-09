@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/config",
+  "langwatch": { "group": "framework" },
   "version": "0.0.1",
   "private": true,
   "description": "Config as declared deployment facts: owners attach hand-written Zod leaves with env spellings where they are defined, and the app's one parse meets them, refusing by owner, path and variable name.",
@@ -22,10 +23,6 @@
     "./public-app-config": {
       "types": "./dist/public-app-config.d.ts",
       "default": "./src/public-app-config.ts"
-    },
-    "./public-app-config/projection": {
-      "types": "./dist/public-app-config.projection.d.ts",
-      "default": "./src/public-app-config.projection.ts"
     }
   },
   "scripts": {

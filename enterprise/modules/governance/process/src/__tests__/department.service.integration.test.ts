@@ -11,8 +11,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
+import { DepartmentService } from "../features/identity/services/department.service.ts";
 import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
-import { DepartmentService } from "../services/department.service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;

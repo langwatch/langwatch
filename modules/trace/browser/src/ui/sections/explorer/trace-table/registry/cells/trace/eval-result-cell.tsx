@@ -2,9 +2,9 @@ import { Circle, HStack, Text } from "@langwatch/design-system/primitives";
 import { EVAL_FIELD_LABELS, type EvalColumnField } from "@langwatch/trace-contract";
 import type React from "react";
 
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { getEvalChipDisplay } from "../../../../../../../model/evaluation-results.ts";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import { latestEvalForKey } from "../../../eval-columns.ts";
 import type { CellDef } from "../../types.ts";
 

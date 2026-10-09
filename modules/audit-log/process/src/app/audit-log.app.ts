@@ -1,21 +1,17 @@
-import { AgentApi } from "@langwatch/agent-contract";
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import {
   AuditLogApi,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type ListAuditLogEntityHistoryInput,
   type RecentItem,
   type RecordAuditLogCommand,
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
-import { DatasetApi } from "@langwatch/dataset-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
-import { PromptApi } from "@langwatch/prompt-contract";
-import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { type AuditLogPipeline, buildAuditLogPipeline } from "../eventing/audit-log.pipeline.ts";
 import type { AuditLogRepositories } from "../repositories/audit-log.repositories.ts";
 import { AuditLogService } from "../services/audit-log.service.ts";
 import { RecentItemsService } from "../services/recent-items.service.ts";
@@ -30,22 +26,13 @@ const MAX_ARGS_BYTES = 4 * 1024;
 
 type AuditLogSetup = FeatureSetup<
   typeof AuditLogModule.dependencies,
-  never,
   undefined,
   AuditLogRepositories
 >;
 
 export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
   static readonly contract = AuditLogApi;
-  static readonly dependencies = {
-    projects: ProjectApi,
-    prompts: PromptApi,
-    workflows: WorkflowApi,
-    datasets: DatasetApi,
-    monitors: MonitorApi,
-    annotations: AnnotationApi,
-    agents: AgentApi,
-  };
+  static readonly dependencies = {};
 
   readonly #entries: AuditLogService;
   readonly #recentItems: RecentItemsService;
@@ -61,17 +48,19 @@ export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
     this.#recentItems = recentItems;
   }
 
-  static create({ repositories, dependencies }: AuditLogSetup): AuditLogModule {
+  static create({ repositories }: AuditLogSetup): AuditLogModule {
     return new AuditLogModule({
       entries: AuditLogService.create({
         repository: repositories.entries,
         maxArgsBytes: MAX_ARGS_BYTES,
       }),
-      recentItems: RecentItemsService.create({
-        touches: repositories.recentTouches,
-        owners: dependencies,
-      }),
+      recentItems: RecentItemsService.create({ touches: repositories.recentTouches }),
     });
+  }
+
+  /** The pipeline whose peer subscribers write organization's audit facts as rows. */
+  factsPipeline(): AuditLogPipeline {
+    return buildAuditLogPipeline({ entries: this.#entries });
   }
 
   record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
@@ -84,6 +73,10 @@ export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
 
   listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {
     return this.#entries.listEntityHistory(input);
+  }
+
+  findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    return this.#entries.findByTargetKind(input);
   }
 
   getRecentItems(input: {

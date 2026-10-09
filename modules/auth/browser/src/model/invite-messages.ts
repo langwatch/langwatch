@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** Recognised message for already-accepted invitations; must sync with server. */
 export const INVITE_ALREADY_ACCEPTED_MESSAGE = "Invite was already accepted" as const;
 
@@ -12,3 +14,14 @@ export const INVITE_ALREADY_ACCEPTED_CODE = "invite_already_accepted" as const;
 export function isInviteAlreadyAccepted(message: string | undefined | null): boolean {
   return message === INVITE_ALREADY_ACCEPTED_MESSAGE || message === INVITE_ALREADY_ACCEPTED_CODE;
 }
+
+/** Narrows `invite.acceptInvite`'s answer to the fields the join toast and redirect read. */
+
+export const acceptInviteResultSchema = z.object({
+  invite: z.object({
+    organization: z.object({ name: z.string() }),
+  }),
+  project: z.object({ slug: z.string() }).nullable().optional(),
+});
+
+export type AcceptInviteResult = z.infer<typeof acceptInviteResultSchema>;

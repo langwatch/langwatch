@@ -10,7 +10,9 @@ Feature: The channel layer
   The shape mirrors repositories: an interface at
   channels/<subject>.channel.ts, implementations at
   channels/<tier>/<tier>.<subject>.channel.ts, a memory twin, and a
-  channels/<f>-channels.registry.ts exporting { live, memory }.
+  channels/<f>-channels.registry.ts exporting defineChannels({ live, memory }),
+  each a class with static readonly requires and static create, named on the
+  installer with .withChannels(...).
 
   The rule that keeps a service out of a channel is specified in
   specs/tooling/lint-service-does-not-open-a-channel.feature.

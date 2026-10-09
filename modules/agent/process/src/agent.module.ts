@@ -1,55 +1,68 @@
+import type { AgentApi, AgentServerConfig } from "@langwatch/agent-contract";
 import {
   bindRestHeader,
   bindRestMiddleware,
-  principalOfCredential,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { AgentModule } from "#app/agent.app";
+import { agentLifecycleEventing } from "#eventing/agent-lifecycle.pipeline";
+import { agentWorkflowFieldsEventing } from "#eventing/agent-workflow-fields.pipeline";
 import { agentRepositories } from "#repositories/agent-repositories.registry";
 import { connectCallerOf } from "#rules/agent-connect-caller.rules";
+import { AgentHttpCredentialsBackfillService } from "#services/agent-http-credentials-backfill.service";
 import { AgentHttpSecretsService } from "#services/agent-http-secrets.service";
 import { AgentService } from "#services/agent.service";
-import { AgentHttpCredentialsBackfillTask } from "#tasks/agent-http-credentials-backfill.task";
 import { agentConnectCredentials, createAgentConnectRest } from "#transport/agent-connect.rest";
 import { createAgentWebSocketProtocol } from "#transport/agent-connect.ws";
 import { agentLegacyRest } from "#transport/agent-legacy.rest";
-import { agentCallerKey, agentTraceparent, createAgentRest } from "#transport/agent.rest";
+import { agentTraceparent, createAgentRest } from "#transport/agent.rest";
 import { agentTrpcTransport } from "#transport/agent.trpc";
-import { httpProxyTrpcTransport } from "#transport/http-proxy.trpc";
 
-export const agentProcessModule = defineProcessModule("agent")
-  .withRepositories(agentRepositories)
-  .withApi(AgentModule)
-  .withTransports(
-    createAgentRest(),
-    createAgentConnectRest(),
-    createAgentWebSocketProtocol(),
-    agentLegacyRest,
-    agentTrpcTransport,
-    httpProxyTrpcTransport,
-  )
-  .withTasks(({ repositories, dependencies }) => {
-    const agents = AgentService.create(repositories.agents);
-
-    return [
-      AgentHttpCredentialsBackfillTask.create({
-        agents,
-        httpSecrets: AgentHttpSecretsService.create({ secrets: dependencies.secrets, agents }),
+export const agentProcessModule: PublishedProcessModule<"agent", AgentApi, AgentServerConfig> =
+  defineProcessModule("agent")
+    .withRepositories(agentRepositories)
+    .withApi(AgentModule)
+    .withTransports(
+      createAgentRest(),
+      createAgentConnectRest(),
+      createAgentWebSocketProtocol(),
+      agentLegacyRest,
+      agentTrpcTransport,
+    )
+    .withEventing(agentLifecycleEventing)
+    .withEventing(agentWorkflowFieldsEventing)
+    .withMigrations(({ dependencies, repositories }) => [
+      defineMigrationStep({
+        id: "agent:move-http-credentials-to-secrets",
+        kind: "data",
+        mode: "background",
+        description: "Stores credentials typed into HTTP agents as project secrets.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = checkpoint.resumeFrom?.afterProjectId;
+          return AgentHttpCredentialsBackfillService.create({
+            agents: repositories.agents,
+            httpSecrets: AgentHttpSecretsService.create({
+              secrets: dependencies.secrets,
+              agents: AgentService.create(repositories.agents),
+            }),
+          }).moveLiterals({
+            dryRun,
+            signal,
+            afterProjectId: typeof resumed === "string" ? resumed : null,
+            onProjectDone: (report) => checkpoint.save({ report }),
+          });
+        },
       }),
-    ];
-  })
-  // The caller key and the connect caller are what the project door resolved; the rest
-  // are request headers.
-  .withTransportFacts(() => [
-    bindRestHeader(agentTraceparent, "traceparent"),
-    bindRestMiddleware(agentCallerKey, (context) => {
-      const principal = principalOfCredential(projectCredentialOfRequest(context.req.raw));
-      return principal?.type === "apiKey" ? principal.id : null;
-    }),
-    bindRestMiddleware(agentConnectCredentials, (context) => ({
-      caller: connectCallerOf(projectCredentialOfRequest(context.req.raw)),
-      instanceToken: context.req.header("x-agent-instance-token"),
-    })),
-  ]);
+    ])
+    // The connect caller is what the project door resolved; the rest are request headers.
+    .withTransportFacts(() => [
+      bindRestHeader(agentTraceparent, "traceparent"),
+      bindRestMiddleware(agentConnectCredentials, (context) => ({
+        caller: connectCallerOf(projectCredentialOfRequest(context.req.raw)),
+        instanceToken: context.req.header("x-agent-instance-token"),
+      })),
+    ]);

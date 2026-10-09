@@ -1,3 +1,4 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import {
   StoredObjectNotFoundError,
   type StoredObjectApi,
@@ -13,6 +14,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import { createUserTestApp } from "./user.fixture.ts";
 
 /** The eight-byte PNG signature, which is all the codec checks. */
@@ -32,7 +34,13 @@ async function* bytesOf(chunk: Uint8Array): AsyncIterable<Uint8Array> {
 }
 
 function appOver(storedObjects: StoredObjectApi) {
-  return createUserTestApp({ dependencies: { storedObjects } });
+  const repositories = MemoryUserRepositories.create({
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
+  vi.spyOn(repositories.organizationDirectory, "findPersonalProjectId").mockResolvedValue(
+    "project-1",
+  );
+  return createUserTestApp({ dependencies: { storedObjects }, repositories });
 }
 
 describe("avatar objects over the stored-object store", () => {
@@ -51,10 +59,11 @@ describe("avatar objects over the stored-object store", () => {
         isDuplicate: false,
       }));
       const app = appOver(createApiFixture<StoredObjectApi>({ storeFromBytes }));
-      const person = await app.createCredentialUser({
+      const person = await app.registerCredentialAccount({
         name: "Sam",
         email: "sam@acme.com",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
 
       const result = await app.setOwnAvatar({
@@ -120,7 +129,10 @@ describe("avatar objects over the stored-object store", () => {
   });
 
   describe("when a signed-in person asks for an avatar's URL", () => {
-    /** @scenario "A signed-in person gets a signed URL only for an uploaded avatar" */
+    /**
+     * @scenario "A signed-in person gets a signed URL only for an uploaded avatar"
+     * @scenario "A signed-in teammate gets a signed URL for another user's uploaded avatar"
+     */
     it("asks for a signed URL held to the avatar purpose and owner kind", async () => {
       const getReadUrlForPurpose = vi.fn<StoredObjectApi["getReadUrlForPurpose"]>(async () => ({
         url: "/api/stored-objects/obj-1/content?sig=sealed",

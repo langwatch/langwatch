@@ -35,7 +35,9 @@ prometheus:
 | App       | 5560 | `/metrics` | Trace ingestion, ClickHouse query latency, event loop lag     |
 | Workers   | 2999 | `/metrics` | Queue backlog, job processing time, job success/failure rates |
 
-Both scrape jobs keep only pods annotated `prometheus.io/scrape: "true"`. The chart adds that annotation to the app pods when `app.telemetry.metrics.enabled` is `true`, and never to the workers pods. Without it the chart-managed Prometheus does not reach the workers' `/metrics`. Both `/metrics` endpoints answer 500 until `app.telemetry.metrics.enabled` is on with an API key, and then require that key as a bearer token.
+Each component has its own scrape job. A job keeps only pods annotated `prometheus.io/scrape: "true"` whose `app.kubernetes.io/name` label is that component's (`<release>-app` or `<release>-workers`). The chart adds the annotation to the app and workers pods when `app.telemetry.metrics.enabled` is `true`. Neither component serves `/metrics` until `app.telemetry.metrics.enabled` is on with an API key, and then both require that key as a bearer token.
+
+The chart-managed Prometheus sends the key only when it is set through `app.telemetry.metrics.apiKey.value`. With `apiKey.secretKeyRef`, the pods get the key but the scrape config does not, and both jobs are answered with 401.
 
 ### Access Prometheus
 
@@ -69,7 +71,14 @@ prometheus.io/scrape: "true"
 prometheus.io/port: "5560"
 ```
 
-The workers pods carry no scrape annotations. Scrape them on port `2999`, path `/metrics`, or add annotations through `workers.pod.annotations`.
+The workers pods are annotated with:
+
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "2999"
+```
+
+Both serve the metrics on the path `/metrics`.
 
 ## Grafana
 
@@ -114,7 +123,7 @@ histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_buc
 The Helm chart configures probes automatically. The app probes `/api/health` on port 5560:
 
 ```yaml
-# Startup probe (allows up to 40 minutes for migrations)
+# Startup probe (allows up to 40 minutes: on a first install the app runs the upgrade before it serves)
 startupProbe:
   httpGet:
     path: /api/health

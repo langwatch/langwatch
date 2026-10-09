@@ -47,7 +47,13 @@
       "path": "../../experiment/contract/tsconfig.build.json"
     },
     {
+      "path": "../../feature-flag/client/tsconfig.build.json"
+    },
+    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../github/client/tsconfig.build.json"
     },
     {
       "path": "../../github/contract/tsconfig.build.json"
@@ -59,13 +65,22 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/client/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
       "path": "../../notification/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../onboarding/client/tsconfig.build.json"
     },
     {
       "path": "../../onboarding/contract/tsconfig.build.json"

@@ -10,7 +10,6 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/__tests__/testing.ts",
     "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts",
     "src/eventing/trace-processing-producer.pipeline.ts",
     "./src/rules/trace-read-mappers.rules.ts",
@@ -89,9 +88,6 @@
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
-      "path": "../../experiment/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
@@ -152,16 +148,19 @@
       "path": "../../share/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
+    },
+    {
       "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../topic/contract/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     }
   ]
 }

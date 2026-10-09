@@ -164,6 +164,7 @@ func TestRepoInputsFindsPrismaMigrationsInTheOldRoot(t *testing.T) {
 	}
 }
 
+// @scenario "A PR into a long-running branch ports a migration main already released"
 func TestRepoInputsPortOfAMigrationReleasedOnMain(t *testing.T) {
 	// main released a migration from its old root. A long-running branch forked
 	// earlier and numbered its own migration above it; a PR into that branch

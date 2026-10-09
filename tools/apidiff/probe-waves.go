@@ -147,7 +147,6 @@ func (engine *probeEngine) probeAt(selected []Operation, index int) opResult {
 		engine.progress("skip %s %s (%s) [%d/%d]\n", operation.Method, operation.Path, skip, index+1, len(selected))
 		return opResult{}
 	}
-	engine.awaitFixtureTraceFor(operation)
 	result := engine.probeOperation(operation)
 	result.probed = true
 	engine.probed.Add(1)

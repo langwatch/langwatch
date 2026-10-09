@@ -413,6 +413,13 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly OrganizationLicense: {
+    readonly organizationId: "String";
+    readonly licenseKey: "String?";
+    readonly expiresAt: "DateTime?";
+    readonly validatedAt: "DateTime?";
+    readonly updatedAt: "DateTime";
+  };
   readonly ActivationCode: {
     readonly id: "String";
     readonly codeHash: "String";
@@ -537,6 +544,15 @@ export interface LwqlPrismaRows {
     readonly occurredAt: "DateTime";
     readonly lastEventId: "String";
     readonly acceptedAt: "DateTime";
+    readonly projectionVersion: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly ScimSsoConnectionView: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly folded: "Json";
+    readonly appliedEventIds: "String[]";
     readonly projectionVersion: "String";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -854,6 +870,8 @@ export interface LwqlPrismaRows {
     readonly sqsAccessKeyId: "String?";
     readonly sqsSecretAccessKeyEncrypted: "String?";
     readonly secretEncrypted: "String";
+    readonly signatureScheme: "String?";
+    readonly idempotencyKey: "String?";
     readonly previousSecretEncrypted: "String?";
     readonly previousSecretExpiresAt: "DateTime?";
     readonly enabledEvents: "String[]";
@@ -1261,6 +1279,42 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly DataPrivacyProjectScope: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly teamId: "String?";
+    readonly isPersonal: "Boolean?";
+    readonly departmentId: "String?";
+    readonly teamRecordedAt: "DateTime?";
+    readonly departmentRecordedAt: "DateTime?";
+    readonly archivedAt: "DateTime?";
+    readonly updatedAt: "DateTime";
+  };
+  readonly DataRetentionProjectScope: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly teamId: "String?";
+    readonly teamRecordedAt: "DateTime?";
+    readonly archivedAt: "DateTime?";
+    readonly updatedAt: "DateTime";
+  };
+  readonly InstantEvalJudgeProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly createdAt: "DateTime";
+  };
+  readonly InstantEvalJudgeUsageBilling: {
+    readonly organizationId: "String";
+    readonly usageBilled: "Boolean";
+    readonly occurredAt: "DateTime";
+    readonly fromCatchUp: "Boolean";
+  };
+  readonly InstantEvalJudgeSpend: {
+    readonly organizationId: "String";
+    readonly requestId: "String";
+    readonly spendNanoUsd: "BigInt";
+    readonly occurredAt: "DateTime";
+  };
   readonly CustomLLMModelCost: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -1324,6 +1378,7 @@ export interface LwqlPrismaRows {
     readonly targetId: "String?";
     readonly before: "Json?";
     readonly after: "Json?";
+    readonly idempotencyKey: "String?";
   };
   readonly LlmPromptConfig: {
     readonly id: "String";
@@ -1690,6 +1745,7 @@ export interface LwqlPrismaRows {
     readonly licenseTokenHash: "String?";
     readonly licenseInstanceId: "String?";
     readonly licenseExpiresAt: "DateTime?";
+    readonly licenseId: "String?";
   };
   readonly VirtualKeyScope: {
     readonly id: "String";
@@ -2146,8 +2202,26 @@ export interface LwqlPrismaRows {
     readonly closeReason: "String?";
     readonly traceId: "String?";
     readonly vendorCostRaw: "Json?";
+    readonly kind: "String?";
+    readonly metering: "String?";
+    readonly credentialExpiresAt: "DateTime?";
+    readonly transcriptionModel: "String?";
+    readonly endUserId: "String?";
+    readonly lastReportAt: "DateTime?";
+    readonly reportedCostNanoUsd: "BigInt";
+    readonly reportCount: "Int";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly GatewayRealtimeSessionReport: {
+    readonly id: "String";
+    readonly sessionId: "String";
+    readonly reportKey: "String";
+    readonly projectId: "String";
+    readonly model: "String";
+    readonly usage: "Json";
+    readonly costNanoUsd: "BigInt";
+    readonly createdAt: "DateTime";
   };
   readonly SystemMigrationTenantState: {
     readonly migrationName: "String";

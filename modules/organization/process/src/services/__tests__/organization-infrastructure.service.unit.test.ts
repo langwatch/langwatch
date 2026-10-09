@@ -17,6 +17,7 @@ import {
   TeamNotFoundError,
   UserNotInOrganizationError,
   type OrganizationBillingProfile,
+  type OrganizationIdPage,
   type OrganizationTeam,
   type OrganizationTeamPage,
   type PersonalFeatures,
@@ -26,22 +27,27 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import type { GroupIdentity } from "../../features/group/services/group-identity.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import type * as groupRepositoryModule from "../../repositories/group.repository.ts";
 import {
   OrganizationRepository,
+  type EnsuredPersonalTeam,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
 } from "../../repositories/organization.repository.ts";
 import { TeamRepository } from "../../repositories/team.repository.ts";
-import type { GroupIdentity } from "../group-identity.service.ts";
 import { OrganizationService } from "../organization.service.ts";
-import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 class StubRepository extends OrganizationRepository {
-  async findAllIds(): Promise<string[]> {
-    return [];
+  async findBySsoDomain(): Promise<null> {
+    return null;
+  }
+
+  async listAllIds(): Promise<OrganizationIdPage> {
+    return { ids: [], next: null };
   }
 
   async countUsage(): Promise<{ members: number; teams: number; ssoProviders: string[] }> {
@@ -66,6 +72,20 @@ class StubRepository extends OrganizationRepository {
   }
 
   async saveSessionPolicy(): Promise<void> {}
+
+  async getSignInSecurityPolicy(): Promise<never> {
+    throw new Error("not used");
+  }
+
+  async updateSignInSecurityPolicy(): Promise<void> {}
+
+  async findSignInSecurityPoliciesForUser(): Promise<[]> {
+    return [];
+  }
+
+  async findConfiguredSignInSecurityPolicies(): Promise<[]> {
+    return [];
+  }
 
   async getPricing(): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
     return { pricingModel: null, currency: "EUR" };
@@ -141,28 +161,47 @@ class StubRepository extends OrganizationRepository {
     throw new OrganizationNotFoundError();
   }
 
-  async claimBillingCustomerId(input: {
-    organizationId: string;
-    billingCustomerId: string;
-  }): Promise<boolean> {
-    if (!this.billingProfile || this.billingProfile.billingCustomerId) {
-      return false;
-    }
-    this.billingProfile = {
-      ...this.billingProfile,
-      billingCustomerId: input.billingCustomerId,
-    };
-    return true;
+  async updateCurrency(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async updatePricingModel(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async findConnectServicesDisabled(): Promise<string[]> {
+    return [];
+  }
+
+  async updateConnectServicesDisabled(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async updateConnectSyncOutcome(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async setLicense(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async clearLicense(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async findLicensingLicenseKeys(): Promise<string[]> {
+    return [];
+  }
+
+  async findFirstAdministratorEmail(): Promise<string | null> {
+    return null;
   }
 
   getPersonalWorkspace(): Promise<PersonalWorkspace> {
     return Promise.reject(new TeamNotFoundError());
   }
 
-  ensurePersonalWorkspace(): Promise<{
-    workspace: PersonalWorkspace;
-    created: boolean;
-  }> {
+  ensurePersonalWorkspace(): Promise<EnsuredPersonalTeam> {
     throw new Error("not used by this test");
   }
 
@@ -170,7 +209,19 @@ class StubRepository extends OrganizationRepository {
     throw new Error("not used by this test");
   }
 
-  setPersonalWorkspaceFeaturesWithAudit(_input: {
+  findProjectIds(): ReturnType<OrganizationRepository["findProjectIds"]> {
+    throw new Error("not used by this test");
+  }
+
+  findProjectNames(): ReturnType<OrganizationRepository["findProjectNames"]> {
+    throw new Error("not used by this test");
+  }
+
+  findProjects(): ReturnType<OrganizationRepository["findProjects"]> {
+    throw new Error("not used by this test");
+  }
+
+  appendPersonalWorkspaceFeaturesAudit(_input: {
     projectId: string;
     callerUserId: string;
     organizationId: string | null;
@@ -187,11 +238,13 @@ class FixedIdentities implements PersonalWorkspaceIdentity {
     return {
       teamId: "team",
       teamSlug: "team",
-      projectId: "project",
       projectSlug: "project",
-      projectApiKey: "key",
       ownerBindingId: "binding",
     };
+  }
+
+  newProjectId(): string {
+    return "project";
   }
 }
 
@@ -625,19 +678,10 @@ describe("OrganizationService", () => {
     ).rejects.toBeInstanceOf(OrganizationHasNoTeamError);
   });
 
-  it("returns and atomically claims the billing profile", async () => {
+  it("returns the billing profile", async () => {
     const service = createService(new StubRepository("team"));
     await expect(service.getBillingProfile({ organizationId: "org" })).resolves.toMatchObject({
       billingCustomerId: null,
-    });
-    await expect(
-      service.claimBillingCustomerId({
-        organizationId: "org",
-        billingCustomerId: "customer-1",
-      }),
-    ).resolves.toBe(true);
-    await expect(service.getBillingProfile({ organizationId: "org" })).resolves.toMatchObject({
-      billingCustomerId: "customer-1",
     });
   });
 
@@ -737,6 +781,7 @@ describe("OrganizationService", () => {
     const repository = new StubRepository("team");
     repository.ensurePersonalWorkspace = () =>
       Promise.resolve({
+        kind: "ready",
         workspace: {
           team: {
             id: "team",
@@ -752,7 +797,6 @@ describe("OrganizationService", () => {
             createdAtMs: 1,
           },
         },
-        created: false,
       });
     const grants = new RecordingGrants();
 
@@ -761,7 +805,7 @@ describe("OrganizationService", () => {
         userId: "user",
         organizationId: "org",
       }),
-    ).resolves.toMatchObject({ created: false });
+    ).resolves.toMatchObject({ kind: "ready" });
     expect(grants.attachedInputs).toEqual([
       {
         organizationId: "org",
@@ -788,6 +832,7 @@ describe("OrganizationService", () => {
     const repository = new StubRepository("team");
     repository.ensurePersonalWorkspace = () =>
       Promise.resolve({
+        kind: "ready",
         workspace: {
           team: {
             id: "team",
@@ -803,7 +848,6 @@ describe("OrganizationService", () => {
             createdAtMs: 1,
           },
         },
-        created: true,
       });
 
     await expect(
@@ -814,6 +858,6 @@ describe("OrganizationService", () => {
         userId: "user",
         organizationId: "org",
       }),
-    ).resolves.toMatchObject({ created: true });
+    ).resolves.toMatchObject({ kind: "ready" });
   });
 });

@@ -1,5 +1,9 @@
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import {
+  createUiScopeHost,
+  UiScopeHostProvider,
+} from "@langwatch/browser-host/use-organization-team-project";
 /**
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
@@ -18,8 +22,8 @@ const state = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
-  useFeatureFlag: (flag: string) => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: ({ name: flag }: { name: string }) => ({
     enabled: flag === "release_ui_agent_testing_v2_enabled" ? state.flagEnabled : false,
     isLoading: state.flagLoading,
   }),
@@ -74,9 +78,18 @@ function TestScenarioHost({ children }: { children: React.ReactNode }) {
     }
   })();
 
+  // The shell publishes the one scope host on every route; the module host publishes none.
+  const shellScope = createUiScopeHost({
+    project: () => host.project(),
+    organization: () => host.organization(),
+    team: () => host.team(),
+  });
+
   return (
     <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
-      <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
+      <UiScopeHostProvider value={shellScope}>
+        <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
+      </UiScopeHostProvider>
     </UiCapabilityContextProvider>
   );
 }

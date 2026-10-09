@@ -51,7 +51,9 @@ const INTERNAL_CONSOLES = new Set([
   "idpsim-web",
   "llmsim-web",
   "mailsim-web",
+  "outboundsim-web",
   "storagesim-web",
+  "telemetrysim-web",
   "voicesim-web",
 ]);
 
@@ -156,6 +158,13 @@ function checkFeatureRoot({
   }
 }
 
+/** `client` holds the derived hooks and lent tokens (§3.4, §10.1); other folders are libraries. */
+function packageKindOf(folder: string): FeaturePackageRole | "client" | "library" {
+  if (isFeatureRole(folder)) return folder;
+
+  return folder === "client" ? "client" : "library";
+}
+
 function discoverFeatureRoles({
   discovery,
   feature,
@@ -173,8 +182,7 @@ function discoverFeatureRoles({
     const manifestPath = join(featureRoot, roleName, "package.json");
     if (!existsSync(manifestPath)) continue;
 
-    // Any other package folder is the module's portable library (ARCHITECTURE.md §3).
-    const role = isFeatureRole(roleName) ? roleName : "library";
+    const role = packageKindOf(roleName);
     const manifest = readManifest(manifestPath);
 
     const expectedName = featurePackageName({ feature, role: roleName, enterprise });

@@ -1,0 +1,276 @@
+[
+  {
+    "id": "agent:move-http-credentials-to-secrets",
+    "kind": "data",
+    "mode": "background",
+    "owner": "agent",
+    "description": "Stores credentials typed into HTTP agents as project secrets.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "analytics:fill-lwql-project-keys",
+    "kind": "data",
+    "mode": "background",
+    "owner": "analytics",
+    "description": "Fills LangWatchQL's key map with every project's key that it lacks."
+  },
+  {
+    "id": "annotation:record-trace-annotations",
+    "kind": "data",
+    "mode": "background",
+    "owner": "annotation",
+    "description": "Records every existing annotation on its trace, so has-annotation search agrees with them.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "automation:import-slack-connections",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Moves each Slack automation's stored secret onto a Slack connection. Delivery does not change."
+  },
+  {
+    "id": "automation:reconcile-report-schedules",
+    "kind": "data",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone."
+  },
+  {
+    "id": "automation:reconcile-report-schedules-after-rollout",
+    "kind": "data",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone. Runs again once older images stop serving.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "automation:reconcile-slack-claims",
+    "kind": "data",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Claims each active Slack automation's connection and releases claims no active automation holds.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "billing:record-usage-billing-catch-up",
+    "kind": "data",
+    "mode": "background",
+    "owner": "billing",
+    "description": "Records whether the meter bills each organisation, the fact the Instant Evals judge folds.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "dataset:move-content-to-object-storage",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Moves each dataset's content out of Postgres and into object-storage chunks.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "entitlement:seed-trace-meter",
+    "kind": "data",
+    "mode": "background",
+    "owner": "entitlement",
+    "description": "Seeds entitlement's trace meter from trace's span log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:record-coding-assistant-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:migrate-anomaly-webhook-destinations",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Annotates each inline anomaly webhook destination with a legacy-scheme endpoint.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:replay-cost-charges",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Fills the cost drift check's charge map from pulled usage over the settling window.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "identity:reopen-unproven-accounts-after-rollout",
+    "kind": "data",
+    "mode": "background",
+    "owner": "identity",
+    "description": "Returns accounts an older image finalized during the rollout to the legacy sign-in path.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "instant-eval:copy-judge-spend",
+    "kind": "data",
+    "mode": "background",
+    "owner": "instant-eval",
+    "description": "Copies each organisation's confirmed Instant Evals ledger spend into the judge's own spend, once per request.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "licensing:copy-organization-licenses",
+    "kind": "data",
+    "mode": "background",
+    "owner": "licensing",
+    "description": "Copies each organization's licence key and its dates into licensing's own licence table, overwriting a row that differs.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "model-provider:seal-plaintext-custom-keys",
+    "kind": "data",
+    "mode": "background",
+    "owner": "model-provider",
+    "description": "Encrypts model provider API keys still stored in plaintext.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "ops:copy-automation-migration-state",
+    "kind": "data",
+    "mode": "blocking",
+    "owner": "ops",
+    "description": "Carries organizations that finished or were enrolled in the Slack connections migration over to its new step, so it does not run for them again and keeps its enrolments."
+  },
+  {
+    "id": "ops:seed-platform-operators",
+    "kind": "data",
+    "mode": "background",
+    "owner": "ops",
+    "description": "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it."
+  },
+  {
+    "id": "organization:record-presence-settings",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Records every existing organization's presence setting, for presence to fold.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "project:record-created-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Records every existing project as created, so the Instant Evals judge, nurturing and data privacy know it.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "project:record-department-assignments",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Records every existing project's department, team and personal flag, for data privacy to fold.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "project:record-presence-settings",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Records every existing project's presence setting, for presence to fold.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "prompt:seed-tags-for-untagged-organizations",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "prompt",
+    "description": "Seeds the production and staging prompt tags for every organization that has none."
+  },
+  {
+    "id": "scenario:close-stalled-runs",
+    "kind": "data",
+    "mode": "background",
+    "owner": "scenario",
+    "description": "Closes historical simulation runs that never received a terminal event.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "scim:replay-sso-connection-view",
+    "kind": "data",
+    "mode": "background",
+    "owner": "scim",
+    "description": "Fills SCIM's SSO connection view from identity's connection log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "stored-object:import-clickhouse-index",
+    "kind": "tenant",
+    "mode": "background",
+    "owner": "stored-object",
+    "description": "Copies each project's latest Stored Object metadata from the ClickHouse index into Postgres.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "suite:replay-scenario-facts-for-open-runs",
+    "kind": "data",
+    "mode": "background",
+    "owner": "suite",
+    "description": "Counts scenario runs that suite runs open at deploy missed during the cut.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "topic:seed-topic-model-history",
+    "kind": "data",
+    "mode": "background",
+    "owner": "topic",
+    "description": "Records each project's existing topics on the topic stream so clustering owns them.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "topic:seed-clustering-schedules",
+    "kind": "data",
+    "mode": "background",
+    "owner": "topic",
+    "description": "Schedules daily topic clustering for every eligible project that has none yet.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:track-updated-at-index-materialisation",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
+    "needsOldWritersGone": false
+  },
+  {
+    "id": "user:record-created-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "user",
+    "description": "Records every existing account as user's created fact, for peers to read.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "user:record-standing-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "user",
+    "description": "Re-states each account's deactivation, and a reactivation its log still misses, for peers.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "workflow:record-current-version-fields",
+    "kind": "data",
+    "mode": "background",
+    "owner": "workflow",
+    "description": "Records each live workflow's current version with its fields for agent.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "workflow:move-http-credentials-to-secrets",
+    "kind": "data",
+    "mode": "background",
+    "owner": "workflow",
+    "description": "Stores credentials typed into workflow HTTP nodes as project secrets.",
+    "needsOldWritersGone": true
+  }
+]

@@ -11,6 +11,7 @@ import {
   ConnectLicenseRevokedError,
   ConnectLicenseTokenMalformedError,
   ConnectWrongInstanceError,
+  ConnectCredentialPendingError,
   entitledConnectServices,
   LicenseSyncPayloadInvalidError,
   LicenseSyncRateLimitedError,
@@ -58,6 +59,7 @@ const SYNC_REFUSALS: Record<LicenseSyncRefusalCode, () => HandledError> = {
   connect_license_revoked: () => new ConnectLicenseRevokedError(),
   connect_license_expired: () => new ConnectLicenseExpiredError(),
   connect_wrong_instance: () => new ConnectWrongInstanceError(),
+  connect_credential_pending: () => new ConnectCredentialPendingError(),
   validation_error: () => new LicenseSyncPayloadInvalidError(),
   rate_limited: () => new LicenseSyncRateLimitedError(),
 };

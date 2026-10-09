@@ -7,7 +7,7 @@ Feature: A simulation run reports its true state and never leaks secrets
   # simulation-run-metrics.projection.ts, scenario-prefetch-completion.service.ts,
   # scenario-target-prefetch.service.ts, scenario-execution-lookup.service.ts,
   # scenario-run-secrets.service.ts, scenario-prefetch-failure.rules.ts,
-  # suite-run-sync.subscriber.ts, snapshot-update-broadcast.subscriber.ts
+  # snapshot-update-broadcast.subscriber.ts (suite progress: suite-progress-from-scenario-facts.feature)
 
   @unit @unimplemented
   Scenario: A run whose prefetch fails is reported failed, not left running

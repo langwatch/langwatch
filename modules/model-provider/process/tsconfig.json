@@ -66,6 +66,9 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
+      "path": "../../secret/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
@@ -73,6 +76,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

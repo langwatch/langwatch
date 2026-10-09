@@ -1,5 +1,4 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthApi } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
@@ -40,6 +39,8 @@ import {
   type TwoStepDisabled,
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
+  type IdentityStorageAdapterInput,
+  type IdentityCeremoniesApi,
 } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -55,9 +56,12 @@ import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
+import type { BetterAuthOptions } from "better-auth";
+import type { AdapterFactory } from "better-auth/adapters";
 
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { systemHostAddresses } from "../channels/dns.host-addresses.channel.ts";
+import type { IdentityChannels } from "../channels/identity.channels.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -72,41 +76,107 @@ import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-cha
 import { ConnectedIdentityEventing } from "../eventing/identity-command-senders.store.ts";
 import { IdentityEventStores } from "../eventing/identity-event-stores.store.ts";
 import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
-import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
-import {
-  composeJoinRequestPipeline,
-  type JoinRequestPipeline,
-} from "../eventing/join-request.pipeline.ts";
-import {
-  composeSsoConnectionGraph,
-  type SsoConnectionPipeline,
-} from "../eventing/sso-connection.pipeline.ts";
 import {
   composeIdentityPipeline,
   type IdentityPipeline,
 } from "../eventing/user-identity.pipeline.ts";
-import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
-import { EventingSsoConnectionHistoryRepository } from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
-import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
-import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
+import { JoinRequestLedgerStore } from "../features/join-request/eventing/join-request-ledger.store.ts";
 import {
-  breakGlassHolderEligibility,
-  passwordDoorMounted,
-} from "../rules/break-glass-eligibility.rules.ts";
-import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
+  composeJoinRequestPipeline,
+  type JoinRequestPipeline,
+} from "../features/join-request/eventing/join-request.pipeline.ts";
 import type {
   JoinMembership,
   JoinOfferDismissals,
   JoinRequestsServiceDeps,
   JoinSetting,
   JoinSettingAudit,
-} from "../rules/join-requests-contract.rules.ts";
-import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
-import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
-import { ssoMethodDialWith } from "../rules/sso-method-dial.rules.ts";
+} from "../features/join-request/rules/join-requests-contract.rules.ts";
+import { JoinAdmissionsService } from "../features/join-request/services/join-admissions.service.ts";
+import { JoinRequestDoorService } from "../features/join-request/services/join-request-door.service.ts";
+import { JoinRequestGuardsService } from "../features/join-request/services/join-request-guards.service.ts";
+import { JoinRequestNotifierService } from "../features/join-request/services/join-request-notifier.service.ts";
+import { JoinRequestService } from "../features/join-request/services/join-request.service.ts";
+import { JoinRequestsService } from "../features/join-request/services/join-requests.service.ts";
+import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts";
+import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
+import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
+import { TwoStepAccountService } from "../features/mfa/services/two-step-account.service.ts";
+import { SignUpIdentifierService } from "../features/signin/services/sign-up-identifier.service.ts";
+import { SignInAccountLookupService } from "../features/signin/services/signin-account-lookup.service.ts";
+import { SignInRouterService } from "../features/signin/services/signin-router.service.ts";
+import { SignupAnnouncementService } from "../features/signin/services/signup-announcement.service.ts";
+import {
+  breakGlassHolderEligibility,
+  passwordDoorMounted,
+} from "../features/sso-arrival/rules/break-glass-eligibility.rules.ts";
+import type { SsoArrivalMemberships } from "../features/sso-arrival/rules/sso-arrival-contract.rules.ts";
+import { ssoMethodDialWith } from "../features/sso-arrival/rules/sso-method-dial.rules.ts";
+import { InProcessBreakGlassLimiterService } from "../features/sso-arrival/services/in-process-break-glass-limiter.service.ts";
+import { LegacySsoDomainRoutingService } from "../features/sso-arrival/services/legacy-sso-domain-routing.service.ts";
+import { SsoArrivalAdoptionService } from "../features/sso-arrival/services/sso-arrival-adoption.service.ts";
+import { SsoArrivalService } from "../features/sso-arrival/services/sso-arrival.service.ts";
+import { SsoAssertionService } from "../features/sso-arrival/services/sso-assertion.service.ts";
+import { SsoAuthenticationActivityService } from "../features/sso-arrival/services/sso-authentication-activity.service.ts";
+import { SsoBreakGlassRecoveryService } from "../features/sso-arrival/services/sso-break-glass-recovery.service.ts";
+import {
+  RequiresLocalDoorAndBinding,
+  SsoBreakGlassService,
+  type SsoBreakGlassDirectory,
+} from "../features/sso-arrival/services/sso-break-glass.service.ts";
+import { SsoIssuerDirectoryService } from "../features/sso-arrival/services/sso-issuer-directory.service.ts";
+import { SsoIssuerEndpointOriginsService } from "../features/sso-arrival/services/sso-issuer-endpoint-origins.service.ts";
+import {
+  SsoLegacyIdentityRetirementService,
+  type SsoLegacyAccessRetirement,
+  type SsoRetirementMemberships,
+} from "../features/sso-arrival/services/sso-legacy-identity-retirement.service.ts";
+import { SsoMigrationCallbackService } from "../features/sso-arrival/services/sso-migration-callback.service.ts";
+import { SsoMigrationFinalizationService } from "../features/sso-arrival/services/sso-migration-finalization.service.ts";
+import { SsoMigrationProgressService } from "../features/sso-arrival/services/sso-migration-progress.service.ts";
+import {
+  SsoTestArrivalService,
+  type SsoTestArrivalAccounts,
+  type SsoTestArrivalMemberships,
+} from "../features/sso-arrival/services/sso-test-arrival.service.ts";
+import { SsoUserResolutionService } from "../features/sso-arrival/services/sso-user-resolution.service.ts";
+import {
+  composeSsoConnectionGraph,
+  type SsoConnectionPipeline,
+} from "../features/sso-connection/eventing/sso-connection.pipeline.ts";
+import { EventingSsoConnectionHistoryRepository } from "../features/sso-connection/repositories/eventing/eventing.sso-connection-history.repository.ts";
+import { newSsoBreakGlassBindingId } from "../features/sso-connection/rules/sso-connection-id.rules.ts";
+import { OrganizationSsoConnectionsService } from "../features/sso-connection/services/organization-sso-connections.service.ts";
+import { SsoConnectionAdminService } from "../features/sso-connection/services/sso-connection-admin.service.ts";
+import { SsoConnectionDirectoryMoveService } from "../features/sso-connection/services/sso-connection-directory-move.service.ts";
+import { SsoConnectionGrandfatherService } from "../features/sso-connection/services/sso-connection-grandfather.service.ts";
+import type { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
+import { SsoConnectionHistoryService } from "../features/sso-connection/services/sso-connection-history.service.ts";
+import { SsoConnectionRoutingService } from "../features/sso-connection/services/sso-connection-routing.service.ts";
+import type { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
+import { SsoEngineProviderService } from "../features/sso-connection/services/sso-engine-provider.service.ts";
+import { SsoIdpCredentialsService } from "../features/sso-connection/services/sso-idp-credentials.service.ts";
+import { SsoIdpRegistrationService } from "../features/sso-connection/services/sso-idp-registration.service.ts";
+import { SsoRegistrantReadsService } from "../features/sso-connection/services/sso-registrant-reads.service.ts";
+import { SsoSetupCommandsService } from "../features/sso-connection/services/sso-setup-commands.service.ts";
+import { SsoSetupService } from "../features/sso-connection/services/sso-setup.service.ts";
+import { IdentityConnectionGrandfatherMigrationService } from "../features/sso-connection/services/system-migration-identity-connection-grandfather.service.ts";
+import { SsoDomainCeremonyService } from "../features/sso-domain/services/sso-domain-ceremony.service.ts";
+import { SsoDomainOwnershipBackfillService } from "../features/sso-domain/services/sso-domain-ownership-backfill.service.ts";
+import { SsoDomainReproofService } from "../features/sso-domain/services/sso-domain-reproof.service.ts";
+import { SsoDomainOwnershipMigrationService } from "../features/sso-domain/services/system-migration-sso-domain-ownership.service.ts";
+import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
+import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
+import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
+import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import { AccountIdentifiersService } from "../services/account-identifiers.service.ts";
+import { BetterAuthAccountBranchService } from "../services/better-auth-account-branch.service.ts";
+import { BetterAuthCeremonyBridgeService } from "../services/better-auth-ceremony-bridge.service.ts";
 import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
+import { BetterAuthIdentityRoutingService } from "../services/better-auth-identity-routing.service.ts";
+import { BetterAuthIdentityStorageService } from "../services/better-auth-identity-storage.service.ts";
+import { BetterAuthUserBranchService } from "../services/better-auth-user-branch.service.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
@@ -119,90 +189,32 @@ import {
 } from "../services/identity-newborn-reconciliation.service.ts";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
-import { InProcessBreakGlassLimiterService } from "../services/in-process-break-glass-limiter.service.ts";
-import { JoinAdmissionsService } from "../services/join-admissions.service.ts";
-import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
-import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
-import { JoinRequestService } from "../services/join-request.service.ts";
-import { JoinRequestsService } from "../services/join-requests.service.ts";
-import { LegacySsoDomainRoutingService } from "../services/legacy-sso-domain-routing.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
-import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { MicrosoftAccountRekeyService } from "../services/microsoft-account-rekey.service.ts";
-import { OrganizationMfaNotifierService } from "../services/organization-mfa-notifier.service.ts";
-import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
-import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import {
   CachedIdentityLatchService,
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
 import { SessionClaimsService } from "../services/session-claims.service.ts";
-import { SignUpIdentifierService } from "../services/sign-up-identifier.service.ts";
-import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
-import { SignInRouterService } from "../services/signin-router.service.ts";
-import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
-import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
-import { SsoArrivalService } from "../services/sso-arrival.service.ts";
-import { SsoAssertionService } from "../services/sso-assertion.service.ts";
-import { SsoAuthenticationActivityService } from "../services/sso-authentication-activity.service.ts";
-import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
-import {
-  RequiresLocalDoorAndBinding,
-  SsoBreakGlassService,
-  type SsoBreakGlassDirectory,
-} from "../services/sso-break-glass.service.ts";
-import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
-import { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
-import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service.ts";
-import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
-import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
-import { SsoConnectionRoutingService } from "../services/sso-connection-routing.service.ts";
-import type { SsoConnectionService } from "../services/sso-connection.service.ts";
-import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
-import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-ownership-backfill.service.ts";
-import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
-import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
-import { SsoIdpCredentialsService } from "../services/sso-idp-credentials.service.ts";
-import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
-import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
-import { SsoIssuerEndpointOriginsService } from "../services/sso-issuer-endpoint-origins.service.ts";
-import {
-  SsoLegacyIdentityRetirementService,
-  type SsoLegacyAccessRetirement,
-  type SsoRetirementMemberships,
-} from "../services/sso-legacy-identity-retirement.service.ts";
-import { SsoMigrationCallbackService } from "../services/sso-migration-callback.service.ts";
-import { SsoMigrationFinalizationService } from "../services/sso-migration-finalization.service.ts";
-import { SsoMigrationProgressService } from "../services/sso-migration-progress.service.ts";
-import { SsoRegistrantReadsService } from "../services/sso-registrant-reads.service.ts";
-import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
-import { SsoSetupService } from "../services/sso-setup.service.ts";
-import {
-  SsoTestArrivalService,
-  type SsoTestArrivalAccounts,
-  type SsoTestArrivalMemberships,
-} from "../services/sso-test-arrival.service.ts";
-import { SsoUserResolutionService } from "../services/sso-user-resolution.service.ts";
-import { IdentityConnectionGrandfatherMigrationService } from "../services/system-migration-identity-connection-grandfather.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
-import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
-import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
+import type { JoinRequestDoorApi } from "../transport/join-request.trpc.ts";
 /**
  * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
  * itself per pass the same way `IdentityNewbornReconciliationService`'s own
  * internal reap of this exact repository call does.
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
-type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, never, IdentityServerConfig> &
-  Readonly<{ repositories: IdentityRepositories }>;
+type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, IdentityServerConfig> &
+  Readonly<{ repositories: IdentityRepositories; channels: IdentityChannels }>;
 
 type IdentityAppParts = {
   emails: IdentityEmailService;
-  ceremonies: IdentityCeremoniesService;
+  ceremonies: IdentityCeremoniesApi;
+  storage: (input: IdentityStorageAdapterInput) => AdapterFactory<BetterAuthOptions>;
   identityGuards: IdentityGuardsService;
   mfaGuards: MfaGuardsService;
   reservations: IdentityRepositories["reservations"];
@@ -220,7 +232,7 @@ type IdentityAppParts = {
   joinRequestGuards: JoinRequestGuardsService;
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
-  ssoBackoffice: SsoConnectionBackofficeService | null;
+  ssoAdmin: SsoConnectionAdminService | null;
   ssoConnectionHistory: SsoConnectionHistoryService;
   ssoConnectionReads: OrganizationSsoConnectionsService;
   ssoIssuers: SsoIssuerDirectoryService;
@@ -231,6 +243,7 @@ type IdentityAppParts = {
   ssoTestArrival: SsoTestArrivalService;
   joinAdmissions: JoinAdmissionsService;
   joinRequests: JoinRequestsService;
+  joinRequestDoor: JoinRequestDoorService;
   ssoActivity: SsoAuthenticationActivityService;
   ssoMigrationCallbacks: SsoMigrationCallbackService;
   ssoBreakGlass: SsoBreakGlassService;
@@ -289,8 +302,8 @@ function testArrivalMemberships(organizations: OrganizationApi): SsoTestArrivalM
 
 /** Which providers signed this person in, from the module that owns every
  *  `Account` row (ADR-129) — identity reads none of them itself. */
-function testArrivalAccounts(auth: AuthApi): SsoTestArrivalAccounts {
-  return { findAccountProvidersForUser: (args) => auth.findFederatedAccountProviders(args) };
+function testArrivalAccounts(reads: IdentityChannels["authReads"]): SsoTestArrivalAccounts {
+  return { findAccountProvidersForUser: (args) => reads.findFederatedAccountProviders(args) };
 }
 
 /** The organization's own member rows, as the migration read asks for them:
@@ -332,9 +345,15 @@ function breakGlassEligibility(
 
 /** Auth owns every `Account` row an identity provider minted, so what still
  *  lets somebody in through a retiring connection is its answer (ADR-129). */
-function legacySsoAccess(auth: AuthApi): SsoLegacyAccessRetirement {
+function legacySsoAccess({
+  reads,
+  auth,
+}: {
+  reads: IdentityChannels["authReads"];
+  auth: IdentityChannels["authCommands"];
+}): SsoLegacyAccessRetirement {
   return {
-    count: (args) => auth.countLegacySsoAccess(args),
+    count: (args) => reads.countLegacySsoAccess(args),
     retire: (args) => auth.retireLegacySsoAccess(args),
   };
 }
@@ -422,7 +441,9 @@ function joinRateLimit(limiter: IdentityRateLimitRepository): JoinRequestsServic
   };
 }
 
-export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
+export class IdentityModule
+  implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi, JoinRequestDoorApi
+{
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
@@ -430,9 +451,6 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
   static readonly dependencies = {
     organizations: OrganizationApi,
     permissions: AuthzApi,
-    /** Who holds the federated account rows a cutover retires: identity
-     *  decides, auth owns and sweeps them. */
-    auth: AuthApi,
     /** Whether somebody holds a password is the module that owns it. */
     users: UserApi,
     /** Whether an organization's plan carries the who-can-join control. */
@@ -475,6 +493,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     });
     const ledger = IdentityLedgerStore.create({
       projectionStore: setup.repositories.identityProjection,
+      heads: setup.repositories.heads,
       eventing: identityEventing,
     });
     const joinRequestLedger = JoinRequestLedgerStore.create({
@@ -511,6 +530,37 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       isLatched,
       clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
+    const isAnyoneOnIdentityWrites = latch.anyoneGate();
+    const { accounts, resolution } = setup.repositories;
+    // better-auth's `database:` (ADR-116 §1); routing and both branches once per bound engine.
+    const storage = (input: IdentityStorageAdapterInput): AdapterFactory<BetterAuthOptions> =>
+      BetterAuthIdentityStorageService.create({
+        legacyEngine: input.legacyEngine,
+        postgresTransaction: input.postgresTransaction,
+        routing: ({ legacy, naming }) =>
+          BetterAuthIdentityRoutingService.create({
+            legacy,
+            naming,
+            accounts,
+            isUserOnIdentityWrites: isLatched,
+            passkeyRemoval: setup.repositories.passkeyRemoval,
+            connectionIssuers: setup.repositories.connectionIssuers,
+            accountBranch: BetterAuthAccountBranchService.create({
+              legacy,
+              accounts,
+              resolution,
+              ceremonies,
+              isUserOnIdentityWrites: isLatched,
+              isAnyoneOnIdentityWrites,
+            }),
+            userBranch: BetterAuthUserBranchService.create({
+              naming,
+              resolution,
+              ceremonies,
+              isUserOnIdentityWrites: isLatched,
+            }),
+          }).adapter(),
+      }).factory();
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
     const signUpIdentifiers = SignUpIdentifierService.create({ identity });
     const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
@@ -525,12 +575,12 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       requests: setup.repositories.joinRequests,
     });
     const signInMethodPolicy = SignInMethodPolicyService.create({
-      resolveAuthProvider: () => setup.dependencies.auth.resolveAuthProvider(),
+      resolveAuthProvider: () => setup.channels.authReads.resolveAuthProvider(),
       federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
-      offersPasskeys: () => setup.dependencies.auth.offersPasskeys(),
-      issuesOwnPasswords: () => setup.dependencies.auth.issuesOwnPasswords(),
+      offersPasskeys: () => setup.config.passkeysEnabled,
+      issuesOwnPasswords: () => setup.config.localPasswords,
       selfHosted: () => !setup.config.isSaas,
-      mountedSocialMethodIds: () => setup.dependencies.auth.findMountedSocialMethodIds(),
+      mountedSocialMethodIds: () => setup.channels.authReads.findMountedSocialMethodIds(),
     });
     const passwordDoor = passwordDoorMounted(signInMethodPolicy);
     const holderCanWalkIn = breakGlassEligibility(
@@ -576,15 +626,15 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
       }),
     });
-    const ssoBackoffice = ssoConnections
-      ? SsoConnectionBackofficeService.create({
-          reads: setup.repositories.ssoBackoffice,
+    const ssoAdmin = ssoConnections
+      ? SsoConnectionAdminService.create({
+          reads: setup.repositories.ssoAdmin,
           connections: () => ssoConnections,
           history: () => ssoConnectionHistory,
         })
       : null;
     // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
-    const dialableIdpOrigins = () => setup.dependencies.auth.findDialableIdentityProviderOrigins();
+    const dialableIdpOrigins = () => setup.channels.authReads.findDialableIdentityProviderOrigins();
     // The same fence the published-proof reads go through: an issuer is a
     // string an administrator typed.
     const issuerDiscovery = ssoIssuerDiscoveryChannels.live.create({
@@ -642,6 +692,8 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         directory: setup.dependencies.scim,
         memberships: setup.dependencies.organizations,
         isHosted: setup.config.isSaas,
+        proposals: identity,
+        auditLog: setup.dependencies.auditLog,
       }),
     });
     const joinRequests = JoinRequestsService.create({
@@ -673,7 +725,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       signups: signupAnnouncements,
     });
     const ssoTestArrival = SsoTestArrivalService.create({
-      accounts: testArrivalAccounts(setup.dependencies.auth),
+      accounts: testArrivalAccounts(setup.channels.authReads),
       connections: setup.repositories.ssoConnections,
       memberships: testArrivalMemberships(setup.dependencies.organizations),
     });
@@ -688,7 +740,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       trail: ssoActivity,
     });
     const memberships = migrationMemberships(setup.dependencies.organizations);
-    const legacyAccess = legacySsoAccess(setup.dependencies.auth);
+    const legacyAccess = legacySsoAccess({
+      reads: setup.channels.authReads,
+      auth: setup.channels.authCommands,
+    });
     // `directory` is unanswered here: whether provisioning has been repointed
     // is the directory module's to say, and an installation without one
     // provisions nobody — which is what `not-applicable` means.
@@ -743,8 +798,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
         ),
     });
-    const auth = setup.dependencies.auth;
-    const resolveAuthProvider = () => auth.resolveAuthProvider();
+    const resolveAuthProvider = () => setup.channels.authReads.resolveAuthProvider();
     const mountedMethods = () =>
       SignInMethodPolicyService.findFederatedMethods(resolveAuthProvider);
     // Main's router (identity/runtime.ts): projected connections first, the legacy columns
@@ -790,9 +844,23 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       }),
     });
 
+    const joinAdmissions = JoinAdmissionsService.create(setup.repositories.joinRequests);
+
+    // auth's databaseHooks: a latched user's account ceremony is the adapter's alone (ADR-116 §5).
+    const bridge = BetterAuthCeremonyBridgeService.create({
+      ceremonies,
+      routesToIdentity: isLatched,
+    });
+    const hookCeremonies: IdentityCeremoniesApi = {
+      beforeUserDelete: (user) => ceremonies.beforeUserDelete(user),
+      createAccountIdentifier: (account) => bridge.createAccountIdentifier(account),
+      beforeAccountDelete: (account) => bridge.beforeAccountDelete(account),
+    };
+
     return new IdentityModule({
       emails,
-      ceremonies,
+      ceremonies: hookCeremonies,
+      storage,
       identityGuards,
       mfaGuards,
       reservations,
@@ -811,7 +879,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           baseUrl: setup.config.publicBaseUrl ?? "",
         }),
         rateLimiter: setup.repositories.rateLimits,
-        sessions: setup.dependencies.auth,
+        sessions: setup.channels.authReads,
         accountAddress: async ({ userId }) => {
           const user = await setup.dependencies.users.findById({ id: userId });
           return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
@@ -833,7 +901,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       joinRequestGuards,
       ssoConnections,
       ssoConnectionGuards,
-      ssoBackoffice,
+      ssoAdmin,
       ssoConnectionHistory,
       ssoConnectionReads,
       ssoIssuers,
@@ -842,8 +910,14 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       ssoAssertion,
       ssoArrival,
       ssoTestArrival,
-      joinAdmissions: JoinAdmissionsService.create(setup.repositories.joinRequests),
+      joinAdmissions,
       joinRequests,
+      joinRequestDoor: JoinRequestDoorService.create({
+        joinRequests,
+        admissions: joinAdmissions,
+        emails,
+        users: setup.dependencies.users,
+      }),
       ssoActivity,
       ssoMigrationCallbacks,
       ssoBreakGlass: ssoBreakGlassGrants,
@@ -852,7 +926,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       lookup: IdentityLookupService.create({
         reads: setup.repositories.identityLookup,
         history: identityHistory,
-        router: setup.dependencies.auth,
+        router: signInRouter,
         identity: () => identity,
         links: LinkProposalService.create({
           guards: LinkProposalGuardsService.create({
@@ -860,21 +934,32 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           }),
           ledger,
           proposals: identityHistory,
-          accounts: setup.dependencies.auth,
+          accounts: setup.channels.authCommands,
         }),
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.repositories.rateLimits,
-        sessions: setup.dependencies.auth,
+        sessions: {
+          listBrowserSessions: (args) => setup.channels.authReads.listBrowserSessions(args),
+          revokeAllBrowserSessions: (args) =>
+            setup.channels.authCommands.revokeAllBrowserSessions(args),
+          endBrowserSessionsForIdentifier: (args) =>
+            setup.channels.authCommands.endBrowserSessionsForIdentifier(args),
+        },
         invitations: setup.dependencies.organizations,
       }),
       twoStepAccounts: TwoStepAccountService.create({
         accounts: setup.repositories.twoStepVerification,
-        deployment: setup.dependencies.auth,
-        protocol: setup.dependencies.auth,
+        deployment: { offersTwoStepVerification: () => setup.config.mfaEnrollmentOpen },
+        protocol: setup.channels.authCommands,
       }),
       organizationMfa: OrganizationMfaService.create({
         accounts: setup.repositories.twoStepVerification,
-        auth: setup.dependencies.auth,
+        auth: {
+          findSessionAmr: (args) => setup.channels.authReads.findSessionAmr(args),
+          findAssertedAmrForIdentifiers: (args) =>
+            setup.channels.authReads.findAssertedAmrForIdentifiers(args),
+          offersTwoStepVerification: () => setup.config.mfaEnrollmentOpen,
+        },
         notifier: OrganizationMfaNotifierService.create({
           accounts: setup.repositories.twoStepVerification,
           mail: organizationMfaRequirementMailChannels.ses.create({ mailer }),
@@ -1091,8 +1176,12 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     return this.#parts.identity;
   }
 
-  ceremonies(): IdentityCeremoniesService {
+  ceremonies(): IdentityCeremoniesApi {
     return this.#parts.ceremonies;
+  }
+
+  createStorageAdapter(input: IdentityStorageAdapterInput): AdapterFactory<BetterAuthOptions> {
+    return this.#parts.storage(input);
   }
 
   newbornSweep(): IdentityNewbornReconciliationService {
@@ -1136,11 +1225,11 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     return this.#parts.ssoConnectionGuards;
   }
 
-  ssoBackoffice(): SsoConnectionBackofficeService {
-    if (!this.#parts.ssoBackoffice || !this.#holdsSsoConnectionLog()) {
-      throw new IdentityCapabilityUnavailableError("SSO connection backoffice");
+  ssoAdmin(): SsoConnectionAdminService {
+    if (!this.#parts.ssoAdmin || !this.#holdsSsoConnectionLog()) {
+      throw new IdentityCapabilityUnavailableError("SSO connection admin");
     }
-    return this.#parts.ssoBackoffice;
+    return this.#parts.ssoAdmin;
   }
 
   ssoConnectionHistory(): SsoConnectionHistoryService {
@@ -1197,6 +1286,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
 
   joinRequests(): JoinRequestsService {
     return this.#parts.joinRequests;
+  }
+
+  joinRequestDoor(): JoinRequestDoorService {
+    return this.#parts.joinRequestDoor;
   }
 
   ssoActivity(): SsoAuthenticationActivityService {

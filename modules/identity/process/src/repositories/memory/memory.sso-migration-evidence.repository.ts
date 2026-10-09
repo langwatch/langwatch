@@ -4,7 +4,7 @@ import type {
   MigrationIdentifierHolding,
   SsoAuthenticationRecord,
   SsoMigrationEvidenceRepository,
-} from "../sso-migration-evidence.repository.ts";
+} from "../../features/sso-arrival/repositories/sso-migration-evidence.repository.ts";
 import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /** The same evidence over the store's identifier and activity rows. */

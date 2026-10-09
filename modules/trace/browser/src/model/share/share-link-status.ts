@@ -1,17 +1,5 @@
 import type { ShareLink } from "@langwatch/share-contract";
-import {
-  type Instant,
-  nowInstant,
-  toEpochMs,
-  Temporal,
-  toDate,
-  type TimeInput,
-} from "@langwatch/time";
-
-/** The moment a screen prints, as the `Date` the Intl formatters take. */
-function readableDate(value: TimeInput) {
-  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
-}
+import { type Instant, nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 
 /**
  * Contract dates arrive as ISO strings because the wire performs no transformation.

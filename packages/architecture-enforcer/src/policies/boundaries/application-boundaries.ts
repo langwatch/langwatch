@@ -307,12 +307,32 @@ const enterpriseRootImportsRuntime: SourceImportRule = ({ pkg, target, sourceImp
   return [];
 };
 
+/** Only apps/ui reads a client; a server application calls the owner's *Api (§3.4). */
+const serverApplicationImportsClient: SourceImportRule = ({ pkg, target, sourceImport }) => {
+  if (pkg.kind !== "application" || pkg.applicationRole === "ui" || target?.kind !== "client") {
+    return [];
+  }
+
+  return [
+    {
+      policy: "application-boundary",
+      file: sourceImport.file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message: `Application ${pkg.applicationRole} cannot import the client ${target.name}.`,
+      allowed:
+        "Only apps/ui and browser packages read a client; a server process calls the owner's *Api.",
+    },
+  ];
+};
+
 /** Every rule a classified package's source import answers to, in reporting order. */
 const SOURCE_IMPORT_RULES: readonly SourceImportRule[] = [
   applicationImportsApplication,
   mismatchedEnterpriseComposition,
   crossedEnterpriseComposition,
   enterpriseRootImportsRuntime,
+  serverApplicationImportsClient,
 ];
 
 function lintClassifiedSourceImports(

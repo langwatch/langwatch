@@ -5,7 +5,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/trace-analytics-projection.repository.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,

@@ -5,7 +5,7 @@ import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.si
 import type { SignupAnnouncementChannel } from "../../channels/signup-announcement.channel.ts";
 import { SlackSignupAnnouncementChannel } from "../../channels/slack/slack.signup-announcement.channel.ts";
 import { SignupAnnouncementService } from "../../services/signup-announcement.service.ts";
-import { LoggedBetterAuthAnnouncements } from "../auth-composition.build.ts";
+import { LoggedBetterAuthAnnouncements } from "../auth.app.ts";
 
 const arrival = { userName: "Jane Doe", userEmail: "jane@acme.example", organizationName: "Acme" };
 

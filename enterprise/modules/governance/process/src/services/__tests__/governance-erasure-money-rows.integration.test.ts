@@ -29,14 +29,14 @@ import { observed } from "../../eventing/__tests__/governance-cost-rollup.fixtur
 import { GovernanceCostChargeMapProjection } from "../../eventing/governance-cost-charge.projection.ts";
 import { GovernanceCostRollupFoldProjection } from "../../eventing/governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../../eventing/governance-cost-rollup.store.ts";
+import { erasureDigest } from "../../features/identity/rules/erasure-digest.rules.ts";
+import { ErasureSuppressionService } from "../../features/identity/services/erasure-suppression.service.ts";
+import { IdentityErasureService } from "../../features/identity/services/identity-erasure.service.ts";
+import { SuppressionSnapshotService } from "../../features/identity/services/suppression-snapshot.service.ts";
 import { ClickHouseGovernanceCostChargeRepository } from "../../repositories/clickhouse/clickhouse.governance-cost-charge.repository.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../../repositories/clickhouse/clickhouse.governance-cost-rollup.repository.ts";
 import { ClickHouseRollupErasureRepository } from "../../repositories/clickhouse/clickhouse.rollup-erasure.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { erasureDigest } from "../../rules/erasure-digest.rules.ts";
-import { ErasureSuppressionService } from "../erasure-suppression.service.ts";
-import { IdentityErasureService } from "../identity-erasure.service.ts";
-import { SuppressionSnapshotService } from "../suppression-snapshot.service.ts";
 
 const SECRET = "c".repeat(32);
 const FIRST_DAY = "2026-08-20";

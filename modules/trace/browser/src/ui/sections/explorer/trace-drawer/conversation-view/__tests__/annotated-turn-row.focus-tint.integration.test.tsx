@@ -18,9 +18,13 @@ vi.mock("../turn-annotation-rail.tsx", () => ({
   TurnAnnotationRail: () => <div data-testid="turn-annotation-rail" />,
 }));
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../behavior/explorer/types/trace.ts";
 import { AnnotatedTurnRow } from "../annotated-turn-row.tsx";
-import type { ParsedTurn, TurnLayout } from "../types.ts";
+import type { ParsedTurn } from "../annotated-turn-row.tsx";
+import type { TurnLayout } from "../chat-turn-row.tsx";
 import { RAIL_WIDTH_SLIM_PX, RAIL_WIDTH_WIDE_PX, type RailLayout } from "../use-rail-layout.ts";
 
 const TRACE_ID = "trace-1";

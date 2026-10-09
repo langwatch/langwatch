@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 
-import type { VoiceNonceRegistryService } from "../../services/voice-nonce-registry.service.ts";
+import type { VoiceNonceRegistryService } from "../../features/voice/services/voice-nonce-registry.service.ts";
 import type { ReceivedVoiceSocket, VoiceSocketReceiver } from "../voice-socket-handoff.channels.ts";
 
 /**

@@ -6,10 +6,14 @@ import type {
   OnboardingInitializeOrganizationInput,
   OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
-import type { PaginatedProjects, Project } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
-import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
+import type { OrganizationAdmission } from "./admission-seat.ts";
+import type {
+  GroupDetail,
+  GroupListItem,
+  GroupMembershipView,
+} from "./features/group/group.responses.ts";
 import type {
   AddOrganizationGroupGrantInput,
   ApplyOrganizationGroupEditsInput,
@@ -26,69 +30,8 @@ import type {
   ListOrganizationGroupsInput,
   RenameOrganizationGroupInput,
   RemoveOrganizationGroupGrantInput,
-} from "./group.ts";
-import type {
-  JoinRequestAdmitted,
-  JoinRequestAutomaticJoins,
-  JoinRequestFiled,
-  JoinRequestJoining,
-  JoinRequestJoiningChanged,
-  JoinRequestMine,
-  JoinRequestPending,
-} from "./join-request.responses.ts";
-import type { JoinRequestApiOrigin } from "./join-request.trpc-schemas.ts";
-import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
-import type {
-  PendingInvitationForCaller,
-  PendingInvitationsForCaller,
-  OrganizationDirectoryCounts,
-  OrganizationInviteAccepted,
-  OrganizationInviteCreated,
-  OrganizationInviteExtended,
-  OrganizationInviteResent,
-  OrganizationListedInvite,
-  OrganizationMemberProvenance,
-  OrganizationPendingInviteApplied,
-} from "./organization.responses.ts";
-import type {
-  Organization,
-  CustomRole,
-  OrganizationUser,
-  OrganizationUserRole,
-  ProjectRow,
-  PricingModel,
-  Team,
-  TeamUser,
-  User,
-} from "./organization.rows.ts";
-import type {
-  OrganizationApiCreateInvitesInput,
-  OrganizationApiInviteScope,
-  OrganizationApiUpdateTeamMemberRoleInput,
-} from "./organization.trpc-schemas.ts";
-import type {
-  EnrichedAuditLog,
-  GetOrganizationBillingProfileInput,
-  GetOrganizationIdByTeamIdInput,
-  GetOrganizationMembersInput,
-  GetOldestTeamInput,
-  OrganizationBillingProfile,
-  OrganizationIntent,
-  UpdateOrganizationSettingsInput,
-  UpdateOrganizationSettingsResult,
-} from "./organization.ts";
-import type * as organizationModule from "./organization.ts";
-import type {
-  FindPersonalWorkspaceInput,
-  EnsuredPersonalWorkspace,
-  PersonalFeatures,
-  PersonalWorkspaceInput,
-  PersonalWorkspace,
-  PersonalWorkspaceFeaturesInput,
-} from "./personal-workspace.ts";
-import type { ScopeGraphOrganization } from "./scope-graph.ts";
-import type { SignUpVerdict } from "./sign-up-policy.ts";
-import type { TeamWithProjects } from "./team.responses.ts";
+} from "./features/group/group.ts";
+import type { TeamWithProjects } from "./features/team/team.responses.ts";
 import type {
   CreateOrganizationTeamWithMembersInput,
   CreateOrganizationTeamInput,
@@ -106,7 +49,63 @@ import type {
   OrganizationTeamWithMembers,
   RemoveOrganizationTeamMemberInput,
   UpdateOrganizationTeamWithMembersInput,
-} from "./team.ts";
+} from "./features/team/team.ts";
+import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
+import type {
+  PendingInvitationForCaller,
+  PendingInvitationsForCaller,
+  OrganizationDirectoryCounts,
+  OrganizationInviteAccepted,
+  OrganizationInviteCreated,
+  OrganizationInviteExtended,
+  OrganizationInviteResent,
+  OrganizationListedInvite,
+  OrganizationInvitedMemberIds,
+  OrganizationPendingInviteApplied,
+} from "./organization.responses.ts";
+import type {
+  Organization,
+  CustomRole,
+  OrganizationUser,
+  OrganizationUserRole,
+  ProjectRow,
+  PricingModel,
+  Team,
+  TeamUser,
+  User,
+} from "./organization.rows.ts";
+import type {
+  OrganizationApiCreateInvitesInput,
+  OrganizationApiInviteScope,
+  OrganizationApiSeatCheckoutInput,
+  OrganizationApiUpdateTeamMemberRoleInput,
+  OrganizationSeatCheckoutRedirect,
+} from "./organization.trpc-schemas.ts";
+import type {
+  EnrichedAuditLog,
+  GetOrganizationBillingProfileInput,
+  GetOrganizationIdByTeamIdInput,
+  GetOrganizationMembersInput,
+  GetOldestTeamInput,
+  OrganizationBillingProfile,
+  OrganizationIntent,
+  UpdateOrganizationSettingsInput,
+  UpdateOrganizationSettingsResult,
+  OrganizationJoinOrigin,
+  OrganizationJoinSetting,
+  SignInSecurityPolicy,
+  SignUpVerdict,
+} from "./organization.ts";
+import type * as organizationModule from "./organization.ts";
+import type {
+  FindPersonalWorkspaceInput,
+  EnsuredPersonalWorkspace,
+  PersonalFeatures,
+  PersonalWorkspaceInput,
+  PersonalWorkspace,
+  PersonalWorkspaceFeaturesInput,
+} from "./personal-workspace.ts";
+import type { ScopeGraphOrganization } from "./scope-graph.ts";
 
 export interface OrganizationCaller {
   readonly id: string;
@@ -200,6 +199,19 @@ export interface OrganizationWithAdministrators {
   administrators: OrganizationAdministrator[];
 }
 
+export interface OrganizationIdPageInput {
+  after?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface OrganizationIdPage {
+  ids: string[];
+  next: string | null;
+}
+
+/** The page size fleet scans pass to `listAllIds`. */
+export const ORGANIZATION_ID_PAGE_LIMIT = 500;
+
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): the
  * members, the single sign-on providers named (by name only), and when the
@@ -240,9 +252,10 @@ export interface OrganizationApi {
   }>;
   /**
    * Whether this address may create a new account on the installation
-   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read.
+   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read;
+   * `hasAnyAccount` (the caller's read) lets the first account bootstrap an invite-only one.
    */
-  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+  checkSignUp(input: Readonly<{ email: string; hasAnyAccount: boolean }>): Promise<SignUpVerdict>;
   /**
    * The invitation waiting for a caller who belongs to no organization yet, on an
    * installation where accounts are created by invitation. Only addresses the account
@@ -284,14 +297,36 @@ export interface OrganizationApi {
    * How colleagues on a matching domain get in, in the columns the
    * organization owns; identity's join ledger reads and writes it here.
    */
-  getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining>;
-  saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void>;
+  getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting>;
+  saveJoinSetting(input: {
+    organizationId: string;
+    setting: OrganizationJoinSetting;
+  }): Promise<void>;
   /** The CLI/device session ceiling in days; zero or an unknown organization is unbounded. */
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }>;
   saveSessionPolicy(input: {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /**
+   * This organization's sign-in security rules (GAC-09, GAC-10).
+   * Throws OrganizationNotFoundError.
+   */
+  getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy>;
+  updateSignInSecurityPolicy(input: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void>;
+  /**
+   * The rules of the organizations this person belongs to and is not
+   * disabled in; read on every session.
+   */
+  findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]>;
+  /**
+   * Cross-tenant by design: every organization that set any rule, for an
+   * address resolving to nobody and the session path's early-out.
+   */
+  findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]>;
   /**
    * The organization's pricing model and currency, for workers deciding on its behalf. A system
    * read: no caller. An unknown organization has no model and the schema's default currency.
@@ -351,9 +386,6 @@ export interface OrganizationApi {
   /** The self-hosted provisioning door's read: one organization's summary, or `not_found`. */
   getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
-  /** A self-hosted licence customer: the organization and its first team, marked. */
-  createSelfHostedCustomer(input: { name: string }): Promise<{ id: string; name: string }>;
-  markSelfHostedCustomer(input: { organizationId: string }): Promise<void>;
   /** Every organization an operator marked as a self-hosted licence customer. */
   findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]>;
   /** Organizations founded in [fromMs, toMs], each with its founder and the founder's
@@ -370,20 +402,6 @@ export interface OrganizationApi {
   findRepresentatives(input: {
     organizationId: string;
   }): Promise<{ userId: string; organizationName: string }[]>;
-  /**
-   * Provisions an organization end to end: it, its first team, a bootstrap
-   * admin key, the summary. A failure past creation deletes the organization
-   * and reports a failed compensation rather than raising it over the cause.
-   */
-  createForProvisioningWithAdminKey(input: {
-    name: string;
-    slug?: string;
-    adminApiKeyName?: string;
-  }): Promise<{
-    organization: { id: string; name: string; slug: string };
-    team: { id: string; slug: string; name: string };
-    adminApiKey: { id: string; token: string };
-  }>;
   /** The authorization feature's per-member access breakdown, organization's own door onto it. */
   getMemberAccessBreakdown(
     input: Readonly<{
@@ -394,9 +412,10 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with
-   * `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission.
-   * `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
+   * Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission-seat.ts): a
+   * MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER or Lite
+   * (EXTERNAL) row is the whole admission, held `pending` when no seat is free. `seat` is the row's
+   * role; `"already-present"` is a concurrent callback or a retry, answered from the row there.
    */
   createMembership(
     input: Readonly<{
@@ -406,9 +425,9 @@ export interface OrganizationApi {
       /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */
       seat?: "MEMBER" | "DEVELOPER";
       /** Where a join request was made, written on the Developer admission audit row. */
-      origin?: JoinRequestApiOrigin;
+      origin?: OrganizationJoinOrigin;
     }>,
-  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+  ): Promise<OrganizationAdmission>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -418,6 +437,19 @@ export interface OrganizationApi {
    * rather than about a listed organization.
    */
   organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
+  /** The organization an email domain is claimed by for SSO, or null when none claims it. */
+  findBySsoDomain(
+    input: Readonly<{ domain: string }>,
+  ): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
+  /**
+   * Writes the plain MEMBER row an SSO domain auto-join admits (ADR-116); the caller grants
+   * the seat itself. A row already there is `"already-present"`: a concurrent callback.
+   */
+  createSsoDomainMembership(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<"created" | "already-present">;
+  /** How many organizations this person has a membership row in, disabled ones included. */
+  countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
   /** Throws `organization_not_found_for_team` when no organization owns the team. */
@@ -470,10 +502,10 @@ export interface OrganizationApi {
     teamId: string;
     departmentId: string | null;
   }): Promise<boolean>;
-  /** Why each member is here, keyed by user id; explains, never grants. */
-  getMemberProvenance(
+  /** The organization's members and which of them an invitation brought; explains, never grants. */
+  getInvitedMemberIds(
     input: Readonly<{ organizationId: string }>,
-  ): Promise<Record<string, OrganizationMemberProvenance>>;
+  ): Promise<OrganizationInvitedMemberIds>;
   /**
    * Every administrator who can still sign in, with what to call them. Asked
    * by a peer choosing somebody for a decision of an administrator's weight —
@@ -530,13 +562,8 @@ export interface OrganizationApi {
   getWithAdministrators(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationWithAdministrators>;
-  /** Main's `updateSentPlanLimitAlert`. */
-  updateSentPlanLimitAlert(
-    input: Readonly<{ organizationId: string; sentAt: Instant }>,
-  ): Promise<void>;
-  claimBillingCustomerId(
-    input: Readonly<{ organizationId: string; billingCustomerId: string }>,
-  ): Promise<boolean>;
+  /** The support contact set in settings, else the longest-seated enabled administrator's email. */
+  findSupportContact(input: Readonly<{ organizationId: string }>): Promise<string | null>;
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
   /** Main `personal-team-scope.ts:78-81`: the personal teams among the ids, archived too. */
   findPersonalTeamOwners(
@@ -615,19 +642,6 @@ export interface OrganizationApi {
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<PersonalFeatures>;
-  findProject(id: string): Promise<Project | null>;
-  listProjectsByOrganization(
-    input: Readonly<{
-      organizationId: string;
-      page: number;
-      limit: number;
-      projectIds?: string[];
-      includeGovernance?: boolean;
-    }>,
-  ): Promise<PaginatedProjects>;
-  listProjectsByTeam(
-    input: Readonly<{ organizationId: string; teamId: string }>,
-  ): Promise<Project[]>;
 
   // -- the doors ------------------------------------------------------------
   //
@@ -692,6 +706,15 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<void>;
   /**
+   * Bounds the invitations by `by`, opens billing's seat checkout, then holds them payment
+   * pending against the subscription it opened (C2 A, Round 50). Refuses
+   * `grant_exceeds_caller_permissions` before any checkout opens.
+   */
+  createSeatCheckoutWithInvites(
+    input: OrganizationApiSeatCheckoutInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationSeatCheckoutRedirect>;
+  /**
    * Holds a seat checkout's invitations until it is paid, as main's billing did; an address
    * that already holds an open invitation here is skipped. `by` is who invited: nobody is
    * invited to more than they hold (checked before storing; acceptance after payment is `system`).
@@ -703,10 +726,6 @@ export interface OrganizationApi {
       invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
     }>,
     by: OrganizationCaller,
-  ): Promise<void>;
-  /** Drops the held invitations of seat checkouts that were abandoned. */
-  cancelPaymentPendingInvites(
-    input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void>;
   /**
    * The seats an organization holds: full and lite members, live invitations
@@ -727,10 +746,6 @@ export interface OrganizationApi {
   reportLimitBlocked(
     input: Readonly<{ organizationId: string; limitType: LimitType }>,
     by: OrganizationCaller,
-  ): Promise<void>;
-  /** Opens the invitations a completed seat checkout paid for, as main's billing webhook did. */
-  approvePaymentPendingInvites(
-    input: Readonly<{ subscriptionId: string; organizationId: string }>,
   ): Promise<void>;
 
   /** One team-role change, with the personal-team, plan and seat guards. */
@@ -790,44 +805,10 @@ export interface OrganizationApi {
     input: ListMemberOrganizationGroupsInput,
   ): Promise<GroupMembershipView[]>;
 
-  lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
-  listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine>;
-  fileJoinRequest(
-    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
-  ): Promise<JoinRequestFiled>;
-  withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void>;
-  listPendingJoinRequests(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending>;
-  approveJoinRequest(
-    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
-  ): Promise<void>;
-  rejectJoinRequest(
-    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
-  ): Promise<void>;
-  readJoiningPolicy(input: Readonly<{ organizationId: string }>): Promise<JoinRequestJoining>;
-  /** Audited against `actorUserId`, the administrator who saved it. */
-  setJoiningPolicy(
-    input: Readonly<{
-      organizationId: string;
-      domainJoin: JoinRequestJoining["domainJoin"];
-      domains: readonly string[];
-      joinerRole?: JoinRequestJoining["joinerRole"];
-      actorUserId: string;
-    }>,
-  ): Promise<JoinRequestJoiningChanged>;
-  /** The post-login offer: the lookup minus the domains this person dismissed. */
-  offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
-  dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void>;
-  admitAutomatically(
-    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
-  ): Promise<JoinRequestAdmitted>;
-  listAutomaticJoins(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<JoinRequestAutomaticJoins>;
-
   initializeOrganization(
     input: OnboardingInitializeOrganizationInput,
     by: OrganizationCaller,
-  ): Promise<OrganizationInitialized>;
+  ): Promise<Omit<OrganizationInitialized, "projectSlug">>;
   recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void;
 
   readPersonalWorkspaceFeatures(
@@ -844,8 +825,11 @@ export interface OrganizationApi {
   ): Promise<PersonalFeatures>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount>;
-  /** Every organization on this install, for the install-wide usage report. */
-  findAllIds(): Promise<string[]>;
+  /**
+   * Organization ids on this install ordered by id, a page at a time for
+   * fleet-wide scans. No limit reads them all; `next` is null on the last page.
+   */
+  listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>()("organization");

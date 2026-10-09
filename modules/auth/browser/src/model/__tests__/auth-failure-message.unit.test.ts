@@ -118,6 +118,24 @@ describe("authFailureMessage", () => {
     });
   });
 
+  describe("when a passkey sign-up is refused for an address that must use its organization's sign-in", () => {
+    it("says an account cannot be created here, and never that the passkey failed", () => {
+      expect(
+        frontDoorErrorCopy({
+          code: "auth_direct_registration_unavailable",
+          httpStatus: 403,
+          meta: {},
+          tips: [],
+          traceId: undefined,
+        }),
+      ).toEqual({
+        title: "Accounts here are created by your identity provider",
+        description:
+          "Use the sign-in method your organization set up. Ask an administrator if you are not sure which one that is.",
+      });
+    });
+  });
+
   describe("when nothing recognizable comes back", () => {
     /** @scenario An unexpected failure still says something honest */
     it("falls back rather than putting an identifier on screen", () => {

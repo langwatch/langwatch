@@ -22,8 +22,14 @@ const SRC_DIR = resolve(FEATURE_DIR, "../..");
  */
 const LAZY_BOUNDARIES = [
   {
-    wrapper: join(FEATURE_DIR, "lazy-langwatch-ql-widget-chart.tsx"),
-    deferred: join(FEATURE_DIR, "langwatch-ql-widget-chart.tsx"),
+    wrapper: join(
+      FEATURE_DIR,
+      "../../features/dashboard-widget/ui/sections/langwatch-ql-dashboard-widget.tsx",
+    ),
+    deferred: join(
+      FEATURE_DIR,
+      "../../features/dashboard-widget/ui/sections/langwatch-ql-widget-chart.tsx",
+    ),
     specifier: 'import("./langwatch-ql-widget-chart.tsx")',
   },
 ] as const;

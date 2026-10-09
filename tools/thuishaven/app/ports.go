@@ -45,7 +45,7 @@ type Proxy interface {
 }
 
 // Store persists everything under the thuishaven home dir plus the worktree-local
-// files (the slug cache, the sticky selection and the HMR gate marker).
+// files (the slug cache and the sticky selection).
 type Store interface {
 	SaveStack(domain.Stack) error
 	RemoveStack(slug string)
@@ -71,19 +71,16 @@ type Store interface {
 	// which is what makes haven fall back to looking.
 	ReadContainerPosture() string
 	WriteContainerPosture(string) error
-	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
-	WriteHMRGate(lwDir string, expiryUnixMs int64) error
-	ReadHMRGate(lwDir string) (int64, bool)
-	ClearHMRGate(lwDir string)
 	// TouchDBActivity records "slug's databases were in use now" — the clock the
 	// daemon's idle-database pruning reads. Touched on every `up` and refreshed
 	// by the daemon while a stack stays registered.
 	TouchDBActivity(slug string) error
 	DBActivity() map[string]time.Time
 	RemoveDBActivity(slug string)
-	// ClaimDaemon atomically records this process as the singleton daemon, but
-	// only if no record exists yet (O_EXCL). It returns false without overwriting
-	// when one already does, so two daemons racing to start can never both win.
+	// ClaimDaemon takes the daemon flock without waiting and, when it wins,
+	// writes the record; the lock is held until ClearDaemon or process death,
+	// so the kernel frees it on a crash and no stale record can block (D9).
+	// False means another daemon holds it.
 	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
@@ -221,6 +218,9 @@ type System interface {
 	FreePorts(n int) ([]int, error)
 	PortInUse(port int) bool
 	ProcessAlive(pid int) bool
+	// ProcessStart is pid's start time, "" when unknown; pid plus start is a
+	// process's identity, so a reused pid is never mistaken for ours (D6).
+	ProcessStart(pid int) string
 	Terminate(pid int)
 	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
 	// bounces one supervised child (its supervisor restarts it on exit).
@@ -470,6 +470,8 @@ type ContainerRuntime interface {
 	// resolved from before the stack is built — "can a container tier run here?"
 	// — which Ensure can only answer by doing the work.
 	Available(ctx context.Context) bool
+	// IsRunning reports whether the VM is up, without starting it.
+	IsRunning(ctx context.Context) bool
 }
 
 // ContainerJanitor sweeps containers a testcontainers run left behind in the
@@ -484,9 +486,10 @@ type ContainerJanitor interface {
 
 // DaemonInfo is the little record `up` reads to find (or spawn) the daemon.
 type DaemonInfo struct {
-	PID  int    `json:"pid"`
-	Port int    `json:"port"`
-	URL  string `json:"url"`
+	PID   int    `json:"pid"`
+	Start string `json:"start,omitempty"`
+	Port  int    `json:"port"`
+	URL   string `json:"url"`
 }
 
 // HeavyRunSnapshot is one heavy run currently holding a slot: its own

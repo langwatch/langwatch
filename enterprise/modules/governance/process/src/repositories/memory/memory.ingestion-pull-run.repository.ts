@@ -7,7 +7,7 @@ import type {
 } from "@langwatch/eventing";
 
 import type { IngestionPullRunStatusData } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
-import type { AgentsListingSummary } from "../../rules/agents-listing-outcome.rules.ts";
+import type { AgentsListingSummary } from "../../features/agents/rules/agents-listing-outcome.rules.ts";
 import { IngestionPullRunRepository } from "../ingestion-pull-run.repository.ts";
 
 /** The run-status twin: one map standing in for the `IngestionPullRunProjection` table. */

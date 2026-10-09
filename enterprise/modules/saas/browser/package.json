@@ -21,8 +21,7 @@
   },
   "dependencies": {
     "@langwatch/browser": "workspace:*",
-    "@langwatch/enterprise-saas-contract": "workspace:*",
-    "posthog-js": "catalog:"
+    "@langwatch/enterprise-saas-contract": "workspace:*"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",

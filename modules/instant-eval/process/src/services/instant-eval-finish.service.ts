@@ -4,25 +4,26 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import type { InstantEvalOutcome, InstantEvalPricing } from "@langwatch/instant-eval-contract";
+import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
+import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
+import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { InstantEvalSpend } from "../eventing/instant-eval-processing.intent.ts";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "../rules/instant-eval-pricing.rules.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
-import type { InstantEvalSpendService } from "./instant-eval-spend.service.ts";
+import type { InstantEvalJudgedSpendService } from "./instant-eval-judged-spend.service.ts";
 
 const logger = createLogger("langwatch:instant-eval:finish");
 
 export class InstantEvalFinishService {
-  private readonly spend: Pick<InstantEvalSpendService, "recordSpend">;
+  private readonly spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
   private readonly budget: Pick<InstantEvalFreeBudgetService, "release">;
   private readonly pricing: InstantEvalPricing;
   private readonly now: () => Instant;
 
   private constructor(options: {
-    spend: Pick<InstantEvalSpendService, "recordSpend">;
+    spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
     budget: Pick<InstantEvalFreeBudgetService, "release">;
     pricing: InstantEvalPricing;
     now: () => Instant;
@@ -39,7 +40,7 @@ export class InstantEvalFinishService {
     pricing,
     now = nowInstant,
   }: {
-    spend: Pick<InstantEvalSpendService, "recordSpend">;
+    spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
     budget: Pick<InstantEvalFreeBudgetService, "release">;
     /** The judge's own published rates, which are what the run is priced at. */
     pricing: InstantEvalPricing;
@@ -72,8 +73,6 @@ export class InstantEvalFinishService {
         runId,
         inputTokens,
         requests,
-        costUsd,
-        priceUsd,
         occurredAt: this.now(),
       });
       logger.debug(

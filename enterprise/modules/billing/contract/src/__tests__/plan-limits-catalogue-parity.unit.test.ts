@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PLAN_LIMITS } from "../plan-limits.ts";
+import { FREE_PLAN_CREATION_CAPS, PLAN_LIMITS } from "../plan-limits.ts";
 import { PlanTypes } from "../plan-types.ts";
 
 /**
@@ -132,7 +132,10 @@ const GROWTH_SEAT_TYPES = [
 describe("PLAN_LIMITS read off the catalogue", () => {
   describe.each(PRESETS)("given $type", (preset) => {
     it("quotes the numbers it quoted when they were inline", () => {
-      expect(PLAN_LIMITS[preset.type]).toEqual(preset);
+      const expected =
+        preset.type === PlanTypes.FREE ? { ...preset, ...FREE_PLAN_CREATION_CAPS } : preset;
+
+      expect(PLAN_LIMITS[preset.type]).toEqual(expected);
     });
   });
 

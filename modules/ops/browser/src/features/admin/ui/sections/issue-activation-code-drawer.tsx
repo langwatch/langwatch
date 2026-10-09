@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 
 import { useActivationCodeCommands } from "../../behavior/use-activation-code-commands.ts";
 import { SERVICES, SERVICE_LABELS, type Service } from "../../model/license-terms.ts";
-import { dateInputToISO } from "../elements/backoffice-cells.tsx";
+import { dateInputToISO } from "../elements/admin-cells.tsx";
 
 type PlanType = "GROWTH" | "PRO" | "ENTERPRISE" | "CUSTOM";
 const PLANS: PlanType[] = ["ENTERPRISE", "GROWTH", "PRO", "CUSTOM"];

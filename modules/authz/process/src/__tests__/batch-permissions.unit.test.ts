@@ -130,7 +130,7 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
       expect(byPermission.get("cost:view")?.projects.get("proj-0")).toBe(false);
     });
 
-    it("collects the owner's grants once, off the same pass", async () => {
+    it("collects the owner's grants once for the whole batch", async () => {
       const stub = reader();
 
       await makeAuthz(stub).canBatchPermissionsByIds({

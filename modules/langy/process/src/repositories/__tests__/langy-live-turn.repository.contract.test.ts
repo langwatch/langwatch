@@ -229,7 +229,6 @@ describe("given the langy repository registry", () => {
         "messages",
         "rateLimits",
         "resourceLinks",
-        "sessionKeyReap",
         "sessionKeys",
         "sessionState",
         "tokenBuffer",

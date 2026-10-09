@@ -20,6 +20,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
+import { FirstTouchAttributionToken } from "@langwatch/onboarding-client";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -114,9 +115,6 @@ class PersonSession extends UiSession {
   isSettled(): boolean {
     return true;
   }
-  featureFlag(): boolean | undefined {
-    return void 0;
-  }
 }
 const ADA: UiActor = { id: "user_ada", name: "Ada", email: "ada@example.com", image: null };
 const BOB: UiActor = { id: "user_bob", name: "Bob", email: null, image: null };
@@ -142,12 +140,13 @@ function capabilities(
       {
         name: "onboarding",
         installation: {
-          capabilities: {
-            firstTouchAttribution: {
-              useCapture: () => void 0,
-              eventProperties: () => attribution,
+          capabilities: {},
+          lends: [
+            {
+              token: FirstTouchAttributionToken,
+              value: { useCapture: () => void 0, eventProperties: () => attribution },
             },
-          },
+          ],
         },
       },
     ]),

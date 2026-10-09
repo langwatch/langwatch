@@ -11,13 +11,18 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
 import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+/** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
+const openSeats = {
+  countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+};
 
 const ORGANIZATION = "org-1";
 const PERSON = "user-1";
@@ -51,16 +56,9 @@ class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-function departments(): ScimDepartmentAssignment {
+function departments(): ScimCostCenterFacts {
   return {
-    departmentResolveByNameOrCreate: vi.fn(async () => ({
-      id: "department-1",
-      organizationId: ORGANIZATION,
-      name: "Engineering",
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-    departmentAssignUser: vi.fn(async () => undefined),
+    recordCostCenterChanged: vi.fn(async () => undefined),
   };
 }
 
@@ -97,12 +95,13 @@ function scimService(repository = scimRepositoryFixture(), users = userService()
       prisma: repository,
       writer: new GrantsFake(),
       users,
-      governance: departments(),
+      costCenterFacts: departments(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
       tokenPepper: "scim-test-pepper",
+      seats: openSeats,
     }),
   };
 }

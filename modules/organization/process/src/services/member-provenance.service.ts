@@ -1,46 +1,34 @@
-import type { OrganizationMemberProvenance } from "@langwatch/organization-contract";
+import type { OrganizationInvitedMemberIds } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
-import {
-  type MemberDomainAdmission,
-  memberProvenanceFor,
-} from "../rules/member-provenance.rules.ts";
 
-/** The domain admissions identity records, asked per call of a peer resolved lazily. */
-interface MemberDomainAdmissions {
-  findForMembers(args: {
-    organizationId: string;
-    userIds: readonly string[];
-  }): Promise<MemberDomainAdmission[]>;
-}
+type ProvenanceMembers = Pick<
+  OrganizationMembershipRepository,
+  "findMemberUserIds" | "findInvitedMemberIds"
+>;
 
-/** Why each member of an organization is here, for the members list and the member dialog. */
+/**
+ * Organization's half of why each member is here: who is a member and whom an invitation brought.
+ * The browser joins identity's domain admissions to it (round 24 EF-3).
+ */
 export class MemberProvenanceService {
-  static create(dependencies: {
-    members: Pick<OrganizationMembershipRepository, "findMemberUserIds" | "findInvitedMemberIds">;
-    admissions: MemberDomainAdmissions;
-  }): MemberProvenanceService {
+  static create(dependencies: { members: ProvenanceMembers }): MemberProvenanceService {
     return new MemberProvenanceService(dependencies);
   }
 
-  private constructor(
-    private readonly dependencies: {
-      members: Pick<OrganizationMembershipRepository, "findMemberUserIds" | "findInvitedMemberIds">;
-      admissions: MemberDomainAdmissions;
-    },
-  ) {}
+  private constructor(private readonly dependencies: { members: ProvenanceMembers }) {}
 
-  async getForOrganization({
+  async getInvitedMemberIds({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<Record<string, OrganizationMemberProvenance>> {
-    const userIds = await this.dependencies.members.findMemberUserIds({ organizationId });
-    if (userIds.length === 0) return {};
-    const [admissions, invitedUserIds] = await Promise.all([
-      this.dependencies.admissions.findForMembers({ organizationId, userIds }),
-      this.dependencies.members.findInvitedMemberIds({ organizationId, userIds }),
-    ]);
-    return memberProvenanceFor({ userIds, admissions, invitedUserIds });
+  }): Promise<OrganizationInvitedMemberIds> {
+    const memberUserIds = await this.dependencies.members.findMemberUserIds({ organizationId });
+    if (memberUserIds.length === 0) return { memberUserIds, invitedUserIds: [] };
+    const invitedUserIds = await this.dependencies.members.findInvitedMemberIds({
+      organizationId,
+      userIds: memberUserIds,
+    });
+    return { memberUserIds, invitedUserIds };
   }
 }

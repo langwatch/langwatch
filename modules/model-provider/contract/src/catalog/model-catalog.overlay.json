@@ -198,7 +198,8 @@
       "pricing": {
         "inputCostPerToken": 2.5e-6,
         "outputCostPerToken": 1e-5,
-        "audioCostPerToken": 2.5e-6
+        "audioCostPerToken": 2.5e-6,
+        "inputCostPerSecond": 0.0001
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -219,7 +220,8 @@
       "pricing": {
         "inputCostPerToken": 1.25e-6,
         "outputCostPerToken": 5e-6,
-        "audioCostPerToken": 1.25e-6
+        "audioCostPerToken": 1.25e-6,
+        "inputCostPerSecond": 5e-5
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -303,7 +305,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 0.0001
+        "inputCostPerCharacter": 8e-5
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -324,7 +326,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-5
+        "inputCostPerCharacter": 4e-5
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -345,7 +347,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-5
+        "inputCostPerCharacter": 4e-5
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -433,7 +435,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-5
+        "inputCostPerCharacter": 4e-5
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -446,6 +448,90 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": true
+    },
+    "elevenlabs/eleven_v4": {
+      "id": "elevenlabs/eleven_v4",
+      "name": "ElevenLabs: v4",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 8e-5
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "ElevenLabs' fourth-generation speech synthesis. Priced per input character, $0.08 per 1k characters (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04).",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "elevenlabs/eleven_v4_turbo": {
+      "id": "elevenlabs/eleven_v4_turbo",
+      "name": "ElevenLabs: v4 Turbo",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 4e-5
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "ElevenLabs' low-latency fourth-generation speech synthesis. Priced per input character, $0.04 per 1k characters (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04).",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "elevenlabs/eleven_v3_conversational": {
+      "id": "elevenlabs/eleven_v3_conversational",
+      "name": "ElevenLabs: v3 Conversational",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 4e-5
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "ElevenLabs' v3 speech synthesis tuned for conversation. Priced per input character, $0.04 per 1k characters (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04).",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "elevenlabs/scribe_v2_realtime": {
+      "id": "elevenlabs/scribe_v2_realtime",
+      "name": "ElevenLabs: Scribe v2 Realtime",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.00010833333333333333
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "ElevenLabs' live speech-to-text. Priced by audio duration at $0.39 per hour (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04), which is $0.39 divided by 3600 per second.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
     },
     "openai/gpt-audio-mini": {
       "id": "openai/gpt-audio-mini",
@@ -598,6 +684,27 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
+    },
+    "elevenlabs/eleven_v3": {
+      "id": "elevenlabs/eleven_v3",
+      "name": "eleven_v3",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 8e-5
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
     }
   }
 }

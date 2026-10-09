@@ -60,7 +60,7 @@ export const transcriptTraceCommand = async (
     events.started("Fetching transcript…");
 
     const response = await langwatchFetch(
-      `${endpoint}/api/traces/${encodeURIComponent(traceId)}/transcript`,
+      `${endpoint}/api/v1/traces/${encodeURIComponent(traceId)}/transcript`,
       {
         headers: cliAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

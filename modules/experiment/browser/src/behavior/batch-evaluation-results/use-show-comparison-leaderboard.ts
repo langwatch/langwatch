@@ -1,6 +1,6 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
 /**
  * The rollout flag the Bradley-Terry leaderboard hangs off (issue #5103).
@@ -18,7 +18,7 @@ export function useShowComparisonLeaderboard(): boolean {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const { enabled } = useFeatureFlag(COMPARISON_LEADERBOARD_FLAG, {
+  const { enabled } = useFeatureFlag(FrontendFlags[COMPARISON_LEADERBOARD_FLAG], {
     projectId: project?.id ?? NOT_TARGETED,
     organizationId: organization?.id,
     // Without the organization there is nothing for an org-targeted rule to

@@ -8,7 +8,7 @@ import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governanc
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
-import { IngestionPullDeadlineExceededError } from "../ingestion-pull-worker.service.ts";
+import { IngestionPullDeadlineExceededError } from "../../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();

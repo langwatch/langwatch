@@ -6,6 +6,7 @@ import {
   type WebhookDeliveryOutcome,
   type WebhookDestinationKind,
   type WebhookEndpointView,
+  type WebhookSignatureScheme,
   WEBHOOK_PREVIOUS_SECRET_TTL_MS,
 } from "@langwatch/webhook-contract";
 
@@ -13,6 +14,8 @@ import { parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import type { WebhookDeliveryDisposition } from "../../rules/webhook-delivery-contract.rules.ts";
 import {
   describeDestination,
+  endpointMaxBatchSize,
+  httpDestinationConfig,
   sqsCredentialMode,
   type WebhookDestinationConfig,
 } from "../../rules/webhook-destination.rules.ts";
@@ -215,10 +218,27 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     maxBatchSize?: number;
     maxBatchDelayMs?: number;
     maxInFlight?: number;
+    signatureScheme?: WebhookSignatureScheme;
+    sharedSecret?: string;
+    idempotencyKey?: string;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
+    const repeated = this.#database
+      .endpoints()
+      .find(
+        (row) =>
+          params.idempotencyKey !== undefined &&
+          row.organizationId === params.organizationId &&
+          row.idempotencyKey === params.idempotencyKey,
+      );
+    if (repeated) {
+      return {
+        endpoint: toView(repeated),
+        secret: this.#options.secrets.decrypt(repeated.secretEncrypted),
+      };
+    }
     const destinationKind = params.destinationKind ?? "http";
     const destination = storedDestination(params, this.#options.secrets);
-    const secret = newSecret();
+    const secret = params.sharedSecret ?? newSecret();
     const now = nowInstant();
     const row: MemoryWebhookEndpointRow = {
       id: this.#options.ids.newEndpointId(),
@@ -235,7 +255,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       failingSince: null,
       lastSuccessAt: null,
       lastFailureAt: null,
-      maxBatchSize: params.maxBatchSize ?? 100,
+      signatureScheme: params.signatureScheme ?? null,
+      idempotencyKey: params.idempotencyKey ?? null,
+      maxBatchSize: params.signatureScheme !== undefined ? 1 : (params.maxBatchSize ?? 100),
       maxBatchDelayMs: params.maxBatchDelayMs ?? 250,
       maxInFlight: params.maxInFlight ?? 4,
       archivedAt: null,
@@ -290,7 +312,14 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       ...sqsUpdate,
       ...(params.url !== undefined ? { url: params.url } : {}),
       ...(params.enabledEvents !== undefined ? { enabledEvents: params.enabledEvents } : {}),
-      ...(params.maxBatchSize !== undefined ? { maxBatchSize: params.maxBatchSize } : {}),
+      ...(params.maxBatchSize !== undefined
+        ? {
+            maxBatchSize: endpointMaxBatchSize({
+              signatureScheme: endpoint.signatureScheme,
+              maxBatchSize: params.maxBatchSize,
+            }),
+          }
+        : {}),
       ...(params.maxBatchDelayMs !== undefined ? { maxBatchDelayMs: params.maxBatchDelayMs } : {}),
       ...(params.maxInFlight !== undefined ? { maxInFlight: params.maxInFlight } : {}),
       updatedAt: nowInstant(),
@@ -359,6 +388,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       ...endpoint,
       archivedAt: nowInstant(),
       status: "DISABLED",
+      idempotencyKey: null,
       updatedAt: nowInstant(),
     });
   }
@@ -414,7 +444,10 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
       };
     }
 
-    return { kind: "http", url: endpoint.url ?? "" };
+    return httpDestinationConfig({
+      url: endpoint.url ?? "",
+      signatureScheme: endpoint.signatureScheme,
+    });
   }
 
   async getSigningSecret(params: { organizationId: string; endpointId: string }): Promise<string> {

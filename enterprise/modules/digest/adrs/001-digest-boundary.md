@@ -37,7 +37,7 @@ None today. Click and unsubscribe counts need an owned table when the send is bu
 
 ## Runtime and registration
 
-Not installed in any process. The package exists so the rules and their unit tests have an owner.
+Not installed in any process. The package exists so the rules and their unit tests have an owner. Its `package.json` records `"staged": "dev/docs/plans/weekly-digest.md"`, so the feature-shape and feature-layout policies ask it for no app, installer or service until that plan is built, and it exports no entry point.
 
 ## Environment and configuration
 

@@ -1,8 +1,9 @@
-import {
-  type DataRetentionApi,
-  PLATFORM_DEFAULT_RETENTION_DAYS,
-  retentionCategories,
-} from "@langwatch/data-retention-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * What a Stripe subscription's own lifecycle events do to our records: deletion, update, and
+ * the payment-success sync that reconciles quantities and the seat policy. Data-retention stamps
+ * a seat plan's retention from the started fact (round 37 D4).
+ */
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
@@ -11,17 +12,14 @@ import {
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * What a Stripe subscription's own lifecycle events do to our records: deletion, update, and
- * the payment-success sync that reconciles quantities, retention and the seat policy.
- */
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createLogger } from "@langwatch/observability";
 import { planQuantities, planQuantitiesOf } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
   BillingWebhookSubscriptionRepository,
@@ -43,22 +41,22 @@ const waitForStripeConsistency = () =>
 type BillingSubscriptionLifecycleOptions = {
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
-  stripe: Stripe;
+  /** Clears a trial's licence once its subscription activates; organization owns the row. */
+  licenses: LicenseClearer;
+  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription" | "cancelSubscription">;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
   host: BillingWebhookHost;
-  /** Data-retention's rules, which a first seat activation stamps at the platform default. */
-  retention: SeatRetentionRules;
   /** Records subscription changes for peers; absent where nothing composes a lifecycle. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
-    "subscriptionActivated" | "subscriptionCancelled"
+    "subscriptionActivated" | "subscriptionCancelled" | "pricingModelChanged"
   >;
 };
 
-/** The two data-retention operations seat provisioning reads and writes. */
-export type SeatRetentionRules = Pick<DataRetentionApi, "listOrganizationRules" | "setForScope">;
+/** The one licensing operation a subscription activation needs for a trial's licence. */
+export type LicenseClearer = Pick<LicensingApi, "removeLicense">;
 
 export class BillingSubscriptionLifecycleService {
   static create(options: BillingSubscriptionLifecycleOptions): BillingSubscriptionLifecycleService {
@@ -67,20 +65,20 @@ export class BillingSubscriptionLifecycleService {
 
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
-  private readonly stripe: Stripe;
+  private readonly licenses: LicenseClearer;
+  private readonly stripeSubscriptions: BillingSubscriptionLifecycleOptions["stripeSubscriptions"];
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
-  private readonly retention: SeatRetentionRules;
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
     this.organizationRepository = options.organizationRepository;
-    this.stripe = options.stripe;
+    this.licenses = options.licenses;
+    this.stripeSubscriptions = options.stripeSubscriptions;
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
-    this.retention = options.retention;
     this.announcer = options.announcer;
   }
 
@@ -347,7 +345,9 @@ export class BillingSubscriptionLifecycleService {
     previousSubscription: BillingSubscriptionRecord;
   }): Promise<boolean> {
     try {
-      const stripeSubscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const stripeSubscription = await this.stripeSubscriptions.getSubscription({
+        subscriptionId,
+      });
       if (stripeSubscription.status !== "canceled") {
         return true;
       }
@@ -379,6 +379,11 @@ export class BillingSubscriptionLifecycleService {
 
   /** Retires the plans this seat-event subscription supersedes, once the records agree. */
   private async migrateToSeatEventPlan(updated: SubscriptionWithOrg): Promise<void> {
+    // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
+    await this.announcer?.pricingModelChanged({
+      organizationId: updated.organizationId,
+      pricingModel: "SEAT_EVENT",
+    });
     const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
       organizationId: updated.organizationId,
       excludeSubscriptionId: updated.id,
@@ -391,66 +396,15 @@ export class BillingSubscriptionLifecycleService {
       }
 
       try {
-        await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, { prorate: true });
+        await this.stripeSubscriptions.cancelSubscription({
+          subscriptionId: oldSub.stripeSubscriptionId,
+          prorate: true,
+        });
       } catch (err) {
         logger.error(
           { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
           "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during " +
             "upgrade. Manual intervention required.",
-        );
-      }
-    }
-
-    await this.applySeatRetentionPolicy(updated.organizationId);
-  }
-
-  /**
-   * A paid Growth-Seat subscription entitles the org to explicit per-category
-   * retention policies at the platform default (49 days), stamped on first
-   * activation. Create-if-absent; best-effort — never fails the Stripe webhook.
-   */
-  private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
-    // Create-if-absent, NOT upsert: a seat/subscription event must never
-    // overwrite an existing org-level override, which could clobber a
-    // grandfathered high policy down to 49d and DELETE data. Mirrors
-    // licenseHandler.provisionMissingRetentionPolicies.
-    let covered: Set<string>;
-    try {
-      const existing = await this.retention.listOrganizationRules({
-        organizationId,
-      });
-      covered = new Set(
-        existing
-          .filter((row) => row.scopeType === "ORGANIZATION" && row.scopeId === organizationId)
-          .map((row) => row.category),
-      );
-    } catch (err) {
-      // If we can't read the current rules we can't prove a category is absent,
-      // so skip provisioning rather than risk a clobber. Ingestion still stamps
-      // PLATFORM_DEFAULT_RETENTION_DAYS via the cascade fallback.
-      logger.error(
-        { organizationId, err },
-        "[stripeWebhook] Failed to read retention rules; skipping seat provisioning",
-      );
-
-      return;
-    }
-
-    for (const category of retentionCategories) {
-      if (covered.has(category)) {
-        continue;
-      }
-
-      try {
-        await this.retention.setForScope({
-          scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
-          category,
-          retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        });
-      } catch (err) {
-        logger.error(
-          { organizationId, category, err },
-          "[stripeWebhook] Failed to apply seat retention policy",
         );
       }
     }
@@ -468,6 +422,6 @@ export class BillingSubscriptionLifecycleService {
       { organizationId: updatedSubscription.organizationId },
       `[stripeWebhook] Clearing trial license — ${reason}`,
     );
-    await this.organizationRepository.clearTrialLicense(updatedSubscription.organizationId);
+    await this.licenses.removeLicense(updatedSubscription.organizationId);
   }
 }

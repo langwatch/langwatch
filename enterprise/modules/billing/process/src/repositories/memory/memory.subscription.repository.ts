@@ -53,6 +53,12 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     );
   }
 
+  async hasAnyForOrganization(organizationId: string): Promise<boolean> {
+    return this.store.subscriptions.some(
+      (subscription) => subscription.organizationId === organizationId,
+    );
+  }
+
   async createPending(input: {
     organizationId: string;
     plan: string;
@@ -150,9 +156,6 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    const organization = this.store.organizations.get(input.organizationId);
-    if (organization) organization.pricingModel = "SEAT_EVENT";
-
     const superseded = this.store.subscriptions.filter(
       (subscription) =>
         subscription.organizationId === input.organizationId &&

@@ -7,7 +7,7 @@
 import { Box, Button, HStack, Progress, Text } from "@langwatch/design-system/primitives";
 import { Square } from "lucide-react";
 
-import type { InstantEvalRunPhase } from "../../../behavior/instant-eval-run.store.ts";
+import type { InstantEvalRunPhase } from "../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 
 /** The phases the bar is shown in: every one before the run has settled. */
 type InstantEvalBarPhase = Exclude<InstantEvalRunPhase, "settled">;

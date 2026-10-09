@@ -30,6 +30,13 @@ import type {
   MapProjectionOptions,
 } from "../projections/mapProjection.types.ts";
 import {
+  type PeerEventSchema,
+  type PeerFoldProjectionDeclaration,
+  type PeerMapProjectionDeclaration,
+  peerFoldProjection,
+  peerMapProjection,
+} from "../projections/peerProjection.ts";
+import {
   type SealedFoldProjection,
   type SealedMapProjection,
   type SealedStateProjection,
@@ -39,15 +46,26 @@ import {
 } from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
-import { ConfigurationError, ValidationError } from "../services/errorHandling.ts";
+import {
+  ConfigurationError,
+  UndeclaredQueuedEventTypeError,
+  ValidationError,
+} from "../services/errorHandling.ts";
 import type {
   EventSubscriberDefinition,
+  EventSubscriberOptions,
   PeerSubscriberDefinition,
 } from "../subscribers/eventSubscriber.types.ts";
 import type {
   SubscriberDispatchDefinition,
   SubscriberDispatchOptions,
 } from "../subscribers/subscriber.types.ts";
+import {
+  assertUpcastsDeclarable,
+  EventUpcaster,
+  type UpcastDeclaration,
+} from "../upcast/eventUpcast.ts";
+import { assertLaneAliasesDeclarable, type LaneAlias } from "../upcast/laneAlias.ts";
 import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder.ts";
 import type {
   ProcessManagerDefinition,
@@ -108,6 +126,8 @@ export class PipelineBuilder<
   private eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private prepareEventForProjection?: (event: EventType) => EventType;
   private retentionPolicyResolver?: RetentionPolicyResolver;
+  private upcastDeclaration?: UpcastDeclaration;
+  private laneAliases: readonly LaneAlias[] = [];
   private readonly globalProjections: GlobalProjection[] = [];
   constructor(
     private readonly name: string,
@@ -136,6 +156,30 @@ export class PipelineBuilder<
    */
   withRetention(resolver: RetentionPolicyResolver): this {
     this.retentionPolicyResolver = resolver;
+    return this;
+  }
+
+  /**
+   * Stored event types this pipeline reads as its current ones, and the former pipeline whose
+   * queued jobs drain into its lanes (§9; Alex, 2026-10-06). Spec: specs/event-upcast.feature.
+   */
+  withUpcasts(declaration: UpcastDeclaration<EventType["type"]>): this {
+    assertUpcastsDeclarable({
+      pipeline: this.name,
+      declaredTypes: new Set(this.events.eventSchemas.keys()),
+      events: declaration.events,
+    });
+    this.upcastDeclaration = declaration;
+    return this;
+  }
+
+  /**
+   * Former lane keys the previous release queued jobs under, each consumed by one of this
+   * pipeline's lanes for one release (round 49 E4). Spec: specs/lane-alias.feature.
+   */
+  withLaneAliases(aliases: readonly LaneAlias[]): this {
+    assertLaneAliasesDeclarable({ pipeline: this.name, aliases });
+    this.laneAliases = aliases;
     return this;
   }
 
@@ -188,10 +232,50 @@ export class PipelineBuilder<
               eventId: event.id,
               ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
             }),
-          options: subscriber.options,
+          options: peerSubscriberOptions(subscriber),
         }),
     });
     return this;
+  }
+
+  /**
+   * This module's fold over a peer pipeline's events (§9), on the global registry: lane
+   * `<this pipeline>.<fold name>`, ordered per source aggregate, deduped by event id, re-folded
+   * and replayed from the owner's event log. Spec: packages/eventing/specs/peer-projection.feature.
+   */
+  withPeerFoldProjection<State, const Events extends readonly PeerEventSchema[]>(
+    declaration: PeerFoldProjectionDeclaration<State, Events>,
+  ): this {
+    const lane = `${this.name}.${declaration.fold.name}`;
+    this.assertGlobalLaneFree(lane);
+    const fold = peerFoldProjection({ lane, declaration });
+    this.globalProjections.push({
+      name: lane,
+      register: (registry, host) => registry.registerPeerFoldProjection(fold, host),
+      peer: { kind: "fold", projection: sealFoldProjection(fold) },
+    });
+    return this;
+  }
+
+  /** This module's map over a peer pipeline's events (§9), as `withPeerFoldProjection`. */
+  withPeerMapProjection<MapRecord, const Events extends readonly PeerEventSchema[]>(
+    declaration: PeerMapProjectionDeclaration<MapRecord, Events>,
+  ): this {
+    const lane = `${this.name}.${declaration.map.name}`;
+    this.assertGlobalLaneFree(lane);
+    const map = peerMapProjection({ lane, declaration });
+    this.globalProjections.push({
+      name: lane,
+      register: (registry, host) => registry.registerPeerMapProjection(map, host),
+      peer: { kind: "map", projection: sealMapProjection<MapRecord, Event, Event>(map) },
+    });
+    return this;
+  }
+
+  private assertGlobalLaneFree(lane: string): void {
+    if (this.globalProjections.some((declared) => declared.name === lane)) {
+      this.throwDuplicateProjectionName(lane);
+    }
   }
 
   /** Register a ClickHouse fold. The app must bind its store through the Redis
@@ -602,10 +686,21 @@ export class PipelineBuilder<
       })),
     };
 
+    const upcasts = this.upcastDeclaration && {
+      pipeline: this.name,
+      aggregateType: aggregate.type,
+      ...this.upcastDeclaration,
+    };
+    const upcaster = EventUpcaster.of(upcasts);
+    const parseEvent = this.events.parseEvent;
     return {
       aggregate,
       eventSchemas: this.events.eventSchemas,
-      parseEvent: this.events.parseEvent,
+      parseEvent: upcaster.active
+        ? (value: unknown) => parseEvent(upcaster.applyToPayload(value))
+        : parseEvent,
+      ...(upcasts === undefined ? {} : { upcasts }),
+      ...(this.laneAliases.length === 0 ? {} : { laneAliases: this.laneAliases }),
       metadata,
       prepareEventForProjection: this.prepareEventForProjection,
       ...(this.retentionPolicyResolver === undefined
@@ -653,7 +748,14 @@ export class PipelineDeclaration {
   > {
     const eventSchemas = indexEventSchemas<Schemas[number]>({ pipelineName: this.name, schemas });
     const parseEvent = (value: unknown): DeclaredEvents<Schemas> => {
-      const schema = eventSchemas.get(eventTypeOf(value));
+      const type = eventTypeOf(value);
+      const schema = eventSchemas.get(type);
+      if (!schema && type !== "") {
+        throw new UndeclaredQueuedEventTypeError({
+          eventType: type,
+          declaredBy: `pipeline "${this.name}"`,
+        });
+      }
       if (!schema) {
         throw new ValidationError({
           reason: `Pipeline "${this.name}" declares no schema for this queued event's type`,
@@ -664,6 +766,24 @@ export class PipelineDeclaration {
     };
     return new PipelineBuilder(this.name, this.aggregate, { eventSchemas, parseEvent });
   }
+}
+
+/** A peer subscriber's options on its lane, its data filter lifted to the staged event. */
+function peerSubscriberOptions<Data extends z.ZodType>(
+  subscriber: PeerSubscriberDefinition<Data>,
+): EventSubscriberOptions | undefined {
+  const { enqueue, ...options } = subscriber.options ?? {};
+  const filter = enqueue?.filter;
+  if (!filter) return subscriber.options && options;
+  return {
+    ...options,
+    enqueue: {
+      filter: (event) => {
+        const parsed = subscriber.data.safeParse(event.data);
+        return parsed.success ? filter(parsed.data) : true;
+      },
+    },
+  };
 }
 
 /** The `type` a queued event claims, read before the schema for that type parses it. */

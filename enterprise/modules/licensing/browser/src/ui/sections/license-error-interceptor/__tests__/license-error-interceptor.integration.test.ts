@@ -5,11 +5,11 @@
  */
 
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { installedModuleFailures } from "@langwatch/browser/application";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { licensingWeb } from "../../../../licensing.web.ts";
+import { useUpgradeModalStore } from "../../../../model/upgrade-modal-store.ts";
 import { reportLicenseFailure } from "../license-error-interceptor.ts";
 
 /** A failed call as the tRPC client hands it over: an Error carrying the serialised `data`. */

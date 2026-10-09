@@ -1,27 +1,28 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
 import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../../behavior/annotation-queue-session.store.ts";
+  openTraceEditorFromConversation,
+  tracePartitionHint,
+} from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useTraceAnnotations } from "../../../../../behavior/reads/use-annotation-reads.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
+import { useTraceHost } from "../../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
 import { PersonAvatar } from "../../../person-avatar.tsx";
-import {
-  openTraceEditorFromConversation,
-  tracePartitionHint,
-} from "../../utils/trace-edit-mode.ts";
 import { AnnotationPopover } from "./annotation-popover.tsx";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -38,10 +39,10 @@ export function TurnEditTraceAction({
   /** When the turn ran, which tells the drawer where to look for it. */
   occurredAtMs?: number | null;
 }) {
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const { openDrawer } = useDrawer();
 
-  if (!hasPermission("annotations:update")) return null;
+  if (!traceHost.hasPermission("annotations:update")) return null;
 
   return (
     <HoverActionCluster label="Turn actions">
@@ -102,7 +103,8 @@ export function TurnAnnotationBadges({
   output,
   prefetchedItems,
 }: TurnAnnotationBadgesProps) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const [listOpen, setListOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   // What the turn carries is what was said about the turn. A comment about one
@@ -112,13 +114,13 @@ export function TurnAnnotationBadges({
     projectId: project?.id,
     traceId,
     anchor: "trace",
-    enabled: hasPermission("annotations:view") && prefetchedItems === undefined,
+    enabled: traceHost.hasPermission("annotations:view") && prefetchedItems === undefined,
   });
 
   const items = prefetchedItems ?? annotations.data ?? [];
   const annotationCount = items.length;
   const hasCorrection = items.some((a) => a.expectedOutput);
-  const canEdit = hasPermission("annotations:manage");
+  const canEdit = traceHost.hasPermission("annotations:manage");
 
   if (annotationCount === 0) return null;
 

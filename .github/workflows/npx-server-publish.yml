@@ -238,9 +238,10 @@ jobs:
             # tarball has to carry is the entry point and the tree it imports.
             "package/app/apps/api/src/main.ts"
             "package/app/apps/worker/src/main.ts"
-            # The task launcher the first boot runs: prisma-migrate,
-            # clickhouse-migrate, then lwql-provision, in that order.
+            # The task launcher the first boot runs: `upgrade`, then the
+            # system-migrations pass; `upgrade` reads the release manifests.
             "package/app/apps/tasks/src/tasks.entrypoint.ts"
+            "package/app/packages/upgrade/releases"
             "package/app/apps/api/prisma.config.ts"
             "package/app/packages/prisma-client/prisma.config.ts"
             # goose reads the ClickHouse migrations from a directory beside the

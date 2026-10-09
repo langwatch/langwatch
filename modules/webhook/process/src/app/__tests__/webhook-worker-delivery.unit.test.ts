@@ -1,6 +1,7 @@
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -65,6 +66,7 @@ function worker() {
         getActivePlan: async () => entitledPlan,
         requestBound: async () => 10,
       }),
+      gateway: createApiFixture<GatewayApi>({}),
       project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
     });
 }
@@ -95,7 +97,7 @@ describe("given a memory-tier worker with one active HTTP endpoint", () => {
         await webhooks.requestGatewayEventDelivery(admitted);
         await webhooks.requestGatewayEventDelivery(confirmed);
 
-        // The egress fence refuses the private address: the attempt still reached the last hop.
+        // The URL policy refuses the private address before any channel; one attempt is logged.
         await vi.waitFor(
           async () => {
             const log = await webhooks.getDeliveries({

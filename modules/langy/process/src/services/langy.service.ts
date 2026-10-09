@@ -17,16 +17,16 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
-import type { LatestControlRequestReading } from "../rules/langy-local-control-request-state.rules.ts";
 import {
   type LangyConversationService,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
-} from "./langy-conversation.service.ts";
+} from "../features/conversation/services/langy-conversation.service.ts";
+import type { LangyTurnService } from "../features/turn/services/langy-turn.service.ts";
+import type { LatestControlRequestReading } from "../rules/langy-local-control-request-state.rules.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
 import type { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
 import type { LangyMessageService } from "./langy-message.service.ts";
-import type { LangyTurnService } from "./langy-turn.service.ts";
 
 /**
  * How this process opens a relay connection for a conversation runtime.

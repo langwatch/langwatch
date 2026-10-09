@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { formatLastUpdate } from "../last-update.ts";
+import { formatLastUpdate } from "../model/last-update.ts";
 
 const NOW = new Date("2026-08-07T12:00:00Z").getTime();
 const HOUR_MS = 60 * 60 * 1000;

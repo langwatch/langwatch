@@ -6,7 +6,10 @@ import { describe, expect, it } from "vitest";
 
 /** Pins the responsive prop contract to source; jsdom cannot see compiled Chakra props. */
 const here = dirname(fileURLToPath(import.meta.url));
-const brandedCard = readFileSync(join(here, "..", "src", "components", "branded-card.tsx"), "utf8");
+const brandedCard = readFileSync(
+  join(here, "..", "src", "components", "brand", "branded-card.tsx"),
+  "utf8",
+);
 
 describe("given a branded card on a small viewport", () => {
   describe("when the card is laid out", () => {

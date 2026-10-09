@@ -1,48 +1,50 @@
 /**
- * @vitest-environment jsdom
- * A variant registers posthog-js's property, no variant clears it.
+ * A variant registers the analytics super-property, no variant clears it.
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const { mockRegister, mockUnregister } = vi.hoisted(() => ({
-  mockRegister: vi.fn(),
-  mockUnregister: vi.fn(),
-}));
-
-vi.mock("posthog-js", () => ({
-  default: { register: mockRegister, unregister: mockUnregister },
-}));
+import { UiAnalytics } from "@langwatch/browser-host/analytics";
+import { describe, expect, it, vi } from "vitest";
 
 import { registerOnboardingExperiment } from "./onboarding-experiment-registration.ts";
 
-describe("registerOnboardingExperiment()", () => {
-  beforeEach(() => vi.clearAllMocks());
+class RecordingUiAnalytics extends UiAnalytics {
+  track(): void {}
+  identify(): void {}
+  group(): void {}
+  reset(): void {}
+  override register = vi.fn();
+  override unregister = vi.fn();
+}
 
+describe("registerOnboardingExperiment()", () => {
   describe("when the organization recorded a variant", () => {
     it("registers the property, control for the classic variant", () => {
-      registerOnboardingExperiment("guided");
-      registerOnboardingExperiment("classic");
+      const analytics = new RecordingUiAnalytics();
+      registerOnboardingExperiment({ analytics, variant: "guided" });
+      registerOnboardingExperiment({ analytics, variant: "classic" });
 
-      expect(mockRegister).toHaveBeenNthCalledWith(1, {
+      expect(analytics.register).toHaveBeenNthCalledWith(1, {
         "$feature/experiment_onboarding_langy_guided": "guided",
       });
-      expect(mockRegister).toHaveBeenNthCalledWith(2, {
+      expect(analytics.register).toHaveBeenNthCalledWith(2, {
         "$feature/experiment_onboarding_langy_guided": "control",
       });
-      expect(mockUnregister).not.toHaveBeenCalled();
+      expect(analytics.unregister).not.toHaveBeenCalled();
     });
   });
 
   describe("when the organization recorded no variant", () => {
     /** @scenario "the registration clears the property for an organization without a variant" */
     it("unregisters the property instead of leaving a previous value", () => {
-      registerOnboardingExperiment("guided");
-      registerOnboardingExperiment(null);
-      registerOnboardingExperiment(undefined);
+      const analytics = new RecordingUiAnalytics();
+      registerOnboardingExperiment({ analytics, variant: "guided" });
+      registerOnboardingExperiment({ analytics, variant: null });
+      registerOnboardingExperiment({ analytics, variant: undefined });
 
-      expect(mockUnregister).toHaveBeenCalledTimes(2);
-      expect(mockUnregister).toHaveBeenCalledWith("$feature/experiment_onboarding_langy_guided");
+      expect(analytics.unregister).toHaveBeenCalledTimes(2);
+      expect(analytics.unregister).toHaveBeenCalledWith(
+        "$feature/experiment_onboarding_langy_guided",
+      );
     });
   });
 });

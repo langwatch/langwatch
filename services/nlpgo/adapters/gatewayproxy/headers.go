@@ -16,7 +16,6 @@ package gatewayproxy
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -225,10 +224,4 @@ func BareModel(model string) string {
 		return model[i+1:]
 	}
 	return model
-}
-
-// LookErrorMessage formats a typed missing-provider error for HTTP
-// callers. Kept as a helper so the handler can wrap consistently.
-func LookErrorMessage(err error) string {
-	return fmt.Sprintf("playground proxy: %s", err.Error())
 }

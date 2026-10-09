@@ -1,6 +1,6 @@
 import type {
   InviteStatus,
-  JoinRequestJoining,
+  OrganizationJoinSetting,
   Organization,
   OrganizationJsonValue,
   OrganizationCurrency,
@@ -14,6 +14,17 @@ import type { Instant } from "@langwatch/time";
 
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
+  /** The email domain the organization claims for SSO auto-join (ADR-116). */
+  ssoDomain?: string | null;
+  ssoProvider?: string | null;
+  /** The licence a mint or an upload wrote; absent reads as unlicensed. */
+  license?: string | null;
+  /** Licensing's Connect facts, as organization keeps them (ORG-CONNECT-WRITES). */
+  connectServicesDisabled?: string[];
+  connectLastSyncAt?: Instant | null;
+  connectLastSyncError?: string | null;
+  licenseExpiresAt?: Instant | null;
+  licenseLastValidatedAt?: Instant | null;
   id: string;
   name: string;
   slug: string;
@@ -34,12 +45,17 @@ export interface MemoryOrganizationRow {
    *  them. Shapeless here for the reason it is shapeless in Postgres. */
   signupData?: Record<string, unknown> | null;
   /** How colleagues on a matching domain get in; absent reads as asking. */
-  domainJoin?: JoinRequestJoining["domainJoin"];
+  domainJoin?: OrganizationJoinSetting["domainJoin"];
   joinDomains?: string[];
   /** The seat a joiner without an invitation lands on (ADR-171); absent reads as MEMBER. */
   joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** The sign-in security columns (GAC-09, GAC-10); absent reads as no rule. */
+  lockoutAfterFailedAttempts?: number;
+  lockoutMinutes?: number;
+  sessionIdleTimeoutMinutes?: number;
+  sessionMaxLifetimeMinutes?: number;
   /** The per-file dataset limit an operator set, in mebibytes. */
   datasetAttachmentMaxMb?: number | null;
   /** The organization's own Instant Evals consent; absent reads as not given. */
@@ -160,6 +176,7 @@ interface MemoryProjectRow {
   organizationId: string | null;
   archivedAt: Instant | null;
   createdAt: Instant;
+  updatedAt: Instant;
   personalFeatures: PersonalFeatures | null;
 }
 
@@ -211,9 +228,9 @@ export function organizationOfRow(row: MemoryOrganizationRow): Organization {
     stripeCustomerId: row.stripeCustomerId,
     currency: "USD",
     pricingModel: "SEAT_EVENT",
-    license: null,
-    licenseExpiresAt: null,
-    licenseLastValidatedAt: null,
+    license: row.license ?? null,
+    licenseExpiresAt: row.licenseExpiresAt ?? null,
+    licenseLastValidatedAt: row.licenseLastValidatedAt ?? null,
   };
 }
 
@@ -226,6 +243,8 @@ export class MemoryOrganizationDatabase {
   readonly organizations = new Map<string, MemoryOrganizationRow>();
   /** Organizations marked as a self-hosted licence customer. */
   readonly selfHostedCustomers = new Set<string>();
+  /** Licensing's licence keys by organization, the twin of its share (C3-KEY-HASH). */
+  readonly licensingLicenseKeys = new Map<string, string>();
   readonly teams = new Map<string, MemoryTeamRow>();
   readonly organizationUsers: MemoryOrganizationUserRow[] = [];
   readonly projects = new Map<string, MemoryProjectRow>();

@@ -182,6 +182,35 @@ describe("OnboardingChecksService", () => {
     });
   });
 
+  describe("given one enabled model provider in a single scope", () => {
+    const scoped = async (scope: { scopeType: string; scopeId: string }) => {
+      const { service, countEnabledInScopes } = checklist({ modelProviders: 1 });
+      const status = await service.getCheckStatus({ projectId: PROJECT_ID });
+      expect(countEnabledInScopes).toHaveBeenCalledWith({
+        scopes: expect.arrayContaining([scope]),
+      });
+      return status;
+    };
+
+    /** @scenario "Step setupModelProviders is complete for a project-scoped provider" */
+    it("reads the step as done for a provider on the project", async () => {
+      const status = await scoped({ scopeType: "PROJECT", scopeId: PROJECT_ID });
+      expect(status.modelProviders).toBe(1);
+    });
+
+    /** @scenario "Step setupModelProviders is complete for an organization-scoped provider" */
+    it("reads the step as done for a provider on the project's organization", async () => {
+      const status = await scoped({ scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID });
+      expect(status.modelProviders).toBe(1);
+    });
+
+    /** @scenario "Step setupModelProviders is complete for a team-scoped provider" */
+    it("reads the step as done for a provider on the project's team", async () => {
+      const status = await scoped({ scopeType: "TEAM", scopeId: TEAM_ID });
+      expect(status.modelProviders).toBe(1);
+    });
+  });
+
   /** @scenario "The checklist carries the organization's guided onboarding" */
   /** @scenario "the onboarding checks expose the guided state of the organization" */
   it("carries the organization's guided onboarding", async () => {

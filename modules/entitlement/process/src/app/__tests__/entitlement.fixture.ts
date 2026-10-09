@@ -1,3 +1,4 @@
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type {
   EntitlementConfig,
   EntitlementSource,
@@ -6,9 +7,7 @@ import type {
   UsageLimitWarning,
   UsageUnit,
 } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
@@ -79,34 +78,26 @@ export class TestUsageWarnings implements UsageWarning {
   async sweep(): Promise<void> {}
 }
 
-export function createEntitlementTestUsers(): UserApi {
-  return createApiFixture<UserApi>({ findById: async () => null });
-}
-
 export function createEntitlementTestApp(
   input: Readonly<{
-    repositories?: EntitlementRepositories;
+    repositories?: Pick<EntitlementRepositories, "membership" | "spend" | "tenancy">;
     infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
-    dependencies?: Partial<{ users: UserApi; organizations: OrganizationApi }>;
+    dependencies?: Partial<{ billing: BillingApi }>;
     config?: Pick<EntitlementConfig, "requestBounds">;
   }>,
 ): EntitlementModule {
   return EntitlementModule.createForTesting({
-    repositories: input.repositories ?? MemoryEntitlementRepositories.create(),
+    repositories: { ...MemoryEntitlementRepositories.create(), ...input.repositories },
     infrastructure: {
       ...input.infrastructure,
       counter: input.infrastructure.counter ?? TestUsageCounter.create(),
       warnings: input.infrastructure.warnings ?? TestUsageWarnings.create(),
     },
     dependencies: {
-      users: input.dependencies?.users ?? createEntitlementTestUsers(),
-      organizations:
-        input.dependencies?.organizations ??
-        createApiFixture<OrganizationApi>({
-          countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
-          getDatasetLimits: async () => ({ attachmentMaxBytes: null }),
-        }),
+      billing:
+        input.dependencies?.billing ??
+        createApiFixture<BillingApi>({ getPricingModel: async () => ({ pricingModel: null }) }),
     },
     config: input.config,
   });

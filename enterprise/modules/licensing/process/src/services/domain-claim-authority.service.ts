@@ -1,12 +1,12 @@
 import type { DomainClaimLicenseAuthority } from "@langwatch/enterprise-licensing-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 
+import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
 import type { LicenseService } from "./license.service.ts";
 
 interface DomainClaimAuthorityDeps {
   isSaas: boolean;
   licenses: Pick<LicenseService, "isPlatformSsoLicensed" | "findPlatformLicenseDigests">;
-  organizations: Pick<OrganizationApi, "findAllIds">;
+  organizations: Pick<ConnectOrganizationRepository, "findAllOldestFirst">;
 }
 
 /**
@@ -26,16 +26,16 @@ export class DomainClaimAuthorityService {
     if (this.deps.isSaas) {
       return { authorizesDomainClaims: false, hostsSingleOrganization: false, licenseDigests: [] };
     }
-    const [authorizesDomainClaims, organizationIds, licenseDigests] = await Promise.all([
+    const [authorizesDomainClaims, organizations, licenseDigests] = await Promise.all([
       this.deps.licenses.isPlatformSsoLicensed({ isSaas: false }),
-      // ponytail: an id scan; a count read on OrganizationApi if installations grow large.
-      this.deps.organizations.findAllIds(),
+      // Read through organization's share (R40, Q9); a self-hosted install holds few.
+      this.deps.organizations.findAllOldestFirst(),
       this.deps.licenses.findPlatformLicenseDigests(),
     ]);
 
     return {
       authorizesDomainClaims,
-      hostsSingleOrganization: organizationIds.length <= 1,
+      hostsSingleOrganization: organizations.length <= 1,
       licenseDigests,
     };
   }

@@ -377,8 +377,10 @@ export function createApiMock() {
         },
         monitors: {
           getAllForProject: { invalidate: mockInvalidate },
-          getPerformanceForProject: { invalidate: mockInvalidate },
           getById: { invalidate: mockInvalidate },
+        },
+        evaluations: {
+          getMonitorPerformanceForProject: { invalidate: mockInvalidate },
         },
       })),
       modelProvider: {
@@ -407,17 +409,6 @@ export function createOrgMock() {
       organization: { id: "test-org-id" },
       team: { id: "test-team-id" },
     }),
-  };
-}
-
-export function createUpgradeModalMock() {
-  return {
-    useUpgradeModalStore: (selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown) => {
-      if (typeof selector === "function") {
-        return selector({ open: mockOpenUpgradeModal });
-      }
-      return { open: mockOpenUpgradeModal };
-    },
   };
 }
 

@@ -151,7 +151,10 @@ Rule: A pull request found for a project's own session records it on that projec
     When the organization's GitHub connection answers with no pull request
     Then the project records nothing about pull requests
 
-  @integration
+  # The chain crosses coding-agent, github and project. Its halves are bound by
+  # "Connecting GitHub backfills recent branches" and "A pull request found for
+  # a project's session records it on the project"; no test composes them yet.
+  @integration @unimplemented
   Scenario: Connecting GitHub records the backfilled pull requests on their projects
     Given a project whose recorded sessions name their branches
     When the organization connects GitHub and the backfill finds a pull request for one of those branches

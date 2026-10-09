@@ -12,6 +12,8 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
+import { useUiFlags, type UiFlags } from "@langwatch/browser-host/feature-flag";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -35,6 +37,7 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
       plan: { isEnterprise: boolean; isLoading: boolean };
       routeReading: GovernanceRouteReading;
       session: UiSession;
+      flags: UiFlags;
       routeCapability: UiRoute;
       navigation: UiNavigation;
       feedback: UiFeedback;
@@ -59,12 +62,12 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
     return this.inputs.session.hasPermission(permission);
   }
 
-  isFeatureEnabled(flag: string): boolean {
-    return this.inputs.session.isFeatureEnabled(flag);
+  isFeatureEnabled(flag: ReleaseFlagToken): boolean {
+    return this.inputs.flags.flag(flag) === true;
   }
 
-  featureFlag(flag: string): boolean | undefined {
-    return this.inputs.session.featureFlag(flag);
+  featureFlag(flag: ReleaseFlagToken): boolean | undefined {
+    return this.inputs.flags.flag(flag);
   }
 
   isSettled(): boolean {
@@ -106,6 +109,7 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
  */
 export default function GovernanceHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback, navigation, route } = useUiCapabilities();
+  const flags = useUiFlags();
   const { organizationId } = useUiScope().activeScope();
 
   const organizations = governanceApi.organization.getScopeGraph.useQuery(
@@ -141,11 +145,12 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
         plan,
         routeReading,
         session,
+        flags,
         routeCapability: route,
         navigation,
         feedback,
       }),
-    [orgs, org, plan, routeReading, session, route, navigation, feedback],
+    [orgs, org, plan, routeReading, session, flags, route, navigation, feedback],
   );
 
   return <GovernanceHostProvider value={host}>{children}</GovernanceHostProvider>;

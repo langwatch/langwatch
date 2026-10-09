@@ -251,3 +251,8 @@ Feature: Permission resolution
     When one permission is decided for them by a declared check and by an imperative check
     Then both are permitted by the one authorization service
     And the declared decision names the caller's organization role
+
+  Scenario: A team scope names whether it is a personal workspace
+    Given a personal team
+    When its scope is resolved
+    Then the scope carries that it is personal and the workspace name

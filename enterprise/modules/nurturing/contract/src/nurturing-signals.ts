@@ -183,6 +183,12 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     userId: id,
   }),
   z.object({
+    /** An account minted by any path, from user's created fact: identify only, never signed_up. */
+    kind: z.literal("user_created"),
+    ...signalSource,
+    userId: id,
+  }),
+  z.object({
     kind: z.literal("session_started"),
     ...signalSource,
     userId: id,

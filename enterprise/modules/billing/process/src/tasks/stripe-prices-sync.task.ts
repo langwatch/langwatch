@@ -17,7 +17,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 import { nowInstant, Temporal } from "@langwatch/time";
-import Stripe from "stripe";
+import type Stripe from "stripe";
+
+import type { StripeMeter, StripeMetersChannel } from "../channels/stripe-meters.channel.ts";
+import type { StripePricesChannel } from "../channels/stripe-prices.channel.ts";
 
 const logger = createLogger("langwatch:task:stripe-prices-sync");
 
@@ -142,69 +145,44 @@ const withRetry = async <T>(action: () => Promise<T>, description: string): Prom
   throw new Error(`Stripe request failed after ${RETRY_ATTEMPTS} attempts: ${description}`);
 };
 
-const fetchAllStripePrices = async (stripe: Stripe): Promise<Stripe.Price[]> => {
-  const allPrices: Stripe.Price[] = [];
+const fetchAllStripePrices = async (prices: StripePricesChannel): Promise<StripePriceDetail[]> => {
+  const allPrices: StripePriceDetail[] = [];
   let startingAfter: string | undefined;
 
   for (let page = 0; page < MAX_PAGE_COUNT; page += 1) {
     const response = await withRetry(
-      async () =>
-        stripe.prices.list({
-          limit: PAGE_LIMIT,
-          starting_after: startingAfter,
-          expand: ["data.product"],
-        }),
+      async () => prices.listPrices({ limit: PAGE_LIMIT, startingAfter }),
       "stripe.prices.list",
     );
-    allPrices.push(...response.data);
-    if (!response.has_more || response.data.length === 0) {
+    allPrices.push(...response.prices);
+    if (!response.hasMore || response.prices.length === 0) {
       return allPrices;
     }
-    startingAfter = response.data[response.data.length - 1]?.id;
+    startingAfter = response.prices[response.prices.length - 1]?.id;
     await sleep(PAGE_DELAY_MS);
   }
 
   throw new Error(`Stripe prices pagination exceeded ${MAX_PAGE_COUNT} pages`);
 };
 
-const fetchAllStripeMeters = async (stripe: Stripe): Promise<Stripe.Billing.Meter[]> => {
-  const allMeters: Stripe.Billing.Meter[] = [];
+const fetchAllStripeMeters = async (meters: StripeMetersChannel): Promise<StripeMeter[]> => {
+  const allMeters: StripeMeter[] = [];
   let startingAfter: string | undefined;
 
   for (let page = 0; page < MAX_PAGE_COUNT; page += 1) {
     const response = await withRetry(
-      async () => stripe.billing.meters.list({ limit: PAGE_LIMIT, starting_after: startingAfter }),
+      async () => meters.listMeters({ limit: PAGE_LIMIT, startingAfter }),
       "stripe.billing.meters.list",
     );
-    allMeters.push(...response.data);
-    if (!response.has_more || response.data.length === 0) {
+    allMeters.push(...response.meters);
+    if (!response.hasMore || response.meters.length === 0) {
       return allMeters;
     }
-    startingAfter = response.data[response.data.length - 1]?.id;
+    startingAfter = response.meters[response.meters.length - 1]?.id;
     await sleep(PAGE_DELAY_MS);
   }
 
   throw new Error(`Stripe meters pagination exceeded ${MAX_PAGE_COUNT} pages`);
-};
-
-export const transformPrice = (price: Stripe.Price): StripePriceDetail => {
-  const productId = typeof price.product === "string" ? price.product : (price.product?.id ?? null);
-
-  return {
-    id: price.id,
-    active: price.active,
-    livemode: price.livemode,
-    product: productId,
-    unitAmount: price.unit_amount,
-    currency: price.currency,
-    type: price.type,
-    recurring: price.recurring
-      ? { interval: price.recurring.interval, intervalCount: price.recurring.interval_count }
-      : null,
-    nickname: price.nickname,
-    lookupKey: price.lookup_key,
-    metadata: price.metadata,
-  };
 };
 
 const pickLookupMappedPriceId = (
@@ -268,7 +246,7 @@ export const normalizeMeterEventName = (eventName: string): string => {
 
 export const resolveRequiredMeterMappings = (params: {
   environment: StripeEnvironment;
-  fetchedMeters: Stripe.Billing.Meter[];
+  fetchedMeters: StripeMeter[];
 }): { mapping: StripeMeterMap; errors: string[]; warnings: string[] } => {
   const { environment, fetchedMeters } = params;
   const resolved = {} as StripeMeterMap;
@@ -277,7 +255,7 @@ export const resolveRequiredMeterMappings = (params: {
 
   for (const key of STRIPE_METER_NAMES) {
     const matches = fetchedMeters.filter(
-      (meter) => normalizeMeterEventName(meter.event_name) === key,
+      (meter) => normalizeMeterEventName(meter.eventName) === key,
     );
     if (matches.length === 0) {
       // An optional meter is provisioned per mode by hand, so an unmapped one
@@ -382,6 +360,13 @@ export const mergeWithExisting = (params: {
   };
 };
 
+/** The account a sync reads: its mode, told by its key, and the two subjects it lists. */
+type StripeCatalogueSource = Readonly<{
+  environment: StripeEnvironment;
+  prices: StripePricesChannel;
+  meters: StripeMetersChannel;
+}>;
+
 export type SyncStripePricesResult = {
   environment: StripeEnvironment;
   priceCount: number;
@@ -395,18 +380,18 @@ export type SyncStripePricesResult = {
  * `STRIPE_METER_NAMES` keys and merges into the on-disk catalog — the
  * opposite environment's rows stay untouched, so test-mode and live never erase each other.
  */
-export const syncStripePrices = async (params: {
-  secretKey: string;
-  outputPath?: string;
-}): Promise<SyncStripePricesResult> => {
+export const syncStripePrices = async (
+  params: StripeCatalogueSource & {
+    outputPath?: string;
+  },
+): Promise<SyncStripePricesResult> => {
   const outputPath = params.outputPath ?? DEFAULT_OUTPUT_PATH;
-  const environment = detectEnvironment(params.secretKey);
-  const stripe = new Stripe(params.secretKey, { apiVersion: "2024-04-10" });
+  const { environment } = params;
 
   logger.info({ environment }, "Fetching Stripe prices and meters");
   const [fetchedPrices, fetchedMeters] = await Promise.all([
-    fetchAllStripePrices(stripe),
-    fetchAllStripeMeters(stripe),
+    fetchAllStripePrices(params.prices),
+    fetchAllStripeMeters(params.meters),
   ]);
   logger.info(
     { environment, priceCount: fetchedPrices.length, meterCount: fetchedMeters.length },
@@ -418,7 +403,7 @@ export const syncStripePrices = async (params: {
   }
 
   const fetchedPricesById = sortRecordByKey(
-    Object.fromEntries(fetchedPrices.map((price) => [price.id, transformPrice(price)])),
+    Object.fromEntries(fetchedPrices.map((price) => [price.id, price])),
   );
 
   const existingCatalog = readCatalog(outputPath);
@@ -484,19 +469,24 @@ export class StripePricesSyncTask extends Task {
   readonly description =
     "Regenerates stripe-catalog.json from this Stripe account's prices and meters.";
 
-  private constructor(private readonly secretKey: () => string | undefined) {
+  private constructor(private readonly source: () => StripeCatalogueSource | undefined) {
     super();
   }
 
-  static create({ secretKey }: { secretKey: () => string | undefined }): StripePricesSyncTask {
-    return new StripePricesSyncTask(secretKey);
+  /** `source` answers nothing without a key; it is asked only when the task runs. */
+  static create({
+    source,
+  }: {
+    source: () => StripeCatalogueSource | undefined;
+  }): StripePricesSyncTask {
+    return new StripePricesSyncTask(source);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    const secretKey = this.secretKey();
-    if (!secretKey) {
+    const source = this.source();
+    if (!source) {
       throw new Error("STRIPE_SECRET_KEY is required to sync Stripe prices");
     }
-    await syncStripePrices({ secretKey });
+    await syncStripePrices(source);
   }
 }

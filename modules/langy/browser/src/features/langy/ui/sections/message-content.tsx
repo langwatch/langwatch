@@ -19,16 +19,6 @@ import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { LentAnswerActions } from "../../../../behavior/lent-answer-actions.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
-  hasLangyBlockParts,
-  type LangyAnswerSegment,
-  langyAnswerSegments,
-  langyAnswerSegmentsFromText,
-} from "../../../../model/langy-answer-segments.ts";
-import {
-  codeAccessCallId,
-  codeAccessOffersDescribe,
-} from "../../../../model/langy-code-access-tool.ts";
-import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
 } from "../../../../model/langy-feedback-directive.ts";
@@ -39,34 +29,44 @@ import {
 } from "../../../../model/langy-local-waits.ts";
 import { offerNotificationsCallId } from "../../../../model/langy-notifications.ts";
 import { langyPlan } from "../../../../model/langy-plan.ts";
-import {
-  linkPullRequestReferences,
-  pullRequestLinksFromToolParts,
-} from "../../../../model/langy-pull-request-links.ts";
-import { questionToolCardParts } from "../../../../model/langy-question-tool.ts";
-import {
-  foldReasoningTitles,
-  stripReasoningTitles,
-} from "../../../../model/langy-reasoning-titles.ts";
-import { sayToolText } from "../../../../model/langy-say-tool.ts";
-import { secretSnippetCalls } from "../../../../model/langy-secret-snippet-tool.ts";
-import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
-import {
-  langyRunText,
-  type LangyTranscriptRun,
-  langyTranscriptRuns,
-} from "../../../../model/langy-transcript.ts";
 import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card.ts";
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
-import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
-import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
-import { LangySecretSnippetCard } from "../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
 import {
   type GuidedPullRequest,
   guidedPathCompletedIn,
 } from "../../../guided-onboarding/model/guided-conversation.ts";
+import {
+  codeAccessCallId,
+  codeAccessOffersDescribe,
+} from "../../../tools/model/langy-code-access-tool.ts";
+import { questionToolCardParts } from "../../../tools/model/langy-question-tool.ts";
+import { sayToolText } from "../../../tools/model/langy-say-tool.ts";
+import { secretSnippetCalls } from "../../../tools/model/langy-secret-snippet-tool.ts";
+import { LangyCodeAccessCard } from "../../../tools/ui/sections/langy-code-access-card.tsx";
+import { LangySecretSnippetCard } from "../../../tools/ui/sections/langy-secret-snippet-card.tsx";
+import {
+  hasLangyBlockParts,
+  type LangyAnswerSegment,
+  langyAnswerSegments,
+  langyAnswerSegmentsFromText,
+} from "../../../transcript/model/langy-answer-segments.ts";
+import {
+  linkPullRequestReferences,
+  pullRequestLinksFromToolParts,
+} from "../../../transcript/model/langy-pull-request-links.ts";
+import {
+  foldReasoningTitles,
+  stripReasoningTitles,
+} from "../../../transcript/model/langy-reasoning-titles.ts";
+import { stripToolNarration } from "../../../transcript/model/langy-tool-narration.ts";
+import {
+  langyRunText,
+  type LangyTranscriptRun,
+  langyTranscriptRuns,
+} from "../../../transcript/model/langy-transcript.ts";
+import { LangyDerivedCardView } from "../../../transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
@@ -106,6 +106,8 @@ type MessageContentProps = {
    * emptiness was the user's own doing, and the copy should say so.
    */
   interrupted?: boolean;
+  /** The last message of the conversation: the empty reply row speaks only there. */
+  isLatest?: boolean;
   /** Active conversation id, so feedback can attach to it. */
   conversationId?: string | null;
   /**
@@ -336,8 +338,16 @@ function showsFeedbackPrompt({
  * A settled reply with nothing visible to say — the model spent the turn reasoning, or the user
  * stopped it first. While streaming there is no box at all: the working lines own the live edge.
  */
-function EmptyAnswer({ isStreaming, interrupted }: { isStreaming: boolean; interrupted: boolean }) {
-  if (isStreaming) return null;
+function EmptyAnswer({
+  isStreaming,
+  interrupted,
+  isLatest,
+}: {
+  isStreaming: boolean;
+  interrupted: boolean;
+  isLatest: boolean;
+}) {
+  if (isStreaming || !isLatest) return null;
   return <MutedAnswerLine>{interrupted ? "Interrupted" : "No content"}</MutedAnswerLine>;
 }
 
@@ -361,11 +371,17 @@ function MutedAnswerLine({ children }: { children: string }) {
  * No avatar: Langy's mark lives on the launcher and the empty state, nowhere else.
  */
 function AssistantMessage(props: MessageContentProps) {
-  const { message, isStreaming = false, interrupted = false, conversationId } = props;
+  const {
+    message,
+    isStreaming = false,
+    interrupted = false,
+    isLatest = true,
+    conversationId,
+  } = props;
   const { project } = useOrganizationTeamProject();
   const reading = useAnswerReading({ message, isStreaming });
   if (!answerHasContent(reading)) {
-    return <EmptyAnswer isStreaming={isStreaming} interrupted={interrupted} />;
+    return <EmptyAnswer isStreaming={isStreaming} interrupted={interrupted} isLatest={isLatest} />;
   }
   const view: RunView = {
     isStreaming,

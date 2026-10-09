@@ -259,3 +259,98 @@ Feature: Automation ownership
     Given a project with an active trace automation
     When trace hands the automation API an event that names no trace
     Then no automation is read and no match is recorded
+
+  # Upgrade steps (migration plan D.1, DATA-AUTOMATION): each repair runs once early and once
+  # more after every older image stops serving; Ops > Upgrades, Retry step, re-runs a failed one.
+  @unit
+  Scenario: The first report-schedule step configures every active report that has no schedule
+    Given an active report trigger without a schedule process
+    And another report trigger whose schedule process is paused
+    When the background step "automation:reconcile-report-schedules" runs
+    Then the report without a schedule process is configured once
+    And the paused schedule stays paused
+    And the step reports how many reports it repaired
+
+  @unit
+  Scenario: The report-schedule twin runs after older images stop serving
+    Given an older image created a report trigger without a schedule process during the rollout
+    When the background step "automation:reconcile-report-schedules-after-rollout" runs
+    Then the step waited until no older image that creates reports still serves
+    And the report the older image created is configured once
+
+  @unit
+  Scenario: Running a report-schedule step twice repairs nothing the second time
+    Given the step "automation:reconcile-report-schedules" has run
+    When it runs again
+    Then it reports no report repaired and sends no schedule command
+
+  @unit
+  Scenario: A report-schedule step's dry run sends no command
+    Given an active report trigger without a schedule process
+    When the step runs as a dry run
+    Then it sends no schedule command and saves no checkpoint
+
+  @unit
+  Scenario: A report trigger whose parameters are not a report is skipped
+    Given an active report trigger whose stored parameters carry no schedule
+    When a report-schedule step runs
+    Then no schedule command is sent for it and the step does not fail
+
+  @unit
+  Scenario: A report-schedule step that fails to configure a report fails by name
+    Given configuring one report's schedule process is refused
+    When a report-schedule step runs
+    Then the step fails with the refusal, and the next run configures the reports still missing
+
+  @unit
+  Scenario: The Slack claim step claims every active Slack automation's connection
+    Given an active Slack automation on a connection it does not claim
+    When the background step "automation:reconcile-slack-claims" runs
+    Then the automation claims its connection, labelled with the automation's name
+    And a second run claims nothing new
+
+  @unit
+  Scenario: The Slack claim step releases what no active automation holds
+    Given a claim held by a Slack automation that is now paused or deleted
+    When the Slack claim step runs
+    Then the claim is released
+    And a claim held by an active automation on that connection stays
+
+  @unit
+  Scenario: The Slack claim step skips an automation whose connection it can no longer use
+    Given an active Slack automation whose connection its project can no longer use
+    When the Slack claim step runs
+    Then that automation is skipped and counted as skipped in the step's report
+    And the step goes on to claim the other automations' connections
+
+  @integration @unimplemented
+  Scenario: A connection an existing automation uses refuses deletion after the claim step
+    Given a Slack automation created by an older image, which recorded no claim
+    When the Slack claim step has run after older images stopped serving
+    And a member deletes the automation's connection
+    Then the deletion is refused as a connection in use, naming the automation
+
+  @unit
+  Scenario: The Slack claim step resumes after the last page it finished
+    Given the step stopped after finishing some pages of claims
+    When it runs again from its checkpoint
+    Then it starts after the last claim it finished and pages the rest by cursor
+
+  @unit
+  Scenario: The Slack channel picker lists a bot connection's channels
+    Given a process composed with a Slack transport
+    And a Slack automation form on a bot connection
+    When the form asks for the connection's channels
+    Then the channels Slack's conversations.list returns are offered, sorted by name
+
+  @unit
+  Scenario: The Slack channel picker names the error when Slack refuses the token
+    Given a Slack automation form on a bot connection whose token Slack refuses
+    When the form asks for the connection's channels
+    Then no channels are offered and the listing carries Slack's error code
+
+  @unit
+  Scenario: Only a caller who may change automations lists Slack channels or test-fires
+    Given a caller who may view automations but not change them
+    When they list a Slack connection's channels or test-fire a template
+    Then both are refused before the service runs, the door asking triggers:update as main's did

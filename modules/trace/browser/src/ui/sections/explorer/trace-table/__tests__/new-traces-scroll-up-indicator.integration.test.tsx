@@ -10,12 +10,12 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useSseStatusStore } from "../../../../../behavior/sse-status.store.ts";
+import { useSseStatusStore } from "../../../../../features/explorer/behavior/sse-status.store.ts";
 import { NewTracesScrollUpIndicator } from "../new-traces-scroll-up-indicator.tsx";
 
 const arrivals = vi.hoisted(() => ({ count: 0, acknowledge: vi.fn() }));
 
-vi.mock("../../hooks/use-trace-new-count.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-new-count.ts", () => ({
   useTraceNewCount: () => ({ count: arrivals.count, acknowledge: arrivals.acknowledge }),
 }));
 

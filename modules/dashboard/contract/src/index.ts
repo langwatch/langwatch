@@ -14,3 +14,4 @@ export * from "./saved-workbench-chart.ts";
 export * from "./saved-workbench-chart.trpc.ts";
 export * from "./saved-workbench-chart-rest.schemas.ts";
 export * from "./dashboard.api.ts";
+export * from "./dashboard.config.ts";

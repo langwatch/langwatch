@@ -8,10 +8,11 @@ import { randomUUID } from "node:crypto";
 import type {
   AuditLogApi,
   AuditLogHistoryEntry,
+  AuditLogTargetEntry,
   RecordAuditLogCommand,
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
-import { PrismaProcessStore } from "@langwatch/eventing/server";
+import { PrismaProcessAdmin, PrismaProcessStore } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -24,13 +25,12 @@ import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
-import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
-import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import type {
   DeadMessageDiscard,
   DeadMessageRedrive,
 } from "../repositories/process-ops.repository.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
+import { ProcessAuditService } from "../services/process-audit.service.ts";
 
 /** The audit log this suite records on: the same rows, written straight to Postgres. */
 class PrismaAuditLogTestSink implements AuditLogApi {
@@ -55,11 +55,17 @@ class PrismaAuditLogTestSink implements AuditLogApi {
         ...command,
         args: command.args ?? undefined,
         metadata: command.metadata ?? undefined,
+        before: command.before ?? undefined,
+        after: command.after ?? undefined,
       },
     });
   }
 
   async listEntityHistory(): Promise<AuditLogHistoryEntry[]> {
+    return [];
+  }
+
+  async findByTargetKind(): Promise<AuditLogTargetEntry[]> {
     return [];
   }
 }
@@ -86,7 +92,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
   const PROJECT = "project_opstest";
   const NOW = Date.now();
 
-  let fleet: ProcessOpsPrismaRepository;
+  let fleet: PrismaProcessAdmin;
   let service: ManagerExplorerService;
   let store: PrismaProcessStore;
 
@@ -99,13 +105,12 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
 
-    fleet = ProcessOpsPrismaRepository.create({ prisma });
+    fleet = PrismaProcessAdmin.create({ database: prisma });
     store = PrismaProcessStore.create({ database: prisma });
     service = ManagerExplorerService.create({
       store,
       fleet,
-      audit: PrismaProcessAuditRepository.create({
-        prisma,
+      audit: ProcessAuditService.create({
         auditLog: PrismaAuditLogTestSink.create(prisma),
       }),
       introspection: new NoopIntrospection(),
@@ -401,13 +406,13 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
         prisma,
         table: "ProcessManagerOutbox",
         first: (tx) =>
-          ProcessOpsPrismaRepository.create({ prisma: tx }).redriveDeadMessage({
+          PrismaProcessAdmin.create({ database: tx }).redriveDeadMessage({
             ref,
             messageId: id,
             now: NOW,
           }),
         second: (tx) =>
-          ProcessOpsPrismaRepository.create({ prisma: tx }).discardDeadMessage({
+          PrismaProcessAdmin.create({ database: tx }).discardDeadMessage({
             ref,
             messageId: id,
             now: NOW,

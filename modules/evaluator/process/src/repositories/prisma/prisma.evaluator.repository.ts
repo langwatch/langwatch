@@ -126,6 +126,13 @@ export class PrismaEvaluatorRepository
     return row ? mapRow(row) : void 0;
   }
 
+  async countActiveByProjects(input: { projectIds: string[] }): Promise<number> {
+    if (input.projectIds.length === 0) return 0;
+    return this.prisma.evaluator.count({
+      where: { projectId: { in: input.projectIds }, archivedAt: null },
+    });
+  }
+
   async findAll(input: { projectId: string }): Promise<Evaluator[]> {
     const rows = await this.prisma.evaluator.findMany({
       where: { projectId: input.projectId, archivedAt: null },

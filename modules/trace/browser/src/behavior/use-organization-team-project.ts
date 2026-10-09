@@ -16,7 +16,6 @@ export function useOrganizationTeamProject(_options?: {
     organization: host.organization(),
     team: host.team(),
     organizationRole: host.organizationRole(),
-    hasPermission: (permission: string) => host.hasPermission(permission),
     isLoading: host.isLoading(),
     isRefetching: false,
   };

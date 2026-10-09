@@ -1,5 +1,7 @@
+import { readdirSync } from "node:fs";
+
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventSourcing, laneAliasesPastWindow } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
@@ -60,10 +62,14 @@ interface WholeListSupply {
   boot(): Promise<BootedRuntime<Record<string, unknown>, unknown, unknown>>;
 }
 
-/** A SaaS deployment: the flag and a synthetic, never-called Stripe key its reports need. */
+/**
+ * A SaaS deployment: the flag and a synthetic, never-called Stripe key its reports need.
+ * Memory stores have no Redis for the Instant Evals budget holds, so the bound is off.
+ */
 const SAAS_ENVIRONMENT: Readonly<Record<string, string>> = {
   ...SYNTHETIC_ENVIRONMENT,
   IS_SAAS: "true",
+  INSTANT_EVAL_BOUNDED: "false",
   STRIPE_SECRET_KEY: "sk_test_synthetic",
 };
 
@@ -78,10 +84,11 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   );
   await resolver.preflight(declared);
 
+  const stores = memoryStores();
   const eventing = new EventSourcing({
     ...(live ? { eventStore: EventStoreMemory.createForTesting() } : { enabled: false }),
     participation: "consume",
-    processStore: InMemoryProcessStore.createForTesting(),
+    processStore: stores.processStore,
     maintenance: () => [
       createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
       createProcessManagerMaintenancePipeline({
@@ -96,7 +103,7 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   const runtime = await supply
     .withModules(processModules)
     .withConfig(config)
-    .withStores(memoryStores())
+    .withStores(stores)
     .withMembers({
       logger: createTestLogger().logger,
       clock: systemClock(),
@@ -172,6 +179,21 @@ describe("the worker process installation", () => {
       const pipelines = eventing.definitions.map((definition) => definition.metadata.name);
       expect(pipelines).toContain("experiment_run_processing");
       expect(pipelines).toContain("coding_agent_processing");
+      expect(pipelines).toContain("github_lifecycle");
+      expect(pipelines).toContain("evaluator_lifecycle");
+      expect(pipelines).toContain("monitor_evaluator_cleanup");
+      expect(pipelines).toContain("scim_sso_connections");
+      expect(pipelines).not.toContain("data_retention_project_scope");
+      expect(pipelines).not.toContain("data_privacy_project_scope");
+      expect(pipelines).toContain("data_retention_seat_policy");
+      expect(pipelines).toContain("audit_log");
+      expect(pipelines).toContain("agent_lifecycle");
+      expect(pipelines).toContain("annotation_lifecycle");
+      expect(pipelines).toContain("agent_workflow_fields");
+      expect(pipelines).toContain("user_lifecycle");
+      expect(pipelines).toContain("workflow_agent_archive_cascade");
+      expect(pipelines).toContain("evaluator_workflow_archive_cascade");
+      expect(pipelines).toContain("share_trace_sharing_revocation");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
       expect(pipelines).toContain("evaluation_processing");
@@ -201,6 +223,8 @@ describe("the worker process installation", () => {
       expect(schedules).not.toEqual([]);
       expect(schedules).toContain("spendSpikeEvaluation");
       expect(schedules).toContain("governanceTraceFacts");
+      // user's fact outbox: its delivered intents are pruned on the worker's daily wake.
+      expect(schedules).toContain("userLifecycleFacts");
     } finally {
       await runtime.stop();
     }
@@ -244,7 +268,7 @@ describe("the worker process installation", () => {
   });
 
   /** @scenario "The worker forwards coding-agent spans, logs and metric points to coding-agent" */
-  it("hosts the span dispatch on trace and coding-agent's log and metric peer lanes", async () => {
+  it("hosts coding-agent's span, log and metric peer lanes on coding-agent, none on trace", async () => {
     const { runtime, eventing } = await bootWorker();
 
     try {
@@ -255,17 +279,118 @@ describe("the worker process installation", () => {
         ...(byName
           .get("trace_processing")
           ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
-      ]).toContain("codingAgentSpanFactsDispatch");
+      ]).not.toContain("codingAgentSpanFactsDispatch");
       expect(
         byName
           .get("coding_agent_processing")
           ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
       ).toEqual(
         expect.arrayContaining([
+          "coding_agent_processing.codingAgentSpanFactsDispatch",
           "coding_agent_processing.codingAgentLogFactsDispatch",
           "coding_agent_processing.codingAgentMetricFactsDispatch",
+          "coding_agent_processing.codingAgentInstallationBackfill",
         ]),
       );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The trigger's lanes are evaluation's own" */
+  it("hosts evaluation's trigger and SDK-evaluation lanes on trace's span facts, none on trace", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      const traceSubscribers = [
+        ...(byName
+          .get("trace_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ];
+      expect(traceSubscribers).not.toContain("evaluationTrigger");
+      expect(traceSubscribers).not.toContain("customEvaluationSync");
+      expect(
+        byName
+          .get("evaluation_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "evaluation_processing.traceEvaluationTrigger",
+          "evaluation_processing.traceOriginEvaluationTrigger",
+          "evaluation_processing.traceCustomEvaluationSync",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker hosts trace's collector evaluation pipeline and evaluation's lane on it" */
+  it("hosts trace's collector evaluation pipeline and evaluation's report lane on it", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      expect(byName.has("trace_collector_evaluations")).toBe(true);
+      expect(
+        byName
+          .get("evaluation_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(expect.arrayContaining(["evaluation_processing.traceCollectorEvaluation"]));
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("hosts suite's peer lanes on scenario's run facts, and no suite sync on scenario", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      expect([
+        ...(byName
+          .get("simulation_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ]).not.toContain("suiteRunSync");
+      expect(
+        byName
+          .get("suite_run_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "suite_run_processing.scenarioRunStarted",
+          "suite_run_processing.scenarioRunFinished",
+          "suite_run_processing.scenarioRunEvaluated",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "An alias past its release is refused so it gets removed" */
+  it("carries no lane alias past the release that shipped it", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const newestRelease = readdirSync(
+        new URL("../../../../packages/upgrade/releases/", import.meta.url),
+      )
+        .flatMap((file) => /^(\d+\.\d+\.\d+)\.json$/.exec(file)?.[1] ?? [])
+        .toSorted((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+        .at(-1)!;
+      const declared = eventing.definitions.map((definition) => ({
+        pipeline: definition.metadata.name,
+        aliases: definition.open((opened) => opened.laneAliases ?? []),
+      }));
+      expect(laneAliasesPastWindow({ declared, newestRelease })).toEqual([]);
     } finally {
       await runtime.stop();
     }
@@ -328,10 +453,12 @@ describe("the worker process installation", () => {
     const { runtime, eventing } = await bootWorker({ saas: true });
 
     try {
-      const usage = eventing.definitions.find((definition) => definition.metadata.name === "usage");
+      const usage = eventing.definitions.find(
+        (definition) => definition.metadata.name === "entitlement",
+      );
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
-      ).toEqual(["orgBillableEventsMeter", "usageTraceMeter"]);
+      ).toEqual(["entitlement.usageTraceMeter", "orgBillableEventsMeter"]);
     } finally {
       await runtime.stop();
     }

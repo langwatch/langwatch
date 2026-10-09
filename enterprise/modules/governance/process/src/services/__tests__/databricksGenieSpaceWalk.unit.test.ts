@@ -17,7 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../channels/governance-http.channel.ts";
 import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.channel.ts";
-import { DatabricksGeniePullerService } from "../databricks-genie-puller.service.ts";
+import { DatabricksGeniePullerService } from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
 
 vi.mock("../../channels/http/http.governance-http.channel.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../../channels/http/http.governance-http.channel.ts");

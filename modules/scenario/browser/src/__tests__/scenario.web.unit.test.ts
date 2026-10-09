@@ -3,12 +3,12 @@
  * Scenario lends its wired Talk to it panel and parameter line by token, so agent's
  * voice editor renders them without importing scenario's browser package.
  */
-import { ParameterLineFieldToken, TalkToItPanelToken } from "@langwatch/scenario-contract";
+import { ParameterLineFieldToken, TalkToItPanelToken } from "@langwatch/scenario-client";
 import { describe, expect, it } from "vitest";
 
 import { LentTalkToItPanel } from "../features/talk-to-it/ui/sections/wired-talk-to-it-panel.tsx";
 import { scenarioWeb } from "../scenario.web.ts";
-import { LentParameterLineField } from "../ui/sections/agent-testing/run/lent-parameter-line-field.tsx";
+import { LentParameterLineField } from "../ui/sections/agent-testing/run-parameters/lent-parameter-line-field.tsx";
 
 async function loadLent({ key }: { key: string }) {
   const lend = scenarioWeb.installation.lends.find(({ token }) => token.key === key);
@@ -17,6 +17,7 @@ async function loadLent({ key }: { key: string }) {
 
 describe("the scenario browser declaration", () => {
   describe("when agent's voice editor reads the Talk to it panel token", () => {
+    /** @scenario Scenario lends its Talk to it panel by its client token */
     it("loads the wired call panel", async () => {
       const loaded = await loadLent(TalkToItPanelToken);
 
@@ -25,6 +26,7 @@ describe("the scenario browser declaration", () => {
   });
 
   describe("when agent's test panel reads the parameter line token", () => {
+    /** @scenario Scenario lends its parameter line by its client token */
     it("loads the lent parameter line", async () => {
       const loaded = await loadLent(ParameterLineFieldToken);
 

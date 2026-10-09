@@ -5,15 +5,15 @@
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import {
   SeatProrationPreviewToken,
   type SeatProrationPreviewProps,
-} from "@langwatch/enterprise-billing-contract";
+} from "@langwatch/enterprise-billing-client";
 import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { useUpgradeModalStore } from "../../../../model/upgrade-modal-store.ts";
 import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
 
 const renderGate = (isSaaS: boolean) =>
@@ -76,6 +76,22 @@ describe("<GlobalUpgradeModal/>", () => {
       expect(screen.getByText("Current usage: 5 / 5")).toBeInTheDocument();
       const link = screen.getByRole("link", { name: "Upgrade Plan" });
       expect(link).toHaveAttribute("href", "/settings/subscription");
+    });
+
+    /** @scenario The upgrade modal names the cap that was reached */
+    it("names the cloud Free scenario cap with the real counts", async () => {
+      renderGate(true);
+
+      act(() => {
+        useUpgradeModalStore.getState().open("scenarios", 3, 3);
+      });
+
+      expect(
+        await screen.findByText("You've reached the limit of 3 scenarios on your current plan."),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Current usage: 3 / 3")).toBeInTheDocument();
+      expect(screen.getByText(/everything you already have keeps working/i)).toBeInTheDocument();
+      expect(screen.queryByText(/disable a membership/i)).toBeNull();
     });
 
     it("links to the license page on a self-hosted deployment", async () => {

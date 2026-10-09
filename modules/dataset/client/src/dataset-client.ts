@@ -6,11 +6,9 @@ import {
   type ModuleApi,
   type OutputsFromMap,
 } from "@langwatch/api/web";
-import type { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
+import type { datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 
-type DatasetApiMap = ContractApiMap<typeof batchRecordTrpc> &
-  ContractApiMap<typeof datasetRecordTrpc> &
-  ContractApiMap<typeof datasetTrpc>;
+type DatasetApiMap = ContractApiMap<typeof datasetRecordTrpc> & ContractApiMap<typeof datasetTrpc>;
 
 export const datasetClient: ModuleApi<DatasetApiMap> = createModuleApi<DatasetApiMap>();
 

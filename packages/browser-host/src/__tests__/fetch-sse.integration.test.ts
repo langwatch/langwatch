@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchSSE } from "../fetch-sse.ts";
+import { fetchSSE } from "../query/fetch-sse.ts";
 
 type Event = { type: string };
 

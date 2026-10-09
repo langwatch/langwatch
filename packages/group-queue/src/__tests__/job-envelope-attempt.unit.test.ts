@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   decodeJobEnvelope,
@@ -9,7 +9,7 @@ import {
 } from "../jobEnvelope.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 const PROJECT = createTenantId("project-1");
 
@@ -26,6 +26,7 @@ function blobStore(): TieredBlobStore {
   return new TieredBlobStore({
     redisBlobs: new InMemoryJobBlobStore(),
     objectStoreFor: () => new InMemoryObjectStore(),
+    mintUri: mintTestUri,
     resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
   });
 }
@@ -49,9 +50,6 @@ async function encodeGq2(
 }
 
 describe("job envelope retry attempt", () => {
-  beforeEach(() => {
-    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
-  });
 
   afterEach(() => {
     vi.unstubAllEnvs();

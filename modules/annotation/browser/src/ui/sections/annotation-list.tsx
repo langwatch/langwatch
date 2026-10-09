@@ -241,6 +241,8 @@ export function AnnotationList({
   /** Replaces "export what is on screen" with the screen's own export. */
   exportLabel,
   onExport,
+  /** Replaces the view's empty-state words, for a screen whose read failed. */
+  emptyNotice,
 }: {
   view: AnnotationView;
   host: AnnotationHostApi;
@@ -252,6 +254,7 @@ export function AnnotationList({
   rowsLoading?: boolean;
   exportLabel?: string;
   onExport?: () => void;
+  emptyNotice?: { title: string; description: string };
 }) {
   const copy = annotationViewCopy(view);
   const project = host.project();
@@ -499,8 +502,8 @@ export function AnnotationList({
       {isLoading && <AnnotationTableSkeleton />}
       {showEmptyState && (
         <NoDataInfoBlock
-          title={copy.noDataTitle}
-          description={copy.noDataDescription}
+          title={emptyNotice?.title ?? copy.noDataTitle}
+          description={emptyNotice?.description ?? copy.noDataDescription}
           docsInfo={
             <Text>
               To get started with annotations, please visit our{" "}

@@ -11,7 +11,8 @@ import {
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { useLent } from "@langwatch/browser-host/lent";
-import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
+import type { ProjectSwitcherProps } from "@langwatch/project-contract";
 import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {

@@ -4,6 +4,7 @@
  * KSUID and every digest is taken as the bytes stream.
  */
 import { HandledError, ValidationError } from "@langwatch/handled-error";
+import { ObjectBodyShortError, ObjectBodyTooLargeError } from "@langwatch/process-stores";
 import {
   DirectUploadUnavailableError,
   StorageUnavailableError,
@@ -158,10 +159,7 @@ export class StoredObjectUploadService {
     const placement = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.place({ projectId: input.projectId, objectId: id }),
     );
-    const limit = Math.min(
-      purposeByteLimitOf(policy, input.maxBytes),
-      placement.maxSinglePutBytes,
-    );
+    const limit = Math.min(purposeByteLimitOf(policy, input.maxBytes), placement.maxSinglePutBytes);
     if (input.byteLength > limit) throw new UploadTooLargeError(input.byteLength, limit);
 
     const now = this.options.now();
@@ -322,10 +320,9 @@ function refusedField(field: "purpose" | "mediaType", message: string): Validati
 
 /** The member refuses a body past or short of its declared length, and keeps nothing. */
 function writeRefusalOf(error: unknown, byteLength: number): Error {
-  const name = error instanceof Error ? error.name : "";
-  if (name === "ObjectBodyTooLargeError")
+  if (error instanceof ObjectBodyTooLargeError)
     return new UploadTooLargeError(byteLength + 1, byteLength);
-  if (name === "ObjectBodyShortError") return new UploadIncompleteError();
+  if (error instanceof ObjectBodyShortError) return new UploadIncompleteError();
 
   return new StorageUnavailableError();
 }

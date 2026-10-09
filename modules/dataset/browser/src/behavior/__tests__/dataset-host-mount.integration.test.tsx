@@ -28,7 +28,8 @@ vi.mock("../dataset-api.ts", () => ({
     useUtils: () => ({ dataset: { getAll: { invalidate: () => Promise.resolve() } } }),
   },
 }));
-vi.mock("@langwatch/dataset-client", () => ({
+vi.mock("@langwatch/dataset-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   datasetClient: {
     useUtils: () => ({ dataset: { getAll: { invalidate: () => Promise.resolve() } } }),
     dataset: {
@@ -113,7 +114,6 @@ describe("given a reader who may create datasets in one of their projects and no
             project: () => ({ id: "proj-1", slug: "demo", name: "Demo" }),
             organization: () => ({ id: "org-1" }),
             team: () => ({ id: "team-1" }),
-            hasPermission: () => true,
           }),
         ),
         copyTargets: lent,

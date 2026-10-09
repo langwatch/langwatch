@@ -89,6 +89,14 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     return row ? subscriptionRecordOf(row) : null;
   }
 
+  async hasAnyForOrganization(organizationId: string): Promise<boolean> {
+    const row = await this.prisma.subscription.findFirst({
+      where: { organizationId },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   async createPending(input: {
     organizationId: string;
     plan: string;
@@ -209,11 +217,6 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     ];
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.organization.update({
-        where: { id: input.organizationId },
-        data: { pricingModel: "SEAT_EVENT" },
-      });
-
       const oldSubs = await tx.subscription.findMany({
         where: {
           organizationId: input.organizationId,

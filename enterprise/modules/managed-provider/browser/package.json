@@ -22,6 +22,7 @@
   "dependencies": {
     "@langwatch/browser": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-managed-provider-client": "workspace:*",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*"
   },
   "devDependencies": {

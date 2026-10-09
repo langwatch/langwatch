@@ -1,4 +1,3 @@
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
@@ -7,12 +6,9 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  */
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as Observability from "@langwatch/observability";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
@@ -21,16 +17,15 @@ import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
 import { otlpIngestRest } from "../otlp-ingest.rest.ts";
@@ -74,35 +69,25 @@ const API_KEY_ID = "api-key-1";
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   for (const token of [
-    AnnotationApi,
     AuthzApi,
-    CodingAgentApi,
     DataPrivacyApi,
     DataRetentionApi,
     EntitlementApi,
-    EvaluationApi,
-    LogApi,
     ModelProviderApi,
     ProjectApi,
     ShareApi,
-    TopicApi,
   ]) {
     apis.declare(token);
   }
 
   return {
-    annotations: apis.reference(AnnotationApi),
     authz: apis.reference(AuthzApi),
-    codingAgents: apis.reference(CodingAgentApi),
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),
-    evaluations: apis.reference(EvaluationApi),
-    logs: apis.reference(LogApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
   };
 }
 
@@ -149,13 +134,19 @@ function apiKeyDirectory(
  * the declared transport, over ONE application bound to its own module-API
  * token.
  */
-function deployment(access: OtlpAccess = {}) {
+function deployment(
+  access: OtlpAccess = {},
+  handoff: { fails?: boolean; failingSpanIds?: Set<string> } = {},
+) {
   const recordedSpans: RecordSpanCommandData[] = [];
   const markedUsed: string[] = [];
   const peers = unreachablePeers();
 
   const commands: TraceProcessingCommands = {
     recordSpan: async (data) => {
+      if (handoff.fails || handoff.failingSpanIds?.has(data.span.spanId)) {
+        throw new Error("queue unavailable");
+      }
       recordedSpans.push(data);
     },
     changeTraceName: async () => undefined,
@@ -174,7 +165,6 @@ function deployment(access: OtlpAccess = {}) {
         legacySpool: S3TraceLegacySpoolChannel.create({
           resolveS3Client: () => Promise.reject(new Error("no object store in this test")),
         }),
-        resolveClickHouseClient: () => Promise.reject(new Error("no ClickHouse in this test")),
       }),
       dedup: MemoryTraceSpanDedupRepository.create(),
       commands,
@@ -200,13 +190,8 @@ function deployment(access: OtlpAccess = {}) {
         fallbackVisibilityDays: 14,
       },
       projects: peers.projects,
-      topics: peers.topics,
       modelProviders: peers.modelProviders,
-      logs: peers.logs,
-      annotations: peers.annotations,
       dataRetention: peers.dataRetention,
-      evaluations: peers.evaluations,
-      codingAgents: peers.codingAgents,
       share: peers.share,
       requestBounds: peers.plans,
       exportBounds: null,
@@ -230,7 +215,7 @@ function deployment(access: OtlpAccess = {}) {
   // point of the file: the door is mounted here only if `trace.module.ts` still
   // mounts it, so dropping it there turns every request below into the 404 an
   // OTLP exporter was getting.
-  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports;
+  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports ?? [];
   const servesOtlp = declaredRest.includes(otlpIngestRest);
 
   const mounted = servesOtlp
@@ -340,6 +325,60 @@ describe("given the trace module as a process composes it", () => {
       await post("/api/otel/v1/traces", otlpTraceBody());
 
       expect(markedUsed).toEqual([API_KEY_ID]);
+    });
+  });
+
+  describe("when the pipeline handoff fails for every span of the batch", () => {
+    /** @scenario "A failed pipeline handoff answers the OTLP export as retryable" */
+    it("answers 503 without a partial success, so the exporter retries", async () => {
+      const { post, recordedSpans } = deployment({}, { fails: true });
+
+      const response = await post("/api/otel/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).not.toHaveProperty("partialSuccess");
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("given a batch where the pipeline takes every span but one", () => {
+    const failingSpanId = "a1b2c3d4e5f60711";
+
+    describe("when the exporter posts it", () => {
+      /** @scenario "A batch where only some handoffs fail is still answered as retryable" */
+      it("answers 503 and keeps the spans it took", async () => {
+        const { post, recordedSpans } = deployment(
+          {},
+          { failingSpanIds: new Set([failingSpanId]) },
+        );
+
+        const response = await post("/api/otel/v1/traces", otlpTraceBody(3));
+
+        expect(response.status).toBe(503);
+        expect(recordedSpans.map((data) => data.span.spanId).toSorted()).toEqual([
+          "a1b2c3d4e5f60710",
+          "a1b2c3d4e5f60712",
+        ]);
+      });
+    });
+
+    describe("when the exporter resends it after the pipeline recovers", () => {
+      /** @scenario "Resending a partly failed batch records each span exactly once" */
+      it("dedupes the taken spans and records the failed one", async () => {
+        const failingSpanIds = new Set([failingSpanId]);
+        const { post, recordedSpans } = deployment({}, { failingSpanIds });
+        await post("/api/otel/v1/traces", otlpTraceBody(3));
+        failingSpanIds.clear();
+
+        const response = await post("/api/otel/v1/traces", otlpTraceBody(3));
+
+        expect(response.status).toBe(200);
+        expect(recordedSpans.map((data) => data.span.spanId).toSorted()).toEqual([
+          "a1b2c3d4e5f60710",
+          "a1b2c3d4e5f60711",
+          "a1b2c3d4e5f60712",
+        ]);
+      });
     });
   });
 

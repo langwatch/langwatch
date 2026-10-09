@@ -47,7 +47,7 @@ function contactHref(value: string): string {
   return "#";
 }
 
-// `api.user.personalBudget` and the gateway 402 payload both pass
+// `api.gatewayBudgets.personalBudget` and the gateway 402 payload both pass
 // `period` as the lowercased root form of the `GatewayBudgetWindow`
 // Prisma enum ("month" / "week" / "day" / "hour" / "minute" / "total").
 // Map to adjective form for display; also accept the adjective forms
@@ -69,7 +69,7 @@ const PERIOD_LABEL: Record<string, string> = {
 const SCOPE_LABEL: Record<string, string> = {
   user: "personal",
   virtual_key: "personal",
-  // Scope classes from `api.user.budgetOverview`, already user-relative.
+  // Scope classes from `api.governance.budgetOverview`, already user-relative.
   personal: "personal",
   key: "personal",
   department: "department",

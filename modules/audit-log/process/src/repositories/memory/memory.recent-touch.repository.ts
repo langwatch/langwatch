@@ -5,7 +5,7 @@ import type {
   RecentTouch,
   RecentTouchRepository,
 } from "../recent-touch.repository.ts";
-import type { MemoryAuditLogStore } from "./memory.audit-log.store.ts";
+import type { MemoryAuditLogStore } from "./memory.audit-log.repository.ts";
 
 export class MemoryRecentTouchRepository implements RecentTouchRepository {
   private constructor(private readonly store: MemoryAuditLogStore) {}

@@ -10,7 +10,7 @@ import type {
   SsoBreakGlassBinding as SsoBreakGlassBindingRow,
 } from "@langwatch/prisma-client/generated";
 
-import { SsoBreakGlassRepository } from "../sso-break-glass.repository.ts";
+import { SsoBreakGlassRepository } from "../../features/sso-arrival/repositories/sso-break-glass.repository.ts";
 
 /** The models the ways back in are kept in, plus the transaction runner. */
 type PrismaSsoBreakGlassDatabase = PrismaClient;

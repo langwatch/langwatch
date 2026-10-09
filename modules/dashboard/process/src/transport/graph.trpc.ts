@@ -12,9 +12,6 @@ import {
   type Graph,
   type GraphAlert,
 } from "@langwatch/dashboard-contract";
-import { z } from "zod";
-
-const graphPayload = z.record(z.string(), z.unknown());
 
 /** Compatibility shape: the old Prisma transport exposed the discriminator. */
 const legacyGraph = <T extends Graph>(graph: T) => ({ ...graph, kind: "builder" as const });
@@ -40,7 +37,7 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
           projectId: input.projectId,
           viewer: { userId: actor.id },
           name: input.name,
-          graph: graphPayload.parse(JSON.parse(input.graph)),
+          graph: input.graph,
           filters: input.filterParams?.filters ?? {},
           ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
           layout: {
@@ -123,7 +120,7 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
           viewer: { userId: actor.id },
           graphId: input.graphId,
           name: input.name,
-          graph: graphPayload.parse(JSON.parse(input.graph)),
+          graph: input.graph,
           filters: input.filterParams?.filters ?? {},
         }),
       ),

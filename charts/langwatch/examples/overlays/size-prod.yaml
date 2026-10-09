@@ -2,6 +2,7 @@
 #
 # 2 app replicas, 2 workers, PDBs, chart-managed ClickHouse.
 # Combine with an access overlay and optionally external database overlays.
+# Requires app.dataplane (S3 or Azure Blob) for stored objects.
 #
 # Usage:
 #   helm install lw . \
@@ -10,8 +11,9 @@
 
 app:
   replicaCount: 2
-  # Multi-pod: local-FS is unsafe (pods don't share filesystems). Combine
-  # with cold-storage-s3.yaml or set app.dataplane.enabled=true.
+  # Multi-pod: local-FS is unsafe (pods don't share filesystems). Set
+  # app.dataplane (S3 or Azure Blob) so every pod reads the same stored
+  # objects. cold-storage-s3.yaml covers ClickHouse only.
   storedObjects:
     localFilesystem:
       enabled: false

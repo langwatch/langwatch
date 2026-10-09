@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 
-import { CONNECT_SERVICES, type ConnectService } from "./connect-services.ts";
+import { CONNECT_SERVICES, type ConnectService } from "./issued-license.ts";
 
 /**
  * Who the gateway resolved the caller to. Never read from the caller's body: a

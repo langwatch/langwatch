@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { settingsToneFor } from "../src/components/settings-card.tsx";
+import { settingsToneFor } from "../src/components/layout/settings-card.tsx";
 
 describe("the settings card's two tone vocabularies", () => {
   it("maps each chip tone onto the dot that says the same thing", () => {

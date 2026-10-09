@@ -1,23 +1,12 @@
-/** What licensing lends this module through its declaration (ARCHITECTURE.md §3.4, rule 7). */
+/** What licensing lends this module by token (ARCHITECTURE.md §10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type { UiResourceLimitRowProps } from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo } from "react";
+import { Lent } from "@langwatch/browser-host/lent";
+import {
+  ResourceLimitRowToken,
+  type ResourceLimitRowProps,
+} from "@langwatch/enterprise-licensing-client";
 
 /** Licensing's usage-against-limit row, rendered as licensing lends it. */
-export function ResourceLimitRow(props: UiResourceLimitRowProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("resourceLimitRow")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function ResourceLimitRow(props: ResourceLimitRowProps) {
+  return <Lent of={ResourceLimitRowToken} props={props} />;
 }

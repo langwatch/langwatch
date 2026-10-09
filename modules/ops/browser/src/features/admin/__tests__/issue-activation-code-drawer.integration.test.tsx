@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 /**
- * Issuing an activation code from the backoffice: every hosted service starts included.
+ * Issuing an activation code from the admin console: every hosted service starts included.
  * Spec: specs/self-hosting/connected-services/activation-codes.feature
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
@@ -38,7 +38,7 @@ async function fillCustomer() {
 }
 
 describe("IssueActivationCodeDrawer", () => {
-  describe("given an operator issuing an activation code in the backoffice", () => {
+  describe("given an operator issuing an activation code in the admin console", () => {
     describe("when the operator fills in the customer and issues the code", () => {
       /** @scenario "A code names the hosted services the license may call" */
       it("includes every hosted service unless the operator unticks it", async () => {

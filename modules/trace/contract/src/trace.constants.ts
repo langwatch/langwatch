@@ -1,6 +1,3 @@
-import { Config, publicBaseUrl, type ConfigOf } from "@langwatch/config";
-import { z } from "zod";
-
 /** Durable raw ingress fact. Its name, version, and payload are replay compatibility. */
 export const SPAN_RECEIVED_EVENT_TYPE = "lw.obs.trace.span_received" as const;
 export const SPAN_RECEIVED_EVENT_VERSION_LATEST = "2025-12-14" as const;
@@ -184,21 +181,3 @@ export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
  * 4 MiB byte budget bounds large previews before this count does.
  */
 export const TRACE_CORRELATION_COALESCE_MAX_BATCH = 256;
-
-/**
- * Span pipeline config: lane count and tokenizer settings, kept in original types so producer
- * and consumer clamp identically. `publicBaseUrl` is the shared origin `platformUrl` links to.
- */
-export const traceConfig = Config.define((c) => ({
-  spanProcessingShards: c.env("TRACE_SPAN_PROCESSING_SHARDS", z.string().optional()),
-  tokenizer: {
-    bpeDirectory: c.env("TIKTOKENS_PATH", z.string().optional()),
-    fetchTimeoutMs: c.env(
-      "TIKTOKEN_FETCH_TIMEOUT_MS",
-      z.union([z.string(), z.number()]).optional(),
-    ),
-  },
-  publicBaseUrl,
-}));
-
-export type TraceServerConfig = ConfigOf<typeof traceConfig>;

@@ -8,20 +8,21 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { modelProviderConnectionPingChannels } from "../../channels/model-provider-connection-ping-channels.registry.ts";
+import { MemoryModelProviderChannels } from "../../channels/memory/memory.model-provider.channels.ts";
+import { CodexAccountService } from "../../features/codex/services/codex-account.service.ts";
+import { CodexOAuthModelProviderTokenRefresherService } from "../../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
+import type { ModelProviderCredentialProbe } from "../../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import { UnavailableModelProviderCredentialProbeService } from "../../features/credential-probe/services/unavailable-model-provider-credential-probe.service.ts";
+import { WindowedModelProviderConnectionRateLimiterService } from "../../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import { CodexAccountService } from "../../services/codex-account.service.ts";
-import { CodexOAuthModelProviderTokenRefresherService } from "../../services/codex-oauth-model-provider-token-refresher.service.ts";
-import type { ModelProviderCredentialProbe } from "../../services/http-model-provider-credential-probe.service.ts";
 import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
 import { RegistryModelProviderCatalogService } from "../../services/registry-model-provider-catalog.service.ts";
-import { UnavailableModelProviderCredentialProbeService } from "../../services/unavailable-model-provider-credential-probe.service.ts";
 import { UnmanagedModelProviderGatewayService } from "../../services/unmanaged-model-provider-gateway.service.ts";
 import { VercelAiModelTranslationService } from "../../services/vercel-ai-model-translation.service.ts";
-import { WindowedModelProviderConnectionRateLimiterService } from "../../services/windowed-model-provider-connection-rate-limiter.service.ts";
 import { ModelProviderModule, type ModelProviderInfrastructure } from "../model-provider.app.ts";
 
 /** A suite that did not decide the issuer's answers must not reach one. */
@@ -112,7 +113,7 @@ export function createModelProviderTestInfrastructure(
       projects,
       executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
     }),
-    connectionPing: modelProviderConnectionPingChannels.memory.create(),
+    ...MemoryModelProviderChannels.create(),
     ids: PrefixedModelProviderIdService.create(),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
@@ -135,6 +136,7 @@ export function createModelProviderTestApp(
       permissions: AuthzApi;
       dataPrivacy: DataPrivacyApi;
       managed: ManagedProviderApi;
+      secrets: SecretApi;
     }>;
   }> = {},
 ): ModelProviderModule {
@@ -149,8 +151,14 @@ export function createModelProviderTestApp(
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       dataPrivacy: input.dependencies?.dataPrivacy ?? createModelProviderTestDataPrivacy(),
       managed: input.dependencies?.managed ?? createModelProviderTestManagedProviders(),
+      secrets: input.dependencies?.secrets ?? createModelProviderTestSecrets(),
     },
   });
+}
+
+/** A project store holding no secret: Codex's gateway ping finds no virtual key. */
+export function createModelProviderTestSecrets(values: Record<string, string> = {}): SecretApi {
+  return createApiFixture<SecretApi>({ getValues: async () => values });
 }
 
 /** A deployment with no managed provider: every provider is the customer's own. */

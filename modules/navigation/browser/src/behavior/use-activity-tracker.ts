@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import type { RecentItemType } from "../model/command-bar-types.ts";
+import type { RecentItemType } from "../features/command-bar/model/command-bar-types.ts";
 import { useNavigationHost } from "../model/navigation-host.ts";
 import { useRecentItems } from "./use-recent-items.ts";
 

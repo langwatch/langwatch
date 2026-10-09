@@ -30,6 +30,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
+import type { CodingAssistantBillingFactService } from "../features/cost/services/coding-assistant-billing-fact.service.ts";
 import type {
   AiToolCatalogRepository,
   AiToolProviderCatalog,
@@ -42,7 +43,6 @@ import {
   selectVisibleAiTools,
 } from "../rules/ai-tool-visibility.rules.ts";
 import type { AiToolProviderReachService } from "./ai-tool-provider-reach.service.ts";
-import type { CodingAssistantBillingFactService } from "./coding-assistant-billing-fact.service.ts";
 
 type AiToolCatalogCollaborators = {
   repository: AiToolCatalogRepository;

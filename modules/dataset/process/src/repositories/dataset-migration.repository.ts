@@ -14,8 +14,10 @@ export type DatasetMigrationSummary = {
   failed: number;
 };
 
+/** `incomplete`: some dataset failed or changed mid-move; the checkpoint never passed it. */
 export type DatasetMigrationRunResult =
   | { status: "completed"; summary: DatasetMigrationSummary }
+  | { status: "incomplete"; summary: DatasetMigrationSummary }
   | { status: "schema-pending" };
 
 /** How many records a dataset holds and when the newest changed: the concurrent-write check. */
@@ -36,7 +38,6 @@ type DatasetKey = { datasetId: string; projectId: string };
 
 /** The Postgres side of the one-off move of dataset content into object-storage chunks. */
 export interface DatasetMigrationRepository {
-  findProjectIds(): Promise<string[]>;
   /** One id-ordered page of a project's datasets still on the postgres layout. */
   findPostgresDatasetIds(input: {
     projectId: string;

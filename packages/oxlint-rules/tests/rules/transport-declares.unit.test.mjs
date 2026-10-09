@@ -291,6 +291,30 @@ describe("given a route whose own chain declares a producer", () => {
   });
 });
 
+describe("given a route that declares its permission target", () => {
+  it("accepts target when withPermission names where the target is", () => {
+    expect(
+      located(
+        '  .post("/widgets/run", "runWidget")',
+        "  .withInput(runSchema)",
+        '  .withPermission("widget:view", { at: "header", param: "projectId", header: "x-project-id" })',
+        "  .handle(async ({ app, input, target }) => app.runWidget({ input, target }))",
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports target when the route's permission declares no target", () => {
+    expect(
+      located(
+        '  .post("/widgets/run", "runWidget")',
+        "  .withInput(runSchema)",
+        '  .withPermission("widget:view")',
+        "  .handle(async ({ app, input, target }) => app.runWidget({ input, target }))",
+      ),
+    ).toEqual([["rawContextField", "target", 6, 31]]);
+  });
+});
+
 describe("given a door credential that declares a session", () => {
   it("accepts session from a router-level or a route-level withCredential", () => {
     expect(

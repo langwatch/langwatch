@@ -1,7 +1,7 @@
 import type { ProcessManagerApplier } from "@langwatch/eventing";
 import { z } from "zod";
 
-import type { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
+import type { GatewaySpendDebitService } from "../features/spend/services/gateway-spend-debit.service.ts";
 import {
   type WriteGatewayDebitsPayload,
   writeGatewayDebitsSchema,

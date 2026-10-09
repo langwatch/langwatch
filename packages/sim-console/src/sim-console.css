@@ -30,6 +30,14 @@
   --sim-accent: var(--moss);
 }
 
+.sim-console[data-sim="outbound"] {
+  --sim-accent: var(--amber);
+}
+
+.sim-console[data-sim="telemetry"] {
+  --sim-accent: var(--rust);
+}
+
 .sim-console .ds-topbar-mark {
   background: var(--sim-accent);
 }

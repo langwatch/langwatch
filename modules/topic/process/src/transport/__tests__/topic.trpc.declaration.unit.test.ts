@@ -67,8 +67,10 @@ describe("the topic tRPC declaration", () => {
 
       expect(table).toEqual([
         ["getAll", "query", "traces:view"],
+        ["getTopicCounts", "query", "traces:view"],
         ["getClusteringStatus", "query", "project:view"],
         ["getClusteringRunHistory", "query", "project:view"],
+        ["triggerTopicClustering", "mutation", "project:update"],
       ]);
     });
 
@@ -93,10 +95,10 @@ describe("the topic tRPC declaration", () => {
     });
 
     /** @scenario "A contract declares a procedure once, in a browser-safe module" */
-    it("value-imports only zod, the module framework entry and its own schemas", () => {
+    it("value-imports only zod, the module framework entry, a peer contract and its own schemas", () => {
       for (const specifier of valueImports(sourceOf("contract/src/topic.trpc.ts"))) {
         expect([specifier, "contract/src/topic.trpc.ts"]).toEqual([
-          expect.stringMatching(/^(?:zod|@langwatch\/module|\.\/)/),
+          expect.stringMatching(/^(?:zod|@langwatch\/module|@langwatch\/[a-z-]+-contract|\.\/)/),
           "contract/src/topic.trpc.ts",
         ]);
       }

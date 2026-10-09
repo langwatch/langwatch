@@ -28,6 +28,9 @@
       "path": "modules/agent/browser/tsconfig.json"
     },
     {
+      "path": "modules/agent/client/tsconfig.json"
+    },
+    {
       "path": "modules/agent/contract/tsconfig.json"
     },
     {
@@ -38,6 +41,9 @@
     },
     {
       "path": "modules/analytics/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/analytics/client/tsconfig.json"
     },
     {
       "path": "modules/analytics/contract/tsconfig.test.json"
@@ -53,6 +59,9 @@
     },
     {
       "path": "modules/annotation/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/annotation/client/tsconfig.json"
     },
     {
       "path": "modules/annotation/contract/tsconfig.json"
@@ -139,6 +148,9 @@
       "path": "modules/coding-agent/browser/tsconfig.json"
     },
     {
+      "path": "modules/coding-agent/client/tsconfig.json"
+    },
+    {
       "path": "modules/coding-agent/contract/tsconfig.json"
     },
     {
@@ -205,6 +217,9 @@
       "path": "enterprise/modules/billing/browser/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/billing/client/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/billing/contract/tsconfig.json"
     },
     {
@@ -229,6 +244,9 @@
       "path": "enterprise/modules/governance/browser/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/governance/client/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/governance/contract/tsconfig.json"
     },
     {
@@ -241,6 +259,9 @@
       "path": "enterprise/modules/licensing/browser/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/licensing/client/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/licensing/contract/tsconfig.json"
     },
     {
@@ -248,6 +269,9 @@
     },
     {
       "path": "enterprise/modules/managed-provider/browser/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/managed-provider/client/tsconfig.json"
     },
     {
       "path": "enterprise/modules/managed-provider/contract/tsconfig.json"
@@ -278,6 +302,9 @@
     },
     {
       "path": "enterprise/modules/scim/browser/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/scim/client/tsconfig.json"
     },
     {
       "path": "enterprise/modules/scim/contract/tsconfig.json"
@@ -331,6 +358,9 @@
       "path": "modules/experiment/browser/tsconfig.json"
     },
     {
+      "path": "modules/experiment/client/tsconfig.json"
+    },
+    {
       "path": "modules/experiment/contract/tsconfig.json"
     },
     {
@@ -338,6 +368,9 @@
     },
     {
       "path": "modules/feature-flag/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/feature-flag/client/tsconfig.json"
     },
     {
       "path": "modules/feature-flag/contract/tsconfig.json"
@@ -359,6 +392,9 @@
     },
     {
       "path": "modules/github/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/github/client/tsconfig.json"
     },
     {
       "path": "modules/github/contract/tsconfig.json"
@@ -385,6 +421,9 @@
       "path": "modules/hosted-mcp/process/tsconfig.json"
     },
     {
+      "path": "modules/identity/client/tsconfig.json"
+    },
+    {
       "path": "modules/identity/contract/tsconfig.test.json"
     },
     {
@@ -406,6 +445,12 @@
       "path": "modules/instant-eval/contract/tsconfig.json"
     },
     {
+      "path": "modules/instant-eval-judge/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/instant-eval-judge/process/tsconfig.json"
+    },
+    {
       "path": "modules/instant-eval/process/tsconfig.json"
     },
     {
@@ -424,6 +469,9 @@
       "path": "modules/langy/browser/tsconfig.json"
     },
     {
+      "path": "modules/langy/client/tsconfig.json"
+    },
+    {
       "path": "modules/langy/contract/tsconfig.json"
     },
     {
@@ -431,6 +479,9 @@
     },
     {
       "path": "services/langyworker/tsconfig.json"
+    },
+    {
+      "path": "packages/limiter/tsconfig.json"
     },
     {
       "path": "apps/llmsim-web/tsconfig.json"
@@ -457,6 +508,9 @@
       "path": "modules/model-provider/browser/tsconfig.json"
     },
     {
+      "path": "modules/model-provider/client/tsconfig.json"
+    },
+    {
       "path": "modules/model-provider/contract/tsconfig.json"
     },
     {
@@ -469,6 +523,9 @@
       "path": "modules/monitor/browser/tsconfig.json"
     },
     {
+      "path": "modules/monitor/client/tsconfig.json"
+    },
+    {
       "path": "modules/monitor/contract/tsconfig.json"
     },
     {
@@ -476,6 +533,12 @@
     },
     {
       "path": "modules/navigation/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/navigation/client/tsconfig.json"
+    },
+    {
+      "path": "modules/navigation/contract/tsconfig.json"
     },
     {
       "path": "modules/notification/browser/tsconfig.json"
@@ -491,6 +554,9 @@
     },
     {
       "path": "modules/onboarding/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/onboarding/client/tsconfig.json"
     },
     {
       "path": "modules/onboarding/contract/tsconfig.json"
@@ -511,6 +577,9 @@
       "path": "modules/organization/browser/tsconfig.json"
     },
     {
+      "path": "modules/organization/client/tsconfig.json"
+    },
+    {
       "path": "modules/organization/contract/tsconfig.json"
     },
     {
@@ -518,6 +587,9 @@
     },
     {
       "path": "packages/otlp/tsconfig.json"
+    },
+    {
+      "path": "apps/outboundsim-web/tsconfig.json"
     },
     {
       "path": "packages/oxlint-rules/tsconfig.json"
@@ -557,6 +629,9 @@
     },
     {
       "path": "modules/project/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/project/client/tsconfig.json"
     },
     {
       "path": "modules/project/contract/tsconfig.json"
@@ -655,6 +730,9 @@
       "path": "modules/slack/process/tsconfig.json"
     },
     {
+      "path": "packages/span-normalisation/tsconfig.json"
+    },
+    {
       "path": "apps/storagesim-web/tsconfig.json"
     },
     {
@@ -682,6 +760,9 @@
       "path": "apps/tasks/tsconfig.test.json"
     },
     {
+      "path": "apps/telemetrysim-web/tsconfig.json"
+    },
+    {
       "path": "packages/test-harness/tsconfig.json"
     },
     {
@@ -700,6 +781,9 @@
       "path": "modules/trace/browser/tsconfig.json"
     },
     {
+      "path": "modules/trace/client/tsconfig.json"
+    },
+    {
       "path": "modules/trace/contract/tsconfig.json"
     },
     {
@@ -710,12 +794,6 @@
     },
     {
       "path": "packages/upgrade/tsconfig.test.json"
-    },
-    {
-      "path": "modules/usage/contract/tsconfig.json"
-    },
-    {
-      "path": "modules/usage/process/tsconfig.json"
     },
     {
       "path": "modules/user/browser/tsconfig.json"
@@ -736,6 +814,9 @@
       "path": "apps/voicesim-web/tsconfig.json"
     },
     {
+      "path": "modules/webhook/client/tsconfig.json"
+    },
+    {
       "path": "modules/webhook/contract/tsconfig.json"
     },
     {
@@ -749,6 +830,9 @@
     },
     {
       "path": "modules/workflow/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/workflow/client/tsconfig.json"
     },
     {
       "path": "modules/workflow/contract/tsconfig.json"

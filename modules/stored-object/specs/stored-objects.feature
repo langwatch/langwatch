@@ -106,21 +106,6 @@ Feature: Stored Objects service and API
     Then one canary object is written under the project's checkup prefix
     And the canary object is removed again
 
-  @unit @migration
-  Scenario: The purge removes main-era evaluation input objects and keeps every other purpose
-    Given stored objects with purpose evaluation_inputs in several projects and objects of other purposes
-    When the purge runs with apply
-    Then the bytes and the rows of the evaluation_inputs objects are deleted, page by page
-    And objects of every other purpose are untouched
-    And without apply the purge only counts what it would delete
-
-  @unit @migration
-  Scenario: A purge that cannot delete an object's bytes keeps its row for the next run
-    Given an evaluation_inputs object whose bytes storage refuses to delete
-    When the purge runs with apply
-    Then that row is kept and counted as failed
-    And the other evaluation_inputs objects are still deleted
-
   @unimplemented @integration @api @authorization
   Scenario: The public API uses the unified API package
     Given the Stored Objects public API is installed
@@ -147,15 +132,32 @@ Feature: Stored Objects service and API
     And a miss with any failed instance is mapped to the existing 502 response
     And a project-scoped URL does not invoke the cross-tenant resolver
 
-  @unimplemented @integration @migration
-  Scenario: The system migration copies legacy ClickHouse rows directly
-    Given an organization has stored_objects rows in ClickHouse
-    When StoredObjectsMigration runs after being registered with the system migration service
-    Then it pages the organization's projects and latest rows
-    And it idempotently upserts their existing IDs and storage locations into StoredObject
-    And rerunning a completed page creates no duplicate state
-    And invalid input parks the tenant with a bounded report
-    And Postgres becomes authoritative only after old writers drain and a final pass succeeds
+  @unit @migration
+  Scenario: The Stored Objects import waits until no old image serves
+    Given old images are the only writers of the legacy ClickHouse index
+    When stored-object declares the ClickHouse import
+    Then it is a background tenant step walking projects one at a time
+    And it waits until the serving roster shows no old image, in place of a drain proof
+
+  @unit @migration
+  Scenario: The Stored Objects import copies one project's latest legacy rows
+    Given a project has stored_objects rows in ClickHouse
+    When the import runs for that project
+    Then each row's latest version is copied into the row store with its id and storage location
+    And the ClickHouse rows stay in place and legacy reads keep working
+
+  @unit @migration
+  Scenario: A second Stored Objects import of a project changes nothing
+    Given the import already copied a project's rows
+    When it runs for that project again
+    Then it reports every row unchanged and writes nothing
+
+  @unit @migration
+  Scenario: A legacy row stored outside its project fails the Stored Objects import
+    Given a legacy row's storage location does not sit under its project
+    When the import runs for that project
+    Then the project's import fails with a bounded error
+    And no row is written for it
 
   @unimplemented @integration @migration @startup
   Scenario: Stored Objects startup migration blocks readiness until finalization
@@ -164,15 +166,6 @@ Feature: Stored Objects service and API
     Then the replica does not construct the Postgres-backed Stored Objects service
     And readiness remains blocked
     And the replica does not accept traffic or consumers
-
-  @unimplemented @integration @migration @startup
-  Scenario: Finalization refuses a missing old-writer drain
-    Given the latest legacy rows have been copied
-    And an old writer is still active or has not been fenced
-    When startup migration finalization runs
-    Then finalization fails with a bounded migration error
-    And the final legacy scan does not authorize cutover
-    And readiness remains blocked
 
   @unimplemented @integration @migration @startup
   Scenario: A failed import leaves startup blocked

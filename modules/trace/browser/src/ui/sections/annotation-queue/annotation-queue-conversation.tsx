@@ -3,7 +3,7 @@
  * rule 7): the item's thread, or its trace as the only turn when it has none.
  */
 
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
@@ -11,8 +11,8 @@ import type { AnnotationQueueConversationProps } from "@langwatch/trace-contract
 import { useCallback, useMemo } from "react";
 
 import { useTraceById } from "../../../behavior/reads/use-trace-mapping-reads.ts";
-import { useConversationTurns } from "../explorer/hooks/use-conversation-turns.ts";
-import { useDrawerProjectId } from "../explorer/hooks/use-drawer-project-id.ts";
+import { useConversationTurns } from "../../../features/conversation/behavior/use-conversation-turns.ts";
+import { useDrawerProjectId } from "../../../features/trace-drawer/behavior/use-drawer-project-id.ts";
 import { ConversationView } from "../explorer/trace-drawer/conversation-view/conversation-view.tsx";
 import { legacyTraceToTurn } from "../explorer/utils/legacy-trace-to-turn.ts";
 import { IsolatedErrorBoundary } from "../isolated-error-boundary.tsx";

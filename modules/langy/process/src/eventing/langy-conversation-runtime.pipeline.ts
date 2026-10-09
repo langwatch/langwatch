@@ -15,11 +15,11 @@ import type {
 import { nowInstant } from "@langwatch/time";
 
 import type { LangyWorker } from "../channels/langy-worker.channel.ts";
+import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
-import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
 import {
@@ -48,7 +48,7 @@ import {
 } from "./langy-web-push.subscriber.ts";
 
 /** The two command senders this pipeline's own effects need back. */
-export interface RedisLangyConversationRuntimeRepository {
+interface RedisLangyConversationRuntimeRepository {
   failAgentResponse(data: {
     tenantId: string;
     occurredAt: number;
@@ -67,7 +67,7 @@ export interface RedisLangyConversationRuntimeRepository {
   }): Promise<void>;
 }
 
-export interface EventingLangyConversationAdapterOptions {
+interface EventingLangyConversationAdapterOptions {
   /** Direct Postgres operational projection; deliberately bypasses Redis. */
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
   /** Direct Postgres per-turn operational projection. */

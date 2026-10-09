@@ -14,11 +14,11 @@ import "@testing-library/jest-dom/vitest";
 // rather than mounting a tRPC provider.
 // The Instant Evals gate reads this flag; stub it enabled so nothing here
 // depends on the tRPC provider this suite doesn't mount.
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
+vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
-vi.mock("../../hooks/use-instant-eval-access.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-access.ts", () => ({
   useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: undefined }),
 }));
 
@@ -59,14 +59,14 @@ vi.mock("../../../use-model-providers-settings.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch at the
 // top level. These tests don't wrap with a tRPC provider, so stub the hook
 // out — server search is covered by its own dedicated suite.
-vi.mock("../../hooks/use-facet-search.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 

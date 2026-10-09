@@ -1,3 +1,4 @@
+import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import {
   CHART_GRID_DEFAULT_COL_SPAN,
   chartGridPlacementSchema,
@@ -8,7 +9,6 @@ import { z } from "zod";
 export const WORKBENCH_CHART_DEFINITION_VERSION = 1;
 /** The house id scheme's kind for a saved workbench chart. */
 export const SAVED_WORKBENCH_CHART_KSUID_RESOURCE = "chart";
-const MAX_LWQL_LENGTH = 50_000;
 const MAX_PARAMETERS = 64;
 const MAX_PARAMETER_NAME_LENGTH = 256;
 const MAX_PARAMETER_VALUE_LENGTH = 4_000;

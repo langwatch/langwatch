@@ -3,6 +3,7 @@
  * registry.
  */
 
+import { releaseFlags } from "@langwatch/module";
 import { z } from "zod";
 
 export const FRONTEND_FEATURE_FLAGS = [
@@ -20,10 +21,14 @@ export const FRONTEND_FEATURE_FLAGS = [
   // default; the section flag being off still hides both.
   "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
-  "release_langy_promo_enabled",
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",
+  // The signal-focused home composition (briefing sheet leads), outranking
+  // the default Langy home composition (lit block) that otherwise rolls out
+  // ON TOP of `release_langy_enabled`. Decides layout ONLY — Langy access
+  // separately gates the sheet's hand-to-Langy affordances.
+  "release_ui_home_signal_focused_enabled",
   // Langy's minimised state as an edge peek of the panel itself (spec:
   // specs/langy/langy-peek-dock.feature). Flag off = the classic corner
   // launcher orb. Swaps only the CLOSED-state affordance; opening, the
@@ -54,6 +59,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",
 ] as const;
+
+/** One `ReleaseFlagToken` per browser-visible flag; screens and readers name these. */
+export const FrontendFlags = releaseFlags(FRONTEND_FEATURE_FLAGS);
 
 /** A key the browser may ask about. */
 export type FrontendFeatureFlag = (typeof FRONTEND_FEATURE_FLAGS)[number];

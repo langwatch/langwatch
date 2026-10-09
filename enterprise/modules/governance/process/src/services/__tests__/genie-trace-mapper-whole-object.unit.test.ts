@@ -22,8 +22,8 @@
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { GENIE_ROUTING_PROFILE } from "../../rules/genie-trace-mapper-service.rules.ts";
-import * as GenieTraceMapperService from "../../rules/genie-trace-mapper-service.rules.ts";
+import { GENIE_ROUTING_PROFILE } from "../../features/databricks-genie/rules/genie-trace-mapper-service.rules.ts";
+import * as GenieTraceMapperService from "../../features/databricks-genie/rules/genie-trace-mapper-service.rules.ts";
 
 const ORIGIN = {
   ingestionSourceId: "source-1",

@@ -18,11 +18,14 @@ import {
   REJECT_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   IDENTITY_PIPELINE_NAME,
+  type IdentifierFact,
+  reduceIdentity,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { Counter, Histogram, register } from "prom-client";
 
+import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { identityEventsFor } from "./identity-events.intent.ts";
@@ -57,10 +60,10 @@ const identityCommitDurationSeconds = new Histogram({
 });
 
 /** The read-your-writes window, the grants ledger's convergence shape. */
-export const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const IDENTITY_CONVERGENCE_POLL_MS = 25;
+const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
+const IDENTITY_CONVERGENCE_POLL_MS = 25;
 
-export type IdentityStagedSender = {
+type IdentityStagedSender = {
   send(data: unknown): Promise<unknown>;
 };
 
@@ -75,8 +78,18 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [REJECT_LINK_COMMAND_TYPE]: "rejectLink",
 };
 
-export interface IdentityLedgerWriterDeps {
-  projectionStore: StateProjectionStore<IdentityFoldState>;
+/**
+ * The projection's one write that is not the fold's: a newborn's heads, rows only, before the
+ * first fold lands. The cursor is never part of it (ADR-135 decision 2, restored by Q63).
+ */
+export interface ProvisionalHeadsWriter {
+  writeProvisionalHeads(args: { facts: IdentifierFact[] }): Promise<void>;
+}
+
+interface IdentityLedgerWriterDeps {
+  projectionStore: StateProjectionStore<IdentityFoldState> & ProvisionalHeadsWriter;
+  /** Whether the user has folded, and what their heads hold: the provisional write's two reads. */
+  heads: Pick<IdentityHeadsRepository, "hasFolded" | "findHeads">;
   /**
    * The event stack this ledger stages through. Required, and asked per command rather than held:
    * the pipeline handle is resolved when a ceremony actually commits, which is what lets a ceremony
@@ -90,7 +103,8 @@ export interface IdentityLedgerWriterDeps {
 }
 
 export class IdentityLedgerStore implements IdentityLedger {
-  private readonly projectionStore: StateProjectionStore<IdentityFoldState>;
+  private readonly projectionStore: IdentityLedgerWriterDeps["projectionStore"];
+  private readonly heads: IdentityLedgerWriterDeps["heads"];
   private readonly stagedSender: (name: string) => Promise<IdentityStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
@@ -100,6 +114,7 @@ export class IdentityLedgerStore implements IdentityLedger {
 
   constructor(deps: IdentityLedgerWriterDeps) {
     this.projectionStore = deps.projectionStore;
+    this.heads = deps.heads;
     this.stagedSender =
       deps.stagedSender ??
       ((command) =>
@@ -123,10 +138,47 @@ export class IdentityLedgerStore implements IdentityLedger {
     if (events.length === 0) return [];
     const done = identityCommitDurationSeconds.startTimer();
     try {
+      await this.writeProvisionalHeads({ command, events });
       await this.stageAndAwait({ command, events });
       return events;
     } finally {
       done();
+    }
+  }
+
+  /**
+   * A newborn's heads, rows only, before the command is staged: the front door routes the address
+   * while the fold is queued; the fold overwrites them whole and sets the cursor. Never fails the
+   * ceremony; a failed stage after it leaves a row the next pass restates (main's ledger.ts).
+   */
+  private async writeProvisionalHeads({
+    command,
+    events,
+  }: {
+    command: IdentityCommand;
+    events: IdentityEvent[];
+  }): Promise<void> {
+    if (command.type !== ATTACH_IDENTIFIER_COMMAND_TYPE) return;
+    const { userId } = command.data;
+    try {
+      if (await this.heads.hasFolded({ userId })) return;
+      const current = await this.heads.findHeads({ userId });
+      const heads = events.reduce(
+        (folded, event) => reduceIdentity({ heads: folded, fact: event }),
+        current,
+      );
+      const facts = events.flatMap((event) => {
+        const identifierId = "identifierId" in event.data ? event.data.identifierId : null;
+        const head = identifierId ? heads.identifiers[identifierId] : undefined;
+        return head ? [head] : [];
+      });
+      if (facts.length === 0) return;
+      await this.projectionStore.writeProvisionalHeads({ facts });
+    } catch (error) {
+      logger.warn(
+        { userId, error },
+        "could not write a newborn's provisional identifier heads; the fold writes them when the queue drains",
+      );
     }
   }
 

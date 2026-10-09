@@ -66,6 +66,7 @@ describe("given an S3 account as the deployment configures it", () => {
 
 describe("given object storage on S3", () => {
   describe("when a module writes a body", () => {
+    /** @scenario "S3 driver handles s3 URIs through the configured S3 client" */
     it("streams it with its declared length and type, and answers its digest", async () => {
       const { client, sent } = scriptedClient(() => Promise.resolve({}));
       const backend = s3Backend({ client, bucket: "objects", clock });

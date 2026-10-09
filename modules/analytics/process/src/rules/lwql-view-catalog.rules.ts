@@ -6,6 +6,13 @@
  * @see specs/lwql/api.feature
  */
 
+import { CLICKHOUSE_OVERRIDES } from "../features/lwql-catalogue/rules/lwql-clickhouse-overrides.rules.ts";
+import { CODING_TOOL_RESULTS } from "../features/lwql-catalogue/rules/lwql-coding-overrides.rules.ts";
+import { defineCatalogTable } from "../features/lwql-catalogue/rules/lwql-dataset-derivation.rules.ts";
+import {
+  LWQL_POSTGRES_CATALOG,
+  LWQL_POSTGRES_CATALOGUE,
+} from "../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   defineLwqlCatalog,
@@ -13,21 +20,15 @@ import {
   exposedCatalogueColumns,
   type LwqlCatalogue,
   type LwqlTableCatalogue,
+  LWQL_CLICKHOUSE_EVENT_TABLES,
   LWQL_TRACES_CATALOGUE,
 } from "./lwql-catalogue.rules.ts";
-import { CLICKHOUSE_OVERRIDES } from "./lwql-clickhouse-overrides.rules.ts";
-import { CODING_TOOL_RESULTS } from "./lwql-coding-overrides.rules.ts";
 import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
-import { defineCatalogTable } from "./lwql-dataset-derivation.rules.ts";
 import {
   catalogueColumnGates,
   type UngatedViewDefinition,
   withCatalogueGates,
 } from "./lwql-gate.rules.ts";
-import {
-  LWQL_POSTGRES_CATALOG,
-  LWQL_POSTGRES_CATALOGUE,
-} from "./lwql-postgres-view-catalog.rules.ts";
 
 /**
  * How long after a write a row can be missing from these views. The projections are folded by
@@ -3034,6 +3035,8 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       LastEventOccurredAt: "inherit",
       _retention_days: "inherit",
       _size_bytes: "inherit",
+      ExpectedTargetResults: "inherit",
+      ExpectedEvaluatorResults: "inherit",
     },
   }),
   gateway_budget_ledger: defineTableCatalogue({
@@ -3264,26 +3267,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       _size_bytes: "inherit",
     },
   }),
-  legacy_event_log: defineTableCatalogue({
-    sourceTable: "event_log",
-    access: { allOf: ["analytics:view", "project:manage"] },
-    columns: {
-      TenantId: "inherit",
-      IdempotencyKey: "inherit",
-      AggregateType: "inherit",
-      AggregateId: "inherit",
-      EventId: "inherit",
-      EventType: "inherit",
-      EventVersion: "inherit",
-      EventTimestamp: "inherit",
-      CreatedAt: "inherit",
-      EventPayload: { content: "output" },
-      ProcessingTraceparent: { content: "output" },
-      EventOccurredAt: "inherit",
-      _retention_days: "inherit",
-      _size_bytes: "inherit",
-    },
-  }),
+  ...LWQL_CLICKHOUSE_EVENT_TABLES.tables,
   legacy_log_records: defineTableCatalogue({
     sourceTable: "stored_log_records",
     access: { allOf: ["analytics:view", "traces:view"] },
@@ -3751,7 +3735,9 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   clickhouseView("governance_security_events", ["TenantId", "EventId", "TraceId", "SourceId"]),
   clickhouseView("langy_conversation_messages", ["TenantId"]),
   clickhouseView("langy_usage_events", ["TenantId", "EventId", "AggregateId"]),
-  clickhouseView("legacy_event_log", ["TenantId", "AggregateId", "EventId"]),
+  ...Object.keys(LWQL_CLICKHOUSE_EVENT_TABLES.tables).map((view) =>
+    clickhouseView(view, LWQL_CLICKHOUSE_EVENT_TABLES.joinKeys[view]),
+  ),
   clickhouseView("legacy_log_records", ["TenantId", "ProjectionId", "TraceId", "SpanId"]),
   clickhouseView("legacy_metric_records", ["TenantId", "ProjectionId", "TraceId", "SpanId"]),
   clickhouseView("log_ingestion_usage", ["TenantId", "OrganizationId", "RecordId"]),

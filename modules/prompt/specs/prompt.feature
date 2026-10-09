@@ -66,6 +66,12 @@ Feature: Prompt service
     Then the browser asks before unloading
     But a tab with nothing unsaved lets the page unload
 
+  @integration
+  Scenario: A promptId link opens that prompt in a new tab
+    Given a link to the prompts page carrying ?promptId= of a saved prompt
+    When the reader opens the link
+    Then Prompt Studio reads that prompt and opens it in exactly one new tab
+
   @unit
   Scenario: a prompt created without a model takes the project's default model
     Given the project's default model for prompts is "openai/gpt-5.6-terra"
@@ -90,3 +96,61 @@ Feature: Prompt service
     Given the organization has a custom prompt tag
     When a caller renames it over the REST API
     Then the tag list shows the new name and no longer the old one
+
+  @unit
+  Scenario: a REST author who is not a user is refused
+    Given the body names an authorId that matches no user
+    When a prompt is created or updated over the REST API
+    Then the write is refused as prompt_author_unknown with status 422
+
+  @unit
+  Scenario: a REST author without the write permission is refused
+    Given the body names a user who lacks prompts:create or prompts:update on the project
+    When a prompt is created or updated over the REST API
+    Then the write is refused as prompt_author_unknown with status 422
+
+  @unit
+  Scenario: a REST author holding the write permission is accepted
+    Given the body names a user who holds the permission on the project
+    When a prompt is created or updated over the REST API
+    Then the prompt is written with that author
+
+  @unit
+  Scenario: a REST write with no authorId is unchanged
+    Given the body names no authorId
+    When a prompt is created or updated over the REST API
+    Then no author check runs and the prompt is written
+
+
+  @unit
+  Scenario: a new organization is seeded with the production and staging prompt tags
+    Given organization records that an organization was created
+    When prompt's peer subscriber handles the fact
+    Then the organization has the production and staging prompt tags
+
+  @unit
+  Scenario: a redelivered creation fact seeds no prompt tag twice
+    Given an organization already seeded with the production and staging prompt tags
+    When the creation fact is delivered again
+    Then the organization still has exactly one production and one staging tag
+
+  @unit
+  Scenario: The deploy backfill seeds prompt tags only for organizations with none
+    Given one organization has no prompt tags and another holds only a custom tag
+    When the tag backfill runs over both organizations twice
+    Then the untagged organization has the production and staging prompt tags
+    And the organization with a custom tag is left as it was
+    And the second pass seeds nothing
+
+  @unit
+  Scenario: A dry run of the deploy backfill writes no prompt tag
+    Given an organization has no prompt tags
+    When the tag backfill runs over it as a dry run
+    Then it reports the organization would be seeded
+    And the organization still has no prompt tags
+
+  @unit
+  Scenario: A worker collects the tag backfill as an organization tenant step
+    Given a worker installs prompt
+    When the upgrade runner migrates one untagged organization through the collected step
+    Then the step finalizes because the organization holds prompt tags

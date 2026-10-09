@@ -1,5 +1,9 @@
+import type { InMemoryProcessStore } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import type { Instant } from "@langwatch/time";
 import type { UserNotificationChoice } from "@langwatch/user-contract";
+
+import { type UserFactIntent, userFactsAppend } from "../../rules/user-lifecycle-outbox.rules.ts";
 
 /**
  * The rows the two user repositories share — one store rather than two,
@@ -48,10 +52,12 @@ export class MemoryUserDatabase {
   #accounts = new Map<string, MemoryUserAccountRow>();
   #passkeys = new Map<string, MemoryUserPasskeyRow>();
 
-  private constructor() {}
+  private constructor(private readonly processStore: InMemoryProcessStore) {}
 
-  static create(): MemoryUserDatabase {
-    return new MemoryUserDatabase();
+  static create({
+    processStore,
+  }: Readonly<{ processStore: InMemoryProcessStore }>): MemoryUserDatabase {
+    return new MemoryUserDatabase(processStore);
   }
 
   /** Every stored user, for the install-wide usage report. */
@@ -77,13 +83,20 @@ export class MemoryUserDatabase {
     this.#users.set(row.id, row);
   }
 
+  /** User's facts into the shared process store's outbox, as the Prisma twin appends them. */
+  async appendFacts({
+    userId,
+    intents,
+  }: Readonly<{ userId: string; intents: readonly UserFactIntent[] }>): Promise<void> {
+    const now = nowInstant().epochMilliseconds;
+    await this.processStore.appendIntents(userFactsAppend({ userId, intents, now }));
+  }
+
   /** Drops the user with every account and passkey it holds, as the erasure does. */
   deleteUser(id: string): void {
     this.#users.delete(id);
     for (const account of this.accountsOf(id)) this.#accounts.delete(account.id);
-    for (const [passkeyId, passkey] of this.#passkeys) {
-      if (passkey.userId === id) this.#passkeys.delete(passkeyId);
-    }
+    this.deletePasskeysOf(id);
   }
 
   accountsOf(userId: string): MemoryUserAccountRow[] {
@@ -112,5 +125,11 @@ export class MemoryUserDatabase {
 
   writePasskey(row: MemoryUserPasskeyRow): void {
     this.#passkeys.set(row.id, row);
+  }
+
+  deletePasskeysOf(userId: string): void {
+    for (const [passkeyId, passkey] of this.#passkeys) {
+      if (passkey.userId === userId) this.#passkeys.delete(passkeyId);
+    }
   }
 }

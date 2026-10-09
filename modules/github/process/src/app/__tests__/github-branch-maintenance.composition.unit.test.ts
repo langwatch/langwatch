@@ -10,8 +10,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
 import { GithubModule } from "../../app/github.app.ts";
+import { HttpGithubApiAdapter } from "../../channels/http/http.github-api.channel.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
+import { githubHostOf } from "../../rules/github-host.rules.ts";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -110,7 +112,7 @@ function sweep(client: PrismaClient) {
       installations: PrismaGithubInstallationsRepository.create(client),
       pullRequests: PrismaGithubPullRequestsRepository.create(client),
     },
-    config: { appId: "1234", privateKey },
+    api: HttpGithubApiAdapter.create("1234", privateKey, githubHostOf()),
   });
 }
 
@@ -165,7 +167,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
           installations: PrismaGithubInstallationsRepository.create(client),
           pullRequests: PrismaGithubPullRequestsRepository.create(client),
         },
-        config: { appId: "", privateKey: "" },
+        api: HttpGithubApiAdapter.create("", "", githubHostOf()),
       });
 
       await expect(uncredentialed.recheckDueBranches()).resolves.toBe(1);
@@ -183,7 +185,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
           installations: PrismaGithubInstallationsRepository.create(client),
           pullRequests: PrismaGithubPullRequestsRepository.create(client),
         },
-        config: { appId: "", privateKey: "" },
+        api: HttpGithubApiAdapter.create("", "", githubHostOf()),
       });
 
       await expect(uncredentialed.pruneStaleBranchLinkage()).resolves.toEqual({

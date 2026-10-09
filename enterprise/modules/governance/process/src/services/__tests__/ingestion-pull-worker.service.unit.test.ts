@@ -14,16 +14,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  GovernanceOcsfEventSink,
-  GovernanceOcsfEventInput,
-} from "../../repositories/governance.repositories.ts";
-import type {
-  IngestionPullSourceReader,
-  UnpricedUsageWindow,
-} from "../../repositories/ingestion-source.repository.ts";
-import type { ErasureSuppressionCheck } from "../../rules/erasure-suppression.rules.ts";
-import type { IngestionPullDiagnosticsSink } from "../ingestion-pull-log.service.ts";
+import type { ErasureSuppressionCheck } from "../../features/identity/rules/erasure-suppression.rules.ts";
+import type { IngestionPullDiagnosticsSink } from "../../features/ingestion-pull/services/ingestion-pull-log.service.ts";
 import {
   type GovernanceTraceIngestionClient,
   type GovernanceTraceRequest,
@@ -32,13 +24,21 @@ import {
   IngestionPullDeadlineExceededError,
   IngestionPullWorkerConfiguration,
   IngestionPullWorkerService,
-} from "../ingestion-pull-worker.service.ts";
+} from "../../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
 import {
   type PulledUsageRateReader,
   PulledUsagePricingService,
-} from "../pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
-import { PullerRegistryService } from "../puller-registry.service.ts";
+} from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../features/ingestion-pull/services/pulled-usage-record.service.ts";
+import { PullerRegistryService } from "../../features/ingestion-pull/services/puller-registry.service.ts";
+import type {
+  GovernanceOcsfEventSink,
+  GovernanceOcsfEventInput,
+} from "../../repositories/governance.repositories.ts";
+import type {
+  IngestionPullSourceReader,
+  UnpricedUsageWindow,
+} from "../../repositories/ingestion-source.repository.ts";
 
 function ingestionSource(
   overrides: Partial<GovernanceIngestionSource> = {},

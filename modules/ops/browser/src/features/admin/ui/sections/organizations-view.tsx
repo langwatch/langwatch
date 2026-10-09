@@ -30,9 +30,9 @@ import { useDebounce } from "use-debounce";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { Currency, PricingModel } from "../../model/backoffice-enums.ts";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { Currency, PricingModel } from "../../model/admin-enums.ts";
+import { dateInputToISO, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
  * admin Hono route strips them from every list/getOne response; the edit
@@ -78,7 +78,7 @@ export default function OrganizationsView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Organizations"
         searchValue={search}
         onSearchChange={(v) => {
@@ -149,7 +149,7 @@ export default function OrganizationsView() {
             ))}
           </Table.Body>
         </Table.Root>
-      </BackofficeTable>
+      </AdminTable>
 
       <OrganizationEditDrawer organization={editing} onClose={() => setEditing(null)} />
     </>

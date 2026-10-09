@@ -11,7 +11,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { ProjectSwitcherToken } from "@langwatch/project-contract";
+import { ProjectSwitcherToken } from "@langwatch/project-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 

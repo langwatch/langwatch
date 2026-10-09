@@ -6,8 +6,8 @@ import {
   cursorSchema,
   encodeGenieCursor,
   nextCursor,
-} from "../databricks-genie-cursor.rules.ts";
-import type { SweepResult } from "../databricks-genie-sweep.rules.ts";
+} from "../../features/databricks-genie/rules/databricks-genie-cursor.rules.ts";
+import type { SweepResult } from "../../features/databricks-genie/rules/databricks-genie-sweep.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const previous = cursorSchema.parse({ sinceMs: 1_000_000 });

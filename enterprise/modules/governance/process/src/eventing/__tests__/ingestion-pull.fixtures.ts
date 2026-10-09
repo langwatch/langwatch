@@ -7,13 +7,13 @@ import {
 import {
   type IngestionPullListingOutcomeChannel,
   IngestionPullListingService,
-} from "../../services/ingestion-pull-listing.service.ts";
-import type { IngestionPullMetricsSink } from "../../services/ingestion-pull-metrics.service.ts";
+} from "../../features/ingestion-pull/services/ingestion-pull-listing.service.ts";
+import type { IngestionPullMetricsSink } from "../../features/ingestion-pull/services/ingestion-pull-metrics.service.ts";
 import {
   type IngestionPullOutcomeChannel,
   type IngestionPullRunner,
   IngestionPullService,
-} from "../../services/ingestion-pull.service.ts";
+} from "../../features/ingestion-pull/services/ingestion-pull.service.ts";
 import {
   type IngestionPullScheduler,
   INGESTION_PULL_PROCESS_NAME,

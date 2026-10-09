@@ -3,7 +3,7 @@
  * call them.
  */
 
-import type { agentTrpc, httpProxyTrpc } from "@langwatch/agent-contract";
+import type { agentTrpc } from "@langwatch/agent-contract";
 import { type ContractApiMap, createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import type { featureFlagTrpc } from "@langwatch/feature-flag-contract";
@@ -31,7 +31,6 @@ type AuthzProcedures = {
 export type ScenarioApiMap = ContractApiMap<typeof suiteTrpc> &
   ContractApiMap<typeof testSuiteTrpc> &
   ContractApiMap<typeof agentTrpc> &
-  ContractApiMap<typeof httpProxyTrpc> &
   ContractApiMap<typeof featureFlagTrpc> &
   ContractApiMap<typeof exportTrpc> &
   ContractApiMap<typeof modelProviderTrpc> &

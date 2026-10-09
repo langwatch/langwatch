@@ -7,6 +7,7 @@ import { DisabledPipeline } from "./disabledPipeline.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
 import type { Event, Projection } from "./domain/types.ts";
 import type { EventingParticipation, ReadHintMap } from "./pipeline/feature-eventing.ts";
+import { peerOwnerOf } from "./pipeline/peerOwner.ts";
 import {
   type SealedPipelineDefinition,
   sealPipelineDefinition,
@@ -23,6 +24,7 @@ import type {
 } from "./process-manager/outbox/outboxDispatcherService.ts";
 import { ProcessRuntime } from "./process-manager/processRuntime.ts";
 import type { ProcessStore } from "./process-manager/stores/processStore.types.ts";
+import type { AggregateEventLog } from "./projections/eventLogLoaders.ts";
 import { ProjectionRegistry } from "./projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "./projections/replayMarkerCheck.ts";
 import { DispatchError } from "./queues/dispatchError.ts";
@@ -32,12 +34,14 @@ import type {
   JobDelivery,
 } from "./queues/index.ts";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory.ts";
+import type { ReplayService } from "./replay/replayService.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types.ts";
 import { EventSourcingPipeline } from "./runtimePipeline.ts";
 import {
   ConfigurationError,
   QueueError,
   QueueTenantMismatchError,
+  UndeclaredQueuedEventTypeError,
   ValidationError,
 } from "./services/errorHandling.ts";
 import {
@@ -47,7 +51,16 @@ import {
 } from "./services/handoff/failedHandoff.ts";
 import { JOB_ROUTING_FIELD, type JobTenants, readJobRouting } from "./services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
+import type { EventReadSeat } from "./stores/eventReadSeat.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
+import { EventUpcaster, type PipelineUpcasts } from "./upcast/eventUpcast.ts";
+import {
+  type LaneAlias,
+  laneAliasTakes,
+  laneAliasTargetKeys,
+  readAliasedBody,
+} from "./upcast/laneAlias.ts";
+import { upcastEventStore } from "./upcast/upcastEventStore.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -57,6 +70,8 @@ const logger = createLogger("langwatch:event-sourcing");
 export interface EventSourcingOptions {
   enabled?: boolean;
   eventStore?: EventStore;
+  /** One event by id beside the event store, which may refuse reads (event-read-seat.feature). */
+  eventReadSeat?: EventReadSeat;
   queueFactory?: (
     definition: EventSourcedQueueDefinition<Record<string, unknown>>,
   ) => EventSourcedQueueProcessor<Record<string, unknown>>;
@@ -91,6 +106,11 @@ export interface EventSourcingOptions {
     hinted: ReadHintMap;
     declaredEventTypes: ReadonlySet<string>;
   }) => StaticPipelineDefinition<never>;
+  /** Opens one replay run's engine over the event log; absent where the role holds no log. */
+  replayEngine?: (input: {
+    definitions: readonly SealedPipelineDefinition[];
+    retentionPolicyResolver?: RetentionPolicyResolver;
+  }) => { service: ReplayService; close: () => Promise<void> };
 }
 
 /**
@@ -127,8 +147,15 @@ export class EventSourcing {
 
   // Infrastructure — lazily initialized
   private _eventStore?: EventStore;
+  private readonly _eventReadSeat?: EventReadSeat;
   private _globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly _globalJobRegistry = new Map<string, JobRegistryEntry>();
+  private readonly _upcastDrains = new Map<
+    string,
+    { pipeline: string; jobNames: ReadonlyMap<string, string> }
+  >();
+  /** Former lane keys by the successors that consume them, each with its alias (round 49 E4). */
+  private readonly _laneAliases = new Map<string, { pipeline: string; alias: LaneAlias }[]>();
   private _initialized = false;
   private _consumersHeld = false;
   private _loggedDisabledWarning = false;
@@ -147,6 +174,7 @@ export class EventSourcing {
   private readonly _participation?: EventingParticipation;
   private readonly _maintenance?: () => readonly StaticPipelineDefinition<never>[];
   private readonly _readHints?: EventSourcingOptions["readHints"];
+  private readonly _replayEngine?: EventSourcingOptions["replayEngine"];
   private _processRuntimeInstance?: ProcessRuntime;
   /** Each registered pipeline's re-drive of its recorded hand-offs, by pipeline name. */
   private readonly handoffRedrives = new Map<
@@ -159,6 +187,7 @@ export class EventSourcing {
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._eventStore = options.eventStore;
+    this._eventReadSeat = options.eventReadSeat;
     this._queueFactory = options.queueFactory;
     this._queueName = options.queueName ?? "event-sourcing/jobs";
     this._consumersEnabled = options.consumersEnabled ?? true;
@@ -171,10 +200,13 @@ export class EventSourcing {
     this._participation = options.participation;
     this._maintenance = options.maintenance;
     this._readHints = options.readHints;
+    this._replayEngine = options.replayEngine;
 
     this.projectionRegistry = new ProjectionRegistry<Event>({
       parseEvent: (value) => this.parseRegisteredEvent(value),
       start: () => this.startGlobalRegistry(),
+      peerEventLog: (peer) => this.peerEventLog(peer),
+      replayMarkerChecker: this._replayMarkerChecker,
     });
     options.configureGlobalProjections?.(this.projectionRegistry);
   }
@@ -256,6 +288,11 @@ export class EventSourcing {
     return this._eventStore;
   }
 
+  /** The one-event read this process composed beside its store; absent where it composed none. */
+  get eventReadSeat(): EventReadSeat | undefined {
+    return this._eventReadSeat;
+  }
+
   get globalQueue(): EventSourcedQueueProcessor<Record<string, unknown>> | undefined {
     this.ensureInitialized();
     return this._globalQueue;
@@ -299,13 +336,42 @@ export class EventSourcing {
     return this._readHints({ hinted, declaredEventTypes });
   }
 
+  /** A peer lane's owner log (§9): the pipeline declaring its types, read as that one reads. */
+  private peerEventLog(peer: { lane: string; eventTypes: readonly string[] }): AggregateEventLog {
+    const owner = peerOwnerOf({ definitions: this.definitions, ...peer });
+    const store = this._eventStore;
+    if (!store) {
+      throw new ConfigurationError(
+        "EventSourcing",
+        `Peer projection "${peer.lane}" has no event log to re-fold from: this runtime holds no EventStore.`,
+        { projection: peer.lane },
+      );
+    }
+    return owner.open((definition) => ({
+      aggregateType: definition.metadata.aggregateType,
+      eventStore: upcastEventStore({
+        store,
+        upcaster: EventUpcaster.of(definition.upcasts),
+        parseEvent: definition.parseEvent,
+      }),
+    }));
+  }
+
   /** A queued event parsed with the schema of whichever registered pipeline declares its type. */
   private parseRegisteredEvent(value: unknown): Event {
     const type =
       typeof value === "object" && value !== null && "type" in value ? value.type : undefined;
-    const owner = this._definitions.find((definition) =>
-      definition.aggregate.events.some((event) => event.type === type),
+    const owner = this._definitions.find(
+      (definition) =>
+        definition.aggregate.events.some((event) => event.type === type) ||
+        definition.open((opened) => EventUpcaster.of(opened.upcasts).declaresFrom(type)),
     );
+    if (!owner && typeof type === "string" && type !== "") {
+      throw new UndeclaredQueuedEventTypeError({
+        eventType: type,
+        declaredBy: "any registered pipeline",
+      });
+    }
     if (!owner) {
       throw new ValidationError({
         reason: "No registered pipeline declares this queued event's type",
@@ -323,6 +389,16 @@ export class EventSourcing {
     if (this._described.size === 0) return this._definitions;
     const kept = this._definitions.filter(({ metadata }) => !this._described.has(metadata.name));
     return [...kept, ...this._described.values()];
+  }
+
+  /** One replay run's engine over the registered pipelines; undefined where none is wired. */
+  replayEngine(): { service: ReplayService; close: () => Promise<void> } | undefined {
+    return this._replayEngine?.({
+      definitions: this.definitions,
+      ...(this._retentionPolicyResolver === undefined
+        ? {}
+        : { retentionPolicyResolver: this._retentionPolicyResolver }),
+    });
   }
 
   /** Lists a pipeline's consume side without starting it: no queue, consumer, timer or sender. */
@@ -400,8 +476,13 @@ export class EventSourcing {
 
   /** A pipeline's cross-pipeline lanes, before the global registry starts routing. */
   private registerGlobalProjections(
-    definition: Pick<StaticPipelineDefinition, "globalProjections" | "metadata">,
+    definition: Pick<
+      StaticPipelineDefinition,
+      "globalProjections" | "metadata" | "retentionPolicyResolver"
+    >,
   ): void {
+    const { retentionPolicyResolver } = definition;
+    const host = retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver };
     for (const projection of definition.globalProjections ?? []) {
       if (this.projectionRegistry.isInitialized) {
         throw new ConfigurationError(
@@ -410,7 +491,7 @@ export class EventSourcing {
           { pipeline: definition.metadata.name, projection: projection.name },
         );
       }
-      projection.register(this.projectionRegistry);
+      projection.register(this.projectionRegistry, host);
     }
   }
 
@@ -482,7 +563,16 @@ export class EventSourcing {
       return disabled as ReturnType;
     }
 
-    const eventStore = this.eventStore as EventStore<EventType>;
+    const eventStore = upcastEventStore({
+      store: this.eventStore as EventStore<EventType>,
+      upcaster: EventUpcaster.of(definition.upcasts),
+      parseEvent: definition.parseEvent,
+    });
+    this.registerUpcastDrain(definition.upcasts);
+    this.registerLaneAliases({
+      pipeline: definition.metadata.name,
+      aliases: definition.laneAliases,
+    });
 
     const serviceOptions = buildServiceOptions(definition);
 
@@ -673,6 +763,103 @@ export class EventSourcing {
     return this._processStore;
   }
 
+  /** A former pipeline's queued jobs drain into the lanes of the pipeline that renamed it (§9). */
+  private registerUpcastDrain(upcasts: PipelineUpcasts | undefined): void {
+    const drain = upcasts?.drain;
+    if (!drain) return;
+    this._upcastDrains.set(drain.pipeline, {
+      pipeline: upcasts.pipeline,
+      jobNames: new Map(Object.entries(drain.jobNames ?? {})),
+    });
+  }
+
+  /** A successor's aliases, consulted for a key no lane and no drain answers. */
+  private registerLaneAliases({
+    pipeline,
+    aliases,
+  }: {
+    pipeline: string;
+    aliases: readonly LaneAlias[] | undefined;
+  }): void {
+    for (const alias of aliases ?? []) {
+      const successors = this._laneAliases.get(alias.from) ?? [];
+      this._laneAliases.set(alias.from, [...successors, { pipeline, alias }]);
+    }
+  }
+
+  /** The successor that takes a job queued under a former key, with the body it reads, if any. */
+  private aliasedJob({
+    registryKey,
+    clean,
+  }: {
+    registryKey: string;
+    clean: Record<string, unknown>;
+  }): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
+    for (const { pipeline, alias } of this._laneAliases.get(registryKey) ?? []) {
+      if (!("to" in alias) || !laneAliasTakes({ alias, stored: clean })) continue;
+      const body = readAliasedBody({ alias, stored: clean });
+      for (const key of laneAliasTargetKeys({ pipeline, to: alias.to })) {
+        const entry = this._globalJobRegistry.get(key);
+        if (entry) return { entry, clean: body };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * A job under a key a successor aliases that no routed alias takes by event type, or that a
+   * tombstone retires: the head deliberately does less, so it is acknowledged with a log line,
+   * not blocked. An alias that takes it but whose lane is not installed still retries.
+   */
+  private acknowledgeUnclaimedAlias(payload: Record<string, unknown>): boolean {
+    const registryKey = `${payload.__pipelineName as string}:${payload.__jobType as string}:${payload.__jobName as string}`;
+    const aliases = this._laneAliases.get(registryKey);
+    if (!aliases) return false;
+    const {
+      __pipelineName: _p,
+      __jobType: _t,
+      __jobName: _n,
+      [JOB_ROUTING_FIELD]: _r,
+      ...clean
+    } = payload;
+    const taking = aliases.filter(({ alias }) => laneAliasTakes({ alias, stored: clean }));
+    const tombstone = taking.find(({ alias }) => "tombstone" in alias)?.alias;
+    if (taking.length > 0 && !tombstone) return false;
+    logger.info(
+      {
+        ...EventSourcing.jobIdentity(payload),
+        tombstone: tombstone && "tombstone" in tombstone ? tombstone.tombstone : undefined,
+      },
+      "No successor of this former lane takes the job; acknowledging it",
+    );
+    return true;
+  }
+
+  /** The lane a job queued under a former pipeline's key drains into, if declared. */
+  private drainedEntry(job: {
+    pipelineName: string;
+    jobType: string;
+    jobName: string;
+  }): JobRegistryEntry | undefined {
+    return this.upcastDrainedEntry(job);
+  }
+
+  /** The current lane a job queued under a former pipeline's key drains into, if declared. */
+  private upcastDrainedEntry({
+    pipelineName,
+    jobType,
+    jobName,
+  }: {
+    pipelineName: string;
+    jobType: string;
+    jobName: string;
+  }): JobRegistryEntry | undefined {
+    const drain = this._upcastDrains.get(pipelineName);
+    if (!drain) return undefined;
+    const current = drain.jobNames.get(jobName) ?? jobName;
+    return this._globalJobRegistry.get(`${drain.pipeline}:${jobType}:${current}`);
+  }
+
   /**
    * Strips routing metadata and looks up the registry entry for a job payload,
    * returning null on no handler. Resolution runs several times per job, so a
@@ -691,11 +878,6 @@ export class EventSourcing {
     }
 
     const registryKey = `${pipelineName}:${jobType}:${jobName}`;
-    const entry = this._globalJobRegistry.get(registryKey);
-    if (!entry) {
-      logger.debug({ registryKey }, "No handler registered for job");
-      return null;
-    }
     const {
       __pipelineName: _p,
       __jobType: _t,
@@ -703,7 +885,12 @@ export class EventSourcing {
       [JOB_ROUTING_FIELD]: _r,
       ...clean
     } = payload;
-    return { entry, clean };
+    const entry =
+      this._globalJobRegistry.get(registryKey) ??
+      this.drainedEntry({ pipelineName, jobType, jobName });
+    const routed = entry ? { entry, clean } : this.aliasedJob({ registryKey, clean });
+    if (!routed) logger.debug({ registryKey }, "No handler registered for job");
+    return routed;
   }
 
   /**
@@ -750,6 +937,34 @@ export class EventSourcing {
       message: "job routing key is not registered in this worker",
       context: identity,
     });
+  }
+
+  /** Reads a dequeued job; an event type this worker does not declare is logged, then retried. */
+  private readDequeued<T>({
+    read,
+    payload,
+    delivery,
+  }: {
+    read: () => T;
+    payload: Record<string, unknown>;
+    delivery: JobDelivery | undefined;
+  }): T {
+    try {
+      return read();
+    } catch (error) {
+      if (error instanceof UndeclaredQueuedEventTypeError) {
+        logger.warn(
+          {
+            ...EventSourcing.jobIdentity(payload),
+            eventType: error.eventType,
+            declaredBy: error.declaredBy,
+            attempt: delivery?.attempt ?? null,
+          },
+          "Queued event type is not declared on this worker; retrying so a worker that declares it takes the job",
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -852,9 +1067,14 @@ export class EventSourcing {
   ): Promise<void> {
     const result = this.lookupEntry(payload);
     if (!result) {
+      if (this.acknowledgeUnclaimedAlias(payload)) return;
       this.rejectUnroutableJob(payload, queueName);
     }
-    const job = result.entry.read(result.clean);
+    const job = this.readDequeued({
+      read: () => result.entry.read(result.clean),
+      payload,
+      delivery,
+    });
     this.assertTenantRoutingConsistency({ tenants: job, payload, queueName });
     // Forward the delivery. Dropping it here silently pinned `deliveryAttempt` at 1 for every
     // registry entry, which disabled the fold store's merge-on-retry handling (#6578).
@@ -878,11 +1098,13 @@ export class EventSourcing {
   ): Promise<void> {
     if (payloads.length === 0) return;
     // Reject unroutable payloads upfront so lookupEntry returns only non-null.
-    const routed = payloads.map((payload) => {
+    const routed = payloads.flatMap((payload) => {
       const result = this.lookupEntry(payload);
+      if (!result && this.acknowledgeUnclaimedAlias(payload)) return [];
       if (!result) this.rejectUnroutableJob(payload, queueName);
-      return { ...result, payload };
+      return [{ ...result, payload }];
     });
+    if (routed.length === 0) return;
 
     // Every payload is read and tenant-gated before any runs: a misrouted job must never reach
     // its handler, alone or folded into a coalesced batch. A mixed batch (the GroupQueue only
@@ -891,7 +1113,11 @@ export class EventSourcing {
     const readBatch = firstEntry?.readBatch;
     if (!readBatch || !routed.every((r) => r.entry === firstEntry)) {
       const jobs = routed.map((r) => {
-        const job = r.entry.read(r.clean);
+        const job = this.readDequeued({
+          read: () => r.entry.read(r.clean),
+          payload: r.payload,
+          delivery,
+        });
         this.assertTenantRoutingConsistency({ tenants: job, payload: r.payload, queueName });
         return job;
       });
@@ -899,7 +1125,11 @@ export class EventSourcing {
       return;
     }
 
-    const batch = readBatch(routed.map((r) => r.clean));
+    const batch = this.readDequeued({
+      read: () => readBatch(routed.map((r) => r.clean)),
+      payload: routed[0]?.payload ?? {},
+      delivery,
+    });
     batch.jobs.forEach((tenants, index) => {
       this.assertTenantRoutingConsistency({
         tenants,
@@ -953,10 +1183,12 @@ export class EventSourcing {
     retentionPolicyResolver?: RetentionPolicyResolver;
     warnWhenProjectionsRunInline?: boolean;
     processStore?: ProcessStore;
+    configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       eventStore: options.eventStore,
+      configureGlobalProjections: options.configureGlobalProjections,
       executionTarget: options.executionTarget,
       retentionPolicyResolver: options.retentionPolicyResolver,
       warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,

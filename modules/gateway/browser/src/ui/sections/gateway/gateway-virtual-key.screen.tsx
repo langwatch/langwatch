@@ -22,7 +22,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
-import { Temporal, formatDistanceToNow, toEpochMs } from "@langwatch/time";
+import { Temporal, formatDistanceToNow, toEpochMs, readableDate } from "@langwatch/time";
 import { Bird, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -60,8 +60,8 @@ import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import { VirtualKeyUsageSnippet } from "../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx";
 import type { GatewayTeam } from "../../../model/gateway-host.ts";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { keepPreviousData } from "../../../model/keep-previous-data.ts";
-import { readableDate } from "../../../model/readable-date.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
@@ -282,7 +282,8 @@ async function runKeyAction<Key>(input: {
 
 function VirtualKeyDetailPage() {
   const showErrorToast = useShowErrorToast();
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
+  const host = useGatewayHost();
   const router = useGatewayRouter();
   const vkId = typeof router.query.id === "string" ? router.query.id : "";
   const orgId = organization?.id ?? "";
@@ -357,9 +358,9 @@ function VirtualKeyDetailPage() {
   // provider (see snippetModel below).
   const [snippetModelOverride, setSnippetModelOverride] = useState<string | null>(null);
 
-  const canUpdate = hasPermission("virtualKeys:update");
-  const canRotate = hasPermission("virtualKeys:rotate");
-  const canAttachGuardrails = hasPermission("gatewayGuardrails:attach");
+  const canUpdate = host.hasPermission("virtualKeys:update");
+  const canRotate = host.hasPermission("virtualKeys:rotate");
+  const canAttachGuardrails = host.hasPermission("gatewayGuardrails:attach");
 
   const vk = detailQuery.data;
 

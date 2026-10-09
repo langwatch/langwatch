@@ -19,6 +19,7 @@ import type {
   DeleteRoutingPolicyInput,
   FindRoutingPolicyInput,
   ListRoutingPoliciesInput,
+  PersonalContext,
   ResolveDefaultRoutingPolicyInput,
   RoutingPolicy,
   SetDefaultRoutingPolicyInput,
@@ -34,6 +35,8 @@ export interface EnterpriseGatewayApi {
   findDefaultRoutingPolicies(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy[]>;
   /** How many policies an organization holds (governance's setup checklist). */
   countRoutingPolicies(input: { organizationId: string }): Promise<number>;
+  /** The caller's personal workspace, provisioned lazily, and the routing policy it inherits. */
+  getPersonalContext(input: { userId: string; organizationId: string }): Promise<PersonalContext>;
   routingPolicyTierSuggestions(
     input: Omit<SuggestTierTargetsInput, "limit">,
   ): TierTargetSuggestion[];

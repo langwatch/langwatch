@@ -15,7 +15,8 @@ import {
 } from "@langwatch/langy-process/streaming/langy-frame-auth";
 import { describe, expect, it } from "vitest";
 
-import type { LangyFrameEnvelope, LangyFrameSigned } from "../langy-frame-auth.rules.ts";
+import type { LangyFrameSigned } from "../langy-frame-auth.rules.ts";
+import type { LangyFrameEnvelope } from "../langy-relay-frame.rules.ts";
 
 interface Vectors {
   vectors: (LangyFrameSigned & { name: string; runToken: string; mac: string })[];

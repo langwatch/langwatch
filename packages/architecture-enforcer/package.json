@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/architecture-enforcer",
+  "langwatch": { "group": "tooling" },
   "version": "0.1.0",
   "private": true,
   "description": "Executable package-boundary policies for the LangWatch monorepo.",
@@ -21,6 +22,7 @@
     "typecheck": "pnpm -w exec tsc -b packages/architecture-enforcer",
     "test": "vitest run",
     "check:feature-parity": "node --experimental-transform-types src/tools/check-feature-parity.ts",
+    "print:table-owners": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/tools/print-table-owners.ts",
     "parity:candidates": "node --experimental-transform-types src/tools/parity-candidates.ts",
     "docs": "node src/lint-rules-doc.mjs",
     "docs:check": "node src/lint-rules-doc.mjs --check"

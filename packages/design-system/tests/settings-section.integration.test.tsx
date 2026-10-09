@@ -3,7 +3,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SettingsSection } from "../src/components/settings-section.tsx";
+import { SettingsSection } from "../src/components/layout/settings-section.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

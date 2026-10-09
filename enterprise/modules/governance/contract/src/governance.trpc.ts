@@ -1,27 +1,33 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every `governance.*` procedure served so far, declared once, at main's wire names. */
 import { defineTrpcContract } from "@langwatch/module";
+import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { z } from "zod";
 
 import {
   adminWorkspaceKindSchema,
   recordWorkspaceViewResultSchema,
 } from "./admin-workspace-view-audit.ts";
-import { governanceActorWorkspaceSchema } from "./governance.responses.ts";
-import { governanceSetupStateSchema } from "./governance.ts";
-import { governanceOcsfExportPageSchema } from "./ocsf-export.ts";
-import { personaResolutionSchema } from "./persona-home.ts";
+import { cliBootstrapResultSchema } from "./features/cli/cli-bootstrap.ts";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
   quarantineFillStatsSchema,
-} from "./quarantine-fill.ts";
+} from "./features/ingestion/quarantine-fill.ts";
+import { personaResolutionSchema } from "./features/personal/persona-home.ts";
+import { governanceBudgetOverviewForUserSchema } from "./features/personal/personal-budget-overview.ts";
+import { personalUsageRollupSchema } from "./features/personal/personal-usage.ts";
+import { governanceActorWorkspaceSchema } from "./governance.responses.ts";
+import { governanceSetupStateSchema } from "./governance.ts";
+import { governanceOcsfExportPageSchema } from "./ocsf-export.ts";
 
 const organizationScope = z.object({ organizationId: z.string() });
 
 export const governanceTrpc = defineTrpcContract("governance")
   /** An actor stamped on spans (email or user id) to their personal workspace here, or null. */
-  .query("resolveActorPersonalProject")
+  .query("resolveActorPersonalProject", {
+    invalidatedBy: [{ event: PROJECT_CREATED_EVENT_TYPE, scope: "organizationId" }],
+  })
   .withInput(z.object({ organizationId: z.string(), actor: z.string().min(1).max(512) }))
   .withOutput(governanceActorWorkspaceSchema.nullable())
 
@@ -69,4 +75,25 @@ export const governanceTrpc = defineTrpcContract("governance")
     }),
   )
   .withOutput(recordWorkspaceViewResultSchema)
+
+  /** The caller's own /me rollup; the window applies only when both ends are given. */
+  .query("personalUsage")
+  .withInput(
+    z.object({
+      ...organizationScope.shape,
+      windowStartMs: z.number().optional(),
+      windowEndMs: z.number().optional(),
+    }),
+  )
+  .withOutput(personalUsageRollupSchema)
+
+  /** Every budget binding the caller's own keys, most binding first. */
+  .query("budgetOverview")
+  .withInput(z.object({ ...organizationScope.shape, includeTopModels: z.boolean().optional() }))
+  .withOutput(governanceBudgetOverviewForUserSchema)
+
+  /** What the CLI's login ceremony renders: the caller's providers and monthly budget. */
+  .query("cliBootstrap")
+  .withInput(organizationScope)
+  .withOutput(cliBootstrapResultSchema)
   .build();

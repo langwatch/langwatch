@@ -11,16 +11,16 @@ import { dirname, join } from "node:path";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
+import { LangWatchQLProductionProvisioningService } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
+import {
+  LangWatchQLSelfProvisioningService,
+  LWQL_SELF_PROVISION_DEFAULTS,
+} from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
   LangWatchQLAccessModelDefinitionService,
   type LwqlAccessModelDefinition,
   type RenderedConfigFile,
 } from "../services/langwatch-ql-access-model-definition.service.ts";
-import { LangWatchQLProductionProvisioningService } from "../services/langwatch-ql-production-provisioning.service.ts";
-import {
-  LangWatchQLSelfProvisioningService,
-  LWQL_SELF_PROVISION_DEFAULTS,
-} from "../services/langwatch-ql-self-provisioning.service.ts";
 
 const logger = createLogger("langwatch:tasks:lwql-render-access-config");
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();

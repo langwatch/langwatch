@@ -13,8 +13,8 @@ import {
   userCredentialAccountSchema,
   userPasskeyNudgeStatusSchema,
   userNotificationChoiceSchema,
+  type AdoptUnconfirmedAccountOutcome,
   type CreateUserInput,
-  type UpdateUserProfileInput,
   type UserAccountInfo,
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
@@ -33,9 +33,13 @@ import type {
   CreatedCredentialUser,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
+  UserCreatedRow,
+  UserStandingRow,
   UserDeactivationOutcome,
   UserRepository,
+  StoredProfileChange,
 } from "../user.repository.ts";
+import { PrismaUserLifecycleOutboxStore } from "./prisma.user-lifecycle-outbox.store.ts";
 
 /**
  * The stored map, read leniently: a choice this release does not know (one a
@@ -98,10 +102,39 @@ export class PrismaUserRepository
   }
 
   readonly #database: UserDatabase;
+  readonly #facts: PrismaUserLifecycleOutboxStore;
 
   private constructor(prisma: UserDatabase) {
     super(prisma);
     this.#database = prisma;
+    this.#facts = PrismaUserLifecycleOutboxStore.create({ database: prisma });
+  }
+
+  /** The created fact, and registered for a self-service sign-up, in the mint's transaction. */
+  async #appendMintFacts({
+    transaction,
+    userId,
+    createdAt,
+    registration,
+  }: {
+    transaction: object;
+    userId: string;
+    createdAt: Date;
+    registration?: { accountId: string; createdAtMs: number; email: string };
+  }): Promise<void> {
+    const occurredAt = createdAt.getTime();
+    const fact = { tenantId: userId, userId, occurredAt };
+    await this.#facts.append({
+      userId,
+      transaction,
+      now: occurredAt,
+      intents: [
+        { type: "recordCreated", data: fact },
+        ...(registration
+          ? [{ type: "recordRegistered" as const, data: { ...fact, ...registration } }]
+          : []),
+      ],
+    });
   }
 
   /** One clock for every server, so user's facts order however the servers' clocks drift. */
@@ -151,6 +184,41 @@ export class PrismaUserRepository
     return row !== null;
   }
 
+  async findCreatedPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserCreatedRow[]> {
+    const rows = await this.prisma.user.findMany({
+      where: afterId === null ? {} : { id: { gt: afterId } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: { id: true, createdAt: true },
+    });
+    return rows.map((row) => ({ id: row.id, createdAt: fromDate(row.createdAt) }));
+  }
+
+  async findStandingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserStandingRow[]> {
+    const rows = await this.prisma.user.findMany({
+      where: afterId === null ? {} : { id: { gt: afterId } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: { id: true, deactivatedAt: true },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      deactivatedAt: row.deactivatedAt ? fromDate(row.deactivatedAt) : null,
+    }));
+  }
+
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 
@@ -179,16 +247,20 @@ export class PrismaUserRepository
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
-    return userProfileSchema.parse(
-      await this.prisma.user.create({ data: input, select: userProfileSelect }),
-    );
+    return this.transaction(async (transaction) => {
+      const user = userProfileSchema.parse(
+        await transaction.user.create({ data: input, select: userProfileSelect }),
+      );
+      await this.#appendMintFacts({ transaction, userId: user.id, createdAt: user.createdAt });
+      return user;
+    });
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
     return this.transaction(async (transaction) => {
-      const user = await transaction.user.create({
+      const { createdAt, ...user } = await transaction.user.create({
         data: { name: input.name, email: input.email, emailVerified: input.emailVerified },
-        select: createdUserSelect,
+        select: { ...createdUserSelect, createdAt: true },
       });
       const parsed = createdUserSchema.parse(user);
       const account = await transaction.account.create({
@@ -198,6 +270,20 @@ export class PrismaUserRepository
           password: input.passwordHash,
         }),
         select: { id: true, createdAt: true },
+      });
+      await this.#appendMintFacts({
+        transaction,
+        userId: parsed.id,
+        createdAt,
+        ...(input.selfRegistered
+          ? {
+              registration: {
+                accountId: account.id,
+                createdAtMs: account.createdAt.getTime(),
+                email: input.email,
+              },
+            }
+          : {}),
       });
 
       return {
@@ -211,11 +297,12 @@ export class PrismaUserRepository
   async createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser> {
     return createdUserSchema.parse(
       await this.transaction(async (transaction) => {
-        const user = await transaction.user.create({
+        const { createdAt, ...user } = await transaction.user.create({
           data: { name: null, email: input.email, emailVerified: input.emailVerified },
-          select: createdUserSelect,
+          select: { ...createdUserSelect, createdAt: true },
         });
         const parsed = createdUserSchema.parse(user);
+        await this.#appendMintFacts({ transaction, userId: parsed.id, createdAt });
         await transaction.account.create({
           data: credentialAccountData({
             userId: parsed.id,
@@ -266,6 +353,33 @@ export class PrismaUserRepository
     return "set";
   }
 
+  async adoptUnconfirmed(input: { id: string }): Promise<AdoptUnconfirmedAccountOutcome> {
+    // Serializable, so a sign-in or a confirmation racing the adoption is either seen
+    // here or retried against what this one wrote.
+    return this.serializableTransaction<AdoptUnconfirmedAccountOutcome>(async (transaction) => {
+      const row = await transaction.user.findUnique({
+        where: { id: input.id },
+        select: { emailVerified: true, lastLoginAt: true },
+      });
+      if (!row) return "no_account";
+      if (row.emailVerified) return "already_confirmed";
+      if (row.lastLoginAt) return "signed_in";
+
+      await transaction.account.deleteMany({ where: { userId: input.id } });
+      await transaction.passkey.deleteMany({ where: { userId: input.id } });
+      await transaction.user.update({
+        where: { id: input.id },
+        data: {
+          emailVerified: true,
+          signupConfirmationPending: false,
+          passkeySignupClaimHash: null,
+        },
+      });
+
+      return "adopted";
+    });
+  }
+
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
     const [passkeyCount, user] = await Promise.all([
       this.prisma.passkey.count({ where: { userId: id } }),
@@ -305,7 +419,7 @@ export class PrismaUserRepository
     });
   }
 
-  async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
+  async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
     const data: { name?: string; email?: string } = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.email !== undefined) data.email = input.email;

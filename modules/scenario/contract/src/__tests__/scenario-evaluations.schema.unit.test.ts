@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Verdict } from "../scenario-run.ts";
+import { Verdict } from "../features/run/scenario-run.ts";
 import {
   SCENARIO_EVALUATION_STATUSES,
   type ScenarioEvaluationResult,

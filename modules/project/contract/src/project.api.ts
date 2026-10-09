@@ -1,7 +1,6 @@
-import { moduleApi, uiTokens } from "@langwatch/module";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
-import type { TopicClusteringRequest } from "./project.responses.ts";
 import type {
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
@@ -12,6 +11,7 @@ import type {
   PaginatedProjects,
   Project,
   ProjectIdentity,
+  LiveProjectIdsByOrganizationInput,
   ProjectIdsByOrganizationInput,
   ProjectNamesByIdsInput,
   ProjectWithTeam,
@@ -36,6 +36,30 @@ export interface ProjectUsageCount {
   readonly updatedProjects: number;
   readonly firstProjectAt?: number;
 }
+
+export interface ProjectIdPageInput {
+  after?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface ProjectIdPage {
+  ids: string[];
+  next: string | null;
+}
+
+/** A project and the organisation that owns it, as fleet scans read them. */
+export interface ProjectOrganizationRef {
+  id: string;
+  organizationId: string;
+}
+
+export interface ProjectOrganizationPage {
+  projects: ProjectOrganizationRef[];
+  next: string | null;
+}
+
+/** The page size fleet scans pass to `listAllIds`. */
+export const PROJECT_ID_PAGE_LIMIT = 500;
 
 export interface ProjectApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
@@ -83,7 +107,9 @@ export interface ProjectApi {
   listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]>;
   listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
   /** Unarchived, non-governance project ids, unpaged: main's `findAllByOrganization` filter. */
-  findLiveNonGovernanceIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
+  findLiveNonGovernanceIdsByOrganization(
+    input: LiveProjectIdsByOrganizationInput,
+  ): Promise<string[]>;
   /** Main's CLI project-key read (auth-cli.ts:2092): a live project by slug, in one org. */
   findLiveBySlug(input: Readonly<{ slug: string; organizationId: string }>): Promise<Project[]>;
   /** Main's `findProjectInOrg` (auth-cli.ts:2533): a live project by id, else slug, in one org. */
@@ -100,6 +126,21 @@ export interface ProjectApi {
       framework: string;
     }>,
     by: Readonly<{ id: string }>,
+  ): Promise<Project>;
+  /**
+   * Provisions a project for a management credential, which may be a service
+   * key acting as nobody: the actor is nullable here, unlike `create`'s.
+   */
+  createInOrganization(
+    input: Readonly<{
+      organizationId: string;
+      userId: string | null;
+      teamId?: string | undefined;
+      newTeamName?: string | undefined;
+      name: string;
+      language: string;
+      framework: string;
+    }>,
   ): Promise<Project>;
   /**
    * Stored-object credentials (`s3Endpoint`, `s3AccessKeyId`, `s3SecretAccessKey`)
@@ -126,10 +167,6 @@ export interface ProjectApi {
   findPersonalWorkspaceOwner(
     input: Readonly<{ organizationId: string; scopeId: string }>,
   ): Promise<{ ownerUserId: string | null } | null>;
-  requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: Readonly<{ id: string }>,
-  ): Promise<TopicClusteringRequest>;
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
   /** Stamps a project as having just seen coding-agent session activity. */
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;
@@ -168,6 +205,16 @@ export interface ProjectApi {
     memberUserId?: string;
     limit: number;
   }): Promise<string[]>;
+  /**
+   * Project ids on this install ordered by id, archived included, a page at a time
+   * for fleet-wide scans. No limit reads them all; `next` is null on the last page.
+   */
+  listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
+  /**
+   * Every project with its organisation, paged like `listAllIds`, for the storage
+   * migration inventory (main `migrateObjectStorage.ts` `listProjectsPage`).
+   */
+  listAllWithOrganization(input?: ProjectIdPageInput): Promise<ProjectOrganizationPage>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");
@@ -177,12 +224,7 @@ export const ProjectApi = moduleApi<ProjectApi>()("project");
 /** What a landing hero hands project's lent inline command palette. */
 export type HeroAskFieldProps = { placeholder: string };
 
-export const HeroAskFieldToken = uiTokens("project").component<HeroAskFieldProps>("heroAskField");
-
 /** Main's project selector, lent by project to pages outside the navigation shell (§10, §10.1). */
 
 /** The switcher needs nothing handed in: it reads the scope and the graph itself. */
 export type ProjectSwitcherProps = Record<string, never>;
-
-export const ProjectSwitcherToken =
-  uiTokens("project").component<ProjectSwitcherProps>("projectSwitcher");

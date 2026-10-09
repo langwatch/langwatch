@@ -7,7 +7,7 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ConfirmDialog } from "../src/components/confirm-dialog.tsx";
+import { ConfirmDialog } from "../src/components/overlays/confirm-dialog.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 const defaultProps = {

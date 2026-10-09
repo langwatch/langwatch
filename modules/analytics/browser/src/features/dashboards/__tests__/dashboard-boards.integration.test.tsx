@@ -208,6 +208,9 @@ const chip = ({ row, name }: { row: string; name: string }) =>
     name: new RegExp(`^${escape(name)}\\s*\\d+$`),
   });
 
+/** The picker's search: the ask bar as a field, named by the bar's words. */
+const pickerSearch = () => screen.getByRole("searchbox", { name: "What do you want to know?" });
+
 /** A chip's whole text: its words, then its count. */
 const chipText = ({ name, count }: { name: string; count: number }) =>
   new RegExp(`^${escape(name)}\\s*${count}$`);
@@ -425,8 +428,8 @@ describe("a member's board", () => {
     });
 
     describe("when the write fails", () => {
-      /** @scenario "AC12c A failed add keeps the picker open and does not seed Langy" */
-      it("keeps the picker open, seeds no Langy conversation, and stores no widget", async () => {
+      /** @scenario "AC12c A failed add takes the widget off again and does not seed Langy" */
+      it("closes the picker, says the add failed, seeds no Langy conversation, and stores no widget", async () => {
         const user = userEvent.setup();
         const server = inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true });
         const { host } = openPicker(server);
@@ -439,7 +442,12 @@ describe("a member's board", () => {
         );
 
         await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
-        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        await waitFor(() =>
+          expect(host.failures).toEqual([
+            expect.objectContaining({ fallbackTitle: "Couldn't add the widget" }),
+          ]),
+        );
+        expect(host.lastQuery).toEqual({ addBlock: void 0 });
         expect(host.langyAsks).toEqual([]);
         expect(server.state.widgets).toEqual([]);
       });
@@ -519,7 +527,7 @@ describe("a member's board", () => {
         openPicker();
 
         const dialog = await screen.findByRole("dialog");
-        expect(screen.getByRole("searchbox", { name: "Search widgets" })).toHaveValue("");
+        expect(pickerSearch()).toHaveValue("");
         const all = chip({ row: "Categories", name: "All" });
         expect(all).toHaveAttribute("aria-pressed", "true");
         expect(all).toHaveTextContent(chipText({ name: "All", count: TOTAL }));
@@ -679,7 +687,7 @@ describe("a member's board", () => {
 
         await screen.findByRole("dialog");
         await user.click(chip({ row: "Categories", name: "Profit" }));
-        fireEvent.change(screen.getByRole("searchbox", { name: "Search widgets" }), {
+        fireEvent.change(pickerSearch(), {
           target: { value: "zzz-no-such-widget" },
         });
 
@@ -691,7 +699,7 @@ describe("a member's board", () => {
         await user.click(screen.getByRole("button", { name: "Clear search and filters" }));
 
         expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
-        expect(screen.getByRole("searchbox", { name: "Search widgets" })).toHaveValue("");
+        expect(pickerSearch()).toHaveValue("");
       });
     });
   });
@@ -731,14 +739,14 @@ describe("a member's board", () => {
       const dialog = await screen.findByRole("dialog");
       await user.click(chip({ row: "Agent types", name: AGENT_KIND_CHIP_LABELS.voice }));
       await user.click(chip({ row: "Categories", name: "Protect" }));
-      fireEvent.change(screen.getByRole("searchbox", { name: "Search widgets" }), {
+      fireEvent.change(pickerSearch(), {
         target: { value: "latency" },
       });
       await user.click(within(dialog).getByRole("button", { name: "Close" }));
       await user.click(await screen.findByRole("button", { name: "Open the picker again" }));
 
       await screen.findByRole("dialog");
-      expect(screen.getByRole("searchbox", { name: "Search widgets" })).toHaveValue("");
+      expect(pickerSearch()).toHaveValue("");
       expect(chip({ row: "Categories", name: "All" })).toHaveAttribute("aria-pressed", "true");
       const types = within(screen.getByRole("group", { name: "Agent types" }));
       for (const type of types.getAllByRole("button")) {

@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Toaster, toaster } from "../src/components/toaster.tsx";
+import { Toaster, toaster } from "../src/components/overlays/toaster.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 beforeEach(() => {

@@ -6,11 +6,11 @@
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import type { RestProjectCredentialPrincipal } from "@langwatch/authorization";
+import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
 import { defineRestMiddleware } from "@langwatch/module";
 import { z } from "zod";
 
 import {
-  INSTANT_EVAL_CLASSIFIER_LIMITS,
   INSTANT_EVAL_JUDGMENT_STATUSES,
   INSTANT_EVAL_MAX_ROW_CAP,
   INSTANT_EVAL_MAX_SHORTHAND_QUESTIONS,
@@ -290,7 +290,6 @@ export const instantEvalSampleQuerySchema = z.object({
     .describe("Rows to re-read, at most twenty five."),
 });
 
-export type InstantEvalListQuery = z.infer<typeof instantEvalListQuerySchema>;
 export type InstantEvalResultsQuery = z.infer<typeof instantEvalResultsQuerySchema>;
 export type InstantEvalSampleQuery = z.infer<typeof instantEvalSampleQuerySchema>;
 
@@ -463,17 +462,34 @@ export const instantEvalRestCredential = defineRestMiddleware(
   instantEvalRestCredentialSchema,
 );
 
+/** Why a self-hosted install is not released, one per remedy (main #8416). */
+export const selfHostedInstantEvalOfferSchema = z.enum([
+  "not_in_license",
+  "switched_off",
+  "not_connected",
+  "ask_operator",
+]);
+export type SelfHostedInstantEvalOffer = z.infer<typeof selfHostedInstantEvalOfferSchema>;
+
 /**
  * What the refusal popover offers an organization that may not judge: its own
- * switch (`enable`), a word with an organization admin for a member who may not
- * throw it (`ask_admin`), or a word with us (`contact_us`: enterprise, self-hosted).
+ * switch (`enable`), a word with an organization admin (`ask_admin`), a word
+ * with us (`contact_us`), or the reason a self-hosted install is not released.
  */
-export const instantEvalOptInOfferSchema = z.enum(["enable", "ask_admin", "contact_us"]);
+export const instantEvalOptInOfferSchema = z.union([
+  z.enum(["enable", "ask_admin", "contact_us"]),
+  selfHostedInstantEvalOfferSchema,
+]);
 export type InstantEvalOptInOffer = z.infer<typeof instantEvalOptInOfferSchema>;
 
-/** Whether the project is released, and what the popover offers when it is not. */
+/**
+ * Whether the project is released, what the popover offers when it is not, and
+ * whether the install judges through LangWatch (`viaConnect`), which is when the
+ * "can't run right now" popover names the two addresses it needs (main #8416).
+ */
 export const instantEvalOptInAccessSchema = z.object({
   released: z.boolean(),
   offer: instantEvalOptInOfferSchema,
+  viaConnect: z.boolean(),
 });
 export type InstantEvalOptInAccess = z.infer<typeof instantEvalOptInAccessSchema>;

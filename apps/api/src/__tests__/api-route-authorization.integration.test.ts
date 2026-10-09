@@ -57,6 +57,19 @@ describe("the installed api's REST routes", () => {
     expect(undeclaredRoutes({ app: booted.rest.app, registry })).toEqual([]);
   });
 
+  /** @scenario "Every installed route declares a permission or a named exception" */
+  it("registers no route that names neither a permission nor a written reason", () => {
+    const registry = allRegisteredRoutes();
+    const unnamed = registry.filter(
+      ({ policy }) =>
+        policyPermissions(policy).length === 0 &&
+        !("reason" in policy && policy.reason.trim() !== ""),
+    );
+
+    expect(registry.length).toBeGreaterThan(0);
+    expect(unnamed.map(({ method, path }) => `${method} ${path}`)).toEqual([]);
+  });
+
   /** @scenario "Every route still admits the roles that could already reach it" */
   it("admits a holder of the resource's manage permission on every permissioned route", () => {
     const manageable = declared.filter(({ permission }) => hasManage(permission));

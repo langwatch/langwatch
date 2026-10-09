@@ -307,6 +307,20 @@ Feature: apidiff boots its instances through haven
       Then it drops only its own databases and leaves the stack up
       And the next run finds the stack on the same ports, or starts it on fresh ones if those fail
 
+    @unit
+    Scenario: A -no-haven run keeps Postgres on haven's host server
+      Given a -no-haven run without -compose-postgres
+      When it provisions its infrastructure
+      Then compose starts only ClickHouse and Redis
+      And each side gets its own run-scoped apidiff_<run>_<side> database on 127.0.0.1:5432, created and dropped by the run
+      And no database it names can be one haven gives a dev stack (lw_<slug>)
+
+    @unit
+    Scenario: -compose-postgres keeps the fully isolated compose stack
+      Given a -no-haven run with -compose-postgres
+      When it provisions its infrastructure
+      Then Postgres runs in the apidiff compose project and is administered through compose exec
+
   Rule: A run proves effects, not only shapes
 
     @unit
@@ -352,3 +366,50 @@ Feature: apidiff boots its instances through haven
       When the run writes its files
       Then signatures.md groups the masked messages as new on candidate, also on base, and base only
       And each line carries the candidate/base counts and the first file:line
+
+  Rule: A dead worker or an unreadable fixture trace stops the run with evidence
+
+    # A worker that dies twice projects nothing; probing on gave 10 minutes of
+    # comparisons of empty answers and no log to read.
+    @unit
+    Scenario: A worker that exits a second time stops the run naming its side
+      Given a side's worker exited during boot and was started once more
+      When the restarted worker exits too
+      Then the run stops with exit 2
+      And the message names the side, base or branch
+      And the last 100 lines of that side's worker log are printed
+
+    @unit
+    Scenario: A worker killed by teardown does not stop the run
+      Given a worker whose run is tearing down
+      When the worker exits
+      Then no worker death is reported
+
+    @unit
+    Scenario: A fixture trace that never reads back stops the run before probing
+      Given both sides accepted the fixture trace
+      And one side never reads it back within the wait
+      When the run seeds its fixtures
+      Then no operation is probed
+      And the run stops with exit 2, naming the side and its worker log
+
+    @unit
+    Scenario: A documentation-only spec change is ruled for the kind it was given for
+      Given main published prompts at the root path and the branch's langy control connect names the instance token
+      When the spec diff reports the removed root operations and the changed connect security
+      Then those changes render under their ruling and are not counted as differences
+      And a different change kind on the same operation is still counted
+
+    @unit
+    Scenario: Stale apidiff databases are swept, and nothing else
+      Given the shared Postgres and ClickHouse servers hold apidiff databases of crashed and kept runs
+      When a run starts on the haven path or not, or apidiff -sweep-databases runs, with -sweep-days at 2
+      Then each apidiff_<run>_branch or _main database older than 2 days is dropped
+      And a database without the apidiff_ prefix is never touched
+      And with -dry-run the databases that would be dropped are printed and none is dropped
+
+    @unit
+    Scenario: A database owned by a running apidiff is never swept
+      Given an old apidiff database whose run directory holds the pid of a live process
+      When the sweep selects databases to drop
+      Then that database and the current run's databases are left alone

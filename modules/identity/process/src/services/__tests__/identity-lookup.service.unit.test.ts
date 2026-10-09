@@ -59,6 +59,10 @@ class FakeAuditLog implements AuditLogApi {
   async listEntityHistory() {
     return [];
   }
+
+  async findByTargetKind() {
+    return [];
+  }
 }
 
 /** Fixed window, in memory - no Redis needed to prove the throttle shape. */

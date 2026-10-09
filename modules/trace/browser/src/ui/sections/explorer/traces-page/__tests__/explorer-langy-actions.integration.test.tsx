@@ -8,7 +8,7 @@ import {
   TraceHostProvider,
   type TraceLangyActionHandlers,
 } from "../../../../../behavior/trace-host.ts";
-import { ExplorerLangyActions } from "../explorer-langy-actions.tsx";
+import { ExplorerLangyActions } from "../traces-page.tsx";
 
 /** A host that does nothing but remember what the page published to it. */
 class FixtureTraceHost extends TraceHostApi {

@@ -1,10 +1,11 @@
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo, PricingModel, UsageUnit } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
+import { nowInstant } from "@langwatch/time";
 
+import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
+import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
+import type { TraceMeterRepository } from "../repositories/trace-meter.repository.ts";
 import { buildLimitMessage, type UsageDeployment } from "../rules/usage-limit-message.rules.ts";
 import { resolveUsageMeter } from "../rules/usage-meter-policy.rules.ts";
 
@@ -42,17 +43,10 @@ export interface UsageCounter {
 }
 
 /**
- * What enforcement needs of the organization graph: which organization a team belongs to, which
- * projects it owns, and the pricing model a licence override is read against. The aggregate is
- * another feature's, so this is the shape rather than its repository.
+ * What enforcement needs of the organization graph: which projects it owns, and the pricing
+ * model a licence override is read against.
  */
 export interface UsageOrganization {
-  /**
-   * Throws `organization_not_found_for_team`: enforcement refuses a tenant that does not
-   * resolve rather than metering traffic against nobody's plan.
-   */
-  getOrganizationIdByTeamId(input: { teamId: string }): Promise<string>;
-
   getProjectIds(organizationId: string): Promise<string[]>;
 
   getPricingModel(organizationId: string): Promise<{ pricingModel: PricingModel | null }>;
@@ -127,16 +121,61 @@ export class InProcessUsageCache implements UsageCache {
   }
 }
 
-/** The peers the live usage count reads through. */
+/** The peer the usage count prices through; traces are counted off entitlement's own meter. */
 export type EntitlementUsagePeers = Readonly<{
-  traces: Pick<TraceApi, "countTracesByProjects">;
-  billing: Pick<
-    BillingApi,
-    "countBillableEventsByProjects" | "getPricingModel" | "sendUsageWarning"
-  >;
-  organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId" | "findAllIds">;
-  projects: Pick<ProjectApi, "listIdsByOrganization">;
+  billing: Pick<BillingApi, "getPricingModel">;
 }>;
+
+/** Where the usage count finds an organisation's projects, and the organisations to sweep. */
+export type UsageTenancy = Pick<TenancyRepository, "findProjectIds" | "findMeteredOrganizationIds">;
+
+/** This UTC month's events per named project off the meter, 0 for a project with none. */
+function meterEventCounter({
+  meter,
+}: {
+  meter: Pick<BillableEventsMeterRepository, "countByProjects">;
+}): UsageVolumeCounter {
+  return {
+    async getCountByProjects({ organizationId, projectIds }) {
+      if (projectIds.length === 0) return [];
+      const month = nowInstant().toZonedDateTimeISO("UTC").toPlainDate().toPlainYearMonth();
+      const window = {
+        startDate: `${month.toString()}-01 00:00:00.000`,
+        endDate: `${month.add({ months: 1 }).toString()}-01 00:00:00.000`,
+      };
+      const counts = await meter.countByProjects({ organizationId, projectIds, window });
+      const countByProject = new Map(counts.map(({ projectId, count }) => [projectId, count]));
+      return projectIds.map((projectId) => ({
+        projectId,
+        count: countByProject.get(projectId) ?? 0,
+      }));
+    },
+  };
+}
+
+/** This UTC month's traces per named project off the trace meter, 0 for a project with none. */
+function meterTraceCounter({
+  meter,
+}: {
+  meter: Pick<TraceMeterRepository, "countByProjects">;
+}): UsageVolumeCounter {
+  return {
+    async getCountByProjects({ organizationId, projectIds }) {
+      if (projectIds.length === 0) return [];
+      const month = nowInstant().toZonedDateTimeISO("UTC").toPlainDate().toPlainYearMonth();
+      const counts = await meter.countByProjects({
+        organizationId,
+        projectIds,
+        month: month.toString(),
+      });
+      const countByProject = new Map(counts.map(({ projectId, count }) => [projectId, count]));
+      return projectIds.map((projectId) => ({
+        projectId,
+        count: countByProject.get(projectId) ?? 0,
+      }));
+    },
+  };
+}
 
 /** Main's 30-second count and meter-decision windows. */
 const USAGE_CACHE_TTL_MS = 30_000;
@@ -185,23 +224,24 @@ export class UsageService {
     return new UsageService(deps);
   }
 
-  /** Main's `UsageService` over the owners' counts: trace's traces, billing's events, pricing. */
+  /** Main's `UsageService` over entitlement's trace and events meters and billing's pricing. */
   static overPeers(input: {
     isSaas: boolean;
     planResolver: PlanResolver;
     peers: EntitlementUsagePeers;
+    tenancy: UsageTenancy;
+    meter: Pick<BillableEventsMeterRepository, "countByProjects">;
+    traceMeter: Pick<TraceMeterRepository, "countByProjects">;
   }): UsageService {
-    const { traces, billing, organizations, projects } = input.peers;
+    const { billing } = input.peers;
+    const { tenancy } = input;
     return new UsageService({
       organizations: {
-        getOrganizationIdByTeamId: (lookup) => organizations.getOrganizationIdByTeamId(lookup),
-        getProjectIds: (organizationId) => projects.listIdsByOrganization({ organizationId }),
+        getProjectIds: (organizationId) => tenancy.findProjectIds({ organizationId }),
         getPricingModel: (organizationId) => billing.getPricingModel({ organizationId }),
       },
-      traceCounter: { getCountByProjects: (counted) => traces.countTracesByProjects(counted) },
-      eventCounter: {
-        getCountByProjects: (counted) => billing.countBillableEventsByProjects(counted),
-      },
+      traceCounter: meterTraceCounter({ meter: input.traceMeter }),
+      eventCounter: meterEventCounter({ meter: input.meter }),
       planResolver: input.planResolver,
       deployment: { isSaas: input.isSaas },
       countCache: new InProcessUsageCache(USAGE_CACHE_TTL_MS),
@@ -217,12 +257,6 @@ export class UsageService {
     this.deployment = deps.deployment;
     this.countCache = deps.countCache ?? new NoUsageCache();
     this.decisionCache = deps.decisionCache ?? new NoUsageCache();
-  }
-
-  async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
-    const organizationId = await this.organizations.getOrganizationIdByTeamId({ teamId });
-
-    return this.checkLimitForOrganization({ organizationId });
   }
 
   async checkLimitForOrganization({

@@ -2,7 +2,7 @@ import type { DatasetActionParams } from "@langwatch/automation-contract";
 import { mapTraceToDatasetEntry, TRACE_EXPANSIONS } from "@langwatch/dataset-contract";
 import { traceSchema, type TraceRecord } from "@langwatch/trace-contract";
 
-import { AutomationDatasetMapper } from "./persist-action.service.ts";
+import { AutomationDatasetMapper } from "../features/runaway/services/persist-action.service.ts";
 
 /** `ADD_TO_DATASET`'s row mapping, through dataset's own trace mapping (main's worker mapper). */
 export class DatasetTraceMapperService extends AutomationDatasetMapper {

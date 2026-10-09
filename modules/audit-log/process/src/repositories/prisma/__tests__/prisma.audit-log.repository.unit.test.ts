@@ -44,3 +44,42 @@ describe("audit entity history", () => {
     });
   });
 });
+
+describe("an audit trail by target kind", () => {
+  it("reads only that kind, newest first, up to the limit", async () => {
+    const entries = [
+      {
+        id: "audit-1",
+        createdAt: new Date(0),
+        action: "ops.scheduler.run_now",
+        targetId: "schedule-1",
+        projectId: "project-1",
+        userId: "user-1",
+        metadata: { slot: null },
+      },
+    ];
+    const findMany = vi.fn(async () => entries);
+    const repository = PrismaAuditLogRepository.create({
+      prisma: { auditLog: { create: vi.fn(), findMany } } as never,
+    });
+
+    await expect(
+      repository.findByTargetKind({ targetKind: "scheduled_job", limit: 20 }),
+    ).resolves.toEqual(entries);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { targetKind: "scheduled_job" },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        createdAt: true,
+        action: true,
+        targetId: true,
+        projectId: true,
+        userId: true,
+        metadata: true,
+      },
+    });
+  });
+});

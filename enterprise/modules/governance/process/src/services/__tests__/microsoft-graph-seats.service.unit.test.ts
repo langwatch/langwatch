@@ -27,7 +27,7 @@ import {
   type SubscribedSku,
   seatsReadIsDue,
   seatsReportDay,
-} from "../../rules/microsoft-graph-seats.rules.ts";
+} from "../../features/microsoft/rules/microsoft-graph-seats.rules.ts";
 
 const DAY = "2026-08-30";
 const NOW_MS = Date.parse("2026-08-30T09:00:00.000Z");

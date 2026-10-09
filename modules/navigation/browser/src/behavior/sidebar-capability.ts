@@ -1,22 +1,17 @@
 /**
- * The `sidebar` capability, published through `withCapabilities` so a peer
- * never imports this closed browser package directly — fold/expand/restore
- * over the group's own remembered preference. ARCHITECTURE.md §10.1.
+ * The sidebar, lent by `SidebarToken` so a peer never imports this closed
+ * browser package: fold/expand/restore over the group's own remembered
+ * preference. ARCHITECTURE.md §10.1.
  */
+
+import type { NavigationSidebar } from "@langwatch/navigation-client";
 
 import {
   clearSidebarSectionOverrides,
   setSidebarSectionOverride,
 } from "./sidebar-section-store.ts";
 
-export type NavigationSidebarCapability = {
-  expandGroup(id: string): void;
-  collapseGroup(id: string): void;
-  /** Drops every override; each group returns to its remembered preference. */
-  restoreAll(): void;
-};
-
-export const sidebarCapability: NavigationSidebarCapability = {
+export const sidebarCapability: NavigationSidebar = {
   expandGroup(id) {
     setSidebarSectionOverride(id, true);
   },

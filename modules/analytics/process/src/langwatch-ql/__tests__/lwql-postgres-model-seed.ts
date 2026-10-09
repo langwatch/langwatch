@@ -4,13 +4,13 @@
  * stripped strings marked `excluded-`, nullable columns left null, required ones filled
  */
 
-import type { DerivedPostgresView } from "../../rules/lwql-postgres-catalog-model.rules.ts";
-import { prismaManifestEnum } from "../../rules/lwql-prisma-manifest.rules.ts";
+import type { DerivedPostgresView } from "../../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
 import type {
   PrismaField,
   PrismaManifest,
   PrismaModel,
-} from "../../rules/lwql-prisma-schema.rules.ts";
+} from "../../features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
+import { prismaManifestEnum } from "../../rules/lwql-prisma-manifest.rules.ts";
 
 /** The subset of a derived view this seeder reads; a supertype of `DerivedPostgresView`. */
 export interface SeedableView {

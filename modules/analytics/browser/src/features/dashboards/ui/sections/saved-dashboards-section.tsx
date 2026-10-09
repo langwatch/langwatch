@@ -5,7 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
-import type { SavedDashboardsProps } from "@langwatch/analytics-contract";
+import type { SavedDashboardsProps } from "@langwatch/analytics-client";
 import type { DashboardStar } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import {

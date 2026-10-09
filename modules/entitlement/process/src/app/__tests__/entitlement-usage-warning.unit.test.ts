@@ -1,8 +1,6 @@
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { applyPlanTypeEntitlements } from "@langwatch/enterprise-licensing-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { UsageThresholdCrossedEventData } from "@langwatch/entitlement-contract";
 import { createTestLogger } from "@langwatch/test-harness";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { coreBaselinePlan } from "../../rules/plan-baseline.rules.ts";
@@ -15,51 +13,47 @@ import {
 import { UsageWarningService } from "../../services/usage-warning.service.ts";
 
 function warningsOver(counts: ProjectUsageCounts) {
-  const sent: Parameters<BillingApi["sendUsageWarning"]>[0][] = [];
+  const recorded: UsageThresholdCrossedEventData[] = [];
   const counted: string[][] = [];
-  const billing = createApiFixture<BillingApi>({
-    getActiveSubscriptionPlan: async () => {
-      throw new Error("off Cloud, no subscription is read");
-    },
-    getPricingModel: async () => ({ pricingModel: null }),
-    countBillableEventsByProjects: async ({ projectIds }) => {
-      counted.push(projectIds);
-      return counts;
-    },
-    sendUsageWarning: async (input) => {
-      sent.push(input);
-      return { sent: true, notificationId: "notification-1" };
-    },
-  });
-  const peers = {
-    billing,
-    traces: {
-      countTracesByProjects: async () => {
-        throw new Error("a free plan off Cloud is metered in events");
-      },
-    },
-    organizations: createApiFixture<OrganizationApi>({}),
-    projects: { listIdsByOrganization: async () => ["project-1", "project-2"] },
+  const tenancy = {
+    findProjectIds: async () => ["project-1", "project-2"],
+    findMeteredOrganizationIds: async () => ["org-1"],
   };
   const plans = EntitlementService.create({
     baseline: coreBaselinePlan({ isSaas: false }),
     license: { resolve: async () => ({ granted: false }) },
     enrichers: [{ enrich: applyPlanTypeEntitlements }],
   });
-  const counter = UsageService.overPeers({
-    isSaas: false,
+  const counter = UsageService.create({
+    organizations: {
+      getProjectIds: () => tenancy.findProjectIds(),
+      getPricingModel: async () => ({ pricingModel: null }),
+    },
+    traceCounter: {
+      getCountByProjects: async () => {
+        throw new Error("a free plan off Cloud is metered in events");
+      },
+    },
+    eventCounter: {
+      getCountByProjects: async ({ projectIds }) => {
+        counted.push(projectIds);
+        return counts;
+      },
+    },
     planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
-    peers,
+    deployment: { isSaas: false },
   });
   const warnings = UsageWarningService.create({
-    billing,
+    record: async (data) => {
+      recorded.push(data);
+    },
     counter,
     plans,
-    peers,
+    tenancy,
     isSaas: false,
     logger: createTestLogger().logger,
   });
-  return { warnings, sent, counted };
+  return { warnings, recorded, counted };
 }
 
 const COUNTS = [
@@ -69,9 +63,12 @@ const COUNTS = [
 
 describe("the usage-limit warning entitlement composes", () => {
   describe("when the reading crosses a threshold", () => {
-    /** @scenario "Entitlement decides the warning and billing only sends it" */
-    it("asks billing to send the decided threshold with each project's count", async () => {
-      const { warnings, sent, counted } = warningsOver(COUNTS);
+    /**
+     * @scenario "Entitlement records a crossed warning threshold as its own event"
+     * @scenario "Asking for a warning records it rather than sending it"
+     */
+    it("records the decided threshold with each project's count, without a notification id", async () => {
+      const { warnings, recorded, counted } = warningsOver(COUNTS);
 
       await expect(
         warnings.sendWarning({
@@ -79,11 +76,13 @@ describe("the usage-limit warning entitlement composes", () => {
           currentMonthMessagesCount: 900,
           maxMonthlyUsageLimit: 1000,
         }),
-      ).resolves.toEqual({ sent: true, notificationId: "notification-1" });
+      ).resolves.toEqual({ sent: true });
 
-      expect(sent).toEqual([
+      expect(recorded).toEqual([
         {
           organizationId: "org-1",
+          month: expect.stringMatching(/^\d{4}-\d{2}$/),
+          occurredAt: expect.any(Number),
           currentMonthMessagesCount: 900,
           maxMonthlyUsageLimit: 1000,
           crossedThreshold: 90,
@@ -95,9 +94,9 @@ describe("the usage-limit warning entitlement composes", () => {
   });
 
   describe("when the reading is below every threshold", () => {
-    /** @scenario "A reading below every warning threshold sends nothing and counts nothing" */
-    it("neither counts nor asks billing", async () => {
-      const { warnings, sent, counted } = warningsOver(COUNTS);
+    /** @scenario "A reading below every warning threshold records nothing and counts nothing" */
+    it("neither counts nor records", async () => {
+      const { warnings, recorded, counted } = warningsOver(COUNTS);
 
       await expect(
         warnings.sendWarning({
@@ -107,15 +106,15 @@ describe("the usage-limit warning entitlement composes", () => {
         }),
       ).resolves.toEqual({ sent: false });
 
-      expect(sent).toEqual([]);
+      expect(recorded).toEqual([]);
       expect(counted).toEqual([]);
     });
   });
 
   describe("when the per-project usage cannot be counted", () => {
-    /** @scenario "A warning whose per-project usage could not be counted is not sent" */
-    it("reports nothing sent and does not ask billing", async () => {
-      const { warnings, sent } = warningsOver(USAGE_UNKNOWN);
+    /** @scenario "A warning whose per-project counts are unknown is not recorded" */
+    it("reports nothing sent and records nothing", async () => {
+      const { warnings, recorded } = warningsOver(USAGE_UNKNOWN);
 
       await expect(
         warnings.sendWarning({
@@ -125,7 +124,7 @@ describe("the usage-limit warning entitlement composes", () => {
         }),
       ).resolves.toEqual({ sent: false });
 
-      expect(sent).toEqual([]);
+      expect(recorded).toEqual([]);
     });
   });
 });

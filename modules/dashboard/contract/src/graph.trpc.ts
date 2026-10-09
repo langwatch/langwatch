@@ -8,6 +8,7 @@ import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
+import { jsonTextField } from "@langwatch/api/json-text-field";
 import { triggerSchema } from "@langwatch/automation-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
@@ -28,7 +29,7 @@ export const graphApiCreateInputSchema = z
   .object({
     projectId: z.string(),
     name: z.string(),
-    graph: z.string(),
+    graph: jsonTextField(z.record(z.string(), z.unknown())),
     filterParams: z.any().optional(),
     dashboardId: z.string().optional(),
     ...chartGridPlacementSchema.partial().shape,
@@ -57,7 +58,7 @@ export const graphApiGraphInputSchema = z.object({
 export const graphApiUpdateInputSchema = z.object({
   projectId: z.string(),
   name: z.string(),
-  graph: z.string(),
+  graph: jsonTextField(z.record(z.string(), z.unknown())),
   graphId: z.string(),
   filterParams: z.any().optional(),
 });

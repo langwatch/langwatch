@@ -3,7 +3,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectSpanParamsBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import type { AttributeEditing } from "../attribute-table.tsx";
 
 /**

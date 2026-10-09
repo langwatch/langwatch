@@ -6,7 +6,7 @@ import type {
 } from "../langy-live-turn.repository.ts";
 
 /** Conversation-scoped Redis links used by Langy's navigate command. */
-export type LangyLinkRedis = Pick<Redis, "hset" | "hget" | "expire">;
+type LangyLinkRedis = Pick<Redis, "hset" | "hget" | "expire">;
 
 export class LangyResourceLinksRedisRepository implements LangyResourceLinksRepository {
   private constructor(private readonly redis: LangyLinkRedis) {}

@@ -21,7 +21,7 @@ import {
  * mutations stays consistent.
  */
 
-const rootKey = (resource: ResourceName) => ["backoffice", resource] as const;
+const rootKey = (resource: ResourceName) => ["admin", resource] as const;
 const listKey = (resource: ResourceName, params: ListParams) =>
   [...rootKey(resource), "list", params] as const;
 const oneKey = (resource: ResourceName, id: string) => [...rootKey(resource), "one", id] as const;

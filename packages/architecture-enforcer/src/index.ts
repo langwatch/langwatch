@@ -55,6 +55,18 @@ export {
   valueImports,
   walkValueImportGraph,
 } from "./workspace/module-graph.ts";
+export {
+  dependencyInitialisers,
+  importedNames,
+  locate,
+  peerEdges,
+  tokens,
+} from "./policies/boundaries/peer-cycles.ts";
+export { featureClaims, prismaModelNames } from "./policies/persistence/prisma-table-ownership.ts";
+export {
+  clickhouseTables,
+  collectAccess,
+} from "./policies/persistence/clickhouse-table-ownership.ts";
 export { lintTestQuality } from "./policies/test-quality.ts";
 export type { TestQualityLintOptions } from "./policies/test-quality.ts";
 export {
@@ -144,7 +156,7 @@ export function lintPolicies(
   return violations
     .map((violation) => ({
       ...violation,
-      file: relative(root, violation.file) || violation.file,
+      file: relative(root, resolve(root, violation.file)) || violation.file,
     }))
     .toSorted((a, b) =>
       `${a.file}:${a.line ?? 0}:${a.policy}`.localeCompare(`${b.file}:${b.line ?? 0}:${b.policy}`),

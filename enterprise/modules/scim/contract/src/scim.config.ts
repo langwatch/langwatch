@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { Config, environmentBooleanSchema, type ConfigOf } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 

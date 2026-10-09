@@ -28,11 +28,6 @@ export class PrismaDatasetMigrationRepository implements DatasetMigrationReposit
 
   private constructor(private readonly options: { database: PrismaClient }) {}
 
-  async findProjectIds(): Promise<string[]> {
-    const projects = await this.options.database.project.findMany({ select: { id: true } });
-    return projects.map((project) => project.id);
-  }
-
   async findPostgresDatasetIds(input: {
     projectId: string;
     afterId?: string | undefined;

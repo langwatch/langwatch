@@ -203,6 +203,40 @@ Feature: Slack connections
       When the user pauses one and deletes the other
       Then no automation uses the connection
 
+  Rule: A claimant pages through every claim to release the ones it no longer holds
+
+    @unit
+    Scenario: A page of claims returns each one with its connection, project and claimant
+      Given automations in two organisations that claim connections
+      When the first page of claims is read
+      Then each claim is returned with its connection, its project and its claimant
+      And the claims are ordered by claim id
+
+    @unit
+    Scenario: The next page resumes after the cursor the last page handed out
+      Given more claims than one page holds
+      When the pages are read one after the other, each from the cursor the last one handed out
+      Then every claim is read exactly once
+      And the last page hands out no cursor
+
+    @unit
+    Scenario: With no claims the page is empty and hands out no cursor
+      Given no automation claims a connection
+      When the first page of claims is read
+      Then the page is empty, it hands out no cursor and nothing fails
+
+    @unit
+    Scenario: A paged claim the claimant releases is no longer listed
+      Given a claim read from a page
+      When its claimant releases it
+      Then reading the page again no longer returns it
+
+    @unit
+    Scenario: A cursor no page handed out is refused
+      Given a cursor that names no claim position
+      When a page of claims is read from it
+      Then the read fails and no claim is returned
+
   Rule: Delivery resolves through the automation's connection
 
     @unit

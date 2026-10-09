@@ -13,7 +13,7 @@ async function reload() {
   setUiStorage(new BrowserUiStorage());
   setUiStorageReader("reader-a");
   const [density, explorer] = await Promise.all([
-    import("../density.store.ts"),
+    import("../../features/explorer/behavior/density.store.ts"),
     import("../explorer.store.ts"),
   ]);
   return { ...density, ...explorer };

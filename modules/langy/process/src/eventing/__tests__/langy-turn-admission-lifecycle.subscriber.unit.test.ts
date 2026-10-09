@@ -3,10 +3,10 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy-contract";
-import { createLangyTurnAdmissionLifecycleSubscriber } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
+import { createLangyTurnAdmissionLifecycleSubscriber } from "../langy-conversation.subscriber.ts";
 
 const context: EventSubscriberContext = {
   tenantId: "ignored-project",

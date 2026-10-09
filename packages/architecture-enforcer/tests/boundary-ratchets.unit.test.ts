@@ -1,6 +1,6 @@
 /**
  * Specs: peer-cycles, eventing-table-access and framework-module-contracts features.
- * Record: dev/docs/ARCHITECTURE.md §5 (peer cycles, no list), §7 and §10.1, §17 on the lists.
+ * Record: dev/docs/ARCHITECTURE.md §5 (peer cycles, one named exception), §7, §10.1, §17 (lists).
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,12 @@ import {
   frameworkContractEdges,
   frameworkContractKey,
 } from "../src/policies/boundaries/framework-module-contracts.ts";
-import { peerCycleEdges } from "../src/policies/boundaries/peer-cycles.ts";
+import {
+  exceptionKey,
+  PEER_CYCLE_EXCEPTIONS,
+  peerCycleEdges,
+  peerCycleExceptionFindings,
+} from "../src/policies/boundaries/peer-cycles.ts";
 import {
   collectEventingTableAccess,
   eventingAccessKey,
@@ -21,6 +26,8 @@ import { compareRatchet, countByKey, readRatchet } from "./ratchet.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(here, "..", "..", "..");
+/** The pairs Alex kept (round 29 PC-1, 2026-10-08); the named exceptions only shrink from here. */
+const RULED_PEER_CYCLE_EXCEPTIONS = ["identity <-> organization"];
 const EVENTING_TABLES = join(here, "baselines", "eventing-table-access.json");
 const FRAMEWORK_CONTRACTS = join(here, "baselines", "framework-module-contracts.json");
 
@@ -80,6 +87,25 @@ describe("the ruled transition lists", () => {
       expect(
         peerCycleKeys(),
         "cut the cycle from the reactor's side (§5); the cycles are mapped in dev/docs/plans/peer-cycles-2026-10-05.md",
+      ).toEqual([]);
+    });
+
+    /** @scenario "The named exceptions hold no pair beyond the ruled ones" */
+    it("finds no named exception beyond the ruled pairs", () => {
+      expect(
+        PEER_CYCLE_EXCEPTIONS.map((item) => exceptionKey(item.between)).filter(
+          (key) => !RULED_PEER_CYCLE_EXCEPTIONS.includes(key),
+        ),
+        "a kept cycle needs Alex's ruling first (§5)",
+      ).toEqual([]);
+    });
+
+    /** @scenario "Every named exception still names its cycle" */
+    it("finds every named exception well formed and still needed", () => {
+      expect(
+        peerCycleExceptionFindings({ packages: snapshot.packages }).map(
+          (finding) => finding.message,
+        ),
       ).toEqual([]);
     });
   });

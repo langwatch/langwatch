@@ -121,6 +121,14 @@ describe("given the central request-bounds registry", () => {
     });
   });
 
+  describe("when the trace download bound is read", () => {
+    it("answers 10 000 on every plan until per-plan values are ruled", () => {
+      for (const planType of ["FREE", "PRO", "ENTERPRISE", "OPEN_SOURCE", undefined]) {
+        expect(resolveRequestBound("tracesDownloadPageSizeMax", planType)).toBe(10_000);
+      }
+    });
+  });
+
   describe("when the centralized tier sets are read", () => {
     it("counts ENTERPRISE as the only enterprise type and FREE and LAUNCH as free", () => {
       expect([...ENTERPRISE_PLAN_TYPES]).toEqual(["ENTERPRISE"]);

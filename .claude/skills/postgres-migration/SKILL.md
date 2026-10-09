@@ -1,20 +1,17 @@
 ---
 name: postgres-migration
-description: "Change the Postgres schema without breaking any release still in the supported window: the expand/contract recipes for adding a column, removing one, renaming one, changing its type, making it NOT NULL, adding a unique index and splitting a table; the LTS-floor rule for every destructive step and the retirement note the scanner requires; no new foreign key and no new @relation (Alex, 2026-10-06; existing ones stay); where schema.prisma and packages/prisma-client/prisma/migrations live; the unqualified-table-name rule; why a merged migration is immutable; inline DML as the simplest blocking data step; and how an event-sourced projection table changes (a rebuild beside the old one, never an ALTER). Use whenever someone says 'add a field', 'drop that column', 'rename this table', 'make it required', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a migration', 'the migration failed on deploy', or a migration-safety test named their migration."
+description: "Change the Postgres schema without breaking any release still in the supported window: the expand/contract recipes for adding a column or table, removing one, renaming one, changing its type, making it NOT NULL, adding an index or a unique constraint and splitting a table; the LTS floor (3.20.1) and the `-- contract: retired in <release>` note every drop needs; the lock-heavy shapes the guard refuses and the ops pre-build note for an index; re-runnable statements; one owner per migration; timestamp keys and the migration-order check; no new foreign key and no new @relation; where schema.prisma and packages/prisma-client/prisma/migrations live; inline DML as the simplest blocking data step; and how a projection table changes (a rebuild beside the old one). Use whenever someone says 'add a field', 'add a column', 'add a table', 'drop that column', 'drop the table', 'rename this table', 'rename the column', 'change the column type', 'make it required', 'NOT NULL', 'add an index', 'unique constraint', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a Prisma migration', 'the migration failed on deploy', 'prisma migrate resolve', or the migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
 
 # Change the Postgres schema inside the window
 
-**The rule** (plan 6.12; Alex, N1): every release from the LTS floor to head must keep running on
-every later schema. `upgrade` steps an installation release by release while the old pods keep
-serving, so each intermediate schema has to suit them too. Every change is expand/contract, and a
-destructive step may only remove what **no release at or above the LTS floor** reads or writes. An
-LTS is named every six months (Alex, N4). The plan is
-`dev/docs/plans/migrations-rethink-2026-10-06.md` (revision 4), cited as "plan 6.x"; ADR-155 is the
-original ruling, widened from "one full release" to the floor. Which recipe applies at all: the
-`migration` skill.
+**The rule** (ADR-155, widened to the floor; ADR-173): every release from the LTS floor
+(`packages/upgrade/releases/lts-floor.json`, `3.20.1`) to head keeps running on every later schema.
+The previous image serves on the new schema during the rollout and after a rollback, so every change
+is expand/contract, and a destructive step may only remove what no release at or above the floor
+reads or writes. Which recipe applies at all: the `migration` skill.
 
 Files: `packages/prisma-client/prisma/schema.prisma` and
 `packages/prisma-client/prisma/migrations/<timestamp>_<slug>/migration.sql`.
@@ -22,35 +19,107 @@ Files: `packages/prisma-client/prisma/schema.prisma` and
 ```bash
 # Edit schema.prisma, then generate the SQL WITHOUT applying it, so you can shape it:
 pnpm --filter @langwatch/prisma-client exec prisma migrate dev --create-only --config ./prisma.config.ts
-# Apply it (today; the `upgrade` command replaces this at S3, plan 8):
-pnpm prisma:migrate
+# Apply it the way a deployment does (`pnpm task upgrade`; the worker runs it at boot):
+pnpm start:prepare:db
 ```
 
 `--create-only` is not optional: Prisma generates the breaking form by default, and every recipe
-below edits the SQL before it is applied. You do not write a release into the migration; the release
-PR stamps every new folder with the release being cut (plan 6.3).
+below edits the SQL first. `pnpm prisma:migrate` still exists but bypasses the ledger, so the api
+and worker keep refusing until `upgrade` runs; use `start:prepare:db`. The release PR stamps the
+folder into a release manifest (`packages/upgrade/releases/<release>.json`); you never write one.
 
 ## The rules that never bend
 
-1. **Never edit a merged migration.** Its checksum is recorded and the `migration-order` workflow
-   refuses the change (`specs/ci/migration-order.feature`). Write a new one.
-2. **Unqualified table names.** `"Monitor"`, never `"langwatch_db"."Monitor"`: the schema comes
-   from the connection string.
-3. **Every new column is nullable or has a `DEFAULT`.** Releases still serving do not name it in
-   their `INSERT`s.
-4. **Nothing is dropped while a release at or above the LTS floor reads or writes it.** The note
-   above the statement names the release whose code stopped using it:
-   `-- contract: retired in <release>`. The scanner checks the note is there; checking `<release>`
-   against the declared floor lands with S9 (plan 6.12, enforcement item 1).
-5. **Nothing is renamed in place**, and no type is changed in place.
-6. **No new foreign key and no new `@relation`** (Alex, 2026-10-06; existing ones stay). See below.
+1. **Never edit, rename or delete a merged migration.** The `migration-order` workflow refuses it
+   and prints the `git checkout` that restores it (`specs/ci/migration-order.feature`).
+2. **Key above main.** The folder's timestamp sorts above the newest folder on `origin/main`, not
+   just your branch. Two PRs that pick the same key, or a key below main's newest, fail the check,
+   which prints the `git mv` to a free key. Rebase, rename the folder, never reuse a key.
+3. **One owner.** Every table the file touches belongs to one module (the one whose repository
+   claims the model). `pnpm lint:architecture --policies migration-owners` refuses two; split the file.
+4. **Unqualified table names.** `"Monitor"`, never `"langwatch_db"."Monitor"`.
+5. **Every new column is nullable or has a `DEFAULT`.** Releases still serving do not name it.
+6. **Re-runnable statements** (round 21): Prisma applies a migration statement by statement, so one
+   cancelled by `lock_timeout` keeps its earlier statements. Every folder newer than the marker
+   `RERUNNABLE_PRISMA_FROM` (`packages/upgrade/src/stepping/rerunnable-migrations.ts`) must survive a
+   second run from its first statement; `pnpm lint:architecture --policies rerunnable-migrations`
+   refuses anything else. Write `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`,
+   `CREATE INDEX IF NOT EXISTS` (never `CONCURRENTLY` in the file), `DROP ... IF EXISTS`,
+   `ADD VALUE IF NOT EXISTS`, `INSERT ... ON CONFLICT`, `CREATE OR REPLACE`; guard a constraint, a
+   type or a rename with a `DO $$ ... $$` block that checks the catalogue. Prisma's generated SQL
+   has none of these: edit it before you commit. Never move the marker back.
+7. **Nothing is dropped while a release at or above the floor uses it**, and the statement carries
+   `-- contract: retired in <release>` with `<release>` at or below the floor. A later release is
+   refused (`retirement-note-above-floor`) with the first release it may ship in.
+8. **Nothing is renamed or retyped in place.**
+9. **No new foreign key and no new `@relation`** (Alex, 2026-10-06; existing ones stay).
 
-**No floor is declared yet** (S9). Until one is, write the expand and migrate halves and leave
-every contract step out: whether a drop may ship is the coordinator's question, not a lane's.
+## What the guard refuses, and what to write instead
 
-## No new foreign keys, no new `@relation`
+Every finding prints its own fix. Source: `packages/prisma-client/src/__tests__/migration-safety.rules.ts`.
+A table created in the same migration is empty, so the locking rules leave it alone.
 
-A reference to another row is a plain scalar column with an index, and nothing else:
+| Rule                                               | Refuses                                                                            | Write instead                                                                                                   |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `drop-without-retirement-note`                     | `DROP TABLE`, `DROP COLUMN` with no note                                           | the note, once the floor allows                                                                                 |
+| `retirement-note-above-floor`                      | a note naming a release above the floor                                            | wait for the floor, or leave the drop out                                                                       |
+| `add-not-null-column-without-default`              | `ADD COLUMN ... NOT NULL` with no `DEFAULT`                                        | a `DEFAULT`, or nullable now                                                                                    |
+| `set-not-null-on-populated-column`                 | `ALTER COLUMN ... SET NOT NULL` on an existing table                               | app-level enforcement, or `CHECK (col IS NOT NULL) NOT VALID` then `VALIDATE` later; no escape hatch (round 22) |
+| `alter-column-type`                                | `ALTER COLUMN ... TYPE`                                                            | new column, backfill, switch, retire the old                                                                    |
+| `enum-recreated`                                   | `ALTER TYPE ... RENAME TO`, drop-and-recreate an enum                              | `ALTER TYPE ... ADD VALUE`; never remove a value                                                                |
+| `unique-or-validated-constraint-on-existing-table` | `ADD UNIQUE`/`PRIMARY KEY` built at once, `CHECK` validated at once                | pre-build the index and `ADD CONSTRAINT ... USING INDEX`, or `NOT VALID` + a later `VALIDATE`                   |
+| `plain-index-on-existing-table`                    | `CREATE INDEX` on an existing table with no pre-build note                         | the ops pre-build note (below)                                                                                  |
+| `rename-in-place`                                  | `RENAME COLUMN`, `ALTER TABLE ... RENAME TO`                                       | add, backfill, dual-write, switch, retire                                                                       |
+| `new-foreign-key`                                  | `FOREIGN KEY` or a `REFERENCES <table>(...)` clause, on a new or an existing table | a plain column with an index (below); a new `@relation` fails the enforcer's relation ratchet                   |
+
+**The ops pre-build note.** `CONCURRENTLY` cannot run inside Prisma's transaction, so an index on an
+existing table carries a comment naming the statement an operator runs ahead; the migration's own
+`IF NOT EXISTS` then finds it built. Exemplar:
+`packages/prisma-client/prisma/migrations/20261006120000_process_outbox_lease_by_process_index/`.
+
+```sql
+-- ops pre-build: CREATE INDEX CONCURRENTLY IF NOT EXISTS "Widget_projectId_idx" ON "Widget" ("projectId");
+CREATE INDEX IF NOT EXISTS "Widget_projectId_idx" ON "Widget" ("projectId");
+```
+
+A failed `CONCURRENTLY` build leaves an invalid index under that name that `IF NOT EXISTS` then skips;
+say in the note to check `pg_index.indisvalid` and `DROP INDEX CONCURRENTLY` before retrying.
+Sessions run with `lock_timeout` 10 s; a statement that waits longer fails the run, the old image
+keeps serving, and the operator re-runs `upgrade`.
+
+**A re-runnable migration, worked.** The shape the `rerunnable-migrations` policy accepts
+(`packages/architecture-enforcer/src/policies/persistence/rerunnable-migrations.ts`, cases in
+`packages/architecture-enforcer/tests/rerunnable-migrations.unit.test.ts`; the in-tree index
+exemplar is the `20261006120000_process_outbox_lease_by_process_index` folder above). Every
+statement is a no-op on its second run, in the order Prisma would apply them:
+
+```sql
+CREATE TABLE IF NOT EXISTS "ProjectWidget" ("id" TEXT NOT NULL, "projectId" TEXT NOT NULL,
+  CONSTRAINT "ProjectWidget_pkey" PRIMARY KEY ("id"));
+ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "slug" TEXT;
+CREATE INDEX IF NOT EXISTS "ProjectWidget_projectId_idx" ON "ProjectWidget" ("projectId");
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Project_slug_present') THEN
+    ALTER TABLE "Project" ADD CONSTRAINT "Project_slug_present"
+      CHECK ("slug" IS NOT NULL) NOT VALID;
+  END IF;
+END $$;
+```
+
+The policy names the fix for each bare form (`a second CREATE TABLE fails: write CREATE TABLE IF NOT
+EXISTS`, `a second INSERT duplicates its rows ...: add ON CONFLICT DO NOTHING`, `a cancelled concurrent
+build leaves an INVALID index ...`); a statement it does not recognise is refused with the `DO $$`
+guard as the fix. Prisma's generated SQL has none of these guards: edit it after `--create-only`.
+
+## No foreign keys, no new `@relation`
+
+The W-01 guard is two checks: the scanner's `new-foreign-key` rule refuses a new `FOREIGN KEY` or
+`REFERENCES` clause in a migration, and the relation ratchet
+(`packages/architecture-enforcer/tests/prisma-relations.unit.test.ts`, list in
+`packages/architecture-enforcer/tests/baselines/prisma-relations.json`, shrink-only) refuses a new `@relation` in `schema.prisma`;
+existing ones stay. A reference is a plain scalar column with an index. Joins happen in the owning repository by a second
+query; a table another module owns is never joined (ask its `*Api`). Deleting dependents is a
+service's behaviour; children in another module go by a fact and that module's purge subscriber (§9.1).
 
 ```prisma
 model ProjectWidget {
@@ -60,97 +129,59 @@ model ProjectWidget {
 }
 ```
 
-- **No new `@relation` field, on either side.** The datasource runs `relationMode = "prisma"`, so a
-  relation already creates no SQL foreign key; what it does create is a client-side join and a
-  client-emulated `onDelete: Cascade`. Both go.
-- **Joins happen in the owning repository**, by a second query over its own tables. A table another
-  module owns is never joined at all (CLAUDE.md, rule 2): ask its `*Api`.
-- **Deleting dependents is behaviour, so it lives in a service**: the owning service deletes its
-  own children explicitly; children in another module go by a fact and that module's purge
-  subscriber (§9.1).
-- **No `ADD CONSTRAINT ... FOREIGN KEY`** in a new migration. No scanner rule refuses it yet.
+## Recipes
 
-The tree's existing `@relation` fields and foreign keys stay as they are (Alex, 2026-10-06): do not
-remove them as a side task. The rule binds new models and new references only.
+**Add a column or table.** One release. `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "slug" TEXT;`
+or with `NOT NULL DEFAULT 'free'`. New writers set the new shape from this release: a fresh install
+plans data steps by mode, so a backfill is never the only way a row becomes correct.
 
-## Recipe: add a column
-
-One release. Nullable, or with a `DEFAULT` (instant in Postgres 11 and later: the default lives in
-the catalogue, no rewrite).
+**Remove a column or table.** Release A stops reading and writing it, marked `/// retired: unread
+since A` in `schema.prisma`, no migration. Once the floor is at or above A, drop it:
 
 ```sql
-ALTER TABLE "Project" ADD COLUMN "slug" TEXT;
-ALTER TABLE "Project" ADD COLUMN "tier" TEXT NOT NULL DEFAULT 'free';
+-- contract: retired in 3.20.1
+ALTER TABLE "Project" DROP COLUMN IF EXISTS "legacyKey";
 ```
 
-New writers must set the new shape from this release on: a fresh install marks every historical
-data step `not-needed` (plan 6.4), so a backfill is never the only way a row becomes correct.
+If a tenant step's legacy path reads it, archive-or-fail first (`migration-data-step`).
 
-## Recipe: remove a column or a table
+**Rename a column, or change its type.** Expand: the new column beside the old. Migrate: dual-write
+from release A and copy (inline `UPDATE ... WHERE "new" IS NULL` for a small table, a background
+`.withMigrations` step for a large one); readers switch in A or read `coalesce(new, old)`. Contract:
+drop the old under rule 7.
 
-- **Release A**: stop reading and writing it. Leave it in `schema.prisma` marked
-  `/// retired: unread since A`. No migration.
-- **The first release whose LTS floor is at or above A**: remove it from `schema.prisma` and drop
-  it, with the note.
+**Make a column required.** Writers set it from release A; a step fills the gaps; enforce it in the
+application. If the database must enforce it, add `CHECK ("slug" IS NOT NULL) NOT VALID` once the
+floor is at or above A, and `VALIDATE CONSTRAINT` in a later migration. Never `SET NOT NULL`.
 
-```sql
--- contract: retired in 1.42.0
-ALTER TABLE "Project" DROP COLUMN "legacyKey";
-```
+**A new unique constraint.** A plain index with the pre-build note; a step repairs duplicates;
+writers comply from A; then a unique index pre-built the same way and attached with
+`ADD CONSTRAINT ... USING INDEX`.
 
-If a tenant step's legacy path reads the source, the drop archives the still-held tenants first
-(archive-or-fail, the `migration-data-step` skill).
+**Split a table.** Create the new table, dual-write and copy (a data step once it is large), switch
+readers, retire the old columns under rule 7.
 
-## Recipe: rename a column, or change its type
+**Inline DML** (`UPDATE`, `INSERT`, `DELETE` in the migration) is the simplest blocking data step: it
+runs at its own release against its own schema. Keep it small and copy, never move.
 
-1. **Expand**: add the new column (new name or new type), nullable, beside the old.
-2. **Migrate**: dual-write from release A, and copy old to new. A small table copies in the same
-   migration (`UPDATE "Project" SET "displayName" = "name" WHERE "displayName" IS NULL;`); a large
-   one is a blocking frozen-SQL step or a background step (the `migration-data-step` skill). Readers
-   switch in A, or read `coalesce(new, old)` to collapse the steps.
-3. **Contract**: drop the old column under rule 4.
+**A projection table** is derived state: create the new shape under its own name, replay it
+(`packages/eventing/src/replay/`), switch readers, retire the old table under rule 7. Never `ALTER`.
 
-## Recipe: make a column NOT NULL
+## When it failed on deploy
 
-1. **Expand**: the column exists with a `DEFAULT`, or nullable.
-2. **Migrate**: every writer sets it from release A; a step fills the gaps.
-3. **Contract**: once the floor is at or above A, a migration that repeats the fill and sets it:
+A folder newer than the marker is re-runnable, so `upgrade` clears it itself: it marks the failed
+row rolled back (`prisma migrate resolve --rolled-back`), waits the retry backoff (2 s, then 4 s) and
+applies it again, up to 3 attempts, logging each by name (`Prisma migration <name> failed on attempt 1
+of 3 and is re-runnable: marked it rolled back`). A failed row an earlier run left is cleared the same
+way at preflight. Still failing after the last attempt, the run exits 1 with code
+`rerunnable_migration_failed`: fix the cause (often a lock another session holds, `lock_timeout` 10 s)
+and run `upgrade` again; no resolve command is needed.
 
-```sql
-UPDATE "Project" SET "slug" = "id" WHERE "slug" IS NULL;
-ALTER TABLE "Project" ALTER COLUMN "slug" SET NOT NULL;
-```
-
-The `UPDATE` guards rows written between the fill and the lock, and is what the scanner looks for.
-`SET NOT NULL` on a populated column counts as destructive under the floor (plan 6.12, enforcement
-item 2; the scanner's check widens at S9).
-
-## Recipe: a new unique constraint
-
-Add a non-unique index first; a step repairs the duplicates; writers comply from release A; make it
-unique once the floor is at or above A. An immediate unique index fails on any duplicate an older
-release writes.
-
-## Recipe: split a table
-
-The same expand/contract, one table wider: create the new table (nothing reads it); dual-write and
-copy the old rows (a data step once the table is big enough that a migration would hold a lock);
-switch the readers; retire the old columns under rule 4. The new table carries plain id columns,
-no foreign key.
-
-## Inline DML is the simplest blocking data step
-
-An `UPDATE`, `INSERT` or `DELETE` inside a Prisma migration stays allowed (plan 6.11): under stepping
-it runs at its own release, against its own release's schema. Keep it small (it runs inside the
-migration's lock) and copy, never move. Anything larger is the `migration-data-step` skill.
-
-## Event-sourced projections are rebuilt, not altered
-
-A projection table is derived state (§9). A change to its shape is a rebuild beside the old one,
-never an `ALTER`: create it under its own name, replay it with `ReplayService`
-(`packages/eventing/src/replay/`), let it catch up while the old one serves, switch the readers,
-retire the old table under rule 4 (ADR-155 rule 6). The fold must be idempotent: the rebuild may run
-twice. A rebuild a release needs becomes a background data step (plan 6.1, K6).
+A folder at or below the marker, or one the image does not ship, keeps the conservative path:
+`upgrade` exits 1 with code `failed_prisma_migration` and names the command to clear it. Check what it left, then
+`prisma migrate resolve --rolled-back <name>` if nothing remains, or `--applied <name>` if you
+completed it by hand, then run `upgrade` again. Nothing has rolled; the old image still serves.
+Spec: `specs/upgrade/rerunnable-migrations.feature`.
 
 ## The scanner
 
@@ -158,10 +189,10 @@ twice. A rebuild a release needs becomes a background data step (plan 6.1, K6).
 VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/prisma-client test src/__tests__/migration-safety.unit.test.ts
 ```
 
-It reads every migration folder not in `src/__tests__/migration-safety.baseline.txt` and fails by
-name, with the fix: a drop without the note, a new `NOT NULL` column without a default,
-`SET NOT NULL` without an `UPDATE` beside it, a rename in place. The baseline is **frozen**; adding
-your migration to it is refused by the baseline test. Migrations merged from main are listed in
-`migration-safety.from-main.txt` by blob sha and skipped while they match.
-
-Spec: `specs/ops/migration-safety.feature`. ClickHouse: the `clickhouse-migration` skill.
+It reads every folder not in `src/__tests__/migration-safety.baseline.txt` (frozen; adding yours is
+refused) and fails by name with the fix. Folders merged from main are in
+`migration-safety.from-main.txt` by blob sha. The seven floor, lock and foreign-key rules
+(`FLOOR_AND_LOCK_RULES` in `migration-safety.rules.ts`) hold only folders after the test's
+`NEW_RULES_FROM` marker (`20261006170527_data_privacy_project_scope`); every new folder sorts above
+it, so all ten rules apply to yours. Spec: `specs/ops/migration-safety.feature`.
+ClickHouse: the `clickhouse-migration` skill.

@@ -5,7 +5,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectSpanEditBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 
 const SPAN_TYPES: SpanTypes[] = spanTypesSchema.options.map((option) => option.value);
 

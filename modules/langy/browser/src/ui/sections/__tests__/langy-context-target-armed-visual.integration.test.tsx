@@ -7,8 +7,8 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useLangyContextTargetStore } from "../../../behavior/langy-context-target.store.ts";
 import { useLangyStore } from "../../../behavior/langy.store.ts";
+import { useLangyContextTargetStore } from "../../../features/context-target/behavior/langy-context-target.store.ts";
 import { LangyContextTargetLayer } from "../langy-context-target-layer.tsx";
 import { LangyContextTarget } from "../langy-context-target.tsx";
 

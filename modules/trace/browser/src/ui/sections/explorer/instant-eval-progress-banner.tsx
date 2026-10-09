@@ -6,14 +6,14 @@
 
 import { useCallback } from "react";
 
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useCancelInstantEval } from "../../../behavior/writes/use-trace-writes.ts";
 import {
   selectInstantEvalRunPhase,
   useInstantEvalRunStore,
-} from "../../../behavior/instant-eval-run.store.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { useCancelInstantEval } from "../../../behavior/writes/use-trace-writes.ts";
+} from "../../../features/instant-eval/behavior/instant-eval-run.store.ts";
+import { useInstantEvalRuns } from "../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import { InstantEvalProgressBar } from "../../elements/explorer/instant-eval-progress.tsx";
-import { useInstantEvalRuns } from "./hooks/use-instant-eval-runs.ts";
 
 export function InstantEvalProgressBanner() {
   const { project } = useOrganizationTeamProject();

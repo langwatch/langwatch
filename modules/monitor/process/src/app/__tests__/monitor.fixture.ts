@@ -4,19 +4,13 @@
  * stub refuses by name rather than answering undefined; ports are recording doubles.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  EvaluationApi,
-  EvaluatorEffectiveSettings,
-  EvaluatorEffectiveSettingsQuery,
-  MonitorPerformanceQuery,
-  OnlineEvaluationPerformance,
-} from "@langwatch/evaluation-contract";
 import {
   EvaluatorNotFoundError,
   evaluatorSchema,
   type Evaluator,
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -77,41 +71,15 @@ export class FakeMonitorEvaluators {
   }
 }
 
-/**
- * What the evaluation module answers for an evaluator's effective settings, in
- * miniature: nested settings win, a top-level config is recovered unless the
- * operator's rollback is on, and otherwise the monitor's own parameters run.
- */
-export class FakeEvaluatorSettings {
+/** The operator's settings-recovery rollback switch, off until a test turns it on or breaks it. */
+export class FakeRecoverySwitch {
   recoveryDisabled = false;
+  unreadable = false;
 
-  async getEvaluatorEffectiveSettings(
-    query: EvaluatorEffectiveSettingsQuery,
-  ): Promise<EvaluatorEffectiveSettings> {
-    const config = (query.config ?? {}) as Record<string, unknown>;
-    const nested = config.settings;
-    if (nested && typeof nested === "object" && Object.keys(nested).length > 0) {
-      return { settings: nested as Record<string, unknown>, source: "config-settings" };
-    }
-    const { evaluatorType: _type, settings: _settings, ...recovered } = config;
-    if (!this.recoveryDisabled && Object.keys(recovered).length > 0) {
-      return { settings: recovered, source: "top-level-recovery" };
-    }
+  async isEnabled(flagKey: string): Promise<boolean> {
+    if (this.unreadable) throw new Error("flag store unreachable");
 
-    return { settings: query.parameters, source: "monitor-parameters" };
-  }
-}
-
-/** The trend, answered from whatever the test seeded. */
-export class FakeMonitorPerformance {
-  readonly queries: MonitorPerformanceQuery[] = [];
-
-  constructor(private readonly rows: OnlineEvaluationPerformance[] = []) {}
-
-  async getMonitorPerformance(query: MonitorPerformanceQuery) {
-    this.queries.push(query);
-
-    return this.rows;
+    return flagKey === "ops_evaluator_settings_recovery_disabled" && this.recoveryDisabled;
   }
 }
 
@@ -156,15 +124,13 @@ export function createMonitorTestApp(
     repositories?: MonitorRepositories;
     permissions?: AuthzApi;
     evaluators?: FakeMonitorEvaluators;
-    effectiveSettings?: FakeEvaluatorSettings;
-    performance?: FakeMonitorPerformance;
+    recoverySwitch?: FakeRecoverySwitch;
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
   }> = {},
 ): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
-  const effectiveSettings = input.effectiveSettings ?? new FakeEvaluatorSettings();
-  const performance = input.performance ?? new FakeMonitorPerformance();
+  const recoverySwitch = input.recoverySwitch ?? new FakeRecoverySwitch();
   const replication =
     input.replication ?? new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null });
 
@@ -180,10 +146,8 @@ export function createMonitorTestApp(
         archive: (scope) => evaluators.archive(scope),
         copy: (copy) => replication.copy(copy),
       }),
-      evaluation: createApiFixture<EvaluationApi>({
-        getMonitorPerformance: (query) => performance.getMonitorPerformance(query),
-        getEvaluatorEffectiveSettings: (query) =>
-          effectiveSettings.getEvaluatorEffectiveSettings(query),
+      featureFlags: createApiFixture<FeatureFlagApi>({
+        isEnabled: (flagKey) => recoverySwitch.isEnabled(flagKey),
       }),
       workflows: createApiFixture<WorkflowApi>({
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),

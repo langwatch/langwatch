@@ -149,4 +149,42 @@ describe("WebhookDeliveryRequestService", () => {
       expect(await queuedEnvelopes(archived.id)).toEqual([]);
     });
   });
+
+  describe("given an unentitled organisation's endpoint migrated with the legacy scheme", () => {
+    /** @scenario "A migrated legacy-scheme endpoint keeps delivering without the plan flag" */
+    it("queues the envelope although the plan lacks webhook endpoints", async () => {
+      const { endpoints, requests, queuedEnvelopes } = harness({ entitled: false });
+      const { endpoint } = await endpoints.create({
+        organizationId: ORGANIZATION_ID,
+        url: "https://receiver.example.test/anomaly",
+        enabledEvents: [EVENT_TYPE],
+        maxBatchDelayMs: 0,
+        signatureScheme: "legacy_sha256",
+      });
+
+      await requests.requestDelivery(request(endpoint.id));
+
+      expect(await queuedEnvelopes(endpoint.id)).toHaveLength(1);
+    });
+
+    /** @scenario "A migrated endpoint signs with the rule's existing shared secret" */
+    it("stores the secret the migration carried as the signing secret", async () => {
+      const { endpoints } = harness();
+      const { endpoint, secret } = await endpoints.create({
+        organizationId: ORGANIZATION_ID,
+        url: "https://receiver.example.test/anomaly",
+        enabledEvents: [EVENT_TYPE],
+        signatureScheme: "legacy_sha256",
+        sharedSecret: "rule-shared-secret",
+      });
+
+      expect(secret).toBe("rule-shared-secret");
+      expect(
+        await endpoints.getSigningSecret({
+          organizationId: ORGANIZATION_ID,
+          endpointId: endpoint.id,
+        }),
+      ).toBe("rule-shared-secret");
+    });
+  });
 });

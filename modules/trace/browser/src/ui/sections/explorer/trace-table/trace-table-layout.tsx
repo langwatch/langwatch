@@ -8,7 +8,7 @@ import {
   setTraceTableScrollElement,
 } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
 import type { PageCursor } from "../../../../behavior/query.slice.ts";
-import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
+import { useRefreshUIStore } from "../../../../features/explorer/behavior/refresh-ui.store.ts";
 import { RefreshProgressBar } from "../traces-page/refresh-progress-bar.tsx";
 import { ColumnEducationDialog } from "./column-education-dialog.tsx";
 import { NewTracesScrollUpIndicator } from "./new-traces-scroll-up-indicator.tsx";

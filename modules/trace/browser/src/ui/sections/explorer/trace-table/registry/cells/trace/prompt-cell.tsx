@@ -2,10 +2,10 @@ import { Badge, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { usePromptsForProject } from "../../../../../../../behavior/reads/use-project-reads.ts";
 import { useOrganizationTeamProject } from "../../../../../../../behavior/use-organization-team-project.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
 
 type Density = "compact" | "comfortable";

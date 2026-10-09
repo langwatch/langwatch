@@ -4,7 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import { LuColumns3, LuMoveHorizontal } from "react-icons/lu";
 
-import { useColumnEducationStore } from "../../../../behavior/column-education.store.ts";
+import { useColumnEducationStore } from "../../../../features/explorer/behavior/column-education.store.ts";
 import {
   DialogBody,
   DialogContent,

@@ -16,6 +16,9 @@ Feature: Recalling an oversized span's payload from outside the application
   nothing, and a recall that returns nothing degrades to the 64 KB preview
   without an error anywhere.
 
+  The recall reads the event through eventing's one-event read seat; its tenant
+  predicate and two-day window are eventing's (packages/eventing/specs/event-read-seat.feature).
+
   @unit
   Scenario: The spool object path is derived from the command, never read from it
     Given a spooled command whose reference names another tenant's object
@@ -57,30 +60,6 @@ Feature: Recalling an oversized span's payload from outside the application
     Given a spool object larger than the read cap
     When the command worker reads it
     Then the read is aborted rather than buffering the whole object
-
-  @unit
-  Scenario: The event log read names the tenant first
-    Given an offloaded field recorded against a trace
-    When the field is recalled from the event log
-    Then the query filters on tenant before any other predicate
-
-  @unit
-  Scenario: The partition window is derived from the event id itself
-    Given an event id that is a parseable KSUID
-    When the field is recalled
-    Then the query prunes to a window around the id's own creation time
-
-  @unit
-  Scenario: A row with no recorded occurred time is never pruned away
-    Given an event log row whose occurred time is the column default
-    When the field is recalled inside a pruned window
-    Then the row is still eligible
-
-  @unit
-  Scenario: An unparseable event id falls back to an unpruned read
-    Given an event id that is not a KSUID
-    When the field is recalled
-    Then no occurred-time predicate is applied
 
   @unit
   Scenario: A malformed sibling attribute cannot mask the offloaded field

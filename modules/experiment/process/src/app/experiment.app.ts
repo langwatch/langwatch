@@ -5,13 +5,19 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
+import {
+  DatasetApi,
+  type BatchEvaluationRecord,
+  type BatchEvaluationSummary,
+  type Dataset,
+} from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import {
   ExperimentApi,
+  ExperimentNotFoundError,
   type ExperimentCaller,
   type ExperimentRunLookupInput,
   type ExperimentUpdateFrame,
@@ -20,8 +26,9 @@ import {
   type ExperimentWorkflowVersionInput,
   type CommitWorkbenchVersionInput,
   type CompleteExperimentRunInput,
-  type ComputeExperimentRunMetricsCommandData,
-  type ExperimentIdLookupResult,
+  type DatasetEvaluationInput,
+  type DatasetEvaluationOutcome,
+  type LogBatchEvaluationInput,
   type CreateEvaluationsV3Input,
   type DSPyRunsSummary,
   type Experiment,
@@ -90,6 +97,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -103,6 +111,26 @@ import {
   type ExperimentLifecyclePipeline,
 } from "../eventing/experiment-lifecycle.pipeline.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
+import { ExperimentRunCommandDispatcherService } from "../features/run/services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunModelCostService } from "../features/run/services/experiment-run-model-cost.service.ts";
+import {
+  ExperimentRunService,
+  type ExperimentRunProcessing,
+} from "../features/run/services/experiment-run.service.ts";
+import {
+  ExperimentWorkbenchObserverService,
+  type ExperimentWorkbenchObserver,
+} from "../features/workbench/services/experiment-workbench-observer.service.ts";
+import { ExperimentWorkbenchPresenceUpdatesService } from "../features/workbench/services/experiment-workbench-presence-updates.service.ts";
+import {
+  ExperimentWorkbenchRunService,
+  type WorkbenchExecutionRequest,
+} from "../features/workbench/services/experiment-workbench-run.service.ts";
+import { ExperimentWorkbenchTargetNamesService } from "../features/workbench/services/experiment-workbench-target-names.service.ts";
+import { ExperimentWorkbenchVersionService } from "../features/workbench/services/experiment-workbench-version.service.ts";
+import { ExperimentWorkflowAuthoringService } from "../features/workflow/services/experiment-workflow-authoring.service.ts";
+import type { WorkflowEvaluationService } from "../features/workflow/services/experiment-workflow-evaluation.service.ts";
+import { ExperimentWorkflowLinkService } from "../features/workflow/services/experiment-workflow-link.service.ts";
 import type { ExperimentPeopleRepository } from "../repositories/experiment-people.repository.ts";
 import type { ExperimentRepositories } from "../repositories/experiment.repositories.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
@@ -111,35 +139,17 @@ import {
   slugifyExperimentName,
 } from "../rules/experiment-slug.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import { ExperimentBatchLogService } from "../services/experiment-batch-log.service.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
+import { ExperimentDatasetEvaluationService } from "../services/experiment-dataset-evaluation.service.ts";
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
-import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
-import type { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
-import {
-  ExperimentRunService,
-  type ExperimentRunProcessing,
-} from "../services/experiment-run.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import {
   ExperimentUpdateStreamService,
   type ExperimentUpdateEmitters,
 } from "../services/experiment-update-stream.service.ts";
-import {
-  ExperimentWorkbenchObserverService,
-  type ExperimentWorkbenchObserver,
-} from "../services/experiment-workbench-observer.service.ts";
-import { ExperimentWorkbenchPresenceUpdatesService } from "../services/experiment-workbench-presence-updates.service.ts";
-import {
-  ExperimentWorkbenchRunService,
-  type WorkbenchExecutionRequest,
-} from "../services/experiment-workbench-run.service.ts";
-import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-workbench-target-names.service.ts";
-import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
-import { ExperimentWorkflowAuthoringService } from "../services/experiment-workflow-authoring.service.ts";
-import type { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
-import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
 
 /** What the process composes this feature's application from. */
@@ -178,6 +188,10 @@ export interface ExperimentAppDependencies {
   }>;
   /** The run pipeline, its senders and run lookup; absent where a suite builds none. */
   runProcessing?: ExperimentRunProcessing;
+  /** The SDK's batch result log; absent where a suite builds none. */
+  batchLog?: Pick<ExperimentBatchLogService, "assertWithinLimit" | "log">;
+  /** The SDK's dataset evaluation; absent where a suite builds none. */
+  datasetEvaluation?: Pick<ExperimentDatasetEvaluationService, "evaluate">;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -185,7 +199,6 @@ const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
 type ExperimentSetup = FeatureSetup<
   typeof ExperimentModule.dependencies,
-  never,
   ExperimentServerConfig,
   ExperimentRepositories
 >;
@@ -216,6 +229,8 @@ export class ExperimentModule implements ExperimentApi {
     apiKeys: ApiKeyApi,
     /** Reads a row's stored attachment for the target it is dispatched to. */
     storedObjects: StoredObjectApi,
+    /** A settled experiment trace's fold, and the summary costs a run's unpriced rows take. */
+    traces: TraceApi,
   };
   static readonly config = experimentConfig;
 
@@ -234,6 +249,7 @@ export class ExperimentModule implements ExperimentApi {
       slugify: slugifyExperimentName,
       newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
       references: { prompts, agents, evaluators, workflows, dataset },
+      traces: dependencies.traces,
       updates: ExperimentWorkbenchPresenceUpdatesService.create({
         presence: dependencies.presence,
         logger,
@@ -250,10 +266,11 @@ export class ExperimentModule implements ExperimentApi {
     });
     const targetNames = ExperimentWorkbenchTargetNamesService.create();
     const entities = ExperimentTargetEntityNamesService.create({ agents, evaluators });
+    const runLookup = ExperimentFindOrCreateService.create(experiments);
 
     return new ExperimentModule({
       experiments,
-      runLookup: ExperimentFindOrCreateService.create(experiments),
+      runLookup,
       slugify: slugifyExperimentName,
       workbenchTargetNames: (input) => targetNames.resolve({ ...input, prompts, entities }),
       workflows,
@@ -268,6 +285,16 @@ export class ExperimentModule implements ExperimentApi {
       workbenchObserver: ExperimentWorkbenchObserverService.create({ logger, senders }),
       lifecycle: { pipeline: buildExperimentLifecyclePipeline(), senders },
       runProcessing: runs.processing,
+      batchLog: ExperimentBatchLogService.create({
+        runLookup,
+        runs: experiments,
+        report: dependencies.evaluation,
+        limits: dataset,
+      }),
+      datasetEvaluation: ExperimentDatasetEvaluationService.create({
+        experiments,
+        evaluation: dependencies.evaluation,
+      }),
     });
   }
 
@@ -530,18 +557,27 @@ export class ExperimentModule implements ExperimentApi {
     return this.#dependencies.experiments.completeExperimentRun(input);
   }
 
-  /** One trace's cost, folded into its run by the run pipeline. */
-  computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void> {
-    return this.#runProcessing().commands.computeRunMetrics(input);
+  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void> {
+    return this.#batchLog().assertWithinLimit(input);
   }
 
-  /** The experiment a run was recorded against, or that no experiment recorded it. */
-  async lookupExperimentId(input: {
-    tenantId: string;
-    runId: string;
-  }): Promise<ExperimentIdLookupResult> {
-    const experimentId = await this.#runProcessing().idLookup.findExperimentId(input);
-    return experimentId ? { kind: "recorded", experimentId } : { kind: "not_recorded" };
+  logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void> {
+    return this.#batchLog().log(input);
+  }
+
+  evaluateDataset(input: DatasetEvaluationInput): Promise<DatasetEvaluationOutcome> {
+    const datasetEvaluation = this.#dependencies.datasetEvaluation;
+    if (!datasetEvaluation)
+      throw new Error("this experiment process composes no dataset evaluation");
+
+    return datasetEvaluation.evaluate(input);
+  }
+
+  #batchLog(): NonNullable<ExperimentAppDependencies["batchLog"]> {
+    const batchLog = this.#dependencies.batchLog;
+    if (!batchLog) throw new Error("this experiment process composes no batch result log");
+
+    return batchLog;
   }
 
   /** The pipeline `experiment_run_processing` registers, built once by {@link create}. */
@@ -765,6 +801,28 @@ export class ExperimentModule implements ExperimentApi {
     input: Readonly<{ datasetId: string; projectId: string; name: string }>,
   ): Promise<Dataset> {
     return this.#dependencies.dataset.renameDataset(input);
+  }
+
+  /** One row per experiment and dataset: how many batch evaluations ran, cost, mean score. */
+  summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]> {
+    return this.#dependencies.dataset.summariseBatchEvaluations(input);
+  }
+
+  /** Every batch-evaluation record of the experiment a URL slug names; dataset holds the rows. */
+  async listBatchEvaluations(input: {
+    projectId: string;
+    experimentSlug: string;
+  }): Promise<BatchEvaluationRecord[]> {
+    const experiment = await this.#dependencies.experiments.findBySlug({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
+    if (!experiment) throw new ExperimentNotFoundError(input.experimentSlug);
+
+    return this.#dependencies.dataset.listBatchEvaluations({
+      projectId: input.projectId,
+      experimentId: experiment.id,
+    });
   }
 
   /** Copies a dataset into another project. */

@@ -16,14 +16,14 @@ const mocks = vi.hoisted(() => {
   return { thread, turns: thread };
 });
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({
     data: { items: mocks.turns },
     isLoading: false,
   }),
 }));
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-annotations.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-annotations.ts", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
     byAnchor: new Map(),
@@ -33,11 +33,11 @@ vi.mock("../../../../../sections/explorer/hooks/use-conversation-annotations.ts"
   }),
 }));
 
-vi.mock("../../../../../sections/explorer/hooks/use-trace-drawer-navigation.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-turn-events.ts", () => ({
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turn-events.ts", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
@@ -76,8 +76,8 @@ vi.mock(
   }),
 );
 
+import type { TraceListItem } from "../../../../../../behavior/explorer/types/trace.ts";
 import { ConversationView } from "../../../../../sections/explorer/trace-drawer/conversation-view/conversation-view.tsx";
-import type { TraceListItem } from "../../../../../sections/explorer/types/trace.ts";
 import { FOCUS_SCROLL_REST_MS } from "../focused-turn.tsx";
 
 function renderView({

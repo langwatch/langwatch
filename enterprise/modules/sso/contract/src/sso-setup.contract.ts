@@ -1,4 +1,5 @@
 import { ledgerActorSchema } from "@langwatch/authorization";
+import { ssoSamlIdpInitiatedSchema } from "@langwatch/identity-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What an organization's own administrator reads about its connection, as
@@ -334,6 +335,8 @@ export const ssoSetupSamlRegistrationSchema = z.object({
   entityId: z.string().trim().max(2048).nullable().default(null),
   metadataXml: z.string().max(512_000).nullable().default(null),
   certificate: z.string().max(64_000).nullable().default(null),
+  /** Opt-in to sign-ins the IdP starts, landing only on a listed app path. */
+  idpInitiated: ssoSamlIdpInitiatedSchema,
 });
 
 export const ssoSetupRegistrationSchema = z.discriminatedUnion("protocol", [
@@ -405,6 +408,7 @@ export const ssoSetupIdentityProviderViewSchema = z.discriminatedUnion("protocol
       entityId: z.string().nullable(),
       metadataXml: z.string().nullable(),
       certificate: z.string().nullable(),
+      idpInitiated: ssoSamlIdpInitiatedSchema,
     })
     .strict(),
 ]);

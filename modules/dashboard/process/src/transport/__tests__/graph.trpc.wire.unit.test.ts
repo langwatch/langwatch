@@ -67,6 +67,7 @@ const GRAPH = {
 describe("the graphs tRPC namespace", () => {
   describe("when the Custom Graph page creates a graph on a dashboard without a size", () => {
     /** @scenario "A graph created without a size lands at the grid's default size" */
+    /** @scenario "A graph created over tRPC without a size keeps the grid's default of four by three" */
     it("lands at half the grid's width and three rows", async () => {
       const app = createDashboardTestApp();
       const call = mounted(app);
@@ -101,7 +102,10 @@ describe("the graphs tRPC namespace", () => {
       const call = mounted(app);
       const dashboard = await dashboardOn(app);
       const created = legacyGraphSchema.parse(
-        await call("create", { ...GRAPH, dashboardId: dashboard.id }),
+        await call(
+          "create",
+          graphApiCreateInputSchema.parse({ ...GRAPH, dashboardId: dashboard.id }),
+        ),
       );
 
       await call(

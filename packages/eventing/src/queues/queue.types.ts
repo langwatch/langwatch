@@ -161,6 +161,10 @@ export interface EventSourcedQueueProcessor<Payload extends Record<string, unkno
   waitUntilReady: () => Promise<void>;
   /** Begins consuming. A queue with no consumer of its own leaves this out. */
   start?: () => void;
+  /** Claims no new job, jobs already claimed running to completion. Idempotent. */
+  pause?: () => void;
+  /** Claims again after `pause`. Idempotent. */
+  resume?: () => void;
   /** Migration-preflight only: prove its allow-listed groups have settled. */
   waitUntilPreflightIdle?: () => Promise<void>;
   /** Migration-preflight only: register every group an aggregate may reach. */

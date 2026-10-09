@@ -12,6 +12,8 @@ import {
   evaluationRanSignal,
   experimentRanSignal,
   guidedOnboardingSignal,
+  NURTURING_CUTOVER_AT,
+  seededAtRead,
   subscriptionChangedSignal,
   subscriptionStartedSignal,
 } from "../nurturing-owner-signals.rules.ts";
@@ -178,6 +180,34 @@ describe("evaluationCompletedSignal", () => {
         organization: { adminUserId: null, seeded: false, evaluationCount: 1 },
       }),
     ).toEqual([]);
+  });
+});
+
+describe("seededAtRead", () => {
+  /** @scenario "An organization that held a project before the cutover never gets a first milestone" */
+  it("seeds an unseeded organization whose earliest project predates the cutover", () => {
+    expect(seededAtRead({ seeded: false, firstProjectCreatedAt: NURTURING_CUTOVER_AT - 1 })).toBe(
+      true,
+    );
+  });
+
+  /** @scenario "An organization whose projects all came after the cutover still gets its first milestone" */
+  it("leaves an organization whose earliest project is at or after the cutover unseeded", () => {
+    expect(seededAtRead({ seeded: false, firstProjectCreatedAt: NURTURING_CUTOVER_AT })).toBe(
+      false,
+    );
+  });
+
+  /** @scenario "An organization with no project its owners hold is not seeded by the cutover" */
+  it("lets the stored flag alone decide when no project is held", () => {
+    expect(seededAtRead({ seeded: false, firstProjectCreatedAt: null })).toBe(false);
+    expect(seededAtRead({ seeded: true, firstProjectCreatedAt: null })).toBe(true);
+  });
+
+  it("keeps a backfilled organization seeded whatever its projects' age", () => {
+    expect(seededAtRead({ seeded: true, firstProjectCreatedAt: NURTURING_CUTOVER_AT + 1 })).toBe(
+      true,
+    );
   });
 });
 

@@ -45,7 +45,7 @@ describe("MemoryOrganizationRepository.ensurePersonalWorkspace", () => {
         resources,
       });
 
-      expect(result.created).toBe(true);
+      expect(result.kind).toBe("pending");
       expect(
         memory.organizationUsers
           .filter((row) => row.userId === "user_ada" && row.organizationId === "org_1")

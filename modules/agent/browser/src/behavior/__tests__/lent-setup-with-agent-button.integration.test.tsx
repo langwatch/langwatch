@@ -9,7 +9,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { SetupWithAgentButtonToken } from "@langwatch/trace-contract";
+import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 

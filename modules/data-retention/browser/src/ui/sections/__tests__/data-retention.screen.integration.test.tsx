@@ -20,42 +20,55 @@ import {
 } from "../../../model/data-retention-host.ts";
 import DataRetentionScreen from "../data-retention.screen.tsx";
 
-const { snapshotRef, invalidate, removeForScope, setForScope, triggerUpdate, killMutation } =
-  vi.hoisted(() => ({
-    invalidate: vi.fn(async () => undefined),
-    removeForScope: vi.fn(async () => undefined),
-    setForScope: vi.fn(async () => undefined),
-    triggerUpdate: vi.fn(async () => ({ appliedRetentionDays: 35 })),
-    killMutation: vi.fn(),
-    snapshotRef: {
-      current: {
-        projectId: "proj-1",
-        effective: { traces: 49, scenarios: 49, experiments: 49 },
-        canConfigureRetention: true,
-        available: {
-          organization: { id: "org-1", name: "Acme" },
-          teams: [{ id: "team-1", name: "Platform" }],
-          projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
-        },
-        rules: [
-          {
-            scopeType: "TEAM" as const,
-            scopeId: "team-1",
-            name: "Platform",
-            category: "traces" as const,
-            retentionDays: 91,
-          },
-          {
-            scopeType: "TEAM" as const,
-            scopeId: "team-1",
-            name: "Platform",
-            category: "scenarios" as const,
-            retentionDays: 91,
-          },
-        ],
+const {
+  snapshotRef,
+  invalidate,
+  previewScopeRemoval,
+  removeForScope,
+  setForScope,
+  triggerUpdate,
+  killMutation,
+} = vi.hoisted(() => ({
+  invalidate: vi.fn(async () => undefined),
+  previewScopeRemoval: vi.fn((input: unknown) => {
+    void input;
+    return { data: void 0, isLoading: false, isError: false };
+  }),
+  removeForScope: vi.fn(async (request: unknown) => {
+    void request;
+  }),
+  setForScope: vi.fn(async () => undefined),
+  triggerUpdate: vi.fn(async () => ({ appliedRetentionDays: 35 })),
+  killMutation: vi.fn(),
+  snapshotRef: {
+    current: {
+      projectId: "proj-1",
+      effective: { traces: 49, scenarios: 49, experiments: 49 },
+      canConfigureRetention: true,
+      available: {
+        organization: { id: "org-1", name: "Acme" },
+        teams: [{ id: "team-1", name: "Platform" }],
+        projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
       },
+      rules: [
+        {
+          scopeType: "TEAM" as const,
+          scopeId: "team-1",
+          name: "Platform",
+          category: "traces" as const,
+          retentionDays: 91,
+        },
+        {
+          scopeType: "TEAM" as const,
+          scopeId: "team-1",
+          name: "Platform",
+          category: "scenarios" as const,
+          retentionDays: 91,
+        },
+      ],
     },
-  }));
+  },
+}));
 
 vi.mock("../../../behavior/data-retention-api.ts", () => ({
   dataRetentionApi: {
@@ -65,9 +78,7 @@ vi.mock("../../../behavior/data-retention-api.ts", () => ({
       getScopeStorageUsage: {
         useQuery: () => ({ data: { totalBytes: 1024, projectCount: 1 }, isLoading: false }),
       },
-      previewScopeRemoval: {
-        useQuery: () => ({ data: void 0, isLoading: false, isError: false }),
-      },
+      previewScopeRemoval: { useQuery: previewScopeRemoval },
       getMutationProgress: {
         useQuery: () => ({ data: [], refetch: vi.fn() }),
       },
@@ -236,6 +247,25 @@ describe("given the retention policies page", () => {
       await waitFor(() => expect(removeForScope).toHaveBeenCalledTimes(2));
       expect(host.successes).toHaveLength(1);
       expect(host.successes[0]?.title).toBe("Retention policy removed");
+    });
+
+    /** @scenario The settings page sends its organisation with every scope write */
+    it("names the page's organization on the preview and on every removal", async () => {
+      const user = userEvent.setup();
+      renderScreen(new TestRetentionHost());
+
+      await user.click(screen.getByRole("button", { name: "Actions for Platform" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
+      await user.click(await screen.findByRole("button", { name: /Remove/ }));
+
+      await waitFor(() => expect(removeForScope).toHaveBeenCalledTimes(2));
+      expect(previewScopeRemoval).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-1" }),
+        expect.anything(),
+      );
+      for (const [request] of removeForScope.mock.calls) {
+        expect(request).toMatchObject({ organizationId: "org-1" });
+      }
     });
 
     /** @scenario A removal that fails names the action rather than a code */

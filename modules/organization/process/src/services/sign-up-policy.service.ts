@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * Who may create an account here, and who may found an organization, from
  * `SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS` and `ADMIN_EMAILS`.
@@ -10,7 +11,6 @@ import {
   type SignUpMode,
   type SignUpVerdict,
 } from "@langwatch/organization-contract";
-import type { UserApi } from "@langwatch/user-contract";
 
 import type { SignUpPolicyRepository } from "../repositories/sign-up-policy.repository.ts";
 
@@ -25,8 +25,8 @@ export interface SignUpPolicySettings {
 interface SignUpPolicyDependencies {
   settings: SignUpPolicySettings;
   repository: SignUpPolicyRepository;
-  /** Whether any account exists, and whether one holds the platform-operator grant. */
-  users: Pick<UserApi, "hasAnyAccount" | "isOperator">;
+  /** Whether an account holds the platform-operator grant: `ops:manage` on the platform. */
+  authorization: Pick<AuthzApi, "can">;
   /** The addresses the caller has proven, read only on an invite-only installation. */
   findProvenAddresses(input: { userId: string }): Promise<readonly string[]>;
 }
@@ -47,8 +47,14 @@ export class SignUpPolicyService {
     this.adminEmails = dependencies.settings.adminEmails.map((email) => email.toLowerCase());
   }
 
-  /** Whether `email` may create a new account here. */
-  async checkSignUp({ email }: { email: string }): Promise<SignUpVerdict> {
+  /** Whether `email` may create a new account here; `hasAnyAccount` comes from the caller. */
+  async checkSignUp({
+    email,
+    hasAnyAccount,
+  }: {
+    email: string;
+    hasAnyAccount: boolean;
+  }): Promise<SignUpVerdict> {
     const { mode, allowedDomains } = this.dependencies.settings;
     const address = email.trim().toLowerCase();
 
@@ -72,7 +78,7 @@ export class SignUpPolicyService {
       return { allowed: true, via: "open" };
     }
     // With no `ADMIN_EMAILS`, the first account bootstraps the installation.
-    if (this.adminEmails.length === 0 && !(await this.dependencies.users.hasAnyAccount())) {
+    if (this.adminEmails.length === 0 && !hasAnyAccount) {
       return { allowed: true, via: "first_account" };
     }
     return { allowed: false, reason: "invite_only" };
@@ -96,7 +102,12 @@ export class SignUpPolicyService {
     if (address && this.adminEmails.includes(address)) {
       return { allowed: true, via: "instance_admin" };
     }
-    if (await this.dependencies.users.isOperator({ userId })) {
+    const operator = await this.dependencies.authorization.can({
+      principal: { type: "user", id: userId },
+      permission: "ops:manage",
+      scope: { type: "platform" },
+    });
+    if (operator) {
       return { allowed: true, via: "instance_admin" };
     }
     if (!(await this.dependencies.repository.hasAnyOrganization())) {

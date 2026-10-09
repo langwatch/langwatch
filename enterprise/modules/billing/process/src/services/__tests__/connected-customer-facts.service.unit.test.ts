@@ -1,4 +1,4 @@
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 /** @see specs/self-hosting/connected-services/connected-billing.feature */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -7,49 +7,11 @@ import { describe, expect, it } from "vitest";
 import {
   type ConnectedCustomerPeers,
   ConnectedCustomerFactsService,
-} from "../connected-customer-facts.service.ts";
+} from "../../features/connected-billing/services/connected-customer-facts.service.ts";
 
 const ACME = "org-acme";
 const AUGUST = Temporal.Instant.from("2026-08-01T00:00:00Z");
 const SEPTEMBER = Temporal.Instant.from("2026-09-01T00:00:00Z");
-
-type ProjectRow = Awaited<
-  ReturnType<ConnectedCustomerPeers["organizations"]["listProjectsByOrganization"]>
->["data"][number];
-
-function project(id: string): ProjectRow {
-  const at = new Date("2026-01-01T00:00:00Z");
-  return {
-    id,
-    name: id,
-    slug: id,
-    apiKey: "",
-    lwqlKey: "",
-    teamId: "team-acme",
-    language: "python",
-    framework: "openai",
-    kind: "application",
-    firstMessage: false,
-    integrated: true,
-    createdAt: at,
-    updatedAt: at,
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
-    isPersonal: false,
-    ownerUserId: null,
-    personalFeatures: null,
-    departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-  };
-}
 
 const seatsWith = (managedVirtualKeyId: string | null) => async () => ({
   licensed: 10,
@@ -76,6 +38,7 @@ function facts(
     organizations: createApiFixture<ConnectedCustomerPeers["organizations"]>(
       peers.organizations ?? {},
     ),
+    projects: createApiFixture<ConnectedCustomerPeers["projects"]>(peers.projects ?? {}),
   });
 }
 
@@ -92,12 +55,7 @@ describe("ConnectedCustomerFactsService", () => {
             return 12_345_000_000;
           },
         },
-        organizations: {
-          listProjectsByOrganization: async () => ({
-            data: [project("project-a"), project("project-b")],
-            pagination: { page: 1, limit: 100, total: 2 },
-          }),
-        },
+        projects: { findProjectIds: async () => ["project-a", "project-b"] },
       });
 
       await expect(

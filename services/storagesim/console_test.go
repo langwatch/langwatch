@@ -134,3 +134,71 @@ func TestConsoleServesTheBundleAndNamesTheBuildWhenMissing(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "The console deletes one object or clears a bucket"
+func TestConsoleDeletesAnObjectAndClearsABucket(t *testing.T) {
+	srv := newTestServer(t)
+	put(t, srv.URL, "/uploads/a.txt", "a", "text/plain")
+	put(t, srv.URL, "/uploads/b.txt", "b", "text/plain")
+	put(t, srv.URL, "/other/c.txt", "c", "text/plain")
+
+	resp, _ := do(t, http.MethodDelete, srv.URL+"/_sim/api/object?bucket=uploads&key=a.txt", nil, nil)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete object = %d", resp.StatusCode)
+	}
+	if status := getJSON(t, srv.URL+"/_sim/api/object?bucket=uploads&key=a.txt", &struct{}{}); status != http.StatusNotFound {
+		t.Fatalf("deleted object reads %d", status)
+	}
+
+	_, body := do(t, http.MethodDelete, srv.URL+"/_sim/api/objects?bucket=uploads", nil, nil)
+	if strings.TrimSpace(body) != `{"deleted":1}` {
+		t.Fatalf("clear bucket = %q", body)
+	}
+	var left struct{ Objects []objectInfo }
+	getJSON(t, srv.URL+"/_sim/api/objects", &left)
+	if len(left.Objects) != 1 || left.Objects[0].Bucket != "other" {
+		t.Fatalf("left = %+v", left.Objects)
+	}
+}
+
+// @scenario "The console mints a presigned URL that storagesim accepts"
+func TestConsolePresignsAPutAndAGetThatRoundTrip(t *testing.T) {
+	srv := newTestServer(t)
+	var minted struct{ URL, Method string }
+	if status := getJSON(t, srv.URL+"/_sim/api/presign?bucket=uploads&key=a%20b/c.txt&method=PUT&expires=60", &minted); status != http.StatusOK {
+		t.Fatalf("presign PUT = %d", status)
+	}
+	if resp, body := do(t, http.MethodPut, minted.URL, strings.NewReader("hello"), nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("presigned PUT = %d %s", resp.StatusCode, body)
+	}
+	getJSON(t, srv.URL+"/_sim/api/presign?bucket=uploads&key=a%20b/c.txt", &minted)
+	if resp, body := do(t, http.MethodGet, minted.URL, nil, nil); resp.StatusCode != http.StatusOK || body != "hello" {
+		t.Fatalf("presigned GET = %d %q", resp.StatusCode, body)
+	}
+	for _, bad := range []string{"bucket=uploads", "bucket=uploads&key=k&method=DELETE", "bucket=uploads&key=k&expires=0"} {
+		if status := getJSON(t, srv.URL+"/_sim/api/presign?"+bad, &struct{}{}); status != http.StatusBadRequest {
+			t.Fatalf("presign %s = %d", bad, status)
+		}
+	}
+	var log struct{ Requests []requestEntry }
+	getJSON(t, srv.URL+"/_sim/api/requests", &log)
+	if got := log.Requests[0]; got.Auth != "presigned" || got.RequestID == "" {
+		t.Fatalf("newest request = %+v", got)
+	}
+}
+
+// @scenario "The console adds the demo objects on request"
+func TestConsoleSeedsTheDemoObjectsOnAPost(t *testing.T) {
+	srv := newTestServer(t)
+	if resp, _ := do(t, http.MethodGet, srv.URL+"/_sim/api/seed", nil, nil); resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET seed = %d", resp.StatusCode)
+	}
+	if _, body := do(t, http.MethodPost, srv.URL+"/_sim/api/seed", nil, nil); strings.TrimSpace(body) != `{"seeded":2}` {
+		t.Fatalf("seed = %q", body)
+	}
+	var listed struct{ Objects []objectInfo }
+	getJSON(t, srv.URL+"/_sim/api/objects?bucket=langwatch", &listed)
+	if len(listed.Objects) != len(seedObjects) {
+		t.Fatalf("objects after seed = %+v", listed.Objects)
+	}
+}

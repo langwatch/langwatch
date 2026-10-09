@@ -351,7 +351,9 @@ describe("GuidedOnboardingHost", () => {
     });
     mount(host);
 
-    expect(mockRegisterOnboardingExperiment).toHaveBeenCalledWith("guided");
+    expect(mockRegisterOnboardingExperiment).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "guided" }),
+    );
   });
 
   /** @scenario "the browser registers nothing for an organization without a variant" */
@@ -363,6 +365,8 @@ describe("GuidedOnboardingHost", () => {
     });
     mount(host);
 
-    expect(mockRegisterOnboardingExperiment).toHaveBeenCalledWith(null);
+    expect(mockRegisterOnboardingExperiment).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: null }),
+    );
   });
 });

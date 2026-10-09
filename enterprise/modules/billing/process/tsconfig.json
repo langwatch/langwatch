@@ -20,16 +20,10 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/data-retention/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -53,7 +47,7 @@
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/instant-eval/contract/tsconfig.build.json"
+      "path": "../../../../modules/instant-eval-judge/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/internal-slack/tsconfig.build.json"
@@ -107,7 +101,10 @@
       "path": "../../../../modules/trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/usage/contract/tsconfig.build.json"
+      "path": "../../../../packages/upgrade/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/instant-eval-judge/process/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/test-harness/tsconfig.build.json"

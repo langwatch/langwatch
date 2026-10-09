@@ -1,11 +1,13 @@
 import type { Instant } from "@langwatch/time";
 import type {
+  AdoptUnconfirmedAccountOutcome,
   CreateUserInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreatedUser,
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
+  UpdateUserEmailInput,
   UpdateUserProfileInput,
   UserAccountInfo,
   UserFullProfile,
@@ -31,9 +33,13 @@ type UserAddressConfirmation = Readonly<{ emailVerified: boolean }>;
 /** A credential user and the row it signs in with: identity states its identifier against it. */
 export type CreatedCredentialUser = CreatedUser & { accountId: string; accountCreatedAtMs: number };
 
+/** A sign-up the person made themselves: its registered fact commits with the account. */
+type UserSelfRegistration = Readonly<{ selfRegistered?: boolean }>;
+
 export type CreateCredentialUserRow = CreateCredentialUserInput &
   UserCredentialIssuer &
-  UserAddressConfirmation;
+  UserAddressConfirmation &
+  UserSelfRegistration;
 export type CreatePasskeyUserRow = CreatePasskeyUserInput &
   UserCredentialIssuer &
   UserAddressConfirmation;
@@ -43,7 +49,20 @@ export type UserDeactivationOutcome =
   | Readonly<{ outcome: "deactivated"; user: UserProfile }>
   | Readonly<{ outcome: "none_active" }>;
 
-/** Persistence owned by User. It never crosses the feature boundary. */
+/** An account as the created-fact seed reads it: its id and when its row was written. */
+export type UserCreatedRow = Readonly<{ id: string; createdAt: Instant }>;
+
+/** An account as the standing-fact step reads it: its id and when it was deactivated, if it is. */
+export type UserStandingRow = Readonly<{ id: string; deactivatedAt: Instant | null }>;
+
+/**
+ * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
+ * created fact (and a self-registration its registered fact) to the fact outbox with the row.
+ */
+/** A name change, an address change, or both, as the two `UserApi` writes ask for them. */
+export type StoredProfileChange = UpdateUserProfileInput &
+  Partial<Pick<UpdateUserEmailInput, "email">>;
+
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
@@ -54,11 +73,16 @@ export interface UserRepository {
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
+  /**
+   * Confirms an unfinished account and drops every account row and passkey it holds, as ONE
+   * serializable transaction; refuses, changing nothing, once it is confirmed or signed into.
+   */
+  adoptUnconfirmed(input: { id: string }): Promise<AdoptUnconfirmedAccountOutcome>;
   findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
   setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void>;
   findJoinOfferDismissedDomains(id: string): Promise<string[]>;
   addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void>;
-  updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
+  updateProfile(input: StoredProfileChange): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
   findTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
   getLangyCodeAccessPreference(id: string): Promise<UserCodeAccessPreference>;
@@ -95,4 +119,8 @@ export interface UserRepository {
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
+  /** One page of every account, in id order after `afterId`, for user's created-fact seed. */
+  findCreatedPage(input: { afterId: string | null; limit: number }): Promise<UserCreatedRow[]>;
+  /** One page of every account, in id order after `afterId`, for user's standing-fact step. */
+  findStandingPage(input: { afterId: string | null; limit: number }): Promise<UserStandingRow[]>;
 }

@@ -12,10 +12,15 @@ const organizationFindUnique = vi.fn();
 const memberCreate = vi.fn();
 const memberFindUnique = vi.fn();
 const auditLogCreate = vi.fn();
+type OutboxRow = Prisma.ProcessManagerOutboxCreateManyInput;
+const outboxCreateMany = vi.fn(async (_input?: { data: OutboxRow[] | OutboxRow }) => ({
+  count: 1,
+}));
 
 const transactionClient = prismaDouble({
   organizationUser: { create: memberCreate, findUnique: memberFindUnique },
   auditLog: { create: auditLogCreate },
+  processManagerOutbox: { createMany: outboxCreateMany },
 });
 
 const prisma = prismaDouble({
@@ -24,6 +29,11 @@ const prisma = prismaDouble({
   auditLog: { create: auditLogCreate },
   $transaction: (run) => run(transactionClient),
 });
+
+/** The audit intents the admission's own transaction appended to organization's outbox. */
+function auditIntents() {
+  return outboxCreateMany.mock.calls.flatMap(([input]) => [input?.data ?? []].flat());
+}
 
 let repository: PrismaOrganizationMembershipRepository;
 
@@ -47,18 +57,21 @@ function arrange({
   memberFindUnique.mockResolvedValue(existingRole ? { role: existingRole } : null);
 }
 
-function admit() {
+async function admit() {
   return repository.createMembership({
     userId: "user_sam",
     organizationId: "org_acme",
     pendingAdmissionId: "rolebinding_pending",
     via: "sso",
+    seat: await repository.readJoinerSeat({ organizationId: "org_acme" }),
+    pending: false,
   });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   auditLogCreate.mockResolvedValue({});
+  outboxCreateMany.mockResolvedValue({ count: 1 });
   repository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
     cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
@@ -72,13 +85,18 @@ describe("given an organization whose joiner seat is Developer", () => {
     it("writes a Developer row with no organization-wide grant pending", async () => {
       arrange({ joinerRole: OrganizationUserRole.DEVELOPER });
 
-      await expect(admit()).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
+      await expect(admit()).resolves.toEqual({
+        outcome: "created",
+        seat: "DEVELOPER",
+        pending: false,
+      });
 
       expect(memberCreate).toHaveBeenCalledWith({
         data: {
           userId: "user_sam",
           organizationId: "org_acme",
           role: OrganizationUserRole.DEVELOPER,
+          disabledAt: null,
           pendingSsoGrantId: null,
         },
       });
@@ -89,14 +107,20 @@ describe("given an organization whose joiner seat is Developer", () => {
 
       await admit();
 
-      expect(auditLogCreate).toHaveBeenCalledWith({
-        data: {
-          action: "organization.member.admitted",
-          userId: "user_sam",
-          organizationId: "org_acme",
-          metadata: { seat: "DEVELOPER", via: "sso" },
-        },
-      });
+      expect(auditLogCreate).not.toHaveBeenCalled();
+      expect(auditIntents()).toEqual([
+        expect.objectContaining({
+          processName: "organizationAudit",
+          intentType: "recordAudit",
+          payload: expect.objectContaining({
+            tenantId: "org_acme",
+            action: "organization.member.admitted",
+            userId: "user_sam",
+            organizationId: "org_acme",
+            metadata: { seat: "DEVELOPER", via: "sso" },
+          }),
+        }),
+      ]);
     });
   });
 });
@@ -109,8 +133,12 @@ describe("given a Developer-joiner organization where a Full member's row alread
         existingRole: OrganizationUserRole.MEMBER,
       });
 
-      await expect(admit()).resolves.toEqual({ outcome: "already-present", seat: "MEMBER" });
-      expect(auditLogCreate).not.toHaveBeenCalled();
+      await expect(admit()).resolves.toEqual({
+        outcome: "already-present",
+        seat: "MEMBER",
+        pending: false,
+      });
+      expect(auditIntents()).toEqual([]);
     });
   });
 });
@@ -121,7 +149,11 @@ describe("given an organization that never changed the setting", () => {
     it("writes a Full member row with the organization-wide grant pending", async () => {
       arrange({ joinerRole: OrganizationUserRole.MEMBER });
 
-      await expect(admit()).resolves.toEqual({ outcome: "created", seat: "MEMBER" });
+      await expect(admit()).resolves.toEqual({
+        outcome: "created",
+        seat: "MEMBER",
+        pending: false,
+      });
 
       expect(memberCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -129,7 +161,7 @@ describe("given an organization that never changed the setting", () => {
           pendingSsoGrantId: "rolebinding_pending",
         }),
       });
-      expect(auditLogCreate).not.toHaveBeenCalled();
+      expect(auditIntents()).toEqual([]);
     });
   });
 });
@@ -147,19 +179,22 @@ describe("given a Full-seat organization and a join request made from the termin
           pendingAdmissionId: "rolebinding_pending",
           via: "join-request-approved",
           seat: "DEVELOPER",
+          pending: false,
           origin: "cli",
         }),
-      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
+      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER", pending: false });
 
       expect(organizationFindUnique).not.toHaveBeenCalled();
-      expect(auditLogCreate).toHaveBeenCalledWith({
-        data: {
-          action: "organization.member.admitted",
-          userId: "user_sam",
-          organizationId: "org_acme",
-          metadata: { seat: "DEVELOPER", via: "join-request-approved", origin: "cli" },
-        },
-      });
+      expect(auditIntents()).toEqual([
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            action: "organization.member.admitted",
+            userId: "user_sam",
+            organizationId: "org_acme",
+            metadata: { seat: "DEVELOPER", via: "join-request-approved", origin: "cli" },
+          }),
+        }),
+      ]);
     });
   });
 });

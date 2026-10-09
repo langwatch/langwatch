@@ -6,7 +6,7 @@
 import type { SpanReceivedEvent } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { SpanStorageMapProjection } from "../span-storage.projection.ts";
 import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
 import { TraceAnalyticsRollupMapProjection } from "../trace-rollup.projection.ts";

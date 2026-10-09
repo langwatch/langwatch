@@ -2,12 +2,13 @@
 
 import type { RestIdentity } from "@langwatch/api/hosting";
 /**
- * The SCIM feature's application: what its four doors call.
+ * The SCIM feature's application: what its six doors call.
  *
  * Two of them mint and retire provisioning tokens — the settings page over
  * tRPC, and the management REST family an identity team scripts against — a
  * third speaks SCIM 2.0 to an identity provider, and a fourth relays a
- * directory's log stream. Before this, the tRPC door declared a context slice
+ * directory's log stream; the last two read reconciliation and oversight over
+ * tRPC. Before this, the tRPC door declared a context slice
  * for itself while the REST families took a `scim` resolver and the webhook
  * took the service as a call argument: three descriptions of one bag, none
  * reachable from the others.
@@ -16,12 +17,11 @@ import type { RestIdentity } from "@langwatch/api/hosting";
  * through it. What this object adds is that they are reached through ONE
  * thing, so a rule about minting a token — which connection it binds to, what
  * is returned once and never again — and a rule about which tenant a push
- * provisions have one place to live rather than four.
+ * provisions have one place to live rather than six.
  */
 import { recordScimCredential } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import {
   SCIM_REQUEST_FEED_LIMIT,
   ScimApi,
@@ -46,7 +46,6 @@ import {
   type ScimRequestEntry,
   type ScimReconciliationScope,
   type ScimServerConfig,
-  type ScimService,
   type ScimDeliveryReceipt,
   type ScimDirectoryConnection,
   type ScimTokenAuditEntry,
@@ -70,9 +69,7 @@ import {
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
-import { IdentityApi } from "@langwatch/identity-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -97,6 +94,10 @@ import {
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
+import {
+  ScimCostCenterFactsService,
+  type ScimCostCenterSenders,
+} from "../services/scim-cost-center-facts.service.ts";
 import { ScimDeprovisionService } from "../services/scim-deprovision.service.ts";
 import { ScimDirectoryExternalIdsService } from "../services/scim-directory-external-ids.service.ts";
 import { ScimDirectoryMoveService } from "../services/scim-directory-move.service.ts";
@@ -107,13 +108,9 @@ import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
+import type { ScimService } from "../services/scim.service.ts";
 
-type ScimSetup = FeatureSetup<
-  typeof ScimModule.dependencies,
-  never,
-  ScimServerConfig,
-  ScimRepositories
->;
+type ScimSetup = FeatureSetup<typeof ScimModule.dependencies, ScimServerConfig, ScimRepositories>;
 
 const CONNECTION_NOT_WRITABLE =
   "This directory token can no longer write through its single sign-on connection";
@@ -218,7 +215,7 @@ function findBearer(authorization: string | null): string | null {
 type ScimDirectoryMoveSender = Pick<EventingCommandSender<RequestDirectoryMoveCommandData>, "send">;
 
 type ScimAppOptions = {
-  scim: ScimService;
+  scim: Pick<ScimService, keyof ScimService>;
   connections: ScimConnectionsService;
   directoryExternalIds: ScimDirectoryExternalIdsService;
   reconciliation: ScimReconciliationService;
@@ -238,17 +235,14 @@ export class ScimModule implements ScimApiContract {
   static readonly dependencies = {
     authorization: AuthzApi,
     users: UserApi,
-    governance: GovernanceRestApi,
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
-    identity: IdentityApi,
-    organization: OrganizationApi,
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
   static readonly operatorReads = scimOperatorReads;
 
-  readonly #scim: ScimService;
+  readonly #scim: Pick<ScimService, keyof ScimService>;
   readonly #connections: ScimConnectionsService;
   readonly #directoryExternalIds: ScimDirectoryExternalIdsService;
   readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -262,6 +256,7 @@ export class ScimModule implements ScimApiContract {
   #directoryMove: ScimDirectoryMoveService | undefined;
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
+  #costCenterFacts: ScimCostCenterFactsService | undefined;
   #syncReads: ScimSyncReadsService | undefined;
 
   private constructor(options: ScimAppOptions) {
@@ -291,6 +286,10 @@ export class ScimModule implements ScimApiContract {
     const tokenPepper = await secrets.into(ScimModule.secrets.tokenPepper, (credentials) =>
       secrets.into(ScimModule.secrets.tokenPepperFallback, (session) => credentials ?? session),
     );
+    const previousTokenPepper = await secrets.into(
+      ScimModule.secrets.tokenPepperPrevious,
+      (previous) => previous || void 0,
+    );
     const scimSyncLedger = ScimSyncLedgerWriterService.create();
     const lifecycle = ScimSyncLifecycleService.create({
       guards: ScimSyncGuardsService.create({ syncs: repositories.scimSyncs }),
@@ -299,17 +298,20 @@ export class ScimModule implements ScimApiContract {
     });
     // The activity log arrives when scim_sync is built over its own store; see readScimSyncFrom.
     const syncs = ScimSyncReadsService.create({ syncs: repositories.scimSyncs, activity: null });
-    const connections = ScimConnectionsService.create(dependencies.identity);
+    const connections = ScimConnectionsService.create(repositories.scimSsoConnections);
+    const costCenterFacts = ScimCostCenterFactsService.create();
     const scim = PostgresScimService.create({
       repository: repositories.scim,
       writer: dependencies.authorization,
       users: dependencies.users,
-      governance: dependencies.governance,
-      organization: dependencies.organization,
+      costCenterFacts,
+      organization: dependencies.authorization,
+      seats: repositories.seats,
       entitlements: dependencies.entitlements,
       lifecycle,
       provenOffboarding: config.provenOffboarding,
       tokenPepper,
+      previousTokenPepper,
       connections,
     });
 
@@ -321,7 +323,7 @@ export class ScimModule implements ScimApiContract {
         identities: repositories.scim,
       }),
       reconciliation: ScimReconciliationService.create({
-        identity: dependencies.identity,
+        connections,
         syncs,
         grants: dependencies.authorization,
         people: dependencies.users,
@@ -333,13 +335,13 @@ export class ScimModule implements ScimApiContract {
       minting: ScimTokenMintService.create(dependencies.authorization),
       oversight: ScimOversightService.create({
         syncs,
-        organizations: dependencies.organization,
+        organizations: repositories.scim,
         identities: repositories.scim,
         lifecycle,
         deprovision: ScimDeprovisionService.create({
           grants: dependencies.authorization,
           lifecycle,
-          organization: dependencies.organization,
+          organization: dependencies.authorization,
         }),
       }),
       platformOperators: dependencies.authorization,
@@ -349,6 +351,7 @@ export class ScimModule implements ScimApiContract {
       lifecycle,
     });
     app.#scimSyncLedger = scimSyncLedger;
+    app.#costCenterFacts = costCenterFacts;
     app.#syncReads = syncs;
     return app;
   }
@@ -365,6 +368,11 @@ export class ScimModule implements ScimApiContract {
 
   connectDirectory(commands: Readonly<{ requestDirectoryMove: ScimDirectoryMoveSender }>): void {
     this.#requestDirectoryMove = commands.requestDirectoryMove;
+  }
+
+  /** scim_cost_center's senders: each member's cost center is recorded through them. */
+  connectCostCenter(commands: ScimCostCenterSenders): void {
+    this.#costCenterFacts?.connect(commands);
   }
 
   /** scim-sync's senders: the directory-sync history stages each fact through them. */

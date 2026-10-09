@@ -13,214 +13,50 @@ import {
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
 } from "@langwatch/auth-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { nowInstant } from "@langwatch/time";
 
 import type { CliDeviceSettlementChannel } from "../channels/cli-device-settlement.channel.ts";
 import type { CliDeviceSessionRepository } from "../repositories/cli-device-session.repository.ts";
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+  DEVICE_CODE_TTL_SECONDS,
+  EXCHANGE_CLAIM_SECONDS,
+  MIN_POLL_INTERVAL_SECONDS,
+  POLL_RATE_LIMIT_SECONDS,
+  decodeCliSession,
+  deviceCodeKey,
+  exchangeClaimKey,
+  extractBearerCliAccessToken,
+  familyIndexKey,
+  generateUserCode,
+  isRecordNotFound,
+  pollRateKey,
+  userCodeKey,
+  type CliAccessTokenRecord,
+  type CliClientInfo,
+  type CliCredentialType,
+  type CliDeviceCodeRecord,
+  type CliMintedSession,
+  type CliRefreshTokenRecord,
+} from "../rules/cli-device-session.rules.ts";
+import { CliDeviceTokenRecordsService } from "./cli-device-token-records.service.ts";
 
-/** Redis key prefix for device-code records. */
-const DEVICE_CODE_PREFIX = "lwcli:device:";
-/** Redis key prefix for the per-device-code poll window. */
-const POLL_RATE_PREFIX = "lwcli:poll:";
-
-/** Lifetime of an unredeemed device_code, in seconds. */
-export const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
-/** Minimum poll interval the CLI should respect. */
-export const MIN_POLL_INTERVAL_SECONDS = 5;
-/** Access token lifetime. Short; refresh is the rotation path. */
-const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1h
-/** Min seconds between successive `/exchange` polls per device_code. */
-const POLL_RATE_LIMIT_SECONDS = 4;
-/**
- * How long one `/exchange` holds the exclusive redemption claim — longer than
- * the poll window, which only paces polls rather than fencing a slower
- * redemption, but short enough to free the code early if release is skipped.
- */
-const EXCHANGE_CLAIM_SECONDS = 30;
-/**
- * Default refresh-token lifetime.
- */
-export const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90d
-
-type CliDeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
-
-/**
- * What the CLI is asking the browser to mint on approval.
- */
-type CliCredentialType = "device_session" | "project_api_key";
-
-/**
- * Device metadata captured at `/exchange` so a person can recognise "Bob's MacBook Pro" in
- * the devices inventory and revoke it per device.
- */
-export type CliClientInfo = {
-  /** Human label, defaults to platform + hostname. e.g. "Macbook Pro". */
-  device_label?: string;
-  /** `os.hostname()` output. */
-  hostname?: string;
-  /** `os.userInfo().username`, so two developers on one Mac stay distinct. */
-  uname?: string;
-  /** "darwin" / "linux" / "win32" — `process.platform`. */
-  platform?: string;
-  /** First-issued timestamp; preserved across rotations of this session. */
-  session_started_at?: number;
+export {
+  DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+  DEVICE_CODE_TTL_SECONDS,
+  MIN_POLL_INTERVAL_SECONDS,
+  type CliClientInfo,
+  type CliDeviceCodeRecord,
+  type CliMintedSession,
+  type CliRefreshTokenRecord,
 };
-
-export interface CliDeviceCodeRecord {
-  device_code: string;
-  user_code: string;
-  status: CliDeviceCodeStatus;
-  created_at: number; // unix ms
-  expires_at: number; // unix ms
-  /** What the CLI is asking the browser to mint. Defaults to `device_session`. */
-  credential_type: CliCredentialType;
-  /**
-   * Whether the CLI asked for management access (`langwatch login --management`).
-   * Absent on records minted before the field, which read as not asked.
-   */
-  management?: boolean;
-  /** Set after browser-side approval. */
-  user_id?: string;
-  organization_id?: string;
-  /**
-   * Personal virtual key shipped in the `/exchange` response. Approval no
-   * longer writes it: the field stays readable so a device approved by another
-   * instance mid-rollout still resolves.
-   */
-  personal_vk?: {
-    id: string;
-    label: string;
-    secret: string;
-    base_url: string;
-  };
-  /**
-   * For `credential_type: "project_api_key"` after approval: the picked
-   * project the exchange binds the session to. Never a key.
-   */
-  project?: {
-    project_id: string;
-    project_slug: string;
-    project_name: string;
-  };
-  /**
-   * For `credential_type: "device_session"` after approval — the scope + permission
-   * selection the authorize screen approved (or the server-side default when the client sent
-   * none). Consumed by `/exchange`, which mints the user-scoped CLI key from it.
-   */
-  key_selection?: CliKeySelection;
-}
-
-export interface CliRefreshTokenRecord {
-  user_id: string;
-  organization_id: string;
-  /** The one project the session is capped at; carried across rotations. */
-  project_id?: string;
-  issued_at: number;
-  expires_at: number;
-  client_info?: CliClientInfo;
-  /**
-   * The user-scoped CLI key `/exchange` minted for this session, carried
-   * across `/refresh` rotations so `/logout` can revoke the key alongside the
-   * tokens. Absent for sessions that minted no key.
-   */
-  cli_api_key_id?: string;
-  /** Set when the person consented to one project only (hosted MCP): no rotation re-scopes it. */
-  project_locked?: boolean;
-  /** The family this session heads, carried across rotations; its forks are filed under it. */
-  family_id?: string;
-  /** On a forked child: the family it was forked from, whose end is its end. */
-  parent_family_id?: string;
-}
-
-interface CliAccessTokenRecord {
-  user_id: string;
-  organization_id: string;
-  /** Mirror of the refresh record's field; see there. */
-  project_id?: string;
-  issued_at: number;
-  expires_at: number;
-  /** Mirror of the refresh record's field; the devices inventory reads it. */
-  client_info?: CliClientInfo;
-  /** Mirror of the refresh record's field; see there. */
-  cli_api_key_id?: string;
-  /** Mirror of the refresh record's field; see there. */
-  project_locked?: boolean;
-  /** Mirror of the refresh record's field; see there. */
-  family_id?: string;
-  /** Mirror of the refresh record's field; see there. */
-  parent_family_id?: string;
-}
-
-/** The pair a completed grant — or a rotation — hands the CLI. */
-export type CliMintedSession = Readonly<{
-  accessToken: string;
-  refreshToken: string;
-  accessTtlSeconds: number;
-  refreshTtlSeconds: number;
-}>;
-
-/**
- * The one grammar for a CLI bearer access token.
- */
-const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_-]+)$/;
-
-/**
- * Generate an RFC 8628 user_code: 8 characters, dashed in the middle for readability, on a
- * base32 alphabet that excludes the ambiguous ones.
- */
-function generateUserCode(): string {
-  // Crockford-ish base32 minus 0/O/I/L/U for unambiguous human entry.
-  const alphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
-  const bytes = randomBytes(8);
-  const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length]!);
-
-  return `${chars.slice(0, 4).join("")}-${chars.slice(4, 8).join("")}`;
-}
-
-function deviceCodeKey(deviceCode: string): string {
-  return `${DEVICE_CODE_PREFIX}${deviceCode}`;
-}
-
-/**
- * The user-code index, stored separately so the browser can resolve a pasted
- * short code back to its device code.
- */
-function userCodeKey(userCode: string): string {
-  return `${DEVICE_CODE_PREFIX}usercode:${userCode}`;
-}
-
-function pollRateKey(deviceCode: string): string {
-  return `${POLL_RATE_PREFIX}${deviceCode}`;
-}
-
-/**
- * The exclusive redemption claim on an approved device code. Separate from the
- * poll window because it answers a different question: not "is this client
- * polling too fast" but "is somebody already spending this code".
- */
-function exchangeClaimKey(deviceCode: string): string {
-  return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
-}
-
-/** The token keys of the children forked from one session family. */
-function familyIndexKey(familyId: string): string {
-  return `lwcli:family:${familyId}`;
-}
 
 /** Everything the device grant stores, over one process's substrate. */
 export class CliDeviceSessionService {
-  /**
-   * Extract the bearer access token from an `Authorization` header, or null.
-   */
+  /** The bearer access token in an `Authorization` header, or null. */
   static extractBearerCliAccessToken(authHeader: string | null | undefined): string | null {
-    if (!authHeader) {
-      return null;
-    }
-
-    const match = BEARER_ACCESS_TOKEN_REGEX.exec(authHeader.trim());
-
-    return match ? match[1]! : null;
+    return extractBearerCliAccessToken(authHeader);
   }
 
   static create(options: {
@@ -245,7 +81,24 @@ export class CliDeviceSessionService {
     private readonly store: CliDeviceSessionRepository,
     readonly refreshTokenTtlSeconds: number,
     private readonly settlements: CliDeviceSettlementChannel,
-  ) {}
+  ) {
+    this.tokenRecords = CliDeviceTokenRecordsService.create({ store });
+  }
+
+  private readonly tokenRecords: CliDeviceTokenRecordsService;
+
+  /** Every CLI token a person still holds, read through their own index. */
+  findTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]> {
+    return this.tokenRecords.findTokenRecordsForUser(input);
+  }
+
+  /** Revokes a person's CLI tokens: the named ones inside their index, or all of it. */
+  revokeTokens(input: {
+    userId: string;
+    tokenKeys?: readonly string[] | undefined;
+  }): Promise<{ revokedCount: number }> {
+    return this.tokenRecords.revokeTokens(input);
+  }
 
   // -- the device code ------------------------------------------------------
 
@@ -539,8 +392,7 @@ export class CliDeviceSessionService {
       if (isRecordNotFound(error)) return undefined;
       throw error;
     });
-    const record =
-      raw === undefined ? null : CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
+    const record = raw === undefined ? null : decodeCliSession<CliRefreshTokenRecord>(raw);
     if (!record) {
       throw new CliDeviceFlowRefusedError({
         refusal: {
@@ -552,19 +404,6 @@ export class CliDeviceSessionService {
     }
 
     return record;
-  }
-
-  /**
-   * A stored session record, or null when it no longer decodes. That should be
-   * a named `cli_session_unreadable` refusal saying "sign in again";
-   * `auth/contract` cannot declare one yet, so null keeps the caller's 401.
-   */
-  private static decodeSession<T>(raw: string): T | null {
-    try {
-      return JSON.parse(raw) as T;
-    } catch {
-      return null;
-    }
   }
 
   /**
@@ -585,22 +424,6 @@ export class CliDeviceSessionService {
     return familyId;
   }
 
-  /**
-   * Ends every child forked from these sessions' families, answering how many records were held.
-   */
-  private async endChildren(
-    records: readonly Pick<CliRefreshTokenRecord, "family_id">[],
-  ): Promise<number> {
-    let ended = 0;
-    for (const familyId of new Set(records.flatMap(({ family_id }) => family_id ?? []))) {
-      const indexKey = familyIndexKey(familyId);
-      const memberKeys = await this.store.findIndexedTokens(indexKey);
-      ended += await this.store.deleteIndexedTokens({ indexKey, memberKeys });
-    }
-
-    return ended;
-  }
-
   /** Drops one refresh token, which is what makes a rejected rotation final. */
   dropRefreshToken(refreshToken: string): Promise<void> {
     return this.store.delete(cliRefreshTokenKey(refreshToken));
@@ -611,12 +434,12 @@ export class CliDeviceSessionService {
    * unreadable record, or an expired one all throw `CliSessionRecordNotFoundError`.
    */
   async getAccessToken(authHeader: string | null | undefined): Promise<CliAccessTokenRecord> {
-    const token = CliDeviceSessionService.extractBearerCliAccessToken(authHeader);
+    const token = extractBearerCliAccessToken(authHeader);
     if (!token) {
       throw new CliSessionRecordNotFoundError();
     }
 
-    const record = CliDeviceSessionService.decodeSession<CliAccessTokenRecord>(
+    const record = decodeCliSession<CliAccessTokenRecord>(
       await this.store.get(cliAccessTokenKey(token)),
     );
     if (!record) {
@@ -639,7 +462,7 @@ export class CliDeviceSessionService {
     authHeader: string | null | undefined;
     userId: string;
   }): Promise<void> {
-    const token = CliDeviceSessionService.extractBearerCliAccessToken(input.authHeader);
+    const token = extractBearerCliAccessToken(input.authHeader);
     if (!token) {
       return;
     }
@@ -651,126 +474,11 @@ export class CliDeviceSessionService {
     });
   }
 
-  /** Every CLI token a person still holds, read through their own index. */
-  async findTokenRecordsForUser({ userId }: { userId: string }): Promise<CliTokenRecordEntry[]> {
-    const entries: CliTokenRecordEntry[] = [];
-    for (const tokenKey of await this.store.findIndexedTokens(cliUserTokensIndexKey(userId))) {
-      const raw = await this.store.get(tokenKey).catch((error: unknown) => {
-        if (isRecordNotFound(error)) return undefined;
-        throw error;
-      });
-      const record =
-        raw === undefined
-          ? null
-          : CliDeviceSessionService.decodeSession<CliAccessTokenRecord | CliRefreshTokenRecord>(
-              raw,
-            );
-      if (!record || record.user_id !== userId) continue;
-
-      entries.push(CliDeviceSessionService.toTokenRecordEntry({ tokenKey, record }));
-    }
-    return entries;
-  }
-
-  /** Revokes a person's CLI tokens: the named ones inside their index, or all of it. */
-  async revokeTokens({
-    userId,
-    tokenKeys,
-  }: {
-    userId: string;
-    tokenKeys?: readonly string[] | undefined;
-  }): Promise<{ revokedCount: number }> {
-    const indexKey = cliUserTokensIndexKey(userId);
-    const indexed = await this.store.findIndexedTokens(indexKey);
-    const memberKeys =
-      tokenKeys === undefined ? indexed : indexed.filter((key) => tokenKeys.includes(key));
-    const parents: Pick<CliRefreshTokenRecord, "family_id">[] = [];
-    for (const memberKey of memberKeys) {
-      const raw = await this.store.get(memberKey).catch((error: unknown) => {
-        if (isRecordNotFound(error)) return undefined;
-        throw error;
-      });
-      const record =
-        raw === undefined
-          ? null
-          : CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
-      if (record) parents.push(record);
-    }
-    // A revoked session's forks go with it.
-    const children = await this.endChildren(parents);
-    return {
-      revokedCount: children + (await this.store.deleteIndexedTokens({ indexKey, memberKeys })),
-    };
-  }
-
-  private static toTokenRecordEntry({
-    tokenKey,
-    record,
-  }: {
-    tokenKey: string;
-    record: CliAccessTokenRecord | CliRefreshTokenRecord;
-  }): CliTokenRecordEntry {
-    const info = record.client_info;
-    return {
-      tokenKey,
-      organizationId: record.organization_id,
-      ...(record.cli_api_key_id ? { cliApiKeyId: record.cli_api_key_id } : {}),
-      issuedAtMs: record.issued_at,
-      expiresAtMs: record.expires_at,
-      ...(info
-        ? {
-            clientInfo: {
-              deviceLabel: info.device_label,
-              hostname: info.hostname,
-              uname: info.uname,
-              platform: info.platform,
-              sessionStartedAtMs: info.session_started_at,
-            },
-          }
-        : {}),
-    };
-  }
-
-  /**
-   * Reads then drops whichever halves of a session a logout named, returning the records so
-   * the caller can revoke the CLI key they carry.
-   */
-  async endSession(input: {
+  /** Reads then drops whichever halves of a session a logout named; see the records service. */
+  endSession(input: {
     refreshToken?: string | undefined;
     accessToken?: string | undefined;
   }): Promise<(CliRefreshTokenRecord | CliAccessTokenRecord)[]> {
-    const records: (CliRefreshTokenRecord | CliAccessTokenRecord)[] = [];
-    for (const [token, keyFor] of [
-      [input.refreshToken, cliRefreshTokenKey],
-      [input.accessToken, cliAccessTokenKey],
-    ] as const) {
-      if (!token) {
-        continue;
-      }
-
-      const raw = await this.store.get(keyFor(token)).catch((error: unknown) => {
-        if (isRecordNotFound(error)) return undefined;
-        throw error;
-      });
-      if (raw !== undefined) {
-        try {
-          records.push(JSON.parse(raw) as CliRefreshTokenRecord);
-        } catch (error) {
-          // A record we cannot read is one we cannot revoke a key from; the
-          // delete below still happens, which is what logout promises.
-          void error;
-        }
-      }
-
-      await this.store.delete(keyFor(token));
-    }
-    // Ending a session ends the children forked from it.
-    await this.endChildren(records);
-
-    return records;
+    return this.tokenRecords.endSession(input);
   }
-}
-
-function isRecordNotFound(error: unknown): boolean {
-  return HandledError.isHandled(error) && error.code === "cli_session_record_not_found";
 }

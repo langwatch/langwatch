@@ -1,7 +1,7 @@
 import { HStack, Text } from "@langwatch/design-system/primitives";
 
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { TracePresenceAvatars } from "../../../../../../elements/presence/trace-presence-avatars.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
 
 export const TraceCell = {

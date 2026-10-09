@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/limiter": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*"
@@ -37,5 +38,8 @@
     "nanoid": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "data"
   }
 }

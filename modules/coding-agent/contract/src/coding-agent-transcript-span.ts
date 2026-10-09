@@ -12,8 +12,9 @@ import {
   fillToolCallGaps,
   type SpanEntryAccumulator,
 } from "./coding-agent-transcript-state.ts";
-import { pickModel, pickNumber, pickString } from "./coding-agent-transcript-value.ts";
+import { pickModel, pickNumber } from "./coding-agent-transcript-value.ts";
 import { parseMcpToolName, deriveToolName } from "./telemetry/coding-agent-normalization.ts";
+import { pickString } from "./telemetry/coding-agent-span.ts";
 import { isModelCallSpan } from "./telemetry/index.ts";
 
 export function collectSpanEntries(

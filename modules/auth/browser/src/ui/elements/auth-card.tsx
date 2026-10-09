@@ -9,6 +9,7 @@ export function AuthCard({
   title,
   intro,
   finePrint,
+  solid = false,
   children,
 }: {
   title: string;
@@ -17,6 +18,9 @@ export function AuthCard({
   intro?: string;
   /** The small print under everything: terms, privacy, nothing louder. */
   finePrint?: ReactNode;
+  /** A near-solid floor instead of the glass, for a card that is one sentence with nothing
+   *  to operate: the glass that flatters a column of fields washes a lone sentence out. */
+  solid?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -24,7 +28,10 @@ export function AuthCard({
       title={title}
       intro={intro}
       footer={finePrint}
-      cardAttributes={{ "data-auth-card": true }}
+      cardAttributes={{
+        "data-auth-card": true,
+        "data-auth-card-surface": solid ? "solid" : "glass",
+      }}
       logoAttributes={{ "data-auth-card-logo": true }}
       bodyAttributes={{ "data-auth-card-body": true }}
     >

@@ -1,3 +1,4 @@
+import { Lent } from "@langwatch/browser-host/lent";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Button,
@@ -8,10 +9,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Suspense, useEffect, useState } from "react";
+import { LicenseBillingSectionToken } from "@langwatch/enterprise-billing-client";
+import { useEffect, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { useLicenseBillingSections } from "../../behavior/use-license-billing-sections.ts";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import {
   termsFormFrom,
@@ -21,12 +22,7 @@ import {
 } from "../../model/license-terms.ts";
 import { seatChangeSummary } from "../../model/seat-change-summary.ts";
 import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
-import {
-  dateInputToISO,
-  EmptyCell,
-  formatDate,
-  formatDateTime,
-} from "../elements/backoffice-cells.tsx";
+import { dateInputToISO, EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
 import { Detail, Section } from "../elements/drawer-sections.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 import { SignedLicenseOnce } from "../elements/signed-license-once.tsx";
@@ -132,22 +128,23 @@ function LicenseBillingSections({
   organizationId: string;
   seatChanges: number;
 }) {
-  const sections = useLicenseBillingSections();
-  return sections.map(({ key, Section }) => (
-    <Suspense key={`${key}:${seatChanges}`} fallback={null}>
-      <Section
-        organizationId={organizationId}
-        organizationName={license.organizationName}
-        email={license.email}
-        issuedAt={license.issuedAt}
-        expiresAt={license.expiresAt}
-        maxMembers={license.maxMembers}
-        seatRateCents={license.seatRateCents}
-        seatCurrency={license.seatCurrency}
-        commitUsdCents={license.commitUsdCents}
-      />
-    </Suspense>
-  ));
+  return (
+    <Lent
+      key={seatChanges}
+      of={LicenseBillingSectionToken}
+      props={{
+        organizationId,
+        organizationName: license.organizationName,
+        email: license.email,
+        issuedAt: license.issuedAt,
+        expiresAt: license.expiresAt,
+        maxMembers: license.maxMembers,
+        seatRateCents: license.seatRateCents,
+        seatCurrency: license.seatCurrency,
+        commitUsdCents: license.commitUsdCents,
+      }}
+    />
+  );
 }
 
 function LicenseDetails({ license }: { license: License }) {

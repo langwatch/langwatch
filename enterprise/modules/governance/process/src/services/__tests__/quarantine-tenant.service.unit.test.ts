@@ -3,7 +3,7 @@
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectQuarantineTenantResolverService } from "../quarantine-tenant.service.ts";
+import { ProjectQuarantineTenantResolverService } from "../../features/ingest/services/quarantine-tenant.service.ts";
 
 describe("ProjectQuarantineTenantResolverService", () => {
   describe("when an organization's quarantine tenant is resolved", () => {

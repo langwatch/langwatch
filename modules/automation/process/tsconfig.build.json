@@ -124,6 +124,9 @@
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
+    },
+    {
       "path": "../../webhook/contract/tsconfig.build.json"
     }
   ]

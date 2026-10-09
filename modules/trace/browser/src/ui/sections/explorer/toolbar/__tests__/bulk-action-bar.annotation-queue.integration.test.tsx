@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => ({
   permissions: new Set<string>(["annotations:create"]),
 }));
 
+vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({
+    hasPermission: (permission: string) => mocks.permissions.has(permission),
+  }),
+}));
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
@@ -22,13 +28,13 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) =
   useLangyStore: (selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown) =>
     selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
 }));
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
-    hasPermission: (permission: string) => mocks.permissions.has(permission),
   }),
 }));
 vi.mock("../../../me/use-personal-feature-gate.ts", () => ({

@@ -50,6 +50,15 @@ export const codeAgentConfigSchema = z.object({
 
 export type CodeAgentConfig = z.infer<typeof codeAgentConfigSchema>;
 
+/** A linked graph's fields as workflow last recorded them; workflow's facts write it. */
+export const workflowAgentFieldsSchema = z.object({
+  inputFields: z.array(fieldSchema),
+  outputFields: z.array(fieldSchema),
+  fieldsResolved: z.boolean(),
+  recordedAt: z.number().int().nonnegative(),
+});
+export type WorkflowAgentFields = z.infer<typeof workflowAgentFieldsSchema>;
+
 export const workflowAgentConfigSchema = z.object({
   ...baseAgentConfigSchema.shape,
   isCustom: z.boolean().optional(),
@@ -57,6 +66,7 @@ export const workflowAgentConfigSchema = z.object({
   publishedId: z.string().optional(),
   version_id: z.string().optional(),
   versions: z.record(z.string(), z.unknown()).optional(),
+  workflowFields: workflowAgentFieldsSchema.optional(),
   scenarioMappings: z.record(z.string(), agentInputBindingSchema).optional(),
   scenarioOutputField: z.string().optional(),
 });

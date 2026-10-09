@@ -24,13 +24,13 @@ Feature: GitHub routes answer through the installed module
     Then the route answers 403
 
   @unimplemented
-  Scenario: a completed installation is recorded, audited and relinks pull requests
+  Scenario: a completed installation is recorded, audited and announced as connected
     Given the github module is installed over memory stores
     And an installation flow was signed for an organization manager
     When GitHub redirects to the Setup URL with the new installation
     Then the installation is recorded against the organization
     And the audit log receives the install line
-    And the organization's coding-agent pull requests are relinked
+    And GitHub records that the installation was connected
 
   @unimplemented
   Scenario: disconnecting records the disconnect in the audit log

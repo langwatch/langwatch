@@ -13,13 +13,16 @@ import {
   type UiActor,
   type UiCapabilities,
   UiFeedback,
+  UiHostServiceProvider,
 } from "@langwatch/browser-host/capabilities";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { ReleaseFlagToken } from "@langwatch/module";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { installedModuleScreens } from "../ui-module-screens.ts";
-import { resolveUiPageAccess, withUiPageGuard } from "../ui-page-guard.tsx";
+import { installedModuleScreens } from "../module/ui-module-screens.ts";
+import { resolveUiPageAccess, withUiPageGuard } from "../page/ui-page-guard.tsx";
 import { defineBrowserModule } from "../web-module.ts";
 
 class SilentNavigation extends UiNavigation {
@@ -42,7 +45,7 @@ class SilentFeedback extends UiFeedback {
 
 class AnsweringSession extends UiSession {
   constructor(
-    private readonly answers: {
+    readonly answers: {
       flags: Record<string, boolean | undefined>;
       permissions: readonly string[];
       settled: boolean;
@@ -66,10 +69,6 @@ class AnsweringSession extends UiSession {
   isSettled(): boolean {
     return this.answers.settled;
   }
-
-  featureFlag(flag: string): boolean | undefined {
-    return this.answers.flags[flag];
-  }
 }
 
 function capabilities(session: UiSession): UiCapabilities {
@@ -84,9 +83,12 @@ function capabilities(session: UiSession): UiCapabilities {
 
 const Page = () => <div>the page</div>;
 
-function renderGuarded(session: UiSession) {
+const GOVERNANCE = ReleaseFlagToken.create("release_ui_ai_governance_enabled");
+const BILLED_COST = ReleaseFlagToken.create("release_ui_governance_billed_cost_enabled");
+
+function renderGuarded(session: AnsweringSession) {
   const Guarded = withUiPageGuard({
-    flags: ["release_ui_ai_governance_enabled"],
+    flags: [GOVERNANCE],
     permission: "governance:view",
     fallbacks: {
       loading: () => <div>still asking</div>,
@@ -97,7 +99,18 @@ function renderGuarded(session: UiSession) {
 
   render(
     <UiCapabilityContextProvider value={capabilities(session)}>
-      <Guarded />
+      <UiHostServiceProvider
+        value={
+          new Map([
+            [
+              UiFlagsService.name,
+              { flag: ({ name }: ReleaseFlagToken) => session.answers.flags[name] },
+            ],
+          ])
+        }
+      >
+        <Guarded />
+      </UiHostServiceProvider>
     </UiCapabilityContextProvider>,
   );
 }
@@ -108,7 +121,7 @@ describe("given a page behind a flag and a permission", () => {
   describe("when the flag has not answered yet", () => {
     it("waits rather than reading the silence as off", () => {
       const access = resolveUiPageAccess({
-        flags: ["release_ui_ai_governance_enabled"],
+        flags: [GOVERNANCE],
         permission: "governance:view",
         featureFlag: () => void 0,
         hasPermission: () => true,
@@ -135,7 +148,7 @@ describe("given a page behind a flag and a permission", () => {
   describe("when the flag is off", () => {
     it("answers not-found before it considers the permission at all", () => {
       const access = resolveUiPageAccess({
-        flags: ["release_ui_ai_governance_enabled"],
+        flags: [GOVERNANCE],
         permission: "governance:view",
         featureFlag: () => false,
         // Holding the grant must not turn the 404 into a page.
@@ -152,7 +165,7 @@ describe("given a page behind a flag and a permission", () => {
       // permission-first guard would tell an outsider that a page they cannot
       // see exists and they merely lack access to it.
       const access = resolveUiPageAccess({
-        flags: ["release_ui_ai_governance_enabled"],
+        flags: [GOVERNANCE],
         permission: "governance:view",
         featureFlag: () => false,
         hasPermission: () => false,
@@ -256,9 +269,9 @@ describe("given a page behind a flag and a permission", () => {
       const asked: string[] = [];
 
       resolveUiPageAccess({
-        flags: ["release_ui_ai_governance_enabled", "release_ui_governance_billed_cost_enabled"],
+        flags: [GOVERNANCE, BILLED_COST],
         featureFlag: (flag) => {
-          asked.push(flag);
+          asked.push(flag.name);
           return void 0;
         },
         hasPermission: () => true,
@@ -282,7 +295,7 @@ describe("given a module declaring a screen that requires a grant", () => {
     "pages/[project]/open": { load: async () => ({ default: Page }) },
     "pages/[project]/flagged": {
       load: async () => ({ default: Page }),
-      flags: ["release_ui_ai_governance_enabled"],
+      flags: [GOVERNANCE],
     },
   });
 
@@ -303,7 +316,13 @@ describe("given a module declaring a screen that requires a grant", () => {
       <UiCapabilityContextProvider
         value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
       >
-        <Screen />
+        <UiHostServiceProvider
+          value={
+            new Map([[UiFlagsService.name, { flag: ({ name }: ReleaseFlagToken) => flags[name] }]])
+          }
+        >
+          <Screen />
+        </UiHostServiceProvider>
       </UiCapabilityContextProvider>,
     );
   }

@@ -7,7 +7,7 @@ import {
   handlePush,
   type PushWindowClient,
   type PushWorkerScope,
-} from "./push-service-worker.ts";
+} from "./push/push-service-worker.ts";
 
 /** The worker globals this script touches, typed here so the package keeps its DOM lib. */
 interface WorkerGlobal {

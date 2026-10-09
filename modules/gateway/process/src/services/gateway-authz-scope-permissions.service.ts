@@ -4,7 +4,7 @@ import type { ApiKeyPermissionScope, AuthzApi } from "@langwatch/authz-contract"
 import type {
   GatewayPermissionScope,
   GatewayScopePermissions,
-} from "./virtual-key-authorization.service.ts";
+} from "../features/virtual-key/services/virtual-key-authorization.service.ts";
 
 /**
  * The two questions a virtual-key write is authorized by, answered from the

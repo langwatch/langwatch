@@ -4,7 +4,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AArrowDown, AArrowUp } from "lucide-react";
 import type React from "react";
 
-import { type Density, useDensityStore } from "../../../../behavior/density.store.ts";
+import {
+  type Density,
+  useDensityStore,
+} from "../../../../features/explorer/behavior/density.store.ts";
 
 // Icons map "visual height of letter" to "row height" — the up-arrow
 // "A↑" reads as "tighter rows, taller letters poking up" = compact,

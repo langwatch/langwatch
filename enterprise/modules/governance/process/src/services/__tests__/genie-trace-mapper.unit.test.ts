@@ -16,18 +16,18 @@
  */
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
 import { spanSchema } from "@langwatch/trace-contract";
-import { computeSpanCost } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
-import { KNOWN_AGENT_IDENTITIES } from "../../rules/conversation-trace-assembly-service.rules.ts";
-import { GENIE_QUERY_SPAN_NAME } from "../../rules/genie-span-attributes-service.rules.ts";
+import { GENIE_QUERY_SPAN_NAME } from "../../features/databricks-genie/rules/genie-span-attributes-service.rules.ts";
 import {
   GENIE_AGENT_MODEL,
   GENIE_MESSAGE_SPAN_NAME,
   GENIE_ROUTING_PROFILE,
-} from "../../rules/genie-trace-mapper-service.rules.ts";
-import * as GenieTraceMapperService from "../../rules/genie-trace-mapper-service.rules.ts";
+} from "../../features/databricks-genie/rules/genie-trace-mapper-service.rules.ts";
+import * as GenieTraceMapperService from "../../features/databricks-genie/rules/genie-trace-mapper-service.rules.ts";
+import { KNOWN_AGENT_IDENTITIES } from "../../features/microsoft/rules/conversation-trace-assembly-service.rules.ts";
 
 const ORIGIN = {
   ingestionSourceId: "source-1",
@@ -429,10 +429,13 @@ describe("given two ingestion sources routing into one destination project", () 
   });
 });
 
+function computeSpanCost(input: { model: string; promptTokens: number; completionTokens: number }) {
+  return estimateModelCost({ attrs: {}, ...input }, getStaticModelCostRates());
+}
+
 describe("given the pricing table (Decision 14(d) pin)", () => {
   it("the Genie agent label resolves to no price — cost enrichment yields zero", () => {
     const cost = computeSpanCost({
-      attrs: {},
       model: GENIE_AGENT_MODEL,
       promptTokens: 100_000,
       completionTokens: 100_000,
@@ -450,7 +453,6 @@ describe("given the pricing table (Decision 14(d) pin)", () => {
   /** @scenario "A source cannot name a real model as its agent" */
   it.each([...KNOWN_AGENT_IDENTITIES])("%s resolves to no price either", (agent) => {
     const cost = computeSpanCost({
-      attrs: {},
       model: agent,
       promptTokens: 100_000,
       completionTokens: 100_000,

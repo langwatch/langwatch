@@ -47,10 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The gate reads no working-tree content: on pull_request events
-          # dorny/paths-filter takes the changed-file list from the API, and
-          # every file this job needs on disk lives under .github/. Checking
-          # out the rest of the tree is pure runner time.
+          # The gate reads no working-tree content: dorny/paths-filter lists
+          # changed paths from git trees, and every file this job needs on disk
+          # lives under .github/. Checking out the rest of the tree is pure
+          # runner time.
           sparse-checkout: .github
       # Only `pull_request` has a base to diff against. Every other event
       # (push, merge_group, workflow_dispatch) forces the filter true, so the
@@ -60,6 +60,9 @@ jobs:
         if: github.event_name == 'pull_request'
         id: filter
         with:
+          # Empty: diff with git, never the files API, which stops at 3,000
+          # files (specs/ci/path-filters.feature).
+          token: ""
           filters: |
             # herrgen walks every Go file in the repo for herr code
             # declarations (tools/herrgen/parse.go::goFiles), so this filter has
@@ -292,6 +295,15 @@ jobs:
       # Through the Makefile, so the check CI runs and the check a developer
       # runs cannot drift apart.
       - run: make herrgen-check
+      # The README generator reads zod schemas from the app, so it needs the
+      # whole installed workspace plus the prepared generated files and a
+      # built SDK. The prepare action runs start:prepare:files and ensure:built.
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "all"
+      - uses: ./.github/actions/prepare-generated-files
+      - name: Generated READMEs are current
+        run: pnpm check:readmes
 
   # The single required status check. Every job above is `if:`-gated and so
   # cannot be required directly — a skipped job never reports, and branch

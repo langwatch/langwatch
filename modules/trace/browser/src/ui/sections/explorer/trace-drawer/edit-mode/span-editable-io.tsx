@@ -3,7 +3,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectSpanEditBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { capturedInputForEditing } from "../../../../../model/explorer/trace-drawer/edit-mode/span-input-seed.ts";
 import { EditableIOField } from "./editable-io-field.tsx";
 

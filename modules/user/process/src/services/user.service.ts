@@ -1,7 +1,7 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { PersonalWorkspacePendingError } from "@langwatch/organization-contract";
+import { fromDate, nowInstant, type Instant } from "@langwatch/time";
 import {
   UserEmailAmbiguousError,
   UserLastPlatformOperatorError,
@@ -13,6 +13,7 @@ import {
   setUserAvatarInputSchema,
   setUserHomePathInputSchema,
   setFirstUserPasswordInputSchema,
+  updateUserEmailInputSchema,
   updateUserProfileInputSchema,
   userEmailInputSchema,
   userIdInputSchema,
@@ -20,6 +21,7 @@ import {
   setUserNotificationPreferenceInputSchema,
   userLifecycleChangeInputSchema,
   userProfilesInputSchema,
+  type AdoptUnconfirmedAccountOutcome,
   type CreateUserInput,
   type CreateCredentialUserInput,
   type CreatePasskeyUserInput,
@@ -29,6 +31,7 @@ import {
   type SetUserHomePathInput,
   type SetFirstUserPasswordInput,
   type SetFirstUserPasswordResult,
+  type UpdateUserEmailInput,
   type UpdateUserProfileInput,
   type UserAccountInfo,
   type UserAvatarResult,
@@ -48,6 +51,7 @@ import {
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
+import type { UserOrganizationDirectoryRepository } from "../repositories/user-organization-directory.repository.ts";
 import type { CreatedCredentialUser, UserRepository } from "../repositories/user.repository.ts";
 import type { UserAvatarStorage } from "./user-avatar-object.service.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
@@ -55,11 +59,17 @@ import type { UserLifecycleNoticeService } from "./user-lifecycle-notice.service
 
 type PlatformOperatorList = Pick<AuthzApi, "listPlatformOperators">;
 
+/** What the service asks of auth: the SSO set-up read, over user's bound channel. */
+type UserAuthCalls = Pick<AuthApi, "getSsoSetupStatus">;
+
+/** The caller's personal-workspace project an avatar is stored under (U1-AVATAR a). */
+type PersonalProjects = Pick<UserOrganizationDirectoryRepository, "findPersonalProjectId">;
+
 export class UserService {
   private readonly avatars = UserAvatarCodecService.create();
   private readonly repository: UserRepository;
-  private readonly organizations: OrganizationApi;
-  private readonly auth: AuthApi;
+  private readonly personalProjects: PersonalProjects;
+  private readonly auth: UserAuthCalls;
   private readonly avatarStorage: UserAvatarStorage;
   /** The issuer every credential account row this service mints is stored under. */
   private readonly credentialIssuer: string;
@@ -69,7 +79,7 @@ export class UserService {
 
   private constructor({
     repository,
-    organizations,
+    personalProjects,
     auth,
     avatarStorage,
     credentialIssuer,
@@ -78,8 +88,8 @@ export class UserService {
     lifecycle,
   }: {
     repository: UserRepository;
-    organizations: OrganizationApi;
-    auth: AuthApi;
+    personalProjects: PersonalProjects;
+    auth: UserAuthCalls;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now: () => Instant;
@@ -87,7 +97,7 @@ export class UserService {
     lifecycle: UserLifecycleNoticeService;
   }) {
     this.repository = repository;
-    this.organizations = organizations;
+    this.personalProjects = personalProjects;
     this.auth = auth;
     this.avatarStorage = avatarStorage;
     this.credentialIssuer = credentialIssuer;
@@ -98,8 +108,8 @@ export class UserService {
 
   static create(options: {
     repository: UserRepository;
-    organizations: OrganizationApi;
-    auth: AuthApi;
+    personalProjects: PersonalProjects;
+    auth: UserAuthCalls;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now?: () => Instant;
@@ -108,7 +118,7 @@ export class UserService {
   }): UserService {
     return new UserService({
       repository: options.repository,
-      organizations: options.organizations,
+      personalProjects: options.personalProjects,
       auth: options.auth,
       avatarStorage: options.avatarStorage,
       credentialIssuer: options.credentialIssuer,
@@ -164,6 +174,17 @@ export class UserService {
     return accounts[0] ?? null;
   }
 
+  /**
+   * Adoption by an address proof (rulings 2026-10-06, Auth 32): the methods set before the proof
+   * go. Auth, which asked, ends the sessions opened with them (round 48, A1-d).
+   */
+  async adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome> {
+    const account = await this.findByEmail(input);
+    if (!account) return "no_account";
+
+    return this.repository.adoptUnconfirmed({ id: account.id });
+  }
+
   /** A case-twin beside a taken address would leave two accounts answering for one person. */
   async emailIsTaken(input: UserEmailInput): Promise<boolean> {
     const parsed = userEmailInputSchema.parse(input);
@@ -171,25 +192,27 @@ export class UserService {
     return (await this.repository.findByEmail(parsed.email)).length > 0;
   }
 
+  /** Every mint commits user's created fact with the row, through the repository's outbox. */
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
-  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedCredentialUser> {
+  /**
+   * The signup form's mint: its registered fact commits with the account. Born confirmed when a
+   * spent mailbox proof confirmed the address.
+   */
+  registerCredentialUser({
+    account,
+    addressConfirmed,
+  }: {
+    account: CreateCredentialUserInput;
+    addressConfirmed: boolean;
+  }): Promise<CreatedCredentialUser> {
     return this.repository.createCredentialUser({
-      ...createCredentialUserInputSchema.parse(input),
+      ...createCredentialUserInputSchema.parse(account),
       issuer: this.credentialIssuer,
-      emailVerified: false,
-    });
-  }
-
-  /** The account a spent mailbox proof earned: born confirmed, as the proof confirmed
-   *  the address. */
-  createConfirmedCredentialUser(input: CreateCredentialUserInput): Promise<CreatedCredentialUser> {
-    return this.repository.createCredentialUser({
-      ...createCredentialUserInputSchema.parse(input),
-      issuer: this.credentialIssuer,
-      emailVerified: true,
+      emailVerified: addressConfirmed,
+      selfRegistered: true,
     });
   }
 
@@ -242,31 +265,21 @@ export class UserService {
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const parsed = updateUserProfileInputSchema.parse(input);
-    const normalizedEmail =
-      parsed.email === undefined ? undefined : parsed.email.trim().toLowerCase();
-    const current =
-      normalizedEmail === undefined ? null : await this.repository.findById(parsed.id);
-    if (normalizedEmail !== undefined && !current) {
-      throw new UserNotFoundError(parsed.id);
-    }
-
     const update: UpdateUserProfileInput = { id: parsed.id };
-    if (parsed.name !== undefined) {
-      update.name = parsed.name;
-    }
+    if (parsed.name !== undefined) update.name = parsed.name;
 
-    if (normalizedEmail !== undefined) {
-      update.email = normalizedEmail;
-    }
+    return this.repository.updateProfile(update);
+  }
 
-    const updated = await this.repository.updateProfile(update);
+  /** Normalized before it is stored; auth's door ends the sessions that cached the old one. */
+  async updateEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
+    const parsed = updateUserEmailInputSchema.parse(input);
+    if (!(await this.repository.findById(parsed.id))) throw new UserNotFoundError(parsed.id);
 
-    // Sessions cache the email (invite accept compares it), so a changed one ends them all.
-    if (current && normalizedEmail !== (current.email ?? "").toLowerCase()) {
-      await this.auth.revokeAllBrowserSessions({ userId: parsed.id });
-    }
-
-    return updated;
+    return this.repository.updateProfile({
+      id: parsed.id,
+      email: parsed.email.trim().toLowerCase(),
+    });
   }
 
   async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
@@ -351,19 +364,26 @@ export class UserService {
     await this.repository.setLastHomePath({ id: parsed.id, path: parsed.path });
   }
 
-  /**
-   * Never the last active platform operator. Credentials end before user's fact is sent, so access
-   * stops at once on every door, whatever authz's lag or a failed send.
-   */
+  /** Never the last active platform operator, checked inside the write; records no fact. */
   async deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     const parsed = userLifecycleChangeInputSchema.parse(input);
     const at = await this.repository.readClock();
-    const user = await this.writeDeactivation({ id: parsed.id, at });
-    await this.auth.revokeAllBrowserSessions({ userId: parsed.id });
-    await this.auth.revokeCliTokens({ userId: parsed.id });
-    await this.lifecycle.deactivated({ userId: parsed.id, actor: parsed.actor, at });
 
-    return user;
+    return this.writeDeactivation({ id: parsed.id, at });
+  }
+
+  /** The fact carries the stored stamp; an account reactivated since has nothing to record. */
+  async recordDeactivated(input: UserLifecycleChangeInput): Promise<void> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
+    const user = await this.repository.findById(parsed.id);
+    if (!user) throw new UserNotFoundError(parsed.id);
+    if (user.deactivatedAt === null) return;
+
+    await this.lifecycle.deactivated({
+      userId: parsed.id,
+      actor: parsed.actor,
+      at: fromDate(user.deactivatedAt),
+    });
   }
 
   /** Stamped from the database's clock, like deactivation, so the two order across servers. */
@@ -398,20 +418,19 @@ export class UserService {
   async setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {
     const parsed = setUserAvatarInputSchema.parse(input);
     const { mediaType, bytes } = this.avatars.parse(parsed.imageDataUrl);
-    const workspace = await this.organizations.ensurePersonalWorkspace({
+    const projectId = await this.personalProjects.findPersonalProjectId({
       userId: parsed.userId,
       organizationId: parsed.organizationId,
-      displayName: parsed.displayName,
-      displayEmail: parsed.displayEmail,
     });
+    if (!projectId) throw new PersonalWorkspacePendingError();
     const stored = await this.avatarStorage.store({
-      projectId: workspace.project.id,
+      projectId,
       userId: parsed.userId,
       mediaType,
       bytes,
     });
     const image = this.avatars.buildUrl({
-      projectId: workspace.project.id,
+      projectId,
       id: stored.id,
     });
     await this.repository.setAvatar({ id: parsed.userId, image });

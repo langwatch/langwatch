@@ -31,6 +31,11 @@ An app is `src/main.ts` plus `src/config.ts`, and holds no product code (§1, §
 - `apps/worker/src/main.ts:19-37`: the same preamble with `processConfig(processModules, "worker")`,
   then `server.container("worker").boot()` and `server.run(app)`. No `exposeTransports`: it exists
   only on the api container (`packages/process/src/process-container.ts:65`).
+- Metrics (ADR-175, `packages/observability/src/node/process-metrics.ts`): `OTEL_METRICS_EXPORTER`
+  lists `otlp` and/or `prometheus`; `prometheus` serves on its own port, 9464 by default
+  (`OTEL_EXPORTER_PROMETHEUS_PORT`; the chart's worker sidecar uses 9465). The door is mounted only
+  when `METRICS_API_KEY` is set, and compares the bearer in constant time. `LANGWATCH_METRICS_*`
+  names are deleted spellings.
 - `apps/tasks/src/main.ts`: migrations by hand; `apps/tasks/src/module-task.ts:29` boots
   `server.container("tasks")` to run a module's task (§4 "Tasks").
 - `processModules` is generated from `modules/catalogue.json` into each app's
@@ -71,8 +76,10 @@ An app is `src/main.ts` plus `src/config.ts`, and holds no product code (§1, §
    No `get()`, no `Secret.define`, no nested `into`. The resolver seals after boot (§6).
 10. **Connection strings are the stores' secrets**, and store clients appear in exactly one place:
     the chain. A module never names a URL or opens a client (§6, §7).
-11. **Migrations are tasks, run before serve**, never by the api (§7). A module's in-place system
-    migration is its own, answered through its `*Api`; ops runs them (§7).
+11. **Migrations run through `pnpm task upgrade`**, never composed by the api (§7, ADR-173,
+    UPGRADE-IN-WORKER). The worker's gate runs it at boot under the runner's lease; the api holds,
+    then serves only `servesWhileUpgrading` routes, until the ledger is current. Both compose
+    `withUpgradeGate`, which refuses by name while a blocking step of the image is outstanding. A module declares its steps with `.withMigrations` (`migration` skill).
 12. **Composition is proven by booting it.** The installation test boots the installed list in a
     role over memory stores with no server (§4 last paragraph, §13). A unit test with fakes proves
     a module's behaviour, never that the process composes.

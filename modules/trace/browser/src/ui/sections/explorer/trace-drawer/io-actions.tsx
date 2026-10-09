@@ -3,9 +3,12 @@ import type { IconType } from "react-icons";
 import { LuLanguages, LuLightbulb, LuMessageSquare, LuPlay } from "react-icons/lu";
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { type TraceAnchor, useAnchoredAnnotations } from "../hooks/use-anchored-annotations.ts";
-import type { useTextTranslation } from "../hooks/use-text-translation.ts";
+import { useTraceHost } from "../../../../behavior/trace-host.ts";
+import {
+  type TraceAnchor,
+  useAnchoredAnnotations,
+} from "../../../../features/annotation/behavior/use-anchored-annotations.ts";
+import type { useTextTranslation } from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
 import { FieldCommentButton } from "./anchored-comments/field-comment-button.tsx";
 import {
   PlaygroundButton,
@@ -110,11 +113,11 @@ function useIOActionGates({
   spanType: string | undefined;
   mode: "input" | "output";
 }) {
-  const { hasPermission } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   const annotations = useAnchoredAnnotations();
   const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
 
-  const canAnnotate = hasPermission("annotations:manage");
+  const canAnnotate = traceHost.hasPermission("annotations:manage");
   return {
     showComment:
       fieldAnchor !== null && (canAnnotate || annotations.commentsAt(fieldAnchor).length > 0),

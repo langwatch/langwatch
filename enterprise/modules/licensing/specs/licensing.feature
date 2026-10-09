@@ -85,6 +85,87 @@ Feature: Enterprise licensing lifecycle
       When that process inspects platform access
       Then the stored key is accepted and only the mutation ports refuse
 
+  Rule: Licensing keeps each organization's licence in its own table
+
+    Round 37 (D6) moved the licence and its dates from organization's columns
+    to a table licensing owns. Until organization reads the licence through
+    LicensingApi, every write also lands on organization's columns, and an
+    organization is read from those columns where licensing holds no row for it
+    or the columns were written after the row. Once no old image is still
+    writing, a background step copies the rest and overwrites a row that
+    differs from organization's columns written after it (R42; newest wins,
+    Alex 2026-10-09).
+
+    @unit
+    Scenario: A stored licence lands on licensing's own row and on organization's columns
+      Given an organization with no licence
+      When licensing stores a licence for it and later removes it
+      Then licensing's own row holds the key, and then a cleared licence
+      And organization is told each write, before licensing keeps it
+
+    @unit
+    Scenario: A cleared licence is never read back from organization's columns
+      Given an organization whose columns still hold a key
+      When licensing removes its licence
+      Then licensing reads no key for it and leaves it out of the platform-access scan
+
+    @unit
+    Scenario: A licence activated before the move is read from organization's columns until it is copied
+      Given an organization whose licence is only on organization's columns
+      When licensing reads its licence or scans for licensed organizations
+      Then it answers the key from organization's columns
+
+    @unit
+    Scenario: A licence written to organization's columns after licensing's row is read from them
+      Given an organization whose row of licensing's holds a key
+      When an old image writes another key to organization's columns afterwards
+      Then licensing reads the columns' key, and the platform-access scan lists it
+
+    @unit
+    Scenario: The worker brings licensing's licence rows level with organization's columns
+      Given organizations whose licences are only on organization's columns
+      And one whose row differs from columns written after it, one whose row differs from older columns, and one whose row matches
+      When the licence copy runs twice
+      Then the first run copies each missing licence with its dates and overwrites the row older than its differing columns
+      And it leaves the row newer than its columns
+      And the second run copies nothing and organization's columns are as they were
+
+    @unit
+    Scenario: A licence cleared on organization's columns alone is cleared on licensing's row
+      Given an organization whose row holds a key its columns, written after it, no longer hold
+      When the licence copy runs
+      Then licensing reads no key for it and leaves it out of the platform-access scan
+
+    @unit
+    Scenario: The licence copy keeps a row written after it read
+      Given a licence copy that has read an organization's row
+      When licensing writes that organization's licence before the copy overwrites it
+      Then the copy leaves the row licensing wrote
+
+    @unit
+    Scenario: The licence copy keeps a licence written to both sides between its reads
+      Given a licence copy that has read organization's columns but not yet licensing's row
+      When a live write puts the same licence on both sides before the copy reads licensing's row
+      Then the copy leaves both sides holding the licence that write put there
+
+    @unit
+    Scenario: A dry run of the licence copy writes nothing
+      Given organizations whose licences are only on organization's columns
+      When the licence copy runs as a dry run
+      Then it reports how many it would copy, saves no checkpoint and copies nothing
+
+    @unit
+    Scenario: An interrupted licence copy resumes after the last organization it saved
+      Given a licence copy that saved its checkpoint after the first batch
+      When the copy runs again from that checkpoint
+      Then it copies only the organizations after the saved one
+
+    @unit
+    Scenario: The worker collects licensing's licence copy as a background step
+      Given the licensing module installed on a worker
+      When the worker collects its migration steps
+      Then the licence copy is a background data step that waits for old writers to go
+
   Rule: Every deployment composes the self-hosted instance registry from its own stores
 
     Main built the instance registry from Postgres on every deployment. The
@@ -181,6 +262,12 @@ Feature: Enterprise licensing lifecycle
       Then only the applicable budgets are listed, and the contract budget is marked as the contract
 
     @unit
+    Scenario: Hosted usage resolves no team for a project authz does not know
+      Given the calling key names a project authz holds no scope for
+      When a connected install reads its hosted usage
+      Then the budgets are resolved with no team rather than the read failing
+
+    @unit
     Scenario: Hosted usage reports spend as unknown when live spend cannot be read
       Given live spend cannot be read
       When a connected install reads its hosted usage
@@ -204,6 +291,83 @@ Feature: Enterprise licensing lifecycle
       Then it passes the gateway's door and is refused as connect_service_not_entitled
 
   @unit
+  Scenario: A hosted service's state names which half said no
+    Given an organization whose license may or may not name a hosted service
+    And an administrator may have switched that service off
+    When licensing is asked for that service's state
+    Then it answers whether the license names it and whether it is still on, without calling LangWatch
+    And a deployment with Connect switched off answers neither
+
+  @unit
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber
+
+  Rule: Licensing records a newly licensed self-hosted customer as a fact; organization creates its row
+
+    Licensing mints the organisation id when it licenses a new self-hosted customer and records
+    lw.licensing.self_hosted_customer_licensed. Organization subscribes and creates the row under
+    that id, so licensing never writes organization's tables or calls it to create one.
+
+    @unit
+    Scenario: Organization creates a newly licensed customer's organisation under licensing's id
+      Given licensing has recorded that it licensed a new self-hosted customer under an id it minted
+      When organization receives the fact
+      Then an organisation with that id and the customer's name exists, marked as a self-hosted customer
+
+    @unit
+    Scenario: A redelivered self-hosted customer fact creates no second organisation
+      Given organization has applied licensing's self-hosted customer fact once
+      When the same fact is delivered again
+      Then there is still exactly one organisation, the one the first delivery created
+
+  Rule: Organization keeps licensing's Connect facts on its own row
+    Licensing records that an administrator switched a hosted service and how a
+    license sync ended; organization writes its own columns from those facts.
+
+    @unit
+    Scenario: Licensing records a stored or cleared licence as a fact for organization to apply
+      Given licensing stores an organization's licence and later clears it
+      When each write lands
+      Then licensing records a licence-stored fact with the key's fingerprint and its dates, never the key, then a licence-cleared fact
+      And it writes organization's licence columns through no organization operation
+
+    @unit
+    Scenario: Organization mirrors the licence licensing stored and clears it when licensing does
+      Given organization subscribes to licensing's licence facts
+      When licensing records a licence stored and then cleared
+      Then organization's licence columns hold the key read from licensing's row and the fact's dates, then hold none
+
+    @unit
+    Scenario: Licensing records a hosted-service switch as a fact for organization to apply
+      Given an administrator switches a hosted service off for their organisation
+      When licensing records the switch
+      Then it records a fact naming the organisation, the service and the switch
+      And it writes nothing to organization's row
+
+    @unit
+    Scenario: Organization keeps a hosted service an administrator switched off
+      Given licensing has recorded that an administrator switched a hosted service off
+      When organization receives the fact, once or more than once
+      Then the organisation's switched-off services name it exactly once
+      And switching it back on removes it
+
+    @unit
+    Scenario: Organization keeps how the last license sync ended
+      Given licensing has recorded that a license sync landed and then that one failed
+      When organization receives each fact in order
+      Then the organisation keeps when the sync last landed and the code the latest one failed on
+
+    @unit
+    Scenario: Licensing records ending or re-resolving a licence's managed key as a fact for gateway to apply
+      Given a licence whose managed key licensing must end, and another whose install binding was reset
+      When licensing ends the first key and asks for the second to be resolved again
+      Then it records a managed-key-retired fact naming the key, its organisation and the actor
+      And a managed-key-invalidated fact naming the other key and its organisation
+
+    @unit
+    Scenario: Gateway ends or re-resolves a licence's managed key from licensing's fact, however often it arrives
+      Given gateway subscribes to licensing's managed-key facts
+      When a managed-key-retired fact arrives once and then again
+      Then gateway revokes that key under the fact's organisation and actor, the same revoke each time
+      And a managed-key-invalidated fact asks every gateway to resolve that key's licence again

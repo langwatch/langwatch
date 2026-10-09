@@ -10,26 +10,25 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioServerConfig, SimulationService } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { CancellationPublisher, CancellationSubscriber } from "../app/scenario.app.ts";
-import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import {
   NodeScenarioChildService,
   type ScenarioChildProcessConfig,
-} from "./node-scenario-child.service.ts";
+} from "../features/child/services/node-scenario-child.service.ts";
+import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
+import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
+import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
+import type { VoicePublicUrl } from "../features/voice/services/voice-public-url.service.ts";
+import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import type { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
-import { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service.ts";
 import { ScenarioExecutionService } from "./scenario-execution.service.ts";
 import { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
 import { ScenarioProcessorMetricsService } from "./scenario-processor-metrics.service.ts";
 import { ScenarioProcessorService } from "./scenario-processor.service.ts";
-import { ScenarioVoiceTargetService } from "./scenario-voice-target.service.ts";
 import type { ScenarioService } from "./scenario.service.ts";
-import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
-import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 
 const logger = createLogger("langwatch:scenarios:executor");
 
@@ -38,7 +37,6 @@ type ScenarioExecutorPeers = Readonly<{
   agents: AgentApi;
   prompts: PromptApi;
   secrets: SecretApi;
-  suites: SuiteApi;
   traces: TraceApi;
   workflows: WorkflowApi;
   projects: ProjectApi;
@@ -129,7 +127,6 @@ export class ScenarioExecutorService {
         legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
       },
       scenarios: this.input.scenarios,
-      suites: peers.suites,
       prompts: peers.prompts,
       agents: peers.agents,
       workflows: peers.workflows,

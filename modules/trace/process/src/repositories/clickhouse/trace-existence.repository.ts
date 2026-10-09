@@ -2,15 +2,18 @@
  * Set membership over trace_summaries without dedup via TenantId-first predicate.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { TraceUsageCount } from "@langwatch/trace-contract";
+import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
 import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
-import { chString } from "./stored-span-row.mapper.ts";
+import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ Total: chString }));
+const traceCostRowsSchema = z.array(
+  z.looseObject({ TraceId: chString, TotalCost: chNumber.nullable() }),
+);
 
 export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository {
   static create(options: {
@@ -58,6 +61,46 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
       );
       throw new Error("Failed to check which traces exist");
     }
+  }
+
+  async findTraceCosts({
+    projectId,
+    traceIds,
+    occurredAt,
+  }: {
+    projectId: string;
+    traceIds: readonly string[];
+    occurredAt: { from: number; to: number };
+  }): Promise<TraceCost[]> {
+    if (traceIds.length === 0) return [];
+    const client = await this.resolveClient(projectId);
+    const result = await client.query({
+      query: `
+          SELECT TraceId, TotalCost
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND TraceId IN ({traceIds:Array(String)})
+            AND OccurredAt >= fromUnixTimestamp64Milli({from:Int64})
+            AND OccurredAt <= fromUnixTimestamp64Milli({to:Int64})
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+              GROUP BY TenantId, TraceId
+            )
+        `,
+      query_params: {
+        tenantId: projectId,
+        traceIds: [...traceIds],
+        from: occurredAt.from,
+        to: occurredAt.to,
+      },
+      format: "JSONEachRow",
+    });
+    return traceCostRowsSchema
+      .parse(await result.json())
+      .map((row) => ({ traceId: row.TraceId, totalCost: row.TotalCost }));
   }
 
   async countUsage({

@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import type { SeatProrationPreviewProps } from "@langwatch/enterprise-billing-contract";
+import type { SeatProrationPreviewProps } from "@langwatch/enterprise-billing-client";
 import { Crown } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";

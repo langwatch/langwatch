@@ -6,12 +6,12 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
-import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
-import { MemoryConnectedBillingRepository } from "../../repositories/memory/memory.connected-billing.repository.ts";
 import {
   ConnectedBillingService,
   type ConnectedBillingTerms,
-} from "../connected-billing.service.ts";
+} from "../../features/connected-billing/services/connected-billing.service.ts";
+import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
+import { MemoryConnectedBillingRepository } from "../../repositories/memory/memory.connected-billing.repository.ts";
 
 const at = (iso: string): Instant => Temporal.Instant.from(iso);
 
@@ -341,7 +341,7 @@ describe("renewing a term", () => {
 });
 
 describe("an invoice paid outside the payment provider", () => {
-  /** @scenario "Finance marks an invoice paid out of band from the backoffice" */
+  /** @scenario "Finance marks an invoice paid out of band from the admin console" */
   it("tells the provider and records when the money arrived", async () => {
     const { invoicing, repository, service } = harness();
     const account = await service.onboard(onboarding());

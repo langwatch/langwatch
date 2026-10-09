@@ -3,11 +3,12 @@
  * Verifies rejection payloads distinguish schema bugs from sender errors.
  * Builds the router directly: proves what it answers, not whether mounted.
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CollectorIngestInput } from "../../rules/trace-collector-body.rules.ts";
+import type { CollectorIngestInput } from "../../features/ingestion/rules/trace-collector-body.rules.ts";
 
 const logCalls: { level: string; fields: unknown; message: string }[] = [];
 
@@ -34,7 +35,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 
 const { collectorRest } = await import("../collector.rest.ts");
 const { TraceCollectorDispatchService } =
-  await import("../../services/trace-collector-dispatch.service.ts");
+  await import("../../features/ingestion/services/trace-collector-dispatch.service.ts");
 
 const project = { id: "project-123", teamId: "team-1", organizationId: "org-1" };
 
@@ -72,7 +73,10 @@ const collector = runtime.mount(collectorRest.router(), {
     },
   }),
   credential: "public",
-  onError: (error, context) => context.json({ error: String(error) }, 500),
+  onError: (error, context) =>
+    HandledError.isHandled(error)
+      ? canonicalErrorResponse(error, context)
+      : context.json({ error: String(error) }, 500),
 });
 
 function postCollector(body: unknown) {
@@ -253,9 +257,6 @@ describe("given a span whose time cannot be stored", () => {
   });
 });
 
-/** Main's `c.json({ message: "Invalid body, expecting json" }, 400)`, byte for byte. */
-const MAIN_NOT_JSON_BODY = '{"message":"Invalid body, expecting json"}';
-
 function postRaw(raw: string, contentType: string) {
   return collector.request("/api/collector", {
     method: "POST",
@@ -264,19 +265,42 @@ function postRaw(raw: string, contentType: string) {
   });
 }
 
-describe("given a body main refused as not json", () => {
+describe("given a body the framework refuses", () => {
   describe.each([
-    { case: "sent as text/plain", raw: "{}", contentType: "text/plain" },
-    { case: "that does not parse", raw: "{not json", contentType: "application/json" },
-    { case: "that is a json array", raw: "[]", contentType: "application/json" },
-    { case: "that is json null", raw: "null", contentType: "application/json" },
-  ])("when the body is $case", ({ raw, contentType }) => {
-    it("answers main's 400 body byte for byte", async () => {
+    {
+      case: "sent as text/plain",
+      raw: "{}",
+      contentType: "text/plain",
+      status: 400,
+      code: "malformed_request",
+    },
+    {
+      case: "that does not parse",
+      raw: "{not json",
+      contentType: "application/json",
+      status: 400,
+      code: "malformed_request",
+    },
+    {
+      case: "that is a json array",
+      raw: "[]",
+      contentType: "application/json",
+      status: 422,
+      code: "validation_error",
+    },
+    {
+      case: "that is json null",
+      raw: "null",
+      contentType: "application/json",
+      status: 422,
+      code: "validation_error",
+    },
+  ])("when the body is $case", ({ raw, contentType, status, code }) => {
+    it("answers the framework's default refusal", async () => {
       const response = await postRaw(raw, contentType);
 
-      expect(response.status).toBe(400);
-      expect(response.headers.get("content-type")).toMatch(/^application\/json/);
-      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toMatchObject({ code });
     });
   });
 });

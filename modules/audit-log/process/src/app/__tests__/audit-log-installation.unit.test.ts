@@ -1,14 +1,6 @@
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { auditLogProcessModule } from "../../audit-log.module.ts";
@@ -17,16 +9,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([auditLogProcessModule])
     .withStores(memoryStores())
-    .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } })
-    .provide({
-      project: createApiFixture<ProjectApi>({}),
-      prompt: createApiFixture<PromptApi>({}),
-      workflow: createApiFixture<WorkflowApi>({}),
-      dataset: createApiFixture<DatasetApi>({}),
-      monitor: createApiFixture<MonitorApi>({}),
-      annotation: createApiFixture<AnnotationApi>({}),
-      agent: createApiFixture<AgentApi>({}),
-    });
+    .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } });
 }
 
 const command = {
@@ -115,5 +98,45 @@ describe("given a process that installed the audit log", () => {
         await runtime.stop();
       }
     });
+  });
+
+  describe("when operator acts are recorded in a memory process", () => {
+    /** @scenario "A memory process's trail lists what its own audit log recorded" */
+    it.each(["api", "worker"] as const)(
+      "lists them by target kind in the %s role",
+      async (role) => {
+        const runtime = await process(role).boot();
+
+        try {
+          const app = runtime.service(AuditLogApi);
+          for (const targetId of ["gateway_debits/project-1/a", "fleet"]) {
+            await app.record({
+              userId: "user-ops",
+              action: "process_wake_now",
+              targetKind: "process_instance",
+              targetId,
+              metadata: { moved: 1 },
+            });
+          }
+          await app.record({
+            userId: "user-ops",
+            action: "queue_drain_group",
+            targetKind: "queue",
+          });
+
+          await expect(
+            app.findByTargetKind({ targetKind: "process_instance", limit: 10 }),
+          ).resolves.toMatchObject([
+            { targetId: "fleet", userId: "user-ops", metadata: { moved: 1 } },
+            { targetId: "gateway_debits/project-1/a" },
+          ]);
+          await expect(
+            app.findByTargetKind({ targetKind: "scheduled_job", limit: 10 }),
+          ).resolves.toEqual([]);
+        } finally {
+          await runtime.stop();
+        }
+      },
+    );
   });
 });

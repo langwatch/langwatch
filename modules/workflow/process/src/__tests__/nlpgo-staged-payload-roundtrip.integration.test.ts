@@ -8,13 +8,13 @@ import type { AddressInfo } from "node:net";
 import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "@langwatch/test-harness/nlpgo";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  NlpInvokeTransportAdapter,
-  type NlpLambdaInvokeResult,
-  type NlpLambdaInvoke,
-  type NlpPayloadStaging,
-  type StagedNlpPayload,
-} from "../index.ts";
+import type {
+  NlpLambdaInvoke,
+  NlpLambdaInvokeResult,
+  NlpPayloadStaging,
+  StagedNlpPayload,
+} from "../channels/nlp-lambda.channel.ts";
+import { NlpInvokeTransportAdapter } from "../channels/workflow-nlp-lambda.channel.ts";
 
 // Unique port alongside the other nlpgo subprocess integration tests
 // (55610 / 55611 / 55612 / 55613 / 55614 / 55620 — see CLAUDE.md). 55615 is

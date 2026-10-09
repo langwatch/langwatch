@@ -1,4 +1,4 @@
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -20,16 +20,17 @@ import {
   LuScanSearch,
 } from "react-icons/lu";
 
+import { enterTraceEditMode } from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
+import { useTraceHost } from "../../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   usePinTrace,
   useTracePinRead,
   useUnpinTrace,
 } from "../../../../../behavior/writes/use-trace-writes.ts";
+import { useConversationTurns } from "../../../../../features/conversation/behavior/use-conversation-turns.ts";
 import { isPreviewTraceId } from "../../../../../model/preview-trace-id.ts";
 import { showErrorToast } from "../../../errors/index.ts";
-import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
-import { enterTraceEditMode } from "../../utils/trace-edit-mode.ts";
 
 interface TraceOverflowMenuProps {
   traceId: string;
@@ -101,17 +102,18 @@ export function TraceOverflowMenu({
   readOnly = false,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const traceHost = useTraceHost();
   // Queueing a trace for annotation is the same authenticated review work the
   // correction is, so the share view leaves it out rather than relying on the
   // reader happening to hold no permission on the project.
-  const canQueueForAnnotation = !readOnly && hasPermission("annotations:create");
+  const canQueueForAnnotation = !readOnly && traceHost.hasPermission("annotations:create");
   // Annotating a trace is review work, which is the permission external
   // reviewers hold, and it is the same one the correction write itself checks.
   // A sample preview trace is left out: it exists only to show an empty project
   // what a trace looks like, so a pass over one could never be saved.
   const canEditTrace =
-    !readOnly && !isPreviewTraceId(traceId) && hasPermission("annotations:update");
+    !readOnly && !isPreviewTraceId(traceId) && traceHost.hasPermission("annotations:update");
 
   const handleEditTrace = useCallback(() => enterTraceEditMode(traceId), [traceId]);
 

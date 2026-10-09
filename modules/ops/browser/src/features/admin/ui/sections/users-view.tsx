@@ -27,8 +27,8 @@ import { useOpsHost } from "../../../../model/ops-host.ts";
 import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { impersonateUser } from "../../behavior/admin-client.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { EmptyCell, formatDate, formatDateTime } from "../elements/backoffice-cells.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 interface OrgRef {
   id: string;
   name: string;
@@ -86,7 +86,7 @@ export default function UsersView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Users"
         searchValue={search}
         onSearchChange={(v) => {
@@ -180,7 +180,7 @@ export default function UsersView() {
             ))}
           </Table.Body>
         </Table.Root>
-      </BackofficeTable>
+      </AdminTable>
 
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
       <ImpersonateDialog user={impersonating} onClose={() => setImpersonating(null)} />

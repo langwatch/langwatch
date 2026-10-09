@@ -21,13 +21,4 @@ export class MemoryOrganizationUserDirectoryRepository extends OrganizationUserD
     const user = this.memory.users.get(userId);
     return user?.emailVerified ? (user.email ?? null) : null;
   }
-
-  async findUserNames(
-    userIds: readonly string[],
-  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]> {
-    return userIds.flatMap((id) => {
-      const user = this.memory.users.get(id);
-      return user ? [{ id: user.id, name: user.name }] : [];
-    });
-  }
 }

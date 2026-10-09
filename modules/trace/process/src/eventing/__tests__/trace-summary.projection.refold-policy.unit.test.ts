@@ -1,10 +1,11 @@
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
+import { MAX_PROCESSED_SPANS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { MAX_PROCESSED_SPANS, TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import {
   createInitState,
   createSpanReceivedEvent,

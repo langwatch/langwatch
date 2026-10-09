@@ -14,8 +14,6 @@ import {
   type LangyWorkerMetrics,
 } from "../langy-worker.channel.ts";
 
-export type { LangyDispatchOutcome } from "../langy-worker.channel.ts";
-
 const AGENT_WARM_TIMEOUT_MS = 3_000;
 const AGENT_PROBE_TIMEOUT_MS = 1_000;
 const AGENT_CANCEL_TIMEOUT_MS = 3_000;
@@ -26,12 +24,12 @@ const probeResponseSchema = z.object({
 
 export const AGENT_DISPATCH_TIMEOUT_MS = LANGY_AGENT_DISPATCH_TIMEOUT_MS;
 
-export type LangyWorkerHttpConfig = {
+type LangyWorkerHttpConfig = {
   agentUrl: string;
   internalSecret: string;
 };
 
-export type LangyWorkerChannelConfig = LangyWorkerHttpConfig & {
+type LangyWorkerChannelConfig = LangyWorkerHttpConfig & {
   metrics: LangyWorkerMetrics;
 };
 

@@ -34,7 +34,8 @@ function installed({ authz }: Scripted) {
     .withModules([storedObjectProcessModule])
     .withConfig({
       "stored-object": {
-        azureSpoolRetentionConfirmed: false,
+        objectRetentionConfirmed: false,
+        legacySpoolRetentionConfirmed: undefined,
         blockLocalHttpCalls: true,
         allowedProxyHosts: [],
         isSaas: false,

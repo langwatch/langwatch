@@ -34,7 +34,7 @@ type MetricDependencies = Readonly<{
   traces: typeof TraceApi;
   retention: typeof DataRetentionApi;
 }>;
-type MetricSetup = FeatureSetup<MetricDependencies, never, MetricServerConfig, MetricRepositories>;
+type MetricSetup = FeatureSetup<MetricDependencies, MetricServerConfig, MetricRepositories>;
 
 /** The process-owned metric preparation capability, and its durable processing pipeline. */
 export class MetricModule implements MetricApiContract {

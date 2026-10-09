@@ -13,6 +13,8 @@ import {
 import { memo, useMemo } from "react";
 import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 
+import type { TraceAnchor } from "../../../../features/annotation/behavior/use-anchored-annotations.ts";
+import { useTextTranslation } from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import { panelChatMessages } from "../../../../model/transcript/panel-messages.ts";
 import { groupMessagesIntoTurns } from "../../../../model/transcript/turns.ts";
@@ -20,8 +22,6 @@ import { TerminalOutput } from "../../../elements/coding-agent/trace/terminal-ou
 import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
 import { TraceMediaPart } from "../../traces/trace-media-part.tsx";
-import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
-import { useTextTranslation } from "../hooks/use-text-translation.ts";
 import { AnnotationExpectedOutputs } from "./annotation-expected-outputs.tsx";
 import { IOViewerBody } from "./io-viewer-body.tsx";
 import { IOViewerToolbar } from "./io-viewer-toolbar.tsx";

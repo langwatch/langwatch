@@ -1,8 +1,8 @@
-import type { UserPersonalBudget } from "@langwatch/user-contract";
+import type { GatewayPersonalBudget } from "@langwatch/gateway-contract";
+import { readableDate } from "@langwatch/time";
 import { useMemo } from "react";
 
 import type { BudgetOverviewItemView } from "../model/budget-overview-item.ts";
-import { readableDate } from "../model/display-formatters.ts";
 import { api } from "./personal-workspace-api.ts";
 import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
 
@@ -17,7 +17,7 @@ export type PersonalSummary = {
 };
 
 /**
- * Mirror of `api.user.budgetOverview`: every budget binding the user's own
+ * Mirror of `api.governance.budgetOverview`: every budget binding the user's own
  * keys, most binding first. `gatewayAccess: false` means the org gives no
  * member-facing gateway path, so budget UI renders nothing, not an empty state.
  */
@@ -75,7 +75,7 @@ export type PersonalContext = {
   apiKeys: PersonalApiKeyRow[];
 };
 
-function budgetStateFrom(raw: UserPersonalBudget): PersonalBudgetState {
+function budgetStateFrom(raw: GatewayPersonalBudget): PersonalBudgetState {
   if (!("limitUsd" in raw)) return { status: "ok" };
   return {
     status: raw.status,
@@ -102,7 +102,7 @@ export function usePersonalContext(): PersonalContext {
   const orgName = organization?.name ?? "Your organization";
   const orgId = organization?.id ?? "org_unknown";
 
-  const personalContextQuery = api.user.personalContext.useQuery(
+  const personalContextQuery = api.routingPolicy.personalContext.useQuery(
     { organizationId: orgId },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
@@ -116,17 +116,17 @@ export function usePersonalContext(): PersonalContext {
     },
   );
 
-  const personalUsageQuery = api.user.personalUsage.useQuery(
+  const personalUsageQuery = api.governance.personalUsage.useQuery(
     { organizationId: orgId },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
-  const personalBudgetQuery = api.user.personalBudget.useQuery(
+  const personalBudgetQuery = api.gatewayBudgets.personalBudget.useQuery(
     { organizationId: orgId },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
-  const budgetOverviewQuery = api.user.budgetOverview.useQuery(
+  const budgetOverviewQuery = api.governance.budgetOverview.useQuery(
     { organizationId: orgId, includeTopModels: true },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );

@@ -2,8 +2,8 @@ import { Box, HStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 import { useEffect, useRef, useState } from "react";
 
-import { useIsTabActive } from "../../../../behavior/use-is-tab-active.ts";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useIsTabActive } from "../../../../features/tabs/behavior/use-is-tab-active.ts";
+import { useDraggableTabsBrowserStore } from "../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import {
   ChatSendButton,
   ChatSyncCheckbox,

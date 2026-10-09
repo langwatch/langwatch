@@ -233,15 +233,10 @@ describe("Self-hosting docs cover the stored-objects deployment surface", () => 
 
   describe("when the architecture overview is loaded", () => {
     /** @scenario "Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
-    it("the architecture diagram shows an App -> S3 arrow for externalized byte content", () => {
-      const overview = readRepoFile("docs/self-hosting/overview.mdx");
+    it("the architecture page names stored objects as externalized byte content in S3", () => {
+      const architecture = readRepoFile("docs/self-hosting/infrastructure/architecture.mdx");
 
-      // Diagram edge added in this PR — the existing CH->S3 cold-storage arrow is
-      // not enough; the App pod itself writes externalized bytes (scenario media,
-      // datasets, ...) into the shared dataplane bucket. The label was reframed
-      // during PR #4058 review from "scenario media" to "externalized byte content"
-      // so the docs accurately name S3 as the general file-storage layer.
-      expect(overview).toMatch(/App\s*-->\s*\|"externalized byte content[^"]*"\|\s*S3/);
+      expect(architecture).toMatch(/Stored objects[^\n]*externalized byte content/);
     });
   });
 });

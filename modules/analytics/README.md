@@ -1,29 +1,50 @@
-# Analytics
+# analytics
 
-Analytics owns the server-side timeseries, feedback, and top-document read
-capabilities. The contract is portable Zod 4 vocabulary; the server contains
-one service, ClickHouse query builders, and one private repository
-implementation. The application supplies only concrete ClickHouse client
-resolution and transport composition.
+Analytics reads: timeseries, feedback and most-used documents over trace and evaluation data, the filter options that drive them, LangWatchQL, and the evaluation analytics rows behind those reads.
 
-Analytics does not own dashboards, saved charts, topics, traces, evaluations,
-or API routes. Those features consume the Analytics service contract. The
-service always passes the project id as the ClickHouse tenant and falls back to
-the legacy source table whenever a rollup or slim query cannot express the
-request safely.
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-The Analytics web surface owns the controlled LangWatchQL workbench, editor,
-parameters and time-window controls, schema and result views, portable request
-state, and Vega-Lite policy/specification behaviour. The application retains
-routing, tRPC query/schema transport, saved-chart persistence, and the narrow
-error, colour-mode, and lazy-chart render ports. This web extraction does not
-change the timeseries service or the separate trace analytics, trace summaries,
-or timeseries rollup boundaries.
+## At a glance
 
-Server-side LangWatchQL execution lives under
-`modules/analytics/process/src/langwatch-ql/`; `apps/api` composes and
-mounts it (`analytics.lwql` on the tRPC router) but does not own its behaviour.
+|                |                                                                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                                |
+| Subjects       | analytics                                                                                                      |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                    |
+| Api token      | `AnalyticsApi` = `moduleApi<AnalyticsApi>()("analytics")`, `contract/src/analytics.api.ts:211` (30 operations) |
+| Other token    | `AnalyticsLegacyApi`, `process/src/transport/analytics-legacy.rest.ts:34`                                      |
+| Other token    | `AnalyticsLwqlApi`, `process/src/transport/analytics-lwql.trpc.ts:56`                                          |
+| Other token    | `AnalyticsQueryApi`, `process/src/transport/query.rest.ts:53`                                                  |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 
-The LangWatchQL behaviour contract is [the web spec](./specs/analytics-lwql-workbench.feature);
-the chart-runtime decision is [ADR-002](./adrs/002-lwql-chart-runtime-without-eval.md),
-and portable workbench conventions are in [the web guide](./docs/lwql-workbench.md).
+## What analytics owns
+
+| Kind                      | Name                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Declared at                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| ClickHouse table (writes) | `evaluation_analytics`                                                                                                                                                                                                                                                                                                                                                                                                                                           | `process/src/repositories/clickhouse/clickhouse.analytics-persistence.repository.ts:91`  |
+| ClickHouse table (writes) | `evaluation_analytics_rollup`                                                                                                                                                                                                                                                                                                                                                                                                                                    | `process/src/repositories/clickhouse/clickhouse.analytics-persistence.repository.ts:209` |
+| ClickHouse table (writes) | `lwql_api_key_tenant_map`                                                                                                                                                                                                                                                                                                                                                                                                                                        | `process/src/repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts:40`   |
+| Stores required           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `process/src/channels/analytics.channels.ts:15`                                          |
+| Stores required           | clickhouse, rateLimiter, clickhouseAdmin, databaseTarget, prisma                                                                                                                                                                                                                                                                                                                                                                                                 | `process/src/repositories/live/live.analytics.repositories.ts:15`                        |
+| Secrets                   | `lwqlClickHousePassword` (LWQL_CLICKHOUSE_PASSWORD), `lwqlPostgresReaderPassword` (LWQL_POSTGRES_READER_PASSWORD)                                                                                                                                                                                                                                                                                                                                                | `process/src/app/analytics.app.ts:352`                                                   |
+| Config                    | `langwatchQl.url` (LWQL_CLICKHOUSE_URL), `langwatchQl.username` (LWQL_CLICKHOUSE_USER), `langwatchQl.database` (LWQL_DATABASE), `langwatchQl.tenantSetting` (LWQL_TENANT_SETTING), `langwatchQl.postgresHost` (LWQL_POSTGRES_HOST), `langwatchQl.accessModelMode` (LWQL_ACCESS_MODEL_MODE), `langwatchQl.sqlSingleNode` (LWQL_ACCESS_MODEL_SQL_SINGLE_NODE), `tenantAnalyticsConcurrency` (CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY), `publicBaseUrl` (BASE_HOST) | `contract/src/analytics.config.ts:11`                                                    |
+
+Anything else analytics needs belongs to another module and is reached through its `*Api`.
+
+## Peers (static dependencies)
+
+| Name           | Token              | Module                                        |
+| -------------- | ------------------ | --------------------------------------------- |
+| `authz`        | `AuthzApi`         | [authz](../authz/README.md)                   |
+| `dataPrivacy`  | `DataPrivacyApi`   | [data-privacy](../data-privacy/README.md)     |
+| `featureFlags` | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)     |
+| `plans`        | `EntitlementApi`   | [entitlement](../entitlement/README.md)       |
+| `projects`     | `ProjectApi`       | [project](../project/README.md)               |
+| `retention`    | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
+| `traces`       | `TraceApi`         | [trace](../trace/README.md)                   |
+
+## Who depends on analytics
+
+[automation](../automation/README.md), [dashboard](../dashboard/README.md), [evaluation](../evaluation/README.md), [instant-eval](../instant-eval/README.md), [ops](../ops/README.md) (as a peer).
+
+<!-- readme:generated:end -->

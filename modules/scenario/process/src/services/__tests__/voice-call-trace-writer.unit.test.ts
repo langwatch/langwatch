@@ -8,8 +8,8 @@
 import type { CallRecord, CallTurn } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { VoiceCallTraceService } from "../../features/voice/services/voice-call-trace.service.ts";
 import { groupTurnsIntoExchanges, voiceCallTraceIds } from "../../rules/voice-call-trace.rules.ts";
-import { VoiceCallTraceService } from "../voice-call-trace.service.ts";
 
 const mockRecordSpan = vi.fn().mockResolvedValue(undefined);
 

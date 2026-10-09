@@ -6,9 +6,13 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => false }),
+}));
+vi.mock("../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx", async () => {
   const actual = await vi.importActual<typeof scenarioRolesModule>(
-    "../../../../../../behavior/scenario-role.store.tsx",
+    "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx",
   );
   return { ...actual, useIsScenarioRole: () => false };
 });
@@ -31,7 +35,7 @@ vi.mock("@langwatch/design-system/conversation-expand-context", async () => {
 
 // The per-turn translate hook dispatches through tRPC; these tests pin
 // redaction rendering, so stub it to the identity passthrough.
-vi.mock("../../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -55,7 +59,6 @@ vi.mock("../../../../markdown.tsx", () => ({
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
-    hasPermission: () => false,
   }),
 }));
 
@@ -64,15 +67,14 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
-    hasPermission: () => false,
   }),
 }));
 
 import type * as actualModule from "@langwatch/design-system/conversation-expand-context";
 
-import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
-import type { TraceListItem } from "../../../types/trace.ts";
-import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../behavior/explorer/types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../../behavior/explorer/types/trace.ts";
+import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 function turn(over: Partial<TraceListItem>): TraceListItem {

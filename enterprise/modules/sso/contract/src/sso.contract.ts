@@ -7,7 +7,7 @@ export const SSO_FEATURE_ID = "sso" as const;
  * tRPC procedure publishes what its handler returns, so an `unknown` here is
  * what the browser gets, and the list reads every row field below.
  */
-export const backofficeSsoConnectionSchema = z
+export const adminSsoConnectionSchema = z
   .object({
     connectionId: z.string(),
     organizationId: z.string(),
@@ -47,15 +47,15 @@ export const backofficeSsoConnectionSchema = z
   .strict();
 
 /** One page of connections, with the total the pager reads. */
-export const backofficeSsoConnectionPageSchema = z
+export const adminSsoConnectionPageSchema = z
   .object({
-    connections: z.array(backofficeSsoConnectionSchema),
+    connections: z.array(adminSsoConnectionSchema),
     total: z.number().int().nonnegative(),
   })
   .strict();
 
-export type BackofficeSsoConnection = z.infer<typeof backofficeSsoConnectionSchema>;
-export type BackofficeSsoConnectionPage = z.infer<typeof backofficeSsoConnectionPageSchema>;
+export type AdminSsoConnection = z.infer<typeof adminSsoConnectionSchema>;
+export type AdminSsoConnectionPage = z.infer<typeof adminSsoConnectionPageSchema>;
 
 /** One page of the back office's list, as the pager asks for it. */
 export const listSsoConnectionsInputSchema = z.object({

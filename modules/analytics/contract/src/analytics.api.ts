@@ -10,6 +10,21 @@ import type {
   AnalyticsEvaluationUpsertInput,
 } from "./analytics.evaluation.ts";
 import type {
+  AnalyticsFeedbacksResult,
+  AnalyticsFilterOption,
+  AnalyticsMetricSource,
+  AnalyticsReadInput,
+  AnalyticsTimeseriesInput,
+  AnalyticsTimeseriesReadOptions,
+  AnalyticsTimeseriesResult,
+  AnalyticsTopDocumentsResult,
+} from "./analytics.timeseries.ts";
+import type {
+  DashboardWidgetDefinition,
+  DashboardWidgetQuery,
+  DashboardWidgetSource,
+} from "./features/dashboard-widget/dashboard-widget-definition.ts";
+import type {
   LangWatchQLCaller,
   LangWatchQLExecuteInput,
   LangWatchQLPassInput,
@@ -19,27 +34,13 @@ import type {
   LangWatchQLSchema,
   LangWatchQLTextHydrationInput,
   LangWatchQLValidationInput,
-} from "./analytics.lwql.ts";
-import type {
-  AnalyticsFeedbacksResult,
-  AnalyticsFilterOption,
-  AnalyticsMetricSource,
-  AnalyticsReadInput,
-  AnalyticsTimeseriesInput,
-  AnalyticsTimeseriesResult,
-  AnalyticsTopDocumentsResult,
-} from "./analytics.timeseries.ts";
-import type {
-  DashboardWidgetDefinition,
-  DashboardWidgetQuery,
-  DashboardWidgetSource,
-} from "./dashboard-widget-definition.ts";
+} from "./features/lwql/analytics.lwql.ts";
 import type {
   LangWatchQLAcceptedStatement,
   LangWatchQLAppFunctionCall,
   LangWatchQLJudgementCall,
-} from "./langwatch-ql-app-functions.ts";
-import type { QueryReference } from "./query-reference.ts";
+} from "./features/lwql/langwatch-ql-app-functions.ts";
+import type { QueryReference } from "./features/lwql/query-reference.ts";
 
 /** A persisted custom-chart-playground widget, parsed from its CustomGraph row. */
 export interface DashboardWidget {
@@ -72,7 +73,7 @@ export interface DashboardWidgetDefinitionInput {
 export interface AnalyticsApi {
   getTimeseries(
     input: AnalyticsTimeseriesInput,
-    options?: { readonly maxResultRows?: number },
+    options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult>;
   getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
   getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult>;

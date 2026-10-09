@@ -15,12 +15,12 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../rules/topic-clustering-events.rules.ts";
+} from "./topic-clustering.events.ts";
 import {
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../rules/topic-clustering-events.rules.ts";
+} from "./topic-clustering.events.ts";
 
 /**
  * One run in the project's history, accumulated across the run's pages. The raw error text is
@@ -47,7 +47,7 @@ const topicClusteringRunHistoryProjectionEntrySchema = z.object({
   pages: z.number(),
 });
 
-export type TopicClusteringRunHistoryEntry = z.infer<
+type TopicClusteringRunHistoryEntry = z.infer<
   typeof topicClusteringRunHistoryProjectionEntrySchema
 >;
 

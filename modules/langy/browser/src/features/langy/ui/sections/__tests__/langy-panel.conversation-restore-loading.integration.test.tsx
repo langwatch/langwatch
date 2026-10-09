@@ -223,7 +223,7 @@ import {
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 /**
@@ -231,6 +231,10 @@ import { LangySidecar } from "../langy-panel.tsx";
  * conversation. Route reading and navigation are inert: nothing in this
  * scenario reads the address bar.
  */
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project() {
     return { id: PROJECT_ID, slug: "demo", name: "demo" };
@@ -247,6 +251,9 @@ class FakeLangyHost extends LangyHostApi {
   currentUser() {
     return { id: "user-1", email: "staff@langwatch.ai" };
   }
+  hasOrganizationPermission() {
+    return false;
+  }
   hasPermission() {
     return true;
   }
@@ -254,9 +261,6 @@ class FakeLangyHost extends LangyHostApi {
     return false;
   }
   isDemoProject() {
-    return false;
-  }
-  featureFlag() {
     return false;
   }
   route(): LangyRouteReading {

@@ -20,6 +20,7 @@ import {
 } from "@langwatch/sim-console";
 import { useState } from "react";
 
+import { ActivityPanel } from "./activity-panel.tsx";
 import { clearRecords, fetchRecords, fetchStatus, kinds, providers } from "./analytics-api.ts";
 import { providerLabel, RecordDetail } from "./record-detail.tsx";
 
@@ -86,6 +87,7 @@ export const RecordsConsole = () => {
         description="Every PostHog and Customer.io call this stack makes lands here and is never sent on to the vendor."
       >
         <Stack gap={4}>
+          {status.data ? <ActivityPanel activity={status.data.activity} /> : undefined}
           <Inline gap={3} wrap>
             <div className="analytics-search">
               <Input
@@ -154,7 +156,7 @@ export const RecordsConsole = () => {
                   }
                 />
               }
-              detail={selected ? <RecordDetail record={selected} /> : undefined}
+              detail={selected ? <RecordDetail record={selected} onPerson={setQuery} /> : undefined}
               emptyDetail={
                 <Panel>
                   <SimEmpty

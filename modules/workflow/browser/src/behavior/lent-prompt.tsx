@@ -1,61 +1,26 @@
-/** What prompt lends the studio through its declaration (ARCHITECTURE.md §3.4, rule 7). */
+/** What prompt lends the studio by token (ARCHITECTURE.md §10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type {
-  UiLlmConfigFieldProps,
-  UiOutputsSectionProps,
-  UiStudioPromptEditorProps,
-} from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo } from "react";
+import { Lent } from "@langwatch/browser-host/lent";
+import {
+  LlmConfigFieldToken,
+  OutputsSectionToken,
+  StudioPromptEditorToken,
+  type LlmConfigFieldProps,
+  type OutputsSectionProps,
+  type StudioPromptEditorProps,
+} from "@langwatch/prompt-client";
 
 /** Prompt's editor, embedded in a signature node's panel. */
-export function StudioPromptEditor(props: UiStudioPromptEditorProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("studioPromptEditor")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function StudioPromptEditor(props: StudioPromptEditorProps) {
+  return <Lent of={StudioPromptEditorToken} props={props} />;
 }
 
 /** Prompt's LLM config row, with the chosen model resolved by prompt. */
-export function LLMConfigField(props: UiLlmConfigFieldProps) {
-  const declarations = useUiDeclarations();
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("llmConfigField")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function LLMConfigField(props: LlmConfigFieldProps) {
+  return <Lent of={LlmConfigFieldToken} props={props} />;
 }
 
 /** Prompt's outputs editor. */
-export function OutputsSection(props: UiOutputsSectionProps) {
-  const declarations = useUiDeclarations();
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("outputsSection")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function OutputsSection(props: OutputsSectionProps) {
+  return <Lent of={OutputsSectionToken} props={props} />;
 }

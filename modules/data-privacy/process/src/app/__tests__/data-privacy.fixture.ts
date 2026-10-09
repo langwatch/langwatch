@@ -1,10 +1,12 @@
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { ModuleSecretsScope } from "@langwatch/process";
-import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
+import type { Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import type { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
+import { MemoryDataPrivacyChannels } from "../../channels/memory/memory.data-privacy.channels.ts";
+import type { DataPrivacyProjectScope } from "../../repositories/data-privacy-project-scope.repository.ts";
+import { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
+import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyRepositories } from "../../repositories/memory/memory.data-privacy.repositories.ts";
 import type { DataPrivacyResolutionService } from "../../services/data-privacy-resolution.service.ts";
 import { DataPrivacyModule } from "../data-privacy.app.ts";
@@ -45,44 +47,23 @@ export function dataPrivacyTestTeam(): Team {
   };
 }
 
-/** The project row the cascade reads its organization, team and department off. */
-export function dataPrivacyTestProject(): ProjectWithTeam {
+/** The test project as project's and organization's rows place it; overrides move it. */
+export function dataPrivacyTestPlacement(
+  overrides: Partial<DataPrivacyProjectScope> = {},
+): DataPrivacyProjectScope {
   return {
-    id: dataPrivacyTestGraph.projectId,
-    name: "Acme production",
-    slug: "acme-production",
-    apiKey: "key",
-    lwqlKey: "lwql-key",
+    projectId: dataPrivacyTestGraph.projectId,
+    organizationId: dataPrivacyTestGraph.organizationId,
     teamId: dataPrivacyTestGraph.teamId,
-    language: "python",
-    framework: "openai",
-    kind: "default",
-    firstMessage: false,
-    integrated: true,
-    createdAt: EPOCH,
-    updatedAt: EPOCH,
-    userLinkTemplate: null,
-    traceSharingEnabled: false,
-    presenceEnabled: false,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
-    s3Bucket: null,
-    archivedAt: null,
     isPersonal: false,
-    ownerUserId: null,
-    personalFeatures: null,
     departmentId: null,
-    langyEgressAllowlist: null,
-    lastCodingAgentSessionAt: null,
-    lastCodingAgentPullRequestAt: null,
-    team: dataPrivacyTestTeam(),
+    ...overrides,
   };
 }
 
-/** The project directory the cascade reads, and nothing else configured. */
-export function createDataPrivacyTestProjects(): ProjectApi {
-  return createApiFixture<ProjectApi>({ getWithTeam: async () => dataPrivacyTestProject() });
+/** Data privacy's placement reader, holding the one test project. */
+export function createDataPrivacyTestScopes(): MemoryDataPrivacyProjectScopeRepository {
+  return MemoryDataPrivacyProjectScopeRepository.create({ projects: [dataPrivacyTestPlacement()] });
 }
 
 /** `createApp` composes no secrets chain, so the module's one secret is answered here. */
@@ -93,17 +74,30 @@ export function dataPrivacyTestSecrets({
 }
 
 /** The app built directly over memory repositories, for a case that seeds the directory. */
-export function createDataPrivacyTestApp({
-  directory,
+export async function createDataPrivacyTestApp({
+  directory = MemoryDataPrivacyDirectoryRepository.create(),
   dependencies,
+  enforcement,
 }: {
-  directory: MemoryDataPrivacyDirectoryRepository;
+  directory?: MemoryDataPrivacyDirectoryRepository;
   dependencies: Parameters<typeof DataPrivacyModule.create>[0]["dependencies"];
+  enforcement?: string;
 }): Promise<DataPrivacyModule> {
+  const config = {
+    googleDlpDisabled: undefined,
+    enforcement,
+    nodeEnvironment: undefined,
+    langevalsEndpoint: undefined,
+  };
   return DataPrivacyModule.create({
-    repositories: { ...MemoryDataPrivacyRepositories.create(), directory },
+    repositories: {
+      ...MemoryDataPrivacyRepositories.create(),
+      directory,
+      projectScopes: createDataPrivacyTestScopes(),
+    },
+    channels: MemoryDataPrivacyChannels.create({ config }),
     dependencies,
-    config: { googleDlpDisabled: undefined, enforcement: undefined, nodeEnvironment: undefined },
+    config,
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     resources: { own: () => void 0, ownService: () => void 0 },
   });

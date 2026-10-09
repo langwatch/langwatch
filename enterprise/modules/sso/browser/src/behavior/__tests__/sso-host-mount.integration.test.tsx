@@ -17,6 +17,12 @@ import { cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const drawer = vi.hoisted(() => ({ openDrawer: () => undefined }));
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDrawer: () => drawer,
+}));
+
 import { useSsoHost } from "../../model/sso-host.ts";
 import SsoHostMount from "../sso-host-mount.tsx";
 

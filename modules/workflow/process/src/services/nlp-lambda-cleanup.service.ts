@@ -13,7 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const FUNCTION_IDLE_DAYS = 7;
 const LOG_GROUP_IDLE_DAYS = 365;
 
-export type NlpLambdaCleanupReport = Readonly<{
+type NlpLambdaCleanupReport = Readonly<{
   functionsDeleted: number;
   logGroupsDeleted: number;
   skippedUnknownActivity: number;

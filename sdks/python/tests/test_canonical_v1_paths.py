@@ -26,10 +26,10 @@ V1_FAMILIES = frozenset(
 
 VERSION_SEGMENT = re.compile(r"^v\d+$")
 BARE_PATH = re.compile(r"/api/([a-zA-Z0-9_-]+)((?:/[a-zA-Z0-9_{}-]+)*)")
+V1_PATH = re.compile(r"/api/v1((?:/[a-zA-Z0-9_{}-]+)+)")
 
 # Routes the document keeps bare because they have no `/api/v1` twin.
 BARE_ONLY = (
-    re.compile(r"^/api/traces/[^/]+/transcript$"),
     re.compile(r"^/api/trace/(search|[^/]+(/share|/unshare)?)$"),
     # Langy's in-process worker families, declared literal with no /api/v1 twin.
     re.compile(r"^/api/langy/(local|waits|ui)(/|$)"),
@@ -52,6 +52,18 @@ def bare_family_paths(files: List[Path]) -> List[str]:
                 continue
             line = source.count("\n", 0, match.start()) + 1
             offenders.append(f"{file.name}:{line} {match.group(0)}")
+    return offenders
+
+
+def v1_bare_only_paths(files: List[Path]) -> List[str]:
+    """Hand-written `/api/v1` URLs for routes the document keeps bare."""
+    offenders: List[str] = []
+    for file in files:
+        source = file.read_text()
+        for match in V1_PATH.finditer(source):
+            if any(bare.match("/api" + match.group(1)) for bare in BARE_ONLY):
+                line = source.count("\n", 0, match.start()) + 1
+                offenders.append(f"{file.name}:{line} {match.group(0)}")
     return offenders
 
 
@@ -79,6 +91,17 @@ def test_facade_request_paths_address_no_bare_family() -> None:
     assert len(files) > 50
 
     assert bare_family_paths(files) == []
+    # The inverse offence: a route with no `/api/v1` twin addressed under it.
+    assert v1_bare_only_paths(files) == []
+
+
+def test_guard_flags_a_v1_path_for_a_bare_only_route(tmp_path: Path) -> None:
+    source = tmp_path / "share.py"
+    source.write_text('url = f"{endpoint}/api/v1/trace/{trace_id}/share"\n')
+
+    assert v1_bare_only_paths([source]) == [
+        "share.py:1 /api/v1/trace/{trace_id}/share"
+    ]
 
 
 # @scenario "The generated REST client is v1-form"

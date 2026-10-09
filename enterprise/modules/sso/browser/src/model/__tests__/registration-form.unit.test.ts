@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { identityProviderPreset } from "../identity-providers.ts";
 import {
+  canListLandingTarget,
   EMPTY_REGISTER_FORM,
   idpFromForm,
   providerNameAfterPick,
@@ -52,6 +53,7 @@ describe("turning the form into a registration", () => {
       entityId: null,
       metadataXml: "<EntityDescriptor />",
       certificate: null,
+      idpInitiated: { enabled: false, landingTargets: [] },
     });
   });
 
@@ -88,5 +90,22 @@ describe("the name a pick prefills", () => {
 
   it("fills nothing for a protocol tile, which names no product", () => {
     expect(providerNameAfterPick({ preset: saml, previous: null, current: "" })).toBe("");
+  });
+});
+
+describe("which landing pages the list accepts", () => {
+  it("accepts a path on LangWatch itself", () => {
+    expect(canListLandingTarget({ listed: [], target: "/acme/messages?tab=all" })).toBe(true);
+  });
+
+  it("refuses anything that could leave LangWatch, as the server does", () => {
+    for (const target of ["//evil.example", "https://evil.example", "/\\evil", "/a%2Fb", "acme"]) {
+      expect(canListLandingTarget({ listed: [], target })).toBe(false);
+    }
+  });
+
+  it("refuses a twenty-first page", () => {
+    const listed = Array.from({ length: 20 }, (_, index) => `/page-${index}`);
+    expect(canListLandingTarget({ listed, target: "/one-more" })).toBe(false);
   });
 });

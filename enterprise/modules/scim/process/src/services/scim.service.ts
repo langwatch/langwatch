@@ -11,7 +11,6 @@ import {
   type ScimRequestLogQuery,
   type ScimRequestRecord,
   type ScimUser,
-  ScimService as ScimServiceContract,
   type ScimTokenEntitlement,
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
@@ -19,8 +18,9 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
+import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
-import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import {
   ScimDirectoryIdentityService,
@@ -38,16 +38,10 @@ import { ScimTokenService } from "./scim-token.service.ts";
  * All operations are scoped to an organization for multi-tenancy.
  */
 /**
- * SCIM takes the dependencies it passes down, not the whole services they
- * came from: `ScimDepartmentAssignment` is Governance's two department calls,
- * declared beside the leaf service that makes them.
- *
- * Asking for a whole `GovernanceRestApi` to use two methods is what forced
- * every test here to build a one-method object and cast it at a service it
- * shares nothing else with. The cast is the signal: a dependency that can only
- * be satisfied by lying about it is asking for more than it needs.
+ * SCIM takes the dependencies it passes down, not the whole services they came from:
+ * `ScimCostCenterFacts` is the one recorder the leaf cost-center service writes through.
  */
-export class ScimService extends ScimServiceContract {
+export class ScimService {
   private readonly repository: ScimRepository;
   private readonly userOperations: ScimProvisioningService;
   private readonly groups: ScimDirectoryService;
@@ -60,26 +54,29 @@ export class ScimService extends ScimServiceContract {
     prisma,
     writer,
     users,
-    governance,
+    costCenterFacts,
     organization,
+    seats,
     entitlements,
     lifecycle,
     provenOffboarding,
     tokenPepper,
+    previousTokenPepper,
     connections,
   }: {
     prisma: ScimRepository;
     writer: ScimGrantAuthority;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    seats: ScimSeatRepository;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    previousTokenPepper?: string | undefined;
     connections: ScimHeldConnections;
   }) {
-    super();
     this.repository = prisma;
     this.requests = ScimRequestLogService.create(prisma);
     this.identities = ScimDirectoryIdentityService.create({ repository: prisma, connections });
@@ -90,17 +87,20 @@ export class ScimService extends ScimServiceContract {
       writer,
       grants,
       users,
-      governance,
+      costCenterFacts,
       organization,
       lifecycle,
       provenOffboarding,
       authority: this.identities,
+      seats,
+      plans: entitlements,
     });
     this.tokens = ScimTokenService.create({
       repository: prisma,
       entitlements,
       lifecycle,
       tokenPepper,
+      previousTokenPepper,
     });
     this.groups = ScimDirectoryService.create({
       prisma,
@@ -114,12 +114,14 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepository;
     writer: ScimGrantAuthority;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
+    seats: ScimSeatRepository;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    previousTokenPepper?: string | undefined;
     connections: ScimHeldConnections;
   }): ScimService {
     return new ScimService(options);

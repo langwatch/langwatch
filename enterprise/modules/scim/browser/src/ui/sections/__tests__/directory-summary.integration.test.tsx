@@ -16,6 +16,14 @@ const { state } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: ({ enabled }: { enabled: boolean }) => ({
+    data: enabled ? state.provenance : void 0,
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 vi.mock("../../../behavior/scim-api.ts", () => {
   const read = (data: () => unknown) => ({ data: data(), isLoading: false, isError: false });
   const membership = (data: () => unknown) => ({
@@ -35,7 +43,6 @@ vi.mock("../../../behavior/scim-api.ts", () => {
     },
     directoryMembershipApi: {
       group: { listAll: membership(() => state.groups) },
-      organization: { getMemberProvenance: membership(() => state.provenance) },
     },
   };
 });

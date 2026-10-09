@@ -1,6 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { RoleApi } from "@langwatch/role-contract";
@@ -26,7 +25,6 @@ function process(role: "api" | "worker") {
       },
     ],
   });
-  const organization = createApiFixture<OrganizationApi>();
   const entitlement = createApiFixture<EntitlementApi>({
     getActivePlan: async () => testPlan(),
   });
@@ -34,7 +32,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([roleProcessModule])
     .withStores(memoryStores())
-    .provide({ authz, organization, entitlement });
+    .provide({ authz, entitlement });
 }
 
 describe("role app installation", () => {

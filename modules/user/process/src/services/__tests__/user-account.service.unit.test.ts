@@ -1,27 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { UserAccountService } from "../user-account.service.ts";
 
 function createService() {
-  const auth = {
-    revokeAllBrowserSessions: vi.fn(async () => undefined),
-    revokeOtherBrowserSessions: vi.fn(async () => undefined),
-  };
-  const organizations = {
-    ensurePersonalWorkspace: vi.fn(),
-    getPersonalWorkspace: vi.fn(),
-  };
-  const service = UserAccountService.create({
-    auth: auth as never,
-    organizations: organizations as never,
-  });
-
-  return { service, auth, organizations };
+  return UserAccountService.create();
 }
 
 describe("UserAccountService", () => {
   it("accepts a legacy project key as its own personal caller", () => {
-    const { service } = createService();
+    const service = createService();
 
     expect(
       service.personalCallerFor({
@@ -32,7 +19,7 @@ describe("UserAccountService", () => {
   });
 
   it("rejects a user-bound key for another personal workspace", () => {
-    const { service } = createService();
+    const service = createService();
 
     expect(() =>
       service.personalCallerFor({
@@ -40,18 +27,5 @@ describe("UserAccountService", () => {
         callerUserId: "other",
       }),
     ).toThrow("cannot read another user's personal workspace");
-  });
-
-  it("delegates session revocation to the complete Auth service", async () => {
-    const { service, auth } = createService();
-
-    await service.revokeOtherBrowserSessions({ userId: "user", keepSessionId: "session" });
-    await service.revokeAllBrowserSessions({ userId: "user" });
-
-    expect(auth.revokeOtherBrowserSessions).toHaveBeenCalledWith({
-      userId: "user",
-      keepSessionId: "session",
-    });
-    expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user" });
   });
 });

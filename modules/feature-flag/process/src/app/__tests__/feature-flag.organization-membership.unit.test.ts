@@ -3,14 +3,12 @@
  * to, omitting the rest — otherwise a membership oracle. The whole list is
  * resolved in ONE membership read, asserted by call count.
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
-import { createFeatureFlagTestApp } from "./feature-flag.fixture.ts";
+import { createFeatureFlagTestApp, createFeatureFlagTestAuthz } from "./feature-flag.fixture.ts";
 
 const USER_ID = "user_1";
 const OWN_ORG_A = "org_own_a";
@@ -36,8 +34,7 @@ function buildApp(memberOf: Set<string>) {
   );
   const app = createFeatureFlagTestApp({
     dependencies: {
-      permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
-      projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => OWN_ORG_A }),
+      permissions: createFeatureFlagTestAuthz(true, OWN_ORG_A),
       organizations: createApiFixture<OrganizationApi>({ memberOrganizationIds }),
     },
   });

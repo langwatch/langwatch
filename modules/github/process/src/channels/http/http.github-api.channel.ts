@@ -12,7 +12,7 @@ import type {
   GithubPullRequestSummary,
   MintInstallationTokenInput,
 } from "../../app/github.app.ts";
-import type { GithubHost } from "../../services/github-host.service.ts";
+import type { GithubHost } from "../../rules/github-host.rules.ts";
 import { GithubInstallationNotFoundError, GithubRateLimitedError } from "../github-api.channel.ts";
 
 const logger = createLogger("langwatch:github:api");

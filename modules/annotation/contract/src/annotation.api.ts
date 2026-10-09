@@ -1,4 +1,4 @@
-import { moduleApi, uiTokens } from "@langwatch/module";
+import { moduleApi } from "@langwatch/module";
 
 import type { AnnotationFormState } from "./annotation-form.types.ts";
 import type {
@@ -127,9 +127,3 @@ export type SuggestBodyProps = { state: AnnotationFormState; originalOutput: str
 
 /** What trace hands annotation's form footer: save, delete and cancel over the same state. */
 export type AnnotationFormFooterProps = { state: AnnotationFormState; padding: number };
-
-export const AnnotateBodyToken =
-  uiTokens("annotation").component<AnnotateBodyProps>("annotateBody");
-export const SuggestBodyToken = uiTokens("annotation").component<SuggestBodyProps>("suggestBody");
-export const AnnotationFormFooterToken =
-  uiTokens("annotation").component<AnnotationFormFooterProps>("annotationFormFooter");

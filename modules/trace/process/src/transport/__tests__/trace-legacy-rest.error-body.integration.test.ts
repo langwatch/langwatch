@@ -98,12 +98,9 @@ describe("given a legacy single-trace read that fails for an unanticipated reaso
   });
 });
 
-/** Main's `c.json({ error: "Invalid body" }, 400)` on the deprecated search, byte for byte. */
-const MAIN_SEARCH_INVALID_BODY = '{"error":"Invalid body"}';
-
 describe("given the deprecated trace search", () => {
   describe("when the body is not sent as json", () => {
-    it("answers main's 400 body before the handler", async () => {
+    it("answers the framework's 400 malformed_request before the handler", async () => {
       const findTrace = vi.fn(() => Promise.reject(new Error("never reached")));
       const search = buildApi(findTrace);
 
@@ -114,13 +111,12 @@ describe("given the deprecated trace search", () => {
       });
 
       expect(response.status).toBe(400);
-      expect(response.headers.get("content-type")).toMatch(/^application\/json/);
-      await expect(response.text()).resolves.toBe(MAIN_SEARCH_INVALID_BODY);
+      await expect(response.json()).resolves.toMatchObject({ error: "malformed_request" });
     });
   });
 
   describe("when the body is sent as json but does not parse", () => {
-    it("answers the same 400 body from the handler", async () => {
+    it("answers the same framework refusal", async () => {
       const search = buildApi(() => Promise.reject(new Error("never reached")));
 
       const response = await search("/api/trace/search", {
@@ -130,7 +126,7 @@ describe("given the deprecated trace search", () => {
       });
 
       expect(response.status).toBe(400);
-      await expect(response.text()).resolves.toBe(MAIN_SEARCH_INVALID_BODY);
+      await expect(response.json()).resolves.toMatchObject({ error: "malformed_request" });
     });
   });
 });

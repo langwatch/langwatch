@@ -8,8 +8,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { QuarantineFillEvaluatorService } from "../quarantine-fill.service.ts";
-import type { QuarantineTenantResolver } from "../quarantine-tenant.service.ts";
+import { QuarantineFillEvaluatorService } from "../../features/ingest/services/quarantine-fill.service.ts";
+import type { QuarantineTenantResolver } from "../../features/ingest/services/quarantine-tenant.service.ts";
 
 const ORGANIZATION_ID = "org-qfe-unit";
 

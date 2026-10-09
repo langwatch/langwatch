@@ -14,13 +14,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceObjectStore } from "../../channels/object-store.channel.ts";
-import { OpenAiComplianceReferencePullerService } from "../openai-compliance-puller.service.ts";
+import { OpenAiComplianceReferencePullerService } from "../../features/ingestion-pull/services/openai-compliance-puller.service.ts";
 
 const stub = vi.hoisted(() => ({
   objects: [] as { key: string; body: string }[],
 }));
 
-import { mapToOcsfRow } from "../../rules/ocsf-pull-event-mapping.rules.ts";
+import { mapToOcsfRow } from "../../features/ingestion-pull/rules/ocsf-pull-event-mapping.rules.ts";
 
 const objects: GovernanceObjectStore = {
   async list({ startAfter }) {

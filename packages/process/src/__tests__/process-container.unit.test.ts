@@ -20,12 +20,11 @@ function containerRuntime(phases: string[]): ProcessBoot {
         role,
         modules,
         config: {},
-        members: {
+        stores: {
           order: [],
           read(name) {
             throw new Error(`Unexpected member: ${name}`);
           },
-          async close() {},
         },
         surface: () => ({ hosts: {}, serve: () => "bundle handler" }),
       });
@@ -88,7 +87,7 @@ describe("process container", () => {
     class CatalogueApp {
       static readonly contract = CatalogueApi;
       static readonly dependencies = {};
-      static create(_setup: FeatureSetup<Record<never, never>, object, undefined>) {
+      static create(_setup: FeatureSetup<Record<never, never>, undefined>) {
         return { read: () => "one dataset" };
       }
     }
@@ -107,7 +106,7 @@ describe("process container", () => {
     class CatalogueApp {
       static readonly contract = CatalogueApi;
       static readonly dependencies = {};
-      static create(_setup: FeatureSetup<Record<never, never>, object, undefined>) {
+      static create(_setup: FeatureSetup<Record<never, never>, undefined>) {
         return { read: () => "one dataset" };
       }
     }
@@ -131,7 +130,7 @@ describe("process container", () => {
           role,
           modules,
           config: {},
-          members: { order: [], read: () => void 0, async close() {} },
+          stores: { order: [], read: () => void 0 },
           surface: () => ({ hosts: { rest }, serve: () => "rest handler" }),
         }),
     };

@@ -11,10 +11,10 @@ import {
   CONTENT_COLUMN_GUTTER,
   ContentColumn,
 } from "../../../elements/agent-testing/shared/content-column.tsx";
+import { SUITE_RAIL_WIDTH } from "../suite-rail/suite-rail.tsx";
 import { CasesPanelBody } from "./cases-panel-body.tsx";
 import { CasesPanelHeader } from "./cases-panel-header.tsx";
 import type { CaseLastResult } from "./cases-table.tsx";
-import { SUITE_RAIL_WIDTH } from "./suite-rail.tsx";
 
 export type ExternalCaseRow = {
   scenarioId: string;

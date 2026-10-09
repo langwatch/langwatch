@@ -4,7 +4,7 @@
 import { SeriesPercentageUnsupportedError } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { GraphTriggerSeriesEvaluationService } from "../graph-trigger-series-evaluation.service.ts";
+import { GraphTriggerSeriesEvaluationService } from "../../features/graph-alert/services/graph-trigger-series-evaluation.service.ts";
 
 function planThatFailsWith(error: unknown) {
   const logged: Record<string, unknown>[] = [];

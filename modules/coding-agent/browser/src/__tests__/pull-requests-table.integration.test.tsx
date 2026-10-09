@@ -13,7 +13,7 @@ const { queryImpls, permissionsRef } = vi.hoisted(() => ({
   permissionsRef: { canManageOrganization: true },
 }));
 
-vi.mock("../coding-agent-api.ts", () => {
+vi.mock("../behavior/coding-agent-api.ts", () => {
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -42,12 +42,12 @@ vi.mock("../coding-agent-api.ts", () => {
   return { codingAgentApi: makeNode("") };
 });
 
-import { PullRequestsTable } from "../pull-requests-table.tsx";
 import {
   codingAgentHostWrapper,
   fakeCodingAgentActivityHost,
   type FakeCodingAgentActivityHost,
 } from "../testing.tsx";
+import { PullRequestsTable } from "../ui/sections/pull-requests-table.tsx";
 
 const INSTALL_URL = "/api/github/install?organizationId=org-1";
 

@@ -12,8 +12,10 @@ import (
 // +langy`, `haven up -nlp`), persisted per worktree, shown by status. The zero
 // value is NOT a fresh worktree's default — that is DefaultSelection.
 type Selection struct {
-	Gateway bool `json:"gateway"`
-	NLP     bool `json:"nlp"`
+	// Mode is the sticky deployment mode (`haven up --mode <m>`); "" is none.
+	Mode    string `json:"mode,omitempty"`
+	Gateway bool   `json:"gateway"`
+	NLP     bool   `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.
@@ -63,6 +65,14 @@ type Selection struct {
 	// default: it takes product analytics away from the real vendors, which
 	// nobody should get by surprise. `haven up +analytics` once.
 	Analytics bool `json:"analytics"`
+	// Outbound is the Slack, webhook and SQS stand-in (outboundsim). Off by
+	// default: it keeps the product's outbound messages from their real
+	// destinations. `haven up +outbound` once.
+	Outbound bool `json:"outbound"`
+	// Telemetry is the OTLP sender (telemetrysim). Off by default: it only
+	// sends when asked, so a stack that never drives it needn't run it.
+	// `haven up +telemetry` once.
+	Telemetry bool `json:"telemetry"`
 }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
@@ -73,7 +83,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "telemetry", "design-system", "mail-room", "langevals"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -169,6 +179,10 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.LLM = on
 	case AnalyticsService:
 		sel.Analytics = on
+	case OutboundService:
+		sel.Outbound = on
+	case TelemetryService:
+		sel.Telemetry = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -206,6 +220,10 @@ func SelectionFromStack(st Stack) Selection {
 			sel.LLM = local
 		case AnalyticsService:
 			sel.Analytics = local
+		case OutboundService:
+			sel.Outbound = local
+		case TelemetryService:
+			sel.Telemetry = local
 		}
 	}
 	return sel
@@ -269,6 +287,8 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Voice, VoiceService)
 	add(s.LLM, LLMService)
 	add(s.Analytics, AnalyticsService)
+	add(s.Outbound, OutboundService)
+	add(s.Telemetry, TelemetryService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	add(s.Langevals, LangevalsService)

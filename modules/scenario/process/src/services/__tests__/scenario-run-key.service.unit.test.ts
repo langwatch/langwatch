@@ -70,7 +70,10 @@ describe("ScenarioRunKeyService", () => {
     ]);
   });
 
-  /** @scenario "A scenario run started by a member calls LangWatch with a key that acts as them" */
+  /**
+   * @scenario "A scenario run started by a member calls LangWatch with a key that acts as them"
+   * @scenario "No internal caller reads the legacy key"
+   */
   it("asks for the starter's key holding only what the target needs", async () => {
     const { service, calls } = createService();
 

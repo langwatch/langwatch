@@ -17,6 +17,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
+import type { GithubHost } from "../rules/github-host.rules.ts";
 import type {
   installErrorHtml,
   installSuccessHtml,
@@ -27,14 +28,11 @@ import {
   type GithubWebhookDelivery,
   type GithubWebhookReceipt,
 } from "../rules/github-webhook.rules.ts";
+import type { BranchMappingRequest } from "./github-branch-demand.service.ts";
 import { GithubConnectionService } from "./github-connection.service.ts";
-import type { GithubHost } from "./github-host.service.ts";
 import type { GithubInstallState } from "./github-install-state.service.ts";
 import type { GithubInstallationsService } from "./github-installations.service.ts";
-import {
-  type GithubPullRequestMappingService,
-  type BranchMappingRequest,
-} from "./github-pull-request-mapping.service.ts";
+import type { GithubPullRequestMappingService } from "./github-pull-request-mapping.service.ts";
 import type { GithubPullRequestStatusService } from "./github-pull-request-status.service.ts";
 
 const logger = createLogger("langwatch:github:webhook");
@@ -169,15 +167,6 @@ export class GithubFeatureService implements GithubApi {
     return this.installations.recordInstallation(input);
   }
 
-  handleWebhookEvent(input: {
-    action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";
-    installationId: string;
-    repositorySelection?: string;
-    repositories?: GithubRepositoryRef[] | null;
-  }): Promise<void> {
-    return this.installations.handleWebhookEvent(input);
-  }
-
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]> {
     return this.installations.listRepositoriesForOrganization(organizationId);
   }
@@ -246,10 +235,6 @@ export class GithubFeatureService implements GithubApi {
 
   popupErrorHtml(message: string): string {
     return this.installResponse.errorHtml(message);
-  }
-
-  parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
-    return this.pullRequestEvents.parse(payload);
   }
 
   /** The webhook door: verified against the shared secret before anything is applied. */

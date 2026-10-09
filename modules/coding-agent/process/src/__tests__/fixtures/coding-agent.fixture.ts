@@ -595,13 +595,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  parsePullRequestEvent(): never {
-    throw new Error("not used by Coding Agent tests");
-  }
 
-  async applyWebhookPayload(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
 
   async getAllForOrganization(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
@@ -627,9 +621,6 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async handleWebhookEvent(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
 
   async listRepositoriesForOrganization(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
@@ -654,13 +645,7 @@ export class TestGithubService implements GithubApi {
     if (this.mappingError !== null) throw this.mappingError;
   }
 
-  async getLivePullRequestStatuses(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
 
-  async applyPullRequestEvent(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
 
   async findForBranches(input: {
     organizationId: string;

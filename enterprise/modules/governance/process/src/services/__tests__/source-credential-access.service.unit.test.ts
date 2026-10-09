@@ -3,8 +3,8 @@
 import { IngestionSourceNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { SourceCredentialAccessService } from "../../features/ingestion-source/services/source-credential-access.service.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
-import { SourceCredentialAccessService } from "../source-credential-access.service.ts";
 
 async function buildWorld() {
   const sources = MemoryIngestionSourceRepository.create();

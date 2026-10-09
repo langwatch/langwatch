@@ -216,6 +216,21 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the request is WITHDRAWN because the invitation was accepted
     And "sam" is a member exactly once
 
+  # Organization records the acceptance; identity withdraws from its own side
+  # (§9, R7), so the withdrawal is eventual and organization holds no identity peer.
+  @unit
+  Scenario: Identity withdraws the pending request from organization's acceptance fact
+    Given "sam" has a PENDING request to join "acme"
+    When organization records that "sam" accepted an invitation to "acme"
+    Then identity withdraws "sam"'s request to join "acme"
+
+  @unit
+  Scenario: A redelivered acceptance withdraws the pending request once
+    Given "sam" has a PENDING request to join "acme"
+    When organization's acceptance fact for that invitation is delivered twice
+    Then both deliveries share one deduplication id keyed by the invitation
+    And the request is withdrawn once
+
   @unit
   Scenario: A pending request never blocks an invitation
     Given "sam" has a PENDING request to join "acme"

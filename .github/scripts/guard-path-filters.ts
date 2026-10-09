@@ -1,6 +1,6 @@
-// Guards the rules that make a native `on.paths` filter safe (R1: filter not
-// a superset of an internal gate; R2: filter contradicts a `*-complete`
-// aggregator; R3: an unparseable filter reported rather than passed).
+// Guards path filters (R1: on.paths not a superset of an internal gate; R2:
+// on.paths contradicts a `*-complete` aggregator; R3: an unparseable filter is
+// reported, not passed; R4: a pull_request_target gate uses braces or `!`).
 // Dependency-free and line-based — no YAML library on a bare runner.
 // Spec: specs/ci/path-filters.feature
 
@@ -10,7 +10,7 @@ import { pathToFileURL } from "node:url";
 
 export interface WorkflowIssue {
   file: string;
-  rule: "R1" | "R2" | "R3";
+  rule: "R1" | "R2" | "R3" | "R4";
   detail: string;
 }
 
@@ -291,11 +291,39 @@ export const covers = (patterns: string[], target: string): boolean => {
   return covered;
 };
 
-export const inspect = (file: string, source: string): WorkflowIssue[] => {
-  const filter = pullRequestFilter(source);
-  if (filter.kind === "none") return [];
+const triggersOnPullRequestTarget = (source: string): boolean =>
+  source
+    .split("\n")
+    .some((line) => /(^|[{,\s[])pull_request_target\s*(:|,|\]|$)/.test(stripComment(line).trim()));
 
-  const issues: WorkflowIssue[] = [];
+/**
+ * R4. On pull_request_target the change detector matches its filters with git
+ * pathspecs (.github/scripts/detect-changes-by-sha.sh): braces and `!`
+ * negation mean something to dorny's picomatch and nothing to git.
+ */
+export const pullRequestTargetGateIssues = (file: string, source: string): WorkflowIssue[] => {
+  if (!triggersOnPullRequestTarget(source)) return [];
+  const gate = gateFilters(source);
+  if (gate.kind === "unparsed") {
+    return [{ file, rule: "R4", detail: gate.detail.replace("R1", "R4") }];
+  }
+  if (gate.kind === "none") return [];
+  return gate.entries
+    .filter((entry) => /[{}]/.test(entry) || entry.startsWith("!"))
+    .map((entry) => ({
+      file,
+      rule: "R4",
+      detail:
+        `gate filter entry "${entry}" uses ${entry.startsWith("!") ? "negation" : "braces"}. ` +
+        `On pull_request_target the change detector matches with git pathspecs, which ` +
+        `read neither, and refuses the filter by running every job. List the paths in full.`,
+    }));
+};
+
+export const inspect = (file: string, source: string): WorkflowIssue[] => {
+  const issues = pullRequestTargetGateIssues(file, source);
+  const filter = pullRequestFilter(source);
+  if (filter.kind === "none") return issues;
 
   // An unparsed filter is still a FILTER — `pullRequestFilter` only reaches
   // this state having found a paths-like key under the pull-request trigger.

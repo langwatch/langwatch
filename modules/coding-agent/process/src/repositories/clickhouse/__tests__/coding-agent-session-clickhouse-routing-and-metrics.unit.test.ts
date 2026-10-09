@@ -8,7 +8,7 @@ import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doub
 import { describe, expect, it } from "vitest";
 
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
-import { NoopCodingAgentReadMetricsService } from "../../../services/coding-agent-read-metrics-noop.service.ts";
+import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
 import type { CodingAgentReadMetrics } from "../../coding-agent-session.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 

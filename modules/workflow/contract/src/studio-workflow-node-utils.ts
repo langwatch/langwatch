@@ -179,6 +179,27 @@ export const getInputsOutputs = (
   return { inputs, outputs };
 };
 
+/**
+ * The entry-field identifiers each workflow's latest version requires; a workflow whose latest
+ * version has no DSL is left out.
+ */
+export const getWorkflowsRequiredFields = ({
+  workflows,
+}: {
+  workflows: readonly { id: string; name: string; versions: readonly Record<string, unknown>[] }[];
+}): { id: string; name: string; requiredFields: string[] }[] =>
+  workflows.flatMap(({ id, name, versions }) => {
+    const dsl = versions[0]?.dsl as { edges?: StudioEdge[]; nodes?: StudioNode[] } | undefined;
+    if (!dsl) return [];
+
+    const { inputs } = getInputsOutputs(dsl.edges ?? [], dsl.nodes ?? []);
+    const requiredFields = inputs
+      .map((input) => input.identifier)
+      .filter((identifier): identifier is string => typeof identifier === "string");
+
+    return [{ id, name, requiredFields }];
+  });
+
 export const checkIsEvaluator = (node: StudioNode): boolean => {
   return node.type === "evaluator" || node.data.behave_as === "evaluator";
 };

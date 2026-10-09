@@ -17,7 +17,6 @@ import {
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
-import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 /** What the legacy door answers: its own sentence refusals, or the series. */
@@ -33,10 +32,6 @@ export interface AnalyticsLegacyApi {
 }
 
 export const AnalyticsLegacyApi = moduleApi<AnalyticsLegacyApi>()("analytics");
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -62,7 +57,7 @@ export const analyticsLegacyRest: Readonly<{
   .post("/api/analytics", "postApiAnalytics")
   // Main parsed the body as JSON under any Content-Type; a mislabelled one is still read.
   .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("analytics:view")
   .responds({ 200: analyticsTimeseriesResponseSchema, 400: legacySentenceErrorSchema })
   .withDocs({

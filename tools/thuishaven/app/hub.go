@@ -32,7 +32,7 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 	if !ok {
 		return fmt.Errorf("no registered stack %q", slug)
 	}
-	if o.sys.ProcessAlive(st.LauncherPID) {
+	if o.launcherIsOurs(st) {
 		o.sys.Terminate(st.LauncherPID)
 	}
 	for _, svc := range st.Services {
@@ -44,6 +44,7 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 		}
 	}
 	o.store.RemoveStack(slug)
+	removeKeeperPlan(st.WorktreeDir, slug)
 	return nil
 }
 

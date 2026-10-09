@@ -113,6 +113,14 @@ Feature: Unified authorization engine
     # effective(key) = grants(key) ∩ grants(owner), evaluated live.
 
   @unit
+  Scenario: An API key and its owner are read from one storage head when grants are not cached
+    Given the grants cache is off, or its epoch store is unreachable
+    And storage is being cut over between two heads that disagree about the key and its owner
+    When the API key's permission is checked, by scope or by ids
+    Then the key's grants and its owner's grants are read from the same head
+    And the check is decided as either head alone would decide it
+
+  @unit
   Scenario: A share token grants exactly one permission on exactly one resource
     Given trace "t1" in project "chatbot" has a public share token
     When an anonymous visitor presents the token
@@ -129,7 +137,7 @@ Feature: Unified authorization engine
     # keeps that line, so anonymous callers resolve through shares alone.
 
   # ============================================================================
-  # Lite member is a role, not a cross-cutting cap
+  # Lite member: the role's own grants, capped by the seat however granted
   # ============================================================================
 
   @unit
@@ -140,17 +148,15 @@ Feature: Unified authorization engine
     And sarah's permission "datasets:manage" is denied
     # The denial reason is "lite-member-restricted" so the UI can explain it.
 
-  # Unit-unprovable today: CollectedGrants has no seat field to hold constant,
-  # because seat classification lives in billing tables the engine never
-  # reads. Stage C separates the concepts; the proving test is an integration
-  # test over billing + authz together.
-  @unimplemented
-  Scenario: Seat classification is billing data and never consulted for access
-    Given user "sarah" is classified as a lite seat for billing
-    And sarah has been granted a custom role with "datasets:manage" on "chatbot"
+  # Ruling (Alex, 2026-10-09): a Lite Member seat holds at most Lite Member permissions however
+  # the grant arrives; a direct custom role no longer escapes the cap.
+  @unit
+  Scenario: A Lite Member seat caps a direct custom role at Lite Member permissions
+    Given user "sarah" holds a Lite Member seat in "acme"
+    And sarah has been granted a custom role with "datasets:manage" and "annotations:create" on "chatbot"
     When sarah's permission "datasets:manage" is checked on project "chatbot"
-    Then the check is granted
-    And the seat classification is unchanged
+    Then the check is denied
+    And sarah's permission "annotations:create" is granted
 
   # ============================================================================
   # Fail-closed surfaces
@@ -273,6 +279,19 @@ Feature: Unified authorization engine
     When the platform checks 50 permissions for alice across the same scopes
     Then no further database reads occur for those checks
     And the answers match a fresh resolution exactly
+
+  @unit
+  Scenario: Checks asked by ids read the same cached grants as a resolved-scope check
+    Given alice's grants were resolved once after the latest grant change
+    When the platform checks alice's permissions by organization, project and batch ids
+    Then no further grant reads occur for those checks
+    And the answers match a fresh resolution exactly
+
+  @unit
+  Scenario: A revocation reaches a check asked by ids on the caller's next request
+    Given alice's grants are being served from a cache
+    When an admin revokes alice's binding, or demotes the owner of alice's API key
+    Then the next check asked by ids is denied
 
   @unimplemented
   Scenario: An impersonated request records both identities

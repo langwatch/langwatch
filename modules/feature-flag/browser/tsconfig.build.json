@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-  "files": ["./src/experiment-catalogue.ts", "./src/feature-flag.web.ts"],
+  "files": ["./src/feature-flag.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -22,7 +22,13 @@
       "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

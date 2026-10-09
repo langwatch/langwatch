@@ -1,57 +1,35 @@
-import {
-  LANGY_SESSION_API_KEY_NAME,
-  TRACE_EXPORT_API_KEY_NAME,
-  WORKFLOW_RUN_API_KEY_NAME,
-} from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { guardOrganizationId } from "../organization-guard.ts";
 
+/** The api-key module declares its sweeps as `@tenancy` SQL; the guard keeps no hatch for them. */
 const elapsed = { not: null, lte: new Date("2026-10-01T00:00:00.000Z") };
 
-function sweep(where: Record<string, unknown>) {
+function guarded(action: string, where: Record<string, unknown>) {
   const next = vi.fn(async () => ({ count: 0 }));
-  const swept = guardOrganizationId(
-    { model: "ApiKey", action: "updateMany", args: { where, data: { revokedAt: new Date() } } },
-    next,
-  );
-
+  const swept = guardOrganizationId({ model: "ApiKey", action, args: { where } }, next);
   return { swept, next };
 }
 
-describe("the cross-tenant sweep of system keys", () => {
-  it.each([WORKFLOW_RUN_API_KEY_NAME, TRACE_EXPORT_API_KEY_NAME])(
-    "admits a %s sweep that keeps to marked rows",
-    async (name) => {
-      const { swept, next } = sweep({
-        name,
-        revokedAt: null,
-        expiresAt: elapsed,
-        isSystemManaged: true,
-      });
+describe("a cross-tenant sweep of API keys through the model API", () => {
+  it.each([
+    [
+      "updateMany",
+      { name: "Workflow run", revokedAt: null, expiresAt: elapsed, isSystemManaged: true },
+    ],
+    ["updateMany", { name: "Langy session", revokedAt: null, expiresAt: elapsed }],
+    ["findMany", { name: { startsWith: "CLI login - " }, revokedAt: null, expiresAt: elapsed }],
+  ])("refuses a %s with no organization", async (action, where) => {
+    const { swept, next } = guarded(action, where);
 
-      await expect(swept).resolves.toEqual({ count: 0 });
-      expect(next).toHaveBeenCalled();
-    },
-  );
+    await expect(swept).rejects.toThrow(/organizationId/);
+    expect(next).not.toHaveBeenCalled();
+  });
 
-  it.each([WORKFLOW_RUN_API_KEY_NAME, TRACE_EXPORT_API_KEY_NAME])(
-    "refuses a %s sweep that could reach a customer's key of that name",
-    async (name) => {
-      const { swept, next } = sweep({ name, revokedAt: null, expiresAt: elapsed });
-
-      await expect(swept).rejects.toThrow(/organizationId/);
-      expect(next).not.toHaveBeenCalled();
-    },
-  );
-
-  it("admits a sweep of a name customers never could use, whose old rows carry no mark", async () => {
-    const { swept } = sweep({
-      name: LANGY_SESSION_API_KEY_NAME,
-      revokedAt: null,
-      expiresAt: elapsed,
-    });
+  it("still admits a lookup by the globally-unique public token half", async () => {
+    const { swept, next } = guarded("findUnique", { lookupId: "lookup-1" });
 
     await expect(swept).resolves.toEqual({ count: 0 });
+    expect(next).toHaveBeenCalled();
   });
 });

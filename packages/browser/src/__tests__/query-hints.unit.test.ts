@@ -11,8 +11,12 @@ import {
 import { focusManager, QueryClient, QueryObserver } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createUiQueryClient } from "../query-client.ts";
-import { readHintStreamOver, startUiQueryHints, type UiQueryHintStream } from "../query-hints.ts";
+import { createUiQueryClient } from "../wire/query-client.ts";
+import {
+  readHintStreamOver,
+  startUiQueryHints,
+  type UiQueryHintStream,
+} from "../wire/query-hints.ts";
 
 const graphKey = trpcQueryKey("organization.getScopeGraph", { input: {}, type: "query" });
 const projectsKey = trpcQueryKey("project.getAll", { input: {}, type: "query" });

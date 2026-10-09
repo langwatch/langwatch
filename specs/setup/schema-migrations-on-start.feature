@@ -7,42 +7,41 @@
 # have. A developer's database silently fell behind and sign-up answered 500
 # on a missing column.
 #
-# The step belongs to the API process when a process is DEPLOYED, because the
-# API is the one process that owns the schema: the worker and the browser
-# application never migrate, so a deployment has exactly one migrator. Locally
-# it belongs to whoever starts the stack, once, because a lane that reloads and
-# restarts would otherwise migrate again every time it came back.
+# The step then belonged to the API process (and, for the tenant-pass start
+# order, the worker too: F11 in dev/docs/plans/migrations-blitz-2026-10-06.md),
+# so every serving container migrated on every start. Since the migrations blitz
+# (rethink 6.7, Q5) serving processes never migrate: each entry point runs the
+# upgrade once before anything serves, and the api and the worker read the
+# upgrade ledger at boot and refuse by name when behind. That gate, not a
+# migration at start, is what keeps a worker off a schema it was not built for.
 #
-# See dev/docs/adr/004-docker-dev-environment.md and specs/setup/
-# dev-process-topology.feature.
+# See specs/upgrade/entry-points.feature (every entry point),
+# specs/upgrade/serving-gate.feature (the refusal) and
+# specs/setup/dev-process-topology.feature.
 
-Feature: Schema migrations run before the API serves
+Feature: Schema migrations run before the API serves, never inside it
   As an operator or a developer starting LangWatch
-  I want both schemas migrated before the API accepts a request
+  I want both schemas brought up to date before the API accepts a request
   So that no process ever serves against a schema it was not built for
 
-  # The step is one script, `start:prepare:db`, and who runs it depends on
-  # whether a process is being deployed or a stack is being started:
+  # The step is one script, apps/api's `start:prepare:db`: `pnpm task upgrade`
+  # alone; the system-migrations pass is not part of api start. Who runs it:
   #
-  #   the image           CMD -> apps/api `start` -> prepare, then serve
+  #   the image           nobody at start: CMD -> apps/api `start` -> the api alone
+  #   Helm / compose      the pre-roll Job, the compose `migrate` service
   #   pnpm dev            dev/scripts/dev-stack.sh, once, before the lanes
   #   make haven up       haven's own `prepare` step, once, before the lanes
   #
   # A supervised lane is restarted on a code change and on a crash, so it does
   # not prepare: that is what made a crashlooping api lane migrate every
   # second. See specs/setup/boot-sequence.feature.
-  #
-  # It runs three tasks from apps/tasks in ONE process, in this order,
-  # sequenced so a failure stops the boot: prisma-migrate, clickhouse-migrate,
-  # lwql-provision. LangWatchQL provisioning reads both schemas, so it cannot
-  # run before either.
 
   @unit
-  Scenario: The API process applies pending schema migrations before it serves
-    Given a database with pending migrations
-    When the API process is started
-    Then the Postgres migrations are applied, then the ClickHouse ones, then LangWatchQL is provisioned
-    And only then does the API entry point run
+  Scenario: Serving processes never migrate; they refuse by name when behind
+    Given the production start commands of the api and the worker
+    When either process is started
+    Then it runs only its own entry point and no migration task
+    And it composes the upgrade gate, which refuses by name when the ledger is behind
 
   @unit
   Scenario: The development start path leaves preparation to the stack
@@ -51,12 +50,10 @@ Feature: Schema migrations run before the API serves
     Then it starts the process it supervises and migrates nothing
 
   @unit
-  Scenario: A failed migration stops the boot instead of serving
-    Given the Postgres migration step fails
-    When the API process is started
-    Then the remaining migration steps do not run
-    And the API entry point never runs
-    And the start command reports failure
+  Scenario: A failed upgrade stops the preparation
+    Given the upgrade exits non-zero
+    When an entry point runs the preparation script
+    Then the preparation reports failure, so nothing that waits on it starts
 
   @unit
   Scenario: An operator can skip a migration step that a deploy already applied
@@ -65,15 +62,15 @@ Feature: Schema migrations run before the API serves
     Then the step it names does nothing and the boot continues
 
   @unit
-  Scenario: The worker and the browser application never migrate
+  Scenario: The browser application and the worker never migrate
     Given a stack running all three Node applications
     When the worker process and the browser application start
-    Then neither of them applies migrations
-    And the stack has exactly one migrator
+    Then neither applies a migration
+    And the worker composes the same upgrade gate as the API before it consumes jobs
 
   @unit
-  Scenario: The image migrates once, through the same script
+  Scenario: The image serves without migrating, and the preparation is written once
     Given the production image's default command
     When a container starts the API
-    Then it runs the API's own start path
-    And the migration steps are not written a second time in the image
+    Then it runs the API's own start path, which migrates nothing
+    And the migration steps are not written in the image

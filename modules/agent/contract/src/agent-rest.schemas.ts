@@ -96,12 +96,3 @@ export const archiveResultSchema = z.object({
   type: agentTypeSchema,
   archivedAt: z.date().nullable(),
 });
-
-export const agentTestRunResponseSchema = z.object({
-  scenarioRunId: z.string().describe("The run to follow; open it in the simulations run drawer."),
-  batchRunId: z.string().describe("The batch the run belongs to."),
-  setId: z.string().describe("The internal set that holds agent test runs."),
-});
-
-/** A test run takes no body: the agent travels in the path. */
-export const testAgentBodySchema = z.object({});

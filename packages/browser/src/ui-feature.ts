@@ -15,14 +15,15 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
 import type { RouteObject } from "react-router";
 
+import type { UiModuleHostMount } from "./module/ui-host-mounts.ts";
+import type { UiHostServiceRun } from "./module/ui-module-host-services.ts";
+import type { UiPageLoaderRegistry } from "./page/ui-page-loaders.ts";
+import type { UiWebRouteParent } from "./ui-web-installation.ts";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiProvider,
   UiFeatureApiTransport,
-} from "./transport.ts";
-import type { UiModuleHostMount } from "./ui-host-mounts.ts";
-import type { UiPageLoaderRegistry } from "./ui-page-loaders.ts";
-import type { UiWebRouteParent } from "./ui-web-installation.ts";
+} from "./wire/transport.ts";
 
 /** What a failure interceptor may do about the failure it just read. */
 export type UiFailureHost = {
@@ -64,6 +65,8 @@ export type UiFeatureInstall = {
    * serve the reader, the scope and the permissions from the deployment.
    */
   session?: UiSessionSource;
+  /** Each host service's loaded source, from createUi's render; the shell runs them in order. */
+  hostServices?: readonly UiHostServiceRun[];
   routes?: Readonly<Record<UiWebRouteParent, readonly RouteObject[]>>;
   /** Every installed module's declared host mounts, in install order. */
   hosts?: readonly UiModuleHostMount[];

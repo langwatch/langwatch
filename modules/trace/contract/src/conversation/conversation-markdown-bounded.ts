@@ -2,7 +2,7 @@ import {
   cutToEstimatedTokens,
   cutToEstimatedTokensKeepingEnds,
   estimateTokensFromBytes,
-} from "../trace-token-budget.ts";
+} from "../features/analytics/trace-token-budget.ts";
 import {
   buildConversationMarkdownChunks,
   type ConversationMarkdownChunk,

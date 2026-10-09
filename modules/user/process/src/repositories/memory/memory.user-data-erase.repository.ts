@@ -1,3 +1,5 @@
+import { nowInstant } from "@langwatch/time";
+
 import type {
   GdprOrganizationRow,
   GdprOrganizationWithMemberCount,
@@ -62,7 +64,13 @@ export class MemoryGdprUserDataEraseRepository implements GdprUserDataEraseRepos
     return [];
   }
 
-  async eraseUserAndOwnedResources(input: { userId: string }): Promise<void> {
-    this.database.deleteUser(input.userId);
+  /** As the Prisma twin's transaction: the rows go and the erased fact is appended together. */
+  async eraseUserAndOwnedResources({ userId }: { userId: string }): Promise<void> {
+    this.database.deleteUser(userId);
+    const occurredAt = nowInstant().epochMilliseconds;
+    await this.database.appendFacts({
+      userId,
+      intents: [{ type: "recordErased", data: { tenantId: userId, userId, occurredAt } }],
+    });
   }
 }

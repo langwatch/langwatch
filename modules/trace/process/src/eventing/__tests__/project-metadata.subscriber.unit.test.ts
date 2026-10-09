@@ -571,8 +571,6 @@ describe("createProjectMetadataHandler()", () => {
   });
 
   describe("given a project receiving its first real trace", () => {
-    let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
-
     beforeEach(() => {
       mockProjects.findById.mockResolvedValue({
         id: tenantId,
@@ -580,45 +578,27 @@ describe("createProjectMetadataHandler()", () => {
         integrated: false,
       });
       mockProjects.updateMetadata.mockResolvedValue(undefined);
-      bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
       deps = {
         projects: mockProjects as any,
         milestones: milestonesOver(mockRecordSignal),
-        bootstrapTopicClustering: bootstrapTopicClustering as any,
       };
     });
 
-    describe("when a topic clustering bootstrap is wired", () => {
-      /** @scenario "A project's first trace claims its topic clustering" */
-      it("bootstraps the project's clustering schedule exactly once", async () => {
+    describe("when the trace arrives", () => {
+      it("records the first trace as trace's own milestone, which topic reacts to", async () => {
         const subscriber = createProjectMetadataHandler(deps);
 
         await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
 
-        expect(bootstrapTopicClustering).toHaveBeenCalledTimes(1);
-        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
-      });
-
-      it("bootstraps independently of the metadata write", async () => {
-        // The bootstrap is no longer sequenced behind the metadata write: it
-        // has to run for projects whose metadata needs no update at all. Its
-        // own try/catch, not its position, is what keeps a bootstrap failure
-        // from being reported as a metadata failure.
-        mockProjects.updateMetadata.mockRejectedValue(new Error("pg down"));
-        const subscriber = createProjectMetadataHandler(deps);
-
-        await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
-
-        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
+        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
+        expect(mockRecordSignal).toHaveBeenCalledWith(
+          expect.objectContaining({ recorded: "firstTrace", projectId: tenantId }),
+        );
       });
     });
 
     describe("when the project is already marked as integrated", () => {
-      it("still re-asserts the clustering schedule", async () => {
-        // The regression that made a deploy-time backfill necessary: an
-        // established project returned early, so a project that lost its
-        // schedule never got it back from ingest. Bootstrap is level-triggered
-        // now, so every real trace re-asserts it.
+      it("records a later trace and writes no metadata", async () => {
         mockProjects.findById.mockResolvedValue({
           id: tenantId,
           firstMessage: true,
@@ -628,71 +608,26 @@ describe("createProjectMetadataHandler()", () => {
 
         await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
 
-        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
-        // Still no redundant metadata write for an already-marked project.
+        expect(mockRecordSignal).toHaveBeenCalledWith(
+          expect.objectContaining({ recorded: "traceReceived", projectId: tenantId }),
+        );
         expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the bootstrap throws", () => {
-      beforeEach(() => {
-        bootstrapTopicClustering.mockRejectedValue(new Error("process store unavailable"));
-      });
-
-      it("swallows the failure (non-fatal)", async () => {
-        const subscriber = createProjectMetadataHandler(deps);
-
-        await expect(
-          subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
-        ).resolves.toBeUndefined();
-      });
-
-      it("does not report the committed metadata write as failed", async () => {
-        const subscriber = createProjectMetadataHandler(deps);
-
-        await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
-
-        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
-        expect(logger.error).toHaveBeenCalledTimes(1);
-        const [, message] = logger.error.mock.calls[0]!;
-        expect(message).toMatch(/bootstrap failed/i);
-        expect(message).not.toMatch(/Failed to update project metadata/i);
-      });
-    });
-
-    describe("when no bootstrap is wired", () => {
-      it("completes the metadata write without error", async () => {
-        const subscriber = createProjectMetadataHandler({
-          projects: mockProjects as any,
-          milestones: milestonesOver(mockRecordSignal),
-        });
-
-        await expect(
-          subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
-        ).resolves.toBeUndefined();
-
-        expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
       });
     });
   });
 
   describe("given a project that already received its first message", () => {
-    let bootstrapTopicClustering: ReturnType<typeof vi.fn>;
-
     beforeEach(() => {
-      // Not yet integrated, so the subscriber still writes metadata. The
-      // bootstrap is no longer gated on the first-message transition.
+      // Not yet integrated, so the subscriber still writes metadata.
       mockProjects.findById.mockResolvedValue({
         id: tenantId,
         firstMessage: true,
         integrated: false,
       });
       mockProjects.updateMetadata.mockResolvedValue(undefined);
-      bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
       deps = {
         projects: mockProjects as any,
         milestones: milestonesOver(mockRecordSignal),
-        bootstrapTopicClustering: bootstrapTopicClustering as any,
       };
     });
 
@@ -703,13 +638,8 @@ describe("createProjectMetadataHandler()", () => {
         await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
       });
 
-      it("updates the metadata and re-asserts the clustering schedule", async () => {
-        // Re-asserting is the point: it is idempotent at the process (a
-        // bootstrap-trigger request cannot move the wake or start a run) and
-        // rate-limited at the injected implementation, so the reconciliation
-        // costs at most one commit per project per claim window.
+      it("updates the metadata", async () => {
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
-        expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
       });
 
       it("does not track first_trace_integrated for the repeat write", async () => {
@@ -731,18 +661,16 @@ describe("createProjectMetadataHandler()", () => {
 
   describe("given the project no longer exists", () => {
     describe("when a trace arrives", () => {
-      it("does not bootstrap clustering", async () => {
-        const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
+      it("records no milestone", async () => {
         mockProjects.findById.mockResolvedValue(null);
         const subscriber = createProjectMetadataHandler({
           projects: mockProjects as any,
           milestones: milestonesOver(mockRecordSignal),
-          bootstrapTopicClustering: bootstrapTopicClustering as any,
         });
 
         await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
 
-        expect(bootstrapTopicClustering).not.toHaveBeenCalled();
+        expect(mockRecordSignal).not.toHaveBeenCalled();
       });
     });
   });

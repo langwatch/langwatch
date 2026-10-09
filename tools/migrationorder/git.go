@@ -30,8 +30,8 @@ func (r Repo) Inputs(ctx context.Context, baseRef string, releasedRefs ...string
 	mergeBase = strings.TrimSpace(mergeBase)
 
 	inputs := make([]Input, 0, len(Sets))
-	for _, set := range Sets {
-		in, err := r.input(ctx, set, comparedRefs{base: baseRef, mergeBase: mergeBase, released: releasedRefs})
+	for i := range Sets {
+		in, err := r.input(ctx, Sets[i], comparedRefs{base: baseRef, mergeBase: mergeBase, released: releasedRefs})
 		if err != nil {
 			return nil, err
 		}
@@ -49,7 +49,7 @@ type comparedRefs struct {
 
 // input reads one migration set at every ref the check compares.
 func (r Repo) input(ctx context.Context, set Set, refs comparedRefs) (Input, error) {
-	in := Input{Set: set, BaseRef: refs.base}
+	in := Input{Set: set, BaseRef: refs.base, ReleasedRefs: refs.released}
 	var err error
 	if in.Base, err = r.entriesAtAny(ctx, refs.base, set); err != nil {
 		return Input{}, err

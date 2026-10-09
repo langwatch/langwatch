@@ -2,6 +2,7 @@ import {
   UiCapabilityContextProvider,
   UiCopyTargets,
   UiScope,
+  UiSession,
   type UiActiveScope,
   type UiCapabilities,
   type UiCopyTarget,
@@ -57,6 +58,21 @@ class TestScope extends UiScope {
   }
 }
 
+/** A signed-in reader whose grants have answered. */
+class SettledSession extends UiSession {
+  currentUser() {
+    return null;
+  }
+
+  hasPermission(): boolean {
+    return true;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+}
+
 /** Stands in for organization's lent capability: one open project, one closed. */
 class LentCopyTargets extends UiCopyTargets {
   readonly asked: string[] = [];
@@ -108,13 +124,15 @@ async function renderUnderMount(
     project: () => ({ id: "proj-1", slug: "demo", name: "Demo" }),
     organization: () => ({ id: "org-1" }),
     team: () => ({ id: "team-1" }),
-    hasPermission: () => true,
   });
   const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
-      route: () => ({ params: { project: "demo" }, query: {}, pathname: "/demo/workflows" }),
-      navigate: navigated,
-    }),
+    ...createUiCapabilitiesFromHost(
+      {
+        route: () => ({ params: { project: "demo" }, query: {}, pathname: "/demo/workflows" }),
+        navigate: navigated,
+      },
+      new SettledSession(),
+    ),
     scope: new TestScope(scopeHost),
     copyTargets,
   };

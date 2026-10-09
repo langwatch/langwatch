@@ -109,6 +109,16 @@ export class PrismaScimRepository extends ScimRepository {
     });
   }
 
+  findOrganizationNames(input: {
+    organizationIds: readonly string[];
+  }): Promise<{ id: string; name: string }[]> {
+    if (input.organizationIds.length === 0) return Promise.resolve([]);
+    return this.prisma.organization.findMany({
+      where: { id: { in: [...input.organizationIds] } },
+      select: { id: true, name: true },
+    });
+  }
+
   // Arrow instance properties, not prototype methods, from here through
   // `removeMembership`: the base class declares these members as properties
   // of function type (so tests can reference a mock repository's methods
@@ -328,9 +338,15 @@ export class PrismaScimRepository extends ScimRepository {
     organizationId: string;
     userId: string;
     role: string;
+    pending?: boolean;
   }): Promise<void> => {
     await this.prisma.organizationUser.create({
-      data: { ...input, role: organizationUserRole(input.role) },
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: organizationUserRole(input.role),
+        disabledAt: input.pending ? new Date() : null,
+      },
     });
   };
   removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
@@ -610,6 +626,16 @@ export class PrismaScimRepository extends ScimRepository {
       where: { hashedToken: { in: hashedTokens } },
       select: { id: true, organizationId: true, connectionId: true },
       take: 2,
+    });
+  }
+  async replaceTokenDigest(input: {
+    tokenId: string;
+    hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
+  }): Promise<void> {
+    await this.prisma.scimToken.updateMany({
+      where: { id: input.tokenId },
+      data: { hashedToken: input.hashedToken, hashScheme: input.hashScheme },
     });
   }
   // Arrow instance property to match the base class's property-typed

@@ -1,6 +1,7 @@
-import { SupplyToken, supplyToken } from "@langwatch/module";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
+import { MissingProviderError } from "../src/boot-errors.ts";
 import { defineProcessModule } from "../src/feature-installer.ts";
 import { createApp as packageCreateApp } from "../src/index.ts";
 import { createApp } from "../src/process-supply.ts";
@@ -8,6 +9,7 @@ import { Server } from "../src/server.ts";
 import {
   clock,
   clockModule,
+  clockRepositories,
   ClockApp,
   connections,
   connectionsModule,
@@ -19,10 +21,13 @@ import {
   facilities,
   licenseConsumerModule,
   licenseSource,
-  memoryRepositoryModule,
+  ScoringApi,
+  scoringModule,
+  type VerdictApi,
 } from "./process-supply.fixtures.ts";
 
 const transportedClockModule = defineProcessModule("annotation")
+  .withRepositories(clockRepositories)
   .withApi(ClockApp)
   .withTransports(
     { protocol: "rest", router: () => ({ family: "clock" }) },
@@ -34,6 +39,7 @@ describe("process supply", () => {
   it("boots with only the clock its module reads", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([clockModule])
+      .withStores(memoryStores())
       .withClock(clock)
       .boot();
     expect(runtime.module(clockModule).provided.now()).toBe("frozen");
@@ -90,16 +96,18 @@ describe("process supply", () => {
 
   it("requires only the selected memory repository tier", async () => {
     const runtime = await createApp({ role: "api" })
-      .withModules([memoryRepositoryModule])
+      .withModules([repositoryModule])
+      .withStores(memoryStores())
       .withClock(clock)
       .boot();
-    expect(runtime.module(memoryRepositoryModule).provided.row()).toBe("memory@frozen");
+    expect(runtime.module(repositoryModule).provided.row()).toBe("memory@frozen");
     await runtime.stop();
   });
 
   it("hands a module its declared custom member", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([connectionsModule])
+      .withStores(memoryStores())
       .withMembers({ connections })
       .boot();
     expect(runtime.module(connectionsModule).provided.primary()).toBe("primary");
@@ -107,10 +115,10 @@ describe("process supply", () => {
     await runtime.stop();
   });
 
-  it("resolves a process-provided supply token outside the module namespace", async () => {
+  it("resolves a provided peer no installed module serves", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([licenseConsumerModule])
-      .provide({ licenseSource })
+      .provide({ licensing: licenseSource })
       .boot();
     expect(runtime.module(licenseConsumerModule).provided.plan()).toBe("pro");
     await runtime.stop();
@@ -118,14 +126,10 @@ describe("process supply", () => {
 
   it("exports the process supply chain as the package createApp", () => {
     expect(packageCreateApp).toBe(createApp);
-    const token = supplyToken<{ resolve(): string }>()("licenseSource");
-    expect(token).toBeInstanceOf(SupplyToken);
-    expect(token.name).toBe("licenseSource");
-    expect(Object.isFrozen(token)).toBe(true);
   });
 
   it("keeps builder branches independent", async () => {
-    const base = createApp({ role: "api" }).withModules([clockModule]);
+    const base = createApp({ role: "api" }).withModules([clockModule]).withStores(memoryStores());
     const first = base.withClock(() => "first");
     const second = base.withClock(() => "second");
     const [a, b] = await Promise.all([first.boot(), second.boot()]);
@@ -137,6 +141,7 @@ describe("process supply", () => {
   it("opens REST and tRPC hosts from the exposed surface", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([transportedClockModule])
+      .withStores(memoryStores())
       .withClock(clock)
       .expose((peers) => {
         const clockApi = peers.app(ClockApp.contract);
@@ -167,6 +172,7 @@ describe("process supply", () => {
   /** @scenario "One door carries every mounted transport" */
   it("composes one handler for every mounted family and namespace, and the server hosts it once", async () => {
     const manyTransports = defineProcessModule("annotation")
+      .withRepositories(clockRepositories)
       .withApi(ClockApp)
       .withTransports(
         { protocol: "rest", router: () => ({ family: "clock" }) },
@@ -185,6 +191,7 @@ describe("process supply", () => {
     );
     const runtime = await createApp({ role: "api" })
       .withModules([manyTransports])
+      .withStores(memoryStores())
       .withClock(clock)
       .expose(() => ({
         hosts: { rest: { mount: (declaration: unknown) => declaration }, trpc: { mount: () => 0 } },
@@ -240,5 +247,42 @@ describe("process supply", () => {
     await runtime.start();
     await runtime.stop();
     expect(events).toEqual(["producer:start", "listener:start", "listener:stop", "producer:stop"]);
+  });
+});
+
+describe("given a module whose channel binds an Api whose module is not installed", () => {
+  describe("when the process stands in for that Api", () => {
+    /** @scenario "Standing in for a capability a module's channel binds" */
+    it("boots and a call through the channel reaches the stand-in", async () => {
+      const standIn: VerdictApi = { judge: (text) => `stood in for ${text}` };
+      const runtime = await createApp({ role: "api" })
+        .withModules([scoringModule])
+        .withStores(memoryStores())
+        .provide({ "instant-eval": standIn })
+        .boot();
+
+      try {
+        expect(runtime.service(ScoringApi).score("a reply")).toBe("scored stood in for a reply");
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the process neither installs nor stands in for it", () => {
+    /** @scenario "Standing in for a capability a module's channel binds" */
+    it("refuses boot, naming the module, the binding and the token", async () => {
+      const boot = createApp({ role: "api" })
+        .withModules([scoringModule])
+        .withStores(memoryStores())
+        // @ts-expect-error the compiler names the bound peer too; this proves boot refuses alone
+        .boot();
+
+      await expect(boot).rejects.toBeInstanceOf(MissingProviderError);
+      await expect(boot).rejects.toMatchObject({
+        feature: "analytics",
+        dependencyKey: "channels.verdicts",
+      });
+    });
   });
 });

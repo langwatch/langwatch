@@ -1,9 +1,9 @@
 import { SELECT_ALL_MATCHING_CAP } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
-import { ALL_MATCHING_PREFIX } from "../../../behavior/langy-chip-context.ts";
 import { type LangyContextChip } from "../../../behavior/langy.store.ts";
 import { useTraceExplorerScope } from "../../../behavior/trace-explorer-scope.ts";
+import { ALL_MATCHING_PREFIX } from "../../context-target/behavior/langy-chip-context.ts";
 
 /**
  * Turns the Trace Explorer's bulk-selection (the row checkboxes) into a Langy context

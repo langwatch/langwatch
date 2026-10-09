@@ -20,7 +20,7 @@ describe("given a code agent whose config declares its own fields", () => {
         },
       });
 
-      const read = agentWithResolvedFields(agent, {});
+      const read = agentWithResolvedFields(agent);
 
       expect(read.inputFields).toEqual([{ identifier: "text", type: "str" }]);
       expect(read.outputFields).toEqual([{ identifier: "answer", type: "str" }]);

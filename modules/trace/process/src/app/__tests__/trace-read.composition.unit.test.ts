@@ -5,9 +5,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
-import { TraceIOExtractionService } from "#services/trace-io-extraction.service";
-import { TraceReadFullIoService } from "#services/trace-read-full-io.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
+import { TraceIOExtractionService } from "#features/derivation/services/trace-io-extraction.service";
+import { TraceReadFullIoService } from "#features/read/services/trace-read-full-io.service";
 
 function capturedSpan(spanAttributes: NormalizedSpan["spanAttributes"]): NormalizedSpan {
   return {

@@ -53,23 +53,6 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     return workflow;
   }
 
-  findFieldSources(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<{ id: string; dsl: unknown }[]> {
-    return Promise.resolve(
-      input.workflowIds
-        .map((id) => this.#liveWorkflow({ id, projectId: input.projectId }))
-        .filter((workflow): workflow is Workflow => Boolean(workflow))
-        .map((workflow) => ({
-          id: workflow.id,
-          dsl: workflow.currentVersionId
-            ? this.store.versions.get(workflow.currentVersionId)?.dsl
-            : undefined,
-        })),
-    );
-  }
-
   findSummaries(input: {
     projectId: string;
     workflowIds: string[];

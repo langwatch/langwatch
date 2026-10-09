@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/__tests__/fixtures/license-keys.fixture.d.ts",
+      "default": "./src/__tests__/fixtures/license-keys.fixture.ts"
     }
   },
   "scripts": {
@@ -30,6 +34,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-license-signing": "workspace:*",
@@ -39,6 +44,7 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
+    "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/internal-slack": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
@@ -49,9 +55,10 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
-    "@langwatch/project-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "undici": "catalog:",

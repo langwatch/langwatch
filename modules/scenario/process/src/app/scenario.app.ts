@@ -3,6 +3,8 @@ import {
   MAX_CALL_TIMEOUT_MS,
   type AgentTestRunResult,
   type AgentTestTurnResult,
+  type HttpAgentTestInput,
+  type HttpProxyResult,
 } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -10,6 +12,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -132,7 +135,6 @@ import {
 } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { credentialsSecret, nlpInternalSecret, sessionSecret } from "@langwatch/secrets";
-import { SuiteApi } from "@langwatch/suite-contract";
 /**
  * The scenario feature's application: what all of its doors call.
  */
@@ -141,7 +143,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { voiceRecordingChannels } from "../channels/voice-recording-channels.registry.ts";
+import type { ScenarioChannels } from "../channels/scenario.channels.ts";
 import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,
@@ -151,34 +153,37 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
+import { AgentTestTurnChildService } from "../features/child/services/agent-test-turn-child.service.ts";
+import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
+import { ScenarioRunExportDownloadService } from "../features/run-export/services/scenario-run-export-download.service.ts";
+import { ScenarioRunExportService } from "../features/run-export/services/scenario-run-export.service.ts";
+import { SimulationCommandDispatcherService } from "../features/simulation/services/simulation-command-dispatcher.service.ts";
+import { SimulationRunViewService } from "../features/simulation/services/simulation-run-view.service.ts";
+import { SimulationUpdateStreamService } from "../features/simulation/services/simulation-update-stream.service.ts";
+import { SimulationService } from "../features/simulation/services/simulation.service.ts";
+import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
+import { VoiceMediaDoorService } from "../features/voice/services/voice-media-door.service.ts";
+import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
+import { VoicePublicUrlService } from "../features/voice/services/voice-public-url.service.ts";
+import { VoiceSessionService } from "../features/voice/services/voice-session.service.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
-import { AgentTestTurnChildService } from "../services/agent-test-turn-child.service.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
+import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 import { ResultAtomsService } from "../services/result-atoms.service.ts";
 import { RunConfigurationsService } from "../services/run-configurations.service.ts";
+import { ScenarioCreationCapService } from "../services/scenario-creation-cap.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
-import { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
 import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.service.ts";
-import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
-import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
+import { ScenarioRunAttachmentsService } from "../services/scenario-run-attachments.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
 import { ScenarioTabRegistryService } from "../services/scenario-tab-registry.service.ts";
-import { ScenarioVoiceTargetService } from "../services/scenario-voice-target.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
-import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
-import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
-import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
-import { SimulationService } from "../services/simulation.service.ts";
-import { VoiceMediaDoorService } from "../services/voice-media-door.service.ts";
-import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
-import { VoicePublicUrlService } from "../services/voice-public-url.service.ts";
-import { VoiceSessionService } from "../services/voice-session.service.ts";
 
 const lifecycleLogger = createLogger("langwatch:scenario:lifecycle");
 
@@ -190,7 +195,11 @@ const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
 /** What the process composes this feature's application from. */
 export interface ScenarioAppDependencies {
   agentTesting: AgentTestService;
+  /** One HTTP agent call from its editor, run by the workflow engine and traced. */
+  httpAgentTesting: HttpAgentTestService;
   scenarios: ScenarioService;
+  /** The cloud Free caps on scenarios and simulations. */
+  creationCaps: ScenarioCreationCapService;
   simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
   prefetcher: ScenarioExecutionPrefetcherService;
@@ -236,8 +245,8 @@ const scenarioAppDependencyTokens = {
   traces: TraceApi,
   /** The platform default a simulation run row is stamped with, read per write. */
   retention: DataRetentionApi,
-  /** Where a suite set's scenario runs are recorded against their suite run. */
-  suites: SuiteApi,
+  /** The saved evaluators a run its test suite grades is scored with (cut S2, R-A option 1). */
+  evaluators: EvaluatorApi,
   /** Runs and reports the evaluators a finished run is graded with. */
   evaluations: EvaluationApi,
   /** A run's prompt, secret and workflow targets, resolved before its child starts. */
@@ -269,9 +278,9 @@ export class ScenarioModule implements ScenarioApi {
   static async create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
-      never,
       ScenarioServerConfig,
-      ScenarioRepositories
+      ScenarioRepositories,
+      ScenarioChannels
     >,
   ): Promise<ScenarioModule> {
     const { secrets, repositories } = setup;
@@ -309,6 +318,12 @@ export class ScenarioModule implements ScenarioApi {
       ids,
       testSuiteIds,
       clock,
+    });
+    const creationCaps = ScenarioCreationCapService.create({
+      plans: setup.dependencies.plans,
+      projects: setup.dependencies.projects,
+      scenarios: repositories.scenarios,
+      simulations,
     });
     const generateBounds = ScenarioGenerateBoundsService.create({
       entitlement: setup.dependencies.plans,
@@ -366,6 +381,12 @@ export class ScenarioModule implements ScenarioApi {
         maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
       }),
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
+      httpAgentTesting: HttpAgentTestService.create({
+        workflows: peers.workflows,
+        traces: peers.traces,
+        agents: peers.agents,
+        secrets: peers.secrets,
+      }),
       projects: peers.projects,
       scenarios,
       simulations,
@@ -373,7 +394,6 @@ export class ScenarioModule implements ScenarioApi {
         runSecretSeal,
         config: prefetchConfig,
         scenarios,
-        suites: peers.suites,
         prompts: peers.prompts,
         agents: peers.agents,
         workflows: peers.workflows,
@@ -402,12 +422,14 @@ export class ScenarioModule implements ScenarioApi {
       generation: ScenarioGenerationService.create({
         bounds: generateBounds,
         modelProviders: setup.dependencies.modelProviders,
+        timeoutMs: setup.config.generateTimeoutMs,
       }),
       runExportDownloads: ScenarioRunExportDownloadService.create({
         auditLog: setup.dependencies.auditLog,
         exports,
         presence: setup.dependencies.presence,
       }),
+      creationCaps,
       events: ScenarioEventService.create({
         simulations,
         scenarioTabs,
@@ -415,6 +437,7 @@ export class ScenarioModule implements ScenarioApi {
         traces: setup.dependencies.traces,
         entitlement: setup.dependencies.plans,
         projects: setup.dependencies.projects,
+        creationCaps,
       }),
       platformLinks,
       runViews: SimulationRunViewService.create({ simulations, platformLinks }),
@@ -427,7 +450,7 @@ export class ScenarioModule implements ScenarioApi {
         voicePublicBaseUrl: config.voicePublicBaseUrl,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
         allowLoopbackVoiceProviders: config.allowLoopbackVoiceProviders,
-        recordings: voiceRecordingChannels.live.create(),
+        recordings: setup.channels.recordings,
       }),
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
@@ -439,12 +462,6 @@ export class ScenarioModule implements ScenarioApi {
         retention: setup.dependencies.retention,
         commands: simulationCommands,
         simulations,
-        suiteRuns: {
-          recordSuiteRunItemStarted: (data) =>
-            setup.dependencies.suites.recordSuiteRunItemStarted(data),
-          completeSuiteRunItem: (data) => setup.dependencies.suites.completeSuiteRunItem(data),
-          regradeSuiteRunItem: (data) => setup.dependencies.suites.regradeSuiteRunItem(data),
-        },
         snapshotUpdates: {
           broadcastUpdate: ({ tenantId, payload }) =>
             broadcast.publishProjectEvent({
@@ -455,11 +472,10 @@ export class ScenarioModule implements ScenarioApi {
         },
         grading: {
           scenarios: { getById: (input) => scenarios.getById(input) },
-          suites: {
-            getRunAttachments: (input) => setup.dependencies.suites.getRunAttachments(input),
-            getAttachedEvaluators: (input) =>
-              setup.dependencies.suites.getAttachedEvaluators(input),
-          },
+          suites: ScenarioRunAttachmentsService.create({
+            scenarios,
+            evaluators: setup.dependencies.evaluators,
+          }),
           evaluations: {
             runEvaluator: (input) => setup.dependencies.evaluations.runEvaluator(input),
             reportEvaluation: (data) => setup.dependencies.evaluations.reportEvaluation(data),
@@ -504,7 +520,7 @@ export class ScenarioModule implements ScenarioApi {
   }
 
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
-    return this.#dependencies.agentTesting.sendTurn(input);
+    return this.#dependencies.agentTesting.testTurn(input);
   }
 
   generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse> {
@@ -566,7 +582,11 @@ export class ScenarioModule implements ScenarioApi {
   }
 
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult> {
-    return this.#dependencies.agentTesting.scheduleRun(input);
+    return this.#dependencies.agentTesting.testRun(input);
+  }
+
+  testHttpAgent(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
+    return this.#dependencies.httpAgentTesting.execute(input);
   }
 
   /**
@@ -680,6 +700,10 @@ export class ScenarioModule implements ScenarioApi {
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
+    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+      projectId: input.projectId,
+      operatorId: by.label === "user" ? by.id : undefined,
+    });
     const scenario = await this.#dependencies.scenarios.create({
       ...input,
       // REST can name an explicit actor when its credential names no person;
@@ -788,10 +812,14 @@ export class ScenarioModule implements ScenarioApi {
   }
 
   /** Copies a scenario, attributed to the caller who asked for it. */
-  duplicate(
+  async duplicate(
     input: Omit<ScenarioDuplicateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
+    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+      projectId: input.projectId,
+      operatorId: by.label === "user" ? by.id : undefined,
+    });
     return this.#dependencies.scenarios.duplicate({ ...input, lastUpdatedById: by.id });
   }
 
@@ -910,7 +938,14 @@ export class ScenarioModule implements ScenarioApi {
       name: input.name,
       metadata,
       ...(secretParameterNames.length > 0 ? { secretParameters: input.secretParameters } : {}),
-      target: { type: target.type, referenceId: target.referenceId },
+      target: {
+        type: target.type,
+        referenceId: target.referenceId,
+        ...(input.target.scenarioMappings
+          ? { scenarioMappings: input.target.scenarioMappings }
+          : {}),
+      },
+      ...(input.evaluators ? { evaluators: input.evaluators } : {}),
       occurredAt: nowInstant().epochMilliseconds,
     });
   }

@@ -4,12 +4,12 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
-import type { InstantEvalSpendRecord } from "../../rules/instant-eval-spend-outcome.rules.ts";
 import { InstantEvalFinishService } from "../instant-eval-finish.service.ts";
+import type { InstantEvalJudgedSpend } from "../instant-eval-judged-spend.service.ts";
 
 const PROJECT_ID = "project-1";
 const RUN_ID = "run-1";
@@ -18,11 +18,11 @@ const AT = Temporal.Instant.from("2026-09-18T10:00:00Z");
 /** The spend spine and the budget, recording what each was told, in order. */
 function finishing({ recorderFails = false }: { recorderFails?: boolean } = {}): {
   service: InstantEvalFinishService;
-  recorded: InstantEvalSpendRecord[];
+  recorded: InstantEvalJudgedSpend[];
   released: { reservationId: string }[];
   order: string[];
 } {
-  const recorded: InstantEvalSpendRecord[] = [];
+  const recorded: InstantEvalJudgedSpend[] = [];
   const released: { reservationId: string }[] = [];
   const order: string[] = [];
 

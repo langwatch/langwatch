@@ -11,7 +11,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   type DeferredOriginPayload,
   DEFERRED_ORIGIN_DELAY_MS,
@@ -45,20 +45,9 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
   const noop = vi.fn().mockResolvedValue(undefined);
   return buildTraceProcessingConsumer(projections, {
     resolveDeferredOrigin,
-    evaluationTrigger: {
-      name: "evaluationTrigger",
-      spec: { fold: "traceSummary", handler: noop },
-    },
-    customEvaluationSync: noop,
     trackedEventSync: noop,
     traceUpdateBroadcast: noop,
     projectMetadata: noop,
-    experimentMetricsSync: noop,
-    codingAgentSpanFactsDispatch: {
-      name: "codingAgentSpanFactsDispatch",
-      eventTypes: [],
-      handle: noop,
-    },
     spanStorageBroadcast: noop,
     broadcastDisabled: false,
   });

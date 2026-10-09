@@ -95,8 +95,6 @@ export type CodingAgentTranscript = z.infer<typeof codingAgentTranscriptSchema>;
 
 type UserPromptEntry = Extract<TranscriptEntry, { kind: "user_prompt" }>;
 
-export type { TranscriptLogRecord } from "./coding-agent-transcript-state.ts";
-
 /** Build the transport-neutral transcript shared by the UI, CLI, and exports. */
 export function buildCodingAgentTranscript({
   spans,

@@ -1,9 +1,9 @@
 import type { SsoConnectionCommand, SsoConnectionFactInput } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
-import { SsoConnectionService } from "../services/sso-connection.service.ts";
+import type { SsoConnectionLedger } from "../features/sso-connection/rules/sso-connection-ledger.rules.ts";
+import { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
+import { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
@@ -74,7 +74,7 @@ beforeEach(() => {
 
 describe("the sso connection write surface", () => {
   describe("when an ops user changes a connection", () => {
-    /** @scenario "Backoffice edits go through commands like everyone else's" */
+    /** @scenario "Admin edits go through commands like everyone else's" */
     it("makes every change a guarded command with the actor on it", async () => {
       await service.registerConnection({
         ...identity,
@@ -137,7 +137,7 @@ describe("the sso connection write surface", () => {
       expect((await connections.getConnection({ connectionId: CONNECTION })).state).toBe("ACTIVE");
     });
 
-    /** @scenario "Backoffice edits go through commands like everyone else's" */
+    /** @scenario "Admin edits go through commands like everyone else's" */
     it("refuses a command the lifecycle forbids rather than writing state", async () => {
       await service.registerConnection({
         ...identity,
@@ -157,7 +157,7 @@ describe("the sso connection write surface", () => {
       expect(committed).toEqual([]);
     });
 
-    /** @scenario "Backoffice edits go through commands like everyone else's" */
+    /** @scenario "Admin edits go through commands like everyone else's" */
     it("never reaches the ledger when the guard states nothing", async () => {
       await service.registerConnection({
         ...identity,

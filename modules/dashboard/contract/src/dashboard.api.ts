@@ -7,7 +7,6 @@ import type {
   LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import type { Trigger } from "@langwatch/automation-contract";
-import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 
 import type {
@@ -335,10 +334,3 @@ export interface DashboardApi {
 }
 
 export const DashboardApi = moduleApi<DashboardApi>()("dashboard");
-
-/** Dashboard's settings: only the shared deployment origin its alert links are built on. */
-export const dashboardConfig = Config.define(() => ({
-  publicBaseUrl,
-}));
-
-export type DashboardServerConfig = ConfigOf<typeof dashboardConfig>;

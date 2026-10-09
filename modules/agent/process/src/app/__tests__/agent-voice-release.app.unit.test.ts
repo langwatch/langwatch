@@ -127,11 +127,10 @@ describe("AgentModule voice release flag", () => {
         });
 
         await expect(
-          app.copy({
+          app.createCopy({
             sourceAgentId: "agent_voice",
             sourceProjectId: "project_source",
             targetProjectId: projectId,
-            actorUserId: "user_1",
             newAgentId: "agent_copy",
           }),
         ).rejects.toMatchObject({ code: "voice_agents_disabled" });

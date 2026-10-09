@@ -1,7 +1,7 @@
 /**
  * Public application config: the exact contract a browser is handed. Lives in @langwatch/config
  * because both the API (builds and injects the meta tag) and browser (reads it) need it and they
- * are different processes. Does not read env vars; `./public-app-config.projection` does that.
+ * are different processes. Does not read env vars.
  */
 import { z, type input, type output, type ZodType } from "zod";
 

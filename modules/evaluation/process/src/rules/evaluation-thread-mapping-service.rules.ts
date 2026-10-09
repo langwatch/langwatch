@@ -11,7 +11,7 @@ import {
 } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
-import type { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
+import type { EvaluationSpanDigestService } from "../features/execution/services/evaluation-span-digest.service.ts";
 
 /**
  * Callback that fetches all traces belonging to a thread.

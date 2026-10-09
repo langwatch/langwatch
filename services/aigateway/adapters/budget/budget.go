@@ -3,7 +3,7 @@
 // Debits are NOT sent from the gateway hot path. The gateway emits spend
 // commands for every request through its spool, and the control plane's
 // debits process manager
-// (enterprise/modules/governance/process/src/processes/gateway-debit.process.ts) writes
+// (modules/gateway/process/src/eventing/gateway-debit.process.ts) writes
 // the ClickHouse ledger rows from them. Single source of truth, no PG
 // dual-write.
 package budget

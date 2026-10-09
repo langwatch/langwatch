@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 // Passthrough mock for langwatch tracer used by TraceIOExtractionService.
 vi.mock("langwatch", () => ({
@@ -36,8 +36,8 @@ import {
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { NullSpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
-import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
-import { SpanStorageService } from "../../trace-span-storage-read.service.ts";
+import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
+import { SpanStorageService } from "../../../features/read/services/trace-span-storage-read.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

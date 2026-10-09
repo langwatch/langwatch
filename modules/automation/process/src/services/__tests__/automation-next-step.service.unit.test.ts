@@ -3,7 +3,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { AutomationNextStepService } from "../automation-next-step.service.ts";
+import { AutomationNextStepService } from "../../features/runaway/services/automation-next-step.service.ts";
 
 const pro: Plan = {
   planSource: "subscription",

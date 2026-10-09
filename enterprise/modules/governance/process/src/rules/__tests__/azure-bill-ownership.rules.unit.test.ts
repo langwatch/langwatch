@@ -5,7 +5,7 @@ import {
   findAzureBillCredentialComplaints,
   findAzureBillClaimComplaints,
   extractClaimedSubscription,
-} from "../azure-bill-ownership.rules.ts";
+} from "../../features/microsoft/rules/azure-bill-ownership.rules.ts";
 
 const SUBSCRIPTION = "00000000-0000-4000-8000-000000000001";
 

@@ -6,8 +6,7 @@
 
 import { z } from "zod";
 
-import type { ConnectService } from "./connect-services.ts";
-import type { ConnectCredentialGrant } from "./issued-license.ts";
+import type { ConnectCredentialGrant, ConnectService } from "./issued-license.ts";
 
 /**
  * Exactly what a sync may carry: the version and the two seat counts. No
@@ -57,6 +56,11 @@ export const CONNECT_CREDENTIAL_REFUSALS = {
   connect_license_revoked: { status: 403, message: "this license is no longer active" },
   connect_license_expired: { status: 403, message: "this license has expired" },
   connect_wrong_instance: { status: 403, message: "this license is bound to another instance" },
+  // C3B-PENDING-CODE: the managed key is still being provisioned; never cached, retried soon.
+  connect_credential_pending: {
+    status: 503,
+    message: "this license's hosted-services key is being set up; retry shortly",
+  },
 } as const;
 
 export type ConnectCredentialRefusalCode = keyof typeof CONNECT_CREDENTIAL_REFUSALS;

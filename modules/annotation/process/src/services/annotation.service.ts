@@ -20,20 +20,30 @@ import {
 import { generate } from "@langwatch/ksuid";
 
 import type { AnnotationRepository } from "../repositories/annotation.repository.ts";
+import type { AnnotationFactsService } from "./annotation-facts.service.ts";
 
+/** Every write is recorded as annotation's fact once it is stored; a refused write records none. */
 export class AnnotationService {
   #repository: AnnotationRepository;
+  #facts: AnnotationFactsService;
 
-  private constructor(repository: AnnotationRepository) {
+  private constructor(repository: AnnotationRepository, facts: AnnotationFactsService) {
     this.#repository = repository;
+    this.#facts = facts;
   }
 
-  static create({ repository }: { repository: AnnotationRepository }): AnnotationService {
-    return new AnnotationService(repository);
+  static create({
+    repository,
+    facts,
+  }: {
+    repository: AnnotationRepository;
+    facts: AnnotationFactsService;
+  }): AnnotationService {
+    return new AnnotationService(repository, facts);
   }
 
   create(input: CreateAnnotationInput): Promise<Annotation> {
-    return this.#repository.create(createAnnotationInputSchema.parse(input));
+    return this.#recordCreated(this.#repository.create(createAnnotationInputSchema.parse(input)));
   }
 
   createUnattributed(input: CreateUnattributedAnnotationInput): Promise<Annotation> {
@@ -49,11 +59,11 @@ export class AnnotationService {
   }
 
   update(input: UpdateAnnotationInput): Promise<Annotation> {
-    return this.#repository.update(updateAnnotationInputSchema.parse(input));
+    return this.#recordUpdated(this.#repository.update(updateAnnotationInputSchema.parse(input)));
   }
 
   delete(input: DeleteAnnotationInput): Promise<Annotation> {
-    return this.#repository.delete(deleteAnnotationInputSchema.parse(input));
+    return this.#recordDeleted(this.#repository.delete(deleteAnnotationInputSchema.parse(input)));
   }
 
   getById(input: AnnotationByIdInput): Promise<Annotation> {
@@ -68,5 +78,23 @@ export class AnnotationService {
 
   listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
     return this.#repository.findForProjection(listProjectionAnnotationsInputSchema.parse(input));
+  }
+
+  async #recordCreated(write: Promise<Annotation>): Promise<Annotation> {
+    const annotation = await write;
+    await this.#facts.annotationCreated({ annotation });
+    return annotation;
+  }
+
+  async #recordUpdated(write: Promise<Annotation>): Promise<Annotation> {
+    const annotation = await write;
+    await this.#facts.annotationUpdated({ annotation });
+    return annotation;
+  }
+
+  async #recordDeleted(write: Promise<Annotation>): Promise<Annotation> {
+    const annotation = await write;
+    await this.#facts.annotationDeleted({ annotation });
+    return annotation;
   }
 }

@@ -199,6 +199,25 @@ export class PrismaSlackConnectionRepository extends SlackConnectionRepository {
     }
   }
 
+  async replaceFingerprint({
+    id,
+    organizationId,
+    secretFingerprint,
+  }: {
+    id: string;
+    organizationId: string;
+    secretFingerprint: string;
+  }): Promise<void> {
+    try {
+      await this.prisma.slackIntegration.updateMany({
+        where: { id, organizationId },
+        data: { secretFingerprint },
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error;
+    }
+  }
+
   async delete({ id, organizationId }: { id: string; organizationId: string }): Promise<void> {
     await this.prisma.slackIntegration.deleteMany({ where: { id, organizationId } });
   }

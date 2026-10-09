@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/module": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

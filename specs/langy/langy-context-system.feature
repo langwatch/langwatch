@@ -21,17 +21,17 @@ Feature: Langy captures what I am viewing as turn context
   Scenario: Viewing an experiment surfaces it as context
     Given I am viewing an experiment
     When I open the Langy panel
-    Then the composer shows a context chip for that experiment
+    Then the add-context control offers a chip for that experiment
 
   @integration
   Scenario: Viewing a trace surfaces it as context
     Given I am viewing a trace
-    Then the composer shows a context chip for that trace
+    Then the add-context control offers a chip for that trace
 
   @integration
   Scenario: Viewing a prompt, dataset, or dashboard surfaces it as context
     Given I am viewing a dataset
-    Then the composer shows a context chip for that dataset
+    Then the add-context control offers a chip for that dataset
 
   @integration
   Scenario: A context chip can be removed

@@ -230,6 +230,8 @@ type PublishHeadline struct {
 	Classes         map[Classification]int
 	// Link is where the run's full report lives; empty shows no link.
 	Link string
+	// Partial says why the run captured less than it planned; empty when it did not.
+	Partial []string
 }
 
 // headlineFor counts a run's rows by class for the comment.
@@ -255,6 +257,9 @@ func RenderComment(headline PublishHeadline, picks []ScreenPick) (string, []Publ
 	body.WriteString(PublishMarker + "\n")
 	fmt.Fprintf(&body, "### visualdiff: %d screens, %d findings\n\n", headline.Rows, headline.Findings)
 	fmt.Fprintf(&body, "Run `%s` · base `%s` · candidate `%s`\n\n", headline.RunID, short(headline.BaseCommit), short(headline.CandidateCommit))
+	for _, reason := range headline.Partial {
+		fmt.Fprintf(&body, "> [!WARNING]\n> Partial run, not every screen was captured: %s\n\n", markdownCell(reason))
+	}
 	body.WriteString(classLine(headline.Classes) + "\n")
 	body.WriteString("\n" + RenderingOnly + "\n")
 	if headline.Link != "" {

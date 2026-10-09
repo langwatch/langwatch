@@ -1,10 +1,5 @@
 import type { Readable } from "node:stream";
 
-import {
-  mintStoredObjectUri,
-  type StoredObjectStorageDestination,
-} from "@langwatch/stored-object-contract";
-
 export type TenantId = string;
 
 export function createTenantId(value: string): TenantId {
@@ -20,21 +15,16 @@ export function tenantIdFromGroupId(groupId: string): string | null {
   return separator > 0 ? groupId.slice(0, separator) : null;
 }
 
-export type ProjectStorageDestination = StoredObjectStorageDestination;
+/** Mints the durable-store uri for one object; the destination type belongs to the caller. */
+export type MintStorageUri<Destination = unknown> = (input: {
+  destination: Destination;
+  tenantId: TenantId;
+  key: string;
+}) => string;
 
 export interface ObjectStore {
   put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
   get(uri: string): Promise<Readable>;
-}
-
-export function mintUriForDestination({
-  destination,
-  objectPath,
-}: {
-  destination: ProjectStorageDestination;
-  objectPath: string;
-}): string {
-  return mintStoredObjectUri({ destination, objectPath });
 }
 
 export function redactStorageUrisInText(text: string): string {

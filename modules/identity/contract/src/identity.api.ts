@@ -1,5 +1,8 @@
 import { moduleApi } from "@langwatch/module";
 import type { SystemMigration } from "@langwatch/system-migrations";
+import type { BetterAuthOptions } from "better-auth";
+import type { AdapterFactory, DBAdapter } from "better-auth/adapters";
+import type { z } from "zod";
 
 import type {
   AccountIdentifier,
@@ -7,10 +10,62 @@ import type {
   MethodsLastUsed,
 } from "./account-identifiers.ts";
 import type {
+  AttachIdentifierCommandData,
+  DetachIdentifierCommandData,
+  EraseUserCommandData,
+  IdentityFact,
+  IdentityFactInput,
+  MarkPrimaryCommandData,
+  ProposeLinkCommandData,
+  VerifyIdentifierCommandData,
+} from "./facts.ts";
+import type {
+  DomainJoinSetting,
+  JoinerRole,
+  JoinLookupDecision,
+  JoinOffer,
+} from "./features/join-request/join-matching.ts";
+import type {
+  ApproveJoinCommandData,
+  ExpireJoinCommandData,
+  RejectJoinCommandData,
+  RequestJoinCommandData,
+  WithdrawJoinCommandData,
+} from "./features/join-request/join-request-commands.ts";
+import type { identityDomainAdmissionSchema } from "./features/join-request/join-request.responses.ts";
+import type {
+  JoinRequestAggregateState,
+  JoinRequestFactInput,
+  JoinRequestOrigin,
+} from "./features/join-request/join-request.ts";
+import type {
+  ConfirmMfaCommandData,
+  ConsumeBackupCodeCommandData,
+  DisableMfaCommandData,
+  EnrollMfaCommandData,
+  ExpireMfaEnrollmentCommandData,
+  RecordMfaVerificationFailureCommandData,
+  RegenerateBackupCodesCommandData,
+  MfaFactInput,
+} from "./features/mfa/mfa.ts";
+import type { RoutingDecision } from "./features/signin/signin-routing.ts";
+import type {
   BreakGlassBinding,
   BreakGlassCandidateView,
   BreakGlassGrantView,
-} from "./break-glass.ts";
+} from "./features/sso-arrival/break-glass.ts";
+import type {
+  SsoArrivingUser,
+  SsoAssertionDecision,
+  SsoTestArrivalStanding,
+  SsoUserResolution,
+  SsoUserResolutionInput,
+} from "./features/sso-arrival/sso-admission.ts";
+import type {
+  SsoMigrationAccountLinkDecision,
+  SsoMigrationAuthenticationDecision,
+  SsoMigrationView,
+} from "./features/sso-arrival/sso-migration.ts";
 import type {
   ActivateConnectionCommandData,
   ApproveDomainClaimCommandData,
@@ -26,7 +81,7 @@ import type {
   ResumeConnectionCommandData,
   SuspendConnectionCommandData,
   VerifyDomainCommandData,
-} from "./connection-commands.ts";
+} from "./features/sso-connection/connection-commands.ts";
 import type {
   SsoArrivalPolicy,
   SsoConnectionFactInput,
@@ -34,91 +89,51 @@ import type {
   SsoDomainVerification,
   SsoMigrationRoute,
   SsoVerificationCeremonyMethod,
-} from "./connection.ts";
-import type {
-  AttachIdentifierCommandData,
-  DetachIdentifierCommandData,
-  EraseUserCommandData,
-  IdentityFact,
-  IdentityFactInput,
-  MarkPrimaryCommandData,
-  ProposeLinkCommandData,
-  VerifyIdentifierCommandData,
-} from "./facts.ts";
-import type { IdentityEmailResolution } from "./identity-email.service.ts";
-import type { VerifiedUserDomain } from "./identity-lookup.ts";
-import type {
-  DomainJoinSetting,
-  JoinerRole,
-  JoinLookupDecision,
-  JoinOffer,
-} from "./join-matching.ts";
-import type {
-  ApproveJoinCommandData,
-  ExpireJoinCommandData,
-  RejectJoinCommandData,
-  RequestJoinCommandData,
-  WithdrawJoinCommandData,
-} from "./join-request-commands.ts";
-import type {
-  JoinRequestAggregateState,
-  JoinRequestFactInput,
-  JoinRequestOrigin,
-} from "./join-request.ts";
-import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
-import type {
-  ConfirmMfaCommandData,
-  ConsumeBackupCodeCommandData,
-  DisableMfaCommandData,
-  EnrollMfaCommandData,
-  ExpireMfaEnrollmentCommandData,
-  RecordMfaVerificationFailureCommandData,
-  RegenerateBackupCodesCommandData,
-  MfaFactInput,
-} from "./mfa.ts";
-import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
-import type { RoutingDecision } from "./signin-routing.ts";
-import type {
-  SsoArrivingUser,
-  SsoAssertionDecision,
-  SsoTestArrivalStanding,
-  SsoUserResolution,
-  SsoUserResolutionInput,
-} from "./sso-admission.ts";
+} from "./features/sso-connection/connection.ts";
 import type {
   OrganizationSsoConnection,
   SsoConnectionHistoryEntryView,
-} from "./sso-connection-history.ts";
-import type {
-  SelfServeActor,
-  SelfServeIssuedDnsRecord,
-  SsoDomainReproofOutcome,
-} from "./sso-domain-proof.ts";
+} from "./features/sso-connection/sso-connection-history.ts";
 import type {
   SsoIdentityProviderView,
   SsoIdpRegistration,
   SsoIdpUpdate,
-} from "./sso-idp-registration.ts";
+} from "./features/sso-connection/sso-idp-registration.ts";
 import type {
-  SsoMigrationAccountLinkDecision,
-  SsoMigrationAuthenticationDecision,
-  SsoMigrationView,
-} from "./sso-migration.ts";
-import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
+  SsoConnectionRemoval,
+  SsoSetupCommand,
+  SsoSetupView,
+} from "./features/sso-connection/sso-setup.ts";
+import type {
+  SelfServeActor,
+  SelfServeIssuedDnsRecord,
+  SsoDomainReproofOutcome,
+} from "./features/sso-domain/sso-domain-proof.ts";
+import type { VerifiedUserDomain } from "./identity-lookup.ts";
+import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
+import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
 import type { OrganizationMfaStanding } from "./two-step-verification.ts";
+
+/** The identifier-backed address, or the instruction to keep the legacy `User.email` (ADR-146). */
+export type IdentityEmailResolution = { kind: "resolved"; email: string } | { kind: "keep_legacy" };
+
+/** Portable read capability for the identifier-backed email fork. */
+export abstract class IdentityEmailService {
+  abstract resolveEmail(input: { userId: string }): Promise<IdentityEmailResolution>;
+}
 
 /** One address-lock reaper pass (ADR-116 §6). */
 export interface IdentityNewbornSweepSummary {
   locksReaped: number;
 }
 
-/** The operator issuing a backoffice SSO command, as the surface knows them. */
+/** The operator issuing a admin SSO command, as the surface knows them. */
 export interface IdentityOperatorActor {
   userId: string;
 }
 
-/** One SSO connection, shaped for the backoffice read surface. */
-export interface IdentityBackofficeSsoConnection {
+/** One SSO connection, shaped for the admin read surface. */
+export interface IdentityAdminSsoConnection {
   connectionId: string;
   organizationId: string;
   organizationName: string | null;
@@ -127,7 +142,7 @@ export interface IdentityBackofficeSsoConnection {
   claimedDomains: string[];
   approvedDomains: string[];
   verifiedDomains: string[];
-  /** What proved each domain. Not its ADR-123 condition: the back-office
+  /** What proved each domain. Not its ADR-123 condition: the admin
    *  surface does not carry one yet. */
   domainVerifications: Pick<
     SsoDomainVerification,
@@ -151,8 +166,8 @@ export interface IdentityBackofficeSsoConnection {
   updatedAtMs: number;
 }
 
-export interface IdentityBackofficeSsoConnectionList {
-  connections: IdentityBackofficeSsoConnection[];
+export interface IdentityAdminSsoConnectionList {
+  connections: IdentityAdminSsoConnection[];
   total: number;
 }
 
@@ -324,14 +339,14 @@ export interface SsoConnectionHistoryApi {
   }): Promise<SsoConnectionHistoryEntryView[]>;
 }
 
-/** The backoffice read/write surface over SSO connections. */
-export interface SsoConnectionBackofficeApi {
+/** The admin read/write surface over SSO connections. */
+export interface SsoConnectionAdminApi {
   list(args: {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<IdentityBackofficeSsoConnectionList>;
-  findById(args: { connectionId: string }): Promise<IdentityBackofficeSsoConnection | null>;
+  }): Promise<IdentityAdminSsoConnectionList>;
+  findById(args: { connectionId: string }): Promise<IdentityAdminSsoConnection | null>;
   /** One connection's history, the organization resolved from the connection
    *  rather than taken from the caller. Null for one that does not exist. */
   findHistory(args: {
@@ -608,13 +623,9 @@ export interface SsoArrivalApi {
 export type SsoArrivalAdmission = { user: SsoArrivingUser; connectionId: string; domain: string };
 
 /** A member a matching domain admitted, and whether the policy did it with nobody approving. */
-export interface IdentityDomainAdmission {
-  userId: string;
-  domain: string;
-  automatic: boolean;
-}
+export type IdentityDomainAdmission = z.infer<typeof identityDomainAdmissionSchema>;
 
-/** Which of an organization's members joined by domain (D12), for the members list. */
+/** Who a domain admitted to an organization (D12), for the members list's provenance. */
 export interface JoinAdmissionsApi {
   findForMembers(args: {
     organizationId: string;
@@ -634,7 +645,7 @@ export interface JoinSettingChange {
 
 /**
  * The join-request ledger (D12, ADR-117): the lookup, the offer, the ask, the
- * admins' answers and the setting behind them. Organization serves the door.
+ * admins' answers and the setting behind them. `identity.joinRequests.*` serves the door.
  */
 export interface JoinRequestsApi {
   lookup(args: { userId: string; verifiedEmail: string | null }): Promise<JoinLookupDecision>;
@@ -721,7 +732,7 @@ export interface IdentityReservationsApi {
 /**
  * The capabilities identity publishes across a package boundary today: email
  * fork read, guard services, address-lock reservations, newborn
- * reconciliation, user-migration registry, SSO backoffice connection writer.
+ * reconciliation, user-migration registry, SSO admin connection writer.
  */
 export interface IdentityApi {
   /** Where one person stands with one organization's second-factor requirement, on this session. */
@@ -797,6 +808,8 @@ export interface IdentityApi {
   identity(): IdentityLedgerApi;
   newbornSweep(): IdentityNewbornSweepApi;
   ceremonies(): IdentityCeremoniesApi;
+  /** better-auth's whole `database:` entry: the identity storage adapter (ADR-116 §1). */
+  createStorageAdapter(input: IdentityStorageAdapterInput): AdapterFactory<BetterAuthOptions>;
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
   /** The ORGANIZATION-rooted migrations identity registers (D04), main's `registeredMigrations`. */
@@ -804,7 +817,7 @@ export interface IdentityApi {
   joinRequestGuards(): JoinRequestGuardsApi;
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;
-  ssoBackoffice(): SsoConnectionBackofficeApi;
+  ssoAdmin(): SsoConnectionAdminApi;
   ssoConnectionHistory(): SsoConnectionHistoryApi;
   ssoConnectionReads(): SsoConnectionReadsApi;
   ssoIssuers(): SsoIssuerDirectoryApi;
@@ -823,3 +836,14 @@ export interface IdentityApi {
 }
 
 export const IdentityApi = moduleApi<IdentityApi>()("identity");
+
+/** better-auth's own storage engine, built but not yet bound to options. */
+export type BetterAuthLegacyEngine = (options: BetterAuthOptions) => DBAdapter;
+
+/** What auth hands the identity storage adapter: its engine and one real Postgres transaction. */
+export interface IdentityStorageAdapterInput {
+  legacyEngine: BetterAuthLegacyEngine;
+  postgresTransaction: <R>(
+    work: (legacyEngine: BetterAuthLegacyEngine) => Promise<R>,
+  ) => Promise<R>;
+}

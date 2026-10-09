@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-export type { DepartmentService } from "./services/department.service.ts";
-export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
+export type { DepartmentService } from "./features/identity/services/department.service.ts";
 
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
@@ -10,13 +9,6 @@ export {
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
-
-/**
- * The feature's application: the one typed thing its transports are given.
- * Every door reaches the same object, so a rule written on it is the rule
- * every door gets.
- */
-export type { GovernanceAppDependencies } from "./app/governance.app.ts";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
@@ -28,10 +20,6 @@ export type * from "./repositories/ingestion-pull-lifecycle.repository.ts";
 export type * from "./repositories/ingestion-source.repository.ts";
 export type * from "./repositories/ingestion-template.repository.ts";
 export type * from "./repositories/spend-spike-anomaly.repository.ts";
-
-export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
-export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
-export type { IngestionPullRunProjectionDatabase } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
 
 export {
   COST_ROLLUP_WATCH_PROCESS_NAME,
@@ -45,13 +33,12 @@ export {
 export { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 export { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
 
-export type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
+export type { AgentsListingSummary } from "./features/agents/rules/agents-listing-outcome.rules.ts";
 export type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
-export type { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
-export type { IngestionPullWorkerService } from "./services/ingestion-pull-worker.service.ts";
+export type { IngestionPullLifecycleService } from "./features/ingestion-pull/services/ingestion-pull-lifecycle.service.ts";
 
 // The thirteen tRPC transports this feature owns are not exported: they still
 // name the deleted legacy builder, so nothing may reach them until each is
@@ -78,16 +65,16 @@ export type {
   GovernanceCliAccessApi,
   GovernanceCliAccessMembers,
   GovernanceCliCaller,
-} from "./services/governance-cli-access.service.ts";
+} from "./features/cli/services/governance-cli-access.service.ts";
 export type {
   GovernanceCliActivityApi,
   GovernanceCliActivityMembers,
-} from "./services/governance-cli-activity.service.ts";
+} from "./features/cli/services/governance-cli-activity.service.ts";
 export type {
   GovernanceCliCredentialApi,
   GovernanceCliCredentialMembers,
   GovernanceCliPersonalWorkspace,
-} from "./services/governance-cli-credentials.service.ts";
+} from "./features/cli/services/governance-cli-credentials.service.ts";
 
 // The Activity Monitor's push-mode receivers.
 export { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
@@ -95,7 +82,7 @@ export type {
   GovernanceIngestAccessApi,
   GovernanceIngestAccessMembers,
   GovernanceIngestAuthorization,
-} from "./services/governance-ingest-access.service.ts";
+} from "./features/ingest/services/governance-ingest-access.service.ts";
 export type {
   GovernanceIngestLogCollectionChannel,
   GovernanceIngestMetricCollectionChannel,
@@ -104,6 +91,6 @@ export type {
   GovernanceIngestReceiverMembers,
   GovernanceIngestSpend,
   GovernanceIngestTraceCollection,
-} from "./services/governance-ingest-receiver.service.ts";
+} from "./features/ingest/services/governance-ingest-receiver.service.ts";
 
 export type { GovernanceMcpServer } from "./services/governance-mcp-tools.service.ts";

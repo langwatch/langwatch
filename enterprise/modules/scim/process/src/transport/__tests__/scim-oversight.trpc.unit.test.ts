@@ -52,7 +52,7 @@ function mount(userId: string) {
       },
       findForOperator: async () => [],
     },
-    organizations: { findProvisioningSummary: async () => null },
+    organizations: { findOrganizationNames: async () => [] },
     identities: MemoryScimRepository.create(),
     lifecycle: { applyRedriven: async () => undefined },
     deprovision: { removeAccess: async () => ({ ownedApiKeys: [], personalTeams: [] }) },
@@ -71,7 +71,7 @@ function mount(userId: string) {
   return { acts, audited, caller: router.createCaller({ actor: { id: userId } }) };
 }
 
-describe("the back-office directory sync surface", () => {
+describe("the admin directory sync surface", () => {
   describe("given a signed-in user who is not a platform operator", () => {
     /** @scenario "The surface is refused without platform operator access" */
     it("refuses every procedure with a plain not-found and runs nothing", async () => {

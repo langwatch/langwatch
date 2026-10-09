@@ -7,7 +7,7 @@ user-invocable: true
 # storagesim
 
 A local S3 answering the path-style calls the product makes (PUT, GET, HEAD, DELETE
-object; HEAD and PUT bucket), with SigV4 (header or presigned) checked against one dev
+object; HEAD and PUT bucket; ListObjectsV2, so upgradelab snapshots work against it), with SigV4 (header or presigned) checked against one dev
 key. Code: `services/storagesim`, console `apps/storagesim-web`.
 
 ## Run it
@@ -23,7 +23,11 @@ key. Code: `services/storagesim`, console `apps/storagesim-web`.
 
 ```
 GET    /_sim/api/buckets   /objects   /object?bucket=&key=   /object/raw?bucket=&key=
-GET    /_sim/api/requests            recent S3 calls with status
+GET    /_sim/api/requests            recent S3 calls: status, auth (presigned|header|none), requestId
+GET    /_sim/api/presign?bucket=&key=[&method=PUT][&expires=s]   a presigned URL for this host
+POST   /_sim/api/seed                adds the demo objects, answers {"seeded": n}
+DELETE /_sim/api/object?bucket=&key=   one object
+DELETE /_sim/api/objects[?bucket=]     every object (in one bucket), answers {"deleted": n}
 ```
 
 Or use any S3 client with path-style addressing, region `auto`, the dev key. A missing
@@ -32,14 +36,28 @@ key answers `NoSuchKey`.
 ## Seed and reset
 
 - `STORAGESIM_SEED=1` (haven sets it) stores `seed/hello.txt` and `seed/sample.json` in
-  `langwatch`; existing objects are left alone.
-- Objects live in `STORAGESIM_DATA_DIR` (haven: `storage/<slug>/` under its home). Delete
-  the directory, or DELETE objects over S3, to reset.
+  `langwatch`; existing objects are left alone. The console's "Add demo objects" and
+  `haven storage seed` do the same on demand.
+- Objects live in `STORAGESIM_DATA_DIR` (haven: `storage/<slug>/` under its home);
+  `haven db reset` removes it. `haven storage clear [bucket]` empties it without a reset.
 
 ## Tests and load
 
 - Hit the loopback port directly; presign with the AWS SDK against that endpoint.
 - Object operations take one of 64 striped locks, so distinct keys do not serialise.
   Benchmark: `go test -bench . -benchmem ./services/storagesim`.
-- Limits: single PUT up to 5 GiB, keys up to 1024 bytes; no listing, multipart or
-  versioning.
+- Limits: single PUT up to 5 GiB, keys up to 1024 bytes; ListObjectsV2 only (no v1
+  listing, no ListBuckets), no multipart or versioning. Listing reads every sidecar per page.
+
+## From a terminal or agent
+
+`--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
+
+```
+haven storage buckets | objects [bucket] | requests
+haven storage object <bucket> <key> [--raw]     # --raw writes the stored bytes to stdout
+haven storage delete <bucket> <key>
+haven storage clear [bucket]                    # every bucket without one
+haven storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
+haven storage seed                              # the demo objects, as STORAGESIM_SEED does
+```

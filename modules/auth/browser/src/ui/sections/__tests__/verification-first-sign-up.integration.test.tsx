@@ -83,8 +83,8 @@ vi.mock("../../../behavior/auth-api.ts", async () => {
         sendMyAddressConfirmation: {
           useMutation: useFakeMutation(sendConfirmationMock),
         },
+        register: { useMutation: useFakeMutation(registerMock) },
       },
-      user: { register: { useMutation: useFakeMutation(registerMock) } },
     },
   };
 });

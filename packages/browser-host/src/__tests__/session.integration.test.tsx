@@ -54,9 +54,6 @@ class SnapshotSession extends UiSession {
   isSettled() {
     return false;
   }
-  featureFlag() {
-    return undefined;
-  }
   override snapshot() {
     return this.reading;
   }

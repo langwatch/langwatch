@@ -10,6 +10,7 @@ import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
+  simulationQueueRunSchema,
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -147,6 +148,24 @@ describe("the evaluators a run is graded with", () => {
 
       expect(loadRunAttachments).not.toHaveBeenCalled();
       expect(events[0]?.data).toMatchObject({ evaluators: supplied });
+    });
+
+    it("keeps a suite's pinned evaluators through the queue door, and parses a command without them", async () => {
+      const pinned = evaluators({ planId: "plan-1" });
+      const { tenantId, occurredAt, scenarioRunId, scenarioId, batchRunId } = queueCommand().data;
+      const shape = {
+        tenantId,
+        occurredAt,
+        scenarioRunId,
+        scenarioId,
+        batchRunId,
+        scenarioSetId: SET_ID,
+      };
+
+      expect(simulationQueueRunSchema.parse({ ...shape, evaluators: pinned }).evaluators).toEqual(
+        pinned,
+      );
+      expect(simulationQueueRunSchema.parse(shape)).not.toHaveProperty("evaluators");
     });
 
     it("queues the run anyway when the attachments cannot be read", async () => {

@@ -63,7 +63,7 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
-import { useLangy } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangy } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import ProjectLangyLayout from "../project-langy-layout.tsx";
 
 function LangySidecarStub() {
@@ -81,6 +81,13 @@ function LangySidecarStub() {
   );
 }
 
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: (flag: { name: string }) => ({
+    enabled: flag.name === "release_ui_langy_peek_dock_enabled" ? gate.peekDock : gate.flagEnabled,
+    isLoading: false,
+  }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   constructor(
     private readonly state: {
@@ -89,7 +96,6 @@ class FakeLangyHost extends LangyHostApi {
       team: LangyHostTeam;
       permissions: string[];
       flagEnabled: boolean;
-      peekDock: boolean;
       isDemoProject: boolean;
     },
   ) {
@@ -110,6 +116,9 @@ class FakeLangyHost extends LangyHostApi {
   currentUser() {
     return { id: "user-1", email: "staff@langwatch.ai" };
   }
+  hasOrganizationPermission() {
+    return false;
+  }
   hasPermission(permission: string) {
     return this.state.permissions.includes(permission);
   }
@@ -118,11 +127,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return this.state.isDemoProject;
-  }
-  featureFlag(flag: string) {
-    return flag === "release_ui_langy_peek_dock_enabled"
-      ? this.state.peekDock
-      : this.state.flagEnabled;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };
@@ -158,7 +162,6 @@ function TestHost({ children }: { children: React.ReactNode }) {
         },
         permissions: gate.permissions,
         flagEnabled: gate.flagEnabled,
-        peekDock: gate.peekDock,
         isDemoProject: gate.isDemoProject,
       }),
     [project],

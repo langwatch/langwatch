@@ -1,6 +1,6 @@
 /** "Run via API" for an evaluations-v3 experiment, lent to the experiment workbench. */
 
-import type { UiRunExperimentViaApiDialogProps } from "@langwatch/browser-host/declarations";
+import type { RunExperimentViaApiDialogProps } from "@langwatch/workflow-client";
 
 import { buildRunSnippet } from "../../../model/run-via-api/run-snippets.ts";
 import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker.tsx";
@@ -15,7 +15,7 @@ export function RunExperimentViaApiDialog({
   datasetColumns,
   datasetName,
   projectSlug,
-}: UiRunExperimentViaApiDialogProps) {
+}: RunExperimentViaApiDialogProps) {
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai";
 

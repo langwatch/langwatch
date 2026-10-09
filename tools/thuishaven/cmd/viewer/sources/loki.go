@@ -3,8 +3,10 @@ package sources
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
@@ -25,6 +27,7 @@ type Loki struct {
 	api        endpoint
 	worktree   string
 	datasource string
+	grafana    string
 	// since is the instant the previous page ended, so a poll asks only for
 	// what it has not already shown.
 	since time.Time
@@ -32,7 +35,10 @@ type Loki struct {
 
 // NewLoki opens a source over the bundle's Grafana for one worktree's lines.
 func NewLoki(grafanaPort int, worktree string, since time.Time) *Loki {
-	return &Loki{api: newEndpoint(grafanaPort), worktree: worktree, datasource: "loki", since: since}
+	return &Loki{
+		api: newEndpoint(grafanaPort), worktree: worktree, datasource: "loki", since: since,
+		grafana: fmt.Sprintf("http://127.0.0.1:%d", grafanaPort),
+	}
 }
 
 // Up reports whether the observability stack is listening.
@@ -107,4 +113,65 @@ func (l *Loki) toLine(lane string, value [2]string) (LogLine, bool) {
 		l.since = at.Add(time.Nanosecond)
 	}
 	return line, true
+}
+
+// LogQuery narrows a full read of this worktree's stream. Services match as
+// substrings of the OTel service name, since haven's lane names are not it.
+type LogQuery struct {
+	Services []string
+	Grep     string
+	TraceID  string
+	Limit    int
+}
+
+// queryQL is the LogQL for the query: the service selector, the worktree pipe
+// filter, then the line and trace filters.
+func (l *Loki) queryQL(q LogQuery) string {
+	sel := ".+"
+	if len(q.Services) > 0 {
+		quoted := make([]string, len(q.Services))
+		for i, s := range q.Services {
+			quoted[i] = ".*" + regexp.QuoteMeta(s) + ".*"
+		}
+		sel = strings.Join(quoted, "|")
+	}
+	ql := fmt.Sprintf("{service_name=~%q}", sel)
+	if q.Grep != "" {
+		ql += fmt.Sprintf(" |= %q", q.Grep)
+	}
+	ql += fmt.Sprintf(" | langwatch_worktree=%q", l.worktree)
+	if q.TraceID != "" {
+		ql += fmt.Sprintf(" | trace_id=%q", q.TraceID)
+	}
+	return ql
+}
+
+// Query returns the matching lines since the source's start, oldest first,
+// capped at the newest q.Limit.
+func (l *Loki) Query(q LogQuery) ([]LogLine, error) {
+	if !l.Up() {
+		return nil, ErrStackDown
+	}
+	if q.Limit <= 0 {
+		q.Limit = lokiLimit
+	}
+	params := url.Values{}
+	params.Set("query", l.queryQL(q))
+	params.Set("start", strconv.FormatInt(l.since.UnixNano(), 10))
+	params.Set("end", strconv.FormatInt(time.Now().UnixNano(), 10))
+	params.Set("limit", strconv.Itoa(q.Limit))
+	params.Set("direction", "backward")
+	var body lokiRange
+	path := "/api/datasources/proxy/uid/" + l.datasource + "/loki/api/v1/query_range"
+	if err := l.api.getJSON(path, params, &body); err != nil {
+		return nil, err
+	}
+	return l.collect(body), nil
+}
+
+// QueryURL opens the query in the bundle's Grafana.
+func (l *Loki) QueryURL(q LogQuery) string {
+	pane := fmt.Sprintf(`{"l":{"datasource":%q,"queries":[{"expr":%q,"queryType":"range"}]}}`,
+		l.datasource, l.queryQL(q))
+	return l.grafana + "/explore?schemaVersion=1&panes=" + url.QueryEscape(pane) + "&orgId=1"
 }

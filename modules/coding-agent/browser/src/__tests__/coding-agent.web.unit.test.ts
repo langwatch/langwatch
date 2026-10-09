@@ -1,10 +1,11 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { hostServiceFakes } from "@langwatch/browser/testing";
 import {
   CodingAgentPullRequestsTableToken,
   CodingAgentSessionsTableToken,
-} from "@langwatch/coding-agent-contract";
+} from "@langwatch/coding-agent-client";
 import { describe, expect, it } from "vitest";
 
 import { codingAgentWeb } from "../coding-agent.web.ts";
@@ -21,7 +22,7 @@ describe("given a browser that installs coding-agent", () => {
   describe("when the kernel renders with no screen requirement to satisfy", () => {
     it("installs the module", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
-        .withModules([codingAgentWeb] as const)
+        .withModules([hostServiceFakes(), codingAgentWeb] as const)
         .render();
 
       expect(installed.modules).toContain(codingAgentWeb);
@@ -29,6 +30,7 @@ describe("given a browser that installs coding-agent", () => {
   });
 
   describe("when user's workspace reads a lent activity table", () => {
+    /** @scenario Trace and coding-agent lend by their client tokens */
     it.each([
       ["pull requests", CodingAgentPullRequestsTableToken],
       ["sessions", CodingAgentSessionsTableToken],

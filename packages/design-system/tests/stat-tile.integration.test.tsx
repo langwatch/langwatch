@@ -8,7 +8,7 @@ import {
   StatTileFigure,
   StatTileGrid,
   StatTileSkeleton,
-} from "../src/components/stat-tile.tsx";
+} from "../src/components/display/stat-tile.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

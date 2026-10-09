@@ -5,7 +5,10 @@
 
 import { useCallback, useState } from "react";
 
-import { useDrawerRunCallbacks } from "../../../behavior/use-drawer-run-callbacks.ts";
+import {
+  type RunSettledCallbacks,
+  useDrawerRunCallbacks,
+} from "../../../behavior/use-drawer-run-callbacks.ts";
 import type { TargetValue } from "../../../model/scenario-target.ts";
 import { useRunScenario } from "../use-run-scenario.ts";
 import { useScenarioTarget } from "../use-scenario-target.ts";
@@ -14,13 +17,17 @@ export function useRunAgainActions({
   scenarioId,
   projectId,
   projectSlug,
+  runCallbacks,
 }: {
   scenarioId: string | undefined;
   projectId: string | undefined;
   projectSlug: string | undefined;
+  /** Where a finished run goes; the drawer's runs-list navigation when absent. */
+  runCallbacks?: RunSettledCallbacks;
 }) {
   const [runModalOpen, setRunModalOpen] = useState(false);
-  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
+  const drawerCallbacks = useDrawerRunCallbacks();
+  const { onRunComplete, onRunFailed } = runCallbacks ?? drawerCallbacks;
 
   const { runScenario, isRunning } = useRunScenario({
     projectId,

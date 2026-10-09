@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { SetupWithAgentButtonToken } from "@langwatch/trace-contract";
+import { SetupWithAgentButtonToken, TracePreviewHoverCardToken } from "@langwatch/trace-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -28,16 +28,16 @@ const traceLends = uiDeclarations([
             default: ({ surface }: { surface: string }) => <button>setup {surface}</button>,
           }),
         },
-      ],
-      capabilities: {
-        tracePreviewHoverCard: {
+        {
+          token: TracePreviewHoverCardToken,
           load: async () => ({
             default: ({ traceId, children }: { traceId: string; children: React.ReactNode }) => (
               <div data-testid={`peek-${traceId}`}>{children}</div>
             ),
           }),
         },
-      },
+      ],
+      capabilities: {},
     },
   },
 ]);
@@ -55,6 +55,7 @@ describe("what trace lends scenario", () => {
       expect(await screen.findByRole("button", { name: "setup simulations" })).toBeInTheDocument();
     });
 
+    /** @scenario Scenario wraps a turn in trace's hover peek through its client token */
     it("wraps the trigger in trace's hover peek", async () => {
       declarations.current = traceLends;
       render(
@@ -73,6 +74,7 @@ describe("what trace lends scenario", () => {
       expect(container).toBeEmptyDOMElement();
     });
 
+    /** @scenario An uninstalled trace leaves scenario's turn without a peek */
     it("keeps the trigger without a peek", () => {
       declarations.current = uiDeclarations([]);
       render(

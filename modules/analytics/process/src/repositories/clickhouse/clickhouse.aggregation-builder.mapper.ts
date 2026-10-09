@@ -8,9 +8,9 @@ import {
   SeriesPercentageUnsupportedError,
   type AnalyticsSeries,
 } from "@langwatch/analytics-contract";
+import { MAX_PROCESSED_SPANS } from "@langwatch/trace-contract";
 
 import { snakeCase } from "../../rules/string-casing.rules.ts";
-import { MAX_PROCESSED_SPANS } from "../../rules/trace-signal.rules.ts";
 import {
   buildJoinClause,
   type CHTable,
@@ -117,9 +117,32 @@ const EVAL_TIME_FILTER_START_END =
   "AND evaluation_runs.UpdatedAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY";
 
 /**
- * Deduped trace_summaries FROM-clause. A narrow column list (no whole `Attributes`
- * map) uses the spillable argMax collapse, since the IN-tuple set cannot spill;
- * wide rows keep the IN-tuple form, whose outer read streams them.
+ * Returns a deduped FROM-clause expression for trace_summaries.
+ *
+ * trace_summaries uses ReplacingMergeTree(UpdatedAt) which can return
+ * multiple versions of the same trace between merges, so every read keeps
+ * only the latest version of each trace. Two forms:
+ *
+ *   - Narrow column list (every caller that passes `columns` without the whole
+ *     `Attributes` map): the spillable `argMax` collapse of
+ *     {@link latestVersionSubquery}. Analytics reads aggregate over every
+ *     trace in range, and the IN-tuple form's hash set (one entry per trace,
+ *     never spilled) is what drove those reads into MEMORY_LIMIT_EXCEEDED on
+ *     high-volume tenants.
+ *   - Wide rows (no column list, or the whole map): the IN-tuple form, whose
+ *     outer read streams the wide columns instead of buffering one row per
+ *     trace.
+ *
+ * The TenantId filter and the dateFilter apply to every version row before
+ * the collapse, which enables partition pruning on toYearWeek(OccurredAt).
+ *
+ * @param alias - Table alias (e.g., "ts")
+ * @param columns - Optional explicit column list. When omitted, selects all
+ *   analytics columns (still excludes ComputedInput/ComputedOutput). Entries
+ *   may be aliased projections (`map(...) AS Attributes`).
+ * @param dateFilter - Optional SQL fragment for date range filtering
+ *   (e.g., DATE_FILTER_CURRENT).
+ *
  * @see dev/docs/best_practices/clickhouse-queries.md "Whole-range aggregates"
  */
 function dedupedTraceSummaries(
@@ -137,7 +160,9 @@ function dedupedTraceSummaries(
       where: `TenantId = {tenantId:String} ${dateClause}`,
     });
   }
-  const columnList = columns ? Array.from(columns).join(", ") : TRACE_ANALYTICS_COLUMNS.join(", ");
+  const columnList = columns
+    ? Array.from(columns).join(", ")
+    : TRACE_ANALYTICS_COLUMNS.join(", ");
   return `(
     SELECT ${columnList} FROM trace_summaries
     WHERE TenantId = {tenantId:String}
@@ -175,12 +200,20 @@ function referencedTraceColumns(
     return exprs;
   });
   const expressions = [...metricExpressions, ...extraExpressions];
-  const columns = [...TRACE_IDENTITY_COLUMNS, ...extractReferencedTraceColumns(expressions)];
+  const columns = [
+    ...TRACE_IDENTITY_COLUMNS,
+    ...extractReferencedTraceColumns(expressions),
+  ];
   // A map read by literal keys only is carried as a map of those keys, which
   // keeps the deduped row narrow (see dedupedTraceSummaries).
-  if (!columns.includes("Attributes")) return columns;
-  const attributes = narrowMapColumnProjection({ column: "Attributes", expressions });
-  return columns.map((column) => (column === "Attributes" ? attributes : column));
+  const narrowedAttributes = columns.includes("Attributes")
+    ? narrowMapColumnProjection({ column: "Attributes", expressions })
+    : null;
+  return narrowedAttributes
+    ? columns.map((column) =>
+        column === "Attributes" ? narrowedAttributes : column,
+      )
+    : columns;
 }
 
 /**
@@ -581,12 +614,20 @@ function spanFirstPositiveExpr(attrKeys: string[]): string {
 function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
   const ts = tableAliases.trace_summaries;
   const smd = SPAN_MODEL_ALIAS;
-  const contribution = (expr: string) => `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
-  // TraceSpanCount = spans of the trace visible to THIS scan, summed before the
-  // zero-suppression filter; spanModelPartitionMissExpr compares it to ts.SpanCount.
-  // It comes from a second GROUP BY over the buckets, not a window, so it spills.
-  // The zero-suppression WHERE is bracketed twice to stay below the tenant guard's
-  // depth (see clickhouse-queries.md "Whole-range aggregates").
+  const contribution = (expr: string) =>
+    `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
+  // TraceSpanCount = spans of the trace visible to THIS scan, summed over the
+  // per-bucket groups BEFORE the zero-suppression filter (a suppressed
+  // model-less bucket still holds real spans, e.g. the root).
+  // spanModelPartitionMissExpr compares it against ts.SpanCount to detect an
+  // incomplete scan (spans outside the StartTime envelope) and fall back to
+  // whole-trace attribution instead of shipping a partial partition.
+  //
+  // The per-trace total comes from a second GROUP BY that collects the
+  // trace's buckets and ARRAY JOINs them back out, not from a window over the
+  // buckets: a window buffers every bucket row of the scan in memory, while
+  // both aggregations here spill to disk past
+  // max_bytes_before_external_group_by.
   const bucketColumns = [
     "SpanModelCost",
     "SpanModelNonBilledCost",
@@ -644,8 +685,7 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
           GROUP BY TenantId, TraceId
         )
         ARRAY JOIN buckets AS bucket
-        WHERE ((
-          SpanModelKey != 'unknown'
+        WHERE SpanModelKey != 'unknown'
           OR SpanModelCost > 0
           OR SpanModelNonBilledCost > 0
           OR SpanModelPromptTokens > 0
@@ -653,7 +693,6 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
           OR SpanModelCacheReadTokens > 0
           OR SpanModelCacheWriteTokens > 0
           OR SpanModelReasoningTokens > 0
-        ))
       ) ${smd} ON ${ts}.TenantId = ${smd}.TenantId AND ${ts}.TraceId = ${smd}.TraceId`;
 }
 
@@ -665,11 +704,7 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
 function spanModelPartitionMissExpr(): string {
   const ts = tableAliases.trace_summaries;
   const smd = SPAN_MODEL_ALIAS;
-  // Negated conjunction, not a disjunction: this lands in a SELECT list above the
-  // deduped trace read, whose tenant predicate sits two subqueries deep, and the
-  // tenant guard refuses an OR at or above that depth. De Morgan holds in
-  // ClickHouse's three-valued logic, so NULL operands give the same verdict.
-  return `(NOT (${smd}.SpanModelKey IS NOT NULL AND ${smd}.SpanModelKey != '' AND ${ts}.SpanCount <= ${MAX_PROCESSED_SPANS} AND ${smd}.TraceSpanCount >= ${ts}.SpanCount))`;
+  return `(${smd}.SpanModelKey IS NULL OR ${smd}.SpanModelKey = '' OR ${ts}.SpanCount > ${MAX_PROCESSED_SPANS} OR ${smd}.TraceSpanCount < ${ts}.SpanCount)`;
 }
 
 /**
@@ -844,11 +879,15 @@ interface BuiltQuery {
 }
 
 /**
- * Model-grouped queries hash one row per trace and model: a grace hash join spills
- * that side past `max_bytes_in_join`, and fewer threads bound the merge of the
- * spilled span aggregation. Slower (5s to 9s at 3M traces), not failing.
+ * Settings for a model-grouped query, which joins the deduped traces to the
+ * span-model partition: one row per trace and model on the hash side, so a
+ * plain hash join holds memory in proportion to the traces in range and
+ * cannot spill. A grace hash join splits that side into buckets on disk past
+ * `max_bytes_in_join`. Fewer threads bound the merge of the spilled span
+ * aggregation, which takes memory per thread; the panel runs slower (about
+ * 5s to 9s at 3M traces in range) instead of failing.
  */
-const SPAN_MODEL_PARTITION_SETTINGS = {
+export const SPAN_MODEL_PARTITION_SETTINGS = {
   join_algorithm: "grace_hash",
   max_bytes_in_join: 200_000_000,
   max_threads: 4,
@@ -2080,13 +2119,16 @@ function buildArrayJoinTimeseriesQuery({
   const cteSelectList = cteSelectExprs.filter((expr) => {
     const alias = /\sAS\s+(trace_[a-z_]+)$/.exec(expr)?.[1];
     if (!alias || alias === "trace_id") return true;
-    return outerSelectExprs.some((outer) => new RegExp(`\\b${alias}\\b`).test(outer));
+    return outerSelectExprs.some((outer) =>
+      new RegExp(`\\b${alias}\\b`).test(outer),
+    );
   });
 
   // Columns the dedup subquery must expose: everything the CTE's SELECT list
-  // and the filter reference. Derived from the assembled expressions rather
-  // than the metric list so no referenced column is pruned.
-  const traceColumns = referencedTraceColumns([], [...cteSelectList, filterWhere, joinClauses]);
+  // (which hardcodes per-trace passthroughs like ts.NonBilledCost regardless of
+  // the requested metrics) and the filter reference. Derived from the assembled
+  // expressions rather than the metric list so no referenced column is pruned.
+  const traceColumns = referencedTraceColumns([], [...cteSelectExprs, filterWhere, joinClauses]);
 
   // The span-model partition join fans each trace out into one row per model
   // its spans used; it rides ALONGSIDE any generic filter/metric JOINs, whose
@@ -2101,7 +2143,7 @@ function buildArrayJoinTimeseriesQuery({
   // otherwise fall back to SELECT DISTINCT for backward-compatible behavior.
   const cteBody = buildDedupCteBody({
     ts,
-    cteSelectExprs: cteSelectList,
+    cteSelectExprs,
     traceColumns,
     cteJoinClauses,
     baseWhere,
@@ -2141,7 +2183,9 @@ function buildArrayJoinTimeseriesQuery({
       ...groupKeyFilterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
-    ...(spanModelPartitioned ? { settings: SPAN_MODEL_PARTITION_SETTINGS } : {}),
+    ...(spanModelPartitioned
+      ? { settings: SPAN_MODEL_PARTITION_SETTINGS }
+      : {}),
   };
 }
 
@@ -3466,7 +3510,9 @@ export function buildTopDocumentsQuery({
   // attributes in range (inputs, outputs, prompts) on the join side.
   const spanJoin = buildJoinClause({
     table: "stored_spans",
-    requiredColumns: new Set([spanAttributesNarrowProjection([RAG_CONTEXTS_ATTRIBUTE])]),
+    requiredColumns: new Set([
+      spanAttributesNarrowProjection([RAG_CONTEXTS_ATTRIBUTE]),
+    ]),
     spanTimeFilter: `${SPAN_TIME_FILTER_START_END} AND SpanAttributes['${RAG_CONTEXTS_ATTRIBUTE}'] != ''`,
   });
 

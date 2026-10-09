@@ -49,7 +49,9 @@ const binary = (root) => {
 };
 
 // A console reaches a binary only through its built output, never its sources.
-const consoleInputs = { namedInputs: { goBuild: [] } };
+// The haven-console tag is the one list of what `haven install --build` and
+// `make haven-web` build: nx run-many -t build --projects=tag:haven-console.
+const consoleInputs = { tags: ["haven-console"], namedInputs: { goBuild: [] } };
 
 export const createNodes = [
   "{go.work,cmd/*/main.go,infra/clickhouse-serverless/cmd/*/main.go,apps/{analyticssim,haven,idpsim,llmsim,mailsim,storagesim,voicesim}-web/package.json}",

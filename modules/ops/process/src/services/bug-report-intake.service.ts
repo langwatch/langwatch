@@ -3,7 +3,8 @@ import { createLogger } from "@langwatch/observability";
 import { BugReportRateLimitedError, type SubmitBugReport } from "@langwatch/ops-contract";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
 
-import type { BugReportNotifier, BugReportRateLimiter } from "../app/ops.app.ts";
+import type { BugReportNotifier } from "../app/ops.app.ts";
+import type { BugReportRateLimitRepository } from "../repositories/bug-report-rate-limit.repository.ts";
 import type { BugReportRepository } from "../repositories/bug-report.repository.ts";
 
 const logger = createLogger("langwatch:bug-reports");
@@ -24,7 +25,7 @@ export class BugReportIntakeService {
     notifier,
   }: {
     reports: BugReportRepository;
-    rateLimiter: BugReportRateLimiter;
+    rateLimiter: BugReportRateLimitRepository;
     notifier: BugReportNotifier;
   }): BugReportIntakeService {
     return new BugReportIntakeService({ reports, rateLimiter, notifier });
@@ -33,7 +34,7 @@ export class BugReportIntakeService {
   private constructor(
     private readonly deps: {
       reports: BugReportRepository;
-      rateLimiter: BugReportRateLimiter;
+      rateLimiter: BugReportRateLimitRepository;
       notifier: BugReportNotifier;
     },
   ) {}

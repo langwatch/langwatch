@@ -11,15 +11,15 @@ import {
 import type React from "react";
 import { useCallback, useMemo } from "react";
 
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
+import { traceContextChip } from "../../../../behavior/langy/langy-context-chips.ts";
+import { type LensConfig } from "../../../../behavior/view.slice.ts";
 import {
   getColumnSizingKey,
   useColumnSizingStore,
-} from "../../../../behavior/column-sizing.store.ts";
-import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
-import { traceContextChip } from "../../../../behavior/langy/langy-context-chips.ts";
-import { type LensConfig } from "../../../../behavior/view.slice.ts";
-import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
-import type { TraceListItem } from "../types/trace.ts";
+} from "../../../../features/explorer/behavior/column-sizing.store.ts";
+import { useEvaluatorOptions } from "../../../../features/instant-eval/behavior/use-evaluator-options.ts";
 import { ADD_COLUMN_ID } from "./add-column-header.tsx";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
 import { RegistryRow } from "./registry/index.ts";

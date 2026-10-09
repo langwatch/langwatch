@@ -11,7 +11,7 @@ export const documentRoot: UiDocument = {
 
 /** The page's config as the api serves it: one slice per owner, by name. */
 export const publicAppConfig: PublicAppConfig = {
-  process: { mode: "test" },
+  process: { mode: "test", deployment: "self-hosted", nlp: true },
   notification: { email: true },
 };
 
@@ -23,9 +23,10 @@ export const transportModule = defineBrowserModule("screen").withScreens({
 
 export const sessionModule = defineBrowserModule("session-only").requires(["session"] as const);
 
-export const configModule = defineBrowserModule("configuration").withConfig({
-  process: z.strictObject({ mode: z.enum(["development", "test", "production"]) }),
-});
+export const configModule = defineBrowserModule("configuration").withConfig(
+  { notification: z.strictObject({ email: z.boolean() }) },
+  ({ notification }) => ({ hasEmailProvider: notification.email }),
+);
 
 export const facilityModule = defineBrowserModule("facilities").requires([
   "feedback",

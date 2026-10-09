@@ -76,7 +76,6 @@ describe("the api process installation", () => {
         "subscription.create",
         "subscription.manage",
         "subscription.addTeamMemberOrEvents",
-        "subscription.upgradeWithInvites",
         "subscription.previewProration",
         "subscription.getLastSubscription",
         "subscription.listInvoices",

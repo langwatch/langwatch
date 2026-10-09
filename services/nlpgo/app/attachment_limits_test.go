@@ -37,7 +37,7 @@ func TestDefaultMaxRequestBodyBytes(t *testing.T) {
 	perFile := 20 * mib
 	files := int64(10)
 
-	// ceil(n/3) * 4, written out apart from Base64Len so the two agree.
+	// ceil(n/3) * 4, written out apart from base64Len so the two agree.
 	encoded := perFile / 3
 	if perFile%3 != 0 {
 		encoded++
@@ -45,10 +45,10 @@ func TestDefaultMaxRequestBodyBytes(t *testing.T) {
 	encoded *= 4
 	derived := files*encoded + mib
 
-	assert.Equal(t, encoded, Base64Len(perFile))
+	assert.Equal(t, encoded, base64Len(perFile))
 	assert.Equal(t, DefaultMaxAttachmentBytes, perFile)
 	assert.Equal(t, AttachmentsPerDatasetRow, files)
-	assert.Equal(t, derived, AttachmentsPerDatasetRow*Base64Len(DefaultMaxAttachmentBytes)+mib)
+	assert.Equal(t, derived, AttachmentsPerDatasetRow*base64Len(DefaultMaxAttachmentBytes)+mib)
 	assert.Equal(t, DefaultMaxRequestBodyBytes, derived)
 	assert.Equal(t, int64(280668856), DefaultMaxRequestBodyBytes)
 }

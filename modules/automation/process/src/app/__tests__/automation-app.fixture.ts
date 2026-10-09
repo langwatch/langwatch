@@ -21,12 +21,12 @@ import {
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
+import type { AutomationRunawaySignals } from "../../features/runaway/services/runaway-containment.service.ts";
 import type { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
 import type { AutomationClock } from "../../repositories/automation.repositories.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { AutomationLogger } from "../../services/automation.service.ts";
-import type { AutomationRunawaySignals } from "../../services/runaway-containment.service.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { AutomationModule, type AutomationInfrastructure } from "../automation.app.ts";
 
@@ -114,7 +114,6 @@ export function createCanonicalAutomationApp(): {
     create: vi.fn(),
     updateSettings: vi.fn(),
     archive: vi.fn(),
-    requestTopicClustering: vi.fn(),
     listByOrganization: vi.fn(),
     listByTeam: vi.fn(),
     touchCodingAgentPullRequestSeen: vi.fn(),
@@ -152,7 +151,6 @@ export function createCanonicalAutomationApp(): {
     assertCheckRunnable: vi.fn(),
     copy: vi.fn(),
     replicate: vi.fn(),
-    performanceForProject: vi.fn(),
   });
   const infrastructure: AutomationInfrastructure = {
     verifier,
@@ -185,6 +183,7 @@ export function createCanonicalAutomationApp(): {
     record: vi.fn(async () => ({ id: "audit", occurredAt: 0 })),
     listEntityHistory: vi.fn(async () => []),
     hasRecordedSince: vi.fn(async () => false),
+    findByTargetKind: vi.fn(async () => []),
   };
   return {
     app: AutomationModule.fromInfrastructure({

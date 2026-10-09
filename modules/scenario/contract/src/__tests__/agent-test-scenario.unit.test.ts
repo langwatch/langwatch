@@ -15,7 +15,7 @@ import {
   isAgentTestScenarioId,
   isAgentTestSetId,
 } from "../agent-test-scenario.ts";
-import { isInternalSetId, isOnPlatformSet } from "../scenario-set-id.ts";
+import { isInternalSetId, isOnPlatformSet } from "../features/run/scenario-set-id.ts";
 
 /**
  * A run plan's own set id, written out rather than imported: the suite

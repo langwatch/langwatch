@@ -11,7 +11,7 @@ import type {
   PlatformTierPermission,
   ScopeTierField,
 } from "@langwatch/authorization";
-import type { ModuleApiToken } from "@langwatch/module";
+import type { ModuleApiToken, ModuleName } from "@langwatch/module";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type * as httpStatusModule from "hono/utils/http-status";
 import { z } from "zod";
@@ -64,6 +64,7 @@ import {
   type RestMultipart,
   type RestMultipartDeclared,
   type RestMultipartFiles,
+  type RestInputMediaType,
   type RestMediaTypeMismatch,
   type RestRateLimitPolicy,
   type RestRawAnswerDeclared,
@@ -179,6 +180,26 @@ export type RestDeprecation = Readonly<{
   readonly successor: string;
   readonly notice?: string;
 }>;
+
+/** A path in another module's namespace: retired by its `deprecate` plan, or `permanent` (§8). */
+export type RestSharedPath = Readonly<
+  {
+    /** The module whose namespace the path sits in. */
+    readonly owner: ModuleName;
+    readonly reason: string;
+  } & (
+    | {
+        /** The plan or release that retires the shared path. */
+        readonly deprecate: string;
+        readonly permanent?: never;
+      }
+    | {
+        /** Ruled to stay: a nested sub-resource the owner's namespace carries for good. */
+        readonly permanent: true;
+        readonly deprecate?: never;
+      }
+  )
+>;
 
 /**
  * The credentials a declaration may choose a door for. `public` is absent on
@@ -492,6 +513,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly operation: string;
   readonly version: DateVersion;
   readonly docs?: RestTransportDocs;
+  /** UIW-6: answers while the installation upgrades; every other route is held before the door. */
+  readonly servesWhileUpgrading?: true;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
   /** Present exactly when the body is a JSON array: `input` is then `{ [as]: schema }`. */
@@ -521,6 +544,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly answers?: RestRouteAnswers;
   /** Present exactly when the route reads its own body instead of parsing one. */
   readonly rawBody?: RestRawBody;
+  /** Present exactly when the JSON body named its media type. */
+  readonly inputMediaType?: RestInputMediaType;
   /** Present exactly when the route's request carries files beside its fields. */
   readonly multipart?: RestMultipart;
   /** Present exactly when the route counts how often one caller may ask. */
@@ -547,6 +572,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly middleware?: readonly RestTransportMiddleware[];
   readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   readonly deprecated?: RestDeprecation;
+  /** Present when the path sits in another module's namespace (R10). */
+  readonly sharedPath?: RestSharedPath;
   /** The door this ONE route answers behind; the family's own when absent. */
   readonly credential?: RestDoorCredential;
   /** The schema the door's session is parsed against; present exactly when one was declared. */
@@ -583,6 +610,7 @@ export type RestArrayBodyDeclared = Readonly<{ as: string; schema: z.ZodArray }>
 
 /** Everything a route has declared so far, before `handle` freezes it. */
 type RouteState = Readonly<{
+  servesWhileUpgrading?: true;
   params?: z.ZodObject;
   input?: SourceSchema;
   arrayBody?: RestArrayBodyDeclared;
@@ -590,6 +618,7 @@ type RouteState = Readonly<{
   output?: OutputSchema;
   answers?: RestRouteAnswers;
   rawBody?: RestRawBody;
+  inputMediaType?: RestInputMediaType;
   multipart?: RestMultipart;
   rateLimit?: RestRateLimitPolicy;
   cache?: RestCachePolicy;
@@ -617,6 +646,7 @@ type RouteState = Readonly<{
   middleware?: readonly RestTransportMiddleware[];
   bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
   deprecated?: RestDeprecation;
+  sharedPath?: RestSharedPath;
   credential?: RestDoorCredential;
   session?: z.ZodType;
   audit?: string;
@@ -759,14 +789,19 @@ class RouteBuilder<Api, S extends RouteShape> {
     Api,
     With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestArrayBody<Field, Item> }>
   >;
+  /**
+   * A JSON body. A named `mediaType` is enforced after the door, as withRawBody's is: another
+   * Content-Type is refused with `mismatch` before the parser reads the body.
+   */
   withInput<Schema extends SourceSchema>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     schema: Schema & DistinctSchema<Schema, S["params"]> & DistinctSchema<Schema, S["query"]>,
+    options?: Readonly<{ mediaType: string; mismatch?: RestMediaTypeMismatch }>,
   ): RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>>;
   withInput(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     declared: SourceSchema | z.ZodArray,
-    options?: Readonly<{ as: string }>,
+    options?: Readonly<{ as?: string; mediaType?: string; mismatch?: RestMediaTypeMismatch }>,
   ): unknown {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
@@ -789,19 +824,34 @@ class RouteBuilder<Api, S extends RouteShape> {
         ...this.state,
         input: schema,
         ...(arrayBody ? { arrayBody } : {}),
+        ...(options?.mediaType === undefined
+          ? {}
+          : {
+              inputMediaType: inputMediaTypeOf({
+                operation: this.operation,
+                mediaType: options.mediaType,
+                mismatch: options.mismatch,
+              }),
+            }),
       },
     });
   }
 
   /**
-   * The body is the evidence, so nothing parses it: the handler gets the exact characters or
-   * bytes sent, read once. A named `mediaType` is enforced after the door: another Content-Type
-   * is refused with `mismatch` (415, main's 400 where kept), or read anyway when `accepted`.
+   * The body is the evidence: the handler gets the exact characters or bytes sent, read once.
+   * A named `mediaType` is enforced after the door: another type is refused with `mismatch`
+   * (415, main's 400 where kept) or read when `accepted`; `refuses` names types refused with 415.
    */
   withRawBody<Form extends RestRawBodyForm>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     form: Form,
-    options: Readonly<{ mediaType?: string; mismatch?: RestMediaTypeMismatch }> = {},
+    options: Readonly<{
+      mediaType?: string;
+      mismatch?: RestMediaTypeMismatch;
+      refuses?: readonly string[];
+      /** Why the route needs the exact body; `langwatch/raw-body-bypass` asks for it. */
+      because?: string;
+    }> = {},
   ): RouteBuilder<
     Api,
     With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
@@ -1108,6 +1158,17 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
+  /** Serves while the installation upgrades (UIW-6); its permission is still asked as declared. */
+  servesWhileUpgrading(): RouteBuilder<Api, S> {
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, servesWhileUpgrading: true },
+    });
+  }
+
   withDocs(docs: RestTransportDocs): RouteBuilder<Api, S> {
     return new RouteBuilder<Api, S>({
       router: this.router,
@@ -1131,6 +1192,34 @@ class RouteBuilder<Api, S extends RouteShape> {
       state: {
         ...this.state,
         deprecated,
+      },
+    });
+  }
+
+  /**
+   * Serves this path in another module's namespace (§8, R10): names the owner, why, and
+   * the plan that retires it, or that it is permanent. Only a literal family may.
+   */
+  withSharedPath(sharedPath: RestSharedPath): RouteBuilder<Api, S> {
+    for (const [field, value] of Object.entries({
+      reason: sharedPath.reason,
+      ...(sharedPath.permanent ? {} : { deprecate: sharedPath.deprecate }),
+    })) {
+      if (value.trim() === "") {
+        throw new Error(
+          `REST path "${this.path}" shares ${sharedPath.owner}'s namespace with a blank ${field}`,
+        );
+      }
+    }
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        sharedPath,
       },
     });
   }
@@ -1336,6 +1425,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       ...(this.state.params ? { params: this.state.params } : {}),
       ...(this.state.input ? { input: this.state.input } : {}),
       ...(this.state.arrayBody ? { arrayBody: this.state.arrayBody } : {}),
+      ...(this.state.inputMediaType ? { inputMediaType: this.state.inputMediaType } : {}),
       ...(this.state.query ? { query: this.state.query } : {}),
       ...accessParts(this.state),
       output: this.state.output ?? successAnswerOf(this.state.answers) ?? z.void(),
@@ -1346,6 +1436,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       ...(this.state.middleware ? { middleware: this.state.middleware } : {}),
       ...(this.state.bodyLimit ? { bodyLimit: this.state.bodyLimit } : {}),
       ...(this.state.deprecated ? { deprecated: this.state.deprecated } : {}),
+      ...(this.state.sharedPath ? { sharedPath: this.state.sharedPath } : {}),
       ...(session ? { session } : {}),
       handler: handler as ErasedHandler,
     });
@@ -1539,12 +1630,20 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.multipart ? { multipart: state.multipart } : {}),
     ...(state.rateLimit ? { rateLimit: state.rateLimit } : {}),
     ...(state.cache ? { cache: state.cache } : {}),
-    ...(state.entitlement ? { entitlement: state.entitlement } : {}),
-    ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
     ...(state.response ? { response: state.response } : {}),
     ...(state.refusal ? { refusal: state.refusal } : {}),
+    ...doorParts(state),
+  };
+}
+
+/** What the door reads of a route beyond its permission: gates, credential, audit, upgrading. */
+function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
+  return {
+    ...(state.entitlement ? { entitlement: state.entitlement } : {}),
+    ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
+    ...(state.servesWhileUpgrading ? { servesWhileUpgrading: true as const } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
@@ -1914,9 +2013,14 @@ function rawBodyOf({
 }: {
   operation: string;
   form: RestRawBodyForm;
-  options: Readonly<{ mediaType?: string; mismatch?: RestMediaTypeMismatch }>;
+  options: Readonly<{
+    mediaType?: string;
+    mismatch?: RestMediaTypeMismatch;
+    refuses?: readonly string[];
+  }>;
 }): RestRawBody {
-  const { mediaType, mismatch } = options;
+  const { mediaType, mismatch, refuses } = options;
+  const refused = refuses === undefined ? {} : { refuses: refusedOf({ operation, options }) };
 
   if (mediaType === undefined) {
     if (mismatch !== undefined) {
@@ -1925,18 +2029,70 @@ function rawBodyOf({
       );
     }
 
-    return { form, mediaType: DEFAULT_RAW_MEDIA_TYPE[form] };
+    return { form, mediaType: DEFAULT_RAW_MEDIA_TYPE[form], ...refused };
   }
 
+  return { form, ...namedMediaType({ operation, mediaType, mismatch }), ...refused };
+}
+
+/** The media types a raw body refuses by name: single essences, beside a type it reads anyway. */
+function refusedOf({
+  operation,
+  options,
+}: {
+  operation: string;
+  options: Readonly<{
+    mediaType?: string;
+    mismatch?: RestMediaTypeMismatch;
+    refuses?: readonly string[];
+  }>;
+}): readonly string[] {
+  if (options.mediaType !== undefined && options.mismatch !== "accepted") {
+    throw new Error(`REST ${operation} refuses media types by name beside the one it enforces`);
+  }
+
+  return (options.refuses ?? []).map((refused) => {
+    const essence = refused.toLowerCase();
+
+    if (!MEDIA_TYPE_ESSENCE.test(essence)) {
+      throw new Error(`REST ${operation} refuses "${refused}", which names no single media type`);
+    }
+
+    return essence;
+  });
+}
+
+type NamedMediaType = Readonly<{
+  operation: string;
+  mediaType: string;
+  mismatch?: RestMediaTypeMismatch | undefined;
+}>;
+
+/** A named media type as one lower-cased essence, refused with 415 unless told otherwise. */
+function namedMediaType({ operation, mediaType, mismatch }: NamedMediaType): RestInputMediaType {
   const essence = mediaType.toLowerCase();
 
   if (!MEDIA_TYPE_ESSENCE.test(essence)) {
     throw new Error(
-      `REST ${operation} reads its raw body as "${mediaType}", which names no single media type`,
+      `REST ${operation} reads its body as "${mediaType}", which names no single media type`,
     );
   }
 
-  return { form, mediaType: essence, mismatch: mismatch ?? "unsupported_media_type" };
+  return { mediaType: essence, mismatch: mismatch ?? "unsupported_media_type" };
+}
+
+/** The only media types the JSON parser reads (Hono's validator); any other is handed `{}`. */
+const JSON_MEDIA_TYPE = /^application\/([a-z.-]+\+)?json$/;
+
+/** A JSON body's named media type: one the parser reads, so no unread body is admitted. */
+function inputMediaTypeOf({ operation, mediaType, mismatch }: NamedMediaType): RestInputMediaType {
+  const named = namedMediaType({ operation, mediaType, mismatch });
+
+  if (!JSON_MEDIA_TYPE.test(named.mediaType)) {
+    throw new Error(`REST ${operation} parses its body as JSON, and "${mediaType}" is not JSON`);
+  }
+
+  return named;
 }
 
 function assertBodyMethod(method: HttpMethod, path: string): void {
@@ -2446,7 +2602,7 @@ function bodySourceOf({
 }: {
   operation: string;
   declared: SourceSchema | z.ZodArray;
-  options: Readonly<{ as: string }> | undefined;
+  options: Readonly<{ as?: string }> | undefined;
 }): Readonly<{ schema: SourceSchema; arrayBody?: RestArrayBodyDeclared }> {
   if (!(declared instanceof z.ZodArray)) return { schema: declared };
 

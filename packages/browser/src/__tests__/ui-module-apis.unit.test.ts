@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { installedModuleApis } from "../ui-module-apis.ts";
+import { installedModuleApis } from "../module/ui-module-apis.ts";
 import { defineBrowserModule } from "../web-module.ts";
 
 const Provider = () => null;

@@ -3,11 +3,13 @@
  * page, whose Access tab /settings/role-bindings now redirects to.
  */
 
+import { authzWebConfigSchema } from "@langwatch/authz-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 import { authzApi } from "./behavior/authz-api.ts";
 
 export const authzWeb = defineBrowserModule("authz")
+  .withConfig({ authz: authzWebConfigSchema }, ({ authz }) => authz)
   .withApi(authzApi)
   .withHosts({
     requires: ["AuthzHostApi"],

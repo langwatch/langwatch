@@ -1,8 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import {
   type OrganizationApi,
@@ -10,7 +8,6 @@ import {
   type PersonalWorkspace,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { type StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -21,6 +18,7 @@ import type { UserBudgetRequestMailChannel } from "../../channels/user-budget-re
 import type { RecordUserLifecycleCommandData } from "../../eventing/user-lifecycle.events.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../../repositories/user.repositories.ts";
+import { userFactsAppend } from "../../rules/user-lifecycle-outbox.rules.ts";
 import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
 import { UserModule, type UserFacts } from "../user.app.ts";
 
@@ -34,23 +32,16 @@ export const REFUSED_ADDRESS_PROOF = "refused-address-proof";
 export const UNCONFIRMED_ADDRESS_PROOF = "unconfirmed-address-proof";
 
 /**
- * The auth peer a suite runs against; `provider` is what ADR-027 resolved,
- * `issuesOwnPasswords` the D09 switch, and `governedDomain` a domain an
- * organization routes through its own connection.
+ * The auth peer a suite runs against; `provider` is what ADR-027 resolved and
+ * `governedDomain` a domain an organization routes through its own connection.
  */
 export function createUserTestAuth(
   provider = "email",
-  {
-    issuesOwnPasswords = false,
-    governedDomain,
-  }: { issuesOwnPasswords?: boolean; governedDomain?: string } = {},
+  { governedDomain }: { governedDomain?: string } = {},
 ) {
   return Object.assign(createApiFixture<AuthApi>(), {
-    revokeOtherBrowserSessions: vi.fn(async () => undefined),
-    revokeAllBrowserSessions: vi.fn(async () => undefined),
     revokeCliTokens: vi.fn(async () => ({ revokedCount: 0 })),
     resolveAuthProvider: vi.fn(async () => provider),
-    issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
     assertSignUpOrigin: vi.fn(async () => undefined),
     claimSignUpAddressProof: vi.fn(
       async ({ token }: { token: string; email: string }) =>
@@ -96,7 +87,7 @@ export function createUserTestAuthorization(operators: ReadonlySet<string> = new
 /** user_lifecycle's senders, recording each fact rather than appending it. */
 export function createUserTestLifecycle() {
   const recorded: {
-    type: "deactivated" | "reactivated" | "registered";
+    type: "deactivated" | "reactivated" | "registered" | "created" | "erased";
     data: RecordUserLifecycleCommandData;
   }[] = [];
   const senders: UserLifecycleSenders = {
@@ -115,20 +106,26 @@ export function createUserTestLifecycle() {
         recorded.push({ type: "registered", data });
       },
     },
+    recordUserCreated: {
+      send: async (data) => {
+        recorded.push({ type: "created", data });
+      },
+    },
+    recordUserErased: {
+      send: async (data) => {
+        recorded.push({ type: "erased", data });
+      },
+    },
   };
 
   return { senders, recorded };
 }
 
-export function createUserTestProjects() {
-  return createApiFixture<ProjectApi>({ findIdentity: async () => null });
-}
-
 export function createUserTestOrganizations(projectId = "project-1") {
   return Object.assign(createApiFixture<OrganizationApi>(), {
     ensurePersonalWorkspace: vi.fn(async () => ({
-      project: { id: projectId },
-      team: { id: "team-1" },
+      kind: "ready" as const,
+      workspace: { project: { id: projectId }, team: { id: "team-1" } },
     })),
     getPersonalWorkspace: vi.fn(async (): Promise<PersonalWorkspace> => {
       throw new TeamNotFoundError();
@@ -174,25 +171,6 @@ export function createUserTestStoredObjects() {
   });
 }
 
-/** The gateway peers behind /me: no default policy, no personal key, every budget allowed. */
-export function createUserTestGateways() {
-  return {
-    enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({
-      findDefaultRoutingPolicies: vi.fn(async () => []),
-      personalVirtualKeyList: vi.fn(async () => []),
-    }),
-    gateway: createApiFixture<GatewayApi>({
-      checkBudget: vi.fn(async () => ({
-        decision: "allow" as const,
-        warnings: [],
-        blockReason: null,
-        scopes: [],
-        blockedBy: [],
-      })),
-    }),
-  };
-}
-
 /** A reversible stand-in for bcrypt, so a hash is recognisable in assertions. */
 export class TestPasswordHasher {
   async hash({ password }: { password: string }): Promise<string> {
@@ -204,8 +182,12 @@ export class TestPasswordHasher {
   }
 }
 
-/** The deployment a suite runs against: no passkeys, no public base URL. */
-export const TEST_USER_CONFIG: UserFacts = { passkeysEnabled: false, baseUrl: null };
+/** The deployment a suite runs against: no passkeys, no two-step offer, no own passwords. */
+export const TEST_USER_CONFIG: UserFacts = {
+  passkeysEnabled: false,
+  mfaEnrollmentOpen: false,
+  localPasswords: false,
+};
 
 /** The whole application over memory repositories, recorded mail and a test's own peers. */
 export function createUserTestApp(
@@ -214,38 +196,43 @@ export function createUserTestApp(
     dependencies?: Partial<{
       auth: AuthApi;
       authz: AuthzApi;
-      enterpriseGateway: EnterpriseGatewayApi;
-      gateway: GatewayApi;
-      governance: GovernanceRestApi;
-      organizations: OrganizationApi;
-      projects: ProjectApi;
       storedObjects: StoredObjectApi;
     }>;
-    facts?: UserFacts;
+    facts?: Partial<UserFacts>;
     lifecycle?: UserLifecycleSenders;
     budgetRequests?: UserBudgetRequestMailChannel;
     now?: () => Instant;
   }> = {},
 ): UserModule {
-  const gateways = createUserTestGateways();
+  const auth = input.dependencies?.auth ?? createUserTestAuth();
   const app = UserModule.createForTesting({
-    repositories: input.repositories ?? MemoryUserRepositories.create(),
-    facts: input.facts ?? TEST_USER_CONFIG,
+    repositories:
+      input.repositories ??
+      MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
+    channels: { authReads: auth },
+    facts: { ...TEST_USER_CONFIG, ...input.facts },
     budgetRequests: input.budgetRequests ?? MemoryUserBudgetRequestMailChannel.create(),
     passwords: new TestPasswordHasher(),
     ...(input.now ? { now: input.now } : {}),
     dependencies: {
-      auth: input.dependencies?.auth ?? createUserTestAuth(),
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
-      enterpriseGateway: input.dependencies?.enterpriseGateway ?? gateways.enterpriseGateway,
-      gateway: input.dependencies?.gateway ?? gateways.gateway,
-      governance: input.dependencies?.governance ?? createApiFixture<GovernanceRestApi>(),
-      organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
-      projects: input.dependencies?.projects ?? createUserTestProjects(),
       storedObjects: input.dependencies?.storedObjects ?? createUserTestStoredObjects(),
     },
   });
   app.connectLifecycle(input.lifecycle ?? createUserTestLifecycle().senders);
 
   return app;
+}
+
+/** User's facts the shared process store's outbox holds for these users, in append order. */
+export async function userFactsIn({
+  processStore,
+  userIds,
+}: Readonly<{ processStore: InMemoryProcessStore; userIds: readonly string[] }>) {
+  const messages = await Promise.all(
+    userIds.map((userId) =>
+      processStore.findMessagesByRef({ ref: userFactsAppend({ userId, intents: [], now: 0 }).ref }),
+    ),
+  );
+  return messages.flat().map(({ intentType, payload }) => ({ type: intentType, data: payload }));
 }

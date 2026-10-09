@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildIngestKeyReceiverPolicies,
   originForIngestSourceType,
-} from "../otlp-receiver-policy.ts";
+} from "../features/ingestion/otlp-receiver-policy.ts";
 
 const identity = { organizationId: "org_1", sourceType: "claude_code" };
 

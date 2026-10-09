@@ -296,12 +296,16 @@ import {
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
 
 class FakeLangyHost extends LangyHostApi {
   project() {
@@ -319,6 +323,9 @@ class FakeLangyHost extends LangyHostApi {
   currentUser() {
     return { id: "user-1", email: "staff@langwatch.ai" };
   }
+  hasOrganizationPermission() {
+    return false;
+  }
   hasPermission() {
     return true;
   }
@@ -326,9 +333,6 @@ class FakeLangyHost extends LangyHostApi {
     return false;
   }
   isDemoProject() {
-    return false;
-  }
-  featureFlag() {
     return false;
   }
   route(): LangyRouteReading {

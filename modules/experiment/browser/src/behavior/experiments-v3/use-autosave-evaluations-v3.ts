@@ -1,3 +1,4 @@
+import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { isNotFoundError as isTrpcNotFound } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -128,10 +129,12 @@ const reportUnexpectedSaveFailure = (error: unknown): void => {
  * other stale refusal stands autosave down; anything else is a failure.
  */
 const handleAutosaveFailure = ({
+  analytics,
   error,
   snapshot,
   projectId,
 }: {
+  analytics: UiAnalytics;
   error: unknown;
   snapshot: string;
   projectId: string | undefined;
@@ -154,16 +157,20 @@ const handleAutosaveFailure = ({
   reportUnexpectedSaveFailure(error);
   toaster.create({ title: "Failed to autosave evaluation", type: "error" });
   // Identifiers, sizes and counts only: the state carries customer content.
-  captureException(toError(error), {
-    extra: {
-      context: "Failed to autosave evaluations v3",
-      projectId,
-      experimentId: state.experimentId,
-      workbenchVersion: state.workbenchVersion,
-      stateByteSize: snapshot.length,
-      datasetCount: state.datasets.length,
-      targetCount: state.targets.length,
-      evaluatorCount: state.evaluators.length,
+  captureException({
+    analytics,
+    error: toError(error),
+    options: {
+      extra: {
+        context: "Failed to autosave evaluations v3",
+        projectId,
+        experimentId: state.experimentId,
+        workbenchVersion: state.workbenchVersion,
+        stateByteSize: snapshot.length,
+        datasetCount: state.datasets.length,
+        targetCount: state.targets.length,
+        evaluatorCount: state.evaluators.length,
+      },
     },
   });
   return "failed";
@@ -216,12 +223,14 @@ type SaveWorkbench = (input: {
  * server already has it. A run-caused stale refusal is adopted and retried once.
  */
 const attemptSave = async ({
+  analytics,
   projectId,
   save,
   lastSavedRef,
   markSaved,
   isRetry,
 }: {
+  analytics: UiAnalytics;
   projectId: string | undefined;
   save: SaveWorkbench;
   lastSavedRef: { current: string | null };
@@ -248,12 +257,12 @@ const attemptSave = async ({
     markSaved();
     return "saved";
   } catch (error) {
-    const outcome = handleAutosaveFailure({ error, snapshot, projectId });
+    const outcome = handleAutosaveFailure({ analytics, error, snapshot, projectId });
     if (outcome !== "adopted") return outcome;
     // Retried once only: looping would spin against whoever is actually ahead.
     return isRetry
       ? standDownAfterRetry(error)
-      : attemptSave({ projectId, save, lastSavedRef, markSaved, isRetry: true });
+      : attemptSave({ analytics, projectId, save, lastSavedRef, markSaved, isRetry: true });
   }
 };
 
@@ -401,6 +410,7 @@ const useWorkbenchLoad = ({
  */
 export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
+  const analytics = useUiAnalytics();
   const queryClient = useQueryClient();
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -511,7 +521,14 @@ export const useAutosaveEvaluationsV3 = () => {
       });
     const link = inFlightRef.current
       .then(() =>
-        attemptSave({ projectId: project?.id, save, lastSavedRef, markSaved, isRetry: false }),
+        attemptSave({
+          analytics,
+          projectId: project?.id,
+          save,
+          lastSavedRef,
+          markSaved,
+          isRetry: false,
+        }),
       )
       .catch((error) => {
         // Only a throw outside the save's own guard lands here; nothing was
@@ -522,7 +539,7 @@ export const useAutosaveEvaluationsV3 = () => {
     inFlightRef.current = link;
     return link;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id]);
+  }, [analytics, project?.id]);
 
   // Autosave effect with debounce
   useEffect(() => {

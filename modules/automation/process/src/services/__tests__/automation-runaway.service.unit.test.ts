@@ -3,9 +3,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { AutomationRunawayMetricsNullService } from "../../__tests__/support/automation-runaway-metrics-null.service.ts";
+import { AutomationRunawayService } from "../../features/runaway/services/automation-runaway.service.ts";
 import { MemoryAutomationContainmentClaimRepository } from "../../repositories/memory/memory.automation-containment-claim.repository.ts";
-import { AutomationRunawayMetricsNullService } from "../automation-runaway-metrics-null.service.ts";
-import { AutomationRunawayService } from "../automation-runaway.service.ts";
 
 class NoopMailer implements MailSender {
   send(): Promise<unknown> {

@@ -8,11 +8,11 @@ import { LuClock, LuCopyPlus, LuEllipsisVertical, LuPencil, LuTrash2 } from "rea
 
 import { useCanModifyPrompt } from "../../../../behavior/use-can-modify-prompt.ts";
 import { usePromptCopyActions } from "../../../../behavior/use-prompt-copy-actions.ts";
-import { usePromptDefaultModel } from "../../../../behavior/use-prompt-default-model.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { usePrompts } from "../../../../behavior/use-prompts.ts";
 import { useRenamePromptHandle } from "../../../../behavior/use-rename-prompt-handle.ts";
+import { usePromptDefaultModel } from "../../../../features/model-selection/behavior/use-prompt-default-model.ts";
+import { useDraggableTabsBrowserStore } from "../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { type PromptHostApi, usePromptHost } from "../../../../model/prompt-host.ts";
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";

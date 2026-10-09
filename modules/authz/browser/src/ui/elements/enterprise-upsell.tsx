@@ -5,7 +5,7 @@
 
 import { Lent } from "@langwatch/browser-host/lent";
 import { Box } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 
 /** The sales block, framed the way both pages framed it. */
 export function EnterpriseUpsell() {

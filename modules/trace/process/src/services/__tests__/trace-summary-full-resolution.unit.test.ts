@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -29,8 +29,8 @@ import {
   NullSpanStorageRepository,
   type SpanStorageRepository,
 } from "../../repositories/span-storage.repository.ts";
-import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
-import { TraceSummaryService } from "../trace-summary-read.service.ts";
+import { TraceIOExtractionService } from "../../features/derivation/services/trace-io-extraction.service.ts";
+import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
 import { blobStoreResolving } from "./support/trace-blob-store.support.ts";
 
 // ---------------------------------------------------------------------------

@@ -6,8 +6,6 @@ import {
   type GithubInstallation,
   type GithubInstallStatePayload,
   type GithubPullRequest,
-  type GithubPullRequestEvent,
-  type GithubPullRequestLiveStatus,
   type GithubRepositoryRef,
   type GithubTurnToken,
 } from "@langwatch/github-contract";
@@ -79,12 +77,6 @@ export class TestGithubService implements GithubApi {
     return "";
   }
 
-  parsePullRequestEvent(): GithubPullRequestEvent | null {
-    return null;
-  }
-
-  async applyWebhookPayload(): Promise<void> {}
-
   async getAllForOrganization(): Promise<readonly GithubInstallation[]> {
     return [];
   }
@@ -109,8 +101,6 @@ export class TestGithubService implements GithubApi {
     return { accountLogin: "test" };
   }
 
-  async handleWebhookEvent(): Promise<void> {}
-
   async listRepositoriesForOrganization(): Promise<readonly GithubRepositoryRef[]> {
     return [];
   }
@@ -126,14 +116,6 @@ export class TestGithubService implements GithubApi {
   async requestBranchMapping(input: MappingRequest): Promise<void> {
     this.mappingRequests.push(input);
     if (this.mappingError !== null) throw this.mappingError;
-  }
-
-  async getLivePullRequestStatuses(): Promise<readonly GithubPullRequestLiveStatus[]> {
-    return [];
-  }
-
-  async applyPullRequestEvent(): Promise<boolean> {
-    return false;
   }
 
   async findForBranches(): Promise<readonly GithubPullRequest[]> {

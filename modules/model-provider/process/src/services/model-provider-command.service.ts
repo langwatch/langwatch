@@ -25,16 +25,22 @@ import {
 } from "@langwatch/model-provider-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
+import type { ModelProviderConnectionPingService } from "../features/credential-probe/services/model-provider-connection-ping.service.ts";
+import type { ModelProviderConnectionRateLimiter } from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
+import type { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
-import type { ModelProviderConnectionPingService } from "./model-provider-connection-ping.service.ts";
+import {
+  deriveSkipPermissionsForWrite,
+  humanize,
+  modelsForWrite,
+  rateLimitsForWrite,
+} from "../rules/model-provider-write.rules.ts";
 import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
-import type { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 import type { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
 import type { ModelProviderIdService } from "./prefixed-model-provider-id.service.ts";
 import type { ModelProviderCatalog } from "./registry-model-provider-catalog.service.ts";
-import type { ModelProviderConnectionRateLimiter } from "./windowed-model-provider-connection-rate-limiter.service.ts";
 
 type ModelProviderCommandOptions = {
   repository: ModelProviderRepository;
@@ -47,18 +53,6 @@ type ModelProviderCommandOptions = {
   onboardingDefaults: ModelProviderOnboardingDefaultsService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
-};
-
-type ProviderModelsForWrite = {
-  customModels: ModelProvider["customModels"];
-  customEmbeddingsModels: ModelProvider["customEmbeddingsModels"];
-};
-
-type ProviderRateLimitsForWrite = {
-  rateLimitRpm: number | null;
-  rateLimitTpm: number | null;
-  rateLimitRpd: number | null;
-  fallbackPriorityGlobal: number | null;
 };
 
 export class ModelProviderCommandService {
@@ -362,8 +356,8 @@ export class ModelProviderCommandService {
     const { parsed, existing, scopes, organizationId, routingHandle } = input;
     const customKeys = await this.credentialsForWrite(parsed, existing);
     const extraHeaders = this.headersForWrite(parsed, existing);
-    const models = this.modelsForWrite(parsed, existing);
-    const rateLimits = this.rateLimitsForWrite(parsed, existing);
+    const models = modelsForWrite(parsed, existing);
+    const rateLimits = rateLimitsForWrite(parsed, existing);
     const now = toDate(nowInstant());
 
     return modelProviderSchema.parse({
@@ -388,40 +382,6 @@ export class ModelProviderCommandService {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
-  }
-
-  private modelsForWrite(
-    parsed: ModelProviderWriteInput,
-    existing: ModelProvider | null,
-  ): ProviderModelsForWrite {
-    return {
-      customModels:
-        parsed.customModels === undefined
-          ? (existing?.customModels ?? [])
-          : (parsed.customModels ?? []),
-      customEmbeddingsModels:
-        parsed.customEmbeddingsModels === undefined
-          ? (existing?.customEmbeddingsModels ?? [])
-          : (parsed.customEmbeddingsModels ?? []),
-    };
-  }
-
-  private rateLimitsForWrite(
-    parsed: ModelProviderWriteInput,
-    existing: ModelProvider | null,
-  ): ProviderRateLimitsForWrite {
-    return {
-      rateLimitRpm:
-        parsed.rateLimitRpm === undefined ? (existing?.rateLimitRpm ?? null) : parsed.rateLimitRpm,
-      rateLimitTpm:
-        parsed.rateLimitTpm === undefined ? (existing?.rateLimitTpm ?? null) : parsed.rateLimitTpm,
-      rateLimitRpd:
-        parsed.rateLimitRpd === undefined ? (existing?.rateLimitRpd ?? null) : parsed.rateLimitRpd,
-      fallbackPriorityGlobal:
-        parsed.fallbackPriorityGlobal === undefined
-          ? (existing?.fallbackPriorityGlobal ?? null)
-          : parsed.fallbackPriorityGlobal,
-    };
   }
 
   private async credentialsForWrite(
@@ -523,26 +483,4 @@ export class ModelProviderCommandService {
       });
     }
   }
-}
-
-function humanize(provider: string): string {
-  return provider.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-/**
- * The skip-permissions list this write stores. Omitting the field leaves
- * the stored list alone; an empty list clears it, so the registry default
- * applies — stored as null, not an empty array reading as "trust nothing".
- */
-function deriveSkipPermissionsForWrite(
-  parsed: ModelProviderWriteInput,
-  existing: ModelProvider | null,
-): string[] | null {
-  if (parsed.langySkipPermissionsModels === undefined) {
-    return existing?.langySkipPermissionsModels ?? null;
-  }
-
-  return (parsed.langySkipPermissionsModels?.length ?? 0) > 0
-    ? (parsed.langySkipPermissionsModels ?? null)
-    : null;
 }

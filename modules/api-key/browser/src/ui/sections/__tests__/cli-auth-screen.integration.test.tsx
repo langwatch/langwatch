@@ -6,6 +6,7 @@
  */
 
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
+import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -428,10 +429,11 @@ describe("given the CLI asked for a project API key", () => {
     });
 
     /** @scenario the no-shared-projects state offers a create-project action */
-    it("offers Create project by address, naming the picked organization", async () => {
+    /** @scenario The CLI authorisation screen opens organization's create-project drawer by token */
+    it("opens organization's create-project drawer by token, naming the picked organization", async () => {
       await user.click(await screen.findByRole("button", { name: /Create project/ }));
       expect(host.drawerOpens).toEqual([
-        { drawer: "createProject", params: { organizationId: "org-1" } },
+        { drawer: CreateProjectDrawerToken, props: { organizationId: "org-1" } },
       ]);
     });
   });

@@ -5,14 +5,14 @@ import type React from "react";
 import { useEffectiveLens, useExplorerStore } from "../../../../behavior/explorer.store.ts";
 import { type PageCursor } from "../../../../behavior/query.slice.ts";
 import { rowKindForGrouping } from "../../../../behavior/view.slice.ts";
-import { HandledErrorState, readHandledError } from "../../errors/index.ts";
-import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
+import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
 import {
   SESSIONS_MAX_PAGE_SIZE,
   type SessionGroupsResult,
   useSessionGroups,
-} from "../hooks/use-session-groups.ts";
-import { useTraceList } from "../hooks/use-trace-list.ts";
+} from "../../../../features/explorer/behavior/use-session-groups.ts";
+import { useTraceList } from "../../../../features/explorer/behavior/use-trace-list.ts";
+import { HandledErrorState, readHandledError } from "../../errors/index.ts";
 import { ConversationLensBody } from "./conversation-lens-body.tsx";
 import { EmptyFilterState } from "./empty-filter-state.tsx";
 import { GroupLensBody } from "./group-lens-body.tsx";

@@ -18,7 +18,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
-import { InviteMemberDrawerToken, PersonDrawerToken } from "@langwatch/organization-contract";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { InviteMemberDrawerToken, PersonDrawerToken } from "@langwatch/organization-client";
 import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 
@@ -32,6 +33,7 @@ import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useInviteActions } from "../../../behavior/use-invite-actions.ts";
 import { useJoinRequests } from "../../../behavior/use-join-requests.ts";
 import { useMemberDisableAction } from "../../../behavior/use-member-disable-action.ts";
+import { useMemberProvenance } from "../../../behavior/use-member-provenance.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePublicEnv } from "../../../behavior/use-public-env.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";
@@ -125,11 +127,10 @@ function usePeopleListState({
   activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
-  const { hasPermission } = useOrganizationTeamProject();
-  const canManage = hasPermission("organization:manage");
-
   const host = useOrganizationHost();
-  const governanceEnabled = host.isFeatureEnabled("release_ui_ai_governance_enabled");
+  const canManage = host.hasPermission("organization:manage");
+
+  const governanceEnabled = host.isFeatureEnabled(FrontendFlags.release_ui_ai_governance_enabled);
   const department = useDepartmentColumn(organization.id, governanceEnabled);
   const showDepartment = department.show && canManage;
   const departmentNameById = useMemo(
@@ -853,10 +854,10 @@ function usePeopleListReads({
   pendingInvites: { data: Invite[] | undefined };
 }) {
   // Asked apart from the list: a failed read leaves everybody listed, without chips.
-  const provenance = api.organization.getMemberProvenance.useQuery(
-    { organizationId: organization.id },
-    { enabled: !!organization.id && canManage },
-  );
+  const provenance = useMemberProvenance({
+    organizationId: organization.id,
+    enabled: !!organization.id && canManage,
+  });
 
   const sortedMembers = useMemo(
     () =>

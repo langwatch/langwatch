@@ -63,4 +63,18 @@ export class MemoryIdentitySecretCarryRepository implements IdentitySecretCarryR
       credentialUpdatedAtMs: args.updatedAtMs,
     });
   }
+
+  /** The twin keeps an account and its credential as one pair; callers pass gone accounts. */
+  async deleteCredentials(args: {
+    userId: string;
+    accountIds: readonly string[];
+  }): Promise<number> {
+    let deleted = 0;
+    for (const accountId of args.accountIds) {
+      if (this.pairs.get(accountId)?.userId !== args.userId) continue;
+      this.pairs.delete(accountId);
+      deleted += 1;
+    }
+    return deleted;
+  }
 }

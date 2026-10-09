@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { VOICE_NONCE_DEFAULT_TTL_MS } from "../../../services/voice-nonce-registry.service.ts";
+import { VOICE_NONCE_DEFAULT_TTL_MS } from "../../../features/voice/services/voice-nonce-registry.service.ts";
 import { RedisVoiceNonceRepository } from "../redis.voice-nonce.repository.ts";
 
 const written: string[] = [];

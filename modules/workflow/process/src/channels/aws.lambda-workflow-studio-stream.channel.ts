@@ -3,6 +3,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+import { nowInstant } from "@langwatch/time";
 import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
 
 import {
@@ -12,6 +13,7 @@ import {
   readLwaPreludeStatus,
 } from "../rules/lambda-web-adapter-stream.rules.ts";
 import { STUDIO_STAGING_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
+import { s3CacheKeyHeaders } from "../rules/s3-cache-key.rules.ts";
 import { sealStagedPayload } from "../rules/staged-payload-seal.rules.ts";
 import {
   type NlpLambdaFunctionReader,
@@ -30,7 +32,7 @@ const logger = createLogger("langwatch:workflow:studio-lambda-stream");
 /** The Go engine's streaming studio route; it is what reads the staged header. */
 const STUDIO_EXECUTE_PATH = "/go/studio/execute";
 
-export type LambdaWorkflowStudioStreamOptions = Readonly<{
+type LambdaWorkflowStudioStreamOptions = Readonly<{
   functions: NlpLambdaFunctionReader;
   invoke: NlpLambdaStreamInvoke;
   /**
@@ -43,6 +45,8 @@ export type LambdaWorkflowStudioStreamOptions = Readonly<{
   stagingTtlSeconds: number;
   /** The engine hop's shared credential, as the process resolved it. */
   internalSecret?: string | undefined;
+  /** Main's `S3_KEY_SALT`; unset sends no per-project cache key. */
+  cacheKeySalt?: string | undefined;
 }>;
 
 export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
@@ -58,6 +62,11 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
       "Content-Type": "application/json",
       "X-LangWatch-Origin": input.origin,
       ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
+      ...s3CacheKeyHeaders({
+        projectId: input.projectId,
+        salt: this.options.cacheKeySalt,
+        now: nowInstant(),
+      }),
     };
     const body = JSON.stringify(input.body);
     const parked = await this.stageIfOversized({

@@ -14,7 +14,6 @@ import {
   scenarioSchema,
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
@@ -30,8 +29,8 @@ import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
-} from "../../services/scenario-execution-prefetcher.service.ts";
-import type { VoiceTargetReader } from "../../services/scenario-target-prefetch.service.ts";
+} from "../../features/prefetch/services/scenario-execution-prefetcher.service.ts";
+import type { VoiceTargetReader } from "../../features/prefetch/services/scenario-target-prefetch.service.ts";
 import type { ScenarioService } from "../../services/scenario.service.ts";
 
 export interface ScenarioFetcher {
@@ -47,24 +46,6 @@ export interface ScenarioFetcher {
     maxTurns?: number | null;
     minTurns?: number | null;
     callerVoice?: unknown;
-  } | null>;
-}
-
-export interface SuiteConfigFetcher {
-  getBySetId(
-    setId: string,
-    projectId: string,
-  ): Promise<{
-    simulatorModel: string | null;
-    judgeModel: string | null;
-    targets?: {
-      type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
-      referenceId: string;
-      scenarioMappings?: Record<
-        string,
-        { type: "source"; sourceId: string; path: string[] } | { type: "value"; value: string }
-      >;
-    }[];
   } | null>;
 }
 
@@ -121,7 +102,6 @@ export interface TraceWaitBudgetResolver {
 
 export interface ScenarioPrefetchFixture {
   scenarioFetcher: ScenarioFetcher;
-  suiteConfigFetcher: SuiteConfigFetcher;
   promptFetcher: PromptFetcher;
   agentFetcher: AgentFetcher;
   workflowVersionFetcher: WorkflowVersionFetcher;
@@ -192,38 +172,6 @@ function scenarioService(deps: ScenarioPrefetchFixture): ScenarioService {
         updatedAt: now,
         ...value,
       });
-    },
-  });
-}
-
-function suiteService(deps: ScenarioPrefetchFixture): SuiteApi {
-  return createApiFixture<SuiteApi>({
-    listByIds: async (input) => {
-      const [id] = input.ids;
-      if (!id) return [];
-      const value = await deps.suiteConfigFetcher.getBySetId(id, input.projectId);
-      if (!value) return [];
-      const now = new Date(0);
-      return [
-        suiteSchema.parse({
-          id,
-          projectId: input.projectId,
-          name: "Test suite",
-          slug: "test-suite",
-          description: null,
-          scenarioIds: [],
-          targets: value.targets ?? [],
-          repeatCount: 1,
-          labels: [],
-          simulatorModel: value.simulatorModel,
-          judgeModel: value.judgeModel,
-          kind: "run_plan",
-          scope: null,
-          archivedAt: null,
-          createdAt: now,
-          updatedAt: now,
-        }),
-      ];
     },
   });
 }
@@ -443,7 +391,6 @@ export function createTestScenarioExecutionPrefetcherService(
     },
     config,
     scenarios: scenarioService(deps),
-    suites: suiteService(deps),
     prompts: promptService(deps),
     agents: agentService(deps),
     workflows: workflowService(deps),

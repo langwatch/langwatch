@@ -20,7 +20,7 @@ export const BILLING_REPORTING_PIPELINE_NAME = "billing_reporting" as const;
 
 /**
  * Command data for reporting usage for a billing month, dispatched when usage
- * records `lw.usage.month_counted`; `billableEvents` is that counted total. Uses
+ * records `lw.entitlement.month_counted`; `billableEvents` is that counted total. Uses
  * organizationId as tenantId — the framework needs it for groupKey only.
  */
 export const reportUsageForMonthCommandDataSchema = z.object({

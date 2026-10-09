@@ -5,6 +5,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { BillingPostgresRepositories } from "../billing.repositories.ts";
 import { PrismaBillingOrganizationRepository } from "./prisma.billing-account-facts.repository.ts";
 import { PrismaBillingCheckpointRepository } from "./prisma.billing-checkpoint.repository.ts";
+import { PrismaBillingProjectDirectoryRepository } from "./prisma.billing-project-directory.repository.ts";
 import { PrismaBillingReportOrganizationRepository } from "./prisma.billing-report-organization.repository.ts";
 import { PrismaBillingWebhookOrganizationRepository } from "./prisma.billing-webhook-organization.repository.ts";
 import { PrismaBillingWebhookSubscriptionRepository } from "./prisma.billing-webhook-subscription.repository.ts";
@@ -34,6 +35,7 @@ export class PostgresBillingRepositories {
       }),
       organizations: PrismaBillingOrganizationRepository.create(prisma),
       organizationPricing: PrismaOrganizationPricingRepository.create(prisma),
+      projects: PrismaBillingProjectDirectoryRepository.create(prisma),
       reportOrganizations: PrismaBillingReportOrganizationRepository.create(prisma),
       seatEventSubscriptions: PrismaSeatEventSubscriptionRepository.create(prisma),
       subscriptions,

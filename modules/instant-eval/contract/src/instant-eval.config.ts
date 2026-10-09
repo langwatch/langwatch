@@ -1,11 +1,9 @@
 import { Config, type ConfigOf, isSaas, nodeEnvironment } from "@langwatch/config";
-import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 /**
- * What the judge costs and how fast it may be asked. `JEV_API_KEY` resolves
- * through `InstantEvalModule.secrets` (ADR-132), never this slice: a deployment
- * with no key judges nothing, which the null judge answers by name.
+ * Which judge a deployment judges with and what a run may spend. The cloud classifier's key,
+ * origin, model and rates belong to the Instant Evals judge (ADR-174 decision 13).
  */
 export const instantEvalConfig = Config.define((c) => ({
   /** "jev", "connect" or "null" (judging off); "memory" is a stand-in refused in production. */
@@ -13,32 +11,12 @@ export const instantEvalConfig = Config.define((c) => ({
     "INSTANT_EVAL_CLASSIFIER",
     z.enum(["jev", "null", "connect", "memory"]).optional(),
   ),
-  /** HTTPS only: the judge key travels in a header, so plaintext would send it in the clear. */
-  classifierBaseUrl: c.env(
-    "JEV_BASE_URL",
-    z
-      .string()
-      .url()
-      .refine((value) => value.startsWith("https://"), { message: "JEV_BASE_URL must use https" })
-      .optional(),
-  ),
-  classifierModel: c.env("JEV_MODEL", z.string().optional()),
-  /** Input tokens per second the whole deployment may send. */
-  globalTokensPerSecond: c.env(
-    "INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND",
-    z.coerce.number().positive().default(300_000),
-  ),
-  /** Input tokens per second one project may send. */
-  tenantTokensPerSecond: c.env(
-    "INSTANT_EVAL_TENANT_TOKENS_PER_SECOND",
-    z.coerce.number().positive().default(150_000),
-  ),
   /**
    * Whether this deployment bills Instant Evals, which is what makes the free
    * allowance a ceiling. An installation that does not bill bounds a run by
-   * its row cap alone. Off by default: only a billing deployment says so.
+   * its row cap alone. Unset follows `isSaas`: see `isInstantEvalBounded`.
    */
-  isBounded: c.env("INSTANT_EVAL_BOUNDED", z.stringbool().default(false)),
+  isBounded: c.env("INSTANT_EVAL_BOUNDED", z.stringbool().optional()),
   /** Input tokens one synchronous query may send. */
   queryTokenBudget: c.env(
     "INSTANT_EVAL_QUERY_TOKEN_BUDGET",
@@ -52,6 +30,13 @@ export const instantEvalConfig = Config.define((c) => ({
 
 export type InstantEvalServerConfig = ConfigOf<typeof instantEvalConfig>;
 
-export const instantEvalSecrets = {
-  classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
-} as const;
+/**
+ * The hosted product bills, so it bounds the free budget unless told not to;
+ * a self-hosted installation bills nothing, so it bounds nothing unless told to.
+ */
+export function isInstantEvalBounded({
+  isBounded,
+  isSaas,
+}: Pick<InstantEvalServerConfig, "isBounded" | "isSaas">): boolean {
+  return isBounded ?? isSaas;
+}

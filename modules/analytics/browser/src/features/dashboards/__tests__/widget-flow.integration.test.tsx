@@ -212,6 +212,17 @@ const editor = async () => {
   );
 };
 
+/**
+ * The Undo buttons on toasts still offered. A dismissed toast leaves on an exit animation
+ * jsdom never ends, so its own state is what says it was taken back.
+ */
+const offeredUndos = () =>
+  screen
+    .queryAllByRole("button", { name: "Undo" })
+    .filter(
+      (button) => button.closest('[data-part="root"]')?.getAttribute("data-state") !== "closed",
+    );
+
 afterEach(() => {
   cleanup();
   toaster.remove();
@@ -301,7 +312,10 @@ describe("the widget editor", () => {
         .getAllByRole("dialog")
         .find((dialog) => within(dialog).queryByRole("tab", { name: "API / MCP" }))!;
 
-      expect(getComputedStyle(drawer).maxWidth).toBe(`calc(100vw - ${LANGY_DOCK_WIDTH_PX + 24}px)`);
+      // jsdom resolves the drawer's `calc(100vw - dock)` against its own viewport width.
+      expect(getComputedStyle(drawer).maxWidth).toBe(
+        `${window.innerWidth - (LANGY_DOCK_WIDTH_PX + 24)}px`,
+      );
     });
 
     /** @scenario "Widget editor: the editor and Langy sit side by side" */
@@ -440,7 +454,7 @@ describe("Picking a widget in Add a widget", () => {
   /** @scenario "Add a widget: a picked widget shows on the board at once" */
   it("closes the picker and shows the widget before the server has stored it", async () => {
     const server = inMemoryServer();
-    let land = () => void 0;
+    let land: () => void = () => void 0;
     server.state.held.set("dashboardWidgets.create", new Promise((open) => (land = open)));
     const host = openBoard({ server, query: { addBlock: "open" } });
 
@@ -512,7 +526,7 @@ describe("Undo", () => {
     /** @scenario "Delete: a widget leaves the board at once, with Undo" */
     it("hides it and offers Undo before the delete lands, then Undo waits and restores it", async () => {
       const server = inMemoryServer();
-      let land = () => void 0;
+      let land: () => void = () => void 0;
       server.state.held.set("dashboardWidgets.delete", new Promise((open) => (land = open)));
       openBoard({ server });
 
@@ -546,7 +560,7 @@ describe("Undo", () => {
         ]),
       );
       expect(await screen.findByRole("button", { name: "Actions for Traces" })).toBeInTheDocument();
-      await waitFor(() => expect(screen.queryByRole("button", { name: "Undo" })).toBeNull());
+      await waitFor(() => expect(offeredUndos()).toEqual([]));
       expect(server.state.widgets).toHaveLength(1);
     });
   });
@@ -613,7 +627,7 @@ describe("Undo", () => {
       await chooseFromMenu("Delete");
 
       await waitFor(() => expect(host.failures).toHaveLength(1));
-      expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+      await waitFor(() => expect(offeredUndos()).toEqual([]));
     });
   });
 });

@@ -29,6 +29,7 @@ function unusedRepository(): EvaluatorRepository {
     findByWorkflow: notUsedHere,
     findByIdOrSlug: notUsedHere,
     findAll: notUsedHere,
+    countActiveByProjects: notUsedHere,
     findCopies: notUsedHere,
     create: notUsedHere,
     update: notUsedHere,
@@ -98,6 +99,7 @@ function buildService() {
       auditLog: {
         record: async () => ({ id: "audit", occurredAt: 0 }),
         listEntityHistory: async () => [],
+        findByTargetKind: async () => [],
         hasRecordedSince: async () => false,
       },
       users: createApiFixture<UserApi>({ getProfiles: async () => [] }),

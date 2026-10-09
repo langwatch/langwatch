@@ -18,9 +18,16 @@ const group: RetentionScopeGroup = {
 describe("given the remove-confirmation dialog", () => {
   describe("when no scope is targeted", () => {
     it("is disabled, so nothing is asked for a dialog that is not open", () => {
-      expect(retentionRemovalPreviewQuery("project-1", null)).toEqual({
+      expect(
+        retentionRemovalPreviewQuery({
+          projectId: "project-1",
+          organizationId: "org-1",
+          target: null,
+        }),
+      ).toEqual({
         input: {
           projectId: "project-1",
+          organizationId: "org-1",
           scope: { scopeType: "PROJECT", scopeId: "" },
         },
         options: { enabled: false },
@@ -30,13 +37,32 @@ describe("given the remove-confirmation dialog", () => {
 
   describe("when a scope is pending removal", () => {
     it("targets that scope and enables the read", () => {
-      expect(retentionRemovalPreviewQuery("project-1", group)).toEqual({
+      expect(
+        retentionRemovalPreviewQuery({
+          projectId: "project-1",
+          organizationId: "org-1",
+          target: group,
+        }),
+      ).toEqual({
         input: {
           projectId: "project-1",
+          organizationId: "org-1",
           scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
         },
         options: { enabled: true },
       });
+    });
+  });
+
+  describe("when the page sits outside an organization", () => {
+    it("asks nothing, since a scope write names its organization", () => {
+      expect(
+        retentionRemovalPreviewQuery({
+          projectId: "project-1",
+          organizationId: undefined,
+          target: group,
+        }).options,
+      ).toEqual({ enabled: false });
     });
   });
 });

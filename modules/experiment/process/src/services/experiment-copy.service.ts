@@ -14,8 +14,8 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
-import type { ExperimentWorkflowAuthoringService } from "./experiment-workflow-authoring.service.ts";
-import type { ExperimentWorkflowLinkService } from "./experiment-workflow-link.service.ts";
+import type { ExperimentWorkflowAuthoringService } from "../features/workflow/services/experiment-workflow-authoring.service.ts";
+import type { ExperimentWorkflowLinkService } from "../features/workflow/services/experiment-workflow-link.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 export type ExperimentCopyServiceOptions = {
@@ -180,6 +180,16 @@ export class ExperimentCopyService {
     // Execution results are not copied into the new project.
     delete workbenchState.results;
 
+    // The copy is its own experiment: carrying the original's id/slug would make
+    // the editor autosave the copy's edits onto the original.
+    delete workbenchState.experimentId;
+    delete workbenchState.experimentSlug;
+
+    const experimentName = `${experiment.name ?? experiment.slug} (copy)`;
+    if (typeof workbenchState.name === "string") {
+      workbenchState.name = experimentName;
+    }
+
     if (copyDatasets && Array.isArray(workbenchState.datasets)) {
       const datasets = workbenchState.datasets as SavedDatasetEntry[];
       const datasetIdMap = await this.copySavedDatasets({
@@ -196,7 +206,6 @@ export class ExperimentCopyService {
       }
     }
 
-    const experimentName = experiment.name ?? experiment.slug;
     const newExperiment = await this.options.experiments.save({
       id: generate("eval").toString(),
       name: experimentName,

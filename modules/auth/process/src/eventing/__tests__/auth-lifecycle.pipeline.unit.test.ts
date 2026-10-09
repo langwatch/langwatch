@@ -5,7 +5,9 @@
  * reacts to each from its own side (ARCHITECTURE §9).
  * @see specs/features/customer-io-nurturing-integration.feature
  */
+import type { AuthApi } from "@langwatch/auth-contract";
 import { createTenantId } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -61,6 +63,9 @@ describe("auth's lifecycle pipeline", () => {
   });
 
   it("declares no subscriber of its own: its peers react from their side", () => {
-    expect(buildAuthLifecyclePipeline().eventSubscribers.size).toBe(0);
+    const pipeline = buildAuthLifecyclePipeline({
+      sessions: createApiFixture<AuthApi>({}, "AuthApi"),
+    });
+    expect(pipeline.eventSubscribers.size).toBe(0);
   });
 });

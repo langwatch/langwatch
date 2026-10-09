@@ -17,6 +17,7 @@ import { Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
+  type BuiltInModel,
   type GroupedModelOptions,
   modelSelectionFrom,
   type ModelOption,
@@ -36,11 +37,14 @@ export const useModelSelectionOptions = ({
   model,
   mode = "chat",
   featureKey,
+  builtInModels,
 }: {
   options: string[];
   model: string;
   mode?: "chat" | "embedding";
   featureKey?: string | undefined;
+  /** Models LangWatch serves itself, listed first and needing no provider. */
+  builtInModels?: readonly BuiltInModel[] | undefined;
 }) => {
   const { project } = useOrganizationTeamProject();
   // `listAllForProjectForFrontend` returns only providers actually stored
@@ -58,8 +62,15 @@ export const useModelSelectionOptions = ({
   // rebuilt its whole combobox collection per parent render because of it.
   const providers = modelProviders.data;
   const { selectOptions, groupedByProvider } = useMemo(
-    () => modelSelectionFrom({ providers: providers ?? [], options, mode, featureKey }),
-    [providers, options, mode, featureKey],
+    () =>
+      modelSelectionFrom({
+        providers: providers ?? [],
+        options,
+        mode,
+        featureKey,
+        ...(builtInModels ? { builtInModels } : {}),
+      }),
+    [providers, options, mode, featureKey, builtInModels],
   );
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
@@ -274,7 +285,7 @@ function ModelOptionGroup({
     <Select.ItemGroup
       label={
         <HStack gap={2} paddingX={2}>
-          <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+          <Text fontWeight="medium">{group.label ?? titleCase(group.provider)}</Text>
         </HStack>
       }
     >
@@ -336,6 +347,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   forFeatureLabel,
   open,
   onOpenChange,
+  builtInModels,
 }: {
   model: string;
   options: string[];
@@ -352,11 +364,14 @@ export const ModelSelector = React.memo(function ModelSelector({
    *  from outside — e.g. force-close it when the parent collapses. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Models LangWatch serves itself, listed first even with no provider configured. */
+  builtInModels?: readonly BuiltInModel[];
 }) {
   const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
     options,
     model,
     mode,
+    builtInModels,
   });
 
   // ALL hooks must run unconditionally — keep the empty-state early

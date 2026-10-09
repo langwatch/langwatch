@@ -26,5 +26,6 @@
   },
   "devDependencies": {
     "typescript": "catalog:"
-  }
+  },
+  "callable": false
 }

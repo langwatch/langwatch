@@ -7,20 +7,20 @@ import { createUiRouter, type UiRouter } from "@langwatch/browser-host/navigatio
 import type { ComponentType } from "react";
 import type { FallbackProps } from "react-error-boundary";
 
+import { createUiModuleHostStack } from "./module/ui-module-hosts.tsx";
+import { type UiPageLoader, type UiPageLoaderRegistry } from "./page/ui-page-loaders.ts";
+import type { UiRouteDescriptor, UiShellLayout } from "./page/ui-route-descriptor.ts";
+import { createUiRouteObjects } from "./page/ui-route-objects.tsx";
 import { mergeUiPageLoaders } from "./ui-feature-loaders.ts";
 import { createUiFeatureShell } from "./ui-feature-shell.tsx";
 import type { UiFailureInterceptor, UiFeatureInstall } from "./ui-feature.ts";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers.tsx";
-import { createUiModuleHostStack } from "./ui-module-hosts.tsx";
 import {
   createUiOuterProvider,
   type UiOuterProviderInstall,
   type UiProviderShell,
 } from "./ui-outer-providers.tsx";
-import { type UiPageLoader, type UiPageLoaderRegistry } from "./ui-page-loaders.ts";
 import { createUiRootLayout } from "./ui-root-layout.tsx";
-import type { UiRouteDescriptor, UiShellLayout } from "./ui-route-descriptor.ts";
-import { createUiRouteObjects } from "./ui-route-objects.tsx";
 import type { SupplyModule } from "./web-module.ts";
 
 export type UiApplicationInstall = {
@@ -87,6 +87,7 @@ export function createUiApplication({
           ...(features.transport ? { transport: features.transport } : {}),
           ...(features.sessionVersions ? { sessionVersions: features.sessionVersions } : {}),
           ...(features.session ? { session: features.session } : {}),
+          ...(features.hostServices ? { hostServices: features.hostServices } : {}),
         }),
         pageErrorFallback: pages.errorFallback,
       }),

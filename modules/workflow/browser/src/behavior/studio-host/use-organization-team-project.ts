@@ -22,8 +22,6 @@ export type StudioScopeReading = {
   organization: StudioOrganization | undefined;
   team: StudioTeam | undefined;
   projectId: string | undefined;
-  hasPermission: (permission: string) => boolean;
-  hasAnyPermission: (permissions: string[]) => boolean;
   /** False while the composing application is still resolving the scope. */
   isResolved: boolean;
   isLoading: boolean;
@@ -63,11 +61,8 @@ export function useOrganizationTeamProject(
       organization: scope.organizationId ? { id: scope.organizationId } : void 0,
       team: scope.teamId ? { id: scope.teamId } : void 0,
       projectId: scope.projectId,
-      hasPermission: (permission: string) => host.hasPermission(permission),
-      hasAnyPermission: (permissions: string[]) =>
-        permissions.some((permission) => host.hasPermission(permission)),
       isResolved: scope.isResolved ?? !!scope.projectId,
       isLoading: !(scope.isResolved ?? !!scope.projectId),
     };
-  }, [host, scope]);
+  }, [scope]);
 }

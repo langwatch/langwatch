@@ -22,23 +22,25 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { GatewayModule } from "../../app/gateway.app.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
-import { gatewayProcessModule } from "../../gateway.module.ts";
-import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
-import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
   type GatewaySpendConfirmation,
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
-} from "../../services/gateway-realtime-session.service.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
+} from "../../features/realtime-session/services/gateway-realtime-session.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
+import { gatewayProcessModule } from "../../gateway.module.ts";
+import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
+import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "../elevenlabs-webhook.rest.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
@@ -93,6 +95,10 @@ const modelProviders = createApiFixture<ModelProviderApi>({
   },
 });
 
+/** A closing session reads its project's team and records one span; neither is asserted here. */
+const projects = createApiFixture<ProjectApi>({ findTraceDestination: async () => null });
+const traces = createApiFixture<TraceApi>({ recordSpan: async () => {} });
+
 let sessions: GatewayRealtimeSessionCollaborators | undefined;
 
 function sessionCollaborators(): GatewayRealtimeSessionCollaborators {
@@ -128,6 +134,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     sessions: PrismaGatewayRealtimeSessionRepository.create({ database: database() }),
     spendRating: ModelCatalogGatewaySpendRatingService.create(),
     spendConfirmation: new RecordingSpendConfirmation(),
+    spanIngestion: { ingestNormalizedSpan: async () => {} },
   };
   // The gateway resolves its secrets through the process chain; an empty one leaves each unset.
   const stores: Readonly<Record<string, unknown>> = {
@@ -143,6 +150,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     .withModules([gatewayProcessModule])
     .withConfig({
       gateway: {
+        foldCacheTtlSeconds: 300,
         spendSettlementGraceMs: undefined,
         internalUrl: undefined,
         controlPlaneUrl: undefined,
@@ -160,19 +168,19 @@ async function mountWebhook(): Promise<MountableRestApp> {
       read: (name) => (Object.hasOwn(stores, name) ? stores[name] : refuseUnsuppliedStore(name)),
     })
     .withSecrets(resolvedSecrets({}))
-    .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
+    .withEncryption({ encrypt: (value: string) => value, decrypt: (value: string) => value })
     .provide({
       webhook: peer("webhook"),
       entitlement: peer("entitlement"),
       authz: peer("authz"),
-      project: peer("project"),
+      project: projects,
       evaluator: peer("evaluator"),
       evaluation: peer("evaluation"),
       monitor: peer("monitor"),
       organization: peer("organization"),
       "feature-flag": peer("feature flag"),
       "model-provider": modelProviders,
-      trace: peer("trace"),
+      trace: traces,
       secret: peer("secret"),
       "api-key": peer("api key"),
     })

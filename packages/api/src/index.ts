@@ -35,6 +35,7 @@ export {
 } from "./errors.ts";
 
 export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
+export { jsonTextField } from "./json-text-field.ts";
 export { ConnectUpgradeRouter } from "./ports.ts";
 export {
   WebSocketHost,
@@ -78,25 +79,20 @@ export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
 export {
   type AccessPolicy,
   anyAuthenticated,
-  apiKeyPermission,
   type CredentialClass,
   credentialClassFor,
-  describeAccessPolicy,
   type HandlerCredential,
   handlerManagedAuth,
   internalSecret,
   isInternalSecretValid,
-  isApiKeyReachable,
   policyPermissions,
   publicEndpoint,
-  requires,
-  requiresOnProject,
-  requiresOnTeam,
 } from "./access-policy.ts";
 
 // Every mounted route and the policy it declared, recorded as each surface mounts.
 export {
   allRegisteredRoutes,
+  routesServingWhileUpgrading,
   getRoutePolicy,
   registerRoutePolicy,
   type RegisteredRoute,

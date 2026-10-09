@@ -30,16 +30,12 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       return { id: "org-1", name: "Acme", members: state.members, teams: [] };
     }
     if (path === "invite.getOrganizationPendingInvites") return state.invites;
-    if (path === "organization.getMemberProvenance") return state.provenance;
     if (path === "plan.getActivePlan") return { type: "ENTERPRISE", free: false, maxMembers: 100 };
     return [];
   };
 
   const endpoint = (path: string) => ({
-    useQuery: () =>
-      path === "organization.getMemberProvenance" && state.provenanceFails
-        ? { data: undefined, isError: true, error: new Error("boom"), refetch: vi.fn() }
-        : { data: answers(path), isError: false, error: null, refetch: vi.fn() },
+    useQuery: () => ({ data: answers(path), isError: false, error: null, refetch: vi.fn() }),
     useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
     invalidate: vi.fn(),
     fetch: vi.fn(),
@@ -56,6 +52,13 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
   root.useUtils = () => root;
   return { api: root };
 });
+
+vi.mock("../../../../behavior/use-member-provenance.ts", () => ({
+  useMemberProvenance: () =>
+    state.provenanceFails
+      ? { data: undefined, isError: true, error: new Error("boom"), refetch: vi.fn() }
+      : { data: state.provenance, isError: false, error: null, refetch: vi.fn() },
+}));
 
 vi.mock("../../../../behavior/use-join-requests.ts", () => ({
   useJoinRequests: () => ({

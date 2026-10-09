@@ -1,9 +1,9 @@
 // Decides whether a pull request has to carry a `## Deployment Impact`
 // writeup, given the files it changed and who opened it.
 //
-// The deployment-impact workflow triggers on `charts/**`, `services/**`,
-// `dev/docs/adr/**`, `dev/docs/best_practices/**`, `.env.example`
-// and `docs/self-hosting/**`. Those globs match every dependency bump in
+// The deployment-impact workflow triggers on deployment surface: `charts/**`,
+// `services/**`, `infra/**`, Dockerfiles, migrations, config and secrets (the
+// `paths:` list in deployment-impact-check.yml). Those globs match every dependency bump in
 // services/langevals, services/aigateway and services/nlpgo, and every chart's
 // Chart.lock — so a routine version bump is asked for a writeup about operator
 // impact it does not have.

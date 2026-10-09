@@ -328,3 +328,204 @@ Feature: Local IdP simulator (idpsim)
     Given one tenant with a registered application and several without
     When the landing page lists the providers
     Then only that tenant is marked, because it is the one being come back to
+
+  # --- Faults: SAML tampers, clock skew, IdP-initiated, disabled users ---
+  # Driven through the control API and `haven idp`, never a page. Every
+  # fault is recorded in the tenant's activity.
+
+  @unit
+  Scenario: A SAML response can be broken once in each way a service provider must refuse
+    Given a tenant armed with one of the SAML tamper modes
+      | mode                      | what the next response carries                 |
+      | saml-bad-signature        | signatures that no longer verify               |
+      | saml-unsigned             | no signature on the response or the assertion  |
+      | saml-wrong-audience       | an audience that is not the service provider   |
+      | saml-wrong-recipient      | a recipient that is not the ACS URL            |
+      | saml-expired              | a validity window that has already closed      |
+      | saml-not-yet-valid        | a validity window that has not opened yet      |
+      | saml-wrong-in-response-to | an InResponseTo naming no request it was sent  |
+    When a service provider signs in through the tenant twice
+    Then the first response is refused by a service provider that checks it
+    And the second response verifies, because the break is one-shot
+    And the tenant's activity shows the mode being armed and the response it broke
+
+  @unit
+  Scenario: A replayed SAML assertion repeats the previous assertion's ID
+    Given a tenant that has already signed one assertion
+    When the tenant is armed with saml-replayed-assertion and signs another
+    Then the new assertion carries the previous assertion's ID
+    And refusing the replay is left to the service provider
+
+  @unit
+  Scenario: An unknown tamper mode is refused
+    When a tenant is armed with a mode it does not know
+    Then the request is refused as a bad request listing the modes it does know
+    And nothing is armed
+
+  @unit
+  Scenario: A tenant's clock can run ahead of or behind the service provider's
+    Given a tenant whose clock is skewed by a number of seconds
+    When a service provider signs in through the tenant
+    Then a skew of ten minutes ahead is refused as not yet valid
+    And a skew of ten minutes behind is refused as expired
+    And a skew of thirty seconds is accepted inside the usual tolerance
+    And the same skew moves the issued-at and expiry of the tenant's ID tokens
+    And the tenant's activity shows the skew being set
+
+  @unit
+  Scenario: An unsolicited SAML response carries the chosen RelayState and no InResponseTo
+    Given a tenant with an active user
+    When the control API is asked for an unsolicited response to an ACS URL with a RelayState
+    Then it returns the ACS URL, the signed response and the RelayState to post
+    And the response names no request it answers
+    And a service provider that accepts only solicited responses refuses it
+    And one that allows IdP-initiated sign-in accepts it for that user
+    And the tenant's activity records the RelayState it was sent with
+
+  @unit
+  Scenario: An unsolicited SAML response needs an ACS URL and an active user
+    When an unsolicited response is asked for without an ACS URL
+    Then the request is refused as a bad request
+    When one is asked for a user the tenant does not have
+    Then the request is refused as forbidden
+    And the tenant's activity records the refusal
+
+  @unit
+  Scenario: A user disabled at the IdP is refused at sign-in
+    Given a tenant whose user has been disabled through the control API
+    When that user signs in over SAML, over OIDC or through an unsolicited response
+    Then the tenant refuses each one itself, before anything reaches the service provider
+    And the tenant's activity shows the user being disabled
+    And a change naming no active flag is refused as a bad request
+    And a change naming an unknown user is refused as not found
+
+  @unit
+  Scenario: Resetting a tenant clears its clock skew
+    Given a tenant whose clock is skewed by ten minutes
+    When the tenant is reset
+    Then the tenant's clock runs true again
+    And the next replayed SAML assertion has no previous assertion to repeat
+
+  @unit
+  Scenario: A tenant's clock skew survives a simulator restart
+    Given a simulator that keeps its state on disk
+    And a tenant whose clock is skewed by ten minutes
+    When the simulator restarts
+    Then the tenant's clock is still skewed by ten minutes
+
+  @unit
+  Scenario: After a key rotation both keys are published and the new one signs
+    Given a tenant with one signing key
+    When the tenant's signing key is rotated through the control API
+    Then the tenant's JWKS publishes the new key and the previous one under different key ids
+    And the tenant's SAML metadata publishes a signing certificate for each key
+    And new ID tokens name the new key id and verify against the new key
+    And new SAML assertions verify against the new certificate
+    And the tenant's activity shows the rotation
+    And a rotated tenant keeps both keys across a simulator restart
+
+  @unit
+  Scenario: After the previous key is dropped only the new one is published
+    Given a tenant whose signing key has been rotated
+    When the previous key is dropped through the control API
+    Then the tenant's JWKS publishes only the new key
+    And the tenant's SAML metadata publishes only the new signing certificate
+    And dropping again when there is no previous key is refused as a conflict
+
+  @unit
+  Scenario: A token signed by a dropped key no longer verifies
+    Given an ID token signed before the tenant's key was rotated
+    When the key is rotated and the previous key is dropped
+    Then the old token finds no matching key in the tenant's JWKS
+    And a malformed rotation body is refused as a bad request
+
+  # --- Console: directory and provider controls ---------------------------
+
+  @integration
+  Scenario: The console adds a person to a tenant's directory
+    Given a tenant's Users tab is open in the console
+    When the operator adds a person by email with a name and groups
+    Then the console asks the simulator to add that person to the tenant
+    And the directory is read again so the person appears
+
+  @integration
+  Scenario: The console disables and re-enables a person at the IdP
+    Given a tenant's Users tab lists an active person
+    When the operator disables that person
+    Then the console asks the simulator to mark the person inactive
+    And a refusal from the simulator is shown in its own words
+
+  @integration
+  Scenario: The console sends one SCIM event on demand
+    Given a tenant's Provisioning tab is open in the console
+    When the operator picks an event kind, a person and a PATCH style and sends it
+    Then the console asks the simulator to send exactly that SCIM event
+    And the status LangWatch answered with is shown
+
+  @integration
+  Scenario: The console sends an Auth0 SCIM webhook
+    Given a tenant's Provisioning tab is open in the console
+    When the operator sends an Auth0 deactivate event for a person to a stack with a secret
+    Then the console asks the simulator to sign and send that webhook
+    And the status the stack answered with is shown
+
+  @integration
+  Scenario: The console makes a tenant pose as a legacy provider and shows its env lines
+    Given a tenant's Setup tab is open in the console
+    When the operator picks Okta as the tenant's legacy provider
+    Then the console asks the simulator to pose as Okta
+    And it shows the issuer and the env lines that point a stack at the tenant
+
+  @unit
+  Scenario: The tenant page reads the keys, skew and armed break it signs with
+    Given a tenant whose key was rotated, whose clock is skewed and which has a SAML break armed
+    When the console reads the tenant
+    Then it answers both published key ids, current first, the skew in seconds and the armed break
+
+  @integration
+  Scenario: The console rotates a tenant's key, skews its clock and arms a broken response
+    Given a tenant's Signing tab is open in the console
+    When the operator rotates the key, applies a clock skew and arms a SAML expired break
+    Then the console asks the simulator for each through its control API
+    And it shows which key signs and which is still published
+
+  @integration
+  Scenario: The console signs an IdP-initiated SAML response ready to post to the ACS
+    Given a tenant's Signing tab is open in the console
+    When the operator asks for an unsolicited response to an ACS address
+    Then the console offers a form that posts the signed response and RelayState to that address
+
+  # --- Console and CLI: proofs on any domain, advanced SCIM events -------
+
+  @integration
+  Scenario: The console publishes and removes a TXT record on any domain
+    Given a tenant's Domain tab is open in the console
+    When the operator publishes two TXT values at a domain no tenant owns, then removes them
+    Then the console asks the simulator to set exactly those values at that name
+    And then asks it to remove the record
+
+  @integration
+  Scenario: The console serves and stops the well-known verification file for a domain
+    Given a tenant's Domain tab is open in the console
+    When the operator serves a token for a domain, then stops serving it
+    Then the console asks the simulator to serve that token as the domain's verification file
+    And then asks it to stop
+
+  @unit
+  Scenario: haven idp verification sets and clears the well-known verification file
+    When an agent runs `haven idp verification set` with a domain and a token
+    Then the simulator is asked to serve that token for the domain
+    And `haven idp verification clear` with the domain asks it to stop
+
+  @integration
+  Scenario: The console sends a SCIM event with ids, attributes and the enterprise extension
+    Given a tenant's Provisioning tab is open on a connected tenant
+    When the operator fills in the receiving side's id, attributes to set, inactive, no externalId and a department
+    Then the console sends those fields in the SCIM event request
+    And a line that is not key=value is refused before anything is sent
+
+  @integration
+  Scenario: The signing inputs follow the tenant after a reset
+    Given a tenant's Signing tab shows a typed clock skew and a chosen break
+    When the tenant is reset and read again
+    Then the skew input and the break select show the tenant's own values

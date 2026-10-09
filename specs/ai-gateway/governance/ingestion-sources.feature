@@ -651,6 +651,16 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And once the upstream platform begins pushing, events appear in the
       Activity Monitor within 30 seconds
 
+  # Ruled 2026-10-09 alongside the trace door: a failed handoff is retryable,
+  # and the resend dedupes the spans the pipeline already took.
+  @unit
+  Scenario: A span batch whose pipeline handoff fails is answered as retryable
+    Given an OTel source pushes a span batch to its OTLP URL
+    And the trace pipeline fails to take one of the batch's spans
+    When the receiver answers
+    Then the batch is answered 503 and marked retryable
+    And no event is recorded against the source, so the resend counts once
+
   Scenario: S3 audit log source with custom parser DSL
     Given a customer's homegrown agent system writes audit logs to S3
     When the admin picks "S3 audit (custom)"

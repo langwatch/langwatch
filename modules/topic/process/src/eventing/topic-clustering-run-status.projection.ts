@@ -13,13 +13,13 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../rules/topic-clustering-events.rules.ts";
+} from "./topic-clustering.events.ts";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../rules/topic-clustering-events.rules.ts";
+} from "./topic-clustering.events.ts";
 
 /**
  * Per-project topic clustering run status (ADR-051 §1/§7): the public read

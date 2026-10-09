@@ -1,4 +1,4 @@
-import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -7,7 +7,7 @@ function unsupported(): never {
   throw new Error("not used by this GitHub test");
 }
 
-export class TestOrganizationService extends OrganizationService {
+export class TestOrganizationService {
   isMemberResult = true;
   readonly api = createApiFixture<OrganizationApi>({
     isMember: () => this.isMember(),
@@ -57,9 +57,6 @@ export class TestOrganizationService extends OrganizationService {
     return unsupported();
   }
 
-  claimBillingCustomerId(): never {
-    return unsupported();
-  }
 
   ensurePersonalWorkspace(): never {
     return unsupported();

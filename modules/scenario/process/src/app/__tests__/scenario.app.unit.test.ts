@@ -4,6 +4,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -22,7 +23,6 @@ import type {
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -37,6 +37,7 @@ import {
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { simulationRunState } from "../../__tests__/support/simulation-run-state.fixture.ts";
 import { simulationSendersOver } from "../../__tests__/support/simulation-service-fake.fixture.ts";
+import { MemoryScenarioChannels } from "../../channels/memory/memory.scenario.channels.ts";
 import { LiveScenarioRepositories } from "../../repositories/live/live.scenario.repositories.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioModule, type ScenarioSecretCipher } from "../scenario.app.ts";
@@ -52,6 +53,7 @@ async function harness() {
   };
 
   const app = await ScenarioModule.create({
+    channels: MemoryScenarioChannels.create(),
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
@@ -64,7 +66,7 @@ async function harness() {
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
-      suites: createApiFixture<SuiteApi>(),
+      evaluators: createApiFixture<EvaluatorApi>(),
       ...scenarioExecutorPeers(),
       ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -374,6 +376,7 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         aggregateId: "run-1",
       });
       const app = await ScenarioModule.create({
+        channels: MemoryScenarioChannels.create(),
         repositories,
         dependencies: {
           agents: createApiFixture<AgentApi>(),
@@ -386,7 +389,7 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
           auditLog: createApiFixture<AuditLogApi>(),
           traces: createApiFixture<TraceApi>(),
           retention: createApiFixture<DataRetentionApi>(),
-          suites: createApiFixture<SuiteApi>(),
+          evaluators: createApiFixture<EvaluatorApi>(),
           ...scenarioExecutorPeers(),
           ...scenarioVoicePeers(),
           featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -416,6 +419,7 @@ describe("given a live process whose scenario registry reads ClickHouse", () => 
       },
     });
     const app = await ScenarioModule.create({
+      channels: MemoryScenarioChannels.create(),
       repositories: LiveScenarioRepositories.create({
         prisma: createApiFixture<PrismaClient>(),
         clickhouse,
@@ -434,7 +438,7 @@ describe("given a live process whose scenario registry reads ClickHouse", () => 
         auditLog: createApiFixture<AuditLogApi>(),
         traces: createApiFixture<TraceApi>(),
         retention: createApiFixture<DataRetentionApi>(),
-        suites: createApiFixture<SuiteApi>(),
+        evaluators: createApiFixture<EvaluatorApi>(),
         ...scenarioExecutorPeers(),
         ...scenarioVoicePeers(),
         featureFlags: createApiFixture<FeatureFlagApi>(),

@@ -86,20 +86,13 @@ Feature: GitHub branch linkage maintenance
     Then it prunes stale branch bookkeeping
     And it reaps the outbox rows of the branch recheck process from that process store
 
-  @unit
+  # Gap: nothing in modules/github/process/src reports absent GitHub App credentials by name yet.
+  @unit @unimplemented
   Scenario: A worker without GitHub App credentials names the missing capability
     Given a worker graph composed without GitHub App credentials
     When the graph is composed
     Then the absence is reported by name
     And the sweep is still mounted, because its retention half needs no credentials
-
-  @unit
-  Scenario: Branch demand runs on two project facts rather than a project service
-    Given a process holding a database, GitHub App credentials and a project seam
-    When a folded coding-agent session asks about a branch somebody is looking at
-    Then the organization is resolved from the tenant through that seam
-    And the pull request GitHub reports is stored
-    And the project is recorded as having had a pull request mapped
 
   @unit
   Scenario: Demand declines a repository host this instance cannot answer for

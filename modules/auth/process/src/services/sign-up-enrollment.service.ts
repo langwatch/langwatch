@@ -1,12 +1,12 @@
 import { NoAddressToConfirmError, type SignUpEnrollment } from "@langwatch/auth-contract";
 import {
-  isOrganizationManagedDecision,
   normalizeIdentifierValue,
   type RoutingDecision,
   type SignInMethod,
-  type SignInRoutingReasonCode,
 } from "@langwatch/identity-contract";
-import { type OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
+import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
+
+import { decideLocalSignUp, isSettledByRouting } from "../rules/local-sign-up.rules.ts";
 
 interface SignUpEnrollmentServiceDeps {
   validateAddressProof(input: { token: string; email: string }): Promise<boolean>;
@@ -19,7 +19,7 @@ interface SignUpEnrollmentServiceDeps {
   resolveDefaultMethods(): Promise<readonly SignInMethod[]>;
   passwordIsAllowed(): Promise<boolean>;
   /** Whether the installation admits a new account for this address. */
-  checkSignUp: OrganizationApi["checkSignUp"];
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
 }
 
 /**
@@ -55,48 +55,52 @@ export class SignUpEnrollmentService {
     throw new NoAddressToConfirmError();
   }
 
+  /**
+   * Whether this address may still enrol `method` here, asked again at a ceremony's two ends. The
+   * proof is neither checked nor spent; an existing account is left to the caller's own refusal.
+   */
+  async enrolsLocally({
+    email,
+    method,
+  }: {
+    email: string;
+    method: SignInMethod["kind"];
+  }): Promise<boolean> {
+    const decision = await this.localDecision({ email });
+    if (decision.outcome === "existing_account") return true;
+    return (
+      decision.outcome === "enroll" && decision.methodSet.some((offered) => offered.kind === method)
+    );
+  }
+
   private async decide({ email }: { email: string }): Promise<SignUpEnrollment> {
-    const decision = await this.deps.route({ identifier: email, breakGlass: false });
-    if (decision.outcome === "redirect_to_connection") {
-      return {
-        outcome: "redirect",
-        methodSet: decision.methodSet,
-        reasonCode: decision.reasonCode,
-      };
-    }
-    if (isOrganizationManagedDecision(decision)) return unavailable(decision.reasonCode);
-
-    if (await this.deps.addressIsTaken({ email: normalizeIdentifierValue(email) })) {
-      return { outcome: "existing_account", methodSet: [], reasonCode: "account_methods" };
-    }
-
-    const offered = await this.offeredMethods(decision);
-    if (offered === null) return unavailable(decision.reasonCode);
-
-    const methodSet = (await this.deps.passwordIsAllowed())
-      ? offered
-      : offered.filter((method) => method.kind !== "password");
-    if (methodSet.length === 0) return unavailable(decision.reasonCode);
+    const decision = await this.localDecision({ email });
+    if (decision.outcome !== "enroll") return decision;
 
     const verdict = await this.deps.checkSignUp({ email });
     if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
 
-    return { outcome: "enroll", methodSet, reasonCode: decision.reasonCode };
+    return decision;
   }
 
-  private async offeredMethods(decision: RoutingDecision): Promise<readonly SignInMethod[] | null> {
-    if (decision.outcome === "route_to_signup") return this.deps.resolveDefaultMethods();
-    if (
-      decision.reasonCode === "method_not_licensed" ||
-      decision.reasonCode === "method_not_configured"
-    ) {
-      return decision.methodSet;
+  private async localDecision({ email }: { email: string }): Promise<SignUpEnrollment> {
+    const decision = await this.deps.route({ identifier: email, breakGlass: false });
+    // An organization's address is answered by routing alone, with no account looked up.
+    if (isSettledByRouting(decision)) {
+      return decideLocalSignUp({
+        decision,
+        addressIsTaken: false,
+        defaultMethods: [],
+        passwordIsAllowed: false,
+      });
     }
 
-    return null;
+    return decideLocalSignUp({
+      decision,
+      addressIsTaken: await this.deps.addressIsTaken({ email: normalizeIdentifierValue(email) }),
+      defaultMethods:
+        decision.outcome === "route_to_signup" ? await this.deps.resolveDefaultMethods() : [],
+      passwordIsAllowed: await this.deps.passwordIsAllowed(),
+    });
   }
-}
-
-function unavailable(reasonCode: SignInRoutingReasonCode): SignUpEnrollment {
-  return { outcome: "unavailable", methodSet: [], reasonCode };
 }

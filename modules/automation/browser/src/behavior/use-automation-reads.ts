@@ -2,8 +2,7 @@
 
 import { datasetClient } from "@langwatch/dataset-client";
 
-import { api, automationApi } from "./automation-api.ts";
-import { slackApi } from "./slack-api.ts";
+import { api, automationApi, slackApi } from "./automation-api.ts";
 
 type Scope = { projectId: string; enabled?: boolean };
 

@@ -26,7 +26,7 @@ export interface SkipPermissionsProviderRow {
 }
 
 /** What the gate loads its rows from. */
-export interface SkipPermissionsProviderRows {
+interface SkipPermissionsProviderRows {
   findAllAccessibleForProject(projectId: string): Promise<SkipPermissionsProviderRow[]>;
 }
 

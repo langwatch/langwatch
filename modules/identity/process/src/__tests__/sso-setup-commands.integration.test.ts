@@ -13,17 +13,17 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { SsoMigrationFinalizationService } from "../features/sso-arrival/services/sso-migration-finalization.service.ts";
+import type { SsoCredentialRead } from "../features/sso-connection/repositories/sso-credential.repository.ts";
+import { SsoCredentialRepository } from "../features/sso-connection/repositories/sso-credential.repository.ts";
+import type { SsoConnectionLedger } from "../features/sso-connection/rules/sso-connection-ledger.rules.ts";
+import { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
+import { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
+import { SsoIdpCredentialsService } from "../features/sso-connection/services/sso-idp-credentials.service.ts";
+import { SsoIdpRegistrationService } from "../features/sso-connection/services/sso-idp-registration.service.ts";
+import { SsoSetupCommandsService } from "../features/sso-connection/services/sso-setup-commands.service.ts";
 import { identityRepositoriesOverMemory } from "../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
-import type { SsoCredentialRead } from "../repositories/sso-credential.repository.ts";
-import { SsoCredentialRepository } from "../repositories/sso-credential.repository.ts";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
-import { SsoConnectionService } from "../services/sso-connection.service.ts";
-import { SsoIdpCredentialsService } from "../services/sso-idp-credentials.service.ts";
-import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
-import type { SsoMigrationFinalizationService } from "../services/sso-migration-finalization.service.ts";
-import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
@@ -213,6 +213,7 @@ describe("given an administrator registering their identity provider", () => {
           entityId: "urn:acme",
           metadataXml: null,
           certificate: CERTIFICATE,
+          idpInitiated: { enabled: false, landingTargets: [] },
         },
       });
 
@@ -234,6 +235,7 @@ describe("given an administrator registering their identity provider", () => {
             entityId: null,
             metadataXml: null,
             certificate: null,
+            idpInitiated: { enabled: false, landingTargets: [] },
           },
         }),
       ).rejects.toMatchObject({ code: "sso_credentials_required" });

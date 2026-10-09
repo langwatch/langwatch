@@ -11,8 +11,8 @@
 --
 -- Keyed and routed by organization, like billable_events (00002), so a
 -- private-instance customer's rows stay on their own cluster; TenantId is kept
--- in the key so a month can be counted per project. No retention TTL: a
--- billing-grade record, kept like billable_events.
+-- in the key so a month can be counted per project. Retention: a fixed
+-- 13-month TTL, added by 00106 (a billing-grade record, like gateway_spend).
 -- ============================================================================
 
 -- +goose StatementBegin

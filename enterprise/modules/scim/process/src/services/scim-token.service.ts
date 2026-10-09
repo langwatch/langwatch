@@ -14,7 +14,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { ScimRepository } from "../repositories/scim.repository.ts";
+import type { ScimRepository, ScimTokenIdentity } from "../repositories/scim.repository.ts";
 import {
   digestScimToken,
   MINIMUM_SCIM_TOKEN_LENGTH,
@@ -31,6 +31,8 @@ export class ScimTokenService {
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     tokenPepper: string | undefined;
+    /** The pepper a rotation retired: it finds a stored token, and none is stored under it. */
+    previousTokenPepper?: string | undefined;
   }): ScimTokenService {
     return new ScimTokenService(options);
   }
@@ -39,22 +41,26 @@ export class ScimTokenService {
   private readonly entitlements: Pick<EntitlementApi, "getActivePlan">;
   private readonly lifecycle: ScimSyncLifecycle;
   private readonly tokenPepper: string | undefined;
+  private readonly previousTokenPepper: string | undefined;
 
   private constructor({
     repository,
     entitlements,
     lifecycle,
     tokenPepper,
+    previousTokenPepper,
   }: {
     repository: ScimRepository;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     tokenPepper: string | undefined;
+    previousTokenPepper?: string | undefined;
   }) {
     this.repository = repository;
     this.entitlements = entitlements;
     this.lifecycle = lifecycle;
     this.tokenPepper = tokenPepper;
+    this.previousTokenPepper = previousTokenPepper;
   }
 
   async generateToken(input: {
@@ -81,8 +87,12 @@ export class ScimTokenService {
 
     const token = input.secret?.trim() ?? crypto.randomBytes(32).toString("hex");
     const pepper = this.tokenHashKey();
-    // Both digests: a legacy sha256 row and a new HMAC row must never name one value.
-    const taken = await this.repository.findTokensByHashes(scimTokenDigests({ token, pepper }));
+    // Every digest: a legacy sha256 row, a new HMAC row and a row still under the
+    // previous pepper must never name one value.
+    const taken = await this.repository.findTokensByHashes([
+      ...scimTokenDigests({ token, pepper }),
+      ...this.previousDigests(token),
+    ]);
     if (taken.length > 0) {
       throw new ScimTokenUnavailableError();
     }
@@ -159,13 +169,7 @@ export class ScimTokenService {
   }
 
   async verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {
-    const matches = await this.repository.findTokensByHashes(
-      scimTokenDigests({ token: input.token, pepper: this.tokenHashKey() }),
-    );
-    if (matches.length > 1) {
-      logger.error({ rows: matches.length }, "a presented SCIM token names more than one row");
-    }
-    const stored = matches.length === 1 ? matches[0] : undefined;
+    const stored = await this.findStoredToken(input.token);
     if (!stored) {
       return { status: "invalid_token" };
     }
@@ -191,6 +195,47 @@ export class ScimTokenService {
 
   async recordTokenUse(input: { tokenId: string }): Promise<void> {
     await this.repository.recordTokenUse({ tokenId: input.tokenId, usedAt: nowInstant() });
+  }
+
+  /**
+   * The row a presented token names. One found only under the previous pepper has its
+   * digest rewritten under the current one, so the previous pepper can later be removed.
+   */
+  private async findStoredToken(token: string): Promise<ScimTokenIdentity | undefined> {
+    const pepper = this.tokenHashKey();
+    const current = await this.repository.findTokensByHashes(scimTokenDigests({ token, pepper }));
+    if (current.length > 0) return this.soleMatch(current);
+
+    const previousDigests = this.previousDigests(token);
+    if (previousDigests.length === 0) return undefined;
+    const stored = this.soleMatch(await this.repository.findTokensByHashes(previousDigests));
+    if (!stored) return undefined;
+
+    try {
+      await this.repository.replaceTokenDigest({
+        tokenId: stored.id,
+        hashedToken: digestScimToken({ token, scheme: "hmac-sha256", pepper }),
+        hashScheme: "hmac-sha256",
+      });
+    } catch (error) {
+      logger.warn(
+        { error, tokenId: stored.id },
+        "a SCIM token verified under the previous pepper could not be moved to the current one; its next use tries again",
+      );
+    }
+    return stored;
+  }
+
+  private soleMatch(matches: ScimTokenIdentity[]): ScimTokenIdentity | undefined {
+    if (matches.length > 1) {
+      logger.error({ rows: matches.length }, "a presented SCIM token names more than one row");
+    }
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  private previousDigests(token: string): string[] {
+    if (!this.previousTokenPepper || this.previousTokenPepper === this.tokenPepper) return [];
+    return [digestScimToken({ token, scheme: "hmac-sha256", pepper: this.previousTokenPepper })];
   }
 
   private tokenHashKey(): string {

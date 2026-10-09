@@ -1,6 +1,6 @@
 // Package fileregistry implements app.Store on the filesystem: the cross-worktree
 // registry + daemon record under the thuishaven home dir, plus the two
-// worktree-local files (the slug cache, the sticky selection and the HMR gate).
+// worktree-local files (the slug cache and the sticky selection).
 package fileregistry
 
 import (
@@ -22,6 +22,8 @@ import (
 // Store is the filesystem-backed implementation of app.Store.
 type Store struct {
 	home string
+	// daemonLock is the held haven.lock while this process is the daemon.
+	daemonLock *os.File
 }
 
 // New builds a Store rooted at the thuishaven home dir (~/.langwatch/portless).
@@ -30,9 +32,11 @@ func New(home string) *Store { return &Store{home: home} }
 func (s *Store) registryDir() string          { return filepath.Join(s.home, "registry") }
 func (s *Store) stackPath(slug string) string { return filepath.Join(s.registryDir(), slug+".json") }
 func (s *Store) daemonPath() string           { return filepath.Join(s.home, "haven.json") }
+func (s *Store) daemonLockPath() string       { return filepath.Join(s.home, "haven.lock") }
 
-// SaveStack persists one stack's registry entry. Mode 0o600: the entry carries
-// LocalAPIKey, so it must not be world-readable.
+// SaveStack persists one stack's registry entry, atomically so the reaper never
+// reads a torn file mid-heartbeat and drops a live stack. Mode 0o600: the entry
+// carries LocalAPIKey, so it must not be world-readable.
 func (s *Store) SaveStack(st domain.Stack) error {
 	if err := os.MkdirAll(s.registryDir(), 0o755); err != nil {
 		return err
@@ -41,7 +45,7 @@ func (s *Store) SaveStack(st domain.Stack) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.stackPath(st.Slug), append(b, '\n'), 0o600)
+	return writeFileAtomic(s.stackPath(st.Slug), append(b, '\n'), 0o600)
 }
 
 // RemoveStack drops a stack's registry entry.
@@ -97,6 +101,7 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 // selectionFile is the on-disk shape of the worktree-local sticky service
 // selection (ADR-064) — .haven.json next to .langwatch-slug.
 type selectionFile struct {
+	Mode     string           `json:"mode,omitempty"`
 	Services *selectionFields `json:"services"`
 }
 
@@ -127,6 +132,8 @@ type selectionFields struct {
 	Voice        *bool `json:"voice"`
 	LLM          *bool `json:"llm"`
 	Analytics    *bool `json:"analytics"`
+	Outbound     *bool `json:"outbound"`
+	Telemetry    *bool `json:"telemetry"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -150,6 +157,8 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Voice, nil, &sel.Voice},
 		{f.LLM, nil, &sel.LLM},
 		{f.Analytics, nil, &sel.Analytics},
+		{f.Outbound, nil, &sel.Outbound},
+		{f.Telemetry, nil, &sel.Telemetry},
 	} {
 		switch {
 		case field.stated != nil:
@@ -180,6 +189,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 	}
 	sel := domain.DefaultSelection()
 	f.Services.applyTo(&sel)
+	sel.Mode = f.Mode
 	return sel, true
 }
 
@@ -191,7 +201,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // on the default-keeping behaviour above — that is there for files it did not
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
-	b, err := json.MarshalIndent(selectionFile{Services: &selectionFields{
+	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Services: &selectionFields{
 		Gateway:      &sel.Gateway,
 		NLP:          &sel.NLP,
 		Langy:        &sel.Langy,
@@ -204,6 +214,8 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Voice:        &sel.Voice,
 		LLM:          &sel.LLM,
 		Analytics:    &sel.Analytics,
+		Outbound:     &sel.Outbound,
+		Telemetry:    &sel.Telemetry,
 	}}, "", "  ")
 	if err != nil {
 		return err
@@ -299,34 +311,6 @@ func (s *Store) WritePrereqSkips(skips map[string]bool) error {
 	return s.writePrereqFile(f)
 }
 
-// hmrGatePath is the marker the Vite HMR-gate plugin reads. The plugin resolves
-// it against its own working directory, which is the Vite lane's — apps/ui —
-// so the marker is written there, not at the workspace root.
-func (s *Store) hmrGatePath(uiDir string) string {
-	return filepath.Join(uiDir, ".haven-hmr-gate")
-}
-
-// WriteHMRGate writes the gate expiry (unix-ms) so Vite defers HMR until then.
-func (s *Store) WriteHMRGate(uiDir string, expiryUnixMs int64) error {
-	return os.WriteFile(s.hmrGatePath(uiDir), []byte(strconv.FormatInt(expiryUnixMs, 10)+"\n"), 0o644)
-}
-
-// ReadHMRGate reads the gate expiry (unix-ms); ok is false when no gate is set.
-func (s *Store) ReadHMRGate(uiDir string) (int64, bool) {
-	b, err := os.ReadFile(s.hmrGatePath(uiDir))
-	if err != nil {
-		return 0, false
-	}
-	n, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
-	if err != nil {
-		return 0, false
-	}
-	return n, true
-}
-
-// ClearHMRGate removes the marker so HMR resumes immediately.
-func (s *Store) ClearHMRGate(uiDir string) { _ = os.Remove(s.hmrGatePath(uiDir)) }
-
 // dbActivityPath is the machine-wide last-seen clock for per-slug databases.
 func (s *Store) dbActivityPath() string { return filepath.Join(s.home, "db-activity.json") }
 
@@ -371,27 +355,31 @@ func (s *Store) writeDBActivity(m map[string]time.Time) error {
 
 // ClaimDaemon / Daemon / ClearDaemon manage the singleton daemon record.
 
-// ClaimDaemon writes the daemon record only if none exists yet. The O_EXCL
-// create is atomic across processes, so of two daemons racing to start exactly
-// one claims the slot; the loser gets (false, nil) and an untouched record. A
-// stale record left by a crashed daemon must be cleared (ClearDaemon) before the
-// claim can succeed — ClaimDaemon itself never overwrites.
+// ClaimDaemon takes haven.lock without waiting and keeps it for the life of
+// this process (D9); the loser gets (false, nil) and an untouched record. The
+// lock is its own file because the record is renamed over, as lockDurations.
+// The kernel drops the lock with its holder, so a crash leaves nothing to clear.
 func (s *Store) ClaimDaemon(info app.DaemonInfo) (bool, error) {
 	if err := os.MkdirAll(s.home, 0o755); err != nil {
 		return false, err
 	}
-	f, err := os.OpenFile(s.daemonPath(), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(s.daemonLockPath(), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // G703: a fixed name under haven's own home
 	if err != nil {
-		if os.IsExist(err) {
+		return false, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
 			return false, nil
 		}
 		return false, err
 	}
-	defer func() { _ = f.Close() }()
 	b, _ := json.MarshalIndent(info, "", "  ")
-	if _, err := f.Write(append(b, '\n')); err != nil {
+	if err := writeFileAtomic(s.daemonPath(), append(b, '\n'), 0o644); err != nil {
+		_ = f.Close()
 		return false, err
 	}
+	s.daemonLock = f
 	return true, nil
 }
 
@@ -407,7 +395,15 @@ func (s *Store) Daemon() (app.DaemonInfo, bool) {
 	return d, true
 }
 
-func (s *Store) ClearDaemon() { _ = os.Remove(s.daemonPath()) }
+// ClearDaemon drops the record, then the lock if this process holds it: in that
+// order, so a successor never claims and then loses its fresh record.
+func (s *Store) ClearDaemon() {
+	_ = os.Remove(s.daemonPath())
+	if s.daemonLock != nil {
+		_ = s.daemonLock.Close()
+		s.daemonLock = nil
+	}
+}
 
 func (s *Store) heavyRunsDir() string  { return filepath.Join(s.home, "heavy-runs") }
 func (s *Store) durationsPath() string { return filepath.Join(s.home, "run-durations.json") }

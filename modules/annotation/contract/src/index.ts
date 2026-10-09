@@ -13,3 +13,4 @@ export * from "./annotation-queue.errors.ts";
 export * from "./annotation-queue.schemas.ts";
 export * from "./annotation-review.schemas.ts";
 export * from "./annotation-form.types.ts";
+export * from "./annotation-facts.events.ts";

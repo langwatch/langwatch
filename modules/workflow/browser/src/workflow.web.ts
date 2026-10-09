@@ -5,11 +5,12 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import {
+  HoverableBigTextToken,
+  RedactedFieldToken,
   RunExperimentViaApiDialogToken,
   VersionBoxToken,
-  workflowOptimizationTrpc,
-  workflowTrpc,
-} from "@langwatch/workflow-contract";
+} from "@langwatch/workflow-client";
+import { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
 
 import { workflowApi } from "./behavior/workflow-api.ts";
 
@@ -31,18 +32,16 @@ export const workflowWeb = defineBrowserModule("workflow")
       load: () => import("./ui/sections/workflows/workflow-chat-screen.tsx"),
     },
   })
-  /** Lent under §3.4 rule 7: to evaluator, and run-via-api plus the version badge to experiment. */
-  .withCapabilities({
-    hoverableBigText: {
-      load: async () => ({
-        default: (await import("./ui/sections/hoverable-big-text.tsx")).HoverableBigText,
-      }),
-    },
-    redactedField: {
-      load: async () => ({
-        default: (await import("./ui/sections/redacted-field.tsx")).RedactedField,
-      }),
-    },
+  /** Lent by token (§10.1): clamped text and the redaction marker to evaluator and experiment. */
+  .lends(HoverableBigTextToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/hoverable-big-text.tsx")).HoverableBigText,
+    }),
+  })
+  .lends(RedactedFieldToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/redacted-field.tsx")).RedactedField,
+    }),
   })
   .lends(VersionBoxToken, {
     load: async () => ({

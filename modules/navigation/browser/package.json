@@ -12,14 +12,6 @@
       "langwatch-declaration-source": "./src/navigation.web.ts",
       "types": "./dist/navigation.web.d.ts",
       "default": "./src/navigation.web.ts"
-    },
-    "./chrome": {
-      "types": "./dist/ui/index.d.ts",
-      "default": "./src/ui/index.ts"
-    },
-    "./navigation": {
-      "types": "./dist/navigation.d.ts",
-      "default": "./src/navigation.ts"
     }
   },
   "scripts": {
@@ -28,19 +20,24 @@
   },
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
-    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-client": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/dataset-client": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/evaluator-client": "workspace:*",
+    "@langwatch/feature-flag-client": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/insight-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/navigation-client": "workspace:*",
+    "@langwatch/navigation-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/organization-client": "workspace:*",
     "@langwatch/prompt-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
