@@ -232,12 +232,15 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
   "services/mailsim",
-  // The other simulators haven runs (LLM, storage, analytics, voice) and the
-  // diff and fuzz suites: their specs/setup scenarios bind only from Go tests.
+  // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
+  // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
+  // only from Go tests.
   "services/llmsim",
   "services/storagesim",
   "services/analyticssim",
   "services/voicesim",
+  "services/outboundsim",
+  "services/telemetrysim",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
