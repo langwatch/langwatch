@@ -462,6 +462,8 @@ export const WelcomeScreen: React.FC = () => {
             />
           </motion.div>
 
+          {currentScreen?.footer ? <currentScreen.footer surface={screenSurface} /> : null}
+
           <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
             <HStack justify="center" gap={1.5}>
               {dotScreens.map((_, idx) => (
