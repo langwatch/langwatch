@@ -14,6 +14,7 @@ import {
   Text,
   Wrap,
 } from "@langwatch/design-system/primitives";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { readableDate } from "@langwatch/time";
 import { DatabaseZap } from "lucide-react";
@@ -22,8 +23,13 @@ import type { ReactNode } from "react";
 import type { RouterOutputs } from "../../../../behavior/ops-api.ts";
 import { formatDuration } from "../../../../model/ops-formatters.ts";
 import {
+  isFinished,
+  orderReleasesNewestFirst,
+  remainingCount,
   runOutcomeLabel,
   statusTone,
+  statusWords,
+  summariseError,
   tonePalette,
   toneOf,
   upgradeCommandFor,
@@ -34,6 +40,7 @@ import type {
   UpgradeStatusView,
   UpgradeStepView,
 } from "../../model/upgrade-view.ts";
+import { UpgradeErrorSummary } from "../elements/upgrade-error-summary.tsx";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
 /** U4: one tenant step (`name` is its step id) with its tenants' state counts, as served. */
@@ -63,17 +70,20 @@ export type UpgradesOverviewProps = {
   onOpenRelease: (release: string) => void;
   onOpenRun: (runId: string) => void;
   onOpenStep: (stepId: string) => void;
+  /** Opens the Tenant migrations tab, where enrolment and per-organization actions live. */
+  onManageTenants?: () => void;
 };
 
 function StateHeadline({ status }: { status: UpgradeStatusView }) {
   const command = upgradeCommandFor({ reason: status.reason });
   return (
-    <Stack gap={2} data-testid="upgrade-installation-state">
-      <HStack gap={2}>
+    <Stack gap={3} data-testid="upgrade-installation-state">
+      <HStack gap={3} flexWrap="wrap">
         <UpgradeStatusBadge label={{ label: status.label, tone: toneOf(status.tone) }} size="lg" />
-        {status.installed && <CopyButton value={status.installed} label="Copy installed release" />}
+        <Text textStyle="sm" color="fg.muted">
+          {status.summary}
+        </Text>
       </HStack>
-      <Text textStyle="sm">{status.summary}</Text>
       {command && (
         <HStack gap={2}>
           <Code>{command}</Code>
@@ -134,7 +144,10 @@ function NeedsAttention({
                 justifyContent="start"
                 onClick={() => onOpenStep(step.id)}
               >
-                {step.id}: {step.lastError ?? step.statusLabel}
+                <Text as="span" fontFamily="mono">
+                  {step.id}
+                </Text>
+                : {step.lastError ? summariseError(step.lastError) : step.statusLabel}
               </Button>
             ))}
           </Stack>
@@ -144,22 +157,49 @@ function NeedsAttention({
   );
 }
 
-function StepCounts({ counts }: { counts: Record<string, number> }) {
+/** The unfinished counts as badges in their tone, e.g. "3 pending", "1 failed". */
+function RemainingBadges({ counts }: { counts: Record<string, number> }) {
   return (
     <Wrap gap={1}>
       {Object.entries(counts)
-        .filter(([, count]) => count > 0)
+        .filter(([status, count]) => count > 0 && !isFinished(status))
         .map(([status, count]) => (
           <Badge
             key={status}
             size="sm"
-            variant="subtle"
-            colorPalette={tonePalette(statusTone(status))}
+            variant="solid"
+            colorPalette={statusTone(status) === "neutral" ? "orange" : tonePalette(statusTone(status))}
           >
-            {count} {status}
+            {count} {statusWords(status)}
           </Badge>
         ))}
     </Wrap>
+  );
+}
+
+function ReleaseProgress({ release }: { release: UpgradeReleaseView }) {
+  if (release.stepCount === 0) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        No steps
+      </Text>
+    );
+  }
+  const done = release.counts.done ?? 0;
+  const notNeeded = release.counts["not-needed"] ?? 0;
+  return (
+    <Stack gap={1}>
+      <MeterBar
+        fillRatio={(done + notNeeded) / release.stepCount}
+        width="160px"
+        height="6px"
+        fillColor="green.solid"
+      />
+      <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
+        {done} of {release.stepCount} done
+        {notNeeded > 0 && ` · ${notNeeded} not needed`}
+      </Text>
+    </Stack>
   );
 }
 
@@ -175,32 +215,52 @@ function ReleasesTable({
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Release</Table.ColumnHeader>
-          <Table.ColumnHeader>Here</Table.ColumnHeader>
-          <Table.ColumnHeader>Steps</Table.ColumnHeader>
+          <Table.ColumnHeader>Still to do</Table.ColumnHeader>
+          <Table.ColumnHeader>Progress</Table.ColumnHeader>
         </Table.Row>
       </Table.Header>
       <Table.Body>
-        {releases.map((release) => (
-          <Table.Row
-            key={release.release ?? UNRELEASED}
-            cursor="pointer"
-            onClick={() => onOpenRelease(release.release ?? UNRELEASED)}
-          >
-            <Table.Cell fontFamily="mono">{release.release ?? "Unreleased"}</Table.Cell>
-            <Table.Cell>
-              <Wrap gap={1}>
-                {release.installed && <Badge size="sm">Installed</Badge>}
-                {release.image && <Badge size="sm">This image</Badge>}
-              </Wrap>
-            </Table.Cell>
-            <Table.Cell>
-              <HStack gap={2}>
-                <Text textStyle="sm">{release.stepCount}</Text>
-                <StepCounts counts={release.counts} />
-              </HStack>
-            </Table.Cell>
-          </Table.Row>
-        ))}
+        {orderReleasesNewestFirst(releases).map((release) => {
+          const remaining = remainingCount(release.counts);
+          return (
+            <Table.Row
+              key={release.release ?? UNRELEASED}
+              cursor="pointer"
+              onClick={() => onOpenRelease(release.release ?? UNRELEASED)}
+              data-testid={`upgrade-release-${release.release ?? UNRELEASED}`}
+            >
+              <Table.Cell>
+                <HStack gap={2}>
+                  <Text fontFamily="mono" textStyle="sm" fontWeight="medium">
+                    {release.release ?? "Unreleased"}
+                  </Text>
+                  {release.installed && (
+                    <Badge size="sm" colorPalette="green" variant="subtle">
+                      Installed
+                    </Badge>
+                  )}
+                  {release.image && (
+                    <Badge size="sm" colorPalette="blue" variant="subtle">
+                      This image
+                    </Badge>
+                  )}
+                </HStack>
+              </Table.Cell>
+              <Table.Cell>
+                {remaining > 0 ? (
+                  <RemainingBadges counts={release.counts} />
+                ) : (
+                  <Text textStyle="sm" color="fg.muted">
+                    {release.stepCount === 0 ? "Nothing" : "All applied"}
+                  </Text>
+                )}
+              </Table.Cell>
+              <Table.Cell>
+                <ReleaseProgress release={release} />
+              </Table.Cell>
+            </Table.Row>
+          );
+        })}
       </Table.Body>
     </ListTable>
   );
@@ -213,7 +273,13 @@ function RunsTable({
   runs: readonly UpgradeRunSummaryView[];
   onOpenRun: (runId: string) => void;
 }) {
-  if (runs.length === 0) return <Text color="fg.muted">No release upgrade has run yet.</Text>;
+  if (runs.length === 0) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        No release upgrade has run yet.
+      </Text>
+    );
+  }
   return (
     <ListTable data-testid="upgrade-runs">
       <Table.Header>
@@ -222,7 +288,7 @@ function RunsTable({
           <Table.ColumnHeader>Release</Table.ColumnHeader>
           <Table.ColumnHeader>Kind</Table.ColumnHeader>
           <Table.ColumnHeader>Started</Table.ColumnHeader>
-          <Table.ColumnHeader>Duration</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Duration</Table.ColumnHeader>
         </Table.Row>
       </Table.Header>
       <Table.Body>
@@ -232,9 +298,13 @@ function RunsTable({
               <UpgradeStatusBadge label={runOutcomeLabel(run.outcome)} />
             </Table.Cell>
             <Table.Cell fontFamily="mono">{run.release ?? "Unreleased"}</Table.Cell>
-            <Table.Cell>{run.kind}</Table.Cell>
-            <Table.Cell>{readableDate(run.startedAt).toLocaleString()}</Table.Cell>
-            <Table.Cell>{formatDuration(run.startedAt, run.finishedAt)}</Table.Cell>
+            <Table.Cell textTransform="capitalize">{run.kind}</Table.Cell>
+            <Table.Cell whiteSpace="nowrap">
+              {readableDate(run.startedAt).toLocaleString()}
+            </Table.Cell>
+            <Table.Cell textAlign="end" whiteSpace="nowrap">
+              {formatDuration(run.startedAt, run.finishedAt)}
+            </Table.Cell>
           </Table.Row>
         ))}
       </Table.Body>
@@ -247,6 +317,25 @@ function waitingWriterLabel(writer: UpgradeStepView["waitingOn"][number]): strin
   const name = writer.release ?? writer.image;
   if (!writer.lastSeenAt) return `${writer.role} (${name})`;
   return `${writer.role} (${name}, last seen ${readableDate(writer.lastSeenAt).toLocaleString()})`;
+}
+
+/** The status badge, with progress or what the step waits on as one muted line under it. */
+function StepState({ step }: { step: UpgradeStepView }) {
+  const detail = step.progress
+    ? `${Math.floor((step.progress.done / step.progress.total) * 100)}% · ${step.progress.done} of ${step.progress.total}`
+    : step.waitingOn.length > 0
+      ? `Waiting on ${step.waitingOn.map(waitingWriterLabel).join(", ")}`
+      : null;
+  return (
+    <Stack gap={1} align="start">
+      <UpgradeStatusBadge label={{ label: step.statusLabel, tone: statusTone(step.status) }} />
+      {detail && (
+        <Text textStyle="xs" color="fg.muted">
+          {detail}
+        </Text>
+      )}
+    </Stack>
+  );
 }
 
 function PendingSteps({
@@ -262,18 +351,22 @@ function PendingSteps({
   onRetryStep?: (stepId: string) => void;
   retryingStepId?: string | null;
 }) {
+  const show = {
+    release: steps.some((step) => step.release !== null),
+    finishBy: steps.some((step) => step.finishBy !== null),
+    error: steps.some((step) => step.lastError !== null),
+    retry: onRetryStep !== void 0 && steps.some((step) => step.status === "failed"),
+  };
   return (
     <ListTable data-testid={`upgrade-${group}-steps`}>
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
           <Table.ColumnHeader>Status</Table.ColumnHeader>
-          <Table.ColumnHeader>Progress</Table.ColumnHeader>
-          <Table.ColumnHeader>Waiting on</Table.ColumnHeader>
-          <Table.ColumnHeader>Release</Table.ColumnHeader>
-          <Table.ColumnHeader>Finish by</Table.ColumnHeader>
-          <Table.ColumnHeader>Last error</Table.ColumnHeader>
-          <Table.ColumnHeader />
+          {show.release && <Table.ColumnHeader>Release</Table.ColumnHeader>}
+          {show.finishBy && <Table.ColumnHeader whiteSpace="nowrap">Finish by</Table.ColumnHeader>}
+          {show.error && <Table.ColumnHeader>Last error</Table.ColumnHeader>}
+          {show.retry && <Table.ColumnHeader aria-label="Actions" />}
         </Table.Row>
       </Table.Header>
       <Table.Body>
@@ -284,38 +377,64 @@ function PendingSteps({
             onClick={() => onOpenStep(step.id)}
             data-testid={`upgrade-${group}-step-${step.id}`}
           >
-            <Table.Cell fontFamily="mono">{step.id}</Table.Cell>
-            <Table.Cell>
-              <UpgradeStatusBadge
-                label={{ label: step.statusLabel, tone: statusTone(step.status) }}
-              />
+            <Table.Cell fontFamily="mono" whiteSpace="nowrap" verticalAlign="top">
+              {step.id}
             </Table.Cell>
-            <Table.Cell>
-              {step.progress && `${Math.floor((step.progress.done / step.progress.total) * 100)}%`}
+            <Table.Cell verticalAlign="top">
+              <StepState step={step} />
             </Table.Cell>
-            <Table.Cell>{step.waitingOn.map(waitingWriterLabel).join(", ")}</Table.Cell>
-            <Table.Cell fontFamily="mono">{step.release ?? "Unreleased"}</Table.Cell>
-            <Table.Cell fontFamily="mono">{step.finishBy}</Table.Cell>
-            <Table.Cell>{step.lastError}</Table.Cell>
-            <Table.Cell textAlign="end">
-              {onRetryStep && step.status === "failed" && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  loading={retryingStepId === step.id}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRetryStep(step.id);
-                  }}
-                >
-                  Retry
-                </Button>
-              )}
-            </Table.Cell>
+            {show.release && (
+              <Table.Cell fontFamily="mono" verticalAlign="top">
+                {step.release ?? "Unreleased"}
+              </Table.Cell>
+            )}
+            {show.finishBy && (
+              <Table.Cell fontFamily="mono" verticalAlign="top">
+                {step.finishBy}
+              </Table.Cell>
+            )}
+            {show.error && (
+              <Table.Cell maxWidth="420px" verticalAlign="top">
+                {step.lastError && <UpgradeErrorSummary error={step.lastError} />}
+              </Table.Cell>
+            )}
+            {show.retry && (
+              <Table.Cell textAlign="end" verticalAlign="top">
+                {step.status === "failed" && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    loading={retryingStepId === step.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRetryStep?.(step.id);
+                    }}
+                  >
+                    Retry
+                  </Button>
+                )}
+              </Table.Cell>
+            )}
           </Table.Row>
         ))}
       </Table.Body>
     </ListTable>
+  );
+}
+
+/** A tenant count: a zero stays quiet, a non-zero Held or Parked takes its tone. */
+function TenantCount({ count, palette }: { count: number; palette?: string }) {
+  if (count === 0 || !palette) {
+    return (
+      <Text as="span" textStyle="sm" color={count === 0 ? "fg.subtle" : void 0}>
+        {count}
+      </Text>
+    );
+  }
+  return (
+    <Badge size="sm" variant="subtle" colorPalette={palette}>
+      {count}
+    </Badge>
   );
 }
 
@@ -331,10 +450,9 @@ function TenantSteps({
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
-          <Table.ColumnHeader>Title</Table.ColumnHeader>
-          <Table.ColumnHeader>Finalized</Table.ColumnHeader>
-          <Table.ColumnHeader>Held</Table.ColumnHeader>
-          <Table.ColumnHeader>Parked</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Finalized</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Held</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Parked</Table.ColumnHeader>
         </Table.Row>
       </Table.Header>
       <Table.Body>
@@ -345,11 +463,23 @@ function TenantSteps({
             onClick={() => onOpenStep(step.name)}
             data-testid={`upgrade-tenant-step-${step.name}`}
           >
-            <Table.Cell fontFamily="mono">{step.name}</Table.Cell>
-            <Table.Cell>{step.title}</Table.Cell>
-            <Table.Cell>{step.counts.finalized}</Table.Cell>
-            <Table.Cell>{step.counts.migrated}</Table.Cell>
-            <Table.Cell>{step.counts.parked}</Table.Cell>
+            <Table.Cell>
+              <Stack gap={0}>
+                <Text textStyle="sm">{step.title}</Text>
+                <Text textStyle="xs" color="fg.muted" fontFamily="mono">
+                  {step.name}
+                </Text>
+              </Stack>
+            </Table.Cell>
+            <Table.Cell textAlign="end">
+              <TenantCount count={step.counts.finalized} />
+            </Table.Cell>
+            <Table.Cell textAlign="end">
+              <TenantCount count={step.counts.migrated} palette="orange" />
+            </Table.Cell>
+            <Table.Cell textAlign="end">
+              <TenantCount count={step.counts.parked} palette="red" />
+            </Table.Cell>
           </Table.Row>
         ))}
       </Table.Body>
@@ -357,10 +487,21 @@ function TenantSteps({
   );
 }
 
-function OverviewBlock({ title, children }: { title: string; children: ReactNode }) {
+function OverviewBlock({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <Stack gap={3}>
-      <Heading size="sm">{title}</Heading>
+      <HStack justify="space-between">
+        <Heading size="sm">{title}</Heading>
+        {action}
+      </HStack>
       {children}
     </Stack>
   );
@@ -382,6 +523,7 @@ export function UpgradesOverview({
   onOpenRelease,
   onOpenRun,
   onOpenStep,
+  onManageTenants,
 }: UpgradesOverviewProps) {
   if (status.reason === "no-upgrade-recorded" && runs.length === 0) {
     return (
@@ -400,14 +542,8 @@ export function UpgradesOverview({
       <OverviewBlock title="Releases">
         <ReleasesTable releases={releases} onOpenRelease={onOpenRelease} />
       </OverviewBlock>
-      {(status.state === "finishing-in-background" ||
-        backgroundSteps.length > 0 ||
-        backgroundLoading ||
-        activeUpcasts) && (
+      {(backgroundSteps.length > 0 || backgroundLoading || activeUpcasts) && (
         <OverviewBlock title="Finishing in background">
-          {status.state === "finishing-in-background" && (
-            <Text textStyle="sm">{status.summary}</Text>
-          )}
           {backgroundLoading && <Skeleton height="120px" aria-label="Loading background steps" />}
           {backgroundSteps.length > 0 && (
             <PendingSteps
@@ -433,7 +569,16 @@ export function UpgradesOverview({
         </OverviewBlock>
       )}
       {tenantSteps.length > 0 && (
-        <OverviewBlock title="Tenant steps">
+        <OverviewBlock
+          title="Tenant steps"
+          action={
+            onManageTenants && (
+              <Button size="xs" variant="ghost" onClick={onManageTenants}>
+                Manage tenant migrations
+              </Button>
+            )
+          }
+        >
           <TenantSteps steps={tenantSteps} onOpenStep={onOpenStep} />
         </OverviewBlock>
       )}

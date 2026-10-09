@@ -150,3 +150,54 @@ export function groupStepsByRelease<Step extends { release: string | null }>(
     ...groups.filter((group) => group.release === null),
   ];
 }
+
+/** Step statuses that need nothing more; every other status is still to do. */
+const FINISHED_STATUSES = new Set(["done", "not-needed"]);
+
+export function isFinished(status: string): boolean {
+  return FINISHED_STATUSES.has(status);
+}
+
+/** How many steps a release still has to do, from its counts by status. */
+export function remainingCount(counts: Record<string, number>): number {
+  return Object.entries(counts)
+    .filter(([status]) => !isFinished(status))
+    .reduce((sum, [, count]) => sum + count, 0);
+}
+
+function releaseParts(release: string): number[] {
+  return release.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+}
+
+/** Unreleased first (cloud tracks main), then newest release first. */
+export function orderReleasesNewestFirst<Release extends { release: string | null }>(
+  releases: readonly Release[],
+): Release[] {
+  return releases.toSorted((a, b) => {
+    if (a.release === null || b.release === null) return a.release === null ? -1 : 1;
+    const left = releaseParts(a.release);
+    const right = releaseParts(b.release);
+    for (let index = 0; index < Math.max(left.length, right.length); index++) {
+      const difference = (right[index] ?? 0) - (left[index] ?? 0);
+      if (difference !== 0) return difference;
+    }
+    return 0;
+  });
+}
+
+/** The longest an error summary reads before it is cut; the full text is a click away. */
+const ERROR_SUMMARY_LENGTH = 90;
+
+/** An error's first clause, parenthesised detail dropped, cut to one readable line. */
+export function summariseError(error: string): string {
+  const clause = (error.split(/[;\n]/)[0] ?? error).replace(/\s*\([^)]*\)/g, "").trim();
+  const sentence = clause.charAt(0).toUpperCase() + clause.slice(1);
+  return sentence.length > ERROR_SUMMARY_LENGTH
+    ? `${sentence.slice(0, ERROR_SUMMARY_LENGTH - 1).trimEnd()}…`
+    : sentence;
+}
+
+/** A status count's words: `not-needed` reads "not needed". */
+export function statusWords(status: string): string {
+  return status.replaceAll("-", " ");
+}

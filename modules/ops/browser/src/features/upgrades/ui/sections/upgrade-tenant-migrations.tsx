@@ -9,7 +9,7 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
+  Skeleton,
   Stack,
   Table,
   Text,
@@ -81,7 +81,8 @@ type EnrollmentListing = RouterOutputs["ops"]["upgrade"]["listMigrationEnrollmen
 type EnrollmentRecord = EnrollmentListing["enrollments"][number];
 type PickedOrganization = { id: string; name: string };
 
-export function MigrationsContent() {
+/** Tenant migrations: per-organization progress, enrolment and actions (was Ops > Migrations). */
+export function UpgradeTenantMigrations() {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
   const { scope } = useOpsPermission();
@@ -105,9 +106,10 @@ export function MigrationsContent() {
 
   if (query.isLoading) {
     return (
-      <Center paddingY={20}>
-        <Spinner />
-      </Center>
+      <Stack gap={4} aria-label="Loading tenant migrations">
+        <Skeleton height="64px" />
+        <Skeleton height="200px" />
+      </Stack>
     );
   }
 
