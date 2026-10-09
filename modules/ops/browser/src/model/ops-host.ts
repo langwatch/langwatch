@@ -31,6 +31,8 @@ export type OpsSuccessNotice = {
 export type OpsFailureNotice = {
   error: unknown;
   fallbackTitle: string;
+  /** A sentence for a refusal the screen made itself, with no code to look up. */
+  description?: string;
   id?: string;
 };
 
