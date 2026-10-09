@@ -41,6 +41,8 @@ export const KSUID_RESOURCES = {
   PROMPT_PLAYGROUND_THREAD: "promptthread",
   DATASET_RECORD: "datasetrecord",
   GROUP: "group",
+  INSIGHT: "insight",
+  INSIGHT_READER: "insightreader",
   INVITE: "invite",
   ROLE_BINDING: "rolebinding",
   API_KEY_ROLE: "apikeyrole",

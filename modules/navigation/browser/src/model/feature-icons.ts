@@ -11,6 +11,7 @@ import {
   FlaskConical,
   FolderOpen,
   Home,
+  Inbox,
   ListChecks,
   ListTree,
   type LucideIcon,
@@ -28,6 +29,7 @@ import {
 
 export type FeatureKey =
   | "home"
+  | "insights"
   | "analytics"
   | "traces"
   | "traces_v2"
@@ -63,6 +65,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: Home,
     color: "gray.600",
     label: "Home",
+  },
+  insights: {
+    icon: Inbox,
+    color: "gray.600",
+    label: "Insights",
   },
   analytics: {
     icon: TrendingUp,

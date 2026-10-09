@@ -22,6 +22,7 @@ export const FEATURE_NAMES = [
   "github",
   "hosted-mcp",
   "identity",
+  "insight",
   "instant-eval",
   "integration",
   "langy",

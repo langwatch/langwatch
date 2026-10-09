@@ -41,6 +41,7 @@ export * from "./langy-permission-policy.ts";
 export * from "./langy-turn-context.ts";
 export * from "./langy-slice.ts";
 export * from "./langy-ask.ts";
+export * from "./langy-answer-action.ts";
 export * from "./langy.dtos.ts";
 export * from "./langy.local-notices.ts";
 export * from "./langy.config.ts";

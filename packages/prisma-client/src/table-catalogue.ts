@@ -50,6 +50,8 @@ export const prismaTableCatalogue = {
   "DatasetRecord": "DatasetRecord",
   "Dashboard": "Dashboard",
   "DashboardFavourite": "DashboardFavourite",
+  "InsightProjection": "InsightProjection",
+  "InsightReaderProjection": "InsightReaderProjection",
   "SavedView": "SavedView",
   "CustomGraph": "CustomGraph",
   "BatchEvaluation": "BatchEvaluation",
@@ -1021,6 +1023,42 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "position",
     "createdAt"
+  ],
+  "InsightProjection": [
+    "id",
+    "projectId",
+    "title",
+    "body",
+    "tone",
+    "topic",
+    "validDays",
+    "lwql",
+    "sourceConversationId",
+    "sourceMessageId",
+    "filedByUserId",
+    "filedAt",
+    "renewedAt",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
+  ],
+  "InsightReaderProjection": [
+    "id",
+    "projectId",
+    "insightId",
+    "userId",
+    "seenAt",
+    "archivedAt",
+    "keptAt",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
   ],
   "SavedView": [
     "id",
@@ -3011,6 +3049,8 @@ export const prismaRelationCatalogue = {
     "graphs": "CustomGraph"
   },
   "DashboardFavourite": {},
+  "InsightProjection": {},
+  "InsightReaderProjection": {},
   "SavedView": {
     "project": "Project",
     "user": "User"

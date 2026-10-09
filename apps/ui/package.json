@@ -64,6 +64,7 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/github-browser": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/insight-browser": "workspace:*",
     "@langwatch/integration-browser": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",

@@ -2202,6 +2202,56 @@ model DashboardFavourite {
   @@map("DashboardFavourite")
 }
 
+/// One insight in a project's inbox, folded from its `insight` aggregate (modules/insight).
+/// A read model: rebuildable by replaying the event log. Epochs in milliseconds.
+model InsightProjection {
+  /// The insight id, which is also its aggregate id.
+  id                   String  @id
+  projectId            String
+  title                String
+  body                 String
+  /// bad | watch | good
+  tone                 String
+  topic                String?
+  validDays            Int
+  lwql                 String?
+  sourceConversationId String?
+  sourceMessageId      String?
+  filedByUserId        String?
+  filedAt              Float
+  /// Set by a later run that found the insight still true; nothing writes it before slice 3.
+  renewedAt            Float?
+  createdAt            Float
+  updatedAt            Float
+  occurredAt           Float
+  acceptedAt           Float
+  lastEventId          String
+  projectionVersion    String
+
+  @@index([projectId, filedAt])
+}
+
+/// One reader's own state on one insight (seen, done, kept), folded from the same stream.
+/// Personal: one member marking an insight done never moves it for another.
+model InsightReaderProjection {
+  id                String @id
+  projectId         String
+  insightId         String
+  userId            String
+  seenAt            Float?
+  archivedAt        Float?
+  keptAt            Float?
+  createdAt         Float
+  updatedAt         Float
+  occurredAt        Float
+  acceptedAt        Float
+  lastEventId       String
+  projectionVersion String
+
+  @@unique([projectId, insightId, userId])
+  @@index([projectId, userId])
+}
+
 model SavedView {
   id        String   @id @default(nanoid())
   projectId String

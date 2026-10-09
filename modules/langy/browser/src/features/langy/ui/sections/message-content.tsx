@@ -16,6 +16,7 @@ import type { UIMessage } from "ai";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { LentAnswerActions } from "../../../../behavior/lent-answer-actions.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   hasLangyBlockParts,
@@ -409,6 +410,14 @@ function AssistantMessage(props: MessageContentProps) {
         <AnswerCards props={props} />
         {/* The reply the user cut short says so, whatever it managed to say first. */}
         {interrupted && !isStreaming ? <MutedAnswerLine>Interrupted</MutedAnswerLine> : null}
+        {!isStreaming && reading.displayText && project ? (
+          <LentAnswerActions
+            projectId={project.id}
+            conversationId={conversationId ?? null}
+            messageId={message.id}
+            answerText={reading.displayText}
+          />
+        ) : null}
         {showsFeedbackPrompt({ props, reading }) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}

@@ -354,6 +354,8 @@ export const APP_ERROR_CODES = [
   "ingestion_source_not_found",
   "ingestion_source_unauthorized",
   "ingestion_wrong_endpoint",
+  "insight_not_found",
+  "insights_not_enabled",
   "instant_eval_already_finished",
   "instant_eval_classifier_not_configured",
   "instant_eval_classifier_unavailable",

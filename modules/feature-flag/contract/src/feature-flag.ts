@@ -296,6 +296,13 @@ export const FEATURE_FLAGS = [
       "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
   },
   {
+    key: "release_insights",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens the Insights inbox (/[project]/insights): the project's saved insights in Inbox, Stale and Archived folders with per-person read and done state, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
+  },
+  {
     key: "release_ui_comparison_leaderboard_enabled",
     scope: "PRODUCT",
     defaultValue: false,

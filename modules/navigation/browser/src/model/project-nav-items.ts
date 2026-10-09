@@ -8,6 +8,7 @@ export type ProjectNavItem = {
 
 export const projectNavItems = {
   home: { path: "/[project]", title: "Home" },
+  insights: { path: "/[project]/insights", title: "Insights" },
   analytics: { path: "/[project]/analytics", title: "Analytics" },
   dashboards: { path: "/[project]/dashboards", title: "Dashboards" },
   traces_v2: { path: "/[project]/traces", title: "Trace Explorer" },

@@ -140,6 +140,12 @@
       "subjects": ["identity"]
     },
     {
+      "id": "insight",
+      "root": "modules/insight",
+      "classification": "core",
+      "subjects": ["insight"]
+    },
+    {
       "id": "instant-eval",
       "root": "modules/instant-eval",
       "classification": "core",

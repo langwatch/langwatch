@@ -44,6 +44,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_custom_chart_playground",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",
+  // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
+  "release_insights",
   // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
   // bar says Instant Evals are not enabled instead of starting a run
   // (specs/traces-v2/instant-eval-search.feature).

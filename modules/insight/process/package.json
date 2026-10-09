@@ -1,0 +1,48 @@
+{
+  "name": "@langwatch/insight-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Insight feature: the insight pipeline, its projections and its doors.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/insight-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

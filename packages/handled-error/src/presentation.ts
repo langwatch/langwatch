@@ -534,6 +534,14 @@ const presentations = {
     title: "Dashboards aren't switched on here",
     describe: () => "This project doesn't have Dashboards enabled yet.",
   },
+  insight_not_found: {
+    title: "Insight not found",
+    describe: () => "It may have been removed. Reload to see the current inbox.",
+  },
+  insights_not_enabled: {
+    title: "Insights aren't switched on here",
+    describe: () => "This project doesn't have Insights enabled yet.",
+  },
   dashboard_reorder_unknown_ids: {
     title: "Some of those dashboards are gone",
     describe: () =>
