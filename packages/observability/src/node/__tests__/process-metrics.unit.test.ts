@@ -16,15 +16,18 @@ const settings = (over: Partial<TelemetrySettings>): TelemetrySettings => ({
   environment: "test",
   serviceVersion: void 0,
   resourceAttributes: void 0,
+  serviceName: void 0,
+  sdkDisabled: false,
   tracesSampleRatio: void 0,
+  traces: { exporter: void 0 },
   logs: {
     format: void 0,
     level: void 0,
     consoleLevel: void 0,
     otelLevel: void 0,
-    otelExport: false,
+    exporter: "none",
   },
-  metrics: { mode: "otlp", enabled: true },
+  metrics: { exporter: "otlp" },
   ...over,
 });
 
@@ -80,7 +83,7 @@ describe("the process metrics transport", () => {
   describe("given the default OTLP mode", () => {
     /** @scenario "Metrics push over OTLP" */
     it("pushes, and mounts no scrape door", async () => {
-      const contributions = await composeMetrics({ metrics: { mode: "otlp", enabled: true } });
+      const contributions = await composeMetrics({ metrics: { exporter: "otlp" } });
 
       expect(routeIn(contributions)).toBeUndefined();
       expect(contributions).toHaveLength(1);
@@ -92,7 +95,7 @@ describe("the process metrics transport", () => {
     /** @scenario "A scrape reads the process's own instruments" */
     it("mounts a door that serves this process's own instruments", async () => {
       const contributions = await composeMetrics({
-        metrics: { mode: "prometheus", enabled: true },
+        metrics: { exporter: "otlp,prometheus" },
       });
       counter({ name: "langwatch_test_jobs", description: "jobs" }).inc(void 0, 2);
 
@@ -106,7 +109,7 @@ describe("the process metrics transport", () => {
     /** @scenario "The scrape door is gated by the configured token" */
     it("refuses a scrape that does not carry the configured token", async () => {
       const contributions = await composeMetrics(
-        { metrics: { mode: "prometheus", enabled: true } },
+        { metrics: { exporter: "otlp,prometheus" } },
         { LANGWATCH_METRICS_TOKEN: "scrape-me" },
       );
 
@@ -119,7 +122,7 @@ describe("the process metrics transport", () => {
     /** @scenario "In production an unset scrape token mounts no door" */
     it("mounts no door when no token is configured", async () => {
       const contributions = await composeMetrics(
-        { metrics: { mode: "prometheus", enabled: true } },
+        { metrics: { exporter: "otlp,prometheus" } },
         {},
         "production",
       );
@@ -131,7 +134,7 @@ describe("the process metrics transport", () => {
     /** @scenario "An authenticated scrape in production reads the process's instruments" */
     it("serves a scrape that carries the configured token", async () => {
       const contributions = await composeMetrics(
-        { metrics: { mode: "prometheus", enabled: true } },
+        { metrics: { exporter: "otlp,prometheus" } },
         { LANGWATCH_METRICS_TOKEN: "scrape-me" },
         "production",
       );
@@ -149,7 +152,7 @@ describe("the process metrics transport", () => {
     /** @scenario "Metrics are switched off entirely" */
     it("mounts no door at all", async () => {
       const contributions = await composeMetrics({
-        metrics: { mode: "prometheus", enabled: false },
+        metrics: { exporter: "none" },
       });
 
       expect(routeIn(contributions)).toBeUndefined();
@@ -164,10 +167,10 @@ describe("the process metrics transport", () => {
         reads += 1;
         observer.observe(1);
       });
-      const first = await composeMetrics({ metrics: { mode: "prometheus", enabled: true } });
+      const first = await composeMetrics({ metrics: { exporter: "otlp,prometheus" } });
       await stopAll(first);
 
-      const second = await composeMetrics({ metrics: { mode: "prometheus", enabled: true } });
+      const second = await composeMetrics({ metrics: { exporter: "otlp,prometheus" } });
       const response = await scrape(second);
 
       expect(response.status).toBe(200);

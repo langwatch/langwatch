@@ -49,7 +49,7 @@ async function serve(environment: Readonly<Record<string, string>>) {
     });
 }
 
-const prometheus = { LANGWATCH_METRICS_MODE: "prometheus" };
+const prometheus = { OTEL_METRICS_EXPORTER: "otlp,prometheus" };
 
 describe("a process scraped through its health door", () => {
   describe("given a metrics key is configured", () => {

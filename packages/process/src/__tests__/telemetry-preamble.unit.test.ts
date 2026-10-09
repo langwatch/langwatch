@@ -31,7 +31,7 @@ describe("the preamble's telemetry and metrics slots", () => {
   describe("given the Prometheus transport", () => {
     it("starts with the scrape door hosted on the built-in health door", async () => {
       const server = await start({
-        LANGWATCH_METRICS_MODE: "prometheus",
+        OTEL_METRICS_EXPORTER: "otlp,prometheus",
         LANGWATCH_METRICS_TOKEN: "scrape-me",
       });
 

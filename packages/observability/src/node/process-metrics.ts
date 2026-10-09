@@ -13,6 +13,7 @@ import { installNodeDefaultMetrics, withRegistryFamilies } from "./node-default-
 import { startOtlpMetricsExport } from "./otlp-metrics.ts";
 import { PrometheusPullReader } from "./prometheus-exposition.ts";
 import { prometheusMetrics } from "./prometheus-metrics-door.ts";
+import { type ResolvedTelemetry, resolveTelemetry } from "./telemetry-aliases.ts";
 import {
   metricsScrapeTokenSecret,
   otlpHeadersFrom,
@@ -39,16 +40,18 @@ export function processMetrics(serviceName: string) {
     logger,
   }: MetricsContext): Promise<readonly MetricsContribution[]> => {
     const settings = config.observability;
+    const resolved = resolveTelemetry(settings);
+    const name = resolved.serviceName ?? serviceName;
 
-    if (settings.metrics.mode === "prometheus") {
+    if (resolved.metrics.mode === "prometheus") {
       const production = config.process?.nodeEnvironment === "production";
       return secrets.into(metricsScrapeTokenSecret, (token) =>
-        scrapeDoor({ serviceName, settings, token, production, logger }),
+        scrapeDoor({ serviceName: name, settings, resolved, token, production, logger }),
       );
     }
 
     return secrets.into(otlpHeadersSecret, (rawHeaders) =>
-      otlpPush({ serviceName, settings, headers: otlpHeadersFrom(rawHeaders) }),
+      otlpPush({ serviceName: name, settings, resolved, headers: otlpHeadersFrom(rawHeaders) }),
     );
   };
 }
@@ -56,15 +59,17 @@ export function processMetrics(serviceName: string) {
 function otlpPush({
   serviceName,
   settings,
+  resolved,
   headers,
 }: {
   serviceName: string;
   settings: TelemetrySettings;
+  resolved: ResolvedTelemetry;
   headers: Readonly<Record<string, string>>;
 }): readonly MetricsContribution[] {
   const flusher = startOtlpMetricsExport({
-    endpoint: settings.otlpEndpoint,
-    enabled: settings.metrics.enabled,
+    endpoint: resolved.metrics.endpoint,
+    enabled: resolved.metrics.enabled,
     headers,
     resourceAttributes: resourceAttributesFrom(settings.resourceAttributes),
     serviceName,
@@ -79,17 +84,19 @@ function otlpPush({
 function scrapeDoor({
   serviceName,
   settings,
+  resolved,
   token,
   production,
   logger,
 }: {
   serviceName: string;
   settings: TelemetrySettings;
+  resolved: ResolvedTelemetry;
   token: string | undefined;
   production: boolean;
   logger: BootLogger | undefined;
 }): readonly MetricsContribution[] {
-  if (!settings.metrics.enabled) return [inert()];
+  if (!resolved.metrics.enabled) return [inert()];
   // An unset token in production is a misconfiguration, not an invitation.
   if (token === undefined && production) {
     logger?.error(

@@ -16,16 +16,26 @@ export type TelemetrySettings = Readonly<{
   serviceVersion: string | undefined;
   /** `OTEL_RESOURCE_ATTRIBUTES`, still in its environment encoding. */
   resourceAttributes: string | undefined;
+  /** `PYROSCOPE_SERVER_ADDRESS`; absent means this process does not profile. */
+  profilingServerAddress?: string | undefined;
+  /** `OTEL_SERVICE_NAME`; absent keeps the process's own name. */
+  serviceName: string | undefined;
+  /** `OTEL_SDK_DISABLED=true`: no signal leaves the process. */
+  sdkDisabled: boolean;
   /** Share of root traces kept, in [0, 1]. Absent keeps the SDK default. */
   tracesSampleRatio: number | undefined;
+  /** Each `exporter` is its `OTEL_*_EXPORTER` list as written; `resolveTelemetry` reads them. */
+  traces: Readonly<{ exporter: string | undefined }>;
   logs: Readonly<{
     format: "pretty" | "json" | undefined;
     level: string | undefined;
     consoleLevel: string | undefined;
     otelLevel: string | undefined;
-    otelExport: boolean;
+    exporter: string | undefined;
   }>;
-  metrics: Readonly<{ mode: MetricsMode; enabled: boolean }>;
+  metrics: Readonly<{ exporter: string | undefined }>;
+  /** main's names keyed by env name, as `telemetryAliases` lists them. */
+  deprecated?: Readonly<Record<string, string | undefined>>;
 }>;
 
 /**

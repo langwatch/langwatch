@@ -28,7 +28,7 @@ async function serve(environment: Readonly<Record<string, string>>) {
   const port = await freePort();
   const { logger, lines } = createTestLogger();
   const server = await Server.create("default-collectors-test")
-    .withEnvironment({ LANGWATCH_METRICS_MODE: "prometheus", ...environment })
+    .withEnvironment({ OTEL_METRICS_EXPORTER: "otlp,prometheus", ...environment })
     .withConfig(processConfig([], "worker"))
     .withHealthPort(port)
     .withProcessOwnership(false)

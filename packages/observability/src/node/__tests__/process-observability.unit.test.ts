@@ -113,15 +113,18 @@ const settings = (over: Partial<TelemetrySettings>): TelemetrySettings => ({
   environment: "test",
   serviceVersion: void 0,
   resourceAttributes: void 0,
+  serviceName: void 0,
+  sdkDisabled: false,
   tracesSampleRatio: void 0,
+  traces: { exporter: void 0 },
   logs: {
     format: void 0,
     level: void 0,
     consoleLevel: void 0,
     otelLevel: void 0,
-    otelExport: false,
+    exporter: "none",
   },
-  metrics: { mode: "otlp", enabled: true },
+  metrics: { exporter: "otlp" },
   ...over,
 });
 

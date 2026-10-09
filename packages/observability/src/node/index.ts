@@ -41,6 +41,12 @@ export {
   type TelemetrySecrets,
   type TelemetrySettings,
 } from "./telemetry-settings.ts";
+export {
+  type ResolvedTelemetry,
+  resolveTelemetry,
+  TelemetryAliasConflictError,
+  telemetryAliases,
+} from "./telemetry-aliases.ts";
 export { processMetrics } from "./process-metrics.ts";
 
 // Every method of a service, wrapped in a span named `ClassName.methodName`,
