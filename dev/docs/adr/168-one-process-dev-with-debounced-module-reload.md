@@ -203,6 +203,8 @@ without the UI: `app.entrypoint.ts --backend-only` under `dev-supervisor.mjs --w
 survives a source edit. The supervisor restarts the process only for a `package.json`, a file
 in the host's own `src/`, or a non-zero exit after `backend ready`; a bad edit never exits the
 host. `LANGWATCH_DEV_RELOAD=process` is the escape hatch: the whole-process restart per change.
+The mail preview runs inside the ui dev process (`apps/ui/vite/mail-preview.ts`), started on first
+visit and closed after idle; `LANGWATCH_MAIL_PREVIEW_SPAWN=1` runs it apart. Storybook is still spawned.
 
 ## Amendment 2026-10-09: hold retired, debounce only
 

@@ -342,3 +342,17 @@ Feature: The local development process topology
     When the new dev server binds the port
     Then it retries until the port is released
     And the tool is not reported as external
+
+  @unit
+  Scenario: A hosted developer tool runs inside the dev server's own process
+    Given a developer tool that the dev server hosts rather than spawns
+    When someone opens the tool's page
+    Then the tool starts inside the dev server's process and serves the page
+    And once idle past the bound it is closed, and the next visit starts it again
+
+  @unit
+  Scenario: The mail preview runs inside the dev server unless asked to run apart
+    Given the ui lane's dev server is running
+    Then the mail preview is hosted in the dev server's own process
+    When the developer sets "LANGWATCH_MAIL_PREVIEW_SPAWN=1"
+    Then the mail preview starts as its own process on the first visit
