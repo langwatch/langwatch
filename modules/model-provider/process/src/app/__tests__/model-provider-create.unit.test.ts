@@ -165,6 +165,26 @@ describe("ModelProviderModule.create", () => {
     });
   });
 
+  describe("given a deployment that blocks local destinations", () => {
+    describe.each([
+      ["a metadata address", "http://169.254.169.254/latest"],
+      ["a loopback address", "http://127.0.0.1:8080/v1"],
+    ])("when a custom provider is saved with %s as its base URL", (_name, baseUrl) => {
+      it("refuses the save with model_provider_invalid", async () => {
+        const app = await createRealModelProviderApp();
+
+        await expect(
+          app.upsertUnattributed({
+            projectId: "project-1",
+            provider: "custom",
+            enabled: true,
+            customKeys: { CUSTOM_API_KEY: "sk-test", CUSTOM_BASE_URL: baseUrl },
+          }),
+        ).rejects.toMatchObject({ code: "model_provider_invalid" });
+      });
+    });
+  });
+
   describe("given default-model configs on the organization and on a sibling project", () => {
     describe("when a credential that names no person reads the snapshot", () => {
       it("lists no configs, as main's null-session read does, and still resolves the cascade", async () => {

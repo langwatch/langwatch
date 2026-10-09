@@ -252,6 +252,10 @@ export class TestModelProviderCatalog extends ModelProviderCatalog {
     return Promise.resolve(this.verdict);
   }
 
+  assertEndpointAllowed(): Promise<void> {
+    return Promise.resolve();
+  }
+
   pickExecutionValue(input: {
     customKeys: Record<string, unknown> | null;
     key: string;

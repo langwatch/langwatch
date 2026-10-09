@@ -123,6 +123,8 @@ export type RotateVirtualKeyInput = {
   id: string;
   organizationId: string;
   actorUserId: string;
+  /** Ends the previous secret at once instead of after the grace window, for a leaked key. */
+  endPreviousSecret?: boolean;
 };
 
 export type RevokeVirtualKeyInput = {

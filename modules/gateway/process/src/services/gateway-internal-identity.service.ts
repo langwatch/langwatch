@@ -9,6 +9,7 @@ import { nowInstant } from "@langwatch/time";
 
 import {
   buildGatewayCanonicalString,
+  canonicalGatewayPath,
   computeGatewaySignature,
   GATEWAY_SIGNATURE_WINDOW_SECONDS,
 } from "../rules/gateway-internal-identity.rules.ts";
@@ -69,10 +70,9 @@ export class GatewayInternalIdentityService implements RestIdentity {
     }
 
     const body = typeof rawBody === "string" ? rawBody : new TextDecoder().decode(rawBody);
-    const url = new URL(request.url);
     const canonical = buildGatewayCanonicalString({
       method: request.method,
-      path: url.pathname,
+      path: canonicalGatewayPath(new URL(request.url)),
       timestamp: presentedTs,
       body,
     });

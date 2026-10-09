@@ -1,7 +1,7 @@
 /**
  * Secret rotation. A new secret is minted and the previous one keeps working through its grace
- * window, so a caller that has not picked up the new value yet is not cut off mid-deploy. The old
- * hash stays stored only until that window closes.
+ * window, so a caller that has not picked up the new value yet is not cut off mid-deploy, unless
+ * the rotation asks to end it now. The old hash stays stored only until that window closes.
  */
 
 import { VirtualKeyRevokedError } from "@langwatch/gateway-contract";
@@ -85,7 +85,9 @@ export class VirtualKeyRotationService {
     const newSecret = this.crypto.mintSecret();
     const { displayPrefix: newDisplayPrefix } = this.crypto.parseSecret(newSecret);
     const newHashedSecret = this.crypto.hashSecret(newSecret);
-    const previousSecretValidUntil = nowInstant().add({ milliseconds: ROTATION_GRACE_MS });
+    const previousSecretValidUntil = nowInstant().add({
+      milliseconds: input.endPreviousSecret ? 0 : ROTATION_GRACE_MS,
+    });
 
     const rotated = await this.transactions.run(async (tx) => {
       const vk = await this.repository.rotateSecret(

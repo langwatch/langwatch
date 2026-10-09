@@ -50,6 +50,11 @@ export abstract class ModelProviderCatalog {
     provider: string,
     customKeys: Record<string, unknown>,
   ): Promise<ModelProviderCredentialVerdict>;
+  /** Refuses a credential write whose endpoint this deployment's egress fence would refuse. */
+  abstract assertEndpointAllowed(
+    provider: string,
+    customKeys: Record<string, unknown>,
+  ): Promise<void>;
   metadata(provider: string): {
     models: string[];
     embeddingsModels: string[];
@@ -298,6 +303,10 @@ export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
       provider,
       customKeys: customKeysSchema.parse(customKeys),
     });
+  }
+
+  assertEndpointAllowed(provider: string, customKeys: Record<string, unknown>): Promise<void> {
+    return this.options.probe.assertEndpointAllowed({ provider, customKeys });
   }
 
   pickExecutionValue(input: {

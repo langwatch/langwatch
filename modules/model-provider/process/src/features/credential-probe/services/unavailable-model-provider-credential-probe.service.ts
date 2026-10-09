@@ -33,6 +33,13 @@ export class UnavailableModelProviderCredentialProbeService extends ModelProvide
     return this.unchecked();
   }
 
+  assertEndpointAllowed(_input: {
+    provider: string;
+    customKeys: Record<string, unknown>;
+  }): Promise<void> {
+    return Promise.resolve();
+  }
+
   private unchecked(): Promise<ModelProviderCredentialVerdict> {
     return Promise.resolve({
       outcome: "unchecked",

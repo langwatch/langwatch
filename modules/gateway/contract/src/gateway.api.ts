@@ -182,6 +182,10 @@ export type GatewayVirtualKeyCommand = Readonly<{
   actorUserId: string;
 }>;
 
+/** A rotate, which may end the previous secret now instead of after its 24 h grace. */
+export type GatewayVirtualKeyRotateCommand = GatewayVirtualKeyCommand &
+  Readonly<{ endPreviousSecret?: boolean }>;
+
 /** The same, with the reason a disable records. */
 export type GatewayVirtualKeyDisableCommand = GatewayVirtualKeyCommand &
   Readonly<{ reason: string | null }>;
@@ -779,7 +783,7 @@ export interface GatewayApi extends GatewayInternalProtocol {
 
   createVirtualKey(input: GatewayVirtualKeyCreateCommand): Promise<GatewayMintedVirtualKey>;
   updateVirtualKey(input: GatewayVirtualKeyUpdateCommand): Promise<GatewayVirtualKeyRecord>;
-  rotateVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayMintedVirtualKey>;
+  rotateVirtualKey(input: GatewayVirtualKeyRotateCommand): Promise<GatewayMintedVirtualKey>;
   revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 
   /**

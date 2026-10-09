@@ -98,6 +98,10 @@ export class RecordingCredentialProbe extends ModelProviderCredentialProbe {
 
     return Promise.resolve(this.verdict);
   }
+
+  assertEndpointAllowed(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 const VERIFIED: ModelProviderCredentialVerdict = { outcome: "verified", valid: true };
