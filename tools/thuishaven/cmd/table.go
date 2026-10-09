@@ -236,6 +236,7 @@ var baseTable = []commandSpec{
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
+			{long: "--ui", takesValue: true, value: "<dev|built>", summary: "built serves a production build of apps/ui from the api, no Vite; sticks; `haven reload ui` rebuilds"},
 			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 			{long: "--no-seed", summary: "skip the auto-seed of an empty stack (HAVEN_AUTO_SEED=0 does too)"},
 		},
@@ -263,6 +264,11 @@ var baseTable = []commandSpec{
 			if inv.has("--watch") {
 				d.opts.ShouldGoWatch = inv.value("--watch") != "false" && inv.value("--watch") != "0"
 				if sel, err = d.orch.ResolveHold(d.worktree, sel, !d.opts.ShouldGoWatch); err != nil {
+					return err
+				}
+			}
+			if inv.has("--ui") {
+				if sel, err = d.orch.ResolveUI(d.worktree, sel, inv.value("--ui")); err != nil {
 					return err
 				}
 			}
@@ -335,8 +341,8 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "reload",
-		summary: "restart the Node host (app|api|worker) onto the current code and wait until it is ready",
-		args:    "[app|api|worker]",
+		summary: "restart the Node host (app|api|worker) onto the current code and wait until it is ready; ui rebuilds a --ui=built stack's bundle and swaps it in",
+		args:    "[app|api|worker|ui]",
 		maxArgs: 1,
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			name := "app"

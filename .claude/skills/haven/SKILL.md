@@ -82,6 +82,8 @@ haven restart sims                # bounce one lane; nothing else restarts
 haven restart api                 # restart the whole lane
 haven up --watch=false -f         # hold the stack (sticky): no backend reload on a file change
 haven reload [app|api|worker]     # apply changes to a held stack in place; waits for "reload finished"
+haven up --ui=built -f            # serve a production build of apps/ui from the api, no Vite (sticky; --ui=dev returns)
+haven reload ui                   # --ui=built: rebuild the bundle and swap it in; returns once swapped
 ```
 
 ## The stack's own traces and logs

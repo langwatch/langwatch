@@ -149,7 +149,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		Stack: st, Opts: opts, RepoDir: repoDir, Base: p.base,
 		NodeEnv: p.nodeEnv, LogPath: p.logPath, Port: p.port,
 	}
-	isOneProcess := !st.Layout.IsMonolith() && opts.ShouldRunOneProcess
+	isOneProcess := !st.Layout.IsMonolith() && (opts.ShouldRunOneProcess || opts.Selection.BuiltUI)
 	out := []Child{p.frontChild(mono, isOneProcess)}
 	out = append(out, p.goLanes(mono)...)
 	if opts.Selection.Langevals {
@@ -277,6 +277,8 @@ func (p *childPlan) frontChild(mono monolithPlan, isOneProcess bool) Child {
 	switch {
 	case p.st.Layout.IsMonolith():
 		return mono.appChild()
+	case isOneProcess && p.opts.Selection.BuiltUI:
+		return builtUIChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	case isOneProcess:
 		return oneProcessChild(p.repoDir, p.nodeEnv(AppLane), p.logPath(AppLane))
 	}
@@ -464,6 +466,27 @@ func oneProcessChild(repoDir string, env []string, logPath string) Child {
 		Env:   env,
 	}
 }
+
+// builtUIChild is `haven up --ui=built`: build apps/ui, then the api and worker
+// with no Vite (`dev`, --backend-only). The api serves apps/ui/dist/client as
+// production does, and app.<slug> routes to the API port (see provision).
+func builtUIChild(repoDir string, env []string, logPath string) Child {
+	return Child{
+		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath,
+		Shell: UIBuildShell + " && pnpm --silent --filter " + BackendPackage + " dev",
+		Env:   env,
+	}
+}
+
+// UIBuildShell builds apps/ui beside the served bundle and swaps it in with
+// two renames, so the api never serves a half-written one. The old hashed
+// assets are carried over: an open page still loads its lazy chunks.
+// shortcut: assets accumulate across reloads, `rm -rf apps/ui/dist` when it matters.
+const UIBuildShell = "set -e; d=" + UIDirRel + "/dist; rm -rf $d/client.next $d/client.old; " +
+	"pnpm --silent --filter " + UIPackage + " build --outDir dist/client.next; " +
+	"if [ -d $d/client/assets ]; then cp -Rn $d/client/assets/. $d/client.next/assets/ || true; fi; " +
+	"if [ -d $d/client ]; then mv $d/client $d/client.old; fi; " +
+	"mv $d/client.next $d/client; rm -rf $d/client.old"
 
 // The Node lanes a stack supervises, by workspace package name. planChildren
 // runs each with `pnpm --filter <pkg> dev` from the workspace root, so the lane

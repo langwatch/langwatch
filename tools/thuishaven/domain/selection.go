@@ -16,7 +16,10 @@ type Selection struct {
 	Mode string `json:"mode,omitempty"`
 	// Held is sticky `haven up --watch=false`: the Node host does not reload on
 	// a file change (LANGWATCH_DEV_WATCH=0); `haven reload` applies changes.
-	Held    bool `json:"held,omitempty"`
+	Held bool `json:"held,omitempty"`
+	// BuiltUI is sticky `haven up --ui=built`: app.<slug> is the api serving a
+	// production build of apps/ui, as production does; no Vite. `haven reload ui` rebuilds.
+	BuiltUI bool `json:"built-ui,omitempty"`
 	Gateway bool `json:"gateway"`
 	NLP     bool `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory

@@ -292,6 +292,21 @@ func (o *Orchestrator) ResolveHold(worktreeDir string, sel domain.Selection, hel
 	return sel, nil
 }
 
+// ResolveUI applies `up --ui=dev|built` to the sticky selection. Persists only a change.
+func (o *Orchestrator) ResolveUI(worktreeDir string, sel domain.Selection, ui string) (domain.Selection, error) {
+	if ui != "dev" && ui != "built" {
+		return sel, fmt.Errorf("--ui takes dev or built, not %q", ui)
+	}
+	if sel.BuiltUI == (ui == "built") {
+		return sel, nil
+	}
+	sel.BuiltUI = ui == "built"
+	if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
+		return sel, fmt.Errorf("saving the ui mode: %w", err)
+	}
+	return sel, nil
+}
+
 // restartObservability stops and re-ensures the shared LGTM stack, re-routing
 // its hostname. Telemetry starts fresh — the stack keeps no volume by design.
 func (o *Orchestrator) restartObservability(ctx context.Context) error {

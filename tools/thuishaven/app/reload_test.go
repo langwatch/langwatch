@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,5 +50,52 @@ func TestHeldStackSetsWatchOffOnTheNodeLane(t *testing.T) {
 		if got := slices.Contains(child.Env, "LANGWATCH_DEV_WATCH=0"); got != held {
 			t.Fatalf("held=%v but LANGWATCH_DEV_WATCH=0 present=%v", held, got)
 		}
+	}
+}
+
+// @scenario "A built UI is rebuilt beside the served one and swapped in"
+func TestUIBuildShellSwapsTheBundleAndKeepsOldAssets(t *testing.T) {
+	repo := t.TempDir()
+	served := filepath.Join(repo, "apps", "ui", "dist", "client")
+	if err := os.MkdirAll(filepath.Join(served, "assets"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(served, "assets", "old.js"), []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A stand-in pnpm: writes a build where `--outDir` (relative to apps/ui) says.
+	fake := "pnpm() { for a; do case $prev in --outDir) out=apps/ui/$a;; esac; prev=$a; done; " +
+		"mkdir -p $out/assets && echo new > $out/index.html && echo new > $out/assets/new.js; }\n"
+	cmd := exec.Command("sh", "-c", fake+UIBuildShell)
+	cmd.Dir = repo
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build shell failed: %v\n%s", err, out)
+	}
+	for _, want := range [][]string{{"index.html"}, {"assets", "new.js"}, {"assets", "old.js"}} {
+		if _, err := os.Stat(filepath.Join(append([]string{served}, want...)...)); err != nil {
+			t.Fatalf("served bundle lacks %v: %v", want, err)
+		}
+	}
+	for _, gone := range []string{"client.next", "client.old"} {
+		if _, err := os.Stat(filepath.Join(repo, "apps", "ui", "dist", gone)); err == nil {
+			t.Fatalf("%s left behind", gone)
+		}
+	}
+}
+
+// @scenario "A built UI stack runs no Vite and routes the app hostname to the api"
+func TestBuiltUIPlansTheBackendOnlyHost(t *testing.T) {
+	repo := t.TempDir()
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	st := domain.Stack{Slug: "branch", WorktreeDir: repo}
+	sel := domain.DefaultSelection()
+	sel.BuiltUI = true
+	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
+	child, ok := findChild(children, AppLane)
+	if !ok || !strings.HasPrefix(child.Shell, UIBuildShell) || !strings.HasSuffix(child.Shell, BackendPackage+" dev") {
+		t.Fatalf("want build then the backend-only host, got %+v", child)
+	}
+	if _, ok := findChild(children, APILane); ok {
+		t.Fatal("a built UI stack runs one Node host, not a separate api lane")
 	}
 }

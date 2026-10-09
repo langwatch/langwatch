@@ -339,3 +339,22 @@ Feature: The local development process topology
     Given a running held stack and a log with an old ready line
     When "haven reload" signals the host
     Then it returns only once a new "backend reload finished" or "backend ready" line is logged
+
+  # --- A built UI serves the production bundle from the api (2026-10-10) ---
+
+  # `haven up --ui=built` sticks for the stack: one backend-only Node lane, no
+  # Vite; the api serves apps/ui/dist/client. `haven reload ui` rebuilds it.
+  @unit
+  Scenario: A built UI stack runs no Vite and routes the app hostname to the api
+    Given a stack started with "haven up --ui=built"
+    When haven plans the Node lanes
+    Then one backend-only host runs with no Vite server
+    And the app hostname routes to the api port
+
+  @unit
+  Scenario: A built UI is rebuilt beside the served one and swapped in
+    Given a stack serving a built UI
+    When "haven reload ui" runs
+    Then the new bundle is built beside the served one
+    And the old assets stay loadable by open pages
+    And the bundles swap only once the build succeeded
