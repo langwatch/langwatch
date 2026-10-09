@@ -351,6 +351,42 @@ describe("seed:apply", () => {
     expect(apis.project.create).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A trace chunk older than 31 days asks the trace owner's backfill reach" */
+  it("asks the trace owner's backfill reach for a chunk older than 31 days, and only then", async () => {
+    const apis = seedApis();
+    const at = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+    const chunk = (id: string, daysAgo: number) => ({
+      id,
+      kind: "trace.otlp",
+      org: "o",
+      project: "p",
+      at: at(daysAgo),
+      input: { resourceSpans: [] },
+    });
+    await applyLines({ apis, lines: [chunk("r/1", 90), chunk("r/2", 3)] });
+    expect(apis.trace.otlpTraces).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "p", backfillMaxPastDays: 91 }),
+    );
+    expect(apis.trace.otlpTraces).toHaveBeenCalledWith({
+      tenantId: "p",
+      traceRequest: { resourceSpans: [] },
+    });
+  });
+
+  /** @scenario "The persona counts haven seed prints are what it created" */
+  it("refuses a trace chunk whose spans the owner dropped", async () => {
+    const apis = seedApis({
+      trace: createApiFixture<TraceApi>({ otlpTraces: vi.fn(async () => ({ rejectedSpans: 2 })) }),
+    });
+    const [reply] = await applyLines({
+      apis,
+      lines: [
+        { id: "r/1", kind: "trace.otlp", org: "o", project: "p", input: { resourceSpans: [] } },
+      ],
+    });
+    expect(reply).toEqual({ id: "r/1", ok: false, code: "otlp_spans_rejected" });
+  });
+
   /** @scenario "Seeded users share one dev password" */
   it("sets the shared password hash on accepted users only", async () => {
     const apis = seedApis();

@@ -15,6 +15,7 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
+  SPAN_MAX_PAST_MS,
   TraceApi,
   type OtlpTracesInput,
 } from "@langwatch/trace-contract";
@@ -118,6 +119,15 @@ const otlpRequestSchema = z.custom<OtlpTracesInput["traceRequest"]>(
   (value) => typeof value === "object" && value !== null && !Array.isArray(value),
 );
 const otlpExportSchema = inProject(z.record(z.string(), z.unknown()));
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A chunk older than the door's 31 days asks the trace owner's backfill reach (plan Q1 (a)). */
+const backfillReachOf = (at: string | undefined): { backfillMaxPastDays?: number } => {
+  if (!at) return {};
+  const days = Math.ceil((Date.now() - Date.parse(at)) / DAY_MS) + 1;
+  return days * DAY_MS > SPAN_MAX_PAST_MS ? { backfillMaxPastDays: days } : {};
+};
 
 const otlpOutcome = (result: { outcome: "collected" } | { outcome: "unavailable" }): SeedOutcome =>
   result.outcome === "unavailable" ? { retry: "otlp_unavailable" } : applied;
@@ -240,8 +250,14 @@ export const SEED_KINDS: Readonly<Record<string, SeedKind>> = {
   "trace.otlp": async ({ action, apis }) => {
     const { project } = otlpExportSchema.parse(action);
     const traceRequest = otlpRequestSchema.parse(action.input);
-    const result = await apis.trace.otlpTraces({ tenantId: project, traceRequest });
-    return (result.ingestionFailures ?? 0) > 0 ? { retry: "otlp_ingestion_failed" } : applied;
+    const result = await apis.trace.otlpTraces({
+      tenantId: project,
+      traceRequest,
+      ...backfillReachOf(action.at),
+    });
+    if ((result.ingestionFailures ?? 0) > 0) return { retry: "otlp_ingestion_failed" };
+    // A dropped span never landed: refusing keeps the printed counts to what exists.
+    return (result.rejectedSpans ?? 0) > 0 ? { refused: "otlp_spans_rejected" } : applied;
   },
   "log.otlp": async ({ action, apis }) => {
     const { org, project, input } = otlpExportSchema.parse(action);

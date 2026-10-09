@@ -46,7 +46,15 @@ export type OtlpTraceCollectionResult = Readonly<{
 
 /** OTLP operations are part of Trace's one public process API. */
 /** One OTLP trace export, for the tenant it belongs to. */
-export type OtlpTracesInput = { tenantId: string; traceRequest: IExportTraceServiceRequest };
+export type OtlpTracesInput = {
+  tenantId: string;
+  traceRequest: IExportTraceServiceRequest;
+  /**
+   * In-process backfill only (seed plan Q1 (a)): admits spans up to this many days old, at most
+   * `SPAN_BACKFILL_MAX_PAST_DAYS`, instead of `SPAN_MAX_PAST_MS`. The OTLP door never sets it.
+   */
+  backfillMaxPastDays?: number;
+};
 
 export type TraceOtlpIngestApi = Readonly<{
   otlpCredential(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential>;
