@@ -31,42 +31,32 @@ import {
   seedAggregateOrganization,
 } from "~/server/app-layer/projects/__tests__/aggregateProjectFixture";
 import { AGGREGATE_PROJECT_KIND } from "~/server/app-layer/projects/project-kinds";
-import { insertEventLogRow } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import {
   BlobStore,
   type S3ClientResolver,
 } from "~/server/app-layer/traces/blob-store.service";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import {
   handledCodeOf,
   insertRows,
   installAggregateTraceApp,
-  spanRow,
 } from "./helpers/aggregateTraceRoutes";
+import {
+  FULL_TURN,
+  offloadedLlmRow,
+  seedOffloadedInput,
+} from "./helpers/offloadedPromptSeed";
 
 const run = nanoid(8);
 const traceIdOf = (handle: string) => `agg-offloaded-${handle}-${run}`;
 const EVENT_ID = `evt-${run}`;
-
-const messages = (userTurn: string) =>
-  JSON.stringify([
-    { role: "system", content: "You are a careful assistant." },
-    { role: "user", content: userTurn },
-  ]);
-const FULL_TURN = `Summarise this: ${"x".repeat(70_000)}`;
-const PREVIEW_TURN = "Summarise this: xxx…";
 
 let ch: ClickHouseClient;
 let fixture: AggregateFixture;
@@ -78,27 +68,6 @@ let occurredAt: number;
 let blobStore: BlobStore;
 let eventLogReads: ReturnType<typeof vi.spyOn>;
 const llmSpanIdOf = new Map<string, string>();
-
-/** An llm span holding only the preview, under a pointer into event_log. */
-function offloadedLlmRow({
-  tenantId,
-  traceId,
-}: {
-  tenantId: string;
-  traceId: string;
-}) {
-  return {
-    ...spanRow({ tenantId, traceId, occurredAt }),
-    SpanAttributes: {
-      "langwatch.span.type": "llm",
-      "langwatch.input": messages(PREVIEW_TURN),
-      [`${EVENTREF_ATTR_PREFIX}langwatch.input`]: JSON.stringify({
-        field: "langwatch.input",
-        eventId: EVENT_ID,
-      }),
-    },
-  };
-}
 
 const tenantsRead = (): string[] =>
   eventLogReads.mock.calls.map(
@@ -150,29 +119,19 @@ beforeAll(async () => {
   const rows = [
     { tenantId: member.id, traceId: traceIdOf("member") },
     { tenantId: outsider.id, traceId: traceIdOf("outsider") },
-  ].map(offloadedLlmRow);
+  ].map(({ tenantId, traceId }) =>
+    offloadedLlmRow({ tenantId, traceId, occurredAt, eventId: EVENT_ID }),
+  );
   for (const row of rows) llmSpanIdOf.set(row.TenantId, row.SpanId);
   await insertRows({ ch, table: "stored_spans", values: rows });
 
   // The full content exists under the member only: a read under any other
   // project id finds nothing and would fall back to the preview.
-  await insertEventLogRow({
-    client: ch,
+  await seedOffloadedInput({
+    ch,
     tenantId: member.id,
-    aggregateId: traceIdOf("member"),
+    traceId: traceIdOf("member"),
     eventId: EVENT_ID,
-    eventType: SPAN_RECEIVED_EVENT_TYPE,
-    eventVersion: SPAN_RECEIVED_EVENT_VERSION_LATEST,
-    eventData: {
-      span: {
-        attributes: [
-          {
-            key: "langwatch.input",
-            value: { stringValue: messages(FULL_TURN) },
-          },
-        ],
-      },
-    },
   });
 }, 180_000);
 

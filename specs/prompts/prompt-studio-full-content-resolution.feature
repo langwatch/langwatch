@@ -155,7 +155,7 @@ Feature: Prompt studio opens the full offloaded prompt, not the preview
     Then the span is reported as not found
     And no offloaded content is read
 
-  # The two scenarios below run against real ClickHouse: the full content is
+  # The three scenarios below run against real ClickHouse: the full content is
   # seeded into event_log under the member only, so a read under the aggregate
   # could only ever find the preview.
 
@@ -173,3 +173,12 @@ Feature: Prompt studio opens the full offloaded prompt, not the preview
     When the aggregate opens a span of that trace through a trace-named link
     Then the span is reported as not found
     And no offloaded content is read
+
+  @integration
+  Scenario: A trace-named link opens the full prompt from real stores
+    Given an ordinary project that reads its own traces
+    And it holds a trace whose llm span input was offloaded to event_log
+    When the project opens that span through a trace-named link
+    Then the returned messages carry the full original value, not the preview
+    And the offloaded content is read under that project's id
+    And no internal pointer key is left in the result
