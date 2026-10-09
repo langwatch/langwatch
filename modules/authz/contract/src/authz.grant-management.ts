@@ -104,6 +104,8 @@ export const authzAccessBreakdownBindingSchema = z
     scopeId: z.string(),
     scopeName: nullableTextSchema,
     permissions: z.array(z.string()),
+    /** The member's seat holds this grant below the permissions it lists (a Lite seat). */
+    cappedBySeat: z.boolean(),
   })
   .strict();
 

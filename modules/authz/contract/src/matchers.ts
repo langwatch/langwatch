@@ -25,9 +25,9 @@ function developerSeatExcludes({
 }
 
 /**
- * A Lite seat holds a group binding as a team Lite Member at most, nothing at the organization,
- * whatever role the group carries (seat-limit-at-provisioning.feature). The seat is read at every
- * collect, so the cap lifts once the person holds a full seat.
+ * A Lite seat holds at most a Lite Member's permissions however the grant arrives (a direct
+ * custom role too), and nothing organization-wide through a group. Read at every collect, so
+ * the cap lifts once the person holds a full seat (seat-limit-at-provisioning.feature).
  */
 function liteSeatWithholds({
   binding,
@@ -35,12 +35,26 @@ function liteSeatWithholds({
   permission,
 }: {
   binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
-  grants: CollectedGrants;
+  grants: Pick<CollectedGrants, "organizationRole">;
   permission: string;
 }): boolean {
-  if (grants.organizationRole !== "EXTERNAL" || !binding.viaGroupId) return false;
-  return (
-    binding.scopeType === "ORGANIZATION" || !builtinRoleGrants({ role: "lite-member", permission })
+  if (grants.organizationRole !== "EXTERNAL") return false;
+  if (binding.viaGroupId && binding.scopeType === "ORGANIZATION") return true;
+  return !builtinRoleGrants({ role: "lite-member", permission });
+}
+
+/** Whether the seat holds this binding below the permissions it lists: shown as capped. */
+export function seatCapsBinding({
+  binding,
+  organizationRole,
+  permissions,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  organizationRole: CollectedGrants["organizationRole"];
+  permissions: readonly string[];
+}): boolean {
+  return permissions.some((permission) =>
+    liteSeatWithholds({ binding, grants: { organizationRole }, permission }),
   );
 }
 
@@ -101,7 +115,7 @@ export function bindingGrants({
     return builtinRoleGrants({ role: "org-member", permission });
   }
 
-  // EXTERNAL membership caps built-in team/project grants; only a direct custom role escapes it.
+  // EXTERNAL membership holds a built-in team/project grant as the lite-member bag.
   if (grants.organizationRole === "EXTERNAL") {
     return builtinRoleGrants({ role: "lite-member", permission });
   }

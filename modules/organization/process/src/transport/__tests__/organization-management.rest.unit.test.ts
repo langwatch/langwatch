@@ -236,6 +236,7 @@ describe("given the /api/organization family", () => {
       scopeId,
       scopeName: scopeId,
       permissions: ["traces:view"],
+      cappedBySeat: false,
     });
 
     /** @scenario "A member's access breakdown spans teams and projects" */

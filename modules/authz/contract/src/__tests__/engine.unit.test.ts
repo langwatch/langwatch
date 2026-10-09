@@ -3,9 +3,48 @@ import { describe, expect, it } from "vitest";
 
 import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "../authz.ts";
 import { AuthzEngine } from "../engine.ts";
+import { seatCapsBinding } from "../matchers.ts";
 import { builtinRoleGrants } from "../roles.ts";
 
 const engine = new AuthzEngine();
+
+describe("seatCapsBinding()", () => {
+  const groupGrant: Pick<CollectedBinding, "scopeType" | "viaGroupId"> = {
+    scopeType: "TEAM",
+    viaGroupId: "grp-1",
+  };
+
+  /** @scenario "Admins see that a group grant is capped for want of a full seat" */
+  it("marks a group grant beyond Lite Member permissions as capped on a Lite seat only", () => {
+    const permissions = ["annotations:create", "datasets:manage"];
+    expect(
+      seatCapsBinding({ binding: groupGrant, organizationRole: "EXTERNAL", permissions }),
+    ).toBe(true);
+    expect(seatCapsBinding({ binding: groupGrant, organizationRole: "MEMBER", permissions })).toBe(
+      false,
+    );
+  });
+
+  it("leaves a grant within Lite Member permissions uncapped on a Lite seat", () => {
+    expect(
+      seatCapsBinding({
+        binding: groupGrant,
+        organizationRole: "EXTERNAL",
+        permissions: ["annotations:create"],
+      }),
+    ).toBe(false);
+  });
+
+  it("marks any organization-wide group grant on a Lite seat as capped", () => {
+    expect(
+      seatCapsBinding({
+        binding: { scopeType: "ORGANIZATION", viaGroupId: "grp-1" },
+        organizationRole: "EXTERNAL",
+        permissions: ["annotations:create"],
+      }),
+    ).toBe(true);
+  });
+});
 
 const ORG = "org-1";
 const TEAM = "team-1";
@@ -260,25 +299,22 @@ describe("authz engine decide()", () => {
       expect(denied.denialReason).toBe("lite-member-restricted");
     });
 
-    it("honours an explicit non-empty custom role over the cap", () => {
+    /** @scenario "A Lite Member seat caps a direct custom role at Lite Member permissions" */
+    it("caps a direct custom role at the lite-member bag, at any scope", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",
         bindings: [
-          binding({
-            roleKey: "custom:cr-2",
-            scopeType: "TEAM",
-            scopeId: TEAM,
-          }),
+          binding({ roleKey: "custom:cr-2", scopeType: "TEAM", scopeId: TEAM }),
+          binding({ roleKey: "custom:cr-2", scopeType: "ORGANIZATION", scopeId: ORG }),
         ],
-        customRolePermissions: new Map([["cr-2", ["datasets:manage"]]]),
+        customRolePermissions: new Map([["cr-2", ["datasets:manage", "annotations:create"]]]),
       });
       expect(
-        engine.decide({
-          grants,
-          permission: "datasets:manage",
-          scope: projectScope,
-        }).allowed,
+        engine.decide({ grants, permission: "annotations:create", scope: projectScope }).allowed,
       ).toBe(true);
+      const denied = engine.decide({ grants, permission: "datasets:manage", scope: projectScope });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("lite-member-restricted");
     });
 
     it("skips org-scoped non-CUSTOM bindings entirely", () => {

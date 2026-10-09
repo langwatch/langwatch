@@ -267,7 +267,8 @@ describe("OrganizationMembershipService", () => {
       vi.mocked(mockRepo.readJoinerSeat).mockResolvedValue("MEMBER");
     });
 
-    it("writes a Lite Member row and attaches no full member grant", async () => {
+    /** @scenario "An approved join request given a Lite Member seat holds the organization-wide Viewer grant" */
+    it("writes a Lite Member row and lands the organization-wide Viewer grant", async () => {
       mockCheckLimit.mockImplementation(async ({ resource }: { resource: string }) => ({
         allowed: resource === "membersLite",
         limitType: resource,
@@ -286,9 +287,28 @@ describe("OrganizationMembershipService", () => {
         seat: "EXTERNAL",
         pending: false,
       });
-      expect(attached).toEqual([]);
+      const grantId = vi
+        .mocked(mockRepo.createMembership)
+        .mock.calls.at(-1)?.[0].pendingAdmissionId;
+      expect(attached).toEqual([
+        expect.objectContaining({
+          source: "join-request",
+          bindings: [
+            expect.objectContaining({
+              bindingId: grantId,
+              principal: { userId: "user-456" },
+              role: "VIEWER",
+              customRoleId: null,
+              scopeType: "ORGANIZATION",
+              scopeId: "org-123",
+            }),
+          ],
+        }),
+      ]);
+      expect(completed).toEqual([{ organizationId: "org-123", userId: "user-456", grantId }]);
     });
 
+    /** @scenario "An arrival held pending for want of any seat is given no grant" */
     it("holds the person pending when the Lite Member seats are used up too", async () => {
       mockCheckLimit.mockResolvedValue({
         allowed: false,

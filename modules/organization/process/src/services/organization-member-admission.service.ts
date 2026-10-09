@@ -83,8 +83,8 @@ export class OrganizationMemberAdmissionService {
   }
 
   /** Admits somebody on the seat the licence leaves free (ADR-171, admission-seat.ts). A MEMBER
-   *  row carries the grant intent an unfinished admission resumes from, in the ledger's own
-   *  scheme (ADR-129); a DEVELOPER or Lite row is the whole admission, no grant. */
+   *  or Lite row carries the grant intent an unfinished admission resumes from, in the ledger's
+   *  own scheme (ADR-129); a DEVELOPER or pending row is the whole admission, no grant. */
   async createMembership({
     organizationId,
     userId,
@@ -110,7 +110,12 @@ export class OrganizationMemberAdmissionService {
       pending: decided.pending,
       ...(origin === undefined ? {} : { origin }),
     });
-    if (admission.outcome !== "created" || !admittedBy || admission.seat !== "MEMBER") {
+    if (
+      admission.outcome !== "created" ||
+      !admittedBy ||
+      admission.pending ||
+      admission.seat === "DEVELOPER"
+    ) {
       return admission;
     }
 
@@ -122,7 +127,8 @@ export class OrganizationMemberAdmissionService {
         {
           bindingId: grantId,
           principal: { userId },
-          role: "MEMBER",
+          // A Lite seat is worth an organization-wide Viewer, as a SCIM create grants it.
+          role: admission.seat === "EXTERNAL" ? "VIEWER" : "MEMBER",
           customRoleId: null,
           scopeType: "ORGANIZATION",
           scopeId: organizationId,

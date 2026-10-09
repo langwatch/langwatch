@@ -137,7 +137,7 @@ Feature: Unified authorization engine
     # keeps that line, so anonymous callers resolve through shares alone.
 
   # ============================================================================
-  # Lite member is a role, not a cross-cutting cap
+  # Lite member: the role's own grants, capped by the seat however granted
   # ============================================================================
 
   @unit
@@ -148,17 +148,15 @@ Feature: Unified authorization engine
     And sarah's permission "datasets:manage" is denied
     # The denial reason is "lite-member-restricted" so the UI can explain it.
 
-  # Unit-unprovable today: CollectedGrants has no seat field to hold constant,
-  # because seat classification lives in billing tables the engine never
-  # reads. Stage C separates the concepts; the proving test is an integration
-  # test over billing + authz together.
-  @unimplemented
-  Scenario: Seat classification is billing data and never consulted for access
-    Given user "sarah" is classified as a lite seat for billing
-    And sarah has been granted a custom role with "datasets:manage" on "chatbot"
+  # Ruling (Alex, 2026-10-09): a Lite Member seat holds at most Lite Member permissions however
+  # the grant arrives; a direct custom role no longer escapes the cap.
+  @unit
+  Scenario: A Lite Member seat caps a direct custom role at Lite Member permissions
+    Given user "sarah" holds a Lite Member seat in "acme"
+    And sarah has been granted a custom role with "datasets:manage" and "annotations:create" on "chatbot"
     When sarah's permission "datasets:manage" is checked on project "chatbot"
-    Then the check is granted
-    And the seat classification is unchanged
+    Then the check is denied
+    And sarah's permission "annotations:create" is granted
 
   # ============================================================================
   # Fail-closed surfaces

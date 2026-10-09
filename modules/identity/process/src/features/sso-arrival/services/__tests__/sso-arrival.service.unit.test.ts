@@ -98,8 +98,8 @@ function serviceOver({
     const outcome = await membership();
     if (outcome === "created") {
       isMember.mockResolvedValue(true);
-      // A Developer gets no grant, so nothing is pending for them.
-      if (joinerSeat === "MEMBER") {
+      // A Developer or a held seat gets no grant, so nothing is pending for them.
+      if (joinerSeat !== "DEVELOPER" && !held) {
         pending = { grantId: "rb_admission", occurredAtMs: 1_756_000_000_000, state: "pending" };
       }
     }
@@ -462,15 +462,31 @@ describe("given an organization whose joiner seat is Developer (ADR-171)", () =>
     expect(parts.startNurturing).toHaveBeenCalledTimes(1);
   });
 
-  it("attaches no full member grant to an arrival given a Lite Member seat", async () => {
+  /** @scenario "A first single sign-on given a Lite Member seat holds the organization-wide Viewer grant" */
+  it("grants an arrival given a Lite Member seat the organization-wide Viewer grant", async () => {
     const parts = serviceOver({ row: connection(), joinerSeat: "EXTERNAL" });
 
     await parts.service.joinOrganization({ user: USER, org: ORG, domain: "acme.com" });
 
-    expect(parts.attachBindings).not.toHaveBeenCalled();
+    expect(parts.attachBindings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORG.id,
+        onDuplicate: "skip",
+        bindings: [
+          expect.objectContaining({
+            principal: { userId: USER.id },
+            role: "VIEWER",
+            customRoleId: null,
+            scopeType: "ORGANIZATION",
+            scopeId: ORG.id,
+          }),
+        ],
+      }),
+    );
     expect(parts.joinedAutomatically).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "An arrival held pending for want of any seat is given no grant" */
   it("attaches no grant and announces nothing for an arrival held pending", async () => {
     const parts = serviceOver({ row: connection(), joinerSeat: "EXTERNAL", held: true });
 

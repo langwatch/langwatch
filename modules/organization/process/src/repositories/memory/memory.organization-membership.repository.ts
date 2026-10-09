@@ -567,7 +567,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       disabledAt: pending ? now : null,
       createdAt: now,
       updatedAt: now,
-      pendingSsoGrantId: seat === "MEMBER" ? pendingAdmissionId : null,
+      pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : pendingAdmissionId,
     });
     return { outcome: "created", seat, pending };
   }

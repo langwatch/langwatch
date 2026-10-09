@@ -59,6 +59,33 @@ Feature: A directory or a first single sign-on never takes a full seat the licen
       When the directory creates "invited-full@acme.example"
       Then "invited-full@acme.example" is a Lite Member of the organization
 
+  Rule: a Lite Member seat holds an organization-wide Viewer grant however the person arrives
+
+    # Ruling (Alex, 2026-10-09): an SSO arrival or an approved join request given a Lite Member
+    # seat holds the organization-wide Viewer grant a SCIM create gives; a held person holds none.
+
+    @unit
+    Scenario: A first single sign-on given a Lite Member seat holds the organization-wide Viewer grant
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      And the connection admits new arrivals automatically
+      When "arrival@acme.example" signs in through the connection for the first time
+      Then "arrival@acme.example" holds an organization-wide Viewer grant
+
+    @unit
+    Scenario: An approved join request given a Lite Member seat holds the organization-wide Viewer grant
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      When an admin approves the join request of "joiner@acme.example"
+      Then "joiner@acme.example" is a Lite Member of the organization
+      And "joiner@acme.example" holds an organization-wide Viewer grant
+
+    @unit
+    Scenario: An arrival held pending for want of any seat is given no grant
+      Given every full member seat and every Lite Member seat the licence covers is in use
+      When "late@acme.example" arrives by single sign-on or an approved join request
+      Then "late@acme.example" holds no grant in the organization
+
   Rule: directory group grants never exceed the seat the person holds
 
     # Ruling (2026-10-09, R2): with directory group grants on, a person on a Lite or pending row
@@ -71,12 +98,19 @@ Feature: A directory or a first single sign-on never takes a full seat the licen
       When the directory maps "capped@acme.example" to a group holding the admin role
       Then "capped@acme.example" holds only Lite Member permissions
 
-    @integration @unimplemented
+    # Ruling (Alex, 2026-10-09): a member's access listing marks each grant the seat narrows.
+    @unit
     Scenario: Admins see that a group grant is capped for want of a full seat
       Given directory group grants are on
       And "capped@acme.example" holds a group grant capped for want of a full seat
-      When an admin views the organization's members
-      Then admins see that the group grant is capped because no full seat is free
+      When an admin reads the access of "capped@acme.example"
+      Then the group grant is marked as capped by the seat
+
+    @integration @unimplemented
+    Scenario: The members screen badges a grant capped by the seat
+      Given "capped@acme.example" holds a group grant capped for want of a full seat
+      When an admin opens "capped@acme.example" from the organization's members
+      Then the group grant shows a "Capped by seat" badge
 
     @unit
     Scenario: A capped group grant lifts once a full seat frees

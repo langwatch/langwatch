@@ -1719,7 +1719,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             organizationId,
             role: seat,
             disabledAt: pending ? new Date() : null,
-            pendingSsoGrantId: seat === "MEMBER" ? input.pendingAdmissionId : null,
+            pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : input.pendingAdmissionId,
           },
         });
         // A Developer gets no grant, so its admission is audited here (ADR-171).

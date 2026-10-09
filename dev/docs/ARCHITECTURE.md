@@ -2722,6 +2722,11 @@ peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing learns it through §9's subscriber, which lives
 in billing on organization's events (Alex, 2026-09-28; placement Alex, 2026-09-29).
 
+**A Lite seat holds Lite permissions however a grant arrives** (Alex, 2026-10-09). A Lite Member
+seat holds at most a Lite Member's permissions through any grant, a direct custom role included;
+it holds an organization-wide Viewer grant however it was admitted; and a member's access listing
+marks each grant the seat narrows as `cappedBySeat`.
+
 **Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29; usage merged into
 entitlement, Alex, 2026-10-06). Entitlement owns all counting (§3): it takes billing's billable-events
 meter projection and its table, and counts traces itself. It counts the month once per project in the
