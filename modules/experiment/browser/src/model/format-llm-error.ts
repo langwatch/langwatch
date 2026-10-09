@@ -6,6 +6,7 @@ export type LLMErrorType =
   | "bad_request"
   | "auth"
   | "rate_limit"
+  | "out_of_credit"
   | "connection"
   | "unknown";
 
@@ -19,6 +20,7 @@ const LLM_ERROR_TYPES: ReadonlySet<string> = new Set<LLMErrorType>([
   "bad_request",
   "auth",
   "rate_limit",
+  "out_of_credit",
   "connection",
   "unknown",
 ]);

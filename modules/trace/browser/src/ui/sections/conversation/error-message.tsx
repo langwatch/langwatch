@@ -1,6 +1,9 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Alert } from "@langwatch/design-system/primitives";
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import {
+  explainHandledError,
+  OUT_OF_CREDIT_ADVICE,
+} from "@langwatch/handled-error/presentation";
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
 interface ErrorMessageProps {
@@ -59,6 +62,8 @@ function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
       return "The model provider doesn't have the model this prompt asks for.";
     case "rate_limit":
       return "The model provider is rate-limiting this project, or the account behind it has no allowance left.";
+    case "out_of_credit":
+      return `The account behind this model has no credit or budget left. ${OUT_OF_CREDIT_ADVICE}`;
     case "bad_request":
       return "The model provider rejected the request, usually a parameter this model doesn't support, or a conversation past its context limit.";
     case "connection":

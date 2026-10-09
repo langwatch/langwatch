@@ -134,6 +134,12 @@ export const MODEL_PROVIDER_FIELD_METADATA: Record<
       description: "Your Cerebras API key from cloud.cerebras.ai",
     },
   },
+  doubleword: {
+    DOUBLEWORD_API_KEY: {
+      label: "API Key",
+      description: "Your Doubleword API key from app.doubleword.ai",
+    },
+  },
   custom: {
     CUSTOM_API_KEY: {
       label: "API Key",

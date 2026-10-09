@@ -1,3 +1,4 @@
+import { llmModels } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { spendUsageSchema, type SpendUsage } from "../features/spend/gateway-spend.schemas.ts";
@@ -93,6 +94,34 @@ describe("findSpendRatingFaults", () => {
       expect(
         findSpendRatingFaults({ model: "openai/gpt-image-2", usage: usage({ image_count: 1 }) }),
       ).toEqual([]);
+    });
+  });
+});
+
+/** Every model id the catalog prices as a router: all its stated rates are negative. */
+const VARIABLE_PRICE_ROUTERS = Object.entries(llmModels.models)
+  .filter(([, entry]) => {
+    const rates = Object.values(entry.pricing ?? {}).filter(
+      (rate): rate is number => typeof rate === "number",
+    );
+    return rates.length > 0 && rates.every((rate) => rate < 0);
+  })
+  .map(([modelId]) => modelId)
+  .toSorted();
+
+describe("rateSpendNanoUsd for a variable-price router", () => {
+  describe("given a gateway request routed through a router", () => {
+    it("has routers in the catalog to guard against", () => {
+      expect(VARIABLE_PRICE_ROUTERS).toContain("nvidia/switchyard");
+    });
+
+    /** @scenario A router call through the gateway never lowers spend */
+    it.each(VARIABLE_PRICE_ROUTERS)("never rates %s below zero", (model) => {
+      const { costNanoUsd } = rateSpendNanoUsd({
+        model,
+        usage: usage({ input_tokens: 1000, output_tokens: 500 }),
+      });
+      expect(costNanoUsd).toBeGreaterThanOrEqual(0);
     });
   });
 });
