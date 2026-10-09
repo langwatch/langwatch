@@ -7,18 +7,22 @@ import { useOpsRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
 import { useRetryUpgradeStep } from "../../behavior/use-retry-upgrade-step.ts";
 import { useUpgradeReadHints } from "../../behavior/use-upgrade-read-hints.ts";
-import { UpgradeDataplanesTabs } from "./upgrade-dataplanes.tsx";
+import { isFinished } from "../../model/upgrade-labels.ts";
 import { UpgradeReadState } from "./upgrade-read-state.tsx";
 import { UPGRADE_STEP_OVERLAY, UpgradeStepDrawer } from "./upgrade-step-drawer.tsx";
+import { UpgradeTenantMigrations } from "./upgrade-tenant-migrations.tsx";
 import { UpgradesOverview } from "./upgrades-overview.tsx";
-
-/** Background and operator step statuses that are finished; every other one is still listed. */
-const FINISHED = new Set(["done", "not-needed"]);
+import {
+  parseUpgradesTab,
+  UPGRADES_TAB_PARAM,
+  type UpgradesTab,
+  UpgradesTabs,
+} from "./upgrades-tabs.tsx";
 
 /** How many recent runs the overview lists. */
 const RECENT_RUNS = 20;
 
-/** W1: where the installation stands, its releases, failed steps and recent runs. */
+/** W1: where the installation stands, its releases, failed steps and runs; tenant migrations are a tab. */
 export default function UpgradesScreen() {
   useUpgradeReadHints();
   const router = useOpsRouter();
@@ -33,6 +37,14 @@ export default function UpgradesScreen() {
   const targets = api.ops.upgrade.listTargets.useQuery();
   const canManage = useOpsHost().isOpsAdmin();
   const { retryStep, retryingStepId } = useRetryUpgradeStep();
+  const tab = parseUpgradesTab({
+    value: router.query[UPGRADES_TAB_PARAM],
+    hasTargets: (targets.data ?? []).length > 0,
+  });
+  const selectTab = (next: UpgradesTab) =>
+    router.replace({
+      query: { ...router.query, [UPGRADES_TAB_PARAM]: next === "overview" ? void 0 : next },
+    });
 
   return (
     <>
@@ -46,8 +58,11 @@ export default function UpgradesScreen() {
       <PageLayout.Container>
         <UpgradeReadState read={status} failedTitle="The upgrade status could not load">
           {(current) => (
-            <UpgradeDataplanesTabs
+            <UpgradesTabs
               targets={targets.data ?? []}
+              tab={tab}
+              onSelectTab={selectTab}
+              tenants={<UpgradeTenantMigrations />}
               overview={
                 <UpgradesOverview
                   status={current}
@@ -55,11 +70,11 @@ export default function UpgradesScreen() {
                   runs={runs.data?.items ?? []}
                   failedSteps={failed.data?.items ?? []}
                   backgroundSteps={(background.data?.items ?? []).filter(
-                    (step) => !FINISHED.has(step.status),
+                    (step) => !isFinished(step.status),
                   )}
                   backgroundLoading={background.isLoading}
                   operatorSteps={(operator.data?.items ?? []).filter(
-                    (step) => !FINISHED.has(step.status),
+                    (step) => !isFinished(step.status),
                   )}
                   tenantSteps={tenants.data ?? []}
                   onRetryStep={canManage ? retryStep : void 0}
@@ -71,6 +86,7 @@ export default function UpgradesScreen() {
                     router.push(`/ops/upgrades/runs/${encodeURIComponent(runId)}`)
                   }
                   onOpenStep={stepDrawer.open}
+                  onManageTenants={() => selectTab("tenants")}
                 />
               }
             />

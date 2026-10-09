@@ -76,10 +76,6 @@ export const opsWeb = defineBrowserModule("ops")
       requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-foundry.screen.tsx"),
     },
-    "pages/ops/migrations": {
-      requires: "ops:view",
-      load: () => import("./ui/sections/ops/ops-migrations.screen.tsx"),
-    },
     "pages/ops/upgrades": {
       requires: "ops:view",
       load: () => import("./features/upgrades/ui/sections/upgrades.screen.tsx"),
