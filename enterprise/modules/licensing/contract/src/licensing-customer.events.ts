@@ -39,3 +39,28 @@ export const licenseSyncFinishedEventDataSchema = z.object({
   error: z.string().min(1).nullable(),
 });
 export type LicenseSyncFinishedEventData = z.infer<typeof licenseSyncFinishedEventDataSchema>;
+
+export const LICENSE_STORED_EVENT_TYPE = "lw.licensing.license_stored" as const;
+export const LICENSE_CLEARED_EVENT_TYPE = "lw.licensing.license_cleared" as const;
+
+/**
+ * Licensing stored an organization's licence. The fact names the key by its sha256 hex
+ * fingerprint, never the key; organization reads the key from licensing's row (C3-KEY-HASH).
+ */
+export const licenseStoredEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  licenseKeyFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  expiresAt: z.number().int(),
+  validatedAt: z.number().int().nullable(),
+});
+export type LicenseStoredEventData = z.infer<typeof licenseStoredEventDataSchema>;
+
+/** Licensing cleared an organization's licence; organization clears its columns. */
+export const licenseClearedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+});
+export type LicenseClearedEventData = z.infer<typeof licenseClearedEventDataSchema>;

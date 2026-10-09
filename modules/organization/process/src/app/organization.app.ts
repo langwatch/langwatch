@@ -1104,15 +1104,17 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.updateConnectSyncOutcome(input);
   }
 
+  /** Licensing's stored licence, applied from its fact; the key is read from licensing's row. */
   setLicense(input: {
     organizationId: string;
-    licenseKey: string;
+    licenseKeyFingerprint: string;
     expiresAt: Instant;
     validatedAt: Instant | null;
   }): Promise<void> {
     return this.#dependencies.organizations.setLicense(input);
   }
 
+  /** Licensing's cleared licence, applied from its fact by the lifecycle subscriber. */
   clearLicense(input: { organizationId: string }): Promise<void> {
     return this.#dependencies.organizations.clearLicense(input);
   }

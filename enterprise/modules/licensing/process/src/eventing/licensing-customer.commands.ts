@@ -2,6 +2,12 @@ import {
   CONNECT_SERVICE_SWITCHED_EVENT_TYPE,
   connectServiceSwitchedEventDataSchema,
   type ConnectServiceSwitchedEventData,
+  LICENSE_CLEARED_EVENT_TYPE,
+  licenseClearedEventDataSchema,
+  type LicenseClearedEventData,
+  LICENSE_STORED_EVENT_TYPE,
+  licenseStoredEventDataSchema,
+  type LicenseStoredEventData,
   LICENSE_SYNC_FINISHED_EVENT_TYPE,
   licenseSyncFinishedEventDataSchema,
   type LicenseSyncFinishedEventData,
@@ -142,6 +148,89 @@ export class RecordLicenseSyncFinishedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: LicenseSyncFinishedEventData): string {
+    return payload.organizationId;
+  }
+}
+
+export const RECORD_LICENSE_STORED_COMMAND_TYPE = "lw.licensing.record_license_stored" as const;
+export const RECORD_LICENSE_CLEARED_COMMAND_TYPE = "lw.licensing.record_license_cleared" as const;
+
+export const licenseStoredEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(LICENSE_STORED_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: licenseStoredEventDataSchema,
+});
+export type LicenseStoredEvent = z.infer<typeof licenseStoredEventSchema>;
+
+export const licenseClearedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(LICENSE_CLEARED_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: licenseClearedEventDataSchema,
+});
+export type LicenseClearedEvent = z.infer<typeof licenseClearedEventSchema>;
+
+/** Records that licensing stored an organization's licence and its dates. */
+export class RecordLicenseStoredCommand implements CommandHandler<
+  Command<LicenseStoredEventData>,
+  LicenseStoredEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_LICENSE_STORED_COMMAND_TYPE,
+    licenseStoredEventDataSchema,
+    "Record that licensing stored an organization's licence",
+  );
+
+  handle(command: Command<LicenseStoredEventData>): LicenseStoredEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<LicenseStoredEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: LICENSE_STORED_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: LicenseStoredEventData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records that licensing cleared an organization's licence. */
+export class RecordLicenseClearedCommand implements CommandHandler<
+  Command<LicenseClearedEventData>,
+  LicenseClearedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_LICENSE_CLEARED_COMMAND_TYPE,
+    licenseClearedEventDataSchema,
+    "Record that licensing cleared an organization's licence",
+  );
+
+  handle(command: Command<LicenseClearedEventData>): LicenseClearedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<LicenseClearedEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: LICENSE_CLEARED_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: LicenseClearedEventData): string {
     return payload.organizationId;
   }
 }

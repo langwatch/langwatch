@@ -1,4 +1,3 @@
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ServerRole } from "@langwatch/process";
 
 import type { LicensingInfrastructure } from "../app/licensing.app.ts";
@@ -6,13 +5,17 @@ import type {
   OrganizationLicenseReads,
   OrganizationLicenseRepository,
 } from "../repositories/organization-license.repository.ts";
+import type { LicensingCustomerFactsService } from "./licensing-customer-facts.service.ts";
 import { OrganizationLicenseWriterService } from "./organization-license-writer.service.ts";
 
-/** Organization's licence columns, still written beside licensing's rows (round 37 D6). */
-type LicenseWrites = Pick<OrganizationApi, "setLicense" | "clearLicense">;
+/** The facts organization mirrors its licence columns from (C3-FACT-FIRST). */
+type LicenseFacts = Pick<LicensingCustomerFactsService, "licenseStored" | "licenseCleared">;
 
 type LicenseRows = OrganizationLicenseReads &
-  Pick<OrganizationLicenseRepository, "organizationExists" | "saveLicense" | "clearLicense">;
+  Pick<
+    OrganizationLicenseRepository,
+    "organizationExists" | "findLicense" | "saveLicense" | "clearLicense" | "restoreLicense"
+  >;
 
 type SeatCounts = Readonly<{
   getMemberCount: (organizationId: string) => Promise<number>;
@@ -43,22 +46,24 @@ export class LicensingInfrastructureService {
           options.licenses.getOrganizationLicense(organizationId),
         findOrganizationsWithLicense: () => options.licenses.findOrganizationsWithLicense(),
         organizationExists: () => Promise.reject(unavailable()),
+        findLicense: () => Promise.reject(unavailable()),
         saveLicense: () => Promise.reject(unavailable()),
         clearLicense: () => Promise.reject(unavailable()),
+        restoreLicense: () => Promise.reject(unavailable()),
       },
-      organizations: {
-        setLicense: () => Promise.reject(unavailable()),
-        clearLicense: () => Promise.reject(unavailable()),
+      facts: {
+        licenseStored: () => Promise.reject(unavailable()),
+        licenseCleared: () => Promise.reject(unavailable()),
       },
     });
   }
 
-  /** The licence rows read and written here, mirrored onto organization, with its seat counts. */
+  /** The licence rows read and written here, each write recorded as a fact, with seat counts. */
   withStorage(
-    options: Readonly<{ licenses: LicenseRows; organizations: LicenseWrites }> & SeatCounts,
+    options: Readonly<{ licenses: LicenseRows; facts: LicenseFacts }> & SeatCounts,
   ): LicensingInfrastructure {
-    const { licenses, organizations } = options;
-    const writer = OrganizationLicenseWriterService.create({ licenses, organizations });
+    const { licenses, facts } = options;
+    const writer = OrganizationLicenseWriterService.create({ licenses, facts });
     return {
       repository: {
         getOrganizationLicense: (organizationId) => licenses.getOrganizationLicense(organizationId),

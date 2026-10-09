@@ -218,6 +218,11 @@ export class LicensingModule implements LicensingApiContract {
     this.#customerFacts.connect(commands);
   }
 
+  /** The facts service those senders bind into, for the licence writes of this module's tasks. */
+  customerFactsService(): LicensingCustomerFactsService {
+    return this.#customerFacts;
+  }
+
   private constructor({
     service,
     runtime,
@@ -296,14 +301,14 @@ export class LicensingModule implements LicensingApiContract {
     // license: it is redeemed at start and stored on an organization.
     const configured = detectLicenseInputForm(instanceLicenseKey);
     const signedInstanceKey = configured.form === "license_key" ? configured.licenseKey : undefined;
+    const customerFacts = LicensingCustomerFactsService.create();
     // The licence rows are this module's own; the seat counts are organization's
     // own membership classification (a peer, not owned here).
     const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
       licenses: repositories.organizationLicenses,
-      organizations: dependencies.organizations,
+      facts: customerFacts,
       ...seatCountsOver(dependencies.organizations),
     });
-    const customerFacts = LicensingCustomerFactsService.create();
     const registryParts = licenseRegistryParts({
       infrastructure: licenseRegistryOver({
         repositories,

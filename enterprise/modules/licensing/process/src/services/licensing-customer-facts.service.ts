@@ -2,6 +2,8 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { LicensingCustomerPipeline } from "../eventing/licensing-customer.pipeline.ts";
+import type { StoredLicense } from "../repositories/organization-license.repository.ts";
+import { fingerprintOfLicenseKey } from "../rules/license-key.rules.ts";
 
 /** Records licensing's facts about its customers on its own pipeline (R42). */
 export class LicensingCustomerFactsService {
@@ -68,6 +70,33 @@ export class LicensingCustomerFactsService {
       occurredAt: at.epochMilliseconds,
       organizationId,
       error,
+    });
+  }
+
+  /** Names the key by its fingerprint only; organization reads the key from licensing's row. */
+  async licenseStored({
+    organizationId,
+    license,
+  }: {
+    organizationId: string;
+    license: StoredLicense;
+  }): Promise<void> {
+    await this.commands().recordLicenseStored.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      licenseKeyFingerprint: fingerprintOfLicenseKey(license.licenseKey),
+      expiresAt: license.expiresAt.epochMilliseconds,
+      validatedAt: license.validatedAt?.epochMilliseconds ?? null,
+    });
+  }
+
+  /** Organization clears its licence columns from this fact. */
+  async licenseCleared({ organizationId }: { organizationId: string }): Promise<void> {
+    await this.commands().recordLicenseCleared.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
     });
   }
 

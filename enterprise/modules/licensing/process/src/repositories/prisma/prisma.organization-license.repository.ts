@@ -16,7 +16,10 @@ import type {
  * rather than the whole generated client. `organization` is the copy source
  * until its licence columns retire (round 37 D6).
  */
-type OrganizationLicenseDatabase = Pick<PrismaClient, "organization" | "organizationLicense">;
+type OrganizationLicenseDatabase = Pick<
+  PrismaClient,
+  "organization" | "organizationLicense" | "$transaction"
+>;
 
 const instantOrNull = (date: Date | null) => (date === null ? null : fromDate(date));
 const dateOrNull = (instant: Instant | null) => (instant === null ? null : toDate(instant));
@@ -96,6 +99,30 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
     return organization !== null;
   }
 
+  async findLicense({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<LicenseColumns[]> {
+    const row = await this.prisma.organizationLicense.findUnique({
+      where: { organizationId },
+      select: { licenseKey: true, expiresAt: true, validatedAt: true },
+    });
+    return row === null ? [] : [licenseOf(row)];
+  }
+
+  async restoreLicense({
+    organizationId,
+    written,
+    previous,
+  }: Readonly<{
+    organizationId: string;
+    written: LicenseColumns;
+    previous: LicenseColumns | null;
+  }>): Promise<void> {
+    const where = { organizationId, ...rowOf(written) };
+    if (previous === null) await this.prisma.organizationLicense.deleteMany({ where });
+    else await this.prisma.organizationLicense.updateMany({ where, data: rowOf(previous) });
+  }
+
   async saveLicense({
     organizationId,
     license,
@@ -160,15 +187,42 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
             })
           ).count;
     let updated = 0;
-    // One compare-and-set per row: a dual-write landing after the read is kept.
     for (const { organizationId, columns, own } of pairs) {
       if (own === null) continue;
-      const { count } = await this.prisma.organizationLicense.updateMany({
-        where: { organizationId, ...rowOf(own) },
-        data: rowOf(columns),
-      });
-      updated += count;
+      updated += await this.overwriteIfUnchanged({ organizationId, columns, own });
     }
     return created + updated;
+  }
+
+  /**
+   * One transaction holds organization's row, checks its columns are still the
+   * ones read and compares-and-sets licensing's row, so a write that reached
+   * either side after the read is kept.
+   */
+  private overwriteIfUnchanged({
+    organizationId,
+    columns,
+    own,
+  }: Readonly<{ organizationId: string; columns: LicenseColumns; own: LicenseColumns }>) {
+    const source = rowOf(columns);
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`
+        SELECT 1 FROM "Organization" WHERE "id" = ${organizationId} FOR SHARE
+      `;
+      const unchanged = await transaction.organization.count({
+        where: {
+          id: organizationId,
+          license: source.licenseKey,
+          licenseExpiresAt: source.expiresAt,
+          licenseLastValidatedAt: source.validatedAt,
+        },
+      });
+      if (unchanged === 0) return 0;
+      const { count } = await transaction.organizationLicense.updateMany({
+        where: { organizationId, ...rowOf(own) },
+        data: source,
+      });
+      return count;
+    });
   }
 }

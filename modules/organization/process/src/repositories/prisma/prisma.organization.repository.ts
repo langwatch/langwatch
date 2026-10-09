@@ -535,6 +535,14 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     if (count === 0) throw new OrganizationNotFoundError();
   }
 
+  async findLicensingLicenseKeys(input: { organizationId: string }): Promise<string[]> {
+    const row = await this.database.organizationLicense.findUnique({
+      where: { organizationId: input.organizationId },
+      select: { licenseKey: true },
+    });
+    return row?.licenseKey ? [row.licenseKey] : [];
+  }
+
   async findFirstAdministratorEmail(organizationId: string): Promise<string | null> {
     const administrator = await this.database.organizationUser.findFirst({
       where: { organizationId, role: "ADMIN", disabledAt: null },

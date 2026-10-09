@@ -101,6 +101,13 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "billing reads its organisations' administrators' names and addresses, and which members are deactivated, never a copy (C2 B, R40)",
   },
   {
+    table: "OrganizationLicense",
+    owner: "licensing",
+    readers: ["organization"],
+    reason:
+      "organization's licence-stored subscriber reads the key from licensing's row, as the fact carries only the key's fingerprint, until organization's licence columns are dropped (C3-KEY-HASH, R40)",
+  },
+  {
     table: "Topic",
     owner: "topic",
     readers: ["trace"],
