@@ -67,6 +67,7 @@
     "langwatch/prisma-count-in-list-query": "error",
     "langwatch/refusal-is-a-handled-error": "error",
     "langwatch/no-hono-http-exception": "error",
+    "langwatch/slice-reader-is-a-hook": "error",
     "langwatch/access-escape-kind": "error",
     "langwatch/authz-members-required": "error",
     "langwatch/schema-outside-contract": "error",

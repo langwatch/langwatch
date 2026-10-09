@@ -64,7 +64,7 @@ export function ValueScreen({
     <TakeoverRow fading={fading} maxWidth={720}>
       <Box
         minH="84px"
-        fontFamily="heading"
+        fontFamily="display"
         fontSize="30px"
         lineHeight="1.25"
         color="fg"

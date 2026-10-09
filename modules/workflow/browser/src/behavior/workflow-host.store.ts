@@ -6,7 +6,7 @@ function unmounted(): never {
 }
 
 /** `workflow:host`: workflow owns it, and its host mount fills in the actions. */
-export const workflowHostSlice = defineSlice<WorkflowHostSlice>({
+export const useWorkflowHostSlice = defineSlice<WorkflowHostSlice>({
   name: WORKFLOW_HOST_SLICE,
   create: () => ({
     scope: unmounted,

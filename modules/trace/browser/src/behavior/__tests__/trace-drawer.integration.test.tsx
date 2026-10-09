@@ -8,7 +8,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setWindowAddress } from "../../__tests__/window-location-router.ts";
-import { drawerChrome } from "../drawer-chrome.store.ts";
+import { useDrawerChrome } from "../drawer-chrome.store.ts";
 
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -46,7 +46,7 @@ function mountOn(url: string) {
 }
 
 beforeEach(() => {
-  drawerChrome.setState(drawerChrome.getInitialState(), true);
+  useDrawerChrome.setState(useDrawerChrome.getInitialState(), true);
   setWindowAddress({ url: PATH });
 });
 
@@ -76,8 +76,8 @@ describe("given an address that names the trace drawer", () => {
 
     /** @scenario "A link that names no view opens on the view the reader last chose" */
     it("opens on the reader's last view and tab when the link names none", () => {
-      drawerChrome.getState().rememberViewMode("trace");
-      drawerChrome.getState().rememberVizTab("flame");
+      useDrawerChrome.getState().rememberViewMode("trace");
+      useDrawerChrome.getState().rememberVizTab("flame");
 
       const { result } = mountOn(OPEN);
 
@@ -93,7 +93,7 @@ describe("given an address that names the trace drawer", () => {
 
   describe("when the row that opened it left a span count", () => {
     it("hands the count to that trace only", () => {
-      drawerChrome.getState().expectSpanCount({ traceId: "trace-1", count: 42 });
+      useDrawerChrome.getState().expectSpanCount({ traceId: "trace-1", count: 42 });
 
       const { result } = mountOn(OPEN);
       expect(result.current.expectedSpanCount).toBe(42);
@@ -135,11 +135,11 @@ describe("given the trace drawer is open", () => {
 
     it("re-opens a collapsed span detail pane", () => {
       mountOn(OPEN);
-      drawerChrome.getState().togglePaneCollapsed("spanDetail");
+      useDrawerChrome.getState().togglePaneCollapsed("spanDetail");
 
       act(() => getTraceDrawer().selectSpan("span-7"));
 
-      expect(drawerChrome.getState().paneState.spanDetail.collapsed).toBe(false);
+      expect(useDrawerChrome.getState().paneState.spanDetail.collapsed).toBe(false);
     });
 
     it("clears it again without touching the pane", () => {
@@ -177,17 +177,17 @@ describe("given the trace drawer is open", () => {
       act(() => getTraceDrawer().setViewMode("conversation"));
 
       expect(result.current.viewMode).toBe("conversation");
-      expect(drawerChrome.getState().lastViewMode).toBe("conversation");
+      expect(useDrawerChrome.getState().lastViewMode).toBe("conversation");
     });
 
     it("leaves what the reader remembered alone when the change is only for this trace", () => {
-      drawerChrome.getState().rememberViewMode("summary");
+      useDrawerChrome.getState().rememberViewMode("summary");
       const { result } = mountOn(OPEN);
 
       act(() => getTraceDrawer().setViewModeTransient("trace"));
 
       expect(result.current.viewMode).toBe("trace");
-      expect(drawerChrome.getState().lastViewMode).toBe("summary");
+      expect(useDrawerChrome.getState().lastViewMode).toBe("summary");
     });
   });
 

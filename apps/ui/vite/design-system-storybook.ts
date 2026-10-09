@@ -5,6 +5,7 @@ import type { Plugin } from "vite";
 
 import {
   DEV_TOOLS_IDLE_ENV,
+  devToolPort,
   idleBoundMs,
   startDormantTool,
   type DormantTool,
@@ -19,18 +20,22 @@ import {
 const ROUTE = "/design-system";
 
 export function designSystemStorybook(options: { appPort: number }): Plugin {
-  const port = Number(process.env.LANGWATCH_STORYBOOK_PORT ?? options.appPort + 5);
-  const storybookUrl = `http://127.0.0.1:${port}`;
-
   return {
     name: "langwatch-design-system-storybook",
     apply: "serve",
-    configureServer(server) {
+    async configureServer(server) {
       const { logger } = server.config;
       if (process.env.LANGWATCH_SKIP_STORYBOOK === "1") {
         logger.info(`  ✓ storybook: skipped (LANGWATCH_SKIP_STORYBOOK=1)`);
         return;
       }
+      const port = await devToolPort({
+        explicit: process.env.LANGWATCH_STORYBOOK_PORT,
+        appPort: options.appPort,
+        offset: 5,
+        env: process.env,
+      });
+      const storybookUrl = `http://127.0.0.1:${port}`;
       const tool = startDormantTool({
         name: "storybook",
         port,

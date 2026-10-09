@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 import {
   createdUserSchema,
   userAccountInfoSchema,
@@ -213,6 +213,7 @@ export class MemoryUserRepository implements UserRepository {
       hasPasskey: this.#database.passkeyCount(id) > 0,
       twoStepEnabled: user?.twoFactorEnabled ?? false,
       dismissedAt: dismissedAt ? toDate(dismissedAt) : null,
+      accountCreatedAt: toDate(user?.createdAt ?? Temporal.Instant.fromEpochMilliseconds(0)),
     });
   }
 

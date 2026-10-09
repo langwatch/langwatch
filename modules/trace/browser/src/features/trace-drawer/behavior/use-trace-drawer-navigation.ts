@@ -1,7 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useCallback } from "react";
 
-import { drawerChrome } from "../../../behavior/drawer-chrome.store.ts";
+import { useDrawerChrome } from "../../../behavior/drawer-chrome.store.ts";
 import { guardTraceEditExit } from "../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { getTraceDrawer, useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import {
@@ -48,7 +48,7 @@ function openTrace({
   leaving.setViewModeTransient(fromViewMode);
   if (fromTimestamp !== undefined) leaving.backfillOccurredAtMs(fromTimestamp);
   if (toViewMode && (input.persistViewMode ?? true)) {
-    drawerChrome.getState().rememberViewMode(toViewMode);
+    useDrawerChrome.getState().rememberViewMode(toViewMode);
   }
   openDrawer(
     TRACE_DRAWER_NAME,
@@ -96,7 +96,7 @@ export function useTraceDrawerNavigation() {
     guardTraceEditExit(() => {
       const previous = traceBackStack[traceBackStack.length - 1];
       if (!previous) return;
-      drawerChrome.getState().rememberViewMode(previous.viewMode);
+      useDrawerChrome.getState().rememberViewMode(previous.viewMode);
       goBackInStack();
     });
   }, [goBackInStack, traceBackStack]);
@@ -108,7 +108,7 @@ export function useTraceDrawerNavigation() {
       guardTraceEditExit(() => {
         const target = traceBackStack[index];
         if (!target) return;
-        drawerChrome.getState().rememberViewMode(target.viewMode);
+        useDrawerChrome.getState().rememberViewMode(target.viewMode);
         goBackToInStack(backStack.length - traceBackStack.length + index);
       });
     },
