@@ -16,7 +16,7 @@ Feature: The dev UI takes its public config from the api's shell
     Given nothing answers on the api's address
     When the dev server starts and serves a page
     Then its config loads without asking the api
-    And the page is a waiting page that reloads itself until the api answers
+    And the page is served at once and boots into the branded waiting page, which reloads itself until the api answers
     And the log names the api address it tried and that the api must be running
 
   @unit
