@@ -324,8 +324,8 @@ jobs:
           # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
           sleep 5
 
-          # Run tests from the self-contained e2e package
-          cd dev/tests/agentic-e2e && pnpm test
+          # Run tests from the self-contained e2e package; the sso and licence journeys need their own modes
+          cd dev/tests/agentic-e2e && pnpm test --project=unit --project=journey --project=chromium
           TEST_EXIT=$?
 
           # Cleanup

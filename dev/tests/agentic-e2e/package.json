@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@langwatch/e2e-stack": "workspace:*"
+    "@langwatch/e2e-stack": "workspace:*",
+    "@langwatch/enterprise-licensing-process": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

@@ -20,6 +20,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/__tests__/fixtures/license-keys.fixture.d.ts",
+      "default": "./src/__tests__/fixtures/license-keys.fixture.ts"
     }
   },
   "scripts": {

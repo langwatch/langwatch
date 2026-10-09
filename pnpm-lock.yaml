@@ -2524,6 +2524,9 @@ importers:
       '@langwatch/e2e-stack':
         specifier: workspace:*
         version: link:../e2e-stack
+      '@langwatch/enterprise-licensing-process':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/process
     devDependencies:
       '@playwright/test':
         specifier: 'catalog:'
