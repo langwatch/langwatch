@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -558,6 +559,34 @@ func TestDBResetFlushesOnlyTheStacksRedisDB(t *testing.T) {
 		}
 		if len(sup.shells) != 0 {
 			t.Fatalf("shells = %v, want none after a failed flush", sup.shells)
+		}
+	})
+}
+
+// @scenario "The keeper seeds once the api reports ready"
+func TestKeeperSeedsOnlyOnceTheAPIReportsReady(t *testing.T) {
+	seed := KeeperSeed{
+		Job:      onceJob{Slug: "feat-x", WorktreeDir: t.TempDir(), Name: "seed", Shell: "pnpm --silent run prisma:seed"},
+		ReadyURL: "http://127.0.0.1:6560/readyz",
+		Since:    time.Now(),
+	}
+	t.Run("given the api reports ready, the seed runs after the readiness wait", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
+		o.seedWhenReady(context.Background(), seed)
+		if len(sup.waited) != 1 || sup.waited[0] != seed.ReadyURL {
+			t.Errorf("waited on %v, want the api's readiness probe", sup.waited)
+		}
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "prisma:seed") {
+			t.Errorf("ran %v, want the seed once", sup.shells)
+		}
+	})
+	t.Run("given the keeper stops before the api is ready, nothing is seeded", func(t *testing.T) {
+		sup := &fakeSupervisor{notReady: true}
+		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
+		o.seedWhenReady(context.Background(), seed)
+		if len(sup.shells) != 0 {
+			t.Errorf("ran %v before the api was ready", sup.shells)
 		}
 	})
 }
