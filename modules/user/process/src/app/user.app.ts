@@ -544,11 +544,7 @@ export class UserModule implements UserApi {
     return this.#users.setAvatar(input);
   }
 
-  /**
-   * The caller's own photo. The display name and address come from this
-   * directory's own row rather than from the door, so both avatar entrypoints
-   * name the personal workspace the same way.
-   */
+  /** The caller's own photo, rate limited, stored under their personal workspace. */
   async setOwnAvatar(input: SetOwnAvatarInput): Promise<UserAvatarResult> {
     const allowance = await this.#rateLimits.check({
       key: `user.setAvatar:${input.userId}`,

@@ -242,8 +242,6 @@ export const setUserAvatarInputSchema = z
     userId: z.string().min(1),
     organizationId: z.string().min(1),
     imageDataUrl: z.string().min(1),
-    displayName: z.string().nullable().optional(),
-    displayEmail: z.string().nullable().optional(),
   })
   .strict();
 export type SetUserAvatarInput = z.infer<typeof setUserAvatarInputSchema>;

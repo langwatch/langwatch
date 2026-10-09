@@ -12316,9 +12316,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../user/contract
       '@slack/webhook':
         specifier: 'catalog:'
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
