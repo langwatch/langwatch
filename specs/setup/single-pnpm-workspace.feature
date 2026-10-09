@@ -257,6 +257,7 @@ Feature: One workspace for every JavaScript project in the repo
     When its databases are prepared, by haven or by `pnpm start:prepare:db`
     Then the SDK is built first, without being asked for
     And a worktree whose SDK bundle is newer than its sources builds nothing
+    And `pnpm task`, `pnpm prisma:migrate` and `pnpm clickhouse:migrate` do the same
     # The migration tasks load the observability package, which resolves the
     # published SDK from its built dist; a fresh worktree failed there with
     # ERR_MODULE_NOT_FOUND. The root script and dev-stack.sh ensure it first;

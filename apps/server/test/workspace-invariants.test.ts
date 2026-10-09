@@ -470,6 +470,16 @@ describe("the repo is a single pnpm workspace", () => {
       expect(apiScripts["start:prepare:db"]).not.toContain("ensure-built");
     });
 
+    /** @scenario A fresh worktree prepares its databases without a manual bundle build */
+    it("builds the bundles before every root entry to the migration tasks, never in the tasks app", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+      for (const name of ["task", "prisma:migrate", "clickhouse:migrate"]) {
+        expect(scripts[name]).toMatch(new RegExp(`^bash ${ensureBuilt} && `));
+      }
+      const tasksScripts = readJson("apps/tasks/package.json").scripts as Record<string, string>;
+      expect(JSON.stringify(tasksScripts)).not.toContain("ensure-built");
+    });
+
     /** @scenario A stale SDK build is rebuilt before the browser application starts */
     it("decides by comparing the bundle against the source it was built from", () => {
       const source = readFileSync(join(repoRoot, ensureBuiltSource), "utf8");
