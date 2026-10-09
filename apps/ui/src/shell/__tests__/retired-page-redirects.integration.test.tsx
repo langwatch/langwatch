@@ -194,6 +194,18 @@ describe("given the legacy Traces addresses", () => {
   });
 });
 
+describe("given the retired project setup address", () => {
+  describe("when an old link to the project setup screen is opened", () => {
+    it("lands on the project home", async () => {
+      const router = open("/acme/setup");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/acme");
+      }, LAZY_CHROME);
+    });
+  });
+});
+
 describe("given the retired ops addresses", () => {
   describe("when an operator follows a saved link to the queues page", () => {
     /** @scenario A retired queues link lands on the dashboard */

@@ -597,8 +597,8 @@ Feature: An aggregate project reads its member projects
     When ana asks for an access token bound to the aggregate project
     Then she is refused because the aggregate accepts no credential
     And no key bound to the aggregate exists
-    And the aggregate's setup page and onboarding say "Data can't be added to this project"
-    And they show no key, no wait for a first trace and no button to mint one
+    And the aggregate's onboarding says "Data can't be added to this project"
+    And it shows no key, no wait for a first trace and no button to mint one
 
   @integration
   Scenario: Landing never resolves to an aggregate from a remembered selection

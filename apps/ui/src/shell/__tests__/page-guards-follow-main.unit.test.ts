@@ -23,7 +23,6 @@ const MAIN_GUARDS: readonly MainGuard[] = [
   { page: "pages/[project]/analytics/users", permission: "analytics:view" },
   { page: "pages/[project]/analytics/custom/index", permission: "analytics:view" },
   { page: "pages/[project]/analytics/custom/[id]", permission: "analytics:view" },
-  { page: "pages/[project]/setup", permission: "project:view" },
   { page: "pages/[project]/evaluators", permission: "evaluations:view" },
   { page: "pages/[project]/online-evaluations", permission: "evaluations:view" },
   { page: "pages/[project]/experiments/index", permission: "experiments:view" },
