@@ -1019,11 +1019,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: AC130 Picker filters: the picker offers the finder's search and chips
     Given the member opens "Add a widget"
-    Then it shows the finder's plain search, the category chips with "All" and the agent-type chips
+    Then its search is the board's ask bar as a field: the same look, size and words, "What do you want to know?"
+    And it shows the finder's category chips with "All" and the agent-type chips
     And its header holds "I'll build it myself" beside the close button
     And it is a solid surface over a dimmed, blurred page, readable in light and dark mode
-    And it keeps its "Ask Langy" footer while Langy is available
+    And it keeps its "Ask Langy" footer, in Langy's colours, while Langy is available
+    And the field's "Ask" pill does what the footer's "Ask Langy" does with the typed text, and shows only while Langy is available
     And it never says "block"
+    # Owner, 2026-10-09: the field is the bar the member just clicked, not a second control
 
   @unit @integration
   Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type
