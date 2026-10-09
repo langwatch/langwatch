@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
-import { SERVING_ROSTER_TIMING } from "../gate/serving-upgrade-gate.ts";
+import { SERVING_ROSTER_TIMING } from "../gate/serving-roster-timing.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
 import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
@@ -132,15 +132,19 @@ function pickStepView({
   imageRelease,
   id,
   roster,
+  needsOldWritersGone,
 }: {
   row: LedgerStepRow | undefined;
   declared: UpgradeImageStep | undefined;
   imageRelease: string;
   id: string;
   roster: readonly LedgerRosterRow[];
+  needsOldWritersGone: ReadonlySet<string>;
 }): UpgradeStepView {
-  if (row) return viewRecordedStep({ row, declared, roster });
-  if (declared) return viewDeclaredStep({ step: declared, imageRelease, roster });
+  if (row) return viewRecordedStep({ row, declared, roster, needsOldWritersGone });
+  if (declared) {
+    return viewDeclaredStep({ step: declared, imageRelease, roster, needsOldWritersGone });
+  }
   throw new UpgradeReadError("upgrade_not_found", `No upgrade step "${id}" in the ledger.`);
 }
 
@@ -182,16 +186,18 @@ function summariseReleases({
 /**
  * The read model of the Upgrades page and `upgrade status` (dev/docs/plans/upgrade-ui-2026-10-06.md
  * section 8). It touches only the ledger tables, tolerates unknown kinds and statuses, and is
- * handed the image's own release and declared steps and the floor, so it reads no manifest.
+ * handed the image's release, declared steps, floor and old-writer code steps; reads no manifest.
  */
 export function createUpgradeReader({
   postgres,
   image,
   floor,
+  needsOldWritersGone = new Set(),
 }: {
   postgres: UpgradePostgres;
   image: UpgradeImage;
   floor: UpgradeFloor | null;
+  needsOldWritersGone?: ReadonlySet<string>;
 }) {
   const repository = UpgradeReaderRepository.create({ postgres });
   const declaredById = new Map(image.steps.map((step) => [step.id, step]));
@@ -259,7 +265,7 @@ export function createUpgradeReader({
       repository.findSteps({ tables }),
       findRoster({ tables }),
     ]);
-    return mergeSteps({ rows, image, roster });
+    return mergeSteps({ rows, image, roster, needsOldWritersGone });
   }
 
   async function listSteps(filter: ListStepsFilter = {}): Promise<UpgradeStepPage> {
@@ -284,7 +290,14 @@ export function createUpgradeReader({
       findRoster({ tables }),
     ]);
     const declared = declaredById.get(id);
-    const view = pickStepView({ row, declared, imageRelease: image.release, id, roster });
+    const view = pickStepView({
+      row,
+      declared,
+      imageRelease: image.release,
+      id,
+      roster,
+      needsOldWritersGone,
+    });
     const targets = await repository.findTargets({ tables, stepId: id });
     return {
       ...view,
@@ -325,7 +338,12 @@ export function createUpgradeReader({
       report: run.report,
       phases: parseRunPhases({ report: run.report }),
       steps: rows.map((row) =>
-        viewRecordedStep({ row, declared: declaredById.get(row.id), roster }),
+        viewRecordedStep({
+          row,
+          declared: declaredById.get(row.id),
+          roster,
+          needsOldWritersGone,
+        }),
       ),
     };
   }

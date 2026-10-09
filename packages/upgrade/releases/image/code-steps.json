@@ -18,56 +18,64 @@
     "kind": "data",
     "mode": "background",
     "owner": "automation",
-    "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone. Runs again once older images stop serving."
+    "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone. Runs again once older images stop serving.",
+    "needsOldWritersGone": true
   },
   {
     "id": "automation:reconcile-slack-claims",
     "kind": "data",
     "mode": "background",
     "owner": "automation",
-    "description": "Claims each active Slack automation's connection and releases claims no active automation holds."
+    "description": "Claims each active Slack automation's connection and releases claims no active automation holds.",
+    "needsOldWritersGone": true
   },
   {
     "id": "billing:record-usage-billing-catch-up",
     "kind": "data",
     "mode": "background",
     "owner": "billing",
-    "description": "Records whether the meter bills each organisation, the fact the Instant Evals judge folds."
+    "description": "Records whether the meter bills each organisation, the fact the Instant Evals judge folds.",
+    "needsOldWritersGone": true
   },
   {
     "id": "dataset:move-content-to-object-storage",
     "kind": "data",
     "mode": "background",
     "owner": "dataset",
-    "description": "Moves each dataset's content out of Postgres and into object-storage chunks."
+    "description": "Moves each dataset's content out of Postgres and into object-storage chunks.",
+    "needsOldWritersGone": true
   },
   {
     "id": "entitlement:seed-trace-meter",
     "kind": "data",
     "mode": "background",
     "owner": "entitlement",
-    "description": "Seeds entitlement's trace meter from trace's span log at deploy."
+    "description": "Seeds entitlement's trace meter from trace's span log at deploy.",
+    "needsOldWritersGone": true
   },
   {
     "id": "governance:record-coding-assistant-billing",
     "kind": "data",
     "mode": "background",
     "owner": "governance",
-    "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest."
+    "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+    "needsOldWritersGone": true
   },
   {
     "id": "governance:migrate-anomaly-webhook-destinations",
     "kind": "data",
     "mode": "background",
     "owner": "governance",
-    "description": "Moves each anomaly rule's inline webhook destinations onto legacy-scheme webhook endpoints."
+    "description": "Moves each anomaly rule's inline webhook destinations onto legacy-scheme webhook endpoints.",
+    "needsOldWritersGone": true
   },
   {
     "id": "governance:replay-cost-charges",
     "kind": "data",
     "mode": "background",
     "owner": "governance",
-    "description": "Fills the cost drift check's charge map from pulled usage over the settling window."
+    "description": "Fills the cost drift check's charge map from pulled usage over the settling window.",
+    "needsOldWritersGone": true
   },
   {
     "id": "identity:reopen-unproven-accounts",
@@ -81,48 +89,55 @@
     "kind": "data",
     "mode": "background",
     "owner": "identity",
-    "description": "Returns accounts an older image finalized during the rollout to the legacy sign-in path."
+    "description": "Returns accounts an older image finalized during the rollout to the legacy sign-in path.",
+    "needsOldWritersGone": true
   },
   {
     "id": "instant-eval:copy-judge-spend",
     "kind": "data",
     "mode": "background",
     "owner": "instant-eval",
-    "description": "Copies each organisation's confirmed Instant Evals ledger spend into the judge's own spend, once per request."
+    "description": "Copies each organisation's confirmed Instant Evals ledger spend into the judge's own spend, once per request.",
+    "needsOldWritersGone": true
   },
   {
     "id": "licensing:copy-organization-licenses",
     "kind": "data",
     "mode": "background",
     "owner": "licensing",
-    "description": "Copies each organization's licence key and its dates into licensing's own licence table, overwriting a row that differs."
+    "description": "Copies each organization's licence key and its dates into licensing's own licence table, overwriting a row that differs.",
+    "needsOldWritersGone": true
   },
   {
     "id": "scim:replay-sso-connection-view",
     "kind": "data",
     "mode": "background",
     "owner": "scim",
-    "description": "Fills SCIM's SSO connection view from identity's connection log at deploy."
+    "description": "Fills SCIM's SSO connection view from identity's connection log at deploy.",
+    "needsOldWritersGone": true
   },
   {
     "id": "suite:replay-scenario-facts-for-open-runs",
     "kind": "data",
     "mode": "background",
     "owner": "suite",
-    "description": "Counts scenario runs that suite runs open at deploy missed during the cut."
+    "description": "Counts scenario runs that suite runs open at deploy missed during the cut.",
+    "needsOldWritersGone": true
   },
   {
     "id": "user:record-created-facts",
     "kind": "data",
     "mode": "background",
     "owner": "user",
-    "description": "Records every existing account as user's created fact, for peers to read."
+    "description": "Records every existing account as user's created fact, for peers to read.",
+    "needsOldWritersGone": true
   },
   {
     "id": "workflow:record-current-version-fields",
     "kind": "data",
     "mode": "background",
     "owner": "workflow",
-    "description": "Records each live workflow's current version with its fields for agent."
+    "description": "Records each live workflow's current version with its fields for agent.",
+    "needsOldWritersGone": true
   }
 ]

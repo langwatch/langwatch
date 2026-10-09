@@ -25,10 +25,8 @@ import {
   UPGRADE_COMMAND,
   type UpgradeFailedRun,
 } from "./serving-gate.ts";
+import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
-
-/** Generous stale bound: a database blip must never take a process out of service (2026-10-09). */
-export const SERVING_ROSTER_TIMING = { staleAfterMs: 10 * 60_000, refreshEveryMs: 15_000 } as const;
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
 export const SERVING_ROSTER_PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
