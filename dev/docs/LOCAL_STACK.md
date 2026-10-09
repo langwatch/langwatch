@@ -166,8 +166,8 @@ hand. `dev/scripts/kill-dev-tree.sh` already does it correctly.
 Locally there is one Node process by default: the `app` lane runs the ui's Vite
 server, the api and the worker together (see "One process" below). It is a
 launcher, not a process role: each still resolves its
-own secrets, config and graph; boot is worker then api, and shutdown drains the
-worker first. Production runs three Node deployments.
+own secrets, config and graph; the api and worker boot together (the api answers
+while the worker upgrades), and shutdown drains the worker first. Production runs three Node deployments.
 
 | Script                                   | What runs                                                                                |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- |

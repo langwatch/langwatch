@@ -1376,13 +1376,23 @@ task upgrade` stays a runner under the same lease for development, CI and an ope
 `start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
 `clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
 (Alex, 2026-10-09); the Helm pre-roll Job renders only
-with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step:
-while a Postgres schema step of its image is outstanding it serves the holding page; after that,
-until the ledger is current, it serves in upgrading mode, only sign-in and the Ops Upgrades page
-(the routes declared to serve while upgrading through a `packages/api` route declaration the door
-enforces; everything else answers the holding page), and reports not ready. A blocking step never
-touches a table owned by auth, user, organization, authz or identity; `lint:architecture` refuses
-one that does (UIW-1..11). A background step names the background steps it runs after by their step
+with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
+and it is up from boot (Alex, 2026-10-09, API-UP-DURING-UPGRADE: "anything important can get stuck
+on the queue for a few mins while upgrades happen, that's fine. Worker can be down, but api must be
+up"); dev starts it beside the worker, never after it. While a Postgres schema step of its image is
+outstanding the door holds each request up to the hold window (30 s) for the hold to lift; after
+that, until the ledger is current, it serves the routes declared to serve while upgrading (a
+`packages/api` route declaration the door enforces): sign-in, the Ops Upgrades page and ingestion
+(OTLP traces, logs and metrics, the collector, tracked events, RUM, evaluator and guardrail calls,
+batch result logs, governance sources). Ingestion only enqueues for the worker, which drains the
+queue once the ledger is current, so nothing is dropped. A request still held when its window ends
+answers the holding page or 503 with Retry-After, and the api reports not ready. Alex's direction
+(2026-10-09: "ideally no dropped api calls either; eventually consistent is fine") is that every
+route serves while upgrading, with an opt-out naming its reason; until that lands the declared set
+is what serves. A blocking step never touches a table the sign-in or ingest doors read or write
+(auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
+model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
+(UIW-1..11). A background step names the background steps it runs after by their step
 values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
 contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
 recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
