@@ -17,12 +17,7 @@ import {
   startBackend,
   type BackendHalves,
 } from "./backend.process.ts";
-import {
-  createReloadTrigger,
-  holdRemainingMs,
-  invalidateModules,
-  staleModuleIds,
-} from "./backend.reload.ts";
+import { createReloadTrigger, invalidateModules, staleModuleIds } from "./backend.reload.ts";
 
 /**
  * Local-only host for the whole Node side of a stack in one process (ADR-168, B1): the UI's Vite
@@ -237,7 +232,6 @@ function watchBackend({ onFile }: { onFile: (file: string) => void }): void {
 /** Starts the UI (not in the api lane), then the first backend generation, then the watch. */
 export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
   if (withUi) {
-    // The HMR gate marker resolves against cwd (apps/ui/vite/havenHmrGate.ts).
     process.chdir(UI_ROOT);
     ui = await startUi();
   }
@@ -250,12 +244,9 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
   };
   await run([]);
   if (!isWatching) return;
-  const marker =
-    process.env.LANGWATCH_DEV_HOLD_MARKER?.trim() || path.join(UI_ROOT, ".haven-hmr-gate");
   const trigger = createReloadTrigger({
     quietMs: envMs({ name: "LANGWATCH_DEV_WATCH_DEBOUNCE_MS", fallback: 2_000 }),
     maxWaitMs: envMs({ name: "LANGWATCH_DEV_WATCH_MAX_WAIT_MS", fallback: 30_000 }),
-    holdMs: () => holdRemainingMs({ marker }),
     run,
   });
   watchBackend({

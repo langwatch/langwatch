@@ -467,14 +467,16 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "hmr",
-		summary: "AI-gated HMR: on [--ttl <dur>] defers Vite reloads, off resumes",
+		summary: "retired no-op: reloads are debounced, there is no hold (ADR-168)",
 		args:    "[on|off|status]",
 		maxArgs: 1,
+		// Kept so agent hooks still calling `haven hmr on --ttl <dur>` exit 0.
 		flags: []flagSpec{
-			{long: "--ttl", takesValue: true, value: "<dur>", summary: "how long the gate holds (default 30s)"},
+			{long: "--ttl", takesValue: true, value: "<dur>", summary: "ignored"},
 		},
-		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunHMR(ctx, d.worktree, inv.raw)
+		run: func(_ context.Context, _ deps, _ invocation) error {
+			fmt.Println("haven hmr is retired: reloads are debounced and nothing holds them; remove the call")
+			return nil
 		},
 	},
 	{

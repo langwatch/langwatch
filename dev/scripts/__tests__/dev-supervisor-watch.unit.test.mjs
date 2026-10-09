@@ -14,7 +14,6 @@ import {
   createBackendFilter,
   createDebouncer,
   createReloadQueue,
-  holdRemainingMs,
   needsNewProcess,
   resolveBundleConfig,
   resolveWatchConfig,
@@ -407,7 +406,7 @@ void describe("createReloadQueue", () => {
   });
 });
 
-void describe("createDebouncer quiet window, max wait and hold", () => {
+void describe("createDebouncer quiet window and max wait", () => {
   /** @scenario "A steady trickle of edits still restarts within the max wait" */
   void it("fires at the max wait when writes never go quiet", async () => {
     const fired = [];
@@ -426,39 +425,6 @@ void describe("createDebouncer quiet window, max wait and hold", () => {
     assert.equal(fired.length, 1);
     assert.ok(fired[0] >= 8, `the max-wait fire carries the burst, got ${fired[0]}`);
   });
-
-  /** @scenario "An agent mid-turn holds the restart until it is released" */
-  void it("defers while the hold is active, then fires once it is released", async () => {
-    let held = true;
-    const fired = [];
-    const debouncer = createDebouncer({
-      debounceMs: 20,
-      holdMs: () => (held ? 100 : 0),
-      holdPollMs: 20,
-      onFire: (files) => fired.push(files),
-    });
-    debouncer.note("a.ts");
-    await sleep(150);
-    assert.deepEqual(fired, []);
-    held = false;
-    await sleep(60);
-    assert.deepEqual(fired, [["a.ts"]]);
-  });
-
-  /** @scenario "A hold expires after the cap" */
-  void it("does not hold past the cap", async () => {
-    const fired = [];
-    const debouncer = createDebouncer({
-      debounceMs: 10,
-      holdMs: () => 10_000,
-      holdCapMs: 80,
-      holdPollMs: 20,
-      onFire: (files) => fired.push(files),
-    });
-    debouncer.note("a.ts");
-    await sleep(200);
-    assert.deepEqual(fired, [["a.ts"]]);
-  });
 });
 
 void describe("needsNewProcess for a child that reloads in-process", () => {
@@ -476,23 +442,5 @@ void describe("needsNewProcess for a child that reloads in-process", () => {
     assert.equal(needs("src/backend.reload.ts"), true);
     assert.equal(needs("../../packages/api/not-a-package.json"), false);
     assert.equal(needs("src/__tests__/backend.reload.unit.test.ts"), false);
-  });
-});
-
-void describe("holdRemainingMs", () => {
-  void it("reads the expiry the marker carries, capped, and 0 for absent or stale", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hold-"));
-    const marker = path.join(dir, ".haven-hmr-gate");
-    assert.equal(holdRemainingMs({ marker }), 0);
-    fs.writeFileSync(marker, "5000\n");
-    assert.equal(holdRemainingMs({ marker, now: 4000 }), 1000);
-    assert.equal(holdRemainingMs({ marker, now: 6000 }), 0);
-    fs.writeFileSync(marker, String(5 * 60_000));
-    assert.equal(holdRemainingMs({ marker, now: 0 }), 5 * 60_000, "a turn-long hold is honoured");
-    fs.writeFileSync(marker, String(60 * 60_000));
-    assert.equal(holdRemainingMs({ marker, now: 0 }), 10 * 60_000, "capped at ten minutes");
-    fs.writeFileSync(marker, "garbage");
-    assert.equal(holdRemainingMs({ marker }), 0);
-    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

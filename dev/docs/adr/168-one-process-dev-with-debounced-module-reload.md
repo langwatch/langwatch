@@ -122,7 +122,7 @@ not the reload time or the process count.
 The shape decides reload cost; the trigger decides how often it is paid.
 
 - **Serialise.** One reload at a time. Changes during a reload queue into exactly one follow-up.
-- **Gate on the agent's turn, not the clock.** haven already installs hooks per worktree. It adds
+- **Gate on the agent's turn, not the clock** (retired 2026-10-09, see the amendment). haven already installs hooks per worktree. It adds
   `PostToolUse` on `Edit|Write|MultiEdit` (hold, renewed per write, 10 min cap) and `Stop` (release
   this session's hold). The backend reloads when no session holds and the quiet window has
   passed. A human's editor never holds, so humans keep 750 ms. It reuses `.haven-hmr-gate`, so
@@ -190,33 +190,10 @@ In `dev/scripts/dev-supervisor.mjs` (proof: `dev/scripts/reload-burst.mjs`, run 
   a `src/` tree (not `package.json`), plus every workspace package no dependency of the watched
   command reaches (13 of 164 packages for `dev-runtime`: design-system, browser-host and the
   like), derived from the `package.json` graph.
-- **The agent-turn hold.** A restart waits while the `.haven-hmr-gate` marker
-  (`apps/ui/.haven-hmr-gate`, unix-ms expiry, `LANGWATCH_DEV_HOLD_MARKER` overrides), is in the
-  future, at most 10 minutes from when the hold began (60 s until 2026-10-09: a turn
-  outlived it). The supervisor only reads it.
+- **The agent-turn hold** shipped here and was retired on 2026-10-09 (see the amendment).
 - **Not in step 1:** link-before-drop. Two whole-process backends cannot share a port, so a
   failed boot still takes the old one down (it is the crashed-boot wait that keeps the lane
   alive). It belongs to B1.
-
-The hold hooks are **opt-in**; `haven up` installs nothing new (open question 2). To try them, add
-to `.claude/settings.local.json`:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "haven hmr on --ttl 10m" }]
-      }
-    ],
-    "Stop": [{ "hooks": [{ "type": "command", "command": "haven hmr off" }] }]
-  }
-}
-```
-
-One marker serves every session in the worktree, so one session's `Stop` releases another's hold.
-`haven hmr on` never shortens a later expiry another session wrote.
 
 ## Step 3, as shipped (2026-10-09)
 
@@ -226,6 +203,15 @@ without the UI: `app.entrypoint.ts --backend-only` under `dev-supervisor.mjs --w
 survives a source edit. The supervisor restarts the process only for a `package.json`, a file
 in the host's own `src/`, or a non-zero exit after `backend ready`; a bad edit never exits the
 host. `LANGWATCH_DEV_RELOAD=process` is the escape hatch: the whole-process restart per change.
+
+## Amendment 2026-10-09: hold retired, debounce only
+
+Alex, 2026-10-09: the backend now reloads changed modules in-process, so a reload is cheap and
+the agent-turn hold is not wanted: "just debounce would be nicer". Removed: the hold in
+`dev-supervisor.mjs` and `backend.reload.ts`, `LANGWATCH_DEV_HOLD_MARKER`, the `.haven-hmr-gate`
+marker in the UI's Vite plugin, and the hold scenarios. What stays is the quiet window (2 s) with
+the max wait (30 s), and the Vite plugin's burst coalescing (300 ms gap, 500 ms settle).
+`haven hmr` remains as a no-op that says it is retired, so old hooks still exit 0; remove them.
 
 ## Risks
 
@@ -255,7 +241,6 @@ A script (`dev/scripts/reload-burst.mjs`) against a running stack, each run from
 | Run                    | Writes                                        | Pass                                      |
 | ---------------------- | --------------------------------------------- | ----------------------------------------- |
 | storm                  | 200 edits over 20 backend files in 2 s        | 1 reload                                  |
-| agent cadence          | 200 edits, one per 1.5 s, hold hook active    | 1 reload, after release                   |
 | agent cadence, no hook | same, no hold                                 | never two reloads at once, no lane exit   |
 | broken mid-burst       | an import to a missing file, fixed 10 s later | old generation serves throughout; 0 exits |
 | non-code               | 200 edits to `.feature`, `.md`, design-system | 0 reloads                                 |
@@ -269,7 +254,7 @@ most 5 s for B1, peak RSS at most today's Node total plus 15%, flat connection c
 
 1. Is B1's one-process shape wanted even though the RSS saving is small (wrappers only) unless
    api and worker share stores, which ADR-004 (2026-09-07) refused?
-2. May haven install `PostToolUse` and `Stop` hooks per worktree by default, as it does the gate?
+2. May haven install `PostToolUse` and `Stop` hooks per worktree by default, as it does the gate? Moot: the hold was retired on 2026-10-09.
 3. Should the npx CLI (`apps/server`) also run api and worker in one process, without watch?
 4. Does "dev-env" mean the compose quickstart? If so, retire `make quickstart` and ADR-004's
    compose presets separately.

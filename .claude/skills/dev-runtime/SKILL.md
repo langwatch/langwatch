@@ -1,6 +1,6 @@
 ---
 name: dev-runtime
-description: "How the Node side of a dev stack runs without haven, and the one-process lane: `pnpm dev`, `pnpm dev:one`, `LANGWATCH_DEV_ONE_PROCESS=1`, tools/dev-runtime (ui + api + worker in one Node process), backend reload on a file change, the debounce and agent-turn hold, ports derived from PORT. Use when someone says 'pnpm dev', 'dev:one', 'one process', 'the app lane', 'backend reload', 'why did the api restart', 'reload storm', 'ADR-168', 'dev-runtime', 'backend ready', or 'LANGWATCH_DEV_WATCH'. ADR-168 is Proposed, not accepted."
+description: "How the Node side of a dev stack runs without haven, and the one-process lane: `pnpm dev`, `pnpm dev:one`, `LANGWATCH_DEV_ONE_PROCESS=1`, tools/dev-runtime (ui + api + worker in one Node process), backend reload on a file change, the debounce (quiet window + max wait), ports derived from PORT. Use when someone says 'pnpm dev', 'dev:one', 'one process', 'the app lane', 'backend reload', 'why did the api restart', 'reload storm', 'ADR-168', 'dev-runtime', 'backend ready', or 'LANGWATCH_DEV_WATCH'. ADR-168 is Proposed, not accepted."
 user-invocable: true
 argument-hint: "[dev | dev:one | reload | ports]"
 ---
@@ -47,7 +47,7 @@ trial, and the four open questions at the foot of the ADR are Alex's, not answer
 - `backend.entrypoint.main.ts`: api and worker in one Node process with no reload
   (`pnpm start`, and the `LANGWATCH_DEV_RELOAD=process` fallback's boot shape).
 - `backend.reload.ts`: finds the loaded modules a changed file reaches
-  (`staleModuleIds`) and drops only those; honours the agent-turn hold.
+  (`staleModuleIds`) and drops only those; reloads are debounced, never held.
 - `backend.process.ts`: `startBackend` boots the worker first, then the api;
   `drainBackend` stops the worker first, then the api.
 
@@ -63,11 +63,10 @@ generation serving. A failed boot waits for the next change. Each generation log
 | `LANGWATCH_DEV_WATCH=0`           | one-shot, no reload (diff tools measure a stack that must not move) |
 | `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` | quiet window before a reload (2000)                                 |
 | `LANGWATCH_DEV_WATCH_MAX_WAIT_MS` | never defer longer than this after the first change (30000)         |
-| `LANGWATCH_DEV_HOLD_MARKER`       | override the `apps/ui/.haven-hmr-gate` marker path                  |
 | `LANGWATCH_DEV_RELOAD=process`    | api lane: back to the supervisor's whole-process restart per change |
 
-The hold marker is what `haven hmr on --ttl 10m` writes during an agent turn (the hooks are
-opt-in, ADR-168); a reload waits for it, at most 10 minutes from when the hold began. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
+There is no agent-turn hold (retired 2026-10-09, ADR-168): the debounce alone coalesces a
+turn's edits, and `haven hmr` is a no-op. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
 a `.json` outside `src/`, or a package the watched command cannot reach. The authority for
 these is `dev/scripts/dev-supervisor.mjs` and ADR-168 "Step 1, as shipped".
 
@@ -80,8 +79,8 @@ two `PORT`s (5570, 5580, ...). A held port stops the launcher with a line saying
 
 ## Failure shapes
 
-- A reload storm after a burst of agent writes: raise the debounce, or turn the hold hook
-  on (`haven hmr on`); the log names the changed files per generation.
+- A reload storm after a burst of agent writes: raise `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`;
+  the log names the changed files per generation.
 - `backend did not link` after an edit: the old generation keeps serving. `boot failed;
   waiting for a change`: the old one is drained and the next change retries. Fix the file;
   do not restart the lane.

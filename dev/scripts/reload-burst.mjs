@@ -39,7 +39,7 @@ else setTimeout(() => {
 setInterval(() => {}, 1000);
 `;
 
-/** Each scenario writes through `write(file, text)`; `hold()` renews the agent-turn marker. */
+/** Each scenario writes through `write(file, text)`. */
 const SCENARIOS = {
   storm: {
     doc: "200 edits over 20 files in 2 s",
@@ -52,7 +52,7 @@ const SCENARIOS = {
     pass: (m) => m.restarts === 1 && !m.exited,
   },
   cadence: {
-    doc: `${edits} edits, one per 1.5 s, no hold`,
+    doc: `${edits} edits, one per 1.5 s`,
     async run({ write }) {
       for (let i = 0; i < edits; i += 1) {
         write(`src/f${i % 20}.ts`, `export const v = ${i};\n`);
@@ -60,18 +60,6 @@ const SCENARIOS = {
       }
     },
     pass: (m) => m.maxConcurrent === 1 && !m.exited,
-  },
-  "cadence-hold": {
-    doc: "30 edits, one per 1.5 s, hold renewed per edit then released (the hold caps at 60 s)",
-    async run({ write, hold, release }) {
-      for (let i = 0; i < 30; i += 1) {
-        hold(5_000);
-        write(`src/f${i % 20}.ts`, `export const v = ${i};\n`);
-        await sleep(1_500);
-      }
-      release();
-    },
-    pass: (m) => m.restarts === 1 && m.maxConcurrent === 1 && !m.exited,
   },
   broken: {
     doc: "an import to a missing file, fixed 10 s later",
@@ -165,7 +153,6 @@ async function runScenario({ name, scenario, supervisor }) {
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "fixture" }));
   fs.writeFileSync(path.join(dir, "child.mjs"), CHILD);
   const events = path.join(dir, "events.log");
-  const marker = path.join(dir, "marker");
   const proc = spawn(
     process.execPath,
     [supervisor, "--watch", "--", process.execPath, "child.mjs"],
@@ -177,7 +164,6 @@ async function runScenario({ name, scenario, supervisor }) {
         LANGWATCH_DEV_WATCH_DIRS: "src",
         LANGWATCH_DEV_GRACE_MS: "3000",
         LANGWATCH_DEV_READY_PATTERN: "backend ready",
-        LANGWATCH_DEV_HOLD_MARKER: marker,
         LANGWATCH_DEV_CRASH_LOG: path.join(dir, "crash.log"),
       },
       stdio: ["ignore", "ignore", "pipe"],
@@ -200,8 +186,6 @@ async function runScenario({ name, scenario, supervisor }) {
   while (!readEvents(events).some((e) => e.event === "READY")) await sleep(100);
   const writeApi = {
     write: (file, text) => fs.writeFileSync(path.join(dir, file), text),
-    hold: (ms) => fs.writeFileSync(marker, String(Date.now() + ms)),
-    release: () => fs.rmSync(marker, { force: true }),
   };
   const coldEvents = readEvents(events).length;
   await scenario.run(writeApi);

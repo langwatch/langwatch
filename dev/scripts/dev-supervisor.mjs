@@ -33,11 +33,6 @@ const DEFAULT_WATCH_DEBOUNCE_MS = 2_000;
 const DEFAULT_WATCH_MAX_WAIT_MS = 30_000;
 /** A boot that never says it is ready settles anyway after this (cold start p90 is 24 s). */
 const DEFAULT_BOOT_SETTLE_MS = 30_000;
-/** The agent-turn hold (`.haven-hmr-gate`) defers a restart at most this long: a whole
- * agent turn, yet bounded so a crashed agent's marker cannot hold forever. */
-const MAX_HOLD_MS = 600_000;
-/** How often a held restart looks at whether the hold was released. */
-const HOLD_POLL_MS = 500;
 /** Default watch roots, relative to cwd: the package's own source, plus every
  * workspace package (architecture-enforcer already forbids api/worker code from
  * reaching a web/ui package, so this needs no per-app allowlist). */
@@ -204,9 +199,6 @@ export function resolveWatchConfig(env) {
     readyPattern: (env.LANGWATCH_DEV_READY_PATTERN ?? "").trim(),
     // LANGWATCH_DEV_RELOAD=module: the child reloads source in-process (ADR-168, B1).
     reloadsInChild: (env.LANGWATCH_DEV_RELOAD ?? "").trim() === "module",
-    holdMarker:
-      (env.LANGWATCH_DEV_HOLD_MARKER ?? "").trim() ||
-      path.join(REPO_ROOT, "apps", "ui", ".haven-hmr-gate"),
   };
 }
 
@@ -493,19 +485,11 @@ function wireStderr(stream, { raw, crashLog, quietMs = 150 }) {
 /**
  * Coalesces changes into one `onFire` after `debounceMs` of quiet, naming every
  * file. `maxWaitMs` bounds the wait from the first change so a trickle cannot
- * starve it; `holdMs()` (an agent mid-turn) defers it, at most `holdCapMs`.
+ * starve it.
  */
-export function createDebouncer({
-  debounceMs,
-  maxWaitMs = Number.POSITIVE_INFINITY,
-  holdMs = () => 0,
-  holdCapMs = MAX_HOLD_MS,
-  holdPollMs = HOLD_POLL_MS,
-  onFire,
-}) {
+export function createDebouncer({ debounceMs, maxWaitMs = Number.POSITIVE_INFINITY, onFire }) {
   let timer = null;
   let firstAt = 0;
-  let heldSince = 0;
   const pending = new Set();
   const arm = (ms) => {
     if (timer) clearTimeout(timer);
@@ -514,13 +498,6 @@ export function createDebouncer({
   };
   function fire() {
     timer = null;
-    const hold = holdMs();
-    if (hold > 0) {
-      heldSince ||= Date.now();
-      const left = holdCapMs - (Date.now() - heldSince);
-      if (left > 0) return arm(Math.min(hold, holdPollMs, left));
-    }
-    heldSince = 0;
     const files = [...pending];
     pending.clear();
     onFire(files);
@@ -533,7 +510,6 @@ export function createDebouncer({
   const cancel = () => {
     if (timer) clearTimeout(timer);
     timer = null;
-    heldSince = 0;
     pending.clear();
   };
   return { note, cancel };
@@ -565,16 +541,6 @@ export function createReloadQueue({ run }) {
     return next;
   };
   return { request, isBusy: () => running };
-}
-
-/** Milliseconds the agent-turn marker still holds a restart: 0 when absent, stale or unreadable. */
-export function holdRemainingMs({ marker, now = Date.now() }) {
-  try {
-    const expiry = Number(fs.readFileSync(marker, "utf8").trim());
-    return Number.isFinite(expiry) ? Math.min(Math.max(expiry - now, 0), MAX_HOLD_MS) : 0;
-  } catch {
-    return 0;
-  }
 }
 
 /** Where workspace packages live, for resolving a dependency to its directory. */
@@ -719,7 +685,6 @@ class WatchSupervisor {
     this.debouncer = createDebouncer({
       debounceMs: config.debounceMs,
       maxWaitMs: config.maxWaitMs,
-      holdMs: () => holdRemainingMs({ marker: config.holdMarker }),
       onFire: (files) => void this.queue.request(files),
     });
   }

@@ -43,7 +43,7 @@ A local Node process started by `pnpm dev` or `pnpm dev:one`. It is not register
 ## Environment and configuration
 
 It reads the same environment the applications read, resolved through their own configuration. It
-adds only the debounce and agent-turn hold settings ADR-168 names.
+adds only the debounce settings ADR-168 names (the agent-turn hold was retired 2026-10-09).
 
 ## Errors
 

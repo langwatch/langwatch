@@ -54,9 +54,6 @@ func (f *fakeStore) ReadSlugCache(dir string) (string, bool) {
 	return s, ok
 }
 func (f *fakeStore) WriteSlugCache(string, string) error { return nil }
-func (f *fakeStore) WriteHMRGate(string, int64) error    { return nil }
-func (f *fakeStore) ReadHMRGate(string) (int64, bool)    { return 0, false }
-func (f *fakeStore) ClearHMRGate(string)                 {}
 func (f *fakeStore) TouchDBActivity(slug string) error {
 	f.touched = append(f.touched, slug)
 	if f.dbActivity == nil {

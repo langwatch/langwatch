@@ -170,37 +170,6 @@ Feature: The local development process topology
     When files keep changing so the quiet window never elapses
     Then the restart fires once the max wait since the first change has passed
 
-  # `haven hmr on --ttl` writes the marker the UI's HMR gate reads (apps/ui/
-  # .haven-hmr-gate, unix-ms expiry). An agent's PostToolUse hook renewing it
-  # per write and its Stop hook clearing it gives "reload after the turn".
-  # Installing those hooks is opt-in: see ADR-168.
-  @unit
-  Scenario: An agent mid-turn holds the restart until it is released
-    Given the backend lane running under a debounced watch
-    And the agent-turn hold marker names an expiry in the future
-    When the quiet window elapses
-    Then no restart happens while the marker holds
-    And exactly one restart happens once the marker is released or expires
-
-  # A turn renews the marker on every write and can run for minutes, so a
-  # one-minute cap reloaded mid-turn. The cap is now ten minutes: a whole turn,
-  # yet bounded, so a crashed agent that never released its marker cannot
-  # hold the backend forever. The supervisor and the in-process host share it.
-  @unit
-  Scenario: A hold lasts as long as the agent turn is active
-    Given the api lane reloading in-process
-    And the agent-turn hold marker is renewed for five minutes
-    When the quiet window elapses
-    Then no reload happens while the marker holds
-    And exactly one reload happens once the marker is released
-
-  @unit
-  Scenario: A hold expires after the cap
-    Given the backend lane running under a debounced watch
-    And the agent-turn hold marker names an expiry that never passes
-    When the quiet window elapses
-    Then exactly one reload happens once ten minutes have passed since the hold began
-
   # --- The api lane reloads in-process (ADR-168, B1) ---
 
   # Restarting the whole process for every edit left a shared checkout's api

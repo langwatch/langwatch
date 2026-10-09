@@ -48,7 +48,6 @@ setInterval(() => {}, 1000);
         LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "50",
         LANGWATCH_DEV_GRACE_MS: "500",
         LANGWATCH_DEV_READY_PATTERN: "backend ready",
-        LANGWATCH_DEV_HOLD_MARKER: path.join(dir, "no-marker"),
         LANGWATCH_DEV_CRASH_LOG: path.join(dir, "crash.log"),
         ...env,
       },
