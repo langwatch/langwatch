@@ -17564,8 +17564,8 @@ On a Claude subscription, `total_cost_usd` and LangWatch both show API-equivalen
 | | Default | `autoCompactWindow: 150000` |
 |---|---|---|
 | Runs | 4 | 4 |
-| Cost per run, list prices | 9.78 USD | 4.82 USD |
-| Cache reads per run | 75.6M | 20.5M |
+| Cost per run, list prices | 9.78 USD | 4.81 USD |
+| Cache reads per run | 75.7M | 20.6M |
 | Questions about early files answered | 6 of 6 | 0 of 6 |
 
 The early window cut cost by 51%, but the agent lost what it had read before each compaction. Pick a window that compacts long sessions without cutting into the part of the session your agent still needs, and check the answers, not only the cost.
@@ -19303,7 +19303,7 @@ Every query below is LangWatchQL, run with `langwatch query run "<sql>" -o json`
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-A query reads every project the login can reach, whatever `--project` says, so check the scope first:
+Without `--project`, a query reads every project the login can reach, so check the scope first:
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
@@ -19312,7 +19312,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team, and for one project add `AND TenantId = '<id>'` to every query below.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -55476,7 +55476,7 @@ Every query below is LangWatchQL, run with `langwatch query run "<sql>" -o json`
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-A query reads every project the login can reach, whatever `--project` says, so check the scope first:
+Without `--project`, a query reads every project the login can reach, so check the scope first:
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
@@ -55485,7 +55485,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team, and for one project add `AND TenantId = '<id>'` to every query below.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -74374,7 +74374,7 @@ Send your LangWatch API key in any one of these forms:
 | Bearer | `Authorization: Bearer <token>` |
 | Basic | `Authorization: Basic base64(projectId:token)` |
 
-Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To narrow the result to one project, filter inside the statement itself with `WHERE TenantId = '<project id>'`.
+Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To run `POST /api/v1/query` over one project only, send its id as `projectId` in the request body: the run then reads that project's rows alone, under that project's own content protections. Without `projectId` the run covers every project the key can read. You can also filter inside the statement itself with `WHERE TenantId = '<project id>'`, but the result is then redacted by the strictest protection across all the projects the key can read.
 
 A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
 
@@ -74390,6 +74390,7 @@ Both endpoints answer with the standard LangWatch error envelope and a real HTTP
 | `401` | `missing_credentials` | No supported authentication credential was sent. |
 | `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
 | `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
+| `404` | `project_not_found` | The body's `projectId` names a project the key cannot read with `analytics:view`, or one that does not exist. The two cases get the same answer. |
 | `413` | `lwql_result_too_large` | The result body exceeds about 8,000,000 bytes. |
 | `422` | `query_scan_limit_exceeded` | The statement is valid but would scan more data than the key allows. |
 

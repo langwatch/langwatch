@@ -106,7 +106,7 @@ Every query below is LangWatchQL, run with `langwatch query run "<sql>" -o json`
 
 `langwatch.coding_session_events` holds one row per event. Model calls have `EventKind = 'model_call'` with `Model`, `InputTokens`, `OutputTokens`, `CacheReadTokens`, `CacheCreationTokens`, `CostUsd`, `TimeUnixMs` and `QuerySource`. `QuerySource` tells threads apart: `repl_main_thread%` or `sdk` is the main conversation, `agent:builtin:<type>` and `agent:custom` are sub-agents, `agent_summary` is a sub-agent's final report, `compact` is a compaction. The context a call carried is `InputTokens + CacheReadTokens + CacheCreationTokens`.
 
-A query reads every project the login can reach, whatever `--project` says, so check the scope first:
+Without `--project`, a query reads every project the login can reach, so check the scope first:
 
 ```sql
 SELECT TenantId, count() AS calls, round(sum(CostUsd), 2) AS cost_usd
@@ -115,7 +115,7 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team, and for one project add `AND TenantId = '<id>'` to every query below.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 

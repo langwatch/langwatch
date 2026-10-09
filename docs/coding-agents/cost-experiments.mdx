@@ -47,8 +47,8 @@ On a Claude subscription, `total_cost_usd` and LangWatch both show API-equivalen
 | | Default | `autoCompactWindow: 150000` |
 |---|---|---|
 | Runs | 4 | 4 |
-| Cost per run, list prices | 9.78 USD | 4.82 USD |
-| Cache reads per run | 75.6M | 20.5M |
+| Cost per run, list prices | 9.78 USD | 4.81 USD |
+| Cache reads per run | 75.7M | 20.6M |
 | Questions about early files answered | 6 of 6 | 0 of 6 |
 
 The early window cut cost by 51%, but the agent lost what it had read before each compaction. Pick a window that compacts long sessions without cutting into the part of the session your agent still needs, and check the answers, not only the cost.

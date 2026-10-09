@@ -30,7 +30,7 @@ import {
   type LangWatchQLJudgementCall,
   type LangWatchQLSchema,
   type LangWatchQLService,
-  type LangWatchQLStatementRequest,
+  type LangWatchQLKeyStatementRequest,
   type LangWatchQLTextHydrationInput,
   type LangWatchQLValidationInput,
   type QueryReference,
@@ -618,16 +618,19 @@ export class AnalyticsModule
   }
 
   /**
-   * One statement over every project this key may read, counted against each of their
-   * windows first. An empty scope still runs, and reads zero rows.
+   * One statement over every project this key may read, or the one `projectId` names, counted
+   * against each of their windows first. An empty scope still runs, and reads zero rows.
    */
   async runLangWatchQLForKey(
     input: Readonly<
-      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLStatementRequest
+      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
-    const { reach, sql, parameters, timeWindow, granularitySeconds, signal } = input;
-    const { projects, protections } = await this.#queryScope.resolve({ reach });
+    const { reach, projectId, sql, parameters, timeWindow, granularitySeconds, signal } = input;
+    const { projects, protections } = await this.#queryScope.resolve({
+      reach,
+      ...(projectId === undefined ? {} : { projectId }),
+    });
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
     }

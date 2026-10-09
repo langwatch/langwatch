@@ -16,6 +16,13 @@ export const PROJECT_FLAG_HELP =
   "Project to run against, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
 
 /**
+ * Help for `--project` on `query run`, where the flag narrows rather than picks: without it the
+ * statement reads every project the login can read.
+ */
+export const QUERY_PROJECT_FLAG_HELP =
+  "Read only this project, by id or slug. Without it the statement covers every project your login can read; `langwatch projects list` shows which ones";
+
+/**
  * Commands that do not run inside a project, each with its reason: machine-local,
  * organization-scoped (the management plane), or naming projects rather than running in one.
  */
@@ -166,6 +173,7 @@ export const COMMANDS_ACROSS_PROJECTS: Record<string, string> = {
   "virtual-keys disable": "acts on a virtual key by id, in whichever scope it lives",
   "virtual-keys enable": "acts on a virtual key by id, in whichever scope it lives",
   "virtual-keys revoke": "acts on a virtual key by id, in whichever scope it lives",
+  "query run": "reads every project the login can read, and --project narrows it to one",
 };
 
 /**

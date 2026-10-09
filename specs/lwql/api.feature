@@ -1396,6 +1396,37 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       Then a content category is offered only when every readable project grants it
       And an empty readable set offers no content
 
+    # Explicit narrowing (the CLI's --project): the body names one project and the
+    # run reads that project alone. Without it the run keeps the whole readable set.
+    @unit
+    Scenario: A run naming no project keeps the key's whole readable scope
+      Given an organization key that reads several projects
+      When it runs a statement whose body names no projectId
+      Then the run spans every project the key holds analytics:view on
+      And it is redacted by the strictest protection across them
+
+    @unit
+    Scenario: A run naming a project reads only that project, under its own protections
+      Given an organization key that reads several projects with differing content protections
+      When it runs a statement whose body names one of them as projectId
+      Then the run reads that project's rows alone
+      And it is redacted by that project's own protections, never another project's
+
+    @unit
+    Scenario: A run naming a project the key cannot read is refused as not found
+      Given a key and a projectId it holds no analytics:view on, outside its organization, or that does not exist
+      When it runs a statement naming that projectId
+      Then the run is refused with project_not_found before the statement reaches the engine
+      And the refusal is the same whichever of those it was, so it reveals nothing about the project
+      And a legacy project key naming any project but its own is refused the same way
+
+    @unit
+    Scenario: The run door publishes projectId as the way to narrow a run to one project
+      Given the generated OpenAPI document for POST /api/v1/query
+      When its request body and description are read
+      Then the body accepts an optional projectId
+      And the description says a run without it spans every readable project and names the project_not_found refusal
+
   Rule: Discover what I can ask
 
     @e2e @unimplemented
