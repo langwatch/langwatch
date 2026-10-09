@@ -48,7 +48,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And their telemetry spans the 30 days before the anchor
     And the run manifest records the flags, the anchor and the recipe version
 
-  @unit @unimplemented
+  @unit
   Scenario: The same seed gives the same logical content
     Given two plans built from the same flags, seed and anchor
     Then their actions, natural keys, payload fields, business times and counts are identical
@@ -59,7 +59,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     When I run "haven seed" with the same flags and seed 7
     Then every action finds its record by natural key and creates nothing new
 
-  @unit @unimplemented
+  @unit
   Scenario: Any telemetry size from one span to two million is accepted
     When I run "haven seed --spans 1" or "haven seed --spans 2000000"
     Then the plan holds exactly that many spans, with logs and metric points in proportion
@@ -70,7 +70,7 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     Then the command exits 2 naming the flag and the values it accepts
     And no store is touched
 
-  @unit @unimplemented
+  @unit
   Scenario: A dry run prints the plan without writing
     When I run "haven seed --size medium --dry-run"
     Then it prints the counts per kind, the estimated rows and bytes per store and the expected duration

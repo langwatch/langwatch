@@ -2,8 +2,8 @@ package seedgen
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -34,9 +34,8 @@ func (r StaticReport) Failed() bool {
 	return len(r.Gaps)+len(r.Stale)+len(r.UnknownKinds)+len(r.Unexplained) > 0
 }
 
-// actionKinds is the seam to SG1's plan model: the action kinds a generator may name.
-// Until the plan's kind registry lands it returns nil, and kind names go unchecked.
-var actionKinds = func() []string { return nil }
+// actionKinds is the seam to the plan model: the action kinds a generator may name.
+var actionKinds = func() []string { return Kinds }
 
 // CheckStatic compares the inventory with the map as sets.
 func CheckStatic(inventory []string, coverage CoverageMap) StaticReport {
@@ -119,7 +118,7 @@ func RunCoverage(args []string, stdout, stderr io.Writer) int {
 }
 
 func staticReport(root, manifestFile string) (StaticReport, error) {
-	manifest, err := extractManifest(manifestFile)
+	manifest, err := extractManifest(root, manifestFile)
 	if err != nil {
 		return StaticReport{}, err
 	}
@@ -134,12 +133,11 @@ func staticReport(root, manifestFile string) (StaticReport, error) {
 	return CheckStatic(inventory, coverage), nil
 }
 
-// extractManifest reads the readmegen manifest. Running the extractor in-process waits on
-// readmegen exporting it (handoff: shared-file request); until then the file is required.
-func extractManifest(file string) (readmegen.Manifest, error) {
+// extractManifest reads the readmegen manifest from file, or runs the extractor over root.
+func extractManifest(root, file string) (readmegen.Manifest, error) {
 	var manifest readmegen.Manifest
 	if file == "" {
-		return manifest, errors.New("--manifest is required until readmegen exports its extractor")
+		return readmegen.Extract(context.Background(), root, os.Stderr)
 	}
 	data, err := os.ReadFile(file) // #nosec G304 -- a path the caller named
 	if err != nil {
