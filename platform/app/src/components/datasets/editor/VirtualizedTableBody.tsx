@@ -6,7 +6,7 @@
  */
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import type { DatasetTableRowData } from "./DatasetTableContext";
 import { TableCell } from "./TableCell";
 
@@ -23,6 +23,10 @@ type VirtualizedTableBodyProps<TData extends DatasetTableRowData> = {
   shouldVirtualize: boolean;
   disableVirtualization: boolean;
   displayRowCount: number;
+  /** Local (within-page) row index to scroll into view and mark
+   *  `data-highlighted`, e.g. arriving via a dataset row deep-link. Null
+   *  once there is nothing to highlight. */
+  highlightedRowIndex?: number | null;
   /** Width of a trailing spacer column, e.g. to leave room for a side
    *  drawer overlaying the table (the evaluations workbench passes its
    *  drawer width). When set, each row also gets a filler cell absorbing
@@ -46,6 +50,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
   shouldVirtualize,
   disableVirtualization,
   displayRowCount,
+  highlightedRowIndex,
   trailingSpacerWidth,
 }: VirtualizedTableBodyProps<TData>) {
   // Stable callbacks for virtualizer
@@ -64,6 +69,16 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
     enabled: shouldVirtualize && !!scrollContainer,
   });
 
+  // Brings a deep-linked row into view once its page has rows to scroll to.
+  // `rows` only changes identity when the underlying data actually does, so
+  // this does not re-fire on every unrelated render (same contract as
+  // useScrollSelectedSpanIntoView, the trace waterfall's equivalent).
+  useEffect(() => {
+    if (highlightedRowIndex == null) return;
+    if (!rows[highlightedRowIndex]) return;
+    rowVirtualizer.scrollToIndex(highlightedRowIndex, { align: "auto" });
+  }, [highlightedRowIndex, rows, rowVirtualizer]);
+
   // Render all rows without virtualization when:
   // - Test mode (disableVirtualization prop)
   // - Fit mode with <= 100 rows
@@ -75,6 +90,9 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
             key={row.id}
             data-index={row.index}
             data-selected={selectedRows.has(row.index) ? "true" : undefined}
+            data-highlighted={
+              row.index === highlightedRowIndex ? "true" : undefined
+            }
           >
             {row.getVisibleCells().map((cell) => (
               <TableCell
@@ -134,6 +152,9 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
             data-index={virtualRow.index}
             style={{ height: `${COMPACT_ROW_HEIGHT}px` }}
             data-selected={selectedRows.has(row.index) ? "true" : undefined}
+            data-highlighted={
+              row.index === highlightedRowIndex ? "true" : undefined
+            }
           >
             {row.getVisibleCells().map((cell) => (
               <TableCell
