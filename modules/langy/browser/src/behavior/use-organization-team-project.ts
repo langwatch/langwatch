@@ -22,7 +22,6 @@ export function useOrganizationTeamProject(_options?: {
     team: host.team(),
     organizationRole: host.organizationRole(),
     isDemoProject: host.isDemoProject(),
-    hasPermission: (permission: string) => host.hasPermission(permission),
     /** Organization scope only; fails closed where no scope host is mounted. */
     hasOrgPermission: (permission: string) =>
       scopeHost?.hasOrganizationPermission(permission) ?? false,

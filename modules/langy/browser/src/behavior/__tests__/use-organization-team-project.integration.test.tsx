@@ -104,7 +104,6 @@ describe("useOrganizationTeamProject (langy)", () => {
     it("refuses the organization permission", () => {
       const scope = readScope({ scopeHost: scopeHostGranting({ organization: [] }) });
 
-      expect(scope.hasPermission("organization:manage")).toBe(true);
       expect(scope.hasOrgPermission("organization:manage")).toBe(false);
     });
   });

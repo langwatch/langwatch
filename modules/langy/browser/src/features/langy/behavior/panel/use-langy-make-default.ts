@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useLangyHost } from "../../../../model/langy-host.ts";
 import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
@@ -20,8 +21,8 @@ type ResolvedDefault = Parameters<typeof makeDefaultOffer>[0]["resolvedDefault"]
  * current default lives at, and only to someone who can manage that scope.
  */
 export function useLangyMakeDefault({ resolvedDefault }: { resolvedDefault: ResolvedDefault }) {
-  const { organization, team, project, hasOrgPermission, hasPermission } =
-    useOrganizationTeamProject();
+  const { organization, team, project, hasOrgPermission } = useOrganizationTeamProject();
+  const langyHost = useLangyHost();
   const projectId = project?.id;
   const utils = api.useUtils();
   const requestComposerFocus = useLangyStore((s) => s.requestComposerFocus);
@@ -39,8 +40,8 @@ export function useLangyMakeDefault({ resolvedDefault }: { resolvedDefault: Reso
       resolvedDefault,
       canManage: {
         organization: hasOrgPermission("organization:manage"),
-        team: hasPermission("team:manage"),
-        project: hasPermission("project:update"),
+        team: langyHost.hasPermission("team:manage"),
+        project: langyHost.hasPermission("project:update"),
       },
       scopeIds: {
         organizationId: organization?.id ?? null,

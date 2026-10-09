@@ -17,7 +17,6 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
     project: { id: "proj-1", slug: "acme-app" },
     organization: { id: "org-1", name: "Acme" },
     team: { id: "team-1", name: "Platform" },
-    hasPermission: () => true,
   }),
 }));
 

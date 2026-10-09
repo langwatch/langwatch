@@ -46,6 +46,7 @@ import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../model/model-provider-helpers.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
 import { CodexSignIn } from "./codex-sign-in.tsx";
 // DefaultProviderSection has been moved out of this drawer to a page-level
@@ -719,9 +720,10 @@ export const EditModelProviderForm = ({
   const { providers: allProviders, isReady: isAllProvidersReady } = useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
   const toaster = useModelProviderToaster();
-  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
-  const canManageOrganization = hasPermission("organization:manage");
-  const canManageTeam = hasPermission("team:manage");
+  const { project, team, organization } = useOrganizationTeamProject();
+  const modelProviderHost = useModelProviderHost();
+  const canManageOrganization = modelProviderHost.hasPermission("organization:manage");
+  const canManageTeam = modelProviderHost.hasPermission("team:manage");
 
   const enabledProvidersCount = useMemo(
     () => countEnabledProviders({ providerKey, providers }),
