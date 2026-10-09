@@ -16,6 +16,7 @@ import { OneTimeRevealService } from "../one-time-reveal.service.ts";
 const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL ?? process.env.REDIS_URL;
 const ORGANIZATION = "org_reveal_integration";
 const SECRET = "secret-content-marker";
+const RECIPIENT = { id: "user_reveal_integration" };
 
 /** A real AES-256-GCM cipher under a throwaway key, so the resting value is genuinely opaque. */
 function aesCipher(): SecretCipher {
@@ -66,18 +67,22 @@ describe.skipIf(!redisUrl)("given a virtual key secret stashed under a reveal id
       keyId: "vk_1",
       preview: "sk-…4f2a",
       secret: SECRET,
+      recipientUserId: RECIPIENT.id,
     });
+    const key = `secret_reveal:${ORGANIZATION}:${RECIPIENT.id}:${revealId}`;
 
-    const resting = await redis.get(`secret_reveal:${ORGANIZATION}:${revealId}`);
+    const resting = await redis.get(key);
     expect(resting).not.toBeNull();
     expect(resting).not.toContain(SECRET);
 
-    await expect(service.reveal({ organizationId: ORGANIZATION, revealId })).resolves.toMatchObject(
-      { secret: SECRET },
-    );
-    expect(await redis.get(`secret_reveal:${ORGANIZATION}:${revealId}`)).toBeNull();
+    await expect(
+      service.reveal({ organizationId: ORGANIZATION, revealId }, RECIPIENT),
+    ).resolves.toMatchObject({ secret: SECRET });
+    expect(await redis.get(key)).toBeNull();
 
-    await expect(service.reveal({ organizationId: ORGANIZATION, revealId })).rejects.toMatchObject({
+    await expect(
+      service.reveal({ organizationId: ORGANIZATION, revealId }, RECIPIENT),
+    ).rejects.toMatchObject({
       code: "secret_already_revealed",
     });
   });

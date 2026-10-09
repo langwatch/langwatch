@@ -56,9 +56,9 @@ export class SecretModule implements SecretApiContract {
     return this.#reveals.stash(input);
   }
 
-  /** Serves a stashed secret and forgets it. Every later read is refused. */
-  revealOnce(input: RevealOnceInput): Promise<RevealedSecret> {
-    return this.#reveals.reveal(input);
+  /** Serves a stashed secret to its recipient and forgets it. Every later read is refused. */
+  revealOnce(input: RevealOnceInput, by: SecretCaller): Promise<RevealedSecret> {
+    return this.#reveals.reveal(input, by);
   }
 
   /** The project's secrets, metadata only. */
