@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "ipykernel>=7.3.0",
     "langwatch",
-    "litellm>=1.96.0",
+    "litellm>=1.96.2",
     "mcp[cli]>=2.0.0",
     "pandas>=2.3.2",
     "tenacity>=9.1.4",
