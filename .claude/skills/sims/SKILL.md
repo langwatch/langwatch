@@ -19,6 +19,7 @@ built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 | `analyticssim` | PostHog, Customer.io           | `+analytics` | `analyticssim` | `ANALYTICSSIM_SEED`    |
 | `idpsim`       | OIDC, SAML, SCIM IdP           | default      | `idpsim`       | none (seeded tenants)  |
 | `voicesim`     | ElevenLabs voice, OpenAI audio | `+voice`     | `voicesim`     | `VOICESIM_SEED`        |
+| `telemetrysim` | OTLP senders (traces, logs, metrics, coding agents) | not yet wired | none | `--seed` per run |
 
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
 `analytics`, `idp`, `voice`) and logs via `haven logs <name>`. `haven up +llm +analytics`
@@ -69,4 +70,5 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 | analytics | `haven analytics status\|records\|clear\|wait --event` |
 | storage | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|requests` |
 | voice | `haven voice status\|calls\|call <id>` |
+| telemetry | `haven telemetry send\|load\|fuzz\|status\|stop` |
 | idp | `haven idp` (summary only; more verbs planned) |

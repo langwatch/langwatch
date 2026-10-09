@@ -387,6 +387,7 @@ var baseTable = []commandSpec{
 		run: runLogsCmd,
 	},
 	querySpec(),
+	telemetrySpec(),
 	{
 		name:    "status",
 		summary: "one-shot report: every stack, service health, shared servers, RAM",

@@ -33,18 +33,19 @@ func simulatorStack(repo string, layout domain.Layout) domain.Stack {
 		{Name: "voice", Port: 45591},
 		{Name: "llm", Port: 45595},
 		{Name: "analytics", Port: 45596},
+		{Name: "telemetry", Port: 45597},
 		{Name: "app", Port: 45560, URL: "https://app.test.langwatch.localhost"},
 	}}
 }
 
-// everySimulator selects all six simulators beside the data plane.
+// everySimulator selects all seven simulators beside the data plane.
 func everySimulator() domain.Selection {
 	sel := domain.DefaultSelection()
-	sel.IDP, sel.Mail, sel.Storage, sel.Voice, sel.LLM, sel.Analytics = true, true, true, true, true, true
+	sel.IDP, sel.Mail, sel.Storage, sel.Voice, sel.LLM, sel.Analytics, sel.Telemetry = true, true, true, true, true, true, true
 	return sel
 }
 
-var simulatorLanes = []string{"idp", "mail", "storage", "voice", "llm", "analytics"}
+var simulatorLanes = []string{"idp", "mail", "storage", "voice", "llm", "analytics", "telemetry"}
 
 // @scenario "A dev checkout's sims lane hosts the simulators"
 func TestTheSimsLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
@@ -67,7 +68,7 @@ func TestTheSimsLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
 	if !ok {
 		t.Fatal("no sims lane was planned")
 	}
-	if !strings.Contains(lane.Shell, `args="idpsim mailsim storagesim voicesim llmsim analyticssim"`) {
+	if !strings.Contains(lane.Shell, `args="idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim"`) {
 		t.Errorf("sims lane runs %q, want it to host every simulator", lane.Shell)
 	}
 	want := map[string]string{
@@ -87,6 +88,8 @@ func TestTheSimsLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
 		"LLMSIM_STACK":            "test",
 		"ANALYTICSSIM_ADDR":       ":45596",
 		"ANALYTICSSIM_SEED":       "1",
+		"TELEMETRYSIM_ADDR":       ":45597",
+		"TELEMETRYSIM_STACK":      "test",
 		"MAILSIM_SEED":            "1",
 		"STORAGESIM_SEED":         "1",
 		"VOICESIM_SEED":           "1",

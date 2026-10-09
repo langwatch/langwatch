@@ -25,7 +25,9 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each
 serve a console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and
 `storage` run by default; `llm`, `voice` and `analytics` need `haven up +llm
-+voice +analytics`. `haven logs <name>` reads any of them.
++voice +analytics`. `haven logs <name>` reads any of them. `telemetry`
+(`haven up +telemetry`) sends OTLP traffic and has no console:
+`haven telemetry send|load|fuzz|status|stop`.
 
 In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go`),
 every selected simulator runs in the `sims` lane: a second `service combined`

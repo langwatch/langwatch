@@ -303,7 +303,7 @@ go-lint: go-lint-slot
 # module's packages are linted from inside that module, in one slot.
 go-lint-changed:
 	@dirs=$$( { git diff --name-only HEAD -- '*.go'; git ls-files -o --exclude-standard -- '*.go'; } \
-		| grep -E '^(services/(aigateway|analyticssim|idpsim|langyagent|llmsim|mailsim|nlpgo|storagesim|voicesim)|pkg|cmd|tools)/' | grep -v '/testdata/' \
+		| grep -E '^(services/(aigateway|analyticssim|idpsim|langyagent|llmsim|mailsim|nlpgo|storagesim|telemetrysim|voicesim)|pkg|cmd|tools)/' | grep -v '/testdata/' \
 		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "$$d"; done); \
 	if [ -z "$$dirs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
 	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$dirs" | wc -l | tr -d ' ') packages)"; \

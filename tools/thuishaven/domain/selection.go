@@ -65,6 +65,10 @@ type Selection struct {
 	// default: it takes product analytics away from the real vendors, which
 	// nobody should get by surprise. `haven up +analytics` once.
 	Analytics bool `json:"analytics"`
+	// Telemetry is the OTLP sender (telemetrysim). Off by default: it only
+	// sends when asked, so a stack that never drives it needn't run it.
+	// `haven up +telemetry` once.
+	Telemetry bool `json:"telemetry"`
 }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
@@ -75,7 +79,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "telemetry", "design-system", "mail-room", "langevals"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -171,6 +175,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.LLM = on
 	case AnalyticsService:
 		sel.Analytics = on
+	case TelemetryService:
+		sel.Telemetry = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -208,6 +214,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.LLM = local
 		case AnalyticsService:
 			sel.Analytics = local
+		case TelemetryService:
+			sel.Telemetry = local
 		}
 	}
 	return sel
@@ -271,6 +279,7 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Voice, VoiceService)
 	add(s.LLM, LLMService)
 	add(s.Analytics, AnalyticsService)
+	add(s.Telemetry, TelemetryService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	add(s.Langevals, LangevalsService)
