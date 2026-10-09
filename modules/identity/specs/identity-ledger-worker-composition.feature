@@ -46,6 +46,24 @@ Feature: The identity and directory-sync ledgers compose from a Prisma client al
       # provider makes and retries on its own schedule, so an unregistered
       # pipeline here loses writes rather than a sweep.
 
+  Rule: A ledger commits from a process that only sends commands
+
+    @unit
+    Scenario: The SSO connection ledger commits without an event log
+      Given a process that sends commands and holds no event log
+      When an SSO connection command states facts
+      Then the ledger stages the command on the pipeline's own sender
+      And it answers the events the queued run will append
+      # The api refuses every append by name, so a ledger that appended before
+      # staging failed each SSO setup step in a split deployment.
+
+    @unit
+    Scenario: An SSO connection command nothing can carry is refused by name
+      Given a process that registered no SSO connection pipeline
+      When an SSO connection command states facts
+      Then the commit is refused naming the missing sender
+      And the ledger does not wait on the projection
+
   Rule: One address lock serves the guards and the fold
 
     @unit

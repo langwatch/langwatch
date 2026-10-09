@@ -1,8 +1,8 @@
-import { createTenantId, type OwnEventStore, type StateProjectionStore } from "@langwatch/eventing";
+import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 /**
- * The SSO connection ledger writer: the app's implementation of `@langwatch/identity-process`'s
- * SsoConnectionLedger, in the shape the 1. the durable ClickHouse append,
- * identity and grants ledgers already have (ADR-110, ADR-101):
+ * The SSO connection ledger writer, in the shape the identity, join-request and grants ledgers
+ * have (ADR-110): the staged command is the sole appender. This writer touches no event log, so
+ * it commits from a process that only sends commands; the queued run appends and folds.
  */
 import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
@@ -83,28 +83,21 @@ export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = 
   [FINALIZE_MIGRATION_COMMAND_TYPE]: "finalizeMigration",
 };
 
-/** The one write this ledger takes off the sso_connection pipeline's own store. */
-export type SsoConnectionEventAppends = Pick<OwnEventStore, "append">;
-
 interface SsoConnectionLedgerWriterDeps {
   projectionStore: StateProjectionStore<SsoConnectionFoldState>;
-  /** The sso_connection pipeline's own store. */
-  eventStore: SsoConnectionEventAppends;
   stagedSender: (name: string) => Promise<SsoConnectionStagedSender | null>;
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
 export class SsoConnectionLedgerStore implements SsoConnectionLedger {
-  /** Over the pipeline's own store and the senders the process connected. */
+  /** Over the senders the process connected. */
   static forPipeline(options: {
     projectionStore: StateProjectionStore<SsoConnectionFoldState>;
-    eventStore: SsoConnectionEventAppends;
     commands: IdentityEventing;
   }): SsoConnectionLedgerStore {
-    const { projectionStore, eventStore, commands } = options;
+    const { projectionStore, commands } = options;
     return SsoConnectionLedgerStore.create({
       projectionStore,
-      eventStore,
       stagedSender: async (command) => {
         const resolved = await commands.resolvePipelineCommand({
           pipeline: SSO_CONNECTION_PIPELINE_NAME,
@@ -120,13 +113,11 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
   }
 
   private readonly projectionStore: StateProjectionStore<SsoConnectionFoldState>;
-  private readonly eventStore: SsoConnectionEventAppends;
   private readonly stagedSender: (name: string) => Promise<SsoConnectionStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: SsoConnectionLedgerWriterDeps) {
     this.projectionStore = deps.projectionStore;
-    this.eventStore = deps.eventStore;
     this.stagedSender = deps.stagedSender;
     this.convergence = deps.convergence ?? {
       timeoutMs: SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS,
@@ -134,6 +125,7 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
     };
   }
 
+  /** The events the command states, returned to the caller after the queue has taken it. */
   async commit({
     command,
     facts,
@@ -144,8 +136,6 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
     const events = ssoConnectionEventsFor({ command, facts });
     if (events.length === 0) return [];
     const { connectionId, tenantId } = command.data;
-
-    await this.eventStore.append({ tenantId, events });
 
     await this.stage({ command });
     await this.awaitFold({ connectionId, tenantId, events });
@@ -192,7 +182,7 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
 
     logger.warn(
       { connectionId, commandCount: events.length },
-      "sso connection projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",
+      "sso connection projection did not land a command's events within the read-your-writes window; the command is queued and the fold will converge",
     );
   }
 
@@ -217,8 +207,8 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
         (cursor.acceptedAt === last.createdAt && cursor.eventId >= last.id)
       );
     } catch (error) {
-      // An unreadable projection is not a failed command: the facts are
-      // durable. Stop waiting and let the caller proceed.
+      // An unreadable projection is not a failed command: the command is
+      // queued. Stop waiting and let the caller proceed.
       logger.warn(
         { connectionId, error },
         "could not read the sso connection projection while waiting for convergence; continuing",
