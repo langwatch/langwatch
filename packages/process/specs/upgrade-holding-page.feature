@@ -77,11 +77,11 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
     Then the request is proxied to the main thread
 
   @unit
-  Scenario: Only a route declared to serve while upgrading passes the holding door
-    Given the liveness thread holds in upgrading mode with one route declared to serve while upgrading
-    When a request names that route's method and path, and another names a route that is not declared
-    Then the declared route reaches the main thread
-    And the other answers 503 before the main thread sees it
+  Scenario: In upgrading mode every route passes the holding door but the held ones
+    Given the liveness thread holds in upgrading mode with one route declared to hold
+    When requests name other routes, pages and the held route's path with another method
+    Then each reaches the main thread
+    And the held route answers 503 before the main thread sees it
 
   @unit
   Scenario: A held request waits for the hold to lift and then reaches the main thread
@@ -93,7 +93,20 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
   @unit
   Scenario: A held request is released once its route serves while upgrading
     Given the liveness thread is holding in the schema phase
-    And an SDK has posted traces and a client has posted to an undeclared route
-    When the hold moves to the upgrading phase with the trace route declared
+    And an SDK has posted traces and a client has posted to a route that holds
+    When the hold moves to the upgrading phase
     Then the trace request reaches the main thread
-    And the undeclared request is answered 503 when the hold window ends
+    And the held request is answered 503 when the hold window ends
+
+  @unit
+  Scenario: A flood of held requests past the cap is answered at once
+    Given the liveness thread holds and as many requests wait as it parks
+    When one more held request arrives
+    Then it is answered 503 with a Retry-After header at once
+    And the parked request still reaches the main thread when the hold lifts
+
+  @unit
+  Scenario: A released request reaches its handler only once the runtime has started
+    Given the hold lifted while a component ahead of the api's runtime is still starting
+    When a request reaches the main thread
+    Then it waits, and its handler runs only after the runtime has started

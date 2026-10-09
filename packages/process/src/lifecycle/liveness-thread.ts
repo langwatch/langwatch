@@ -24,6 +24,11 @@ const BIND_HANDOVER_MS = 10_000;
 export const UPGRADE_RETRY_AFTER_SECONDS = 10;
 /** A held request waits this long for its route to pass before it is answered held (API-UP). */
 export const UPGRADE_HOLD_WINDOW_MS = 30_000;
+/**
+ * Held requests one door parks at once; past it a held request is answered 503 at once, so a
+ * flood cannot hold every socket for the window. ponytail: one global count, per client if abused.
+ */
+export const UPGRADE_HOLD_MAX_PARKED = 1_000;
 
 /** The failure console's forms (UPGRADE-CONSOLE, 2026-10-09); answered only while it shows. */
 export const UPGRADE_CONSOLE_PATH = "/_upgrade/console";
@@ -35,7 +40,7 @@ export const UPGRADE_CONSOLE_TOKEN_TTL_MS = 30 * 60_000;
 /** D4: wrong tokens a process takes in a minute before every submission answers 429. */
 export const UPGRADE_CONSOLE_WRONG_TOKENS_PER_MINUTE = 5;
 
-/** The api's phase once the schema steps are done: it boots and serves declared routes (UIW-1). */
+/** The api's phase once the schema steps are done: it boots and serves every route not held. */
 export const UPGRADING_PHASE = "upgrading";
 /** Where the upgrading holding page sends a browser: sign-in, then the Upgrades page. */
 export const UPGRADE_SIGN_IN_HREF = "/auth/signin?callbackUrl=%2Fops%2Fupgrades";
@@ -44,10 +49,10 @@ export const UPGRADE_SIGN_IN_HREF = "/auth/signin?callbackUrl=%2Fops%2Fupgrades"
 export type UpgradeHolding = Readonly<{ phase: string; outstandingStepIds: readonly string[] }>;
 
 /**
- * What still reaches the main thread while the door holds: exact `paths` (the health routes) and
- * `routes`, regex sources over `METHOD /path` declared to serve while upgrading (UIW-6).
+ * What still reaches the main thread while the door holds: exact `paths` (the health routes) and,
+ * in upgrading mode, every request but `held`: regex sources over `METHOD /path` (API-UP).
  */
-export type UpgradePassThrough = Readonly<{ paths: readonly string[]; routes: readonly string[] }>;
+export type UpgradePassThrough = Readonly<{ paths: readonly string[]; held?: readonly string[] }>;
 
 /** A failed upgrade run, shown only to a console session. D1: the thread gets the token's hash. */
 export type UpgradeConsole = Readonly<{
@@ -142,7 +147,7 @@ const stalledMs = () => {
 };
 const target = { host: "127.0.0.1", port: workerData.proxyPort };
 let holdingPage = null;
-let passThrough = { paths: [], routes: [] };
+let passThrough = { paths: [], held: null };
 let consoleHold = null;
 const sessions = [];
 let wrongTokensAt = [];
@@ -163,6 +168,7 @@ const releaseParked = () => {
 };
 // API-UP-DURING-UPGRADE: a held request waits for the hold to lift or its route to pass.
 const park = (req, res) => {
+  if (parked.size >= workerData.maxParked) return answerHolding(req, res);
   const release = () => {
     if (holdingPage !== null && !passes(req) && consoleHold === null) return;
     settle();
@@ -181,8 +187,10 @@ const park = (req, res) => {
 };
 const passes = (req) => {
   const path = String(req.url).split("?")[0];
+  if (passThrough.paths.includes(path)) return true;
+  if (passThrough.held === null) return false;
   const route = req.method + " " + path;
-  return passThrough.paths.includes(path) || passThrough.routes.some((pattern) => pattern.test(route));
+  return !passThrough.held.some((pattern) => pattern.test(route));
 };
 const answerConsole = (res, status, page, headers) => {
   res.writeHead(status, {
@@ -347,7 +355,10 @@ server.on("error", (error) => {
 parentPort.on("message", (message) => {
   if (message.type === "hold") {
     holdingPage = message.page;
-    passThrough = { paths: message.paths, routes: message.routes.map((source) => new RegExp(source)) };
+    passThrough = {
+      paths: message.paths,
+      held: message.held === null ? null : message.held.map((source) => new RegExp(source)),
+    };
     consoleHold = null;
     if (message.page === null) sessions.length = 0;
     releaseParked();
@@ -430,6 +441,7 @@ export async function startLivenessThread({
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
   proxyTimeoutMs = MAIN_THREAD_PROXY_TIMEOUT_MS,
   holdWindowMs = UPGRADE_HOLD_WINDOW_MS,
+  maxParked = UPGRADE_HOLD_MAX_PARKED,
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
@@ -442,6 +454,8 @@ export async function startLivenessThread({
   proxyTimeoutMs?: number;
   /** How long a held request waits for its route to pass (UPGRADE_HOLD_WINDOW_MS). */
   holdWindowMs?: number;
+  /** How many held requests may wait at once (UPGRADE_HOLD_MAX_PARKED). */
+  maxParked?: number;
 }): Promise<LivenessThread> {
   const thread = new Worker(LIVENESS_THREAD_SOURCE, {
     eval: true,
@@ -458,6 +472,7 @@ export async function startLivenessThread({
       handoverMs: BIND_HANDOVER_MS,
       retryAfterSeconds: UPGRADE_RETRY_AFTER_SECONDS,
       holdWindowMs,
+      maxParked,
       consolePath: UPGRADE_CONSOLE_PATH,
       retryPath: UPGRADE_RETRY_PATH,
       consoleCookie: UPGRADE_CONSOLE_COOKIE,
@@ -477,14 +492,14 @@ export async function startLivenessThread({
   thread.on("error", (error) => logger.error({ error }, "liveness thread failed"));
   return {
     address,
-    hold: async (holding, passThrough = { paths: [], routes: [] }) => {
+    hold: async (holding, passThrough = { paths: [] }) => {
       const held = nextMessage({ thread, type: "held" });
       const page = holding === undefined ? null : renderUpgradeHoldingPage(holding);
       thread.postMessage({
         type: "hold",
         page,
         paths: passThrough.paths,
-        routes: passThrough.routes,
+        held: passThrough.held ?? null,
       });
       await Promise.race([held, exited]);
     },

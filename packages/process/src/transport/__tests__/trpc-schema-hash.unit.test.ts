@@ -11,6 +11,7 @@ import { z } from "zod";
 
 import { inertApiDoor } from "../../__tests__/support/api-door.ts";
 import { composeApiApplication } from "../api-surface.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 interface ProfileApi {
   motto(): { motto: string };
@@ -47,6 +48,7 @@ describe("given a tRPC surface mounting a contract", () => {
     const trpc = TrpcHost.create({
       sessions: SessionReader.create({ verify: async () => ({ userId: "user_ada" }) }),
       authz: {
+        ...testAuthorizeDefaults,
         ...inertApiDoor().authz,
         checkScopeLineage: async () => ({ kind: "consistent" }),
       },

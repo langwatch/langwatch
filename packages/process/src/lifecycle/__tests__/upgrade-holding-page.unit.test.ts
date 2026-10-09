@@ -1,8 +1,6 @@
 import http from "node:http";
 import net, { type AddressInfo } from "node:net";
 
-import { routesServingWhileUpgrading } from "@langwatch/api";
-import { BrowserBundle } from "@langwatch/api/hosting";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -34,9 +32,11 @@ afterEach(async () => {
 async function bootThread({
   onProxied,
   holdWindowMs = 20,
+  maxParked,
 }: {
   onProxied: () => void;
   holdWindowMs?: number;
+  maxParked?: number;
 }): Promise<LivenessThread> {
   const listener = http.createServer((_req, res) => {
     onProxied();
@@ -54,6 +54,7 @@ async function bootThread({
     proxyPort: address.port,
     logger,
     holdWindowMs,
+    ...(maxParked === undefined ? {} : { maxParked }),
   });
   threads.push(thread);
   return thread;
@@ -165,9 +166,9 @@ describe("the upgrade holding page", () => {
       });
     });
 
-    describe("when the hold moves to upgrading and the parked request's route is declared", () => {
+    describe("when the hold moves to upgrading with one parked request's route held", () => {
       /** @scenario "A held request is released once its route serves while upgrading" */
-      it("proxies the declared request and keeps holding the undeclared one", async () => {
+      it("proxies the serving request and keeps holding the held one", async () => {
         const onProxied = vi.fn();
         const thread = await bootThread({ onProxied, holdWindowMs: 300 });
         await thread.hold(holding);
@@ -177,7 +178,7 @@ describe("the upgrade holding page", () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
         await thread.hold(
           { phase: UPGRADING_PHASE, outstandingStepIds: ["clickhouse:00042"] },
-          { paths: [], routes: ["^POST /api/otel/v1/traces$"] },
+          { paths: [], held: ["^POST /api/datasets$"] },
         );
 
         expect((await ingest).status).toBe(200);
@@ -249,15 +250,16 @@ describe("the upgrade holding page", () => {
 });
 
 describe("the liveness door's routing while it holds", () => {
-  describe("given the door holds with a health path and a route declared to serve while upgrading", () => {
-    const passThrough = { paths: ["/api/health"], routes: ["^POST /api/auth/(?:[^/]+)$"] };
+  describe("given the door holds with a health path, and in upgrading mode one held route", () => {
+    const upgrading = { phase: UPGRADING_PHASE, outstandingStepIds: [] };
+    const passThrough = { paths: ["/api/health"], held: ["^POST /api/datasets$"] };
 
     describe("when the kubelet requests the health route", () => {
       /** @scenario "A health route reaches the main thread while an upgrade holds the door" */
       it("proxies it to the main thread", async () => {
         const proxied = vi.fn();
         const thread = await bootThread({ onProxied: proxied });
-        await thread.hold(holding, passThrough);
+        await thread.hold(holding, { paths: ["/api/health"] });
 
         const response = await fetch(urlOf(thread.address, "/api/health?probe=1"));
 
@@ -266,41 +268,37 @@ describe("the liveness door's routing while it holds", () => {
       });
     });
 
-    describe("when a request names a declared route, then one that is not", () => {
-      /** @scenario "Only a route declared to serve while upgrading passes the holding door" */
-      it("proxies the declared route and holds the other before the main thread", async () => {
+    describe("when requests name routes that serve, then the held one", () => {
+      /** @scenario "In upgrading mode every route passes the holding door but the held ones" */
+      it("proxies every route that does not hold and holds the held one before the main thread", async () => {
         const proxied = vi.fn();
         const thread = await bootThread({ onProxied: proxied });
-        await thread.hold({ phase: "upgrading", outstandingStepIds: [] }, passThrough);
+        await thread.hold(upgrading, passThrough);
 
-        const declared = await fetch(urlOf(thread.address, "/api/auth/sign-in"), {
-          method: "POST",
+        const signIn = await fetch(urlOf(thread.address, "/api/auth/sign-in"), { method: "POST" });
+        const page = await fetch(urlOf(thread.address, "/settings"), {
+          headers: { Accept: "text/html" },
         });
-        const wrongMethod = await fetch(urlOf(thread.address, "/api/auth/sign-in"));
-        const undeclared = await fetch(urlOf(thread.address, "/api/traces"), { method: "POST" });
+        const read = await fetch(urlOf(thread.address, "/api/datasets"));
+        const held = await fetch(urlOf(thread.address, "/api/datasets"), { method: "POST" });
 
-        expect(declared.status).toBe(200);
-        expect(wrongMethod.status).toBe(503);
-        expect(undeclared.status).toBe(503);
-        expect(proxied).toHaveBeenCalledOnce();
+        expect([signIn.status, page.status, read.status]).toEqual([200, 200, 200]);
+        expect(held.status).toBe(503);
+        expect(proxied).toHaveBeenCalledTimes(3);
       });
     });
 
-    describe("when a batched tRPC call names a declared procedure beside an undeclared one", () => {
-      it("proxies a batch only when every procedure in it is declared", async () => {
+    describe("when a batched tRPC call names a held procedure beside a serving one", () => {
+      it("proxies a batch only when no procedure in it holds", async () => {
         const proxied = vi.fn();
         const thread = await bootThread({ onProxied: proxied });
-        const batch =
-          "^(?:GET|POST) /api/trpc/(?:ops\\.plan|ops\\.retry)(?:,(?:ops\\.plan|ops\\.retry))*$";
-        await thread.hold(
-          { phase: "upgrading", outstandingStepIds: [] },
-          { paths: [], routes: [batch] },
-        );
+        const batch = "^(?:GET|POST) /api/trpc/(?:[^/]*,)?(?:ops\\.purge)(?:,[^/]*)?$";
+        await thread.hold(upgrading, { paths: [], held: [batch] });
 
-        const declared = await fetch(urlOf(thread.address, "/api/trpc/ops.plan,ops.retry?batch=1"));
-        const mixed = await fetch(urlOf(thread.address, "/api/trpc/ops.plan,traces.list?batch=1"));
+        const serving = await fetch(urlOf(thread.address, "/api/trpc/ops.plan,ops.retry?batch=1"));
+        const mixed = await fetch(urlOf(thread.address, "/api/trpc/ops.plan,ops.purge?batch=1"));
 
-        expect(declared.status).toBe(200);
+        expect(serving.status).toBe(200);
         expect(mixed.status).toBe(503);
         expect(proxied).toHaveBeenCalledOnce();
       });
@@ -308,57 +306,53 @@ describe("the liveness door's routing while it holds", () => {
   });
 });
 
-describe("the liveness door in upgrading mode with the browser bundle's declarations", () => {
-  const upgradingHold = { phase: UPGRADING_PHASE, outstandingStepIds: ["trace:fill-cost"] };
-  const passing = [
-    { method: "GET", path: "/assets/index-abc123.js" },
-    { method: "HEAD", path: "/assets/index-abc123.css" },
-    { method: "GET", path: "/favicon.ico" },
-    { method: "GET", path: "/favicon.svg" },
-    { method: "GET", path: "/fonts/Sentient-Regular.woff2" },
-    { method: "GET", path: "/auth/signin?callbackUrl=%2Fops%2Fupgrades" },
-    { method: "GET", path: "/ops/upgrades" },
-    { method: "GET", path: "/ops/upgrades/runs/run_1" },
-  ];
+describe("the liveness door's cap on parked requests", () => {
+  describe("given the door holds and as many requests wait as it parks", () => {
+    describe("when one more held request arrives", () => {
+      /** @scenario "A flood of held requests past the cap is answered at once" */
+      it("answers it 503 with Retry-After at once and keeps the parked one waiting", async () => {
+        const proxied = vi.fn();
+        const thread = await bootThread({ onProxied: proxied, holdWindowMs: 5_000, maxParked: 1 });
+        await thread.hold(holding);
 
-  async function holdUpgrading(proxied: () => void): Promise<LivenessThread> {
-    BrowserBundle.registerRoutePolicies();
-    const thread = await bootThread({ onProxied: proxied });
-    await thread.hold(upgradingHold, { paths: [], routes: routesServingWhileUpgrading() });
-    return thread;
-  }
+        const parked = fetch(urlOf(thread.address, "/api/otel/v1/traces"), { method: "POST" });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const startedAt = Date.now();
+        const flooded = await fetch(urlOf(thread.address, "/api/otel/v1/traces"), {
+          method: "POST",
+        });
 
-  describe("when a browser loads sign-in, the Upgrades pages and the files the shell needs", () => {
-    it("proxies each to the main thread", async () => {
-      const proxied = vi.fn();
-      const thread = await holdUpgrading(proxied);
-
-      for (const { method, path } of passing) {
-        const response = await fetch(urlOf(thread.address, path), { method });
-        expect({ method, path, status: response.status }).toEqual({ method, path, status: 200 });
-      }
-      expect(proxied).toHaveBeenCalledTimes(passing.length);
+        expect(flooded.status).toBe(503);
+        expect(flooded.headers.get("retry-after")).toBe("10");
+        expect(Date.now() - startedAt).toBeLessThan(1_000);
+        await thread.hold(undefined);
+        expect((await parked).status).toBe(200);
+        expect(proxied).toHaveBeenCalledOnce();
+      });
     });
   });
+});
 
-  describe("when a browser requests a page that is not served", () => {
+describe("the liveness door in upgrading mode", () => {
+  const upgradingHold = { phase: UPGRADING_PHASE, outstandingStepIds: ["trace:fill-cost"] };
+
+  describe("when a browser requests a page that holds", () => {
     /** @scenario "The holding page offers sign-in to follow the upgrade" */
     it("holds it with a link to sign-in returning to Ops > Upgrades, and the link passes", async () => {
       const proxied = vi.fn();
-      const thread = await holdUpgrading(proxied);
+      const thread = await bootThread({ onProxied: proxied });
+      await thread.hold(upgradingHold, { paths: [], held: ["^GET /settings$"] });
 
       const held = await fetch(urlOf(thread.address, "/settings"), {
         headers: { Accept: "text/html" },
       });
       const page = await held.text();
       const followed = await fetch(urlOf(thread.address, UPGRADE_SIGN_IN_HREF));
-      const otherWrite = await fetch(urlOf(thread.address, "/auth/signin"), { method: "POST" });
 
       expect(held.status).toBe(503);
       expect(page).toContain(`<a href="${UPGRADE_SIGN_IN_HREF}">Sign in to follow the upgrade</a>`);
       expect(UPGRADE_SIGN_IN_HREF).toBe("/auth/signin?callbackUrl=%2Fops%2Fupgrades");
       expect(followed.status).toBe(200);
-      expect(otherWrite.status).toBe(503);
       expect(proxied).toHaveBeenCalledOnce();
     });
   });

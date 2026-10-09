@@ -1,7 +1,7 @@
 import {
   RawHttpHost,
   RawSocketHost,
-  routesServingWhileUpgrading,
+  routesHeldWhileUpgrading,
   type TransportPeers,
   WebSocketHost,
 } from "@langwatch/api";
@@ -260,7 +260,7 @@ export class ProcessServer implements ProcessBoot {
         onHolding: (holding) =>
           this.server.holdForUpgrade(
             holding,
-            holding?.phase === UPGRADING_PHASE ? routesServingWhileUpgrading() : [],
+            holding?.phase === UPGRADING_PHASE ? routesHeldWhileUpgrading() : undefined,
           ),
         onFailed: (upgradeConsole) => this.server.consoleForUpgrade(upgradeConsole),
       }),

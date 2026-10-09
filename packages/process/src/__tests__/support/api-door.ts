@@ -2,6 +2,7 @@ import { type TransportPeers } from "@langwatch/api";
 import { type ApiDoor, bindApiDoor, type RestIdentity } from "@langwatch/api/hosting";
 
 import { transportPeersOf } from "../../transport-peers.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 const refuse = () => Promise.reject(new Error("this test's API door decides nothing"));
 const nobody: RestIdentity = { authenticate: refuse, identify: refuse };
@@ -11,6 +12,7 @@ export function inertApiDoor(parts: Partial<ApiDoor> = {}): ApiDoor {
   return {
     sessions: () => Promise.resolve(null),
     authz: {
+      ...testAuthorizeDefaults,
       getDecision: refuse,
       getProjectAnyDecision: refuse,
       checkScopeLineage: refuse,

@@ -126,7 +126,6 @@ class ApiSurface {
     this.sessions = sessions;
     if (composition.selection.selected.rest) this.#rest = this.#restHost(idempotency, rateLimiter);
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
-    if (composition.selection.selected.bundle) BrowserBundle.registerRoutePolicies();
   }
 
   #restHost(

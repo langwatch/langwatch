@@ -12,6 +12,7 @@ import { z } from "zod";
 
 import { inertApiDoor } from "../../__tests__/support/api-door.ts";
 import { composeApiApplication } from "../api-surface.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 interface ProfileApi {
   own(input: { userId: string }): { name: string };
@@ -61,6 +62,7 @@ describe("given a tRPC surface reading session versions from authz", () => {
       ["user_bo", "Bo"],
     ]);
     const authz: Authorize & TrpcSessionVersions = {
+      ...testAuthorizeDefaults,
       ...inertApiDoor().authz,
       getSessionVersion: async () => {
         reads += 1;

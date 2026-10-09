@@ -43,6 +43,7 @@ async function bootThread(): Promise<LivenessThread> {
     heartbeat: heartbeat.buffer,
     proxyPort: address.port,
     logger: { info: vi.fn(), error: vi.fn() },
+    holdWindowMs: 20,
   });
   threads.push(thread);
   return thread;
