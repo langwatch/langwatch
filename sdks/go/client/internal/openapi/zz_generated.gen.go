@@ -18235,6 +18235,27 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	}
 }
 
+// Defines values for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType.
+const (
+	PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersTypeBoolean PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType = "boolean"
+	PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersTypeNumber  PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType = "number"
+	PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersTypeString  PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType enum.
+func (e PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType) Valid() bool {
+	switch e {
+	case PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersTypeBoolean:
+		return true
+	case PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersTypeNumber:
+		return true
+	case PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1QueryJSONBodyGranularitySeconds0.
 const (
 	PostApiV1QueryJSONBodyGranularitySeconds0N1 PostApiV1QueryJSONBodyGranularitySeconds0 = 1
@@ -18655,6 +18676,54 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKindEval:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKindExtraction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "costs"
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "input"
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "<nil>"
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "ms"
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens"
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens/s"
+	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "USD"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD:
 		return true
 	default:
 		return false
@@ -32200,6 +32269,32 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersType defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersType string
 
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONBody defines parameters for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement.
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONBody struct {
+	ColSpan     *int   `json:"colSpan,omitempty"`
+	DashboardId string `json:"dashboardId"`
+	GridColumn  *int   `json:"gridColumn,omitempty"`
+	GridRow     *int   `json:"gridRow,omitempty"`
+	RowSpan     *int   `json:"rowSpan,omitempty"`
+}
+
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0 defines parameters for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement.
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0 = string
+
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1 defines parameters for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement.
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1 = float32
+
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2 defines parameters for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement.
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2 = bool
+
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default defines parameters for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement.
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default struct {
+	union json.RawMessage
+}
+
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType defines parameters for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement.
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType string
+
 // PostApiV1QueryJSONBody defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBody struct {
 	GranularitySeconds *PostApiV1QueryJSONBody_GranularitySeconds                          `json:"granularitySeconds,omitempty"`
@@ -32318,6 +32413,12 @@ type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind string
 // GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind defines parameters for GetApiV1QuerySchema.
 type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind string
 
+// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates string
+
+// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit string
+
 // GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates defines parameters for GetApiV1QuerySchema.
 type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates string
 
@@ -32419,12 +32520,17 @@ type RunRunPlanJSONBody struct {
 	Config struct {
 		// Evaluators The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]RunRunPlanJSONBody_Config_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                          `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// JudgeModel The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.
@@ -32751,18 +32857,26 @@ type ListTestSuites200JSONResponseBodyFieldsType string
 type CreateTestSuiteJSONBody struct {
 	// Evaluators The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.
 	Evaluators *[]struct {
+		// EvaluatorId The id of the saved evaluator this attachment runs.
 		EvaluatorId string `json:"evaluatorId"`
-		Id          string `json:"id"`
+
+		// Id The attachment id. Stable across edits of the attachment.
+		Id string `json:"id"`
 
 		// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 		Mappings map[string]CreateTestSuiteJSONBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-		Required bool                                                                        `json:"required"`
+
+		// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+		Required bool `json:"required"`
 	} `json:"evaluators,omitempty"`
 
 	// Fields The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.
 	Fields *[]struct {
-		Identifier string                            `json:"identifier"`
-		Type       CreateTestSuiteJSONBodyFieldsType `json:"type"`
+		// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+		Identifier string `json:"identifier"`
+
+		// Type The value type every scenario carries for this field.
+		Type CreateTestSuiteJSONBodyFieldsType `json:"type"`
 	} `json:"fields,omitempty"`
 
 	// Name The test suite name, as it reads in the platform.
@@ -32866,18 +32980,26 @@ type GetTestSuite200JSONResponseBodyFieldsType string
 type UpdateTestSuiteJSONBody struct {
 	// Evaluators The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid.
 	Evaluators *[]struct {
+		// EvaluatorId The id of the saved evaluator this attachment runs.
 		EvaluatorId string `json:"evaluatorId"`
-		Id          string `json:"id"`
+
+		// Id The attachment id. Stable across edits of the attachment.
+		Id string `json:"id"`
 
 		// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 		Mappings map[string]UpdateTestSuiteJSONBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-		Required bool                                                                        `json:"required"`
+
+		// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+		Required bool `json:"required"`
 	} `json:"evaluators,omitempty"`
 
 	// Fields The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use.
 	Fields *[]struct {
-		Identifier string                            `json:"identifier"`
-		Type       UpdateTestSuiteJSONBodyFieldsType `json:"type"`
+		// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+		Identifier string `json:"identifier"`
+
+		// Type The value type every scenario carries for this field.
+		Type UpdateTestSuiteJSONBodyFieldsType `json:"type"`
 	} `json:"fields,omitempty"`
 
 	// Name The new name. The slug is kept.
@@ -33881,6 +34003,9 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONRequest
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody defines body for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard for application/json ContentType.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONBody
+
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONRequestBody defines body for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement for application/json ContentType.
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONRequestBody PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONBody
 
 // PostApiV1QueryJSONRequestBody defines body for PostApiV1Query for application/json ContentType.
 type PostApiV1QueryJSONRequestBody PostApiV1QueryJSONBody
@@ -78219,6 +78344,94 @@ func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboar
 	return err
 }
 
+// AsPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0 returns the union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default as a PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) AsPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0() (PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0, error) {
+	var body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0 overwrites any union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default as the provided PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) FromPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0(v PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0 performs a merge with any union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0
+func (t *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) MergePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0(v PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1 returns the union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default as a PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) AsPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1() (PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1, error) {
+	var body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1 overwrites any union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default as the provided PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) FromPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1(v PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1 performs a merge with any union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1
+func (t *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) MergePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1(v PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2 returns the union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default as a PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) AsPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2() (PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2, error) {
+	var body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2 overwrites any union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default as the provided PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) FromPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2(v PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2 performs a merge with any union data inside the PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default, using the provided PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2
+func (t *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) MergePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2(v PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersDefault2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiV1QueryJSONBodyGranularitySeconds0 returns the union data inside the PostApiV1QueryJSONBody_GranularitySeconds as a PostApiV1QueryJSONBodyGranularitySeconds0
 func (t PostApiV1QueryJSONBody_GranularitySeconds) AsPostApiV1QueryJSONBodyGranularitySeconds0() (PostApiV1QueryJSONBodyGranularitySeconds0, error) {
 	var body PostApiV1QueryJSONBodyGranularitySeconds0
@@ -81920,6 +82133,14 @@ type ClientInterface interface {
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardWithBody(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard(ctx context.Context, projectId string, widgetId string, body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement request
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement(ctx context.Context, projectId string, widgetId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBody request with any body
+	PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBody(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement(ctx context.Context, projectId string, widgetId string, body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PostApiV1QueryWithBody request with any body
 	PostApiV1QueryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -86859,6 +87080,42 @@ func (c *Client) PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId
 
 func (c *Client) PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard(ctx context.Context, projectId string, widgetId string, body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRequest(c.Server, projectId, widgetId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement(ctx context.Context, projectId string, widgetId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequest(c.Server, projectId, widgetId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBody(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequestWithBody(c.Server, projectId, widgetId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement(ctx context.Context, projectId string, widgetId string, body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequest(c.Server, projectId, widgetId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -100553,6 +100810,101 @@ func NewPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	return req, nil
 }
 
+// NewDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequest generates requests for DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement
+func NewDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequest(server string, projectId string, widgetId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "widgetId", widgetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/analytics/dashboard-widgets/%s/placement", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequest calls the generic PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement builder with application/json body
+func NewPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequest(server string, projectId string, widgetId string, body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequestWithBody(server, projectId, widgetId, "application/json", bodyReader)
+}
+
+// NewPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequestWithBody generates requests for PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement with any type of body
+func NewPutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementRequestWithBody(server string, projectId string, widgetId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "widgetId", widgetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/projects/%s/analytics/dashboard-widgets/%s/placement", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewPostApiV1QueryRequest calls the generic PostApiV1Query builder with application/json body
 func NewPostApiV1QueryRequest(server string, body PostApiV1QueryJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -103070,6 +103422,14 @@ type ClientWithResponsesInterface interface {
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardWithBodyWithResponse(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse, error)
 
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardWithResponse(ctx context.Context, projectId string, widgetId string, body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse, error)
+
+	// DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse request
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse(ctx context.Context, projectId string, widgetId string, reqEditors ...RequestEditorFn) (*DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error)
+
+	// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBodyWithResponse request with any body
+	PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBodyWithResponse(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error)
+
+	PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse(ctx context.Context, projectId string, widgetId string, body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONRequestBody, reqEditors ...RequestEditorFn) (*PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error)
 
 	// PostApiV1QueryWithBodyWithResponse request with any body
 	PostApiV1QueryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1QueryResponse, error)
@@ -112354,6 +112714,10 @@ func (r UpdateProjectResponse) ContentType() string {
 type GetProjectApiKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *struct {
+		// ApiKey Send as X-Auth-Token, Bearer, or Basic
+		ApiKey string `json:"apiKey"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -112383,6 +112747,10 @@ func (r GetProjectApiKeyResponse) ContentType() string {
 type RegenerateProjectApiKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *struct {
+		// ApiKey Send as X-Auth-Token, Bearer, or Basic
+		ApiKey string `json:"apiKey"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -113665,11 +114033,12 @@ type CreateRoleBindingResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		CreatedAt      string  `json:"createdAt"`
-		CustomRoleId   *string `json:"customRoleId"`
-		CustomRoleName *string `json:"customRoleName"`
-		Id             string  `json:"id"`
-		Principal      struct {
+		CreatedAt             string  `json:"createdAt"`
+		CustomRoleId          *string `json:"customRoleId"`
+		CustomRoleName        *string `json:"customRoleName"`
+		HasLegacyAccessNotice *bool   `json:"hasLegacyAccessNotice,omitempty"`
+		Id                    string  `json:"id"`
+		Principal             struct {
 			Id   string                                            `json:"id"`
 			Name *string                                           `json:"name"`
 			Type CreateRoleBinding201JSONResponseBodyPrincipalType `json:"type"`
@@ -121682,6 +122051,189 @@ func (r PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	return ""
 }
 
+type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON401 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON403 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON404 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON500 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ColSpan     int     `json:"colSpan"`
+		CreatedAt   string  `json:"createdAt"`
+		DashboardId *string `json:"dashboardId"`
+		Definition  struct {
+			Code    string `json:"code"`
+			Queries []struct {
+				Name       string `json:"name"`
+				Parameters *[]struct {
+					Default *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+					Name    string                                                                                                                            `json:"name"`
+					Type    PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+				} `json:"parameters,omitempty"`
+				Sql string `json:"sql"`
+			} `json:"queries"`
+			Version float32 `json:"version"`
+		} `json:"definition"`
+		GridColumn  int    `json:"gridColumn"`
+		GridRow     int    `json:"gridRow"`
+		Id          string `json:"id"`
+		Name        string `json:"name"`
+		PlatformUrl string `json:"platformUrl"`
+		RowSpan     int    `json:"rowSpan"`
+		UpdatedAt   string `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON401 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON403 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON404 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON500 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PostApiV1QueryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -121967,7 +122519,24 @@ type GetApiV1QuerySchemaResponse struct {
 			Returns     string                                                     `json:"returns"`
 			Signature   string                                                     `json:"signature"`
 		} `json:"appFunctions"`
-		Database  string   `json:"database"`
+		Database string `json:"database"`
+		Datasets *[]struct {
+			Columns []struct {
+				Available   bool                                                         `json:"available"`
+				Description string                                                       `json:"description"`
+				Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
+				Name        string                                                       `json:"name"`
+				Type        string                                                       `json:"type"`
+				Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+			} `json:"columns"`
+			Description string   `json:"description"`
+			ExampleSql  string   `json:"exampleSql"`
+			Freshness   string   `json:"freshness"`
+			Grain       string   `json:"grain"`
+			JoinKeys    []string `json:"joinKeys"`
+			Name        string   `json:"name"`
+			TimeColumn  string   `json:"timeColumn"`
+		} `json:"datasets,omitempty"`
 		Functions []string `json:"functions"`
 		Views     []struct {
 			Columns []struct {
@@ -122065,12 +122634,17 @@ type ListRunPlansResponse struct {
 
 		// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]ListRunPlans200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Id The run plan id.
@@ -122279,12 +122853,17 @@ type GetRunPlanResponse struct {
 
 		// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]GetRunPlan200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                              `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Id The run plan id.
@@ -122457,18 +123036,26 @@ type ListTestSuitesResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]ListTestSuites200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                  `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                      `json:"identifier"`
-			Type       ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -122530,18 +123117,26 @@ type CreateTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                   `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                       `json:"identifier"`
-			Type       CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -122639,18 +123234,26 @@ type GetTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]GetTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                    `json:"identifier"`
-			Type       GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -122721,18 +123324,26 @@ type UpdateTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]UpdateTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                   `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                       `json:"identifier"`
-			Type       UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -127756,6 +128367,32 @@ func (c *ClientWithResponses) PostApiV1ProjectsByProjectIdAnalyticsDashboardWidg
 		return nil, err
 	}
 	return ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardResponse(rsp)
+}
+
+// DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse request returning *DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse
+func (c *ClientWithResponses) DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse(ctx context.Context, projectId string, widgetId string, reqEditors ...RequestEditorFn) (*DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error) {
+	rsp, err := c.DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement(ctx, projectId, widgetId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse(rsp)
+}
+
+// PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBodyWithResponse request with arbitrary body returning *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse
+func (c *ClientWithResponses) PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBodyWithResponse(ctx context.Context, projectId string, widgetId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error) {
+	rsp, err := c.PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithBody(ctx, projectId, widgetId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse(rsp)
+}
+
+func (c *ClientWithResponses) PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse(ctx context.Context, projectId string, widgetId string, body PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementJSONRequestBody, reqEditors ...RequestEditorFn) (*PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error) {
+	rsp, err := c.PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement(ctx, projectId, widgetId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse(rsp)
 }
 
 // PostApiV1QueryWithBodyWithResponse request with arbitrary body returning *PostApiV1QueryResponse
@@ -138747,6 +139384,19 @@ func ParseGetProjectApiKeyResponse(rsp *http.Response) (*GetProjectApiKeyRespons
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// ApiKey Send as X-Auth-Token, Bearer, or Basic
+			ApiKey string `json:"apiKey"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -138761,6 +139411,19 @@ func ParseRegenerateProjectApiKeyResponse(rsp *http.Response) (*RegenerateProjec
 	response := &RegenerateProjectApiKeyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// ApiKey Send as X-Auth-Token, Bearer, or Basic
+			ApiKey string `json:"apiKey"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -140332,11 +140995,12 @@ func ParseCreateRoleBindingResponse(rsp *http.Response) (*CreateRoleBindingRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			CreatedAt      string  `json:"createdAt"`
-			CustomRoleId   *string `json:"customRoleId"`
-			CustomRoleName *string `json:"customRoleName"`
-			Id             string  `json:"id"`
-			Principal      struct {
+			CreatedAt             string  `json:"createdAt"`
+			CustomRoleId          *string `json:"customRoleId"`
+			CustomRoleName        *string `json:"customRoleName"`
+			HasLegacyAccessNotice *bool   `json:"hasLegacyAccessNotice,omitempty"`
+			Id                    string  `json:"id"`
+			Principal             struct {
 				Id   string                                            `json:"id"`
 				Name *string                                           `json:"name"`
 				Type CreateRoleBinding201JSONResponseBodyPrincipalType `json:"type"`
@@ -149610,6 +150274,235 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 	return response, nil
 }
 
+// ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse parses an HTTP response from a DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse call
+func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse(rsp *http.Response) (*DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse parses an HTTP response from a PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementWithResponse call
+func ParsePutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse(rsp *http.Response) (*PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacementResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ColSpan     int     `json:"colSpan"`
+			CreatedAt   string  `json:"createdAt"`
+			DashboardId *string `json:"dashboardId"`
+			Definition  struct {
+				Code    string `json:"code"`
+				Queries []struct {
+					Name       string `json:"name"`
+					Parameters *[]struct {
+						Default *PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
+						Name    string                                                                                                                            `json:"name"`
+						Type    PutApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdPlacement200JSONResponseBodyDefinitionQueriesParametersType         `json:"type"`
+					} `json:"parameters,omitempty"`
+					Sql string `json:"sql"`
+				} `json:"queries"`
+				Version float32 `json:"version"`
+			} `json:"definition"`
+			GridColumn  int    `json:"gridColumn"`
+			GridRow     int    `json:"gridRow"`
+			Id          string `json:"id"`
+			Name        string `json:"name"`
+			PlatformUrl string `json:"platformUrl"`
+			RowSpan     int    `json:"rowSpan"`
+			UpdatedAt   string `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParsePostApiV1QueryResponse parses an HTTP response from a PostApiV1QueryWithResponse call
 func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -149953,7 +150846,24 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 				Returns     string                                                     `json:"returns"`
 				Signature   string                                                     `json:"signature"`
 			} `json:"appFunctions"`
-			Database  string   `json:"database"`
+			Database string `json:"database"`
+			Datasets *[]struct {
+				Columns []struct {
+					Available   bool                                                         `json:"available"`
+					Description string                                                       `json:"description"`
+					Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
+					Name        string                                                       `json:"name"`
+					Type        string                                                       `json:"type"`
+					Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+				} `json:"columns"`
+				Description string   `json:"description"`
+				ExampleSql  string   `json:"exampleSql"`
+				Freshness   string   `json:"freshness"`
+				Grain       string   `json:"grain"`
+				JoinKeys    []string `json:"joinKeys"`
+				Name        string   `json:"name"`
+				TimeColumn  string   `json:"timeColumn"`
+			} `json:"datasets,omitempty"`
 			Functions []string `json:"functions"`
 			Views     []struct {
 				Columns []struct {
@@ -150071,12 +150981,17 @@ func ParseListRunPlansResponse(rsp *http.Response) (*ListRunPlansResponse, error
 
 			// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]ListRunPlans200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Id The run plan id.
@@ -150273,12 +151188,17 @@ func ParseGetRunPlanResponse(rsp *http.Response) (*GetRunPlanResponse, error) {
 
 			// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]GetRunPlan200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                              `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Id The run plan id.
@@ -150443,18 +151363,26 @@ func ParseListTestSuitesResponse(rsp *http.Response) (*ListTestSuitesResponse, e
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]ListTestSuites200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                  `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                      `json:"identifier"`
-				Type       ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -150512,18 +151440,26 @@ func ParseCreateTestSuiteResponse(rsp *http.Response) (*CreateTestSuiteResponse,
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                   `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                       `json:"identifier"`
-				Type       CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -150613,18 +151549,26 @@ func ParseGetTestSuiteResponse(rsp *http.Response) (*GetTestSuiteResponse, error
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]GetTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                    `json:"identifier"`
-				Type       GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -150691,18 +151635,26 @@ func ParseUpdateTestSuiteResponse(rsp *http.Response) (*UpdateTestSuiteResponse,
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]UpdateTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                   `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                       `json:"identifier"`
-				Type       UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.

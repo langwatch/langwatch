@@ -77,6 +77,7 @@ export interface ChartQueryResult {
   readonly columns: readonly { readonly name: string; readonly type: string }[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: Record<string, unknown>;
+  readonly truncated: boolean;
   readonly diagnostics: readonly Record<string, unknown>[];
   readonly followsTimeWindow: boolean;
   readonly followsGranularity: boolean;
@@ -239,6 +240,10 @@ export function toChartQueryResult(result: {
     })),
     rows: result.rows,
     statistics: (result.statistics ?? {}) as Record<string, unknown>,
+    // The service now refuses an oversized result instead of silently
+    // truncating (it throws before returning), so a result that reaches here is
+    // never truncated. Kept on the wire so the frame's banner code stays valid.
+    truncated: false,
     diagnostics: result.diagnostics as readonly Record<string, unknown>[],
     followsTimeWindow: result.followsTimeWindow,
     followsGranularity: result.followsGranularity,

@@ -187,3 +187,40 @@ STUB
   grep -q "https://api.openai.com/v1/models" "$TEST_DIR/curl-args"
   ! grep -q "attacker.example" "$TEST_DIR/curl-args"
 }
+
+# @scenario "AGENT_PORT derives from PORT+4 when LANGY_AGENT_URL names no port"
+@test "with no LANGY_AGENT_URL, the doctor checks langyagent on PORT+4, not a hard-coded port" {
+  mkdir -p "$TEST_DIR/sessions" "$TEST_DIR/workspace"
+  cat >"$ENV_FILE" <<EOF
+LANGY_INTERNAL_SECRET="test-secret"
+LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
+SESSIONS_ROOT="$TEST_DIR/sessions"
+LANGY_WORKSPACE_ROOT="$TEST_DIR/workspace"
+FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled
+EOF
+  DERIVED_PORT=$((BASE_PORT + 4))
+  listen_on "$BASE_PORT"
+  listen_on $((BASE_PORT + 3))
+  listen_on "$DERIVED_PORT"
+
+  run_doctor
+  [[ "$output" == *"LANGY_AGENT_URL missing"* ]]
+  [[ "$output" == *"langyagent on :${DERIVED_PORT}"* ]]
+}
+
+# @scenario "OPENCODE_AGENT_URL is not read by the app"
+@test "OPENCODE_AGENT_URL set instead of LANGY_AGENT_URL is flagged, not silently ignored" {
+  mkdir -p "$TEST_DIR/sessions" "$TEST_DIR/workspace"
+  cat >"$ENV_FILE" <<EOF
+OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
+LANGY_INTERNAL_SECRET="test-secret"
+LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
+SESSIONS_ROOT="$TEST_DIR/sessions"
+LANGY_WORKSPACE_ROOT="$TEST_DIR/workspace"
+FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled
+EOF
+
+  run_doctor
+  [[ "$output" == *"OPENCODE_AGENT_URL is set but the app reads LANGY_AGENT_URL"* ]]
+  [[ "$output" == *"LANGY_AGENT_URL missing"* ]]
+}
