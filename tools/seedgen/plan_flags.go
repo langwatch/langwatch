@@ -41,6 +41,10 @@ const MaxSpans = 2_000_000
 // MaxDays bounds --days.
 const MaxDays = 365
 
+// MaxReach is how far back telemetry may start: the trace backfill ceiling
+// (SPAN_BACKFILL_MAX_PAST_DAYS); --age plus --days stays within it.
+const MaxReach = 365
+
 // Flags are the seed's inputs; the same Flags give the same plan.
 type Flags struct {
 	Size     string    `json:"size"`
@@ -135,6 +139,7 @@ func ParseFlags(args []string, anchor time.Time) (Flags, error) {
 	private := set.Int("private", -1, "")
 	seed := set.Int64("seed", 1, "")
 	anchorText := set.String("anchor", "", "")
+	age := set.String("age", "0d", "")
 	shape := set.String("shape", "saas", "")
 	admin := set.String("admin", "", "")
 	into := set.String("into", "", "")
@@ -161,6 +166,11 @@ func ParseFlags(args []string, anchor time.Time) (Flags, error) {
 		}
 		flags.Anchor = parsed.UTC()
 	}
+	ageDays, err := strconv.Atoi(strings.TrimSuffix(*age, "d"))
+	if err != nil || ageDays < 0 || ageDays+flags.Days > MaxReach {
+		return Flags{}, &FlagError{Flag: "age", Value: *age, Accepts: fmt.Sprintf("Nd, with N + --days at most %d", MaxReach)}
+	}
+	flags.Anchor = flags.Anchor.Add(-time.Duration(ageDays) * 24 * time.Hour)
 	flags.Personas = Personas
 	if *personas != "all" {
 		flags.Personas = strings.Split(*personas, ",")

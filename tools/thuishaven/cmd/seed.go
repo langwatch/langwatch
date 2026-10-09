@@ -11,7 +11,7 @@ import (
 )
 
 // seedValueFlags are the seedgen flags `haven seed` passes through, in the order it passes them.
-var seedValueFlags = []string{"--size", "--spans", "--days", "--persona", "--private", "--seed", "--anchor", "--shape", "--into"}
+var seedValueFlags = []string{"--size", "--spans", "--days", "--persona", "--private", "--seed", "--anchor", "--shape", "--into", "--age"}
 
 func seedSpec() commandSpec {
 	flags := []flagSpec{
@@ -22,6 +22,7 @@ func seedSpec() commandSpec {
 		{long: "--private", takesValue: true, value: "<n>", summary: "organizations on private stores"},
 		{long: "--seed", takesValue: true, value: "<s>", summary: "the seed: the same seed gives the same content"},
 		{long: "--anchor", takesValue: true, value: "<rfc3339>", summary: "the moment history ends at"},
+		{long: "--age", takesValue: true, value: "<n>d", summary: "history ends n days ago, so retention can be tested (default 0d)"},
 		{long: "--shape", takesValue: true, value: "saas|sh-licensed|sh-free", summary: "deployment shape"},
 		{long: "--org", takesValue: true, value: "name=..,plan=free,users=N[,persona=..]", summary: "create this org instead of the tier's (repeatable)"},
 		{long: "--into", takesValue: true, value: "<org-id>/<project-id>", summary: "send telemetry only, into an existing project"},

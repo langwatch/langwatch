@@ -114,6 +114,13 @@ Feature: haven seed fills a stack with every kind of data, at any size, without 
     And --into with --org, or without a project, is refused naming --into
 
   @unit
+  Scenario: Old telemetry lands at its own time so retention can be tested
+    When I run "haven seed --days 30 --age 90d"
+    Then every trace, log and metric is timed between 120 and 90 days ago
+    And the data goes through the owners' ingest, so tenancy and the retention policy apply to it
+    And an age that is negative, not whole days, or reaching past 365 days with --days is refused naming --age
+
+  @unit
   Scenario: haven seed refuses a stack that is not up
     Given the stack's api or worker is not running
     When I run "haven seed"

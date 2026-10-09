@@ -35,6 +35,14 @@ Feature: seed:apply applies seedgen's actions through installed module APIs
     And anything an earlier run created is found and returned instead of created again
 
   @unit
+  Scenario: A trace chunk older than 31 days asks the trace owner's backfill reach
+    Given a trace.otlp action whose hour is 90 days ago
+    When the action is applied
+    Then the export goes to TraceApi.otlpTraces with a backfill reach covering its age
+    And a chunk inside 31 days goes with no reach
+    And a chunk whose spans the owner dropped is refused, so it is never counted
+
+  @unit
   Scenario: Seeded users share one dev password
     Given seedgen hands the runner the hash of the stack's dev password
     When accepted and invited users are created

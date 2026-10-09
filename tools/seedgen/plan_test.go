@@ -248,3 +248,19 @@ func TestIntoSendsOnlyTelemetry(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "Old telemetry lands at its own time so retention can be tested"
+func TestAgeMovesTheHistoryBack(t *testing.T) {
+	plan := mustPlan(t, "--size", "tiny", "--days", "30", "--age", "90d")
+	end, start := anchor.Add(-90*24*time.Hour), anchor.Add(-120*24*time.Hour)
+	for step := range plan.Steps() {
+		if cell := step.Cell; cell != nil && (cell.Start.Before(start) || !cell.Start.Before(end)) {
+			t.Fatalf("cell at %s outside [%s, %s)", cell.Start, start, end)
+		}
+	}
+	for _, age := range []string{"-1d", "ninety", "340d"} {
+		if _, err := ParseFlags([]string{"--age", age, "--days", "30"}, anchor); !isFlagError(err, "age") {
+			t.Errorf("--age %s: want a refusal naming --age, got %v", age, err)
+		}
+	}
+}
