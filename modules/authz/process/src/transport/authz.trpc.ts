@@ -80,7 +80,6 @@ const customRoles = { feature: "RBAC", when: assignsCustomGrantRole };
 export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrpc> =
   defineTrpcRouter(AuthzApi, authzTrpc)
     .procedure("effectivePermissions")
-    .servesWhileUpgrading()
     .serviceAuthorized({
       reason:
         "resolves the caller's OWN effective permissions at the project or organization scope named; a non-member resolves to the empty set (no default access)",

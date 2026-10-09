@@ -3,7 +3,7 @@
  * The shell's permission read passes the holding door while the installation upgrades.
  * @see specs/upgrade/in-app-upgrade.feature
  */
-import { routesServingWhileUpgrading } from "@langwatch/api";
+import { routesHeldWhileUpgrading } from "@langwatch/api";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { describe, expect, it } from "vitest";
 
@@ -19,13 +19,13 @@ function passes(route: string): boolean {
     router: (record) => record,
   };
   authzTrpcTransport.router(runtime, notCalled);
-  return routesServingWhileUpgrading().some((source) => new RegExp(source).test(route));
+  return !routesHeldWhileUpgrading().some((source) => new RegExp(source).test(route));
 }
 
 describe("given the installation upgrading", () => {
-  /** @scenario "The shell renders sign-in and the Upgrades page while its other startup reads answer 503" */
-  it("passes the caller's own effective permissions and holds every grant read and write", () => {
+  /** @scenario "The shell's startup reads serve while the installation upgrades" */
+  it("passes every read, the shell's startup reads included", () => {
     expect(passes("GET /api/trpc/authz.effectivePermissions")).toBe(true);
-    expect(passes("GET /api/trpc/authz.listGrants")).toBe(false);
+    expect(passes("GET /api/trpc/authz.listGrants")).toBe(true);
   });
 });
