@@ -74,24 +74,23 @@ export type BackendStartOptions = {
 };
 
 /**
- * Start the worker first so the API never accepts work without a consumer.
- * If API boot fails, drain the half-started worker before rethrowing.
+ * Start both halves together: the api answers at once while the worker runs the upgrade, and a
+ * queue with no consumer yet is fine (Alex, 2026-10-09, API-UP-DURING-UPGRADE). If either half
+ * refuses, drain the one that started before rethrowing.
  */
 export async function startBackend(options: BackendStartOptions): Promise<BackendHalves> {
-  // One graph per process: the worker sets the telemetry SDK up and the API
-  // joins it. A second setup is what prints "OpenTelemetry is already set up".
-  const worker = await bootHalf("worker", () =>
-    options.startWorker({ ownsProcess: false, ownsTelemetry: true }),
-  );
-  try {
-    const api = await bootHalf("api", () =>
-      options.startApi({ ownsProcess: false, ownsTelemetry: false }),
-    );
-    return { api, worker };
-  } catch (error) {
-    await worker.close();
-    throw error;
+  // One graph per process: the worker sets the telemetry SDK up and the API joins it.
+  const [worker, api] = await Promise.allSettled([
+    bootHalf("worker", () => options.startWorker({ ownsProcess: false, ownsTelemetry: true })),
+    bootHalf("api", () => options.startApi({ ownsProcess: false, ownsTelemetry: false })),
+  ]);
+  if (worker.status === "fulfilled" && api.status === "fulfilled") {
+    return { api: api.value, worker: worker.value };
   }
+  if (worker.status === "fulfilled") await worker.value.close();
+  if (api.status === "fulfilled") await api.value.close();
+  throw [worker, api].find((half): half is PromiseRejectedResult => half.status === "rejected")
+    ?.reason;
 }
 
 /** A reload's outcome: the api always serves; a worker that refused boot is named, not thrown. */
