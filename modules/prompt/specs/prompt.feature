@@ -166,3 +166,9 @@ Feature: Prompt service
     Given the change-handle dialog opened for a prompt with a handle
     When a new handle is typed and saved
     Then the save carries the new handle
+
+  @integration
+  Scenario: Typing then saving at once keeps the last characters
+    Given the prompt editor with a template being typed
+    When the editor loses focus right after the last keystroke
+    Then the full typed text, including a closing "}}", reaches the form before the save reads it
