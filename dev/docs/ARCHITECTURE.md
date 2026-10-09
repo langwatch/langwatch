@@ -1351,7 +1351,9 @@ live stores; a test or dev harness hands `memoryStores()` directly and never tou
 `start:prepare:db`: upgrade alone; the system-migrations pass is not part of api start), before serve, from every entry
 point (ADR-173). On a self-hosted install the new image's api runs that same `upgrade` itself,
 under the runner's lease, whenever the ledger is behind it, behind the holding page; the worker
-never does (Alex, 2026-10-09, UPGRADE-FIXES). Prisma migrations
+never does (Alex, 2026-10-09, UPGRADE-FIXES). A background step names the background steps
+it runs after by their step values (`after: [step]`, STEP-AFTER); the worker waits on them, the
+upgrade inlines them before a contract, and an unknown id or a cycle refuses the plan. Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
 process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
 migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and

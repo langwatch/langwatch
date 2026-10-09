@@ -759,9 +759,9 @@ export class UpgradeRunnerService {
     return inlineBeforeContracts({
       releases: plan.releases,
       contracts: this.options.contracts ?? imageContractSteps(),
-      background: this.shipped.filter(
-        (step) => step.mode === "background" && this.codeSteps.has(step.id),
-      ),
+      background: this.shipped
+        .filter((step) => step.mode === "background" && this.codeSteps.has(step.id))
+        .map((step) => ({ ...step, after: this.codeSteps.get(step.id)?.after })),
       settled: new Set(settled),
     });
   }

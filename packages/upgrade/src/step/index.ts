@@ -2,6 +2,7 @@ export {
   type MigrationStep,
   type MigrationStepCheckpoint,
   type MigrationStepDeclaration,
+  type MigrationStepDefinition,
   MigrationStepDeclarationError,
   type MigrationStepKind,
   type MigrationStepRefusal,

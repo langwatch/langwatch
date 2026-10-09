@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
-import { inlineBeforeContracts, planUpgrade } from "../plan-upgrade.ts";
+import { inlineBeforeContracts, planUpgrade, type StepOrderError } from "../plan-upgrade.ts";
 
 function step(
   id: string,
@@ -278,6 +278,79 @@ describe("inlineBeforeContracts()", () => {
           settled: new Set(),
         }),
       ).toEqual([[], ["dataset:same-release"]]);
+    });
+  });
+
+  describe("when a released background step runs after one not released yet", () => {
+    /** @scenario "A background step runs before a contract after every step it names, released or not" */
+    it("runs the named unreleased step first", () => {
+      expect(
+        inlineBeforeContracts({
+          releases: planned(),
+          contracts,
+          background: [
+            {
+              id: "stored-object:purge-inputs",
+              release: "3.21.0",
+              after: ["evaluation:copy-inputs"],
+            },
+            { id: "evaluation:copy-inputs", release: null },
+          ],
+          settled: new Set(),
+        }),
+      ).toEqual([[], [], ["evaluation:copy-inputs", "stored-object:purge-inputs"]]);
+    });
+  });
+
+  describe("when the named step is already done", () => {
+    /** @scenario "A step named by another that is already done is not run again" */
+    it("runs only the step that names it", () => {
+      expect(
+        inlineBeforeContracts({
+          releases: planned(),
+          contracts,
+          background: [
+            {
+              id: "stored-object:purge-inputs",
+              release: "3.21.0",
+              after: ["evaluation:copy-inputs"],
+            },
+          ],
+          settled: new Set(["evaluation:copy-inputs"]),
+        }),
+      ).toEqual([[], [], ["stored-object:purge-inputs"]]);
+    });
+  });
+
+  const refusalOf = (background: { id: string; release: null; after?: string[] }[]) => {
+    try {
+      inlineBeforeContracts({ releases: planned(), contracts, background, settled: new Set() });
+    } catch (error) {
+      return error as StepOrderError;
+    }
+    throw new Error("expected the plan to refuse");
+  };
+
+  describe("when a step runs after a step the image does not declare", () => {
+    /** @scenario "A step that runs after an unknown step is refused at plan time" */
+    it("refuses with step_after_unknown, naming both", () => {
+      const refusal = refusalOf([
+        { id: "stored-object:purge-inputs", release: null, after: ["evaluation:copy-inptus"] },
+      ]);
+      expect(refusal.code).toBe("step_after_unknown");
+      expect(refusal.message).toContain("evaluation:copy-inptus");
+    });
+  });
+
+  describe("when two steps run after each other", () => {
+    /** @scenario "Steps that run after each other in a cycle are refused at plan time" */
+    it("refuses with step_after_cycle, naming the cycle", () => {
+      const refusal = refusalOf([
+        { id: "a:one", release: null, after: ["a:two"] },
+        { id: "a:two", release: null, after: ["a:one"] },
+      ]);
+      expect(refusal.code).toBe("step_after_cycle");
+      expect(refusal.message).toContain("a:one -> a:two -> a:one");
     });
   });
 });

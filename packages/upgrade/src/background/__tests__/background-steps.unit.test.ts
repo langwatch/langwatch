@@ -56,6 +56,53 @@ describe("BackgroundStepsService", () => {
     });
   });
 
+  describe("given a step that runs after a step not yet done", () => {
+    /** @scenario "A worker holds a background step until every step it runs after is done" */
+    it("waits on it and runs nothing until the named step is done", async () => {
+      const copy = defineMigrationStep({
+        id: "evaluation:copy-inputs",
+        kind: "data",
+        mode: "background",
+        description: "Copies evaluation inputs.",
+        run: refuse,
+      });
+      const ledger: BackgroundStepsLedger = {
+        findSteps: async () => [
+          { id: "evaluation:copy-inputs", status: "running", report: null },
+          { id: "evaluation:purge-inputs", status: "pending", report: null },
+        ],
+        acquireLease: async () => null,
+        renewLease: refuse,
+        releaseLease: refuse,
+        markRunning: refuse,
+        setStatus: refuse,
+        saveReport: refuse,
+      };
+      const service = BackgroundStepsService.create({
+        ledger,
+        steps: [
+          defineMigrationStep({
+            id: "evaluation:purge-inputs",
+            kind: "data",
+            mode: "background",
+            description: "Purges copied evaluation inputs.",
+            after: [copy],
+            run: refuse,
+          }),
+        ],
+        serving: () => true,
+        oldWritersGoneFor: async () => true,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+
+      const sweep = await service.sweep({ signal: new AbortController().signal });
+
+      expect(sweep.waiting).toEqual(["evaluation:purge-inputs"]);
+      expect(sweep.ran).toEqual([]);
+    });
+  });
+
   describe("given a step another worker finished between the read and the lease", () => {
     /** @scenario "A step another worker finished while this one took the lease does not run again" */
     it("does not run it, mark it running or keep its lease", async () => {

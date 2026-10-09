@@ -125,3 +125,64 @@ describe("isMigrationStep", () => {
     expect(isMigrationStep({ ...step, kind: "tenant" })).toBe(false);
   });
 });
+
+describe("defineMigrationStep after", () => {
+  const copy = defineMigrationStep({
+    id: "evaluation:copy-inputs",
+    kind: "data",
+    mode: "background",
+    description: "Copies evaluation inputs.",
+    run: noReport,
+  });
+
+  describe("when a background step runs after another step value", () => {
+    /** @scenario "A step names the steps it runs after by their values and keeps their ids" */
+    it("keeps the named step's id", () => {
+      const purge = defineMigrationStep({
+        id: "evaluation:purge-inputs",
+        kind: "data",
+        mode: "background",
+        description: "Purges copied evaluation inputs.",
+        after: [copy],
+        run: noReport,
+      });
+
+      expect(purge.after).toEqual(["evaluation:copy-inputs"]);
+      expect(isMigrationStep(purge)).toBe(true);
+    });
+  });
+
+  describe("when a step names another by a string", () => {
+    /** @scenario "A step named by a mistyped id fails typecheck" */
+    it("fails typecheck and is refused at runtime", () => {
+      expect(() =>
+        defineMigrationStep({
+          id: "evaluation:purge-inputs",
+          kind: "data",
+          mode: "background",
+          description: "Purges copied evaluation inputs.",
+          // @ts-expect-error a step runs after step values, never a free string
+          after: ["evaluation:copy-inptus"],
+          run: noReport,
+        }),
+      ).toThrow("only a background step runs after others");
+    });
+  });
+
+  describe("when a blocking step runs after a background step", () => {
+    /** @scenario "Only a background step runs after others, and only after background steps" */
+    it("refuses it as after_not_background", () => {
+      const refusal = refusalOf(() =>
+        defineMigrationStep({
+          id: "evaluation:copy-keys",
+          kind: "data",
+          mode: "blocking",
+          description: "Copies keys.",
+          after: [copy],
+          run: noReport,
+        }),
+      );
+      expect(refusal.refusal).toBe("after_not_background");
+    });
+  });
+});

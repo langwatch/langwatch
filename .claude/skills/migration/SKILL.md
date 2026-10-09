@@ -95,6 +95,12 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 - Background steps run on the worker after the last release. A step with `needsOldWritersGone`
   waits until the serving roster says every live process declares it. A rollback is seen from the serving roster and
   reopens level-triggered background steps, so a re-upgrade re-runs them.
+- A background step that must follow another names it with `after: [copyStep]`: the step value,
+  never a string, so a missing step fails typecheck (Alex, 2026-10-09, STEP-AFTER). The worker holds
+  it `waiting` until each named step is `done` or `not-needed`; before a contract the upgrade runs
+  the named steps inline first, released or not. Only a background step runs after others, and only
+  after background steps (`after_not_background`). An unknown id or a cycle is refused at plan time
+  (`step_after_unknown`, `step_after_cycle`). Steps in another module cannot be named yet.
 - A fresh install applies all schema at once and plans code and upcast steps by mode, so **a data
   step is never the only way new rows become correct**: writers write the new shape from the release
   that adds it.

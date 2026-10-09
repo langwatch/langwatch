@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import type { UpgradeStep } from "../ledger.ts";
@@ -138,10 +139,78 @@ export function planUpgrade({
   return { outcome: "planned", fresh: false, releases, notNeeded: [] };
 }
 
+export type StepOrderErrorCode = "step_after_unknown" | "step_after_cycle";
+
+/** An image whose steps name a step it does not have, or name each other in a cycle. */
+export class StepOrderError extends HandledError {
+  declare readonly code: StepOrderErrorCode;
+
+  constructor({ code, message }: { code: StepOrderErrorCode; message: string }) {
+    super(code, message, { httpStatus: 500 });
+    this.name = "StepOrderError";
+  }
+}
+
+type OrderedStep = { id: string; after?: readonly string[] };
+
+/** The ids in declaration order, each after every step it names; refuses unknown ids and cycles. */
+export function orderAfter({
+  steps,
+  settled,
+}: {
+  steps: readonly OrderedStep[];
+  settled: ReadonlySet<string>;
+}): string[] {
+  const byId = new Map(steps.map((step) => [step.id, step]));
+  const ordered: string[] = [];
+  const visiting: string[] = [];
+  const visit = (id: string) => {
+    if (ordered.includes(id)) return;
+    if (visiting.includes(id)) {
+      const cycle = [...visiting.slice(visiting.indexOf(id)), id].join(" -> ");
+      throw new StepOrderError({
+        code: "step_after_cycle",
+        message: `steps run after each other in a cycle: ${cycle}`,
+      });
+    }
+    visiting.push(id);
+    for (const named of byId.get(id)?.after ?? []) {
+      if (byId.has(named)) visit(named);
+      else if (!settled.has(named)) {
+        throw new StepOrderError({
+          code: "step_after_unknown",
+          message: `step ${id} runs after ${named}, which this image does not declare and the ledger has not settled`,
+        });
+      }
+    }
+    visiting.pop();
+    ordered.push(id);
+  };
+  for (const step of steps) visit(step.id);
+  return ordered;
+}
+
+/** A step and, ahead of it, every unsettled step it runs after that no earlier release ran. */
+function pullDue({
+  id,
+  after,
+  skip,
+  due,
+}: {
+  id: string;
+  after: ReadonlyMap<string, readonly string[]>;
+  skip: (id: string) => boolean;
+  due: Set<string>;
+}): void {
+  if (skip(id) || due.has(id)) return;
+  due.add(id);
+  for (const named of after.get(id) ?? []) pullDue({ id: named, after, skip, due });
+}
+
 /**
  * Before a release whose schema holds a contract step, every unfinished background step shipped in
- * an earlier release runs inline, forced and blocking (Alex, 2026-10-09, UPGRADE-FIXES), so a
- * contract never drops what a background step still reads. Per planned release, the ids to run.
+ * an earlier release runs inline, forced and blocking (Alex, 2026-10-09, UPGRADE-FIXES), and ahead
+ * of it each step it runs `after`, released or not (STEP-AFTER). Per planned release, the ids.
  */
 export function inlineBeforeContracts({
   releases,
@@ -151,18 +220,25 @@ export function inlineBeforeContracts({
 }: {
   releases: readonly Pick<PlannedRelease, "release" | "schema">[];
   contracts: ReadonlySet<string>;
-  background: readonly { id: string; release: string | null }[];
+  background: readonly (OrderedStep & { release: string | null })[];
   settled: ReadonlySet<string>;
 }): string[][] {
-  const earlier = (left: string | null, right: string | null) =>
-    left !== null && (right === null || compareReleases({ left, right }) < 0);
+  const order = orderAfter({ steps: background, settled });
+  const after = new Map(background.map((step) => [step.id, step.after ?? []]));
   const inlined = new Set<string>();
+  const skip = (id: string) => settled.has(id) || inlined.has(id);
   return releases.map(({ release, schema }) => {
     if (!schema.some((id) => contracts.has(id))) return [];
-    const due = background.filter(
-      (step) => !settled.has(step.id) && !inlined.has(step.id) && earlier(step.release, release),
-    );
-    for (const step of due) inlined.add(step.id);
-    return due.map((step) => step.id);
+    const due = new Set<string>();
+    for (const step of background.filter((each) => releasedBefore(each.release, release))) {
+      pullDue({ id: step.id, after, skip, due });
+    }
+    for (const id of due) inlined.add(id);
+    return order.filter((id) => due.has(id));
   });
+}
+
+function releasedBefore(left: string | null, right: string | null): boolean {
+  if (left === null) return false;
+  return right === null || compareReleases({ left, right }) < 0;
 }

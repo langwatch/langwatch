@@ -27,6 +27,8 @@ export const migrationStepDeclarationSchema = z.object({
   mode: upgradeStepModeSchema,
   description: z.string().trim().min(1),
   needsOldWritersGone: z.boolean().optional(),
+  /** The background steps this one runs after, by id; declared as the step values themselves. */
+  after: z.array(z.string().regex(MIGRATION_STEP_ID)).optional(),
 });
 export type MigrationStepDeclaration = z.infer<typeof migrationStepDeclarationSchema>;
 
@@ -46,7 +48,17 @@ export type MigrationStepRun = (args: {
 
 export type MigrationStep = Readonly<MigrationStepDeclaration & { run: MigrationStepRun }>;
 
-export type MigrationStepRefusal = "malformed_id" | "missing_description" | "blocking_not_data";
+export type MigrationStepRefusal =
+  | "malformed_id"
+  | "missing_description"
+  | "blocking_not_data"
+  | "after_not_background";
+
+/** What a module writes: `after` names step values, so a missing step fails typecheck. */
+export type MigrationStepDefinition = Omit<MigrationStepDeclaration, "after"> & {
+  after?: readonly MigrationStep[];
+  run: MigrationStepRun;
+};
 
 /** A step its own declaration refuses; `module` and `step` name it for boot's message. */
 export class MigrationStepDeclarationError extends Error {
@@ -74,9 +86,7 @@ export class MigrationStepDeclarationError extends Error {
 }
 
 /** Declares one code step; refuses by name an id, description or mode the rules forbid. */
-export function defineMigrationStep(
-  step: MigrationStepDeclaration & { run: MigrationStepRun },
-): MigrationStep {
+export function defineMigrationStep(step: MigrationStepDefinition): MigrationStep {
   if (!MIGRATION_STEP_ID.test(step.id)) {
     throw new MigrationStepDeclarationError({
       step: step.id,
@@ -98,7 +108,16 @@ export function defineMigrationStep(
       detail: `it is blocking but of kind "${step.kind}"; only a data step blocks (frozen SQL).`,
     });
   }
-  return Object.freeze({ ...migrationStepDeclarationSchema.parse(step), run: step.run });
+  const after = step.after?.map((named) => named.id);
+  if (after && [step, ...(step.after ?? [])].some((each) => each.mode !== "background")) {
+    throw new MigrationStepDeclarationError({
+      step: step.id,
+      refusal: "after_not_background",
+      detail: `only a background step runs after others, and only after background steps (${after.join(", ")}).`,
+    });
+  }
+  const declared = migrationStepDeclarationSchema.parse({ ...step, after });
+  return Object.freeze({ ...declared, run: step.run });
 }
 
 /** The guard `packages/process` collects with, as tasks are collected with `isTask`. */

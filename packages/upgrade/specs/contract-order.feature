@@ -2,6 +2,8 @@
 # is a schema step whose SQL carries `-- contract: retired in <release>`. Before the release holding
 # one is applied, every unfinished background step shipped in an earlier release runs inline under
 # the upgrade, forced and blocking, so a contract never drops data a background step still needs.
+# A background step may run `after` other background steps, named by their step values (Alex,
+# 2026-10-09, STEP-AFTER), so a mistyped id fails typecheck and the planner orders them.
 
 Feature: A contract step waits for the background steps shipped before it
   As an operator of a LangWatch installation
@@ -63,3 +65,52 @@ Feature: A contract step waits for the background steps shipped before it
     Given 3.21.0 is installed and the worker finished its background step
     When the upgrade moves to 3.22.0, which ships a contract step
     Then it applies 3.22.0's schema without running the background step again
+
+  @unit
+  Scenario: A background step runs before a contract after every step it names, released or not
+    Given a background step shipped in 3.21.0 that runs after a step not released yet
+    And 3.23.0 ships a contract step
+    When 3.20.1 upgrades to 3.23.0
+    Then the named step runs first, then the step that names it, before 3.23.0's schema
+
+  @unit
+  Scenario: A step named by another that is already done is not run again
+    Given a background step that runs after a step the ledger has done
+    When the upgrade runs it before a contract step
+    Then only the step that names it runs
+
+  @unit
+  Scenario: A step that runs after an unknown step is refused at plan time
+    Given a background step that runs after a step the image does not declare and the ledger has not settled
+    When the upgrade is planned
+    Then it is refused as step_after_unknown, naming both steps
+
+  @unit
+  Scenario: Steps that run after each other in a cycle are refused at plan time
+    Given two background steps that each run after the other
+    When the upgrade is planned
+    Then it is refused as step_after_cycle, naming the cycle
+
+  @unit
+  Scenario: A step names the steps it runs after by their values and keeps their ids
+    Given a background step declared to run after another step value
+    When it is defined
+    Then it keeps the named step's id
+
+  @unit
+  Scenario: A step named by a mistyped id fails typecheck
+    Given a background step that names the step it runs after by a string
+    When the package is typechecked
+    Then the declaration is a type error
+
+  @unit
+  Scenario: Only a background step runs after others, and only after background steps
+    Given a blocking step declared to run after a background step
+    When it is defined
+    Then it is refused as after_not_background
+
+  @unit
+  Scenario: A worker holds a background step until every step it runs after is done
+    Given a pending background step that runs after a step still running
+    When the worker sweeps
+    Then it reports the step waiting and runs nothing
