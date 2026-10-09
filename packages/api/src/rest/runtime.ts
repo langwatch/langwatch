@@ -1118,7 +1118,9 @@ function inputMiddleware({
     const sent = route.arrayBody ? { [route.arrayBody.as]: json } : json;
     const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : sent;
 
-    context.set(ROUTE_INPUT, mergeInput({ params, query, body }));
+    const bodyTarget = route.multipart ? "form" : "json";
+
+    context.set(ROUTE_INPUT, mergeInput({ params, query, body, bodyTarget }));
     await next();
   };
 }
@@ -1127,10 +1129,12 @@ function mergeInput({
   params,
   query,
   body,
+  bodyTarget,
 }: {
   params: unknown;
   query: unknown;
   body: unknown;
+  bodyTarget: "form" | "json";
 }): Record<string, unknown> | undefined {
   if (params === undefined && query === undefined && body === undefined) return undefined;
 
@@ -1147,16 +1151,36 @@ function mergeInput({
       throw new TypeError(`REST ${source} schemas must produce an object`);
     }
 
-    for (const [key, value] of Object.entries(part)) {
-      if (Object.hasOwn(input, key)) {
-        throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
-      }
+    for (const key of Object.keys(part)) refuseRepeatedKey({ input, key, source, bodyTarget });
 
-      input[key] = value;
-    }
+    Object.assign(input, part);
   }
 
   return input;
+}
+
+/** Declared sources never overlap (declaration.ts), so a body key that does was sent. */
+function refuseRepeatedKey({
+  input,
+  key,
+  source,
+  bodyTarget,
+}: {
+  input: Record<string, unknown>;
+  key: string;
+  source: "path" | "query" | "body";
+  bodyTarget: "form" | "json";
+}): void {
+  if (!Object.hasOwn(input, key)) return;
+
+  if (source === "body") {
+    throw new MalformedRequestError({
+      target: bodyTarget,
+      detail: `The body field "${key}" repeats a path or query field of the same name`,
+    });
+  }
+
+  throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
 }
 
 /** Authenticate, decide, handle, check the answer, respond. */

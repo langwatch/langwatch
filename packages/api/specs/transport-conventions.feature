@@ -42,6 +42,14 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then the handler is handed the fields of both sides
       And malformed JSON is refused with 400 malformed_request and a body missing a side with 422 validation_error
 
+    # Alex, 2026-10-09 (G3B-PATHKEYS): every route, before the handler.
+    @unit
+    Scenario: A body field that repeats a path parameter is refused as a handled 400
+      Given a route with a path parameter whose JSON input passes undeclared fields through
+      When it is called with a body carrying a key named like that path parameter
+      Then it is refused with 400 and the code malformed_request, never a 500
+      And the handler is not reached, while a body without such a key reaches it unchanged
+
   Rule: A protocol route renders every refusal in its protocol's own document
 
     @integration
