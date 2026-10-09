@@ -60,3 +60,16 @@ Feature: Doubleword model provider
     When a prompt playground call to a Doubleword model is refused with HTTP 402
     Then the playground says the account has no credit or budget left
     And it points at both the provider's billing and the gateway budget
+
+  @unit
+  Scenario: The catalog sync prices a Doubleword model from its realtime tariff
+    Given Doubleword lists a model with a batch tariff and a realtime tariff
+    When the model-registry sync maps it
+    Then the catalog entry is "doubleword/<model name>" with the realtime price
+    And a model with no active realtime tariff is left out
+
+  @unit
+  Scenario: The catalog sync keeps the Doubleword models when it cannot read the list
+    Given the catalog already lists Doubleword models
+    When the sync runs without a Doubleword platform key or the request fails
+    Then the Doubleword entries already in the catalog are kept

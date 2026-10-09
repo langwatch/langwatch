@@ -248,6 +248,8 @@ export class ModelProviderModule implements ModelProviderApi {
   /** What the module's own operations spend, never a platform provider credential. */
   static readonly operationalSecrets = {
     openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
+    /** Doubleword's platform key, which reads its model list and prices for the catalog sync. */
+    doublewordCatalog: Secret.load("DOUBLEWORD_API_KEY", { optional: true }),
     /** The engine hop's shared credential: the same handle the process owner holds. */
     nlpInternal: nlpInternalSecret,
   } as const;

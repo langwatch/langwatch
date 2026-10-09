@@ -1,4 +1,4 @@
-import type { LitellmPriceEntry } from "../rules/litellm-audio-prices.rules.ts";
+import type { LitellmPriceEntry } from "../rules/litellm-prices.rules.ts";
 
 /** Why litellm's price registry could not be read this run. */
 type LitellmPriceUnavailableReason = "transport_failed" | "http_status" | "malformed_body";
