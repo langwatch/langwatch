@@ -1374,7 +1374,10 @@ so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provi
 both schemas under the same migration lock, before serve, and the access-config render runs from
 env alone in its Helm job (Alex, 2026-09-28).
 SQL migrations stay central, and each is attributed to the owner of the table it touches; a check
-refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3).
+refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A migration main
+has released keeps main's bytes even when it touches two owners: installs hold its checksum, so a
+later idempotent migration carries the split instead, and the check names it as released history
+(Alex, 2026-10-09).
 
 **In-place system migrations belong to their subject; the framework runs, ops reads and requests**
 (Alex, 2026-10-06, round 14, Q-U8 and UP-3, amending "the runner belongs to ops"). The upgrade run

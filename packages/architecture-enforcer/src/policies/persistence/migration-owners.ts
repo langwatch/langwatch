@@ -22,6 +22,8 @@ const POLICY = "migration-owners";
 const PRISMA_MIGRATIONS = "packages/prisma-client/prisma/migrations";
 const CLICKHOUSE_MIGRATIONS = "packages/clickhouse-migrations/migrations";
 const FROZEN_BELOW = { postgres: "20260914", clickhouse: "00089" } as const;
+// Released on main above the cutoff, so their bytes are frozen too (Alex, 2026-10-09).
+const RELEASED_ON_MAIN = new Set(["20260918171002_org_sign_in_security"]);
 const SQL_COMMENT = /--[^\n]*/g;
 const MATERIALISED_SUFFIX = /_mv$/;
 const ALLOWED =
@@ -62,6 +64,7 @@ function prismaMigrationFiles(root: string): string[] {
 
   return readdirSync(directory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name >= FROZEN_BELOW.postgres)
+    .filter((entry) => !RELEASED_ON_MAIN.has(entry.name))
     .map((entry) => `${PRISMA_MIGRATIONS}/${entry.name}/migration.sql`)
     .filter((file) => existsSync(join(root, file)));
 }
