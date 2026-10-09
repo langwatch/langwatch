@@ -430,6 +430,14 @@ Feature: AI Gateway — transparent upstream error forwarding
     Then the client receives HTTP 402 with a JSON error envelope
     And the envelope message is "Account balance too low."
 
+  @bdd @error-transparency @unit
+  Scenario: A governance message survives a plain-text provider error body
+    Given the provider refuses a call with HTTP 402 and a plain-text body
+    And the gateway already set the governance message for account exhaustion
+    When the gateway forwards the error
+    Then the envelope message is the governance message
+    And the provider's billing text is not in the response
+
   # ==========================================================================
   # End-to-end: the real wrapper must fail fast, not retry-loop
   # ==========================================================================

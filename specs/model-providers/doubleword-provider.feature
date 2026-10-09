@@ -58,4 +58,5 @@ Feature: Doubleword model provider
   Scenario: A provider account with no credit left is named in the playground
     Given a Doubleword account with no credit
     When a prompt playground call to a Doubleword model is refused with HTTP 402
-    Then the playground says the provider account has no credit left
+    Then the playground says the account has no credit or budget left
+    And it points at both the provider's billing and the gateway budget

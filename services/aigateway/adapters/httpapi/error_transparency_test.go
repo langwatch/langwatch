@@ -372,6 +372,22 @@ func TestWriteUpstreamError_PlainTextBodyIsWrappedInEnvelope(t *testing.T) {
 		rec.Body.String())
 }
 
+// @scenario "A governance message survives a plain-text provider error body"
+func TestWriteUpstreamError_PlainTextBodyKeepsAMessageAlreadySet(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeUpstreamError(rec, &domain.UpstreamError{
+		StatusCode: http.StatusPaymentRequired,
+		Body:       []byte("Account balance too low.\n"),
+		Message:    "Your organization's AI gateway access is exhausted. Contact your LangWatch admin.",
+		Provider:   "doubleword",
+	})
+
+	require.Equal(t, http.StatusPaymentRequired, rec.Code)
+	assert.JSONEq(t,
+		`{"error":{"type":"provider_error","code":"provider_error","message":"Your organization's AI gateway access is exhausted. Contact your LangWatch admin.","meta":{"status":402,"provider":"doubleword"}}}`,
+		rec.Body.String())
+}
+
 func TestWriteUpstreamError_PlainTextBodyWithItsOwnContentTypeIsVerbatim(t *testing.T) {
 	rec := httptest.NewRecorder()
 	writeUpstreamError(rec, &domain.UpstreamError{

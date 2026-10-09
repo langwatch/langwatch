@@ -1970,9 +1970,15 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	body, message := ue.Body, ue.Message
 	// A body without a Content-Type of its own is served as JSON, so a
 	// plain-text body (e.g. "Account balance too low.") goes inside the
-	// envelope as its message instead of reaching the client as broken JSON.
+	// envelope instead of reaching the client as broken JSON. A message
+	// already set on the error wins over the body text: the governance
+	// re-message for account exhaustion is set there, and the provider's
+	// billing text must not replace it.
 	if len(body) > 0 && !upstreamContentType && !gjson.ValidBytes(body) {
-		body, message = nil, strings.TrimSpace(string(body))
+		if message == "" {
+			message = strings.TrimSpace(string(body))
+		}
+		body = nil
 	}
 	w.WriteHeader(status)
 	if len(body) > 0 {
