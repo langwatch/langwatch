@@ -1,4 +1,5 @@
-import { OffboardIncompleteError } from "@langwatch/authz-contract";
+import { grantConditionSchema } from "@langwatch/authorization";
+import { type AuthzSharedProjectGrant, OffboardIncompleteError } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 import {
@@ -168,11 +169,15 @@ export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
   }: {
     organizationId: string;
     readerProjectId: string;
-  }): Promise<{ grantId: string; memberProjectId: string }[]> {
+  }): Promise<AuthzSharedProjectGrant[]> {
     const where = sharedProjectReadsOf({ organizationId, readerProjectId });
     return this.liveGrants()
       .filter((row) => matchesFilter({ row, where }))
-      .map((row) => ({ grantId: row.id, memberProjectId: row.scopeId }))
+      .map((row) => ({
+        grantId: row.id,
+        memberProjectId: row.scopeId,
+        condition: grantConditionSchema.safeParse(row.condition).data ?? null,
+      }))
       .toSorted((a, b) => a.memberProjectId.localeCompare(b.memberProjectId));
   }
 
