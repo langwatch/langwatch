@@ -429,3 +429,12 @@ Feature: Slack connections
       When the Slack connection migration runs for the organization
       Then each connection is used by the automations that deliver through it
       And running it again changes nothing
+
+  Rule: A bot token is checked at the configured Slack Web API
+
+    @unit
+    Scenario: A bot token is checked against the configured Slack Web API
+      Given a process whose Slack API base names a stand-in
+      When a bot connection's token is checked
+      Then auth.test is asked of the stand-in, never of slack.com
+      And the workspace the stand-in answers names the connection

@@ -15,7 +15,9 @@ it. Code: `services/outboundsim`, console `apps/outboundsim-web`.
 
 - Opt-in: `haven up +outbound` (sticky). Hosted in the `sims` lane.
 - Console and base URL: `https://outbound.<slug>.langwatch.localhost`.
-- The overlay points the four internal Slack channel settings at it and sets
+- The overlay points the four internal Slack channel settings at it, sets
+  `SLACK_API_BASE=<base>/api` and `SLACK_WEBHOOK_BASE=<base>` (so a bot token check,
+  `chat.postMessage` and a `https://hooks.slack.com/...` test fire land here, not at Slack) and
   `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1`, each only when `.env` leaves it unset. A webhook
   destination you create in the app points at `<base>/hooks/<name>`; `haven outbound urls`
   prints every URL to paste.

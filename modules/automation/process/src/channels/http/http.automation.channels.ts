@@ -1,3 +1,5 @@
+import type { AutomationServerConfig } from "@langwatch/automation-contract";
+
 import type { AutomationChannels } from "../automation.channels.ts";
 import { SlackWebApiTransportChannel } from "../slack/slack.web-api-transport.channel.ts";
 import { SlackWebhookClientChannel } from "../slack/slack.webhook-client.channel.ts";
@@ -6,10 +8,12 @@ import { SlackWebhookClientChannel } from "../slack/slack.webhook-client.channel
 export class HttpAutomationChannels {
   static readonly requires = [] as const;
 
-  static create(): AutomationChannels {
+  static create({ config }: { config: AutomationServerConfig }): AutomationChannels {
     return {
-      slackWebhookClient: SlackWebhookClientChannel.create(),
-      slackApiTransport: SlackWebApiTransportChannel.create(),
+      slackWebhookClient: SlackWebhookClientChannel.create({
+        webhookBase: config.slackWebhookBase,
+      }),
+      slackApiTransport: SlackWebApiTransportChannel.create({ apiBase: config.slackApiBase }),
     };
   }
 }

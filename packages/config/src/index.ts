@@ -53,6 +53,8 @@ export {
   signInProviders,
   signUpAllowedDomains,
   signUpMode,
+  slackApiBase,
+  slackWebhookBase,
   telemetryExporterEndpoint,
   trustedIdpOrigins,
 } from "./deployment-facts.ts";
