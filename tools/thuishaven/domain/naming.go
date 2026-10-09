@@ -71,6 +71,11 @@ const LLMService = "llm"
 // analytics.<slug>.langwatch.localhost. Opt-in like voice and llm.
 const AnalyticsService = "analytics"
 
+// OutboundService is the Slack, webhook and SQS stand-in (services/outboundsim)
+// that records what the product sends out, routed at
+// outbound.<slug>.langwatch.localhost. Opt-in like analytics.
+const OutboundService = "outbound"
+
 // TelemetryService is the OTLP sender (services/telemetrysim) that drives
 // seeded telemetry at the stack's OTLP door, routed at
 // telemetry.<slug>.langwatch.localhost. Opt-in like voice and llm.

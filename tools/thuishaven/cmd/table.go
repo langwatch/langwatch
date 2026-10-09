@@ -200,7 +200,7 @@ var table = append(baseTable, tabSpecs()...)
 var baseTable = []commandSpec{
 	{
 		name:    "simulator",
-		args:    "<mail|idp|storage|voice|llm|analytics>",
+		args:    "<mail|idp|storage|voice|llm|analytics|outbound>",
 		maxArgs: 1,
 		hidden:  true,
 		run:     runBundledSimulator,
@@ -297,7 +297,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "idp",
-		summary: "idpsim: bare runs the standalone IdP simulator; with a verb it drives this stack's (tenant show | apps | populate | churn | user add | scim ... | dns | activity | signin | reset | samlp | legacy | tamper | auth0-webhook | scim-event)",
+		summary: "idpsim: bare runs the standalone IdP simulator; with a verb it drives this stack's (tenants | tenant show | apps | populate | churn | user add | scim ... | dns | activity | signin | reset | samlp | legacy | tamper | auth0-webhook | scim-event)",
 		args:    "[verb] [tenant] [args]",
 		maxArgs: -1,
 		flags:   simFlags(idpFlags...),
@@ -353,12 +353,40 @@ var baseTable = []commandSpec{
 		run: runAnalytics,
 	},
 	{
+		name:    "outbound",
+		summary: "outboundsim's caught Slack, webhook and SQS sends: status | records | deliveries | clear | wait | fault | receiver | urls",
+		args:    "<status|records|deliveries|clear|wait|fault|receiver|urls> [add|list|clear|set] [name]",
+		maxArgs: 3,
+		flags: simFlags(
+			flagSpec{long: "--channel", takesValue: true, value: "<name>", summary: "records/wait/fault add: slack-webhook, slack-api, webhook or sqs"},
+			flagSpec{long: "--target", takesValue: true, value: "<glob>", summary: "records/wait/fault add: only this target"},
+			flagSpec{long: "--event-id", takesValue: true, value: "<id>", summary: "records/deliveries: only this event"},
+			flagSpec{long: "--since", takesValue: true, value: "<time>", summary: "records: only newer than this"},
+			flagSpec{long: "--count", takesValue: true, value: "<n>", summary: "wait: how many matches to wait for (default 1)"},
+			flagSpec{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+			flagSpec{long: "--status", takesValue: true, value: "<code>", summary: "fault add: the status to answer with"},
+			flagSpec{long: "--body", takesValue: true, value: "<text>", summary: "fault add: the body to answer with"},
+			flagSpec{long: "--retry-after", takesValue: true, value: "<seconds>", summary: "fault add: Retry-After to send"},
+			flagSpec{long: "--latency", takesValue: true, value: "<ms>", summary: "fault add: stall this long before answering"},
+			flagSpec{long: "--drop", summary: "fault add: close the connection without answering"},
+			flagSpec{long: "--times", takesValue: true, value: "<n>", summary: "fault add: apply this many times, then delete itself"},
+			flagSpec{long: "--secret", takesValue: true, value: "<secret>", summary: "receiver set: the webhook secret to verify signatures with"},
+		),
+		run: runOutbound,
+	},
+	{
 		name:    "storage",
 		summary: "storagesim's S3: buckets | objects [bucket] | object <bucket> <key> [--raw] | requests",
 		args:    "<buckets|objects|object|requests> [bucket] [key]",
 		maxArgs: 3,
 		flags:   simFlags(flagSpec{long: "--raw", summary: "object: the stored bytes instead of the metadata"}),
 		run:     runStorage,
+	},
+	{
+		name:    "sims",
+		summary: "every simulator: running here or not, its console, the +name to start it, its verbs and skill",
+		flags:   simFlags(),
+		run:     runSims,
 	},
 	{
 		name:    "voice",

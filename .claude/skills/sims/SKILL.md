@@ -1,28 +1,33 @@
 ---
 name: sims
-description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim and voicesim, the haven sims lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', or does not know which sim to use."
+description: "Map of LangWatch's local simulators and how they run: llmsim, mailsim, storagesim, analyticssim, idpsim, voicesim, outboundsim and telemetrysim, the haven sims lane, the single Go mono-binary (`service combined`), the ADR-160 consoles and load runs. Use when someone says 'which simulators are there', 'sims', 'run it locally at scale', 'load test the sims', 'haven up +llm', 'the sims lane', 'where is the sim console', 'add a simulator', or does not know which sim to use."
 user-invocable: true
 ---
 
 # Simulators
 
-Six Go simulators stand in for outside services so a stack runs offline, deterministically
+Start here: `haven sims --json` lists every simulator with whether it runs in this stack, its
+console URL, the `haven up +<name>` it needs if off, its verbs (read from haven's own command
+table) and its skill path. `--stack <slug>` reads another worktree's stack.
+
+Seven Go simulators stand in for outside services so a stack runs offline, deterministically
 and for free. Code is `services/<name>` and each console is a React app, `apps/<name>-web`,
 built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 `dev/docs/adr/160-internal-consoles-are-go-served-react.md`).
 
-| Sim            | Stands in for                  | haven        | Skill          | Seed env               |
-| -------------- | ------------------------------ | ------------ | -------------- | ---------------------- |
-| `llmsim`       | OpenAI, Anthropic              | `+llm`       | `llmsim`       | none (built-in corpus) |
-| `mailsim`      | SMTP                           | default      | `mailsim`      | `MAILSIM_SEED`         |
-| `storagesim`   | S3                             | default      | `storagesim`   | `STORAGESIM_SEED`      |
-| `analyticssim` | PostHog, Customer.io           | `+analytics` | `analyticssim` | `ANALYTICSSIM_SEED`    |
-| `idpsim`       | OIDC, SAML, SCIM IdP           | default      | `idpsim`       | none (seeded tenants)  |
-| `voicesim`     | ElevenLabs voice, OpenAI audio | `+voice`     | `voicesim`     | `VOICESIM_SEED`        |
-| `telemetrysim` | OTLP senders (traces, logs, metrics, coding agents) | not yet wired | none | `--seed` per run |
+| Sim            | Stands in for                                       | haven        | Skill                                      | Seed env               |
+| -------------- | --------------------------------------------------- | ------------ | ------------------------------------------ | ---------------------- |
+| `llmsim`       | OpenAI, Anthropic                                   | `+llm`       | `llmsim`                                   | none (built-in corpus) |
+| `mailsim`      | SMTP                                                | default      | `mailsim`                                  | `MAILSIM_SEED`         |
+| `storagesim`   | S3                                                  | default      | `storagesim`                               | `STORAGESIM_SEED`      |
+| `analyticssim` | PostHog, Customer.io                                | `+analytics` | `analyticssim`                             | `ANALYTICSSIM_SEED`    |
+| `idpsim`       | OIDC, SAML, SCIM IdP                                | default      | `idpsim`                                   | none (seeded tenants)  |
+| `voicesim`     | ElevenLabs voice, OpenAI audio                      | `+voice`     | `voicesim`                                 | `VOICESIM_SEED`        |
+| `telemetrysim` | OTLP senders (traces, logs, metrics, coding agents) | `+telemetry` | [`telemetrysim`](../telemetrysim/SKILL.md) | `--seed` per run       |
+| `outboundsim`  | Slack, webhook receivers, SQS                       | `+outbound`  | `outboundsim`                              | `OUTBOUNDSIM_SEED`     |
 
 Each has a console at `<name>.<slug>.langwatch.localhost` (names: `llm`, `mail`, `storage`,
-`analytics`, `idp`, `voice`) and logs via `haven logs <name>`. `haven up +llm +analytics`
+`analytics`, `idp`, `voice`, `outbound`, `telemetry`) and logs via `haven logs <name>`. `haven up +llm +analytics`
 selects (sticky); `-mail` deselects. haven sets every `*_SEED=1`. Two shared console packages,
 `@langwatch/design-system-internal` and `@langwatch/sim-console`, draw all of them; no
 Chakra, no product design system.
@@ -63,12 +68,13 @@ storagesim, idpsim).
 
 Every console action has a verb (`--json` on reads, non-zero exit on failure, `--stack <slug>`):
 
-| Sim | Verbs |
-|---|---|
-| mail | `haven mail address\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear` |
-| llm | `haven llm info\|calls\|call <id>\|clear\|set --error --seed` |
-| analytics | `haven analytics status\|records\|clear\|wait --event` |
-| storage | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|requests` |
-| voice | `haven voice status\|calls\|call <id>` |
-| telemetry | `haven telemetry send\|load\|fuzz\|status\|stop` |
-| idp | `haven idp` (summary only; more verbs planned) |
+| Sim       | Verbs                                                                                                                 |
+| --------- | --------------------------------------------------------------------------------------------------------------------- |
+| mail      | `haven mail address\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                            |
+| llm       | `haven llm info\|calls\|call <id>\|clear\|set --error --seed`                                                         |
+| analytics | `haven analytics status\|records\|clear\|wait --event`                                                                |
+| storage   | `haven storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|requests`                                    |
+| voice     | `haven voice status\|calls\|call <id>` (no clear: voicesim has no DELETE endpoint yet)                                |
+| telemetry | `haven telemetry send\|load\|fuzz\|status\|stop`                                                                      |
+| outbound  | `haven outbound status\|records\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`       |
+| idp       | `haven idp tenants\|tenant show\|apps add\|populate\|churn\|scim ...\|signin\|reset` (full list: `haven sims --json`) |

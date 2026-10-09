@@ -468,6 +468,27 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 	return env
 }
 
+// OutboundProviderEnv points the product's four internal Slack channel settings
+// at outboundsim's haven route and admits local webhook URLs, each only when
+// the resolved environment leaves it unset.
+func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
+	var env []string
+	for _, c := range []struct{ key, bucket string }{
+		{"SLACK_CHANNEL_SIGNUPS", "B0SIGNUPS"},
+		{"SLACK_PLAN_LIMIT_CHANNEL", "B0PLANLIMIT"},
+		{"SLACK_CHANNEL_SUBSCRIPTIONS", "B0SUBSCRIPTIONS"},
+		{"SLACK_CHANNEL_SELF_HOSTED", "B0SELFHOSTED"},
+	} {
+		if resolved[c.key] == "" {
+			env = append(env, c.key+"="+endpoint+"/services/T0SIM/"+c.bucket+"/x")
+		}
+	}
+	if resolved["WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS"] == "" {
+		env = append(env, "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1")
+	}
+	return env
+}
+
 // llmProbeProviders are the providers whose credential probe the model-provider
 // module aims at the API root named by <PROVIDER>_BASE_URL. They get the base URL
 // only: a dummy key would seed an organization-level row for each one.

@@ -34,7 +34,9 @@ EXAMPLES
     haven up +langevals          # run the evaluators monitors and evaluations call
     haven up +llm                # answer every model call from llmsim, at no cost
     haven up +analytics          # catch PostHog and Customer.io calls in analyticssim
+    haven up +outbound           # catch Slack, webhook and SQS sends in outboundsim
     haven up +telemetry          # send, load or fuzz OTLP traffic with telemetrysim
+    haven sims --json            # every simulator: running here, console, verbs, skill
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
@@ -61,13 +63,14 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-The six simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
-idp and storage run by default; llm, voice and analytics come with "haven up +llm
-+voice +analytics". Read one's output with "haven logs <name>". Drive one from a
-terminal with "haven mail|llm|analytics|storage|voice <verb>" (--json on every read).
-telemetrysim ("haven up +telemetry") has no console: "haven telemetry send|load|fuzz|status|stop".
+The eight simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp and storage run by default; llm, voice, analytics, outbound and telemetry come with
+"haven up +llm +voice +analytics +outbound +telemetry". "haven sims --json" lists every one: running
+here or not, its console, its verbs and its skill. Read one's output with "haven logs
+<name>". Drive one from a terminal with "haven mail|idp|llm|analytics|outbound|storage|voice|telemetry
+<verb>" (--json on every read).
 
-    mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
+    mail|idp|storage|llm|voice|analytics|outbound|telemetry.portless.langwatch.localhost
 
 Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 

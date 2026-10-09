@@ -1,5 +1,5 @@
 // Package storagesim is haven's local S3: the path-style calls the product
-// makes (PUT, GET, HEAD, DELETE object; HEAD/PUT bucket), answered as S3
+// makes (PUT, GET, HEAD, DELETE object; HEAD/PUT bucket; ListObjectsV2), answered as S3
 // answers them, SigV4 (header or presigned query) checked against one dev key.
 // Objects are content-addressed 0600 files in one 0700 data directory, served
 // nosniff and sandboxed. See README.md for what it leaves out.
@@ -265,7 +265,7 @@ func (s *Server) bucketExists(bucket string) bool {
 	return s.buckets == nil || s.buckets[bucket]
 }
 
-// serveBucket answers HeadBucket and CreateBucket.
+// serveBucket answers HeadBucket, CreateBucket and ListObjectsV2.
 func (s *Server) serveBucket(x exchange, obj object) {
 	w := x.w
 	switch x.r.Method {
@@ -283,8 +283,14 @@ func (s *Server) serveBucket(x exchange, obj object) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+	case http.MethodGet:
+		if x.r.URL.Query().Get("list-type") != "2" {
+			x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim lists with ListObjectsV2 (list-type=2) only"))
+			return
+		}
+		s.listObjectsV2(x, obj)
 	default:
-		x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim does not list or configure buckets"))
+		x.fail(obj.fail(http.StatusNotImplemented, "NotImplemented", "storagesim does not configure buckets"))
 	}
 }
 

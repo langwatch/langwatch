@@ -16,8 +16,9 @@ haven runs it as the `storage` lane (`tools/thuishaven/app/plan_storage.go`).
 | `modules/stored-object/.../s3.payload-staging.repository.ts`                                                               | PutObject, then a presigned GetObject          | header, then query | the presigned GET is fetched by nlpgo and langevals                               |
 | `modules/trace/.../s3.trace-legacy-spool.channel.ts`                                                                       | GetObject, DeleteObject                        | SigV4 header       |                                                                                   |
 
-Not pointed at storagesim: governance's `ListObjectsV2` reads a customer's own
-bucket. Go services only fetch presigned URLs over plain HTTP.
+`tools/upgradelab/snapshot/s3.go` lists a bucket with `ListObjectsV2` (empty-bucket
+check, capture, restore). Not pointed at storagesim: governance's `ListObjectsV2`
+reads a customer's own bucket. Go services only fetch presigned URLs over plain HTTP.
 
 ## What it answers
 
@@ -37,6 +38,10 @@ bucket. Go services only fetch presigned URLs over plain HTTP.
   missing key `404 NoSuchKey`; unknown bucket `404 NoSuchBucket`.
 - Buckets: `STORAGESIM_BUCKETS` lists the ones that exist (a `PUT /<bucket>`
   adds one); unset, every bucket exists.
+- `GET /<bucket>?list-type=2` is ListObjectsV2: keys in lexical order with
+  `prefix`, `delimiter` (`CommonPrefixes`), `start-after`, `max-keys` (default
+  and ceiling 1000) and an opaque `continuation-token`; `encoding-type` is ignored.
+  A `GET /<bucket>` without `list-type=2` answers `501 NotImplemented`.
 - PUT answers the MD5 as a quoted `ETag`; GET/HEAD answer `Content-Type`,
   `Content-Length`, `ETag`, `Last-Modified`, ranges and conditionals.
 - `aws-chunked` bodies are decoded; `x-amz-decoded-content-length` is required.
@@ -61,12 +66,13 @@ unless the type is a plain image (PNG, JPEG, GIF, WebP, AVIF) or `text/plain`.
 ## Disposable
 
 haven sets `STORAGESIM_DATA_DIR=<haven home>/storage/<slug>`. It survives
-`haven down` today, as the databases do; removing it with `haven db reset` is
-a pending thuishaven change.
+`haven down`, as the databases do, and `haven db reset` removes it with them.
+`DELETE /_sim/api/object?bucket=&key=` and `DELETE /_sim/api/objects[?bucket=]`
+(`haven storage delete` / `clear`) empty it without a reset.
 
 ## Left out
 
-Virtual-host addressing, ListBuckets, ListObjects, multipart uploads, copy,
+Virtual-host addressing, ListBuckets, ListObjects (v1), multipart uploads, copy,
 object tagging and ACLs, POST policy uploads, `response-*` overrides,
 stored `Content-Disposition`/`Cache-Control`/user metadata, SSE, versioning,
 stored checksums, per-chunk signature checks on `STREAMING-AWS4-HMAC-SHA256-PAYLOAD`,

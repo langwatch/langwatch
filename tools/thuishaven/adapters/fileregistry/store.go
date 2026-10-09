@@ -128,6 +128,7 @@ type selectionFields struct {
 	Voice        *bool `json:"voice"`
 	LLM          *bool `json:"llm"`
 	Analytics    *bool `json:"analytics"`
+	Outbound     *bool `json:"outbound"`
 	Telemetry    *bool `json:"telemetry"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
@@ -152,6 +153,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Voice, nil, &sel.Voice},
 		{f.LLM, nil, &sel.LLM},
 		{f.Analytics, nil, &sel.Analytics},
+		{f.Outbound, nil, &sel.Outbound},
 		{f.Telemetry, nil, &sel.Telemetry},
 	} {
 		switch {
@@ -208,6 +210,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Voice:        &sel.Voice,
 		LLM:          &sel.LLM,
 		Analytics:    &sel.Analytics,
+		Outbound:     &sel.Outbound,
 		Telemetry:    &sel.Telemetry,
 	}}, "", "  ")
 	if err != nil {

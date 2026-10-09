@@ -580,6 +580,9 @@
       "path": "packages/otlp/tsconfig.json"
     },
     {
+      "path": "apps/outboundsim-web/tsconfig.json"
+    },
+    {
       "path": "packages/oxlint-rules/tsconfig.json"
     },
     {
@@ -746,6 +749,9 @@
     },
     {
       "path": "apps/tasks/tsconfig.test.json"
+    },
+    {
+      "path": "apps/telemetrysim-web/tsconfig.json"
     },
     {
       "path": "packages/test-harness/tsconfig.json"

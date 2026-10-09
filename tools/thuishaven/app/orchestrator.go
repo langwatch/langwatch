@@ -1149,6 +1149,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.LLM
 	case domain.AnalyticsService:
 		return opts.Selection.Analytics
+	case domain.OutboundService:
+		return opts.Selection.Outbound
 	case domain.TelemetryService:
 		return opts.Selection.Telemetry
 	default:
