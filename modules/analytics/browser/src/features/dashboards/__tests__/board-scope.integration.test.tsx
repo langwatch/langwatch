@@ -598,7 +598,7 @@ describe("a board's scope in the browser", () => {
     });
 
     /** @scenario "AC184 View-only: a board the reader cannot edit offers no edit control" */
-    it("keeps only the widget menu action that changes nothing", async () => {
+    it("keeps only the widget menu actions that change nothing", async () => {
       const { user } = open({ server: withWidget() });
 
       await user.click(await screen.findByRole("button", { name: "Actions for Pass rate" }));
@@ -606,6 +606,7 @@ describe("a board's scope in the browser", () => {
 
       expect(screen.getAllByRole("menuitem").map((item) => item.textContent?.trim())).toEqual([
         "Copy widget id",
+        expect.stringMatching(/^Export CSV/),
       ]);
     });
 
@@ -718,7 +719,7 @@ describe("a board's scope in the browser", () => {
       }).toEqual({
         add: [],
         dragHandles: [],
-        menu: ["Copy widget id"],
+        menu: ["Copy widget id", expect.stringMatching(/^Export CSV/)],
         scopeControl: null,
         lock: "no-permission",
       });

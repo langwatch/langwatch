@@ -885,6 +885,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       or any board opened by a member without analytics:update
     Then there is no "Add a widget", no add card, no widget menu action that edits, duplicates
       or deletes, and nothing can be moved or resized
+    And the widget menu still offers "Copy widget id" and "Export CSV", which change nothing
     And the description cannot be edited, and the sidebar menu offers no Rename and no Delete
     And outside the owning project the header reads "<organization> · owned by <project>"
 
