@@ -92,7 +92,7 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
 	}
-	if !o.sys.ProcessAlive(st.LauncherPID) {
+	if !o.launcherIsOurs(st) {
 		return nil, fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
 	}
 	targets := restartTargets(st, name)

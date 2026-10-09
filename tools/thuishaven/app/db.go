@@ -347,7 +347,7 @@ func (o *Orchestrator) DBURL(ctx context.Context, p UpParams, engine string) err
 func (o *Orchestrator) DownAll(ctx context.Context) error {
 	var stopped []int
 	for _, st := range o.store.Stacks() {
-		if o.sys.ProcessAlive(st.LauncherPID) {
+		if o.launcherIsOurs(st) {
 			stopped = append(stopped, st.LauncherPID)
 		}
 		if err := o.DownStack(ctx, st.Slug); err != nil {
@@ -369,7 +369,7 @@ func (o *Orchestrator) DownAll(ctx context.Context) error {
 		o.ch.Stop()
 		fmt.Println("stopped managed clickhouse-server (data kept)")
 	}
-	if info, ok := o.store.Daemon(); ok && o.sys.ProcessAlive(info.PID) {
+	if info, ok := o.store.Daemon(); ok && o.pidIsOurs(info.PID, info.Start) {
 		o.sys.Terminate(info.PID)
 		o.store.ClearDaemon()
 		fmt.Printf("stopped haven daemon (pid %d)\n", info.PID)

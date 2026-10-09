@@ -77,9 +77,10 @@ type Store interface {
 	TouchDBActivity(slug string) error
 	DBActivity() map[string]time.Time
 	RemoveDBActivity(slug string)
-	// ClaimDaemon atomically records this process as the singleton daemon, but
-	// only if no record exists yet (O_EXCL). It returns false without overwriting
-	// when one already does, so two daemons racing to start can never both win.
+	// ClaimDaemon takes the daemon flock without waiting and, when it wins,
+	// writes the record; the lock is held until ClearDaemon or process death,
+	// so the kernel frees it on a crash and no stale record can block (D9).
+	// False means another daemon holds it.
 	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
@@ -217,6 +218,9 @@ type System interface {
 	FreePorts(n int) ([]int, error)
 	PortInUse(port int) bool
 	ProcessAlive(pid int) bool
+	// ProcessStart is pid's start time, "" when unknown; pid plus start is a
+	// process's identity, so a reused pid is never mistaken for ours (D6).
+	ProcessStart(pid int) string
 	Terminate(pid int)
 	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
 	// bounces one supervised child (its supervisor restarts it on exit).
@@ -482,9 +486,10 @@ type ContainerJanitor interface {
 
 // DaemonInfo is the little record `up` reads to find (or spawn) the daemon.
 type DaemonInfo struct {
-	PID  int    `json:"pid"`
-	Port int    `json:"port"`
-	URL  string `json:"url"`
+	PID   int    `json:"pid"`
+	Start string `json:"start,omitempty"`
+	Port  int    `json:"port"`
+	URL   string `json:"url"`
 }
 
 // HeavyRunSnapshot is one heavy run currently holding a slot: its own
