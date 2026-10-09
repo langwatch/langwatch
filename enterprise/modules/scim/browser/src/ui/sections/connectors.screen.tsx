@@ -34,11 +34,13 @@ export default function ConnectorsScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Connectors</PageLayout.Heading>
-      </PageLayout.Header>
       <SectionNavigationFrame
         label="Authentication"
+        header={
+          <PageLayout.Header>
+            <PageLayout.Heading>Connectors</PageLayout.Heading>
+          </PageLayout.Header>
+        }
         links={AUTHENTICATION_LINKS}
         activeHref="/settings/authentication/connectors"
         onNavigate={(href) => navigation?.navigate(href)}
