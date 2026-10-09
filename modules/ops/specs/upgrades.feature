@@ -233,3 +233,11 @@ Feature: Ops shows an installation's release upgrades, read-only
     Given the ledger records no per-target rows
     When an operator opens Ops, Upgrades
     Then no Dataplanes tab is offered
+
+  # Upgrading mode (UPGRADE-IN-WORKER slice 4, UIW-6; plan dev/docs/plans/upgrade-in-worker-2026-10-09.md section 4)
+  @unit
+  Scenario: The Upgrades reads and Retry serve while the installation upgrades and the migration procedures stay held
+    Given the api is in upgrading mode
+    When a batched call names the eight upgrade reads and Retry
+    Then it passes the holding door to the door that asks ops:view or ops:manage at the platform
+    And a call naming any system-migration procedure answers 503 before the door

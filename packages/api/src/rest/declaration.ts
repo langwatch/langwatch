@@ -1630,12 +1630,20 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.multipart ? { multipart: state.multipart } : {}),
     ...(state.rateLimit ? { rateLimit: state.rateLimit } : {}),
     ...(state.cache ? { cache: state.cache } : {}),
-    ...(state.entitlement ? { entitlement: state.entitlement } : {}),
-    ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
     ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
     ...(state.response ? { response: state.response } : {}),
     ...(state.refusal ? { refusal: state.refusal } : {}),
+    ...doorParts(state),
+  };
+}
+
+/** What the door reads of a route beyond its permission: gates, credential, audit, upgrading. */
+function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
+  return {
+    ...(state.entitlement ? { entitlement: state.entitlement } : {}),
+    ...(state.mintsCredential ? { mintsCredential: state.mintsCredential } : {}),
+    ...(state.servesWhileUpgrading ? { servesWhileUpgrading: true as const } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),

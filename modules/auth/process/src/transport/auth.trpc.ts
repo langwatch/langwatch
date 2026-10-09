@@ -103,6 +103,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * router itself cannot tell the two apart either (ADR-117 §2).
    */
   .procedure("route")
+  .servesWhileUpgrading()
   .withFacts(callerAddressFact)
   .withAccess(ANONYMOUS_ROUTING)
   .handle(async ({ app, input }, address) => {
@@ -213,6 +214,7 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
 
   /** Why a signed-out visitor is here: only an expired session of theirs names its address. */
   .procedure("priorSession")
+  .servesWhileUpgrading()
   .withFacts(authRequestHeadersFact)
   .withAccess(OWN_SESSION_COOKIE)
   .handle(({ app }, headers) => app.getPriorSession({ headers }))

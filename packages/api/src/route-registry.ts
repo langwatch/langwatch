@@ -74,17 +74,32 @@ export function allRegisteredRoutes(): RegisteredRoute[] {
 
 /**
  * Every route declared to serve while upgrading, as a regex over `METHOD /path` the liveness
- * door matches before it proxies (UIW-6). Spec: specs/upgrade/in-app-upgrade.feature.
+ * door matches before it proxies (UIW-6). A wildcard skips the literal routes beneath it that
+ * do not declare it themselves (UIW-WILDCARD-SKIPS-LITERALS). Spec: in-app-upgrade.feature.
  */
 export function routesServingWhileUpgrading(): string[] {
-  const rest = allRegisteredRoutes()
+  const routes = allRegisteredRoutes();
+  const held = routes.filter((route) => !route.servesWhileUpgrading).flatMap(addressesOf);
+  const rest = routes
     .filter((route) => route.servesWhileUpgrading)
-    .flatMap((route) =>
-      [route.path, ...(route.canonicalPath ? [route.canonicalPath] : [])].map(
-        (path) => `^${route.method === "ALL" ? "[A-Z]+" : route.method} ${pathPattern(path)}$`,
-      ),
-    );
+    .flatMap(addressesOf)
+    .map(({ method, path }) => {
+      const pattern = `${method} ${pathPattern(path)}`;
+      if (!path.includes("*")) return `^${pattern}$`;
+      const beneath = new RegExp(`^${pattern}$`);
+      const skipped = held
+        .filter((other) => !other.path.includes("*") && beneath.test(`${other.verb} ${other.path}`))
+        .map((other) => `(?!${other.method} ${pathPattern(other.path)}$)`);
+      return `^${skipped.join("")}${pattern}$`;
+    });
   return trpcServingWhileUpgrading.size === 0 ? rest : [...rest, trpcBatchPattern()];
+}
+
+/** A route's bare and twin paths, each with its method as a regex and as declared. */
+function addressesOf(route: RegisteredRoute): { method: string; verb: string; path: string }[] {
+  const method = route.method === "ALL" ? "[A-Z]+" : route.method;
+  const paths = [route.path, ...(route.canonicalPath ? [route.canonicalPath] : [])];
+  return paths.map((path) => ({ method, verb: route.method, path }));
 }
 
 const trpcServingWhileUpgrading = new Set<string>();

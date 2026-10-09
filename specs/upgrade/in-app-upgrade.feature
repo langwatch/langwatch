@@ -88,7 +88,7 @@ Feature: The new image's worker runs its blocking upgrade while the api holds, t
     And any other page answers the holding page and any other request 503 with Retry-After 10
     And the api reports not ready
 
-  @unimplemented
+  @unit
   Scenario: Upgrading mode serves only the routes declared to serve while upgrading
     Given the api is in upgrading mode
     When a request reaches a route that does not declare it serves while upgrading
