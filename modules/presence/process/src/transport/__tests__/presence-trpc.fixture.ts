@@ -16,7 +16,7 @@ import type { AuthzPermission } from "@langwatch/authorization";
  */
 import type { TrpcContract } from "@langwatch/module";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import { mintTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { mintTestAuthorization, testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 
 import { presenceSessionPersonFact } from "../presence.trpc.ts";
@@ -34,6 +34,7 @@ function members(
     identity: { caller: () => ({ actor }) },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async () => ({ permitted, organizationRole: null }),
         getProjectAnyDecision: async () => ({ permitted, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

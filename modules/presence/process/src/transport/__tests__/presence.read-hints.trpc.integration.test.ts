@@ -17,6 +17,7 @@ import {
   TestPresenceEmitters,
 } from "../../app/__tests__/presence.fixture.ts";
 import { presenceSessionPersonFact, presenceTrpcTransport } from "../presence.trpc.ts";
+import { testAuthorizeDefaults } from "@langwatch/test-harness/trpc-members";
 
 type DoorContext = { actor: { id: string } | null };
 
@@ -35,6 +36,7 @@ function members(): TrpcRuntimeMembers<DoorContext> {
     },
     authorization: {
       forRequest: () => ({
+        ...testAuthorizeDefaults,
         getDecision: async ({ userId, scope }) => ({
           permitted:
             userId === "u1" &&
