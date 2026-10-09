@@ -267,3 +267,68 @@ func Env(values map[string]string) []string {
 }
 
 func itoa(value int) string { return strconv.Itoa(value) }
+
+// The argv each release runs: built output only, never tsx, vite dev or watch (ruling 2026-10-10).
+// Head's start is the release image's CMD (infra/docker/Dockerfile): apps/api and apps/worker start.
+var (
+	FromAppArgs    = []string{"pnpm", "-s", "run", "runtime:app"}
+	FromWorkerArgs = []string{"pnpm", "-s", "run", "runtime:workers"}
+	HeadStartArgs  = []string{"pnpm", "--silent", "run", "start"}
+	// FromStartup is main's preflight, in order, from origin/main platform/app/scripts/start-runtime.sh.
+	FromStartup = [][]string{{"start:prepare:db"}, {"task", "system-migrations"}}
+)
+
+// headBuildScript is the release image's build step (infra/docker/Dockerfile), run in head's checkout.
+const headBuildScript = `pnpm start:prepare:files && pnpm ensure:built && pnpm exec tsc -b --builders 16 tsconfig.build.json && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build`
+
+// BuildStamp sits in node_modules, which git ignores, so a build never dirties the checkout.
+const BuildStamp = "node_modules/.upgradelab-build"
+
+// Build is one release's build: Args run in Root/Dir, skipped while the stamp records HEAD and Output exists.
+type Build struct {
+	Root, Dir, Output string
+	Args              []string
+}
+
+// FromBuild is main's release image build (origin/main infra/docker/Dockerfile), run from the root.
+func FromBuild(root string) Build {
+	return Build{Root: root, Output: "platform/app/dist/server/server.cjs", Args: []string{"pnpm", "--filter", "@langwatch/web...", "run", "build"}}
+}
+
+// HeadBuild is the release image's build; the api serves the UI bundle it writes.
+func HeadBuild(root string) Build {
+	return Build{Root: root, Output: "apps/ui/dist/index.html", Args: []string{"bash", "-c", headBuildScript}}
+}
+
+// Fresh answers whether the last build was of commit and its output is still there.
+func (build Build) Fresh(commit string) bool {
+	stamp, err := os.ReadFile(filepath.Join(build.Root, BuildStamp)) // #nosec G304 -- the harness's own stamp.
+	_, outputErr := os.Stat(filepath.Join(build.Root, build.Output))
+	return commit != "" && err == nil && outputErr == nil && strings.TrimSpace(string(stamp)) == commit
+}
+
+// Ensure builds unless Fresh, with no store or secret in its environment, then stamps HEAD.
+func (build Build) Ensure(ctx context.Context, log string) error {
+	out, _ := exec.CommandContext(ctx, "git", "-C", build.Root, "rev-parse", "HEAD").Output() // #nosec G204 -- fixed argv.
+	commit := strings.TrimSpace(string(out))
+	if build.Fresh(commit) {
+		return nil
+	}
+	env := map[string]string{"NODE_OPTIONS": "--max-old-space-size=4096"}
+	for _, key := range processKeys {
+		if value, ok := os.LookupEnv(key); ok {
+			env[key] = value
+		}
+	}
+	command := exec.CommandContext(ctx, build.Args[0], build.Args[1:]...) // #nosec G204 -- argv fixed by the harness.
+	command.Dir, command.Env = filepath.Join(build.Root, build.Dir), Env(env)
+	output, err := command.CombinedOutput()
+	_ = os.WriteFile(log, output, 0o600)
+	if err != nil {
+		return fmt.Errorf("build %s: %w: %s", build.Root, err, tail(output))
+	}
+	if commit == "" {
+		return nil
+	}
+	return os.WriteFile(filepath.Join(build.Root, BuildStamp), []byte(commit+"\n"), 0o600)
+}

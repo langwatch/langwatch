@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,9 +38,11 @@ type Options struct {
 	SwitchOn, ServiceBin             string
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
 	Ledger                           []string // #8553 rows this cell claims and reports to
+	FromSnapshot                     string   // a produce entry directory or cache key: restore instead of seeding
 	MaxLoad                          float64  // refuse to start above this 1-minute load average
 	TestedBy                         string   // who runs the cell, for the ledger's Tested by (lane:<id> (model) or @handle)
 	Keep, Shots                      bool
+	Stdout                           io.Writer // where the live origin lines go; nil prints nothing
 }
 
 // run is one cell in flight: its stores, processes, traffic and what it measured.
@@ -51,6 +54,9 @@ type run struct {
 	apiPort            int
 	origin             time.Time
 	procs              []*Proc
+	procsMu            sync.Mutex // the resource sampler reads procs while the cell starts and stops them
+	walker             *Walker
+	sampleStop         context.CancelFunc
 	report             *Report
 	seeder             *seed.Seeder
 	client             Client
@@ -72,9 +78,11 @@ type run struct {
 	tenancy            seed.Tenancy
 	apiCrashes         []int64       // ms from start of each head api exit before ready
 	granted            chan struct{} // closed once the seed account is a platform operator on head
+	recipe             snapshot.Recipe
+	anchor             time.Time
 
-	stopTraffic, stopPoller context.CancelFunc
-	trafficDone             chan struct{}
+	stopTraffic, stopPoller, stopSampler context.CancelFunc
+	trafficDone                          chan struct{}
 }
 
 // Name is the cell's store suffix and report id, e.g. cloud_s_typical_1.
@@ -94,28 +102,57 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	defer cell.teardown()
 	cell.claimLedger(ctx)
 	cell.noteLoad("start")
-	steps := []struct {
-		name string
-		do   func(context.Context) error
-	}{
-		{"stores", cell.freshStores}, {"from-schema", cell.fromSchema}, {"from-up", cell.fromUp}, {"seed", cell.seed},
-		{"traffic-before", cell.trafficBefore}, {"cut", cell.cut}, {"switch", cell.switchToHead}, {"ready", cell.awaitReady},
-		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"checks", cell.checks},
+	origin := []step{{"stores", cell.freshStores}, {"from-schema", cell.fromSchema}, {"from-up", cell.fromUp}, {"seed", cell.seed}}
+	if options.FromSnapshot != "" {
+		origin = []step{{"stores", cell.freshStores}, {"restore", cell.restore}, {"from-up", cell.fromUp}, {"sign-in", cell.resumeSeed}}
 	}
+	cell.runSteps(ctx, slices.Concat([]step{{"build", cell.buildBoth}}, origin, []step{
+		{"traffic-before", cell.trafficBefore}, {"cut", cell.cut}, {"switch", cell.switchToHead}, {"ready", cell.awaitReady},
+		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"checks", func(ctx context.Context) error {
+			cell.stopObservers()
+			return cell.checks(ctx)
+		}},
+	}))
+	cell.finishTraffic()
+	cell.partialTraffic()
+	cell.noteLoad("end")
+	cell.reportLedger(ctx)
+	return cell.report, cell.write()
+}
+
+type step struct {
+	name string
+	do   func(context.Context) error
+}
+
+// runSteps runs each step in order, timing it, and stops at the first error into the report.
+func (cell *run) runSteps(ctx context.Context, steps []step) {
 	for _, step := range steps {
 		started := time.Now()
 		err := step.do(ctx)
 		cell.report.Timings = append(cell.report.Timings, Timing{Step: step.name, Ms: time.Since(started).Milliseconds()})
 		if err != nil {
 			cell.report.Error = fmt.Sprintf("step %s: %v", step.name, err)
-			break
+			return
 		}
 	}
-	cell.finishTraffic()
-	cell.partialTraffic()
-	cell.noteLoad("end")
-	cell.reportLedger(ctx)
-	return cell.report, cell.write()
+}
+
+// buildBoth builds each release as it ships, once per commit (ruling 2026-10-10: built code only).
+func (cell *run) buildBoth(ctx context.Context) error {
+	if err := FromBuild(cell.options.FromDir).Ensure(ctx, cell.logPath("from-build")); err != nil {
+		return err
+	}
+	return HeadBuild(cell.options.HeadDir).Ensure(ctx, cell.logPath("head-build"))
+}
+
+// announce prints the public origin and the seed account (never its password) so a person can watch live.
+func (cell *run) announce(when string) {
+	if cell.options.Stdout == nil {
+		return
+	}
+	email, _ := generate.SeedAccount(cell.options.Seed)
+	fmt.Fprintf(cell.options.Stdout, "upgradelab: %s: open %s and sign in as %s for Ops > Upgrades\n", when, cell.url(), email)
 }
 
 // partialTraffic keeps what a stopped cell measured: calls and phases, writes unchecked.
@@ -196,7 +233,7 @@ func (cell *run) freshStores(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cell.procs = append(cell.procs, redis)
+	cell.addProc(redis)
 	if err := cell.ports(); err != nil {
 		return err
 	}
@@ -208,7 +245,7 @@ func (cell *run) freshStores(ctx context.Context) error {
 	return err
 }
 
-// ports picks the balancer's public port and one per release; main's dev server binds PORT+1000.
+// ports picks the balancer's public port and one per release; main's production server binds PORT.
 func (cell *run) ports() error {
 	for _, port := range []*int{&cell.apiPort, &cell.fromPort, &cell.headPort} {
 		value, err := apiPort()
@@ -251,32 +288,36 @@ func (cell *run) envWith(extra map[string]string) []string {
 	return Env(merged)
 }
 
-// fromSchema migrates the stores as the old release does before it serves (main: start:prepare:db).
+// fromSchema migrates the stores as the old release does before it serves (main: FromStartup).
 func (cell *run) fromSchema(ctx context.Context) error {
-	command := exec.CommandContext(ctx, "pnpm", "-s", "run", "start:prepare:db") // #nosec G204 -- fixed argv.
-	command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform", "app"), cell.envWith(nil)
-	out, err := command.CombinedOutput()
-	_ = os.WriteFile(cell.logPath("from-schema"), out, 0o600)
-	if err != nil {
-		return fmt.Errorf("old release start:prepare:db: %w: %s", err, tail(out))
+	var log []byte
+	defer func() { _ = os.WriteFile(cell.logPath("from-schema"), log, 0o600) }()
+	for _, script := range FromStartup {
+		command := exec.CommandContext(ctx, "pnpm", append([]string{"-s", "run"}, script...)...) // #nosec G204 -- fixed argv.
+		command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform", "app"), cell.envWith(nil)
+		out, err := command.CombinedOutput()
+		log = append(log, out...)
+		if err != nil {
+			return fmt.Errorf("old release %s: %w: %s", strings.Join(script, " "), err, tail(out))
+		}
 	}
 	return nil
 }
 
 func (cell *run) fromUp(ctx context.Context) error {
 	dir := filepath.Join(cell.options.FromDir, "platform", "app")
-	base := map[string]string{"PORT": itoa(cell.fromPort - 1000)}
-	worker := map[string]string{"PORT": itoa(cell.fromPort - 1000), "WORKER_METRICS_PORT": itoa(mustPort())}
+	base := map[string]string{"PORT": itoa(cell.fromPort)}
+	worker := map[string]string{"PORT": itoa(cell.fromPort), "WORKER_METRICS_PORT": itoa(mustPort())}
 	for _, spec := range []ProcSpec{
-		{Name: "from-app", Args: []string{"pnpm", "-s", "run", "runtime:app:dev"}, Env: cell.envWith(base)},
-		{Name: "from-worker", Args: []string{"pnpm", "-s", "run", "runtime:workers:dev"}, Env: cell.envWith(worker)},
+		{Name: "from-app", Args: FromAppArgs, Env: cell.envWith(base)},
+		{Name: "from-worker", Args: FromWorkerArgs, Env: cell.envWith(worker)},
 	} {
 		spec.Dir, spec.Log = dir, cell.logPath(spec.Name)
 		proc, err := Start(spec)
 		if err != nil {
 			return err
 		}
-		cell.procs = append(cell.procs, proc)
+		cell.addProc(proc)
 	}
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
 		status, _, err := get(ctx, httpClient, cell.fromURL()+"/api/health")
@@ -285,7 +326,11 @@ func (cell *run) fromUp(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return cell.balancer.Switch(cell.fromURL())
+	if err := cell.balancer.Switch(cell.fromURL()); err != nil {
+		return err
+	}
+	cell.announce("main is up")
+	return nil
 }
 
 func mustPort() int {
@@ -311,12 +356,13 @@ func waitFor(ctx context.Context, within time.Duration, done func() bool) error 
 
 // seed writes the tenancy at the old schema, the seed account, every product kind and a base prompt.
 func (cell *run) seed(ctx context.Context) error {
+	cell.anchor = time.Now().UTC().Truncate(24 * time.Hour)
 	plan, err := generate.Build(generate.Request{Shape: cell.profile.Shape, Release: cell.options.Release, Volume: cell.options.Tier,
-		Seed: cell.options.Seed, Anchor: time.Now().UTC().Truncate(24 * time.Hour)})
+		Seed: cell.options.Seed, Anchor: cell.anchor})
 	if err != nil {
 		return err
 	}
-	cell.tenancy = plan.Tenancy
+	cell.tenancy, cell.recipe = plan.Tenancy, snapshot.Recipe{Version: seed.RecipeVersion, Hash: plan.Digest()}
 	if err := psqlFile(ctx, cell.stores.psqlURL(), plan.TenancyS); err != nil {
 		return fmt.Errorf("tenancy: %w", err)
 	}
@@ -328,16 +374,24 @@ func (cell *run) seed(ctx context.Context) error {
 	if err := cell.seeder.Seed(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "product seeds: "+err.Error())
 	}
+	if err := cell.useSeed(cell.seeder.Session()); err != nil {
+		return err
+	}
+	if err := cell.basePrompt(ctx); err != nil {
+		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
+	}
+	return nil
+}
+
+// useSeed points the cell's clients at the seed project, from a fresh seed or a restored one.
+func (cell *run) useSeed(session http.Header) error {
 	cell.client = Client{URL: cell.url(), APIKey: cell.seeder.Context.APIKey, Project: cell.seeder.Context.ProjectID,
-		Session: cell.seeder.Session(), Seed: cell.options.Seed, BasePrompt: "upgradelab-base"}
+		Session: session, Seed: cell.options.Seed, BasePrompt: "upgradelab-base"}
 	if cell.client.APIKey == "" {
 		return errors.New("the seed project has no API key: product seeds never reached it")
 	}
 	if private, label, ok := cell.privateClient(); ok {
 		cell.privateTraffic, cell.privateLabel = &Traffic{Client: private, Kinds: PrivateMix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold}, label
-	}
-	if err := cell.basePrompt(ctx); err != nil {
-		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
 	}
 	return nil
 }
@@ -374,7 +428,10 @@ func (cell *run) trafficBefore(ctx context.Context) error {
 		private.Wait()
 		close(cell.trafficDone)
 	}()
-	go cell.sampleQueue(trafficCtx)
+	samplerCtx, stopSampler := context.WithCancel(context.WithoutCancel(ctx)) // outlives traffic: N4 needs samples until settled
+	cell.stopSampler = stopSampler
+	go cell.sampleQueue(samplerCtx)
+	cell.startObservers(ctx)
 	cell.mark("trafficStart")
 	return sleep(ctx, cell.options.Before)
 }
@@ -396,13 +453,17 @@ func sleep(ctx context.Context, span time.Duration) error {
 	}
 }
 
+func (cell *run) sampleQueueOnce(ctx context.Context) {
+	if depth, err := QueueDepth(ctx, cell.stores.RedisPort); err == nil {
+		cell.queueMu.Lock()
+		cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
+		cell.queueMu.Unlock()
+	}
+}
+
 func (cell *run) sampleQueue(ctx context.Context) {
 	for {
-		if depth, err := QueueDepth(ctx, cell.stores.RedisPort); err == nil {
-			cell.queueMu.Lock()
-			cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
-			cell.queueMu.Unlock()
-		}
+		cell.sampleQueueOnce(ctx)
 		if sleep(ctx, 2*time.Second) != nil {
 			return
 		}
@@ -433,8 +494,44 @@ func (cell *run) fingerprint(ctx context.Context) (snapshot.Fingerprint, error) 
 	return snapshot.TakeFingerprint(ctx, snapshot.Stores{Postgres: postgres, ClickHouse: map[string]snapshot.ClickHouse{"shared": clickhouse}})
 }
 
+func (cell *run) addProc(proc *Proc) {
+	cell.procsMu.Lock()
+	defer cell.procsMu.Unlock()
+	cell.procs = append(cell.procs, proc)
+}
+
+// procList is a copy of procs, safe to range while another goroutine starts or stops one.
+func (cell *run) procList() []*Proc {
+	cell.procsMu.Lock()
+	defer cell.procsMu.Unlock()
+	return slices.Clone(cell.procs)
+}
+
+// startObservers starts the resource sampler and, with shots, the browser walker (W3).
+func (cell *run) startObservers(ctx context.Context) {
+	sampleCtx, stop := context.WithCancel(ctx)
+	cell.sampleStop = stop
+	go SampleResources(sampleCtx, SampleSpec{Path: filepath.Join(cell.options.RunDir, "resources.jsonl"), Origin: cell.origin,
+		Every: 5 * time.Second, Procs: cell.procList, ClickHouseBase: cell.stores.ClickHouseBase, RedisPort: cell.stores.RedisPort})
+	if cell.options.Shots {
+		email, password := generate.SeedAccount(cell.options.Seed)
+		cell.walker, _ = StartWalker(ctx, WalkSpec{Dir: filepath.Join(cell.options.HeadDir, "apps", "ui"), RunDir: cell.options.RunDir,
+			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: 10 * time.Second})
+	}
+}
+
+// stopObservers is safe to call twice: before the checks and again in teardown.
+func (cell *run) stopObservers() {
+	if cell.sampleStop != nil {
+		cell.sampleStop()
+	}
+	if cell.walker != nil {
+		cell.walker.Stop(30 * time.Second)
+	}
+}
+
 func (cell *run) proc(name string) *Proc {
-	for _, proc := range cell.procs {
+	for _, proc := range cell.procList() {
 		if proc.Name == name {
 			return proc
 		}
@@ -446,7 +543,9 @@ func (cell *run) proc(name string) *Proc {
 // worker WorkerDelay later, the balancer switches once head answers SwitchOn, then the old release
 // stops. Stop-start (single-instance self-hosted): the old release stops first.
 func (cell *run) switchToHead(ctx context.Context) error {
-	cell.poller = &Poller{URL: cell.headURL(), Origin: cell.origin, Every: 500 * time.Millisecond, Notify: make(chan string, 8)}
+	cell.announce("switching to head")
+	cell.poller = &Poller{URL: cell.headURL(), Origin: cell.origin, Every: 500 * time.Millisecond, Notify: make(chan string, 8),
+		PhaseFile: filepath.Join(cell.options.RunDir, "phase.txt")}
 	watchCtx := cell.pollerCtx(ctx)
 	go cell.poller.Run(watchCtx)
 	if cell.options.Shots {
@@ -526,7 +625,9 @@ func (cell *run) reviveAPI() {
 	crashLog := cell.logPath(fmt.Sprintf("head-api-crash-%d", len(cell.apiCrashes)+1))
 	_ = os.Rename(cell.logPath("head-api"), crashLog)
 	cell.apiCrashes = append(cell.apiCrashes, time.Since(cell.origin).Milliseconds())
+	cell.procsMu.Lock()
 	cell.procs = slices.DeleteFunc(cell.procs, func(proc *Proc) bool { return proc == api })
+	cell.procsMu.Unlock()
 	if err := cell.startHeadAPI(); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "restarting head-api: "+err.Error())
 	}
@@ -538,9 +639,9 @@ func (cell *run) startHeadWorker() error {
 
 func (cell *run) startHead(name, app string, extra map[string]string) error {
 	proc, err := Start(ProcSpec{Name: name, Dir: filepath.Join(cell.options.HeadDir, app), Log: cell.logPath(name),
-		Args: []string{"node", "--experimental-transform-types", "src/main.ts"}, Env: cell.envWith(extra)})
+		Args: HeadStartArgs, Env: cell.envWith(extra)})
 	if err == nil {
-		cell.procs = append(cell.procs, proc)
+		cell.addProc(proc)
 	}
 	return err
 }
@@ -619,6 +720,10 @@ func (cell *run) settle(ctx context.Context) error {
 		return err == nil && depthErr == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && depth == 0
 	})
 	cell.mark("settled")
+	if cell.stopSampler != nil {
+		cell.stopSampler()
+		cell.sampleQueueOnce(ctx) // the drained sample the 2 s sampler may have missed
+	}
 	if err != nil && ctx.Err() == nil {
 		cell.report.Notes = append(cell.report.Notes, "settle: "+err.Error()+"; the invariants judge the stores as they are")
 		return nil
@@ -639,9 +744,14 @@ func (cell *run) teardown() {
 	if cell.stopPoller != nil {
 		cell.stopPoller()
 	}
+	if cell.stopSampler != nil {
+		cell.stopSampler()
+	}
 	cell.shotsWG.Wait()
-	for index := len(cell.procs) - 1; index >= 0; index-- {
-		cell.procs[index].Stop(15 * time.Second)
+	cell.stopObservers()
+	procs := cell.procList()
+	for index := len(procs) - 1; index >= 0; index-- {
+		procs[index].Stop(15 * time.Second)
 	}
 	if cell.balancer != nil {
 		cell.balancer.Close()

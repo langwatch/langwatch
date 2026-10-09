@@ -69,7 +69,8 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 	maps.Copy(env, input.Profile.Extra)
 	origin := "http://127.0.0.1:" + strconv.Itoa(input.APIPort) // main realigns a localhost origin to its PORT (alignDevAuthUrlsToPort)
 	maps.Copy(env, map[string]string{
-		"NODE_ENV": "development", "SKIP_ENV_VALIDATION": "true",
+		"NODE_ENV": "production", "SKIP_ENV_VALIDATION": "true", // as the release image sets them
+		"pnpm_config_verify_deps_before_run": "false", "CHECKPOINT_DISABLE": "1",
 		"DATABASE_URL": input.Stores.DatabaseURL(), "CLICKHOUSE_URL": input.Stores.ClickHouseURL(""),
 		"REDIS_URL": input.Stores.RedisURL(), "REDIS_DB_INDEX": "0",
 		"BASE_HOST": origin, "NEXTAUTH_URL": origin, "LANGWATCH_ENDPOINT": origin,

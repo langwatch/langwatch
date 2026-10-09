@@ -30,6 +30,24 @@ it first. A head api that exits before ready is restarted, as an orchestrator wo
 hybrid, H1 to H3 into `report.md` and `report.json`. Exit 0 all pass, 1 an invariant failed, 2 a
 step stopped the cell (its databases are kept for inspection).
 
+Built code only, both sides: main runs `pnpm build` in `platform/app`, then `runtime:app` and
+`runtime:workers` (`dist/server/*.cjs`); head runs the release image's build step and its CMD
+(`apps/api` and `apps/worker` `pnpm run start`), every process with `NODE_ENV=production`. A build
+is skipped while `node_modules/.upgradelab-build` records the checkout's HEAD and the output exists.
+The cell prints its public origin and seed account when main is up and at the switch.
+
+```bash
+.bin/upgradelab/upgradelab produce -deployment cloud -tier S            # once per main commit and shape
+.bin/upgradelab/upgradelab cell -deployment cloud -tier S -from-snapshot <entry dir or cache key>
+```
+
+`produce` builds and boots main, seeds it, runs `-before` traffic, pauses main's worker for
+`-at-cut` so jobs queue, stops main's app and captures every store into an entry
+(`snapshot/` plus `seed-context.json`) under `${XDG_CACHE_HOME:-~/.cache}/langwatch/upgrade-snapshots/<key>`,
+key = deployment, tier, shape, seed, main commit and recipe version; a cached key is skipped unless
+`-force`. `cell -from-snapshot` restores that entry into fresh stores instead of seeding, writes
+`restored-fingerprint.json` before main boots, then runs the cell unchanged.
+
 Both checkouts must hold no `.env` (worktree hooks copy one in: delete it); every process gets an
 environment built from `seed/env/<shape>.env` and the cell's stores only. `-deployment` picks a
 `Profile` (`cell/profile.go`); a new deployment, tier or shape is a new entry there.

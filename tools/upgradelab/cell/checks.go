@@ -9,7 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -41,6 +43,12 @@ func (cell *run) checks(ctx context.Context) error {
 		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict())
+	for index := range cell.report.Verdicts {
+		cell.report.Verdicts[index].Scenarios = scenarioIDs[cell.report.Verdicts[index].ID]
+	}
+	cell.report.Resources, _ = ResourcePeaks(filepath.Join(cell.options.RunDir, "resources.jsonl"))
+	cell.report.Ribbon = Ribbon(cell.report, cell.origin, final)
 	return nil
 }
 
@@ -150,10 +158,44 @@ func (cell *run) secondRunVerdict(ctx context.Context, final []LedgerRow) Verdic
 		fmt.Sprintf("exit %v; changed %v", errText(err), changed))
 }
 
-// logVerdict counts error lines in head's logs; today's count is the baseline (accepted list: none yet).
+// acceptedLog is an error signature the lab tolerates, with the reason printed in the report.
+// Window limits it to the span between the switch and ready (needs the line's pino "time").
+type acceptedLog struct {
+	Signature, Reason string
+	Window            bool
+}
+
+var acceptedLogs = []acceptedLog{
+	{"TwilioTunnel: cloudflared exited", "no cloudflared in the lab", false},
+	{"UpgradeInProgressError", "expected 503 upgrade_in_progress while steps run", true},
+}
+
+var logTime = regexp.MustCompile(`"time":(\d{13})`)
+
+// accepts answers the accepted entry that covers line, if any; atMs bounds are ms from origin.
+func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog, bool) {
+	for _, each := range acceptedLogs {
+		if !strings.Contains(line, each.Signature) {
+			continue
+		}
+		if !each.Window {
+			return each, true
+		}
+		if match := logTime.FindStringSubmatch(line); match != nil && switched >= 0 && ready >= 0 {
+			epoch, _ := strconv.ParseInt(match[1], 10, 64)
+			if at := epoch - origin.UnixMilli(); at >= switched && at <= ready {
+				return each, true
+			}
+		}
+	}
+	return acceptedLog{}, false
+}
+
+// logVerdict counts error lines in head's logs: new ones fail I9, accepted ones are counted apart with their reason.
 func (cell *run) logVerdict() Verdict {
-	counts := map[string]int{}
+	counts, accepted := map[string]int{}, map[string]int{}
 	var first []string
+	switched, ready := cell.marks["switched"], FirstAt(cell.report.Phases, "ready")
 	for _, name := range []string{"head-api", "head-worker"} {
 		file, err := os.Open(cell.logPath(name))
 		if err != nil {
@@ -162,14 +204,20 @@ func (cell *run) logVerdict() Verdict {
 		scanner := bufio.NewScanner(file)
 		scanner.Buffer(make([]byte, 1<<20), 1<<20)
 		for scanner.Scan() {
-			if line := scanner.Text(); isErrorLine(line) {
-				counts[name]++
-				first = appendDistinct(first, fmt.Sprintf("%s: %.160s", name, line))
+			line := scanner.Text()
+			if !isErrorLine(line) {
+				continue
 			}
+			if each, ok := accepts(line, switched, ready, cell.origin); ok {
+				accepted[each.Signature+" ("+each.Reason+")"]++
+				continue
+			}
+			counts[name]++
+			first = appendDistinct(first, fmt.Sprintf("%s: %.160s", name, line))
 		}
 		_ = file.Close()
 	}
-	return verdict("I9", len(counts) == 0, fmt.Sprintf("%v; first: %v", counts, first))
+	return verdict("I9", len(counts) == 0, fmt.Sprintf("new %v; first: %v; accepted: %v", counts, first, accepted))
 }
 
 func isErrorLine(line string) bool {
@@ -452,4 +500,104 @@ func (cell *run) targetsVerdict(ctx context.Context) Verdict {
 	open := slices.ContainsFunc(rows, func(row string) bool { return !strings.Contains(row, ":0/") })
 	return verdict("H2", len(rows) == 1+len(cell.private) && !open,
 		fmt.Sprintf("target:open/steps %v, want %d targets", rows, 1+len(cell.private)))
+}
+
+// browserVerdict: the signed-in walk saw no console error and no failed request outside the accepted list.
+func (cell *run) browserVerdict() Verdict {
+	walks, expected, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"))
+	if err != nil || walks == 0 {
+		return Verdict{ID: "B1", Name: invariantNames["B1"], Result: "inconclusive", Detail: fmt.Sprintf("%d completed walks; %s", walks, errText(err))}
+	}
+	var first []string
+	for _, each := range findings[:min(len(findings), 3)] {
+		first = append(first, fmt.Sprintf("%s %s %d %.120s at %s (%d ms, %s)", each.Kind, each.URL, each.Status, each.Text, each.Step, each.AtMs, PhaseAt(cell.report.Phases, each.AtMs)))
+	}
+	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run)", walks, len(findings), first, expected))
+}
+
+// readModelVerdict (I5): the projections an upgrade must leave filled. Any failed part fails it; a part
+// that cannot be judged makes it inconclusive, never a pass.
+func (cell *run) readModelVerdict(ctx context.Context) Verdict {
+	parts := []Verdict{cell.traceMeterPart(ctx), cell.openSuitesPart(ctx), cell.scopePart(ctx)}
+	result, detail := "pass", []string{}
+	for _, part := range parts {
+		detail = append(detail, part.Name+": "+part.Result+" ("+part.Detail+")")
+		if part.Result == "fail" || (part.Result == "inconclusive" && result == "pass") {
+			result = part.Result
+		}
+	}
+	return Verdict{ID: "I5", Name: invariantNames["I5"], Result: result, Detail: strings.Join(detail, "; ")}
+}
+
+// traceMeterPart compares distinct traces per tenant in usage_trace_meter and trace_summaries on every target.
+// Per tenant, not per month: the meter counts the month a span arrived, a snapshot's traces keep older dates.
+func (cell *run) traceMeterPart(ctx context.Context) Verdict {
+	part := Verdict{Name: "trace meter", Result: "pass"}
+	var mismatched []string
+	traces := 0
+	for _, label := range append([]string{""}, cell.stores.Private...) {
+		meter, err1 := tenantTraceCounts(ctx, cell.stores.queryURL(label), "usage_trace_meter")
+		summaries, err2 := tenantTraceCounts(ctx, cell.stores.queryURL(label), "trace_summaries")
+		if err1 != nil || err2 != nil {
+			return Verdict{Name: part.Name, Result: "inconclusive", Detail: errText(err1) + " " + errText(err2)}
+		}
+		for tenant, count := range summaries {
+			traces += count
+			if meter[tenant] != count {
+				mismatched = append(mismatched, fmt.Sprintf("%s %q meter %d, traces %d", label, tenant, meter[tenant], count))
+			}
+		}
+		for tenant, count := range meter {
+			if _, ok := summaries[tenant]; !ok {
+				mismatched = append(mismatched, fmt.Sprintf("%s %q meter %d, traces 0", label, tenant, count))
+			}
+		}
+	}
+	part.Detail = fmt.Sprintf("%d traces; mismatched: %v", traces, mismatched)
+	if traces == 0 {
+		part.Result, part.Detail = "inconclusive", "no trace on any target to count"
+	} else if len(mismatched) > 0 {
+		part.Result = "fail"
+	}
+	return part
+}
+
+func tenantTraceCounts(ctx context.Context, target, table string) (map[string]int, error) {
+	out, err := clickhouseQuery(ctx, target, "SELECT TenantId, uniqExact(TraceId) FROM "+table+" GROUP BY TenantId FORMAT TSV")
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]int{}
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if tenant, count, found := strings.Cut(line, "\t"); found {
+			counts[tenant], _ = strconv.Atoi(count)
+		}
+	}
+	return counts, nil
+}
+
+// openSuitesPart reports the suite runs by status. The cell starts no suite run on main yet, so there is no
+// expected count to compare: inconclusive until traffic does (plan 8.1, workerrun stream).
+func (cell *run) openSuitesPart(ctx context.Context) Verdict {
+	out, err := clickhouseQuery(ctx, cell.stores.queryURL(""), "SELECT Status, count() FROM suite_runs FINAL GROUP BY Status ORDER BY Status FORMAT TSV")
+	if err != nil {
+		return Verdict{Name: "open suite runs", Result: "inconclusive", Detail: err.Error()}
+	}
+	return Verdict{Name: "open suite runs", Result: "inconclusive", Detail: fmt.Sprintf("by status %q; no started-run count to compare yet", strings.ReplaceAll(strings.TrimSpace(out), "\n", ", "))}
+}
+
+// scopePart: privacy and retention resolve through a per-project scope row (data privacy's and data
+// retention's own fold); a live project without one resolves to nothing.
+func (cell *run) scopePart(ctx context.Context) Verdict {
+	var gaps []string
+	for _, table := range []string{"DataPrivacyProjectScope", "DataRetentionProjectScope"} {
+		out, err := psql(ctx, cell.stores.psqlURL(), `SELECT count(*) FROM mydb."Project" p WHERE p."archivedAt" IS NULL AND NOT EXISTS (SELECT 1 FROM mydb."`+table+`" s WHERE s."projectId" = p.id)`)
+		if err != nil {
+			return Verdict{Name: "privacy and retention", Result: "inconclusive", Detail: err.Error()}
+		}
+		if strings.TrimSpace(out) != "0" {
+			gaps = append(gaps, table+" misses "+strings.TrimSpace(out))
+		}
+	}
+	return Verdict{Name: "privacy and retention", Result: map[bool]string{true: "pass", false: "fail"}[len(gaps) == 0], Detail: fmt.Sprintf("projects without a scope row: %v", gaps)}
 }

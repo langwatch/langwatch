@@ -32,7 +32,7 @@ type ProductInput struct {
 
 // ProductContext is what the seed's own setup learned from the old app's answers.
 type ProductContext struct {
-	OrganizationID, ProjectID, TraceID, Label, APIKey string
+	OrganizationID, ProjectID, TraceID, Label, APIKey, ScenarioID string
 }
 
 // productDoor is one kind's tRPC create input, its read-back query and the marker the answer must hold.
@@ -80,7 +80,7 @@ var productDoors = map[string]productDoor{
 		return map[string]any{"projectId": ctx.ProjectID, "name": "rehearsal report " + ctx.Label}
 	}},
 	"suite": {read: "suites.getAll", input: projectInput, marker: named("rehearsal suite"), create: func(ctx ProductContext) any {
-		return map[string]any{"projectId": ctx.ProjectID, "name": "rehearsal suite " + ctx.Label}
+		return map[string]any{"projectId": ctx.ProjectID, "name": "rehearsal suite " + ctx.Label, "scenarioIds": []string{ctx.ScenarioID}}
 	}},
 }
 
@@ -120,6 +120,16 @@ func (seeder *Seeder) Seed(ctx context.Context) error {
 	}
 	var refused []error
 	for _, kind := range seedableKinds() {
+		if kind.Kind == "suite" {
+			// A suite needs a scenario to hold; main's own scenarios.create makes one.
+			scenario := map[string]any{"projectId": seeder.Context.ProjectID, "name": "rehearsal scenario " + seeder.Context.Label, "situation": "upgrade rehearsal seed"}
+			var created struct{ ID string }
+			if err := seeder.trpc(ctx, trpcCall{mutation: true, path: "scenarios.create", input: scenario, out: &created}); err != nil {
+				refused = append(refused, fmt.Errorf("kind %s: %w", kind.Kind, err))
+				continue
+			}
+			seeder.Context.ScenarioID = created.ID
+		}
 		call := trpcCall{mutation: true, path: kind.Create, input: productDoors[kind.Kind].create(seeder.Context)}
 		if err := seeder.trpc(ctx, call); err != nil {
 			refused = append(refused, fmt.Errorf("kind %s: %w", kind.Kind, err))

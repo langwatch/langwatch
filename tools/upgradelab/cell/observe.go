@@ -2,12 +2,16 @@ package cell
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,7 +47,8 @@ type Poller struct {
 	Origin time.Time
 	Every  time.Duration
 
-	Notify chan string // each new phase, for whoever screenshots it; a full channel drops it
+	Notify    chan string // each new phase, for whoever screenshots it; a full channel drops it
+	PhaseFile string      // when set, each new phase is written here for the browser walker
 
 	mu      sync.Mutex
 	changes []PhaseChange
@@ -96,6 +101,9 @@ func (poller *Poller) observe(phase string) {
 		return
 	}
 	poller.changes = append(poller.changes, PhaseChange{Phase: phase, AtMs: time.Since(poller.Origin).Milliseconds()})
+	if poller.PhaseFile != "" {
+		_ = os.WriteFile(poller.PhaseFile, []byte(phase), 0o600)
+	}
 	select {
 	case poller.Notify <- phase:
 	default:
@@ -285,11 +293,12 @@ type LedgerRow struct {
 	Status   string `json:"status"`
 	Attempt  int    `json:"attempt"`
 	Finished string `json:"finished_at"`
+	Started  string `json:"started_at"`
 }
 
 // Ledger reads every step row; a missing ledger schema is an empty ledger.
 func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
-	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
+	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text, 'started_at', started_at::text) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
 	if err != nil {
 		if strings.Contains(err.Error(), "does not exist") {
 			return nil, nil
@@ -326,4 +335,104 @@ func Reopened(before, after []LedgerRow) []string {
 		}
 	}
 	return reopened
+}
+
+//go:embed walk.mjs
+var walkScript []byte
+
+// Walker is the browser walk (walk.mjs) running beside the cell until Stop.
+type Walker struct {
+	command *exec.Cmd
+	stop    string
+	done    chan struct{}
+}
+
+// WalkSpec is what the walk needs: head's apps/ui as Dir, the balancer as URL, the seed account.
+type WalkSpec struct {
+	Dir, RunDir, URL, Email, Password string
+	Origin                            time.Time
+	Every                             time.Duration
+}
+
+// StartWalker writes walk.mjs into the run dir and starts it; a start error is the caller's note, not a failure.
+func StartWalker(ctx context.Context, spec WalkSpec) (*Walker, error) {
+	script := filepath.Join(spec.RunDir, "walk.mjs")
+	if err := os.WriteFile(script, walkScript, 0o600); err != nil {
+		return nil, err
+	}
+	args, _ := json.Marshal(map[string]any{"url": spec.URL, "email": spec.Email, "password": spec.Password, "runDir": spec.RunDir, "originMs": spec.Origin.UnixMilli(), "every": spec.Every.Milliseconds()})
+	command := exec.CommandContext(ctx, "node", script, string(args)) // #nosec G204 -- harness-written script.
+	command.Dir = spec.Dir
+	if err := command.Start(); err != nil {
+		return nil, fmt.Errorf("start walk: %w", err)
+	}
+	walker := &Walker{command: command, stop: filepath.Join(spec.RunDir, "walk.stop"), done: make(chan struct{})}
+	go func() {
+		_ = command.Wait()
+		close(walker.done)
+	}()
+	return walker, nil
+}
+
+// Stop asks the walk to finish its round and waits up to grace before killing it.
+func (walker *Walker) Stop(grace time.Duration) {
+	_ = os.WriteFile(walker.stop, nil, 0o600)
+	select {
+	case <-walker.done:
+	case <-time.After(grace):
+		_ = walker.command.Process.Kill()
+		<-walker.done
+	}
+}
+
+// BrowserRecord is one line of browser.jsonl.
+type BrowserRecord struct {
+	AtMs   int64  `json:"atMs"`
+	Phase  string `json:"phase"`
+	Kind   string `json:"kind"`
+	Step   string `json:"step"`
+	URL    string `json:"url"`
+	Status int    `json:"status"`
+	Text   string `json:"text"`
+	// RetryAfter is the response's Retry-After header, empty when absent.
+	RetryAfter string `json:"retryAfter"`
+}
+
+// expectedWhileStepsRun: a 503 upgrade_in_progress with Retry-After between the switch and ready (ms from start).
+func expectedWhileStepsRun(record BrowserRecord, switched, ready int64) bool {
+	return record.Kind == "http" && record.Status == http.StatusServiceUnavailable && record.RetryAfter != "" &&
+		strings.Contains(record.Text, "upgrade_in_progress") && switched >= 0 && ready >= 0 && record.AtMs >= switched && record.AtMs <= ready
+}
+
+// acceptedBrowserNoise is the console errors and failed requests a round tolerates: url or text substrings. Empty on purpose.
+var acceptedBrowserNoise []string
+
+// BrowserFindings reads browser.jsonl: the walks completed and every error outside the accepted list.
+func BrowserFindings(path string, switched, ready int64) (walks, expected int, findings []BrowserRecord, err error) {
+	data, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		var record BrowserRecord
+		if strings.TrimSpace(line) == "" || json.Unmarshal([]byte(line), &record) != nil {
+			continue
+		}
+		switch {
+		case record.Kind == "walk":
+			walks++
+		case expectedWhileStepsRun(record, switched, ready):
+			expected++
+		case record.Kind == "walkerror" || accepted(record):
+		default:
+			findings = append(findings, record)
+		}
+	}
+	return walks, expected, findings, nil
+}
+
+func accepted(record BrowserRecord) bool {
+	return slices.ContainsFunc(acceptedBrowserNoise, func(noise string) bool {
+		return strings.Contains(record.URL, noise) || strings.Contains(record.Text, noise)
+	})
 }
