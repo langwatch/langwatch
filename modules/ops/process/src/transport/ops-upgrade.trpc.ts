@@ -34,6 +34,10 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.getUpgradeRun({ id: input.id }))
 
+    .procedure("retryStep")
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input }) => app.retryUpgradeStep({ id: input.id }))
+
     .procedure("listSystemMigrations")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.listSystemMigrations())

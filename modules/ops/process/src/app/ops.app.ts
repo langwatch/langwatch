@@ -1947,6 +1947,10 @@ export class OpsModule implements OpsApi {
     return this.#dependencies.upgrades.getRun(input);
   }
 
+  retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
+    return this.#dependencies.upgrades.retryStep(input);
+  }
+
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
     const checkup = this.#checkup;
     if (checkup.isSaas) throw new CheckupNotSelfHostedError();

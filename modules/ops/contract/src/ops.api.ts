@@ -692,6 +692,8 @@ export interface OpsApi {
   listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
+  /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
+  retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
 }
 
 export const OpsApi = moduleApi<OpsApi>()("ops");
