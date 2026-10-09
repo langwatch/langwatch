@@ -254,10 +254,13 @@ export class TeamRestService {
    */
   async listProjects({
     teamId,
+    callerOrganizationRole,
   }: {
     teamId: string;
+    /** Decides whether aggregate projects are listed (ADR-144 decision 5). */
+    callerOrganizationRole: string | null;
   }): Promise<TeamProjectListing[]> {
-    return this.repo.findProjectsInTeam({ teamId });
+    return this.repo.findProjectsInTeam({ teamId, callerOrganizationRole });
   }
 
   async listMembers({

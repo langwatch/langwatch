@@ -1,5 +1,6 @@
 import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -95,4 +96,6 @@ function TopicsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view")(TopicsContent);
+export default withPermissionGuard("analytics:view")(
+  withAggregateAnalyticsGate("Topics", TopicsContent),
+);

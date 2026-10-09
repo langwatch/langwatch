@@ -69,10 +69,33 @@ export function appPermissionsService(): PermissionsService {
   });
 }
 
+/** The stand-in proof the mocked door mints; never a sealed one. It holds
+ *  no grants, so nothing reading them (the aggregate read audit) mistakes it
+ *  for a proof that reads another project. */
+const APP_MOCK_AUTHORIZATION = Object.freeze({
+  mock: "authorization",
+  grants: Object.freeze([]),
+});
+
 export function appPermissionsMock() {
   const permissions = appPermissionsService();
   return {
-    getApp: () => ({ permissions }),
+    getApp: () => ({
+      permissions,
+      // The door is not under test here: a route checked under a
+      // proof-bearing permission gets a stand-in proof so the check's own
+      // behaviour can be asserted. A test of the proof itself hands in an
+      // App of its own through the context slot.
+      authorization: {
+        authorize: async () => APP_MOCK_AUTHORIZATION,
+      },
+      // No project here is an aggregate (ADR-144): a write is never refused
+      // and a read is never audited for its kind.
+      projectKinds: {
+        kindOf: async () => null,
+        kindsOf: async () => new Map<string, string>(),
+      },
+    }),
     tryGetApp: () => null,
   };
 }

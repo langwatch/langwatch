@@ -21,6 +21,10 @@ import {
   type AccessListingRepository,
 } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  projectKindsHiddenFrom,
+  withoutAggregateCredentials,
+} from "~/server/app-layer/projects/project-kinds";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -305,9 +309,12 @@ export class TeamService {
   async getTeamWithMembers({
     slug,
     organizationId,
+    callerOrganizationRole,
   }: {
     slug: string;
     organizationId: string;
+    /** Decides whether the team's aggregate projects are listed (ADR-144). */
+    callerOrganizationRole: string | null;
   }) {
     const team = await this.prisma.team.findFirst({
       where: { slug, organizationId },
@@ -315,7 +322,7 @@ export class TeamService {
         projects: {
           where: {
             archivedAt: null,
-            kind: { not: "internal_governance" },
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
           },
         },
       },
@@ -331,6 +338,7 @@ export class TeamService {
 
     return {
       ...team,
+      projects: team.projects.map(withoutAggregateCredentials),
       members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
     };
   }
@@ -345,10 +353,13 @@ export class TeamService {
     organizationId,
     callerId,
     callerHasManage,
+    callerOrganizationRole,
   }: {
     organizationId: string;
     callerId: string;
     callerHasManage: boolean;
+    /** Decides whether aggregate projects are listed (ADR-144). */
+    callerOrganizationRole: string | null;
   }) {
     const teams = await this.prisma.team.findMany({
       where: {
@@ -367,7 +378,7 @@ export class TeamService {
         projects: {
           where: {
             archivedAt: null,
-            kind: { not: "internal_governance" },
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
           },
         },
       },
@@ -382,6 +393,7 @@ export class TeamService {
 
     return teams.map((team) => ({
       ...team,
+      projects: team.projects.map(withoutAggregateCredentials),
       members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
     }));
   }
@@ -421,14 +433,24 @@ export class TeamService {
 
   async getTeamsWithRoleBindings({
     organizationId,
+    callerOrganizationRole,
   }: {
     organizationId: string;
+    /**
+     * Decides whether aggregate projects are listed (ADR-144). The route asks
+     * organization:manage, which a custom role can grant to someone who is
+     * not an organisation admin.
+     */
+    callerOrganizationRole: string | null;
   }) {
     const teams = await this.prisma.team.findMany({
       where: { organizationId, archivedAt: null },
       include: {
         projects: {
-          where: { archivedAt: null, kind: { not: "internal_governance" } },
+          where: {
+            archivedAt: null,
+            kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
+          },
           orderBy: { name: "asc" },
         },
       },
@@ -699,7 +721,7 @@ export class TeamService {
           id: team.id,
           name: team.name,
           slug: team.slug,
-          projects: team.projects,
+          projects: team.projects.map(withoutAggregateCredentials),
           directMembers,
           projectOnlyAccess: [...projectOnlyMap.values()],
           projectAccess,

@@ -7,6 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
+import type { ReactNode } from "react";
 import { HelpCircle } from "react-feather";
 import { Delayed } from "../Delayed";
 import { Tooltip } from "../ui/tooltip";
@@ -20,6 +21,7 @@ export function SummaryMetric({
   increaseIs,
   noDataUrl,
   titleProps,
+  valueSlot,
 }: {
   label: string;
   current?: number | string;
@@ -34,6 +36,8 @@ export function SummaryMetric({
     color?: SystemStyleObject["color"];
     fontWeight?: SystemStyleObject["fontWeight"];
   };
+  /** Drawn in place of the number, for a figure that has no value to show. */
+  valueSlot?: ReactNode;
 }) {
   return (
     <VStack
@@ -71,13 +75,15 @@ export function SummaryMetric({
           </Tooltip>
         )}
       </Heading>
-      <SummaryMetricValue
-        current={current}
-        previous={previous}
-        format={format}
-        increaseIs={increaseIs}
-        noDataUrl={noDataUrl}
-      />
+      {valueSlot ?? (
+        <SummaryMetricValue
+          current={current}
+          previous={previous}
+          format={format}
+          increaseIs={increaseIs}
+          noDataUrl={noDataUrl}
+        />
+      )}
     </VStack>
   );
 }

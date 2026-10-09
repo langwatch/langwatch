@@ -9,10 +9,10 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import { formatDuration } from "~/shared/format/time";
 import { api } from "~/utils/api";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import { formatCost, formatTokens } from "../../../utils/formatters";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
@@ -68,11 +68,16 @@ export const TurnSteps = memo(function TurnSteps({
   spanCount,
 }: TurnStepsProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
+  // A conversation's turns belong to the member the drawer is on.
+  const { projectId, tenantId } = useTraceQueryArgs();
 
   const query = api.tracesV2.spansFull.useQuery(
-    { projectId, traceId, occurredAtMs },
+    {
+      projectId,
+      traceId,
+      occurredAtMs,
+      ...(tenantId !== null ? { tenantId } : {}),
+    },
     {
       enabled: isOpen && projectId !== "",
       refetchOnWindowFocus: false,

@@ -5836,7 +5836,16 @@
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": false,
-					"documentation": "Project kind:\n- \"application\": user-facing workspace where developers send their\nown app traces. The default for everything created via the\nonboarding/quickstart flow.\n- \"internal_governance\": hidden per-org routing/tenancy artifact\nfor IngestionSource ingest data. Auto-created lazily on the\nfirst IngestionSource mint via ensureHiddenGovernanceProject().\nMUST be filtered out of every user-visible Project surface\n(project picker, /api/v1/projects, billing exports, RBAC\npickers, etc.) - the regression-test invariant in\nspecs/ai-gateway/governance/ui-contract.feature codifies this.\nStored as a free-form string (matching IngestionSource.sourceType\npattern) so future routing kinds can ship without schema migrations."
+					"documentation": "Project kind:\n- \"application\": user-facing workspace where developers send their\nown app traces. The default for everything created via the\nonboarding/quickstart flow.\n- \"internal_governance\": hidden per-org routing/tenancy artifact\nfor IngestionSource ingest data. Auto-created lazily on the\nfirst IngestionSource mint via ensureHiddenGovernanceProject().\nMUST be filtered out of every user-visible Project surface\n(project picker, /api/v1/projects, billing exports, RBAC\npickers, etc.) - the regression-test invariant in\nspecs/ai-gateway/governance/ui-contract.feature codifies this.\n- \"aggregate\": a project that owns no traces and reads its member\nprojects through shared project-reader grants (ADR-144). Hidden\nfrom every \"send traces here\" picker and from ingestion; visible in\nthe project switcher to organisation admins only.\nStored as a free-form string (matching IngestionSource.sourceType\npattern) so future routing kinds can ship without schema migrations."
+				},
+				{
+					"name": "aggregateRule",
+					"columnName": "aggregateRule",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The scope rule an aggregate project materialises into grants. Null on\nevery other kind; decided in ADR-144. Shapes: { kind: \"all-personal\" } |\n{ kind: \"personal-by-department\", departmentId } |\n{ kind: \"explicit\", projectIds: string[] }."
 				},
 				{
 					"name": "firstMessage",
@@ -16336,6 +16345,15 @@
 					"name": "maxViews",
 					"columnName": "maxViews",
 					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "condition",
+					"columnName": "condition",
+					"type": "Json",
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": true,

@@ -14,7 +14,9 @@ import {
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { getServerAuthSession } from "~/server/auth";
 import { nlpgoInternalHeaders } from "~/server/nlpgo/internalSecret";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
@@ -56,6 +58,14 @@ secured
         { status: 403 },
       );
     }
+
+    // ADR-144 decision 8: nothing is written under an aggregate's tenant.
+    // The tRPC door refuses it for mutations; this route checks its own
+    // permission, so it asks the guard itself.
+    await assertProjectAcceptsWrites({
+      kinds: getApp().projectKinds,
+      projectId,
+    });
 
     const { messages } = await c.req.json();
 

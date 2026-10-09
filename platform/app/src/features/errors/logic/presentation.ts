@@ -1463,6 +1463,39 @@ const presentations = {
   },
 
   // ---- access, org & limits ----
+  aggregate_project_admin_only: {
+    // Reached from the new-project flow or the rule editor by someone whose
+    // role lets them manage projects but who is not an organisation admin.
+    // Nothing was written, so the copy says who can do it.
+    title: "Only organization admins can do this",
+    describe: () =>
+      "This project reads traces from every member project, including personal ones, so only an organization admin can create it or change what it reads.",
+  },
+  aggregate_project_has_no_credential: {
+    // Reached by an SDK or exporter pointed at the aggregate, so the answer is
+    // where the traces should go instead. The key is not the problem.
+    title: "This project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and accepts no API key of its own. Send traces to one of its member projects instead.",
+  },
+  aggregate_project_is_read_only: {
+    // Reached from any save, create or edit aimed at an aggregate, often a
+    // form opened before the project was switched, so the copy says where
+    // the change belongs rather than what went wrong. Renaming, archiving
+    // and editing its rule still work, so the title names data, not the
+    // project.
+    title: "Data can't be added to this project",
+    describe: () =>
+      "It reads traces from other projects and keeps nothing of its own. Open the project the data belongs to and make the change there.",
+  },
+  aggregate_rule_outside_organization: {
+    // Raised before anything is written, so the form is still open with the
+    // rule in it: the copy says what to change there. One answer for a
+    // foreign id and a missing one, on purpose.
+    title: "That rule names something outside this organization",
+    describe: () =>
+      "An aggregate project can only read projects and departments of this organization. Remove the project or department that isn't listed here, then create it again.",
+  },
   project_not_found: {
     title: "Project not found",
     describe: () =>
@@ -4612,6 +4645,13 @@ const presentations = {
         ? `It can reach ${scopes} projects, so its traces and costs would go to none of them. Pick the one they should land in.`
         : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
     },
+  },
+  gateway_trace_project_not_a_destination: {
+    // The form is still open with the aggregate picked, so the copy says
+    // what to pick instead.
+    title: "That project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and has none of its own. Pick one of the projects it reads as this key's destination.",
   },
   gateway_trace_project_unknown: {
     // Says the destination is the problem, not the key, because the form

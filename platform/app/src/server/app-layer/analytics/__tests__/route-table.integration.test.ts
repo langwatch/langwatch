@@ -21,7 +21,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-builder";
-import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
+import type { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import {
   startTestContainers,
@@ -32,6 +32,7 @@ import {
   type TraceAnalyticsRow,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import { traceAnalyticsRepositoryFor } from "~/test-utils/traceAnalyticsRepository";
 import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
 import type { AnalyticsTimeseriesBuilderInput } from "../types";
@@ -128,7 +129,7 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
 
-  analyticsRepo = new TraceAnalyticsClickHouseRepository(async () => ch);
+  analyticsRepo = traceAnalyticsRepositoryFor(async () => ch);
   rollupRepo = new TraceAnalyticsRollupClickHouseRepository(async () => ch);
 
   // Seed THREE per-span rollup rows in the same bucket: total cost = 0.10,

@@ -243,12 +243,13 @@ Feature: Handled errors — what the customer actually reads
     Then the customer reads the calm generic message instead
 
     Examples:
-      | shape                           |
-      | a database driver's diagnostic  |
-      | a socket error code             |
-      | a stack frame                   |
-      | a socket address with a port    |
-      | longer than a sentence or two   |
+      | shape                                       |
+      | a database driver's diagnostic              |
+      | a socket error code                         |
+      | a stack frame                               |
+      | a socket address with a port                |
+      | longer than a sentence or two               |
+      | a request router's missing-procedure answer |
       # deliberately narrow: a bare address a person typed ("The IP 10.0.0.1 is
       # not allowed as a webhook destination") is real copy and must survive
 

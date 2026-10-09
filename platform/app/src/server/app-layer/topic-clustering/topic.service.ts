@@ -7,8 +7,13 @@ import type { TopicRepository } from "./repositories/topic.repository";
 export class TopicService {
   constructor(private readonly repository: TopicRepository) {}
 
+  /**
+   * Names for topic ids owned by any of `projectIds`. A proof can span
+   * several projects (an aggregate lists its members' traces), so the lookup
+   * names every project the caller may read.
+   */
   async getNamesByIds(params: {
-    projectId: string;
+    projectIds: readonly string[];
     ids: readonly string[];
   }): Promise<Map<string, string>> {
     return this.repository.findNamesByIds(params);
