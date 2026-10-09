@@ -6,10 +6,10 @@ export class ObservabilitySupply<
 > {
   constructor(readonly supplied: Supplied) {}
 
-  withLogging<Value extends MemberValue<Modules, "logging">>(logging: Value) {
-    return new ObservabilitySupply<Modules, Merge<Supplied, { logging: Value }>>({
+  withLogging<Value extends MemberValue<Modules, "logger">>(logger: Value) {
+    return new ObservabilitySupply<Modules, Merge<Supplied, { logger: Value }>>({
       ...this.supplied,
-      logging,
+      logger,
     });
   }
 
@@ -20,10 +20,10 @@ export class ObservabilitySupply<
     });
   }
 
-  withMetrics<Value extends MemberValue<Modules, "metrics">>(metrics: Value) {
-    return new ObservabilitySupply<Modules, Merge<Supplied, { metrics: Value }>>({
+  withMetrics<Value extends MemberValue<Modules, "telemetry">>(telemetry: Value) {
+    return new ObservabilitySupply<Modules, Merge<Supplied, { telemetry: Value }>>({
       ...this.supplied,
-      metrics,
+      telemetry,
     });
   }
 }

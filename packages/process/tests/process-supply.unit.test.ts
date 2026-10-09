@@ -87,7 +87,7 @@ describe("process supply", () => {
   it("supplies the store declared by a repository", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([repositoryModule])
-      .withStores({ tier: "live", order: ["relational"], read: () => facilities.relational })
+      .withStores({ tier: "live", order: ["prisma"], read: () => facilities.prisma })
       .withClock(clock)
       .boot();
     expect(runtime.module(repositoryModule).provided.row()).toBe("rows@frozen");
