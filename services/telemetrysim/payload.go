@@ -62,6 +62,8 @@ type SpanShape struct {
 	OffsetMs   int64
 	DurationMs int64
 	Attrs      []Attr
+	// Error, when set, ends the span with an error status and an exception event.
+	Error string
 }
 
 // LogShape is one record of a logs preset.
@@ -111,7 +113,7 @@ const (
 // presets are synthesized shapes, not recordings: the coding-agent ones follow
 // the span and attribute names those agents document, and a recording replaces
 // them as the reference once one is committed.
-var presets = []Preset{
+var presets = append([]Preset{
 	{Name: "llm-trace", Signal: SignalTraces, Service: "telemetrysim-agent", Spans: []SpanShape{
 		{Name: "agent.run", Kind: internal, DurationMs: 2400, Attrs: []Attr{{"langwatch.thread.id", "$session"}, {"langwatch.user.id", "$user"}}},
 		{Name: "chat gpt-4o-mini", Parent: 1, Kind: client, OffsetMs: 20, DurationMs: 1300, Attrs: []Attr{
@@ -160,7 +162,7 @@ var presets = []Preset{
 		{Name: "telemetrysim.queue.depth", Unit: "{item}", Kind: MetricGauge, Base: 12},
 		{Name: "telemetrysim.request.duration", Unit: "ms", Kind: MetricHistogram, Base: 120, Attrs: []Attr{{"http.route", "/api/chat"}}},
 	}},
-}
+}, backfillPresets...)
 
 // PresetNames lists the presets in order.
 func PresetNames() []string {
@@ -340,6 +342,11 @@ func (b *batch) traces(p Preset, res *resourcepb.Resource) *colltracepb.ExportTr
 		}
 		if shape.Parent > 0 {
 			spans[i].ParentSpanId = ids[shape.Parent-1]
+		}
+		if shape.Error != "" {
+			spans[i].Status = &tracepb.Status{Code: tracepb.Status_STATUS_CODE_ERROR, Message: shape.Error}
+			spans[i].Events = []*tracepb.Span_Event{{Name: "exception", TimeUnixNano: spans[i].EndTimeUnixNano,
+				Attributes: b.attributes([]Attr{{"exception.message", shape.Error}})}}
 		}
 	}
 	return &colltracepb.ExportTraceServiceRequest{ResourceSpans: []*tracepb.ResourceSpans{{
