@@ -17069,9 +17069,6 @@ importers:
 
   packages/prisma-client:
     dependencies:
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../modules/api-key/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability

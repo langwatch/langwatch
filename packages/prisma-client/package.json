@@ -38,7 +38,6 @@
     "db:seed": "pnpm --filter @langwatch/tasks task storage-seed"
   },
   "dependencies": {
-    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@prisma/adapter-pg": "7.10.0",

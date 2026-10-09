@@ -1,10 +1,4 @@
 import {
-  CLI_LOGIN_KEY_NAME_PREFIX,
-  HIDDEN_SYSTEM_KEY_NAMES,
-  RESERVED_SYSTEM_KEY_NAMES,
-} from "@langwatch/api-key-contract";
-
-import {
   clauseField,
   isClause,
   type GuardMiddleware,
@@ -45,63 +39,6 @@ export const PRISMA_READ_ACTIONS = [
 ] as const;
 
 const READ_ACTIONS = new Set<string>(PRISMA_READ_ACTIONS);
-
-/**
- * A reserved, system-managed key name, matched exactly, never by `contains`/`startsWith`.
- * New customer keys are refused one; a customer row predating a name's reservation is
- * kept off the sweep by `isSystemManaged: true`, which the sweep below requires.
- */
-const isSystemManagedKeyName = (value: unknown): boolean =>
-  typeof value === "string" && RESERVED_SYSTEM_KEY_NAMES.includes(value);
-
-/**
- * Matches exactly `expiresAt: { not: null, lte: <Date> }` — an expiry that
- * has passed. A looser check (merely having the key, or an unbounded
- * matcher) would readmit still-live keys this clause exists to exclude.
- */
-const isElapsedExpiryBound = (value: unknown): boolean => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const bound = value as Record<string, unknown>;
-  return Object.keys(bound).length === 2 && bound.not === null && bound.lte instanceof Date;
-};
-
-/**
- * Maintenance sweep for system-managed keys: matches reserved name, revokedAt: null, and
- * elapsed-expiry bound. Names other than the two customers never could use must also say
- * `isSystemManaged: true`, so a customer's key under a later-reserved name is never swept.
- */
-const isSystemManagedKeySweep = (clause: unknown): boolean => {
-  if (!clause || typeof clause !== "object") return false;
-  const where = clause as Record<string, unknown>;
-  const name = where.name;
-  const neverCustomerName = typeof name === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(name);
-  return (
-    isSystemManagedKeyName(name) &&
-    (neverCustomerName || where.isSystemManaged === true) &&
-    where.revokedAt === null &&
-    isElapsedExpiryBound(where.expiresAt)
-  );
-};
-
-/**
- * Hourly reap sweep for CLI login keys: matches the reserved prefix via
- * `startsWith` — safe because `ApiKeyService.create` refuses a customer
- * key that would collide — revokedAt: null, and the elapsed-expiry bound.
- */
-const isCliLoginKeyExpirySweep = (clause: unknown): boolean => {
-  if (!clause || typeof clause !== "object") return false;
-  const where = clause as Record<string, unknown>;
-  const name = where.name;
-  if (!name || typeof name !== "object" || Array.isArray(name)) return false;
-  const nameBound = name as Record<string, unknown>;
-  return (
-    Object.keys(where).length === 3 &&
-    Object.keys(nameBound).length === 1 &&
-    nameBound.startsWith === CLI_LOGIN_KEY_NAME_PREFIX &&
-    where.revokedAt === null &&
-    isElapsedExpiryBound(where.expiresAt)
-  );
-};
 
 /**
  * Branch-recheck sweep shape: branches with no PR, backoff elapsed, and recent requests.
@@ -265,12 +202,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       hasInlineScope(clause),
   },
   ApiKey: {
-    // lookupId is globally-unique public token half. System-managed key sweep exemption is bounded
-    // by predicate and action (updateMany only) to prevent reads or deletes of all tenant keys.
-    extraBound: ({ clause, action }) =>
-      typeof clauseField(clause, "lookupId") === "string" ||
-      (action === "updateMany" && isSystemManagedKeySweep(clause)) ||
-      (action === "findMany" && isCliLoginKeyExpirySweep(clause)),
+    // lookupId is the globally-unique public token half. The api-key module declares its
+    // fleet-wide sweeps as `@tenancy` SQL in its own repository; no hatch here.
+    extraBound: ({ clause }) => typeof clauseField(clause, "lookupId") === "string",
   },
   RoutingPolicy: {},
   // Governance identity (ADR-128 §11). Every read and write names its
