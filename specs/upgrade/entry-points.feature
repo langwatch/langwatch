@@ -50,7 +50,7 @@ Feature: Every entry point runs the upgrade once; serving processes never migrat
   Scenario: The npx server runs the upgrade once before its services
     Given the npx server's migration phase
     When it prepares the databases
-    Then it runs `upgrade` and then the system-migrations pass from the tasks app
+    Then it runs `upgrade` alone from the tasks app, with no system-migrations pass
     And it runs no Prisma or ClickHouse migration task of its own
 
   @unit
