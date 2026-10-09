@@ -1455,7 +1455,10 @@ step's per-tenant state lives in one framework-owned table beside the ledger,
 tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
 steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
 accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
-tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). Stored-object's ClickHouse import is a `project` tenant step with
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A finished upgrade run asks ops for one
+system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
+2026-10-09, UPG-008 D2). A step that must read every tenant reads through its owner's repository with
+raw SQL marked `-- @tenancy: <reason>`, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1). Stored-object's ClickHouse import is a `project` tenant step with
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
 migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's

@@ -32,6 +32,9 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Keys from main | Legacy project keys and ownerless keys keep the full project access they had on main; new projects no longer get a legacy project key |
 | Retention loop | Gateway and Instant Eval get tenant retention by cutting licensing's calls into them over to events (no peer cycle) |
 | SaaS image | Migration is the upgrade system's (the worker upgrades under its lease); the image lane's other defaults stand in the draft SaaS PR |
+| Cross-tenant step reads | A step that must read every tenant uses raw SQL marked `-- @tenancy: <reason>` in its owner's repository (UPG-008) |
+| Tenant steps at upgrade | A finished upgrade asks ops for one system-migrations pass, so tenant steps settle at upgrade (UPG-008) |
+| UPG-007 | 🟡 minor: 3.20.1 drops OTLP spans without attributes yet answers 2xx; a known issue in the upgrade guide |
 
 ## 3. Landed (pushed)
 
@@ -60,9 +63,10 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Tested-flow ledger | Missing area files, fold in the code sweep (3,103 rows), assemble the #8553 body; coordinator publishes |
 | Upgrade e2e harness | First proven cell (cloud, no hybrid, small) with overlap; verdicts per invariant into #8553 |
 | UPG-003 | Legacy and ownerless main keys keep main's access; no legacy key for new projects |
-| Retention loop | C3 cuts licensing's edges: C3a-S1 landed (connect module; licensing no longer calls Instant Eval; peer cycles 80 → 73). C3a-S2 (contract budget sync, lane running), then S3 and C3b-3 (fingerprint fact, ruled) remove licensing → gateway. Then apply the saved retention patch (local handoff `gw-ie-retention.patch`) |
+| Retention loop | C3 cuts licensing's edges: C3a-S1, S2 and S3 (partial) landed: connect owns hosted Connect and the contract budget; licensing no longer calls Instant Eval (peer cycles 80 → 73). Left: billing's spend read (parked, below) and C3b-3 (fingerprint fact, ruled) remove licensing → gateway. Then apply the saved retention patch (local handoff `gw-ie-retention.patch`) |
 | Haven | Stripe is paymentsim unless the developer sets their own Stripe keys, which are then used; `haven seed` returns logins and made-up credentials; skills updated |
-| Upgrade cells 3 | Backfills every earlier round onto #8553, finishes upgradelab's `-ledger` writer (claims and reports its own rows), reruns UP-04 and UP-06 on the fixed head, triages UPG-007 and UPG-008 |
+| Upgrade cells | Ledger backfilled; upgradelab claims and reports its own rows and refuses to start above load 40. UP-04 and UP-06 reruns wait for a quiet machine |
+| UPG-008 | Six steps that never finish after an upgrade: `@tenancy` reads for three, an upgrade-requested system-migrations pass for the three tenant steps (lane running) |
 
 ## 5. Next, in order
 
@@ -82,6 +86,7 @@ Shapes: self-hosted · cloud · cloud hybrid (tenants on their own ClickHouse an
 | Stripe secrets to 1Password | Steps in the local handoff `stripe-secrets-1password.md`: add the two fields in 1Password, delete the two Stripe lines from `.env`, add `LANGWATCH_OP_ACCOUNT`, `haven down && haven up`. Also lets `haven up +payment` use paymentsim |
 | Live check of seeded grants | Needs a `haven db reset` of the local stack (wipes local data) |
 | Seeding as the system caller | Record a one-line ruling that seeding may use the system caller for the fixed local identity only |
+| Connected billing drawdown | Parked (Alex: "skip for now"): should billing's commit drawdown equal the spend the gateway enforces (ledger events) or what is invoiced (gateway_spend)? Billing keeps `getHostedUsage` until then |
 | Older held questions | Image identity; the nine held ledger questions; nx daemon for trusted worktrees; renaming the remaining "binding" vocabulary and retiring RoleBinding; branding the upgrade holding page; `pnpm dev` migrations |
 
 ## 7. Known reds not from this drive
