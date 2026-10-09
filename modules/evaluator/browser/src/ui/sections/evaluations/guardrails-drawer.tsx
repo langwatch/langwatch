@@ -1,7 +1,9 @@
 import type { WireOf } from "@langwatch/api/web";
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Box, Button, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";
@@ -9,7 +11,6 @@ import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EvaluatorSelectionBox } from "../../elements/evaluations/evaluator-selection-box.tsx";
-import { RenderCode } from "../workflow/code/render-code.tsx";
 
 export type GuardrailsDrawerProps = {
   open?: boolean;
@@ -189,7 +190,7 @@ func llmStep(userInput string) (string, error) {
 \t})
 
 \treq, err := http.NewRequestWithContext(ctx, http.MethodPost,
-\t\t"https://app.langwatch.ai/api/evaluations/${evaluatorSlug}/evaluate",
+\t\t"${langwatchEndpoint()}/api/evaluations/${evaluatorSlug}/evaluate",
 \t\tbytes.NewReader(body))
 \tif err != nil {
 \t\treturn "", err
@@ -231,7 +232,7 @@ func main() {
 API_KEY="$LANGWATCH_API_KEY"
 
 # Use curl to send the POST request
-curl -X POST "https://app.langwatch.ai/api/evaluations/${evaluatorSlug}/evaluate" \\
+curl -X POST "${langwatchEndpoint()}/api/evaluations/${evaluatorSlug}/evaluate" \\
      -H "X-Auth-Token: $API_KEY" \\
      -H "Content-Type: application/json" \\
      -d @- <<EOF
@@ -339,11 +340,7 @@ EOF
                   </NativeSelect.Root>
 
                   <Box borderRadius="md" overflow="hidden" width="full">
-                    <RenderCode
-                      code={getCode()}
-                      language={getLanguageForHighlight()}
-                      style={{ padding: "16px", width: "100%" }}
-                    />
+                    <CodePreview code={getCode()} language={getLanguageForHighlight()} />
                   </Box>
 
                   <Text fontSize="sm" color="gray.600">

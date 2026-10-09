@@ -3,6 +3,7 @@ import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities"
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Menu } from "@langwatch/design-system/menu";
 import {
@@ -51,7 +52,6 @@ import {
 } from "../../../model/studio-dataset.utils.ts";
 import { exportedDatasetCutNotice } from "../../../model/workflow-export-dataset.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
-import { RenderCode } from "../code/render-code.tsx";
 import { useVersionState } from "./use-version-state.ts";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
@@ -721,8 +721,8 @@ export const ApiModalContent = () => {
           Incorporate the following JSON payload within the body of your HTTP POST request to get
           the workflow result.
         </Text>
-        <Box padding={4} backgroundColor={"#272822"}>
-          <RenderCode
+        <Box>
+          <CodePreview
             code={`# Set your API key
 LANGWATCH_API_KEY="${token ?? API_KEY_PLACEHOLDER}"
 

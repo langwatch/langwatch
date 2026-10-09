@@ -1,6 +1,8 @@
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -85,7 +87,6 @@ import {
   type PipelineFields,
   type SharedFiltersInput,
 } from "../../../model/analytics-vocabulary.ts";
-import { CodeSnippet } from "../../../ui/elements/code-snippet.tsx";
 import { AnalyticsPeriodPicker } from "../../../ui/sections/analytics-period-picker.tsx";
 import {
   CustomGraph,
@@ -466,11 +467,11 @@ function AnalyticsCustomGraphContent({
               Incorporate the following JSON payload within the body of your HTTP POST request to
               access identical data tailored for the custom graphs.
             </Text>
-            <Box padding={4} backgroundColor="bg.subtle">
-              <CodeSnippet
+            <Box>
+              <CodePreview
                 code={`# Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
-ENDPOINT="https://app.langwatch.ai/api/analytics"
+ENDPOINT="${langwatchEndpoint()}/api/analytics"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "$ENDPOINT" \\
