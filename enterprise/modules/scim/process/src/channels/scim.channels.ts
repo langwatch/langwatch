@@ -4,8 +4,8 @@ import type { BoundApis } from "@langwatch/process";
 
 /** Every channel bound to a module that SCIM holds, as the container hands them to the class. */
 export interface ScimChannels {
-  /** A deleted directory user leaves, and an unvouched account is invited, through organization. */
-  readonly members: Pick<OrganizationApi, "deleteMember" | "createInvitations">;
+  /** A deleted directory user leaves through organization, which owns the membership row. */
+  readonly members: Pick<OrganizationApi, "deleteMember">;
 }
 
 /** Both tiers bind organization: a binding to a module is no peer (record §5). */
