@@ -113,6 +113,12 @@ Feature: Evaluation service boundary
     Then the ledger holds one entry under the id the call chose, inside its project only
 
   @unit
+  Scenario: An evaluate call outside a trace still records its cost
+    Given an evaluate call from an experiment workbench, which names no trace
+    When the evaluator's cost is recorded
+    Then the entry is written without a trace id rather than failing the evaluation
+
+  @unit
   Scenario: An evaluate call reads the monitor it names by slug from the monitor module
     Given a process that installs the evaluation feature beside a monitor owner
     When an evaluate call names a monitor slug the project holds
