@@ -26,6 +26,16 @@ function isNamedHeader(node) {
   return false;
 }
 
+// `.withPermission(..., { at: "header", header: "x-project-id" })` tells the door which header to read.
+function isDeclaredScopeHeader(node) {
+  const property = node.parent;
+  if (property?.type !== "Property" || property.value !== node) return false;
+  if (nameOf(property.key) !== "header") return false;
+  const call = property.parent?.parent;
+
+  return call?.type === "CallExpression" && nameOf(call.callee) === "withPermission";
+}
+
 function nameOf(node) {
   if (node?.type === "Identifier") return node.name;
 
@@ -54,6 +64,7 @@ export const authHeaderReadRule = defineRule({
     return {
       Literal(node) {
         if (typeof node.value !== "string" || node.parent?.type === "TSLiteralType") return;
+        if (isDeclaredScopeHeader(node)) return;
         check(node, node.value);
       },
       TemplateLiteral(node) {

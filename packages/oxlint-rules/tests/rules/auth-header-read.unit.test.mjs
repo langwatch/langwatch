@@ -64,6 +64,20 @@ describe("given a module transport, app or module file", () => {
   });
 });
 
+describe("given a route that declares its scope header", () => {
+  describe("when `.withPermission` names the header the door reads", () => {
+    /** @scenario "The scope header a permission declares is not this rule's business" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          'route.withPermission("playground:view", { at: "header", param: "projectId", header: "x-project-id" });',
+          "modules/agent/process/src/transport/agent.rest.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
+});
+
 describe("given a module service", () => {
   describe("when it names an auth header", () => {
     /** @scenario "A service naming an auth header is not this rule's business" */

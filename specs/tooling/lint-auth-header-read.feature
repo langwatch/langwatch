@@ -33,3 +33,9 @@ Feature: The auth-header-read lint rule
     Given a module transport naming authorization as an object key and a member, and x-api-key in a plain template
     When the auth-header-read rule runs over it
     Then it reports each, and nothing for a computed member
+
+  @unit
+  Scenario: The scope header a permission declares is not this rule's business
+    Given a module transport whose `.withPermission` names x-project-id as the header the door reads the scope from
+    When the auth-header-read rule runs over it
+    Then it reports nothing
