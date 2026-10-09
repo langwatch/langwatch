@@ -76,6 +76,7 @@ class StubRepository implements UserRepository {
     hasPasskey: false,
     twoStepEnabled: false,
     dismissedAt: null,
+    accountCreatedAt: new Date(0),
   }));
   setPasskeyNudgeDismissedAt = vi.fn(async () => undefined);
   findJoinOfferDismissedDomains = vi.fn(async (): Promise<string[]> => ["acme.com"]);
@@ -214,6 +215,7 @@ describe("UserService", () => {
       hasPasskey: false,
       twoStepEnabled: false,
       dismissedAt: null,
+      accountCreatedAt: new Date(0),
     });
     await service.dismissPasskeyNudge({ id: "user-1" });
 

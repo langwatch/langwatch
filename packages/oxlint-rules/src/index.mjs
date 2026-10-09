@@ -66,6 +66,7 @@ import { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-
 import { serviceLoadsItsOwnConfigRule } from "./rules/service-loads-its-own-config.rule.mjs";
 import { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs";
 import { signatureMirrorRule } from "./rules/signature-mirror.rule.mjs";
+import { sliceReaderIsAHookRule } from "./rules/slice-reader-is-a-hook.rule.mjs";
 import { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
 import { storeContainmentRule } from "./rules/store-containment.rule.mjs";
 import { suppressionStatesWhyRuleFor } from "./rules/suppression-states-why.rule.mjs";
@@ -124,6 +125,7 @@ const HOUSE_RULES = [
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  sliceReaderIsAHookRule,
   accessEscapeKindRule,
   authzMembersRequiredRule,
   noAmbientContextRule,
@@ -222,6 +224,7 @@ export {
   noBootHookOutsideGuardRule,
   noHandRolledPlanGateRule,
   noHonoHttpExceptionRule,
+  sliceReaderIsAHookRule,
   accessEscapeKindRule,
   authzMembersRequiredRule,
   noAmbientContextRule,

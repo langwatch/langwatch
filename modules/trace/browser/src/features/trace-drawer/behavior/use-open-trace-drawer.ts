@@ -2,7 +2,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { drawerChrome } from "../../../behavior/drawer-chrome.store.ts";
+import { useDrawerChrome } from "../../../behavior/drawer-chrome.store.ts";
 import {
   buildPreviewTraceDetail,
   buildRichArrivalTraceDetail,
@@ -44,7 +44,9 @@ export function useOpenTraceDrawer() {
         prefetchTraceReads({ utils, queryClient, projectId: project.id, trace, tenantArg });
       }
       // The row's span count holds the skeleton to the right height until the tree loads.
-      drawerChrome.getState().expectSpanCount({ traceId: trace.traceId, count: trace.spanCount });
+      useDrawerChrome
+        .getState()
+        .expectSpanCount({ traceId: trace.traceId, count: trace.spanCount });
       openDrawer(TRACE_DRAWER_NAME, {
         // `t` is the partition-pruning hint useTraceHeader reads; the member lets a reload
         // reopen the same member's trace.

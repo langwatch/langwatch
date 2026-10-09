@@ -1,7 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useEffect, useRef } from "react";
 
-import { drawerChrome } from "../../../behavior/drawer-chrome.store.ts";
+import { useDrawerChrome } from "../../../behavior/drawer-chrome.store.ts";
 import {
   enterTraceEditMode,
   exitTraceEditMode,
@@ -71,7 +71,7 @@ function settleClose({
   if (!closed) return;
   lastOpen.current = null;
   if (keepDrawerForUnsavedEdit({ closed, drawer })) return;
-  drawerChrome.getState().reset();
+  useDrawerChrome.getState().reset();
   exitTraceEditMode();
 }
 
@@ -102,7 +102,7 @@ function keepDrawerForUnsavedEdit({
     urlParams: { edit: "1" },
   });
   editStore.requestExit(() => {
-    drawerChrome.getState().reset();
+    useDrawerChrome.getState().reset();
     exitTraceEditMode();
     // The link was put back to keep the drawer on screen for the question, so
     // taking the answer means taking it out again.

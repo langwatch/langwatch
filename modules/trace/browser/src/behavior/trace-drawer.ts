@@ -20,7 +20,7 @@ import {
   type VizTab,
   viewModeForEditState,
 } from "../model/trace-drawer-params.ts";
-import { type DrawerChromeState, drawerChrome } from "./drawer-chrome.store.ts";
+import { type DrawerChromeState, useDrawerChrome } from "./drawer-chrome.store.ts";
 
 /** A trace the reader navigated away from inside the drawer, and the view they left it on. */
 export interface TraceHistoryEntry {
@@ -28,7 +28,7 @@ export interface TraceHistoryEntry {
   viewMode: DrawerViewMode;
   /** The trace's `occurredAt` (ms since epoch), the partition-pruning hint its reads need. */
   occurredAtMs?: number;
-  /** The member that owns the trace on an aggregate, so going back reopens the same member's trace. */
+  /** The member that owns the trace on an aggregate, so going back reopens that member's trace. */
   tenantId?: string;
 }
 
@@ -51,7 +51,7 @@ interface TraceDrawerAddressActions {
   clearPinnedSpans: () => void;
   /** Fill in the partition hint from a resolved trace timestamp when the link carried none. */
   backfillOccurredAtMs: (occurredAtMs: number) => void;
-  /** Fill in the owning member from the header read when a deep link into an aggregate named none. */
+  /** Fill in the owning member from the header read when an aggregate deep link named none. */
   backfillTenantId: (tenantId: string) => void;
 }
 
@@ -110,22 +110,22 @@ function pinned({ ids, spanId }: { ids: string[]; spanId: string }): string[] {
 
 const addressActions: TraceDrawerAddressActions = {
   selectSpan: (spanId) => {
-    drawerChrome.getState().expandSpanDetail();
+    useDrawerChrome.getState().expandSpanDetail();
     writeAddress({ span: spanId });
   },
   clearSpan: () => writeAddress({ span: undefined }),
   openSpanInTrace: (spanId) => {
-    drawerChrome.getState().expandSpanDetail();
+    useDrawerChrome.getState().expandSpanDetail();
     writeAddress({ span: spanId, viz: "waterfall", mode: "trace" });
   },
   setIsEditing: (value) => writeAddress({ edit: value ? "1" : undefined }),
   setViewMode: (mode) => {
-    drawerChrome.getState().rememberViewMode(mode);
+    useDrawerChrome.getState().rememberViewMode(mode);
     writeAddress({ mode });
   },
   setViewModeTransient: (mode) => writeAddress({ mode }),
   setVizTab: (tab) => {
-    drawerChrome.getState().rememberVizTab(tab);
+    useDrawerChrome.getState().rememberVizTab(tab);
     writeAddress({ viz: tab });
   },
   setVizTabTransient: (tab) => writeAddress({ viz: tab }),
@@ -190,7 +190,7 @@ export function useTraceDrawer<T>(selector: (state: TraceDrawerState) => T): T {
     () => ({ address: readTraceDrawerAddress(query), backStack: traceBackStackOf(state) }),
     [query, state],
   );
-  return drawerChrome((chrome) => selector(composeState({ ...view, chrome })));
+  return useDrawerChrome((chrome) => selector(composeState({ ...view, chrome })));
 }
 
 /** The same reading for event handlers and callbacks, taken from the address now. */
@@ -199,7 +199,7 @@ export function getTraceDrawer(): TraceDrawerState {
   return composeState({
     address: readTraceDrawerAddress(query),
     backStack: traceBackStackOf(state),
-    chrome: drawerChrome.getState(),
+    chrome: useDrawerChrome.getState(),
   });
 }
 

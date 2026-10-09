@@ -17,10 +17,10 @@ export type {
   WorkflowSuccessNotice,
 } from "@langwatch/workflow-contract";
 
-const workflowHostReader = readSlice<WorkflowHostSlice>({ name: WORKFLOW_HOST_SLICE });
+const useWorkflowHostReader = readSlice<WorkflowHostSlice>({ name: WORKFLOW_HOST_SLICE });
 
 export function useWorkflowHost(): WorkflowHostSlice {
-  return workflowHostReader();
+  return useWorkflowHostReader();
 }
 
 /** The grant the platform page asked for, unchanged. */

@@ -3,7 +3,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
  * Connect an AI provider on the way into the product: one row of marks, one
  * focused connect panel, and a quiet "Skip Guided Tour" link that asks once.
  */
-import { Box, chakra, Flex, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, chakra, Flex, Text } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
@@ -63,7 +63,7 @@ export function ProviderScreen({
     <TakeoverRow fading={fading} maxWidth={720}>
       <Box
         minH="68px"
-        fontFamily="heading"
+        fontFamily="display"
         fontSize="24px"
         lineHeight="1.375"
         color="fg"
@@ -103,12 +103,14 @@ export function ProviderScreen({
                 border="1px solid"
                 borderColor={isSelected ? "fg" : "border"}
                 bg={isSelected ? "bg.panel" : "bg.panel/60"}
+                boxShadow={isSelected ? "xs" : "none"}
                 px={3}
                 py={2}
                 cursor="pointer"
                 transition="all 0.15s ease"
+                _hover={{ borderColor: isSelected ? "fg" : "border.emphasized" }}
               >
-                <Box w="16px" h="16px" flexShrink={0}>
+                <Box w="16px" h="16px" flexShrink={0} css={{ "& > svg": { w: "full", h: "full" } }}>
                   {modelProviderIcons[provider.registryKey]}
                 </Box>
                 <Text fontSize="12.5px" fontWeight="500" color={isSelected ? "fg" : "fg.muted"}>
@@ -127,6 +129,7 @@ export function ProviderScreen({
           borderColor="border"
           bg="bg.panel"
           p={5}
+          boxShadow="xs"
           data-testid="provider-panel"
         >
           <LentEditModelProviderForm
@@ -155,6 +158,7 @@ export function ProviderScreen({
             fontWeight="500"
             color="fg.subtle"
             cursor="pointer"
+            _hover={{ color: "fg.muted" }}
           >
             {SKIP_TOUR_COPY.link}
           </chakra.button>
@@ -179,43 +183,32 @@ export function ProviderScreen({
             </Text>
           </Dialog.Body>
           <Dialog.Footer borderTop="1px solid" borderColor="border" gap={2}>
-            <VStack width="full" gap={2}>
-              <HStack width="full" justify="flex-end" gap={2}>
-                <chakra.button
-                  type="button"
-                  onClick={() => {
-                    emit("confirmed", "skip_tour");
-                    setConfirmSkip(false);
-                    skip()
-                      .then(onSkip)
-                      .catch((error: unknown) => onSkipFailed?.(error));
-                  }}
-                  fontSize="13px"
-                  fontWeight="500"
-                  color="fg.muted"
-                  px={3}
-                  py={2}
-                >
-                  {SKIP_TOUR_COPY.skip}
-                </chakra.button>
-                <chakra.button
-                  type="button"
-                  onClick={() => {
-                    emit("confirmed", "kept_guide");
-                    setConfirmSkip(false);
-                  }}
-                  fontSize="13px"
-                  fontWeight="600"
-                  bg="fg"
-                  color="bg.panel"
-                  borderRadius="8px"
-                  px={3}
-                  py={2}
-                >
-                  {SKIP_TOUR_COPY.keep}
-                </chakra.button>
-              </HStack>
-            </VStack>
+            <Button
+              variant="ghost"
+              size="sm"
+              color="fg.muted"
+              onClick={() => {
+                emit("confirmed", "skip_tour");
+                setConfirmSkip(false);
+                skip()
+                  .then(onSkip)
+                  .catch((error: unknown) => onSkipFailed?.(error));
+              }}
+            >
+              {SKIP_TOUR_COPY.skip}
+            </Button>
+            <Button
+              size="sm"
+              bg="fg"
+              color="bg.panel"
+              _hover={{ opacity: 0.9 }}
+              onClick={() => {
+                emit("confirmed", "kept_guide");
+                setConfirmSkip(false);
+              }}
+            >
+              {SKIP_TOUR_COPY.keep}
+            </Button>
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
