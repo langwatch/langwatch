@@ -348,3 +348,17 @@ Feature: Enterprise licensing lifecycle
       Given licensing has recorded that a license sync landed and then that one failed
       When organization receives each fact in order
       Then the organisation keeps when the sync last landed and the code the latest one failed on
+
+    @unit
+    Scenario: Licensing records ending or re-resolving a licence's managed key as a fact for gateway to apply
+      Given a licence whose managed key licensing must end, and another whose install binding was reset
+      When licensing ends the first key and asks for the second to be resolved again
+      Then it records a managed-key-retired fact naming the key, its organisation and the actor
+      And a managed-key-invalidated fact naming the other key and its organisation
+
+    @unit
+    Scenario: Gateway ends or re-resolves a licence's managed key from licensing's fact, however often it arrives
+      Given gateway subscribes to licensing's managed-key facts
+      When a managed-key-retired fact arrives once and then again
+      Then gateway revokes that key under the fact's organisation and actor, the same revoke each time
+      And a managed-key-invalidated fact asks every gateway to resolve that key's licence again

@@ -158,6 +158,10 @@ import type { z } from "zod";
 
 import type { GatewayChannels } from "../channels/gateway.channels.ts";
 import {
+  buildGatewayConnectManagedKeyPipeline,
+  type GatewayConnectManagedKeyPipeline,
+} from "../eventing/gateway-connect-managed-key.pipeline.ts";
+import {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
 } from "../eventing/gateway-debit.process.ts";
@@ -1446,6 +1450,11 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
       }),
     });
+  }
+
+  /** gateway_connect_managed_key: ends or re-resolves a licence's managed key from its facts. */
+  connectManagedKeyPipeline(): GatewayConnectManagedKeyPipeline {
+    return buildGatewayConnectManagedKeyPipeline({ managedKeys: this.#connectManagedKeyService() });
   }
 
   /** Binds the crossing and lifecycle senders the debit writer and key services record through. */

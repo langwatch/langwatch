@@ -34,6 +34,12 @@ function connectedFacts() {
       recordLicenseCleared: createApiFixture<Senders["recordLicenseCleared"]>({
         send: async (payload) => void sent.push(payload),
       }),
+      recordManagedKeyRetired: createApiFixture<Senders["recordManagedKeyRetired"]>({
+        send: async (payload) => void sent.push(payload),
+      }),
+      recordManagedKeyInvalidated: createApiFixture<Senders["recordManagedKeyInvalidated"]>({
+        send: async (payload) => void sent.push(payload),
+      }),
     }),
   );
   return { facts, sent };
@@ -106,6 +112,36 @@ describe("licensing's Connect facts", () => {
           validatedAt: null,
         },
         { tenantId: ORGANIZATION, occurredAt: expect.any(Number), organizationId: ORGANIZATION },
+      ]);
+    });
+  });
+
+  describe("when licensing ends a licence's managed key and then re-resolves another", () => {
+    /** @scenario "Licensing records ending or re-resolving a licence's managed key as a fact for gateway to apply" */
+    it("records the key, its organisation and the actor, then the key to resolve again", async () => {
+      const { facts, sent } = connectedFacts();
+
+      await facts.managedKeyRetired({
+        virtualKeyId: "vk-old",
+        organizationId: ORGANIZATION,
+        actorId: "operator-1",
+      });
+      await facts.managedKeyInvalidated({ virtualKeyId: "vk-new", organizationId: ORGANIZATION });
+
+      expect(sent).toEqual([
+        {
+          tenantId: ORGANIZATION,
+          occurredAt: expect.any(Number),
+          organizationId: ORGANIZATION,
+          virtualKeyId: "vk-old",
+          actorId: "operator-1",
+        },
+        {
+          tenantId: ORGANIZATION,
+          occurredAt: expect.any(Number),
+          organizationId: ORGANIZATION,
+          virtualKeyId: "vk-new",
+        },
       ]);
     });
   });

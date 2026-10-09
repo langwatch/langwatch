@@ -910,12 +910,13 @@ function licenseRegistryOver({
     LicensingRepositories,
     "issuedLicenses" | "activationCodes" | "rateLimits" | "connectOrganizations"
   >;
-  customerFacts: Pick<LicensingCustomerFactsService, "selfHostedCustomerLicensed">;
+  customerFacts: Pick<
+    LicensingCustomerFactsService,
+    "selfHostedCustomerLicensed" | "managedKeyRetired" | "managedKeyInvalidated"
+  >;
   gateway: Pick<
     GatewayApi,
     | "provisionConnectManagedKey"
-    | "revokeManagedInternal"
-    | "invalidateManagedInternal"
     | "setManagedKeyConnectServicesInternal"
     | "setManagedKeyLicenseInternal"
   >;
@@ -938,8 +939,8 @@ function licenseRegistryOver({
           licenseId,
           actorUserId: systemActorId,
         }),
-      retire: (key) => gateway.revokeManagedInternal(key),
-      invalidate: (key) => gateway.invalidateManagedInternal(key),
+      retire: (key) => customerFacts.managedKeyRetired(key),
+      invalidate: (key) => customerFacts.managedKeyInvalidated(key),
       setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
       setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
     },

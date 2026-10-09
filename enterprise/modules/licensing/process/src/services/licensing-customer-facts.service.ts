@@ -100,6 +100,41 @@ export class LicensingCustomerFactsService {
     });
   }
 
+  /** Gateway revokes the key from this fact, seconds later; a revoked key is left alone. */
+  async managedKeyRetired({
+    virtualKeyId,
+    organizationId,
+    actorId,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+    actorId: string;
+  }): Promise<void> {
+    await this.commands().recordManagedKeyRetired.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      virtualKeyId,
+      actorId,
+    });
+  }
+
+  /** Gateway tells every gateway to resolve the key's licence again from this fact. */
+  async managedKeyInvalidated({
+    virtualKeyId,
+    organizationId,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<void> {
+    await this.commands().recordManagedKeyInvalidated.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      virtualKeyId,
+    });
+  }
+
   private commands(): EventingCommands<LicensingCustomerPipeline> {
     if (!this.#commands) {
       throw new Error("licensing_customer pipeline senders are not connected yet");

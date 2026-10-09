@@ -64,3 +64,25 @@ export const licenseClearedEventDataSchema = z.object({
   organizationId: z.string().min(1),
 });
 export type LicenseClearedEventData = z.infer<typeof licenseClearedEventDataSchema>;
+
+export const MANAGED_KEY_RETIRED_EVENT_TYPE = "lw.licensing.managed_key_retired" as const;
+export const MANAGED_KEY_INVALIDATED_EVENT_TYPE = "lw.licensing.managed_key_invalidated" as const;
+
+/** Licensing ended a licence's managed key for good; gateway revokes it, safe to repeat. */
+export const managedKeyRetiredEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  virtualKeyId: z.string().min(1),
+  actorId: z.string().min(1),
+});
+export type ManagedKeyRetiredEventData = z.infer<typeof managedKeyRetiredEventDataSchema>;
+
+/** Licensing changed what a managed key's licence resolves to; gateway tells every gateway. */
+export const managedKeyInvalidatedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  virtualKeyId: z.string().min(1),
+});
+export type ManagedKeyInvalidatedEventData = z.infer<typeof managedKeyInvalidatedEventDataSchema>;

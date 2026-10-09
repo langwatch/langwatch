@@ -13,6 +13,12 @@ import {
   type LicenseSyncFinishedEventData,
   LICENSING_CUSTOMER_AGGREGATE_TYPE,
   LICENSING_CUSTOMER_EVENT_VERSION,
+  MANAGED_KEY_INVALIDATED_EVENT_TYPE,
+  MANAGED_KEY_RETIRED_EVENT_TYPE,
+  managedKeyInvalidatedEventDataSchema,
+  type ManagedKeyInvalidatedEventData,
+  managedKeyRetiredEventDataSchema,
+  type ManagedKeyRetiredEventData,
   SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
   selfHostedCustomerLicensedEventDataSchema,
   type SelfHostedCustomerLicensedEventData,
@@ -231,6 +237,93 @@ export class RecordLicenseClearedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: LicenseClearedEventData): string {
+    return payload.organizationId;
+  }
+}
+
+export const RECORD_MANAGED_KEY_RETIRED_COMMAND_TYPE =
+  "lw.licensing.record_managed_key_retired" as const;
+export const RECORD_MANAGED_KEY_INVALIDATED_COMMAND_TYPE =
+  "lw.licensing.record_managed_key_invalidated" as const;
+
+export const managedKeyRetiredEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(MANAGED_KEY_RETIRED_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: managedKeyRetiredEventDataSchema,
+});
+export type ManagedKeyRetiredEvent = z.infer<typeof managedKeyRetiredEventSchema>;
+
+export const managedKeyInvalidatedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(MANAGED_KEY_INVALIDATED_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: managedKeyInvalidatedEventDataSchema,
+});
+export type ManagedKeyInvalidatedEvent = z.infer<typeof managedKeyInvalidatedEventSchema>;
+
+/** Records that licensing ended a licence's managed key; gateway revokes it from the fact. */
+export class RecordManagedKeyRetiredCommand implements CommandHandler<
+  Command<ManagedKeyRetiredEventData>,
+  ManagedKeyRetiredEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MANAGED_KEY_RETIRED_COMMAND_TYPE,
+    managedKeyRetiredEventDataSchema,
+    "Record that licensing ended a licence's managed key",
+  );
+
+  handle(command: Command<ManagedKeyRetiredEventData>): ManagedKeyRetiredEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ManagedKeyRetiredEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: MANAGED_KEY_RETIRED_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:managed_key_retired:${data.virtualKeyId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ManagedKeyRetiredEventData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records that a managed key's licence resolves differently; gateway invalidates from the fact. */
+export class RecordManagedKeyInvalidatedCommand implements CommandHandler<
+  Command<ManagedKeyInvalidatedEventData>,
+  ManagedKeyInvalidatedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MANAGED_KEY_INVALIDATED_COMMAND_TYPE,
+    managedKeyInvalidatedEventDataSchema,
+    "Record that a managed key's licence must be resolved again",
+  );
+
+  handle(command: Command<ManagedKeyInvalidatedEventData>): ManagedKeyInvalidatedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ManagedKeyInvalidatedEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: MANAGED_KEY_INVALIDATED_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:managed_key_invalidated:${data.virtualKeyId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ManagedKeyInvalidatedEventData): string {
     return payload.organizationId;
   }
 }
