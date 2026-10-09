@@ -1,27 +1,36 @@
 /**
- * What the application shows when it threw: the sign-in doors' branded card, never a white page.
+ * What the application shows when it threw: a centred error card, never a white page.
  * Spec: specs/frontend/app-error-page.feature
  */
 
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
-import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
-import { Button, Center, Collapsible, HStack, Text } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Center,
+  Code,
+  Collapsible,
+  Heading,
+  HStack,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 import { nowInstant } from "@langwatch/time";
-import { Check, ChevronRight, Copy } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, Copy, Home, RotateCcw } from "lucide-react";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { useLocation, useRouteError } from "react-router";
 
 type UiErrorProps = { error: unknown; isDevelopment: boolean };
 
-/** The whole viewport: the branded ground with the error card on it. */
+/** The whole viewport: the error card centred on the page ground. */
 export function UiErrorPage(props: UiErrorProps) {
   return (
-    <BrandedCardPage>
+    <Center minHeight="100vh" padding={8} backgroundColor="bg.canvas">
       <UiErrorCard {...props} />
-    </BrandedCardPage>
+    </Center>
   );
 }
 
@@ -62,29 +71,42 @@ function UiErrorCard({ error, isDevelopment }: UiErrorProps) {
     console.error("[UiErrorPage]", error);
   }, [error]);
 
+  const canCopy = typeof navigator !== "undefined" && navigator.clipboard;
+
   return (
-    <BrandedCard
-      title={copy.title}
-      intro={copy.description}
-      cardAttributes={{ "data-testid": "app-error-page" }}
-      footer={
-        copy.traceId ? (
+    <VStack gap={6} maxWidth="560px" width="full" data-testid="app-error-page">
+      <VStack gap={3}>
+        <Box padding={3} borderRadius="full" backgroundColor="red.subtle" color="red.fg">
+          <AlertTriangle size={28} />
+        </Box>
+        <Heading as="h1" size="md">
+          {copy.title}
+        </Heading>
+        <Text fontSize="sm" color="fg.muted" textAlign="center" maxWidth="400px">
+          {copy.description}
+        </Text>
+        {copy.traceId ? (
           <Text fontSize="xs" color="fg.muted" fontFamily="mono" userSelect="all">
             Trace id: {copy.traceId}
           </Text>
-        ) : null
-      }
-    >
-      <HStack justify="center" gap={3}>
-        <Button colorPalette="orange" onClick={() => window.location.reload()}>
-          Reload
-        </Button>
-        <Button variant="outline" asChild>
-          <a href="/">Go home</a>
-        </Button>
-      </HStack>
-      <Collapsible.Root width="full" minWidth={0}>
-        <HStack justify={isDevelopment ? "space-between" : "center"} gap={2}>
+        ) : null}
+      </VStack>
+
+      <Collapsible.Root
+        width="full"
+        minWidth={0}
+        borderRadius="lg"
+        borderWidth="1px"
+        borderColor="border"
+        overflow="hidden"
+      >
+        <HStack
+          paddingX={4}
+          paddingY={2}
+          backgroundColor="bg.subtle"
+          justify={isDevelopment ? "space-between" : "center"}
+          gap={2}
+        >
           {isDevelopment ? (
             <Collapsible.Trigger asChild>
               <Button size="xs" variant="ghost" color="fg.muted">
@@ -93,7 +115,7 @@ function UiErrorCard({ error, isDevelopment }: UiErrorProps) {
               </Button>
             </Collapsible.Trigger>
           ) : null}
-          {typeof navigator !== "undefined" && navigator.clipboard ? (
+          {canCopy ? (
             <Button
               size="xs"
               variant="ghost"
@@ -116,28 +138,40 @@ function UiErrorCard({ error, isDevelopment }: UiErrorProps) {
         </HStack>
         {isDevelopment ? (
           <Collapsible.Content>
-            <Text
-              as="pre"
-              marginTop={2}
-              padding={3}
-              borderRadius="md"
-              backgroundColor="bg.subtle"
-              fontSize="xs"
-              fontFamily="mono"
-              color="fg.muted"
-              textAlign="left"
-              maxHeight="240px"
+            <Code
+              display="block"
+              paddingX={4}
+              paddingY={3}
+              maxHeight="180px"
               overflow="auto"
+              fontSize="xs"
               whiteSpace="pre-wrap"
               overflowWrap="anywhere"
+              backgroundColor="bg.panel"
+              color="red.fg"
+              borderRadius={0}
+              textAlign="left"
               data-testid="app-error-stack"
             >
               {stack}
-            </Text>
+            </Code>
           </Collapsible.Content>
         ) : null}
       </Collapsible.Root>
-    </BrandedCard>
+
+      <HStack gap={3}>
+        <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+          <RotateCcw size={14} />
+          Reload
+        </Button>
+        <Button size="sm" variant="ghost" color="fg.muted" asChild>
+          <a href="/">
+            <Home size={14} />
+            Go home
+          </a>
+        </Button>
+      </HStack>
+    </VStack>
   );
 }
 

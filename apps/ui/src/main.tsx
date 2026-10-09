@@ -53,6 +53,7 @@ import { uiRouteTable } from "./shell/ui-route-table";
 import { UiSaasFooter } from "./shell/ui-saas-footer";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
+import { hasInjectedPublicConfig, UiWaitingForApiShell } from "./shell/ui-waiting-for-api-page";
 import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
 import {
   uiDeploymentOf,
@@ -262,6 +263,9 @@ class BrowserUiShell extends UiShell {
  * mounts over what it returns. Installing a module edits the catalogue.
  */
 export async function startUi(): Promise<void> {
+  if (!hasInjectedPublicConfig(document)) {
+    return UiRuntime.create({ document, shell: new UiWaitingForApiShell() }).start();
+  }
   const served = readPublicAppConfig(document);
   // The framework's own slice: the transport is built before the supply renders.
   const process = readUiProcessConfig(served);

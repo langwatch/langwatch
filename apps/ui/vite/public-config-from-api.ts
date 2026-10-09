@@ -7,10 +7,6 @@ import {
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
 
-import { WAITING_FOR_API_PAGE } from "./waiting-for-api-page";
-
-export { WAITING_FOR_API_PAGE };
-
 const META_CONTENT = new RegExp(`<meta name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`);
 const RETRY_EVERY_MS = 500;
 
@@ -54,8 +50,9 @@ export async function fetchPublicConfigFromApi({
 }
 
 /**
- * The page for a shell, read per request: waits only for the api's first answer, then keeps the
- * last config while a reload has it briefly down; with none yet, the waiting page.
+ * The page for a shell, read per request and never waited on: the api's config once it answers,
+ * the last config while a reload has it briefly down, and with none yet the bare shell, which
+ * boots into the browser's waiting page (apps/ui/src/shell/ui-waiting-for-api-page.tsx).
  */
 export function publicConfigPages({
   apiUrl,
@@ -67,13 +64,15 @@ export function publicConfigPages({
   fetchShell?: (url: string) => Promise<Response>;
 }): (html: string) => Promise<string> {
   let last: PublicAppConfig | undefined;
+  let warned = false;
   return async (html) => {
     try {
-      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: last ? 0 : 3_000, fetchShell });
+      last = await fetchPublicConfigFromApi({ apiUrl, waitMs: 0, fetchShell });
     } catch (failure) {
-      if (!last) warn(failure instanceof Error ? failure.message : String(failure));
+      if (!last && !warned) warn(failure instanceof Error ? failure.message : String(failure));
+      warned = true;
     }
-    return last ? injectPublicAppConfigIntoHtml({ html, config: last }) : WAITING_FOR_API_PAGE;
+    return last ? injectPublicAppConfigIntoHtml({ html, config: last }) : html;
   };
 }
 

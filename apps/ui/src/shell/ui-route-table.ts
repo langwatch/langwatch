@@ -894,10 +894,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
       { path: "/ops/foundry", page: "pages/ops/foundry" },
       {
+        // Tenant migrations are a tab of the Upgrades page now.
         path: "/ops/migrations",
-        page: "pages/ops/migrations",
+        redirect: { from: "/ops/migrations", to: "/ops/upgrades", pinParams: { tab: "tenants" } },
       },
       { path: "/ops/upgrades", page: "pages/ops/upgrades" },
+      { path: "/ops/upgrades/preview", page: "pages/ops/upgrades/preview" },
       {
         path: "/ops/upgrades/releases/:release",
         page: "pages/ops/upgrades/releases/[release]",
