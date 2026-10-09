@@ -193,3 +193,25 @@ func TestDispatchBoundariesRejectPrivateCustomerEndpoints(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrBadRequest))
 }
+
+func bedrockRuntimeCredential(endpoint string) domain.Credential {
+	return domain.Credential{
+		ProviderID: domain.ProviderBedrock,
+		Extra:      map[string]string{"bedrock_runtime_endpoint": endpoint},
+	}
+}
+
+func TestValidateCredentialEndpointsChecksTheBedrockRuntimeAddress(t *testing.T) {
+	t.Parallel()
+	vpce := "http://vpce-0abc.bedrock-runtime.eu-west-1.vpce.amazonaws.com"
+
+	blocking := policyWithResolver(true, nil, staticResolver("10.0.0.8"))
+	require.Error(t, validateCredentialEndpoints(t.Context(), bedrockRuntimeCredential(vpce), blocking))
+
+	metadata := policyWithResolver(false, nil, staticResolver("169.254.169.254"))
+	require.Error(t, validateCredentialEndpoints(t.Context(), bedrockRuntimeCredential(vpce), metadata))
+
+	allowlisted := newCustomerEndpointPolicy(true, true, []string{"vpce-0abc.bedrock-runtime.eu-west-1.vpce.amazonaws.com"})
+	allowlisted.resolve = staticResolver("10.0.0.8")
+	require.NoError(t, validateCredentialEndpoints(t.Context(), bedrockRuntimeCredential(vpce), allowlisted))
+}

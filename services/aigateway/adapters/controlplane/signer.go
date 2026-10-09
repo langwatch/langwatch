@@ -7,7 +7,10 @@ import (
 	"errors"
 	"hash"
 	"net/http"
+	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -55,7 +58,7 @@ var sigBufPool = sync.Pool{
 //
 // Canonical string matches the control-plane verifier:
 //
-//	METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
+//	METHOD + "\n" + CanonicalPath + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
 func (s *Signer) Sign(req *http.Request, body []byte) {
 	buf := sigBufPool.Get().(*sigBuf)
 	// Pool the HMAC — hmac.New allocates ~10 objects internally; Reset()
@@ -72,7 +75,7 @@ func (s *Signer) Sign(req *http.Request, body []byte) {
 	buf.canonical = buf.canonical[:0]
 	buf.canonical = append(buf.canonical, req.Method...)
 	buf.canonical = append(buf.canonical, '\n')
-	buf.canonical = append(buf.canonical, req.URL.Path...)
+	buf.canonical = append(buf.canonical, CanonicalPath(req.URL)...)
 	buf.canonical = append(buf.canonical, '\n')
 	buf.canonical = append(buf.canonical, ts...)
 	buf.canonical = append(buf.canonical, '\n')
@@ -92,4 +95,29 @@ func (s *Signer) Sign(req *http.Request, body []byte) {
 
 	s.macPool.Put(mac)
 	sigBufPool.Put(buf)
+}
+
+// CanonicalPath is the signed PATH line: the path, plus the query when there is
+// one, its pairs RFC 3986-encoded and sorted so both ends agree however the
+// query was written. Mirrors canonicalGatewayPath in
+// modules/gateway/process/src/rules/gateway-internal-identity.rules.ts.
+func CanonicalPath(u *url.URL) string {
+	values := u.Query()
+	if len(values) == 0 {
+		return u.Path
+	}
+	pairs := make([]string, 0, len(values))
+	for key, vs := range values {
+		for _, v := range vs {
+			pairs = append(pairs, rfc3986Escape(key)+"="+rfc3986Escape(v))
+		}
+	}
+	sort.Strings(pairs)
+	return u.Path + "?" + strings.Join(pairs, "&")
+}
+
+// rfc3986Escape leaves only A-Z a-z 0-9 - . _ ~ unescaped. QueryEscape already
+// escapes a literal "+", so every "+" it emits is a space.
+func rfc3986Escape(s string) string {
+	return strings.ReplaceAll(url.QueryEscape(s), "+", "%20")
 }

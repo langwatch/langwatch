@@ -156,6 +156,14 @@ func validateCredentialEndpoints(ctx context.Context, cred domain.Credential, po
 			}
 		}
 	}
+	if endpoint := bedrockRuntimeEndpoint(cred); endpoint != "" && cred.ProviderID == domain.ProviderBedrock {
+		// validateBedrockEndpoint already confines plaintext to PrivateLink hosts.
+		bedrockPolicy := policy
+		bedrockPolicy.requireHTTPS = false
+		if err := validateCustomerEndpoint(ctx, endpoint, bedrockPolicy); err != nil {
+			return fmt.Errorf("bedrock runtime endpoint rejected: %w", err)
+		}
+	}
 	return nil
 }
 
