@@ -96,6 +96,33 @@ describe("Server", () => {
     });
   });
 
+  describe("given an application is expected but not yet served", () => {
+    describe("when a product path is requested", () => {
+      it("answers 503 with Retry-After, then reaches the route once served", async () => {
+        const server = await startServer();
+        server.expectApplication();
+        await server.openLiveness();
+
+        const early = await fetchFrom(server, "/api/things");
+
+        expect(early.status).toBe(503);
+        expect(early.headers.get("retry-after")).toBe("5");
+
+        await server.serve({
+          name: "app",
+          start: () => undefined,
+          stop: () => undefined,
+          handler: (_request, response) => {
+            response.writeHead(200).end("application");
+          },
+        });
+        const late = await fetchFrom(server, "/api/things");
+
+        expect(late.status).toBe(200);
+      });
+    });
+  });
+
   describe("given an unregistered path", () => {
     describe("when it is requested", () => {
       /**
