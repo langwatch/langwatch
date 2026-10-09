@@ -166,7 +166,8 @@ export const createManyDatasetRecords = async ({
   // For callers supplying deterministic ids: an id that already exists means
   // the row was already added, so it is skipped instead of failing the batch
   // (P2002). Only the postgres layout honors it; the s3_jsonl and legacy
-  // useS3 layouts append and do not dedupe against stored rows. The record id
+  // useS3 layouts append and do not dedupe against stored rows. Tracked in
+  // https://github.com/langwatch/langwatch/issues/8544. The record id
   // is a global primary key, so an id existing in ANY dataset is skipped.
   shouldSkipDuplicates?: boolean;
 }) => {

@@ -625,7 +625,11 @@ describe("readDatasetHeadS3Jsonl()", () => {
 
 describe("createManyDatasetRecords()", () => {
   const createMany = vi.fn();
-  const db = { datasetRecord: { createMany } } as never;
+  const datasetUpdate = vi.fn();
+  const db = {
+    datasetRecord: { createMany },
+    dataset: { update: datasetUpdate },
+  } as never;
   const unsupportedWarning =
     "shouldSkipDuplicates is not supported on this dataset layout; existing rows may be duplicated";
 
@@ -642,8 +646,9 @@ describe("createManyDatasetRecords()", () => {
   beforeEach(() => {
     createMany.mockResolvedValue({ count: 1 });
     appendS3JsonlRecords.mockResolvedValue(undefined);
-    storageGetObject.mockResolvedValue(undefined);
+    storageGetObject.mockResolvedValue({ records: [] });
     storagePutObject.mockResolvedValue(undefined);
+    datasetUpdate.mockResolvedValue(undefined);
   });
 
   describe("when shouldSkipDuplicates is requested on an s3_jsonl dataset", () => {
@@ -659,10 +664,12 @@ describe("createManyDatasetRecords()", () => {
 
   describe("when shouldSkipDuplicates is requested on a legacy useS3 dataset", () => {
     it("warns that the layout does not support it", async () => {
-      await addWithFlag({ contentLayout: "postgres", useS3: true }).catch(
-        () => undefined,
-      );
+      const result = await addWithFlag({
+        contentLayout: "postgres",
+        useS3: true,
+      });
 
+      expect(result).toEqual({ success: true });
       expect(loggerWarn).toHaveBeenCalledWith(
         expect.objectContaining({ useS3: true }),
         unsupportedWarning,
@@ -675,14 +682,6 @@ describe("createManyDatasetRecords()", () => {
       await addWithFlag({ contentLayout: "postgres", useS3: false });
 
       expect(loggerWarn).not.toHaveBeenCalled();
-    });
-
-    it("passes the flag to Prisma as skipDuplicates", async () => {
-      await addWithFlag({ contentLayout: "postgres", useS3: false });
-
-      expect(createMany).toHaveBeenCalledWith(
-        expect.objectContaining({ skipDuplicates: true }),
-      );
     });
   });
 });

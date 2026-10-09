@@ -1,8 +1,13 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import { TriggerAction } from "~/generated/prisma/client";
-import { dispatchTriggerAction } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
+import {
+  dispatchTriggerAction,
+  type TriggerActionDispatchDeps,
+} from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createManyDatasetRecords } from "../datasetRecord.utils";
@@ -214,11 +219,12 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
         dispatchedDatasetId = datasetId;
         triggerId = `trigger_${nanoid()}`;
         const traceId = `trace-${nanoid()}`;
-        const trigger = {
+        const trigger: TriggerSummary = {
           id: triggerId,
           projectId,
           name: "dup",
           action: TriggerAction.ADD_TO_DATASET,
+          triggerKind: TriggerKind.AUTOMATION,
           actionParams: {
             datasetId,
             datasetMapping: {
@@ -229,7 +235,20 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
               expansions: [],
             },
           },
-        } as never;
+          filters: {},
+          alertType: "WARNING",
+          message: "",
+          customGraphId: null,
+          notificationCadence: "immediate",
+          filterQuery: null,
+          traceDebounceMs: 0,
+          templates: {
+            slackTemplateType: null,
+            slackTemplate: null,
+            emailSubjectTemplate: null,
+            emailBodyTemplate: null,
+          },
+        };
         const trace = {
           trace_id: traceId,
           project_id: projectId,
@@ -247,6 +266,7 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
         };
         // addToDataset is wired exactly as automationDispatch.wiring.ts does;
         // the production dispatcher supplies shouldSkipDuplicates itself.
+        // Only the members dispatch touches are real; the rest are stubs.
         const deps = {
           triggers: { updateLastRunAt: async () => undefined },
           projects: {
@@ -255,17 +275,19 @@ describe("createManyDatasetRecords duplicate ids (integration)", () => {
           },
           traceById: async () => trace,
           addToAnnotationQueue: async () => undefined,
-          addToDataset: async (params: never) => {
+          addToDataset: async (
+            params: Parameters<TriggerActionDispatchDeps["addToDataset"]>[0],
+          ) => {
             await createManyDatasetRecords(params);
           },
-        } as never;
+        } as unknown as TriggerActionDispatchDeps;
         const dispatch = () =>
           dispatchTriggerAction({
             deps,
             trigger,
             traceId,
             tenantId: projectId,
-            foldState: {} as never,
+            foldState: { traceId } as TraceSummaryData,
           });
         await dispatch();
         secondDispatch = dispatch();
