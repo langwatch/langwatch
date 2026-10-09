@@ -186,6 +186,11 @@ func TestLangyChildHostTier(t *testing.T) {
 }
 
 func TestEnsureLangyWorkerBinary(t *testing.T) {
+	bunDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bunDir, "bun"), []byte("#!/bin/sh\n"), 0o700); err != nil { //nolint:gosec // the fixture needs the exec bit
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bunDir)
 	run := func(t *testing.T, sup *fakeSupervisor, withBinary bool, tier domain.LangyTier) PlanOptions {
 		t.Helper()
 		repo := t.TempDir()
@@ -223,6 +228,18 @@ func TestEnsureLangyWorkerBinary(t *testing.T) {
 		sup := &fakeSupervisor{err: errors.New("exit 1")}
 		if run(t, sup, false, domain.LangyTierHostUnsafe).Selection.Langy {
 			t.Fatal("Langy still selected after a failed build")
+		}
+	})
+
+	// @scenario "A Langy that cannot build for want of bun says how to fix it"
+	t.Run("skips the build and deselects Langy when bun is missing", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		sup := &fakeSupervisor{}
+		if run(t, sup, false, domain.LangyTierHostUnsafe).Selection.Langy {
+			t.Fatal("Langy still selected with no bun to build its worker")
+		}
+		if len(sup.shells) != 0 {
+			t.Fatalf("a build ran with no bun: %v", sup.shells)
 		}
 	})
 
