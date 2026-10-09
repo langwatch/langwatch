@@ -2825,6 +2825,9 @@ billing, so connect syncs on licensing's `contract_terms_changed` and resets on 
 `connected_term_renewed` / `connected_customer_onboarded` facts (the cap is not a precondition of the
 billing call), and billing reads the contract `GatewayBudget` through a declared share plus its ClickHouse
 spend share. `connect.errors.ts` stays in licensing-contract.
+The connect upstream reaches gateway as a licensing fact carrying the organization, base URL, instance id and
+the licence token's fingerprint, never the token; gateway reads the token from licensing's row through a declared
+read-only share (Alex, 2026-10-09, C3b D2; the C3-KEY-HASH shape).
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
