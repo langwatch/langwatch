@@ -435,3 +435,17 @@ func TestReadSelectionIgnoresTheOptInEraPaymentKey(t *testing.T) {
 		t.Error(`a stated "paymentsim": false (haven up -payment) was ignored`)
 	}
 }
+
+// The sticky stack modes (--watch=false, --ui=built|bundled) survive a write and a read.
+func TestSelectionKeepsTheStickyModes(t *testing.T) {
+	s, dir := New(t.TempDir()), t.TempDir()
+	want := domain.DefaultSelection()
+	want.Held, want.BuiltUI = true, true
+	if err := s.WriteSelection(dir, want); err != nil {
+		t.Fatalf("WriteSelection: %v", err)
+	}
+	got, ok := s.ReadSelection(dir)
+	if !ok || !got.Held || !got.BuiltUI || got.BundledUI {
+		t.Fatalf("read back held=%v built=%v bundled=%v ok=%v", got.Held, got.BuiltUI, got.BundledUI, ok)
+	}
+}

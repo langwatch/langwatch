@@ -101,8 +101,11 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 // selectionFile is the on-disk shape of the worktree-local sticky service
 // selection (ADR-064) — .haven.json next to .langwatch-slug.
 type selectionFile struct {
-	Mode     string           `json:"mode,omitempty"`
-	Services *selectionFields `json:"services"`
+	Mode      string           `json:"mode,omitempty"`
+	Held      bool             `json:"held,omitempty"`
+	BuiltUI   bool             `json:"built-ui,omitempty"`
+	BundledUI bool             `json:"bundled-ui,omitempty"`
+	Services  *selectionFields `json:"services"`
 }
 
 // selectionFields is domain.Selection with every service optional. The pointers
@@ -194,7 +197,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 	}
 	sel := domain.DefaultSelection()
 	f.Services.applyTo(&sel)
-	sel.Mode = f.Mode
+	sel.Mode, sel.Held, sel.BuiltUI, sel.BundledUI = f.Mode, f.Held, f.BuiltUI, f.BundledUI
 	return sel, true
 }
 
@@ -206,7 +209,7 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // on the default-keeping behaviour above — that is there for files it did not
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
-	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Services: &selectionFields{
+	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Held: sel.Held, BuiltUI: sel.BuiltUI, BundledUI: sel.BundledUI, Services: &selectionFields{
 		Gateway:      &sel.Gateway,
 		NLP:          &sel.NLP,
 		Langy:        &sel.Langy,
