@@ -75,6 +75,12 @@ function readerOfOneRelease(): UpgradeReader {
     listRuns: vi.fn(async () => ({ items: [RUN_SUMMARY], cursor: null })),
     getRun: vi.fn(async () => RUN),
     preflight: vi.fn(async () => []),
+    preview: vi.fn(async () => ({
+      installed: "3.23.0",
+      plan: { outcome: "planned" as const, fresh: false, releases: [], notNeeded: [] },
+      preflight: [],
+    })),
+    listTargets: vi.fn(async () => []),
   };
 }
 
@@ -142,7 +148,7 @@ function boundAccess(): Record<string, string> {
 
 describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
-  it("declares each of the six reads behind ops:view at the platform scope", () => {
+  it("declares each of the eight reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
       Object.entries(boundAccess()).filter(
         ([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name) && name !== "ops.upgrade.retryStep",
@@ -156,6 +162,8 @@ describe("the ops.upgrade reads", () => {
       "ops.upgrade.getStep": "permission-platform:ops:view",
       "ops.upgrade.listRuns": "permission-platform:ops:view",
       "ops.upgrade.getRun": "permission-platform:ops:view",
+      "ops.upgrade.preview": "permission-platform:ops:view",
+      "ops.upgrade.listTargets": "permission-platform:ops:view",
     });
   });
 

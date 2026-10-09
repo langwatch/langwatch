@@ -85,6 +85,7 @@ const PARAMETERIZED_CODES = new Set([
   "langy_api_actor_missing",
   "upgrade_invalid_cursor",
   "upgrade_not_found",
+  "upgrade_plan_unavailable",
 ]);
 
 /**

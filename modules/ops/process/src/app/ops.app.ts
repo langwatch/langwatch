@@ -232,12 +232,15 @@ import {
   type OpsUpgradeIdInput,
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
+  type OpsUpgradePreview,
+  type OpsUpgradePreviewInput,
   type OpsUpgradeReleasePage,
   type OpsUpgradeRun,
   type OpsUpgradeRunPage,
   type OpsUpgradeStatus,
   type OpsUpgradeStepDetail,
   type OpsUpgradeStepPage,
+  type OpsUpgradeTargetSummary,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -1948,6 +1951,14 @@ export class OpsModule implements OpsApi {
 
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
     return this.#dependencies.upgrades.getRun(input);
+  }
+
+  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
+    return this.#dependencies.upgrades.preview(input);
+  }
+
+  listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]> {
+    return this.#dependencies.upgrades.listTargets();
   }
 
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {

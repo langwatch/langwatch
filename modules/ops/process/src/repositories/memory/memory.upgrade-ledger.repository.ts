@@ -5,12 +5,14 @@ import {
   type ListStepsFilter,
   type UpgradeImage,
   type UpgradeReader,
+  type UpgradePreview,
   type UpgradeReleasePage,
   type UpgradeRunDetail,
   type UpgradeRunPage,
   type UpgradeStatus,
   type UpgradeStepDetail,
   type UpgradeStepPage,
+  type UpgradeTargetSummary,
 } from "@langwatch/upgrade/reader";
 
 import type { UpgradeLedgerRepository } from "../upgrade-ledger.repository.ts";
@@ -69,6 +71,14 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
 
   getRun(input: { id: string }): Promise<UpgradeRunDetail> {
     return this.reader.getRun(input);
+  }
+
+  findPreview(input: { to: string }): Promise<UpgradePreview> {
+    return this.reader.preview(input);
+  }
+
+  findTargets(): Promise<UpgradeTargetSummary[]> {
+    return this.reader.listTargets();
   }
 
   /** Checks and records with no await between them, so concurrent retries reopen it once. */

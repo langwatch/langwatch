@@ -185,3 +185,51 @@ Feature: Ops shows an installation's release upgrades, read-only
     Given no step with the id asked for
     When an operator holding ops:manage asks to retry it
     Then it is refused as not found
+
+  # W5 Preview (U6, ruling U6-U9-READS 2026-10-09): ops.upgrade.preview({ to })
+  @unit
+  Scenario: The preview lists the steps up to the release asked for, release by release
+    Given an installation on 3.21.0 whose image is 3.23.0
+    When an operator holding ops:view previews an upgrade to 3.22.0
+    Then the preview lists release 3.22.0 with its schema, blocking, background and operator steps
+    And it lists nothing from 3.23.0
+
+  @unit
+  Scenario: The preview shows the preflight rows the CLI prints
+    Given a step that failed and no upgrade holding the lease
+    When an operator previews an upgrade to the image's release
+    Then the preflight refuses "No failed step" naming that step
+    And it verifies "No upgrade in progress"
+    And it leaves "Recent backup" unchecked with the fix to take a backup
+
+  @unit
+  Scenario: A target newer than the image is refused with the command that previews from that image
+    Given an image on 3.23.0
+    When an operator previews an upgrade to 3.24.0
+    Then the preview is refused as "target_not_in_image"
+    And it shows the command that runs "upgrade plan --to 3.24.0" from the 3.24.0 image
+
+  @unimplemented
+  Scenario: An installation below the floor previews as refused with the LTS to upgrade to first
+    Given an installation on 3.18.0 below the floor 3.20.1
+    When an operator previews an upgrade to the image's release
+    Then the preview is refused as "below_lts_floor" naming 3.20.1
+
+  @unimplemented
+  Scenario: The preview page shows a skeleton while the preview loads
+    When an operator opens Ops, Upgrades, Preview
+    Then a loading skeleton shows until the preview answers
+
+  # W7 Dataplanes (U9, ruling U6-U9-READS 2026-10-09): ops.upgrade.listTargets
+  @unit
+  Scenario: The dataplanes tab lists each ClickHouse target with its version, outstanding steps and last error
+    Given two private ClickHouse targets, one with a failed schema step
+    When an operator holding ops:view opens the Dataplanes tab
+    Then each target shows its goose version and how many steps are outstanding
+    And the failed target shows its last error
+
+  @unimplemented
+  Scenario: The dataplanes tab is hidden when no private target exists
+    Given the ledger records no per-target rows
+    When an operator opens Ops, Upgrades
+    Then no Dataplanes tab is offered

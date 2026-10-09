@@ -8,12 +8,14 @@ import {
   type ListStepsFilter,
   type UpgradeImage,
   type UpgradeReader,
+  type UpgradePreview,
   type UpgradeReleasePage,
   type UpgradeRunDetail,
   type UpgradeRunPage,
   type UpgradeStatus,
   type UpgradeStepDetail,
   type UpgradeStepPage,
+  type UpgradeTargetSummary,
 } from "@langwatch/upgrade/reader";
 import { UpgradeRunnerRepository } from "@langwatch/upgrade/runner";
 
@@ -51,8 +53,10 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
     steps?: UpgradeImage["steps"];
     needsOldWritersGone?: ReadonlySet<string>;
   }): PrismaUpgradeLedgerRepository {
-    const { manifests, floor } = loadReleases();
+    const releases = loadReleases();
+    const { manifests, floor } = releases;
     const release = manifests.at(-1)?.release;
+    const shipped = imageSteps({ release: release ?? "0.0.0" });
     const postgres = {
       query: async <Row extends object>(text: string, values: unknown[] = []) => ({
         rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
@@ -63,10 +67,11 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
         postgres,
         image: {
           release: release ?? "unreleased",
-          steps: steps ?? imageSteps({ release: release ?? "0.0.0" }),
+          steps: steps ?? shipped,
         },
         floor,
         needsOldWritersGone,
+        planning: { image: { release: release ?? null, steps: shipped }, releases },
       }),
       UpgradeRunnerRepository.create({ postgres }),
     );
@@ -94,6 +99,14 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
 
   getRun(input: { id: string }): Promise<UpgradeRunDetail> {
     return this.reader.getRun(input);
+  }
+
+  findPreview(input: { to: string }): Promise<UpgradePreview> {
+    return this.reader.preview(input);
+  }
+
+  findTargets(): Promise<UpgradeTargetSummary[]> {
+    return this.reader.listTargets();
   }
 
   reopenFailedStep({ id }: { id: string }): Promise<boolean> {

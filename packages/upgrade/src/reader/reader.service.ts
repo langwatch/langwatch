@@ -417,7 +417,12 @@ export function createUpgradeReader({
 
   /** `upgrade plan --to` as the preview page shows it, beside the preflight (U6-U9-READER). */
   async function preview({ to }: { to: string }): Promise<UpgradePreview> {
-    if (!planning) throw new Error("this upgrade reader was created without planning");
+    if (!planning) {
+      throw new UpgradeReadError(
+        "upgrade_plan_unavailable",
+        "this upgrade reader was created without the planning a preview needs",
+      );
+    }
     const tables = await repository.findTables();
     const { installed, plan } = planInstallation({
       ...planning,
@@ -457,11 +462,15 @@ export function createUpgradeReader({
 
 export type UpgradeReader = ReturnType<typeof createUpgradeReader>;
 
-export type UpgradeReadErrorCode = "upgrade_not_found" | "upgrade_invalid_cursor";
+export type UpgradeReadErrorCode =
+  | "upgrade_not_found"
+  | "upgrade_invalid_cursor"
+  | "upgrade_plan_unavailable";
 
 const HTTP_STATUS: Record<UpgradeReadErrorCode, number> = {
   upgrade_not_found: 404,
   upgrade_invalid_cursor: 400,
+  upgrade_plan_unavailable: 503,
 };
 
 /** A read the ledger cannot answer. Consumers branch on `code`, never on the message. */
@@ -469,7 +478,10 @@ export class UpgradeReadError extends HandledError {
   declare readonly code: UpgradeReadErrorCode;
 
   constructor(code: UpgradeReadErrorCode, message: string) {
-    super(code, message, { httpStatus: HTTP_STATUS[code], fault: "customer" });
+    super(code, message, {
+      httpStatus: HTTP_STATUS[code],
+      fault: code === "upgrade_plan_unavailable" ? "platform" : "customer",
+    });
     this.name = "UpgradeReadError";
   }
 }

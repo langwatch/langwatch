@@ -6,13 +6,13 @@ import { BackgroundStepsService } from "../background/background-steps.service.t
 import { imageContractSteps } from "../gate/image-tree.ts";
 import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
-import type { UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
+import type { UpcastStepInput, UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
 import { compareReleases } from "../manifest/manifest.ts";
 import type { LtsFloor, ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
+import { planInstallation } from "../plan/plan-installation.ts";
 import {
   inlineBeforeContracts,
   type PlannedRelease,
-  planUpgrade,
   type UpgradePlan,
 } from "../plan/plan-upgrade.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
@@ -26,7 +26,6 @@ import {
 } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
 import { isRerunnablePrismaMigration } from "../stepping/rerunnable-migrations.ts";
-import { highestRecordedFloor, inferInstalledRelease } from "./installed-release.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
 import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
@@ -56,6 +55,8 @@ export interface UpgradeRunnerOptions {
   /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
   contracts?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
+  /** The image's declared event upcasts and the stored events each covers (record §9). */
+  upcasts?: () => Promise<readonly UpcastStepInput[]>;
   identity: { image: string; host: string };
   log: UpgradeRunnerLog;
   lease?: Partial<UpgradeLeaseTiming>;
@@ -303,30 +304,7 @@ export class UpgradeRunnerService {
     fresh?: boolean;
   }) {
     const { image, releases } = this.options;
-    const upgraded = runs.some((run) => run.kind === "upgrade");
-    const known =
-      fresh && !upgraded
-        ? ({ known: true, installed: null } as const)
-        : inferInstalledRelease({ runs, steps, manifests: releases.manifests });
-    if (!known.known) {
-      const predates = known.predates ?? "every shipped release";
-      const message = `this installation predates ${predates}; upgrade to ${releases.floor.release} (LTS) first, then to this image`;
-      const plan: UpgradePlan = {
-        outcome: "refused",
-        code: "below_lts_floor",
-        stopAt: releases.floor.release,
-        message,
-      };
-      return { installed: null, plan };
-    }
-    const plan = planUpgrade({
-      installed: known.installed,
-      image,
-      floor: releases.floor,
-      manifests: releases.manifests,
-      ledger: { floor: highestRecordedFloor({ runs }), steps },
-    });
-    return { installed: known.installed, plan };
+    return planInstallation({ image, releases, steps, runs, fresh });
   }
 
   private async upgradeUnderLease({
@@ -351,6 +329,8 @@ export class UpgradeRunnerService {
     const phases = this.phasesOf({ runId: run.id });
     try {
       const report = await this.applyPlan({ plan, before, runId: run.id, signal, phases });
+      const upcasts = await this.options.upcasts?.();
+      if (upcasts) await this.ledger.recordUpcastSteps({ runId: run.id, steps: upcasts });
       await this.finishRun({ runId: run.id, outcome: "succeeded", report, phases });
       const message = `upgraded to ${this.options.image.release ?? "this image"}`;
       return upgradeOutcome({ code: "done", message, runId: run.id, detail: report });

@@ -4850,6 +4850,11 @@ const presentations = {
     title: "That page of upgrade runs couldn't be read",
     describe: () => "Reload the upgrades page to start from the newest run.",
   },
+  upgrade_plan_unavailable: {
+    title: "The upgrade preview isn't available here",
+    describe: () =>
+      "This process was started without the release manifests a preview needs. Open the preview from the API.",
+  },
   upgrade_step_not_failed: {
     title: "Only a failed step can be retried",
     describe: (error) => {

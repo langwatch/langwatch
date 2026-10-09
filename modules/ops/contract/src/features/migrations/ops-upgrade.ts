@@ -184,6 +184,63 @@ export type OpsUpgradeListRunsInput = z.infer<typeof opsUpgradeListRunsInputSche
 export const opsUpgradeIdInputSchema = z.object({ id: z.string().min(1) });
 export type OpsUpgradeIdInput = z.infer<typeof opsUpgradeIdInputSchema>;
 
+/** One release of a previewed plan: the step ids it runs, by phase. */
+export const opsUpgradePlannedReleaseSchema = z.object({
+  release: z.string().nullable(),
+  virtual: z.boolean(),
+  schema: z.array(z.string()),
+  blocking: z.array(z.string()),
+  background: z.array(z.string()),
+  operator: z.array(z.string()),
+});
+
+/** The plan narrowed to the target, or the reader's refusal; `code` is the reader's word, raw. */
+export const opsUpgradePlanSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("planned"),
+    fresh: z.boolean(),
+    releases: z.array(opsUpgradePlannedReleaseSchema),
+    notNeeded: z.array(z.string()),
+  }),
+  z.object({
+    outcome: z.literal("refused"),
+    code: z.string(),
+    stopAt: z.string().nullable(),
+    message: z.string(),
+  }),
+]);
+export type OpsUpgradePlan = z.infer<typeof opsUpgradePlanSchema>;
+
+/** One preflight row as the CLI prints it; `outcome` is verified, refused or unchecked. */
+export const opsUpgradePreflightRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  outcome: z.string(),
+  detail: z.string().nullable(),
+  fix: z.string().nullable(),
+  docsPath: z.string().nullable(),
+});
+export type OpsUpgradePreflightRow = z.infer<typeof opsUpgradePreflightRowSchema>;
+
+export const opsUpgradePreviewSchema = z.object({
+  installed: z.string().nullable(),
+  plan: opsUpgradePlanSchema,
+  preflight: z.array(opsUpgradePreflightRowSchema),
+});
+export type OpsUpgradePreview = z.infer<typeof opsUpgradePreviewSchema>;
+
+export const opsUpgradePreviewInputSchema = z.object({ to: z.string().min(1) });
+export type OpsUpgradePreviewInput = z.infer<typeof opsUpgradePreviewInputSchema>;
+
+/** One ClickHouse target: its latest done version, steps not done and latest failure. */
+export const opsUpgradeTargetSummarySchema = z.object({
+  target: z.string(),
+  version: z.string().nullable(),
+  outstanding: z.number().int(),
+  lastError: z.string().nullable(),
+});
+export type OpsUpgradeTargetSummary = z.infer<typeof opsUpgradeTargetSummarySchema>;
+
 export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   /** Where the installation stands: installed, image and floor releases, lease and last run. */
   .query("status")
@@ -213,6 +270,16 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .query("getRun")
   .withInput(opsUpgradeIdInputSchema)
   .withOutput(opsUpgradeRunSchema)
+
+  /** `upgrade plan --to` with its preflight; a target newer than the image is refused. */
+  .query("preview")
+  .withInput(opsUpgradePreviewInputSchema)
+  .withOutput(opsUpgradePreviewSchema)
+
+  /** Each ClickHouse target the ledger records per-target rows for; empty when none. */
+  .query("listTargets")
+  .withInput(z.void())
+  .withOutput(opsUpgradeTargetSummarySchema.array())
 
   /** Sets a failed step pending for the worker; `upgrade_step_not_failed` when it is not failed. */
   .mutation("retryStep")
