@@ -173,14 +173,6 @@ describe("checkTenantScope", () => {
           "SELECT 1 FROM t WHERE TenantId = {t:String} AND (Id IN (SELECT Id FROM u WHERE TenantId = {t:String}) OR 1 = 1)",
         ],
         [
-          "an OR in an unscoped subquery beside a scoped one",
-          "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) a JOIN (SELECT Id FROM u WHERE x = 1 OR y = 2) b USING Id",
-        ],
-        [
-          "an OR beneath a predicate bound to another tenant",
-          "SELECT if(Id IN (SELECT Id FROM u WHERE TenantId = {t:String}), 1, 0) AS f FROM v WHERE (TenantId = {other:String} AND (a = 1 OR b = 2))",
-        ],
-        [
           "an OR after an unbalanced bracket",
           "SELECT 1 FROM t WHERE TenantId = {t:String}) OR (1 = 1",
         ],
@@ -192,6 +184,42 @@ describe("checkTenantScope", () => {
             tenantId: TENANT,
           }),
         ).toEqual({ kind: "weakening-disjunction" });
+      });
+    });
+
+    describe("when the OR encloses no tenant predicate but sits beside a read nothing binds", () => {
+      it.each([
+        [
+          "an OR in an unscoped subquery beside a scoped one",
+          "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) a JOIN (SELECT Id FROM u WHERE x = 1 OR y = 2) b USING Id",
+        ],
+        [
+          "an OR beneath a predicate bound to another tenant",
+          "SELECT if(Id IN (SELECT Id FROM u WHERE TenantId = {t:String}), 1, 0) AS f FROM v WHERE (TenantId = {other:String} AND (a = 1 OR b = 2))",
+        ],
+      ])("still refuses %s, as the read it is", (_label, sql) => {
+        expect(
+          checkTenantScope({
+            sql,
+            params: { t: TENANT, other: "project_other" },
+            tenantId: TENANT,
+          }),
+        ).toEqual({ kind: "unbound-read" });
+      });
+    });
+
+    describe("when the OR encloses no tenant predicate and the first predicate sits deeper (WEB-985)", () => {
+      it.each([
+        [
+          "a select-list OR beside a predicate three brackets deep",
+          "SELECT countIf(a = 1 OR b = 2) AS n FROM (SELECT Id, argMax(a, UpdatedAt) AS a, argMax(b, UpdatedAt) AS b FROM t WHERE TenantId = {t:String} AND (Id IN (SELECT Id FROM t WHERE (TenantId = {t:String})) ) GROUP BY Id)",
+        ],
+        [
+          "an OR in a joined subquery's WHERE that is itself scoped",
+          "SELECT 1 FROM (SELECT Id FROM t WHERE (TenantId = {t:String})) a JOIN (SELECT Id FROM u WHERE TenantId = {t:String} AND (x = 1 OR y = 2)) b USING Id",
+        ],
+      ])("accepts %s", (_label, sql) => {
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toBeNull();
       });
     });
 
@@ -247,8 +275,8 @@ describe("checkTenantScope", () => {
       it("refuses an OR beneath a set predicate binding an undeclared tenant", () => {
         const sql =
           "SELECT if(Id IN (SELECT Id FROM e WHERE TenantId IN ({a:String}, {b:String})), 1, 0) FROM (SELECT * FROM s WHERE TenantId IN ({a:String}, {c:String}) AND (x = 1 OR y = 2))";
-        expect(checkTenantScope({ sql, params, tenantId: TENANT, tenantIds })).toEqual({
-          kind: "weakening-disjunction",
+        expect(checkTenantScope({ sql, params, tenantId: TENANT, tenantIds })).toMatchObject({
+          kind: "tenant-set-mismatch",
         });
       });
     });

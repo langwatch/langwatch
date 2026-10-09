@@ -190,7 +190,7 @@ describe("tenant scope guard vs the timeseries builders", () => {
   });
 
   // WEB-985: the eval slim builder is still refused; flip to `it` once fixed (routed to fix-hi).
-  it.fails("passes the overview's evaluation summary on the table it routes to (WEB-985)", () => {
+  it("passes the overview's evaluation summary on the table it routes to (WEB-985)", () => {
     const input = {
       projectId: "tenant-a",
       ...dates,
