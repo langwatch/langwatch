@@ -39,7 +39,7 @@ func telemetryEnv(st domain.Stack) []string {
 func (o *Orchestrator) telemetryChild(st domain.Stack, repoRoot string, base []string) Child {
 	logDir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
 	return Child{
-		Name: domain.TelemetryService, Dir: repoRoot, Color: palette[5], LogPath: filepath.Join(logDir, domain.TelemetryService+".log"),
+		Name: domain.TelemetryService, Dir: repoRoot, Color: palette[9], LogPath: filepath.Join(logDir, domain.TelemetryService+".log"),
 		Shell: o.simulatorShell("telemetry"),
 		Env:   append(append(append([]string{}, base...), domain.LaneEnv(domain.TelemetryService)), telemetryEnv(st)...),
 	}

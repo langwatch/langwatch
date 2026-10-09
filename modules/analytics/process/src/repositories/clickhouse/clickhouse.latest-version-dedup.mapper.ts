@@ -43,9 +43,7 @@ const VERSION = "__version";
  * expression (`map('k', Attributes['k']) AS Attributes`).
  */
 export function parseLatestVersionColumn(entry: string): LatestVersionColumn {
-  const aliased = /^([\s\S]+?)\s+AS\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/i.exec(
-    entry.trim(),
-  );
+  const aliased = /^([\s\S]+?)\s+AS\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/i.exec(entry.trim());
   if (aliased) {
     return { name: aliased[2]!, expression: aliased[1]!.trim() };
   }
@@ -140,9 +138,7 @@ export function latestVersionSubquery({
     );
     outerSelect.push(`argMax(${LATEST_ROW}, ${VERSION}) AS ${LATEST}`);
     carried.forEach((column, index) => {
-      outerSelect.push(
-        `tupleElement(${LATEST}, ${index + 1}) AS ${column.name}`,
-      );
+      outerSelect.push(`tupleElement(${LATEST}, ${index + 1}) AS ${column.name}`);
     });
   }
   if (isVersionCarried) {

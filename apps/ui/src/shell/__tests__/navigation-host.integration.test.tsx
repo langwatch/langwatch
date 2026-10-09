@@ -314,7 +314,11 @@ describe("the application chrome", () => {
     /** @scenario "A project address is not called missing while its scope is still settling" */
     /** @scenario The workspace is still resolving while the session is */
     it("reports the workspace as still resolving rather than a project that is not there", async () => {
-      renderChrome({ ...HOST_SERVICES, scope: new SettlingScope(), session: new SettlingSession() });
+      renderChrome({
+        ...HOST_SERVICES,
+        scope: new SettlingScope(),
+        session: new SettlingSession(),
+      });
 
       await waitFor(() =>
         expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("1"),

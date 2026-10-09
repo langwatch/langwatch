@@ -6,14 +6,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { TraceSpanNormalization } from "../../features/span/services/span-normalization.service.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TraceIoExtractionAdapterService } from "../../features/derivation/services/trace-io-extraction-adapter.service.ts";
 import type { TraceIoExtraction } from "../../features/derivation/services/trace-io-extraction.service.ts";
-import type { TraceMediaReferenceResolver } from "../../features/media/services/trace-media-reference.service.ts";
-import { TraceMediaReferenceService } from "../../features/media/services/trace-media-reference.service.ts";
 import type { TraceModelCost } from "../../features/derivation/services/trace-model-cost.service.ts";
 import { TraceModelCostService } from "../../features/derivation/services/trace-model-cost.service.ts";
+import type { TraceMediaReferenceResolver } from "../../features/media/services/trace-media-reference.service.ts";
+import { TraceMediaReferenceService } from "../../features/media/services/trace-media-reference.service.ts";
+import type { TraceSpanNormalization } from "../../features/span/services/span-normalization.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { EventingRecordSpanAdapter } from "../record-span.commands.ts";
 import {

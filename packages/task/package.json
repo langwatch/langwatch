@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/task",
-  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "The task interface: an abstract Task, a catalogue that resolves one by name, a launcher that runs it to an exit code, and the TaskHostPort a task uses to reach infrastructure that might not be there.",
@@ -32,5 +31,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

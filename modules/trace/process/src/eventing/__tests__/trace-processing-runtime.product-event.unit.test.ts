@@ -19,8 +19,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => logger,
 }));
 
-import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import {
   type TraceProcessingPipelineInput,
   TraceProcessingRuntimeAdapter,

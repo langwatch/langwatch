@@ -61,7 +61,8 @@ type Slice = { root: string; slice: number; of: number };
 const job = isMainThread ? undefined : (workerData as Slice);
 const [outFile = "", rootArgument = "", part = "all"] = job ? [] : process.argv.slice(2);
 const root = job?.root ?? rootArgument;
-if (!job && (!outFile || !root)) throw new Error("usage: main.mts <out-file> <workspace-root> [part]");
+if (!job && (!outFile || !root))
+  throw new Error("usage: main.mts <out-file> <workspace-root> [part]");
 
 const reading: Reading = { root, resolver: createWorkspaceModuleResolver({ root }) };
 const { packages, catalogue } = discoverClassifiedPackages(root);
@@ -208,7 +209,10 @@ const facts = async () => ({
     feature: pkg.feature ?? "",
   })),
 });
-const routes = async () => ({ mounted: await mountedRoutes(), schemas: await readSchemas({ root }) });
+const routes = async () => ({
+  mounted: await mountedRoutes(),
+  schemas: await readSchemas({ root }),
+});
 
 if (job) {
   parentPort?.postMessage(readSlice(job));

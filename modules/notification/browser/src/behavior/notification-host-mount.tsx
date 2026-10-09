@@ -55,7 +55,8 @@ export default function NotificationHostMount({ children }: { children?: ReactNo
   const { projectId } = useUiScope().activeScope();
 
   const host = useMemo(
-    () => new HostServiceNotificationHost(projectId ? { id: projectId } : void 0, session, feedback),
+    () =>
+      new HostServiceNotificationHost(projectId ? { id: projectId } : void 0, session, feedback),
     [projectId, session, feedback],
   );
 

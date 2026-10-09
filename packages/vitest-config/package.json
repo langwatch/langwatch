@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/vitest-config",
-  "langwatch": { "group": "tooling" },
   "version": "0.1.0",
   "private": true,
   "description": "The one vitest shape every LangWatch package declares: the jsdom/node builder, the real-browser lane, and the console guard a unit suite sets up. It also configures the test process's logger as its boot seam, so observability and time, beneath it, keep plain vitest configs.",
@@ -56,5 +55,8 @@
     "playwright": {
       "optional": true
     }
+  },
+  "langwatch": {
+    "group": "tooling"
   }
 }

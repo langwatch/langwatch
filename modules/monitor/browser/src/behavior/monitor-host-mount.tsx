@@ -125,7 +125,14 @@ export default function MonitorHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new HostServiceMonitorHost({ hostScope, session, lent, navigation, uiRoute: route, feedback }),
+      new HostServiceMonitorHost({
+        hostScope,
+        session,
+        lent,
+        navigation,
+        uiRoute: route,
+        feedback,
+      }),
     [hostScope, session, lent, navigation, route, feedback],
   );
 

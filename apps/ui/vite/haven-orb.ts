@@ -10,9 +10,7 @@ const ORB_ENTRY = path.join(import.meta.dirname, "haven-orb", "orb-client.ts");
 /** End of head: after plugin-react's preamble (its .tsx needs it), before the app entry in body. */
 export function havenOrbTags({ slug }: { slug: string | undefined }): HtmlTagDescriptor[] {
   if (!slug) return [];
-  return [
-    { tag: "script", attrs: { type: "module", src: `/@fs${ORB_ENTRY}` }, injectTo: "head" },
-  ];
+  return [{ tag: "script", attrs: { type: "module", src: `/@fs${ORB_ENTRY}` }, injectTo: "head" }];
 }
 
 /** The haven dev orb (specs/setup/haven-dev-orb.feature); `apply: "serve"` skips builds. */

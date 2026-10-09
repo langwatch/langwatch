@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { WireOf } from "@langwatch/api/web";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { datasetClient } from "@langwatch/dataset-client";
 import {

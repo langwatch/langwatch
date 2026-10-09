@@ -50,7 +50,6 @@ async function encodeGq2(
 }
 
 describe("job envelope retry attempt", () => {
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });

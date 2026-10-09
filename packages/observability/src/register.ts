@@ -34,7 +34,7 @@ if (unknown.length > 0) {
   process.stderr.write(`[observability] unknown instrumentations ignored: ${unknown.join(", ")}\n`);
 }
 if (names.length > 0) {
-  // Wrap only node_modules: a wrapped workspace .ts module is re-emitted unstripped and breaks boot.
+  // Wrap only node_modules: a wrapped workspace .ts module comes back unstripped and breaks boot.
   register("@opentelemetry/instrumentation/hook.mjs", import.meta.url, {
     data: { include: [/\/node_modules\//] },
   });

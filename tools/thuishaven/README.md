@@ -715,7 +715,7 @@ The daemon's JSON, which the console reads:
   rather than letting a test model run as your own user. On macOS haven wants no
   colima: a development stack runs the worker on the host tier by default and
   `up` prints `Langy runs unsandboxed on this machine (macOS runs langyagent on
-  the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
+the host); set LANGY_UNSAFE_HOST_ACCESS=0 to run it sandboxed in colima`. The
   container tiers below stay as an explicit opt-in there. On the host tier haven
   also sets `LANGY_EGRESS_REQUIRE_TLS=false` in the langyagent environment (the
   worker reaches the manager's loopback relay over plain HTTP), and `up` builds the

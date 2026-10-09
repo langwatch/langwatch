@@ -2,8 +2,8 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TraceExportRateLimitedError } from "@langwatch/trace-contract";
 
-import type { TraceExportSlotRepository } from "../repositories/trace-export-slot.repository.ts";
 import type { TraceRateLimitRepository } from "../../ingestion/repositories/trace-rate-limit.repository.ts";
+import type { TraceExportSlotRepository } from "../repositories/trace-export-slot.repository.ts";
 
 /**
  * A held slot outlives its export for ten minutes at most: the TTL is the

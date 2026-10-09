@@ -187,7 +187,9 @@ function useNavigationHostReading({
   );
   const organizationRole = useMemo(
     () =>
-      scopeHostService.organizationRoleOf(read.find((one) => one.id === activeScope.organizationId)),
+      scopeHostService.organizationRoleOf(
+        read.find((one) => one.id === activeScope.organizationId),
+      ),
     [read, activeScope.organizationId, scopeHostService],
   );
   const team = useMemo(
@@ -345,7 +347,9 @@ function useNavigationHostReading({
           pathname,
           search,
           projectParam: routeReading.projectParam,
-          projectSlugFromAddress: scopeHostService.projectSlugAddressedBy(routeReading.projectParam),
+          projectSlugFromAddress: scopeHostService.projectSlugAddressedBy(
+            routeReading.projectParam,
+          ),
           catchAllPath: routeReading.pathname.replace(/^\/@project\/?/, ""),
           routePattern,
           deployment,

@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 const CONTRACT_SRC = fileURLToPath(new URL("../", import.meta.url));
 
-const SCHEMA_NAMES = readFileSync(join(CONTRACT_SRC, "features/execution/scenario-execution-data.ts"), "utf8")
+const SCHEMA_NAMES = readFileSync(
+  join(CONTRACT_SRC, "features/execution/scenario-execution-data.ts"),
+  "utf8",
+)
   .split("\n")
   .map((line) => /^export const (\w+Schema)\b/.exec(line)?.[1])
   .filter((name): name is string => name !== undefined);

@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/handled-error",
-  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "The handled-error machinery: the HandledError base class, its subclasses, the serialized wire shapes and the Go herr envelope adapter, the enumerated app error codes and the code-keyed customer presentation registry.",
@@ -54,5 +53,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

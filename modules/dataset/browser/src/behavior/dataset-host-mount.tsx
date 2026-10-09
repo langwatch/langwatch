@@ -128,7 +128,14 @@ export default function DatasetHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new HostServiceDatasetHost({ scopeHost, session, lent, uiRoute: route, navigation, feedback }),
+      new HostServiceDatasetHost({
+        scopeHost,
+        session,
+        lent,
+        uiRoute: route,
+        navigation,
+        feedback,
+      }),
     [scopeHost, session, lent, route, navigation, feedback],
   );
 

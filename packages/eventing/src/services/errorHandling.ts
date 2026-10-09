@@ -583,9 +583,7 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
  * every attempt for the same "too large" answer.
  */
 export const CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS: readonly string[] =
-  CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS.filter(
-    (fragment) => fragment !== "MEMORY_LIMIT_EXCEEDED",
-  );
+  CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS.filter((fragment) => fragment !== "MEMORY_LIMIT_EXCEEDED");
 
 /**
  * Classifies a ClickHouse error as RECOVERABLE (transient) or CRITICAL.

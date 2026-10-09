@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/prisma-client",
-  "langwatch": { "group": "data" },
   "version": "0.1.0",
   "private": true,
   "description": "Explicitly configured Prisma/Postgres construction and lifecycle services, the tenancy query guards every process composes its client with, plus the canonical LangWatch schema, migrations, and generated client.",
@@ -53,5 +52,8 @@
     "prisma": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "data"
   }
 }

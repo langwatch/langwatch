@@ -14,14 +14,14 @@ The contract is fixed now; the pieces it names land in slices. All five have lan
 the workers run `upgrade` at start (the chart's pre-roll Job does too, when upgrades are serialised), and every admitted api and worker writes its roster entry
 (15 s refresh, 60 s stale).
 
-| Piece                                           | Lands with                                                   |
-| ----------------------------------------------- | ------------------------------------------------------------ |
-| `pnpm task upgrade` (the one command)           | `mig-s3-runner`                                              |
-| The workers, and the chart Job when upgrades are serialised, running `upgrade` | `mig-entry-points`, UIW slice 7 |
-| New pods refusing until current, and the roster | `mig-serving-gate`                                           |
-| The serving roster table                        | `mig-ledger-widen`                                           |
-| The "old writers gone" predicate                | `mig-cloud-presence` (`packages/upgrade/src/serving-roster`) |
-| Writers before the roster (assertion, grace)    | `mig-pre-roster`; the serving gate's wiring is pending       |
+| Piece                                                                          | Lands with                                                   |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `pnpm task upgrade` (the one command)                                          | `mig-s3-runner`                                              |
+| The workers, and the chart Job when upgrades are serialised, running `upgrade` | `mig-entry-points`, UIW slice 7                              |
+| New pods refusing until current, and the roster                                | `mig-serving-gate`                                           |
+| The serving roster table                                                       | `mig-ledger-widen`                                           |
+| The "old writers gone" predicate                                               | `mig-cloud-presence` (`packages/upgrade/src/serving-roster`) |
+| Writers before the roster (assertion, grace)                                   | `mig-pre-roster`; the serving gate's wiring is pending       |
 
 ## The contract
 

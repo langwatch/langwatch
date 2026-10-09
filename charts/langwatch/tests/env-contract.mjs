@@ -104,16 +104,30 @@ const PROCESS_CONTAINERS = {
   workers: ["templates/workers/deployment.yaml", "lw-workers"],
   migrate: ["templates/app/migrate-pre-roll-job.yaml", "migrate"],
 };
+// Renders only for a local-filesystem install that serialises its upgrades.
+const CONDITIONAL = new Set(["migrate"]);
+
+/** One template's render, or null when the values leave it out. */
+function renderedTemplate(args, template) {
+  try {
+    return execFileSync("helm", ["template", "lw", chart, ...args, "--show-only", template], {
+      encoding: "utf8",
+      maxBuffer: 64 << 20,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    if (String(error.stderr).includes("could not find template")) return null;
+    throw error;
+  }
+}
 
 /**
  * The env names one container is given, and the names its values interpolate. Read from
  * the rendered lines rather than a YAML parser, so the check needs nothing but helm and node.
  */
 function renderedEnv(args, [template, container]) {
-  const out = execFileSync("helm", ["template", "lw", chart, ...args, "--show-only", template], {
-    encoding: "utf8",
-    maxBuffer: 64 << 20,
-  });
+  const out = renderedTemplate(args, template);
+  if (out === null) return null;
   const lines = out.split("\n");
   const start = lines.findIndex((l) => l.trim() === `- name: ${container}`);
   const envAt = lines.findIndex((l, i) => i > start && l.trim() === "env:");
@@ -189,6 +203,7 @@ function problemsIn(set, args, isRead) {
   const envs = {};
   for (const [container, where] of Object.entries(PROCESS_CONTAINERS)) {
     const env = renderedEnv(args, where);
+    if (!env && CONDITIONAL.has(container)) continue;
     if (!env) {
       problems.push(`[${set}] ${container}: not rendered`);
       continue;

@@ -46,9 +46,9 @@
     "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm-filters.test.ts"
   },
   "dependencies": {
-    "@langwatch/process": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/time": "workspace:*",
     "chalk": "catalog:",
     "commander": "catalog:",

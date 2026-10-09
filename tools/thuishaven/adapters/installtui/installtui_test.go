@@ -2,7 +2,6 @@ package installtui
 
 import (
 	"regexp"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -377,7 +376,7 @@ func TestEveryLineWrapsToTheTerminalWidth(t *testing.T) {
 	}
 	squash := strings.NewReplacer(" ", "", "\n", "")
 	for _, r := range m.rows {
-		if _, manual := r.st.Candidates[r.candidate].InstallOn(runtime.GOOS); isManual(r) && !strings.Contains(squash.Replace(view), squash.Replace(manual)) {
+		if _, manual := r.st.Candidates[r.candidate].InstallOn(platform(r)); isManual(r) && !strings.Contains(squash.Replace(view), squash.Replace(manual)) {
 			t.Errorf("the %s command was cut off:\n%s", r.st.Name, view)
 		}
 	}

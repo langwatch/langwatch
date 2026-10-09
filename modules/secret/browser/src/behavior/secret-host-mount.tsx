@@ -75,7 +75,8 @@ export default function SecretHostMount({ children }: { children?: ReactNode }) 
   const { projectId } = useUiScope().activeScope();
   const Switcher = useLent(ProjectSwitcherToken);
   const host = useMemo(
-    () => new HostServiceSecretHost({ projectId: projectId ?? void 0, session, feedback, Switcher }),
+    () =>
+      new HostServiceSecretHost({ projectId: projectId ?? void 0, session, feedback, Switcher }),
     [projectId, session, feedback, Switcher],
   );
   return <SecretHostProvider value={host}>{children}</SecretHostProvider>;

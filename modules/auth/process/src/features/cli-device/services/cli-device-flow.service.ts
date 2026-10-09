@@ -9,13 +9,13 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { EnsuredPersonalWorkspace } from "@langwatch/organization-contract";
 import type * as zodModule from "zod";
 
+import type { CliAccessProject } from "../../../services/api-rest-credentials.service.ts";
 import {
   answer,
   expired,
   posted,
   type CliDeviceFlowAnswer,
 } from "../rules/cli-device-flow.rules.ts";
-import type { CliAccessProject } from "../../../services/api-rest-credentials.service.ts";
 import {
   type CliDeviceApprovalFrame,
   CliDeviceApprovalService,

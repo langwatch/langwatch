@@ -9,13 +9,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
+import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import { blobStoreResolving } from "../../../../../services/__tests__/support/trace-blob-store.support.ts";
-import type { TraceBlobStoreService } from "../../../../media/services/trace-blob-store.service.ts";
-import { TraceIOExtractionService } from "../../../../derivation/services/trace-io-extraction.service.ts";
 import { TraceOffloadResolutionService } from "../../../../../services/trace-offload-resolution.service.ts";
+import { TraceIOExtractionService } from "../../../../derivation/services/trace-io-extraction.service.ts";
+import type { TraceBlobStoreService } from "../../../../media/services/trace-blob-store.service.ts";
 import type { ResolveTraceSpansFn } from "../../trace-legacy-read.repository.ts";
 import type * as traceLegacyReadRepositoryModule from "../trace-legacy-read.repository.ts";
-import { traceSummaryRow } from "../../../../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
