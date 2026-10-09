@@ -89,6 +89,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb", s.handleOrbPreflight)
 	mux.HandleFunc("OPTIONS /api/stacks/{slug}/orb/", s.handleOrbPreflight)
 	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
+	mux.HandleFunc("/api/stacks/{slug}/start", s.handleStartKeeper)
 	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
 	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
 	mux.HandleFunc("/api/stacks/{slug}/start-service", s.handleStartService)

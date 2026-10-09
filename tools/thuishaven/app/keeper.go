@@ -13,7 +13,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// keeperHandover bounds how long an up waits for its keeper to take the record
+// keeperHandover bounds how long the daemon waits for a keeper to take the record
 // (race 1 in section 11.2 of dev/docs/plans/haven-one-go-process-2026-10-09.md).
 const keeperHandover = 10 * time.Second
 
@@ -210,9 +210,9 @@ func (o *Orchestrator) keeperPlan(children []Child, isOwner bool) KeeperPlan {
 	return plan
 }
 
-// handOver gives a provisioned stack to its keeper: write the plan, start
-// `haven keep` in its own session and wait for the keeper's pid in the record.
-// The caller has stopped its heartbeat, so no beat overwrites the keeper's.
+// handOver gives a provisioned stack to its keeper: write the plan, then ask
+// the daemon, started first if none runs, to start `haven keep` (ruling
+// D-S4c-1). The caller has stopped its heartbeat, so no beat overwrites the keeper's.
 func (o *Orchestrator) handOver(ctx context.Context, st domain.Stack, plan KeeperPlan) error {
 	if err := ignoreHavenState(st.WorktreeDir); err != nil {
 		return fmt.Errorf("keeping .haven out of git: %w", err)
@@ -220,10 +220,49 @@ func (o *Orchestrator) handOver(ctx context.Context, st domain.Stack, plan Keepe
 	if err := writeKeeperPlan(keeperPlanPath(st.WorktreeDir, st.Slug), plan); err != nil {
 		return fmt.Errorf("writing the keeper plan: %w", err)
 	}
+	if o.daemon == nil {
+		return errors.New("no daemon client configured")
+	}
+	o.ensureDaemon(st.WorktreeDir)
+	info, ok := o.store.Daemon()
+	if !ok || !o.daemonAlive() {
+		return errors.New("no haven daemon is running to start the keeper (see haven.log in the haven home)")
+	}
+	if err := o.daemon.StartKeeper(ctx, info.Port, st.Slug); err != nil {
+		return fmt.Errorf("the daemon did not start the keeper: %w", err)
+	}
+	return nil
+}
+
+// StartKeeper is the daemon's half of the hand-over: it starts slug's keeper
+// only while the plan's provisioner, alive, still holds the record, and
+// returns once the keeper has taken it (race 1 in section 11.2 of the plan).
+func (o *Orchestrator) StartKeeper(ctx context.Context, slug string) error {
+	plan, err := o.ReadKeeperPlan(slug)
+	if err != nil {
+		return fmt.Errorf("stack %q has no readable keeper plan", slug)
+	}
+	if o.sem != nil {
+		release, _, err := o.sem.Acquire(ctx, "up-"+slug, 1)
+		if err != nil {
+			return err
+		}
+		defer release()
+	}
+	st, ok := o.stackBySlug(slug)
+	if !ok || st.LauncherPID != plan.ProvisionerPID || !o.launcherIsOurs(st) {
+		return fmt.Errorf("stack %q is not waiting for a keeper", slug)
+	}
 	if err := o.spawnKeeper(st); err != nil {
 		return err
 	}
-	return o.awaitKeeper(ctx, st.Slug, keeperHandover)
+	ctx, cancel := context.WithTimeout(ctx, keeperHandover)
+	defer cancel()
+	err = o.awaitKeeper(ctx, slug, plan.ProvisionerPID)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("the keeper for %q did not take the stack within %s", slug, keeperHandover)
+	}
+	return err
 }
 
 // spawnKeeper starts `haven keep <slug>` in its own session, its output in the
@@ -241,20 +280,15 @@ func (o *Orchestrator) spawnKeeper(st domain.Stack) error {
 }
 
 // awaitKeeper waits until the record names a launcher that is ours and is not
-// this process. A canceled ctx (Ctrl-C) returns at once (ruling R4).
-func (o *Orchestrator) awaitKeeper(ctx context.Context, slug string, timeout time.Duration) error {
-	self := o.sys.Getpid()
-	deadline := time.Now().Add(timeout)
+// the provisioner, until ctx's deadline. A canceled ctx (Ctrl-C) returns at once (ruling R4).
+func (o *Orchestrator) awaitKeeper(ctx context.Context, slug string, provisioner int) error {
 	for {
 		st, ok := o.stackBySlug(slug)
 		if !ok {
 			return fmt.Errorf("stack %q was torn down during the hand-over", slug)
 		}
-		if st.LauncherPID != self && st.LauncherPID != 0 && o.launcherIsOurs(st) {
+		if st.LauncherPID != provisioner && st.LauncherPID != 0 && o.launcherIsOurs(st) {
 			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("the keeper for %q did not take the stack within %s", slug, timeout)
 		}
 		select {
 		case <-ctx.Done():

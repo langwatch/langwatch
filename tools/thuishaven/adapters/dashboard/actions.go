@@ -27,6 +27,9 @@ type Actions struct {
 	// ResetDatabases runs `haven db reset --yes` for it. Both return once spawned.
 	StartService   func(slug, service string) error
 	ResetDatabases func(slug string) error
+	// StartKeeper starts a provisioned stack's keeper for the `haven up` that
+	// asks, and returns once the keeper holds the stack's record.
+	StartKeeper func(ctx context.Context, slug string) error
 }
 
 // maxActionBody caps a request body that is only ever a small JSON object, so a
@@ -218,4 +221,23 @@ func (s *Server) handleResetDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeActionResult(w, "resetting "+slug+"'s databases: migrating and seeding them fresh", s.config.Actions.ResetDatabases(slug))
+}
+
+// handleStartKeeper is the hand-over `haven up` asks for (ruling D-S4c-1). The
+// CLI passes guardAction with Sec-Fetch-Site: none; a page on a stack's app
+// origin is same-site, not same-origin, and is refused like any other page.
+func (s *Server) handleStartKeeper(w http.ResponseWriter, r *http.Request) {
+	if !guardAction(w, r) {
+		return
+	}
+	if s.config.Actions.StartKeeper == nil {
+		http.Error(w, "this haven cannot start a keeper", http.StatusNotImplemented)
+		return
+	}
+	slug := r.PathValue("slug")
+	if !s.knownLogStack(slug) {
+		http.Error(w, "unknown stack", http.StatusNotFound)
+		return
+	}
+	writeActionResult(w, "started "+slug+"'s keeper", s.config.Actions.StartKeeper(r.Context(), slug))
 }
