@@ -5887,6 +5887,11 @@ const presentations = {
     title: "Couldn't load an attachment",
     describe: () => "Check the file is still available, then run again.",
   },
+  connect_credential_pending: {
+    title: "Hosted services are still being set up",
+    describe: () =>
+      "Your license is valid and its key is being prepared. Try again in a few seconds.",
+  },
   connect_instance_required: {
     title: "This install did not identify itself",
     describe: () =>

@@ -74374,7 +74374,11 @@ Send your LangWatch API key in any one of these forms:
 | Bearer | `Authorization: Bearer <token>` |
 | Basic | `Authorization: Basic base64(projectId:token)` |
 
-Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To run `POST /api/v1/query` over one project only, send its id as `projectId` in the request body: the run then reads that project's rows alone, under that project's own content protections. Without `projectId` the run covers every project the key can read. You can also filter inside the statement itself with `WHERE TenantId = '<project id>'`, but the result is then redacted by the strictest protection across all the projects the key can read.
+Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required.
+
+To run `POST /api/v1/query` over one project only, send its id as `projectId` in the request body: the run then reads that project's rows alone, under that project's own content protections. Without `projectId` the run covers every project the key can read.
+
+You can also filter inside the statement itself with `WHERE TenantId = '<project id>'`, but the result is then redacted by the strictest protection across all the projects the key can read.
 
 A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
 
