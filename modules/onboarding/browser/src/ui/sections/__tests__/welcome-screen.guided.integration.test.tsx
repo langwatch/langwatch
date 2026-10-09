@@ -550,3 +550,28 @@ describe("WelcomeScreen in the classic variant", () => {
     );
   });
 });
+
+describe("WelcomeScreen going back from the intent step", () => {
+  beforeEach(() => {
+    flags.experiment_onboarding_langy_guided = false;
+    flags.release_ui_ai_governance_enabled = true;
+    organizations = [];
+    routerState.query = {};
+  });
+
+  /** @scenario "Going back to the organization step keeps what was typed" */
+  it("keeps the organization name and the terms tick", async () => {
+    renderWelcome();
+    await screen.findByLabelText("Organization name");
+    fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "ACME" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    await waitFor(() => expect(next()).toBeEnabled());
+    fireEvent.click(next());
+    await userEvent.click(await screen.findByText("Track AI coding agents"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(await screen.findByLabelText("Organization name")).toHaveValue("ACME");
+    expect(screen.getByRole("checkbox")).toBeChecked();
+  });
+});
