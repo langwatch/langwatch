@@ -36,6 +36,22 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer calls that tool with JSON arguments that satisfy its parameters schema
     And the same request gives the same arguments
 
+  Scenario: Tools mode calls a tool on an auto tool choice
+    Given the model name contains "tools" or the call carries X-Llmsim-Tools "auto"
+    When a chat completion offers tools with an auto tool choice
+    Then the answer calls one of them with schema-valid arguments
+    And the same request picks the same tool
+
+  Scenario: Tools mode calls the tool the user message names
+    Given the model is "markov-tools"
+    When the last user message mentions an offered tool's name
+    Then the answer calls that tool
+
+  Scenario: Tools mode answers text after a tool result
+    Given the model is "markov-tools"
+    When the last message is a tool result, over chat completions, responses or messages
+    Then the answer is text with no tool call
+
   Scenario: A json_schema response satisfies the schema
     When a chat completion asks for a json_schema response format
     Then the answer is JSON with every required key, formats, bounds, enums, consts and $ref types honoured

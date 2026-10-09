@@ -30,6 +30,7 @@ const (
 	HeaderSeed  = "X-Llmsim-Seed"
 	HeaderMode  = "X-Llmsim-Mode"
 	HeaderError = "X-Llmsim-Error"
+	HeaderTools = "X-Llmsim-Tools"
 )
 
 // maxBodyBytes caps one request body; agent transcripts run large.
@@ -303,7 +304,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 // Models are what /models lists; any model name is answered regardless.
-var Models = []string{"markov-small", "markov-json", "langy-echo", "text-embedding-llmsim", "canned-hello", "canned-ok", "canned-json"}
+var Models = []string{"markov-small", "markov-json", "markov-tools", "langy-echo", "text-embedding-llmsim", "canned-hello", "canned-ok", "canned-json"}
 
 // canned are the fixed answers a "canned-<name>" model returns, whatever the prompt.
 var canned = map[string]string{

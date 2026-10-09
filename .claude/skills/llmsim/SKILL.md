@@ -23,11 +23,15 @@ seeded Markov chain: the same prompt gets the same answer, at no cost. Code:
 
 ## Steer a call
 
-- Models: `markov-small`, `markov-json`, `langy-echo`, `text-embedding-llmsim`; any name works.
+- Models: `markov-small`, `markov-json`, `markov-tools`, `langy-echo`, `text-embedding-llmsim`; any name works.
 - `canned-hello`, `canned-ok`, `canned-json` return that fixed text for every prompt.
 - `error-429` / `error-500` in the model name, or header `X-Llmsim-Error`, force that error.
 - `X-Llmsim-Seed` pins or (`random`) varies the answer; `X-Llmsim-Mode: langy` echoes.
 - `response_format` json_schema and forced tools get schema-valid output.
+- Agentic runs: `tools` in the model name (`markov-tools`) or `X-Llmsim-Tools: auto` makes
+  an auto tool choice always call a tool (the one the last user message names, else a
+  seeded pick, schema-valid args); after a tool result it answers text. Chat, responses
+  and messages.
 
 ## Inspect and assert
 
