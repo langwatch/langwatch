@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -290,6 +291,20 @@ func (p *childPlan) goLanes(mono monolithPlan) []Child {
 		})
 	}
 	return append(out, sims.children...)
+}
+
+// retireStaleSimsCapture removes the sims capture an earlier split run left
+// when this run plans a go lane and no sims lane (LANGWATCH_GO_ONE_PROCESS):
+// `haven logs <sim>` reads sims.log first, so a dead one would hide go.log.
+func retireStaleSimsCapture(children []Child) {
+	if slices.ContainsFunc(children, func(c Child) bool { return c.Name == SimsLane }) {
+		return
+	}
+	for _, c := range children {
+		if c.Name == GoLane && c.LogPath != "" {
+			_ = os.Remove(filepath.Join(filepath.Dir(c.LogPath), SimsLane+".log"))
+		}
+	}
 }
 
 // goServices is the data-plane services the Go lane hosts, and its env.

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -99,6 +100,12 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 		return nil, fmt.Errorf("unknown service %q — restartable: %s", name, strings.Join(restartableNames(st), ", "))
 	}
 	var msgs []string
+	if slices.ContainsFunc(targets, isSimsTarget) {
+		if goLane, ok := o.goLaneHostingSims(st); ok {
+			targets = foldSimsIntoGoLane(targets, goLane)
+			msgs = append(msgs, fmt.Sprintf("%-10s run inside the go lane (LANGWATCH_GO_ONE_PROCESS=1), so the go lane restarts with them", SimsLane))
+		}
+	}
 	for _, t := range targets {
 		pids := o.sys.PIDsOnPort(t.Port)
 		if len(pids) == 0 {
@@ -116,6 +123,34 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the supervisor brings it back", t.Name, t.Port))
 	}
 	return msgs, nil
+}
+
+// goLaneHostingSims is the go lane when the process holding the simulators'
+// port also holds the go lane's: LANGWATCH_GO_ONE_PROCESS folded them in.
+func (o *Orchestrator) goLaneHostingSims(st domain.Stack) (restartTarget, bool) {
+	goLane, sims := restartTargets(st, GoLane), restartTargets(st, SimsLane)
+	if len(goLane) == 0 || len(sims) == 0 {
+		return restartTarget{}, false
+	}
+	goPIDs := o.sys.PIDsOnPort(goLane[0].Port)
+	for _, pid := range o.sys.PIDsOnPort(sims[0].Port) {
+		if slices.Contains(goPIDs, pid) {
+			return goLane[0], true
+		}
+	}
+	return restartTarget{}, false
+}
+
+func isSimsTarget(t restartTarget) bool { return t.Name == SimsLane }
+
+// foldSimsIntoGoLane swaps the sims target for the go lane hosting them, so
+// the shared process is bounced once whichever of the two was named.
+func foldSimsIntoGoLane(targets []restartTarget, goLane restartTarget) []restartTarget {
+	out := slices.DeleteFunc(slices.Clone(targets), isSimsTarget)
+	if !slices.ContainsFunc(out, func(t restartTarget) bool { return t.Name == GoLane }) {
+		out = append(out, goLane)
+	}
+	return out
 }
 
 // restartTargets resolves which children to bounce. Only supervised children

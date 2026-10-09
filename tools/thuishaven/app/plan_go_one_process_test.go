@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -78,4 +80,35 @@ func TestOneGoProcessHostsTheDataPlaneAndTheSimulators(t *testing.T) {
 			}
 		}
 	}
+}
+
+// @scenario "One Go process retires the sims log a split run left behind"
+func TestOneGoProcessRetiresTheStaleSimsCapture(t *testing.T) {
+	writeCapture := func(t *testing.T, dir string) string {
+		t.Helper()
+		path := filepath.Join(dir, SimsLane+".log")
+		if err := os.WriteFile(path, []byte("an earlier split run\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	t.Run("when the go lane hosts the simulators, the old sims.log goes", func(t *testing.T) {
+		dir := t.TempDir()
+		path := writeCapture(t, dir)
+		retireStaleSimsCapture([]Child{{Name: GoLane, LogPath: filepath.Join(dir, GoLane+".log")}})
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("sims.log survived (stat err %v); haven logs <sim> would read it", err)
+		}
+	})
+	t.Run("when a sims lane runs, its capture stays", func(t *testing.T) {
+		dir := t.TempDir()
+		path := writeCapture(t, dir)
+		retireStaleSimsCapture([]Child{
+			{Name: GoLane, LogPath: filepath.Join(dir, GoLane+".log")},
+			{Name: SimsLane, LogPath: path},
+		})
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("the live sims lane's capture was removed: %v", err)
+		}
+	})
 }
