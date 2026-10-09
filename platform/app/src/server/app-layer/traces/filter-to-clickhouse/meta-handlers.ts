@@ -111,6 +111,13 @@ const TRACE_ID_DEF: FieldDef = {
 // has / none — existence categories
 // ---------------------------------------------------------------------------
 
+/**
+ * The event name user feedback lands under. A `thumbs_up_down` tracked event,
+ * whether sent to `POST /api/events/track` or reconstructed from an SDK
+ * `langwatch.event` span event, is stored as an event of this name.
+ */
+const FEEDBACK_TRACKED_EVENT_TYPE = "thumbs_up_down";
+
 function translateExistence(
   tag: TagToken,
   negated: boolean,
@@ -149,7 +156,7 @@ function translateExistence(
         boundedSubquery(
           "stored_spans",
           "StartTime",
-          "has(`Events.Name`, 'user_feedback')",
+          `has(\`Events.Name\`, '${FEEDBACK_TRACKED_EVENT_TYPE}')`,
         ),
         negated,
       );
@@ -236,7 +243,9 @@ function evaluateExistence(
       return polarise(trace.evaluations.length > 0);
     case "feedback":
       if (trace.events == null) return UNSUPPORTED;
-      return polarise(trace.events.some((e) => e.name === "user_feedback"));
+      return polarise(
+        trace.events.some((e) => e.name === FEEDBACK_TRACKED_EVENT_TYPE),
+      );
     case "annotation":
       return polarise(trace.summary.annotationIds.length > 0);
     case "conversation":

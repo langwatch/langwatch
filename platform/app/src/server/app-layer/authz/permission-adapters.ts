@@ -18,6 +18,14 @@ import {
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import {
+  aggregatesClosedTo,
+  applyAggregateAdminGate,
+  closeProjects,
+  permittedIds,
+  projectKindReaderFor,
+} from "~/server/app-layer/permissions/aggregate-admin-gate";
+import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
   ProjectPermissionDeniedError,
@@ -60,6 +68,36 @@ function membershipDisabledDenial(): TRPCError {
   });
 }
 
+/**
+ * The denial a capped seat gets instead of the generic one: a Lite Member is
+ * told the feature is not for their account, a Developer that it is outside
+ * their seat (ADR-143). Any other seat falls through to the caller's own
+ * denial.
+ */
+function throwIfSeatRestricted({
+  organizationRole,
+  permission,
+}: {
+  organizationRole: OrganizationUserRole | null | undefined;
+  permission: Permission;
+}): void {
+  const resource = permission.split(":")[0] ?? "unknown";
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This feature is not available for your account",
+      cause: new LiteMemberRestrictedError(resource),
+    });
+  }
+  if (organizationRole === OrganizationUserRole.DEVELOPER) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This is outside your Developer seat",
+      cause: new DeveloperSeatRestrictedError(resource),
+    });
+  }
+}
+
 /** Supports data-dependent middleware composition; fixed scopes use .permission(). */
 export const checkProjectPermission =
   (permission: Permission) =>
@@ -75,15 +113,7 @@ export const checkProjectPermission =
       if (denialReason === "membership-disabled") {
         throw membershipDisabledDenial();
       }
-      if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(
-            permission.split(":")[0] ?? "unknown",
-          ),
-        });
-      }
+      throwIfSeatRestricted({ organizationRole, permission });
       // The boundary maps the handled cause to its HTTP status and customer code.
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -112,15 +142,7 @@ export const checkTeamPermission =
       if (denialReason === "membership-disabled") {
         throw membershipDisabledDenial();
       }
-      if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(
-            permission.split(":")[0] ?? "unknown",
-          ),
-        });
-      }
+      throwIfSeatRestricted({ organizationRole, permission });
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this team resource",
@@ -170,11 +192,15 @@ export async function resolveProjectPermission(
     permission,
     projectId,
   });
-  return {
-    permitted: decision.allowed,
-    organizationRole: decision.organizationRole,
-    denialReason: decision.denialReason,
-  };
+  return applyAggregateAdminGate({
+    decision: {
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole,
+      denialReason: decision.denialReason,
+    },
+    projectId,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
 }
 
 export async function resolveProjectPermissionAny(
@@ -192,11 +218,15 @@ export async function resolveProjectPermissionAny(
     permissions,
     projectId,
   });
-  return {
-    permitted: decision.allowed,
-    organizationRole: decision.organizationRole,
-    denialReason: decision.denialReason,
-  };
+  return applyAggregateAdminGate({
+    decision: {
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole,
+      denialReason: decision.denialReason,
+    },
+    projectId,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
 }
 
 export async function hasProjectPermission(
@@ -278,7 +308,7 @@ export async function batchProjectPermissions(
 ): Promise<Permission[]> {
   const userId = ctx.session?.user?.id;
   if (!userId) return [];
-  const { byPermission } = await authzChecksFor(
+  const { byPermission, organizationRole } = await authzChecksFor(
     ctx.prisma,
   ).canBatchPermissionsByIds({
     principal: { type: "user", id: userId },
@@ -287,10 +317,17 @@ export async function batchProjectPermissions(
     teams: [],
     projects: [{ projectId: args.projectId, teamId: args.teamId }],
   });
-  return args.permissions.filter(
+  const held = args.permissions.filter(
     (permission) =>
       byPermission.get(permission)?.projects.get(args.projectId) === true,
   );
+  if (held.length === 0) return held;
+  const closed = await aggregatesClosedTo({
+    projectIds: [args.projectId],
+    organizationRole,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
+  return closed.has(args.projectId) ? [] : held;
 }
 
 export async function batchTeamsPermissions(
@@ -350,7 +387,15 @@ export async function batchScopePermissions(
       teamId: args.projectTeamId[projectId],
     })),
   });
-  return { teams: decision.teams, projects: decision.projects };
+  const closed = await aggregatesClosedTo({
+    projectIds: permittedIds(decision.projects),
+    organizationRole: decision.organizationRole,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
+  return {
+    teams: decision.teams,
+    projects: closeProjects({ projects: decision.projects, closed }),
+  };
 }
 
 /**

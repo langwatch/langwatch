@@ -76,30 +76,32 @@ describe("filter-translator", () => {
         expect(result.params).toEqual({ labels_0: ["label1", "label2"] });
       });
 
-      it("translates metadata.key filter with parameterized query", () => {
+      it("reads a metadata.key filter from all three storage formats", () => {
         const result = translateFilter("metadata.key", ["custom_key"]);
-        expect(result.whereClause).toContain("arrayExists");
-        expect(result.whereClause).toContain("mapContains");
-        expect(result.whereClause).toContain("{metaKeys_0:Array(String)}");
-        expect(result.params).toEqual({ metaKeys_0: ["custom_key"] });
+        expect(Object.values(result.params)).toEqual(
+          expect.arrayContaining([
+            "metadata.custom_key",
+            "langwatch.metadata.custom_key",
+            "custom_key",
+          ]),
+        );
+        expect(result.requiredJoins).toHaveLength(0);
       });
 
-      it("translates metadata.value filter with key using parameterized query", () => {
+      it("reads a metadata.value filter from all three storage formats", () => {
         const result = translateFilter(
           "metadata.value",
           ["value1", "value2"],
           "custom_key",
         );
-        expect(result.whereClause).toContain(
-          "ts.Attributes[{metaValue_0_key:String}]",
+        expect(Object.values(result.params)).toEqual(
+          expect.arrayContaining([
+            "metadata.custom_key",
+            "langwatch.metadata.custom_key",
+            "custom_key",
+            ["value1", "value2"],
+          ]),
         );
-        expect(result.whereClause).toContain(
-          "IN ({metaValue_0:Array(String)})",
-        );
-        expect(result.params).toEqual({
-          metaValue_0_key: "custom_key",
-          metaValue_0: ["value1", "value2"],
-        });
       });
 
       it("handles dots replaced with · in metadata.value key", () => {
@@ -108,9 +110,14 @@ describe("filter-translator", () => {
           ["value"],
           "key·with·dots",
         );
-        expect(result.params).toHaveProperty(
-          "metaValue_0_key",
-          "key.with.dots",
+        expect(Object.values(result.params)).toContain(
+          "metadata.key.with.dots",
+        );
+      });
+
+      it("matches nothing for a metadata.value filter without a key", () => {
+        expect(translateFilter("metadata.value", ["value"]).whereClause).toBe(
+          "1=0",
         );
       });
     });

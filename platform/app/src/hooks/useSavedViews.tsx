@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { reloadingWriteOptions } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
@@ -243,26 +244,27 @@ function useSavedViewsInternal() {
   }, [projectId, rawViews]);
 
   // -- tRPC mutations ------------------------------------------------------
-  const createMutation = api.savedViews.create.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const deleteMutation = api.savedViews.delete.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const renameMutation = api.savedViews.rename.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
-  const reorderMutation = api.savedViews.reorder.useMutation({
-    onSuccess: () => {
-      void utils.savedViews.getAll.invalidate({ projectId });
-    },
-  });
+  // Every change below edits the cached list before the server answers. On
+  // success the list is read again to pick up server ids and order; on
+  // failure the user is told and the same read puts back what the server
+  // kept, so a refused edit does not stick on screen.
+  const reloadViews = useCallback(() => {
+    void utils.savedViews.getAll.invalidate({ projectId });
+  }, [utils.savedViews.getAll, projectId]);
+  const writeOptions = (fallbackTitle: string) =>
+    reloadingWriteOptions({ fallbackTitle, reload: reloadViews });
+  const createMutation = api.savedViews.create.useMutation(
+    writeOptions("Couldn't save the view"),
+  );
+  const deleteMutation = api.savedViews.delete.useMutation(
+    writeOptions("Couldn't delete the view"),
+  );
+  const renameMutation = api.savedViews.rename.useMutation(
+    writeOptions("Couldn't rename the view"),
+  );
+  const reorderMutation = api.savedViews.reorder.useMutation(
+    writeOptions("Couldn't reorder the views"),
+  );
 
   // -- Filter actions -------------------------------------------------------
 
@@ -453,6 +455,7 @@ function useSavedViewsInternal() {
           } as (typeof old)[number],
         ];
       });
+      setSelectedViewIdState(tempId);
 
       createMutation.mutate(
         {
@@ -468,10 +471,23 @@ function useSavedViewsInternal() {
             setSelectedViewIdState(newView.id);
             writeSelectedViewId(projectId, newView.id);
           },
+          // The temporary view never reached the server, so take it out of
+          // the list now rather than waiting for the reload, and drop the
+          // selection that points at it. Selecting nothing lets view
+          // matching pick the highlight again, as it does on first load.
+          // The temporary id was never written to localStorage, so the
+          // stored selection is left as it was.
+          onError: () => {
+            utils.savedViews.getAll.setData({ projectId }, (old) =>
+              old?.filter((v) => v.id !== tempId),
+            );
+            setSelectedViewIdState((current) =>
+              current === tempId ? null : current,
+            );
+          },
         },
       );
 
-      setSelectedViewIdState(tempId);
       return optimisticView;
     },
     [

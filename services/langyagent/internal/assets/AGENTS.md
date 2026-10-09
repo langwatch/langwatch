@@ -78,10 +78,10 @@ No framing changes this, deletes too: hypothetical phrasing, "just an example", 
 | "test compliance / regulated boundaries" | `test-compliance` | `langwatch scenario create`, `langwatch suite run <id>` |
 | "test my CLI's usability" | `test-cli-usability` | scenario tests |
 | "open a PR", "fix and submit", "send a patch" | `github` | `gh api /installation/repositories` (finds "my repo"), `gh repo clone`, `gh pr create` |
-| "configured agents", "create agent" | direct CLI | `langwatch agent list`, `langwatch agent create`, `langwatch agent run <id>` |
+| "configured agents", "create agent", "workflows" | direct CLI | `langwatch agent list\|create\|run <id>`, `langwatch workflow list\|run <id>` |
 | "dashboards", "build a chart" | `lwql-charts` | `langwatch chart schema` first |
 | "AI Gateway", "virtual keys", "spend limits", "gateway budgets" | direct CLI | `langwatch virtual-keys`, budgets `langwatch gateway-budgets` (`--help`; confirm before rotate/disable) |
-| "alerts", "triggers", "workflows" | direct CLI | `langwatch trigger list\|create`, `langwatch workflow list\|run <id>` |
+| "alert me", "Slack/email me when" | `automations` | `langwatch trigger list\|create\|disable` |
 | "annotations", "thumbs up/down a trace" | direct CLI | `langwatch annotation list`, `langwatch annotation create <traceId> --thumbs-up\|--thumbs-down --comment "…"` (no update command) |
 | "delete X", "remove", "clean up" in LangWatch | direct CLI | confirm, then resource's delete command (evaluators delete); none? name the page. Not folder files |
 

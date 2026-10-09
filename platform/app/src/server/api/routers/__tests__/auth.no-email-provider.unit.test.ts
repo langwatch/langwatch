@@ -5,7 +5,9 @@
  * provider (ADR-117, revision 2026-09-25).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "~/env.mjs";
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
+import type { NextApiRequest } from "~/types/next-stubs";
 import { createInnerTRPCContext } from "../../trpc";
 import { authRouter } from "../auth";
 
@@ -14,6 +16,7 @@ const {
   addressState,
   requestVerification,
   issueUnconfirmedAddressProof,
+  sendOwnAddressConfirmation,
   hasEmailProvider,
   isEmailUnconfigured,
 } = vi.hoisted(() => ({
@@ -21,6 +24,7 @@ const {
   addressState: vi.fn(),
   requestVerification: vi.fn(),
   issueUnconfirmedAddressProof: vi.fn(),
+  sendOwnAddressConfirmation: vi.fn(),
   hasEmailProvider: vi.fn(),
   isEmailUnconfigured: vi.fn(),
 }));
@@ -35,6 +39,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     requestVerification,
     issueUnconfirmedAddressProof,
   }),
+  accountIdentifiers: () => ({ sendOwnAddressConfirmation }),
 }));
 
 vi.mock("~/server/mailer/providers", async (importOriginal) => ({
@@ -47,8 +52,19 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-const signedOut = () =>
-  authRouter.createCaller(createInnerTRPCContext({ session: null }));
+/** A well-formed S256 challenge: 43 base64url characters. */
+const CHALLENGE = "a".repeat(43);
+
+/** The address the installation is set up for, whatever this run configured. */
+const APP_ORIGIN = new URL(env.NEXTAUTH_URL).origin;
+
+const signedOut = (origin = APP_ORIGIN) =>
+  authRouter.createCaller(
+    createInnerTRPCContext({
+      session: null,
+      req: { headers: { origin } } as unknown as NextApiRequest,
+    }),
+  );
 
 const signedIn = () =>
   authRouter.createCaller(
@@ -75,6 +91,7 @@ describe("auth router without an email provider", () => {
     addressState.mockResolvedValue("unknown");
     requestVerification.mockResolvedValue(void 0);
     issueUnconfirmedAddressProof.mockResolvedValue("unconfirmed-proof");
+    sendOwnAddressConfirmation.mockResolvedValue({ identifierId: "idf_own" });
   });
 
   describe("when sign-up asks for a confirmation link", () => {
@@ -88,6 +105,32 @@ describe("auth router without an email provider", () => {
       expect(issueUnconfirmedAddressProof).toHaveBeenCalledWith({
         email: "sam@acme.com",
       });
+    });
+
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("refuses a foreign web address before issuing a proof", async () => {
+      await expect(
+        signedOut("http://localhost:18560").requestSignUpVerification({
+          email: "sam@acme.com",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+
+      expect(addressState).not.toHaveBeenCalled();
+      expect(issueUnconfirmedAddressProof).not.toHaveBeenCalled();
+      expect(requestVerification).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("refuses a foreign web address before mailing a link once a provider is configured", async () => {
+      hasEmailProvider.mockReturnValue(true);
+      isEmailUnconfigured.mockReturnValue(false);
+
+      await expect(
+        signedOut("http://localhost:18560").requestSignUpVerification({
+          email: "sam@acme.com",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+      expect(requestVerification).not.toHaveBeenCalled();
     });
 
     it("sends an address that already has an account to log in", async () => {
@@ -159,9 +202,31 @@ describe("auth router without an email provider", () => {
     /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
     it("refuses to send with a named error instead of failing", async () => {
       await expect(
-        signedIn().sendMyAddressConfirmation({}),
+        signedIn().sendMyAddressConfirmation({ codeChallenge: CHALLENGE }),
       ).rejects.toMatchObject({
         cause: { code: "auth_email_sending_unavailable" },
+      });
+      expect(requestVerification).not.toHaveBeenCalled();
+      expect(sendOwnAddressConfirmation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a signed-in account resends its own confirmation with a provider configured", () => {
+    beforeEach(() => {
+      hasEmailProvider.mockReturnValue(true);
+      isEmailUnconfigured.mockReturnValue(false);
+    });
+
+    /** @scenario "The own address confirmation only ever goes to the session's own address" */
+    it("starts the session-bound ceremony for the session's own address, never a sign-up link", async () => {
+      await expect(
+        signedIn().sendMyAddressConfirmation({ codeChallenge: CHALLENGE }),
+      ).resolves.toEqual({ sent: true, identifierId: "idf_own" });
+
+      expect(sendOwnAddressConfirmation).toHaveBeenCalledWith({
+        userId: "user-1",
+        email: "sam@acme.com",
+        codeChallenge: CHALLENGE,
       });
       expect(requestVerification).not.toHaveBeenCalled();
     });

@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_instant_eval_run_response_200 import GetInstantEvalRunResponse200
+from ...models.get_instant_eval_run_response_404 import GetInstantEvalRunResponse404
 from ...types import Response, safe_http_status
 
 
@@ -25,11 +26,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetInstantEvalRunResponse200 | None:
+) -> GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404 | None:
     if response.status_code == 200:
         response_200 = GetInstantEvalRunResponse200.from_dict(response.json())
 
         return response_200
+
+    if response.status_code == 404:
+        response_404 = GetInstantEvalRunResponse404.from_dict(response.json())
+
+        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -39,7 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[GetInstantEvalRunResponse200]:
+) -> Response[GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -55,7 +61,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetInstantEvalRunResponse200]:
+) -> Response[GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404]:
     """Read one run: its status, how many rows it found and judged, how many matched in total and per
     question, what it could not answer, and the tokens, cost and price the judging came to. An id this
     project does not hold answers 404 instant_eval_not_found.
@@ -68,7 +74,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetInstantEvalRunResponse200]
+        Response[GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -86,7 +92,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> GetInstantEvalRunResponse200 | None:
+) -> GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404 | None:
     """Read one run: its status, how many rows it found and judged, how many matched in total and per
     question, what it could not answer, and the tokens, cost and price the judging came to. An id this
     project does not hold answers 404 instant_eval_not_found.
@@ -99,7 +105,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetInstantEvalRunResponse200
+        GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404
     """
 
     return sync_detailed(
@@ -112,7 +118,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[GetInstantEvalRunResponse200]:
+) -> Response[GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404]:
     """Read one run: its status, how many rows it found and judged, how many matched in total and per
     question, what it could not answer, and the tokens, cost and price the judging came to. An id this
     project does not hold answers 404 instant_eval_not_found.
@@ -125,7 +131,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetInstantEvalRunResponse200]
+        Response[GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -141,7 +147,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> GetInstantEvalRunResponse200 | None:
+) -> GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404 | None:
     """Read one run: its status, how many rows it found and judged, how many matched in total and per
     question, what it could not answer, and the tokens, cost and price the judging came to. An id this
     project does not hold answers 404 instant_eval_not_found.
@@ -154,7 +160,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetInstantEvalRunResponse200
+        GetInstantEvalRunResponse200 | GetInstantEvalRunResponse404
     """
 
     return (

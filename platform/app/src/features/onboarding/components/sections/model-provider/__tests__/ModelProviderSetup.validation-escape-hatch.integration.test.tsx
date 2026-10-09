@@ -21,14 +21,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockSubmit,
-  mockSetEnabled,
   mockValidateApiKey,
   mockValidateWithCustomUrl,
   mockClearError,
   mockCustomKeys,
 } = vi.hoisted(() => ({
   mockSubmit: vi.fn().mockResolvedValue({}),
-  mockSetEnabled: vi.fn().mockResolvedValue({}),
   mockValidateApiKey: vi.fn().mockResolvedValue(true),
   mockValidateWithCustomUrl: vi.fn().mockResolvedValue(true),
   // Stable across renders on purpose: the component clears its field errors in
@@ -65,7 +63,6 @@ vi.mock("../../../../../../hooks/useModelProviderForm", () => {
     setCustomKey: (key: string, value: string) => {
       mockCustomKeys.current = { ...mockCustomKeys.current, [key]: value };
     },
-    setEnabled: mockSetEnabled,
     submit: mockSubmit,
     setManaged: () => undefined,
   };
@@ -131,7 +128,6 @@ describe("Feature: a refused API key is not a dead end during onboarding", () =>
     vi.clearAllMocks();
     mockCustomKeys.current = { OPENAI_API_KEY: "sk-the-customers-key" };
     mockSubmit.mockResolvedValue({});
-    mockSetEnabled.mockResolvedValue({});
     mockValidateApiKey.mockResolvedValue(true);
     mockValidateWithCustomUrl.mockResolvedValue(true);
   });

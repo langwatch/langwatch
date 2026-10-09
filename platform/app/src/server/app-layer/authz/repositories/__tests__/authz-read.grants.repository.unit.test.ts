@@ -30,6 +30,7 @@ const bindingGrantSelect = {
   createdByUserId: true,
   expiresAt: true,
   maxViews: true,
+  condition: true,
   occurredAt: true,
 } as const satisfies Prisma.GrantSelect;
 

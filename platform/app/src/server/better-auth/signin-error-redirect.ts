@@ -58,6 +58,68 @@ export function withholdInternalSignInError({
   return new Response(response.body, { status: response.status, headers });
 }
 
+/**
+ * The paths a browser arrives at from an identity provider: the social
+ * provider callback, the generic OAuth callback, the SSO plugin's OIDC
+ * callback and its SAML assertion consumer. Nothing else under /api/auth is navigated to by a person.
+ */
+const SIGN_IN_CALLBACK_PATH =
+  /^\/api\/auth\/(?:callback\/|oauth2\/callback\/|sso\/callback(?:\/|$)|sso\/saml2\/sp\/acs(?:\/|$))/;
+
+/**
+ * A server error on a sign-in callback, sent to the sign-in error screen.
+ *
+ * better-auth answers an exception thrown during a callback with a bare 500,
+ * and the person who clicked "Continue with ..." sees an empty page. The
+ * callback is a browser navigation, so it gets the same generic refusal an
+ * unrecognized sign-in error gets, with the trace id. Every other auth route
+ * keeps its status, because the callers of those read it.
+ */
+export async function redirectFailedSignInCallback({
+  response,
+  path,
+  errorPageUrl,
+  traceId,
+}: {
+  response: Response;
+  path: string;
+  errorPageUrl: string;
+  traceId?: string | null;
+}): Promise<Response> {
+  if (response.status < 500) return response;
+  if (!SIGN_IN_CALLBACK_PATH.test(path)) return response;
+
+  const cause = await errorCauseOf(response);
+  logger.error(
+    { status: response.status, path, traceId: traceId ?? null, cause },
+    "a sign-in callback failed on the server; the person was sent a generic refusal",
+  );
+
+  const target = new URL(errorPageUrl);
+  target.searchParams.set("error", GENERIC_SIGN_IN_ERROR_CODE);
+  if (traceId) target.searchParams.set("trace", traceId);
+  return new Response(null, {
+    status: 302,
+    headers: { location: target.toString() },
+  });
+}
+
+/**
+ * The stable `code` of better-auth's JSON error body, for the log only. The
+ * message is left out because it can carry an address or a token; the thrower
+ * logs its own error with the same trace id.
+ */
+async function errorCauseOf(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = JSON.parse(await response.text());
+    if (typeof body !== "object" || body === null) return null;
+    const { code } = body as Record<string, unknown>;
+    return typeof code === "string" ? code.slice(0, 100) : null;
+  } catch {
+    return null;
+  }
+}
+
 function signInErrorTarget(
   response: Response,
   errorPageUrl: string,

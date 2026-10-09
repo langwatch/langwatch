@@ -20,7 +20,13 @@ import {
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SlackConnectionSaved } from "~/features/automations/components/slack-connection/slackConnectionTypes";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
+
+interface ConnectionDrawerProps {
+  onSuccess: (saved: SlackConnectionSaved) => void;
+  onClose: () => void;
+}
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 vi.mock("~/components/ui/color-mode", () => ({
@@ -34,30 +40,109 @@ const listedChannels: { current: { id: string; name: string }[] | undefined } =
   };
 /** Why the listing is short of the workspace, as the server would report it. */
 const listedGaps: { current: string[] } = { current: [] };
+/** A server-reported listing failure (`missing_scope`, `no_token`, …) on
+ *  `data.error` — distinct from a transport-level mutation failure below. */
+const listedError: { current: string | null } = { current: null };
+/** A transport-level mutation failure (`list.isError` / `list.error`). */
+const mutationError: { current: unknown } = { current: null };
+/** Every call the form made to `listSlackChannels.mutate`. */
+const mutateCalls: { projectId: string; slackIntegrationId: string }[] = [];
+/** Stable empty-array fallback for `listedChannels.current` — a fresh `[]`
+ *  literal on every mocked render would loop the collection-sync effect. */
+const NO_CHANNELS: { id: string; name: string }[] = [];
+
+type Connection = {
+  id: string;
+  name: string;
+  kind: "BOT" | "INCOMING_WEBHOOK";
+  scopeType: "ORGANIZATION" | "PROJECT";
+  scopeId: string;
+  scopeName: string;
+};
+const BOT_CONNECTION: Connection = {
+  id: "conn-bot",
+  name: "Alerts bot",
+  kind: "BOT",
+  scopeType: "ORGANIZATION",
+  scopeId: "org-1",
+  scopeName: "Acme",
+};
+const WEBHOOK_CONNECTION: Connection = {
+  id: "conn-hook",
+  name: "Ops webhook",
+  kind: "INCOMING_WEBHOOK",
+  scopeType: "PROJECT",
+  scopeId: "project-1",
+  scopeName: "Project",
+};
+/** The connections the project can use, as `slackIntegration.list` answers. */
+const connectionList: {
+  current: Connection[] | undefined;
+  canManage: boolean;
+} = { current: [BOT_CONNECTION, WEBHOOK_CONNECTION], canManage: true };
+
+const { openDrawerMock, goBackMock, keepDraftOnReturnMock } = vi.hoisted(
+  () => ({
+    openDrawerMock:
+      vi.fn<(drawer: string, props: ConnectionDrawerProps) => void>(),
+    goBackMock: vi.fn(),
+    keepDraftOnReturnMock: vi.fn(),
+  }),
+);
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ openDrawer: openDrawerMock, goBack: goBackMock }),
+}));
+
+vi.mock("../../../state/subFlow", () => ({
+  keepDraftOnSubFlowReturn: keepDraftOnReturnMock,
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
-    automation: {
-      getTriggers: {
-        useQuery: () => ({ data: [], isLoading: false }),
+    slackIntegration: {
+      list: {
+        useQuery: () => ({
+          data: connectionList.current
+            ? {
+                connections: connectionList.current,
+                canManageProject: connectionList.canManage,
+                canManageOrganization: false,
+              }
+            : undefined,
+          refetch: vi.fn(),
+        }),
       },
+    },
+    automation: {
       listSlackChannels: {
         useMutation: () => ({
-          mutate: vi.fn(),
-          data: listedChannels.current
-            ? { channels: listedChannels.current, gaps: listedGaps.current }
-            : undefined,
+          mutate: (
+            args: { projectId: string; slackIntegrationId: string },
+            opts?: { onError?: (error: unknown) => void },
+          ) => {
+            mutateCalls.push(args);
+            if (mutationError.current) opts?.onError?.(mutationError.current);
+          },
+          data:
+            listedChannels.current || listedError.current
+              ? {
+                  channels: listedChannels.current ?? NO_CHANNELS,
+                  gaps: listedGaps.current,
+                  error: listedError.current,
+                }
+              : undefined,
           isPending: false,
+          isError: !!mutationError.current,
+          error: mutationError.current,
         }),
       },
     },
   },
 }));
 
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  type SlackPreview,
-} from "@langwatch/automations/providers/slack";
+import type { SlackPreview } from "@langwatch/automations/providers/slack";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import slackClient, { type SlackSlice } from "../client";
 import {
   SLACK_BLOCK_KIT_TEMPLATES,
@@ -142,21 +227,108 @@ const renderForm = (
 
 const botSlice = (overrides: Partial<SlackSlice> = {}): SlackSlice => ({
   ...slackClient.initialSlice(),
+  slackIntegrationId: "conn-bot",
   deliveryMethod: "bot",
   channelId: "C0123",
   ...overrides,
 });
 
+const webhookSlice = (overrides: Partial<SlackSlice> = {}): SlackSlice => ({
+  ...slackClient.initialSlice(),
+  slackIntegrationId: "conn-hook",
+  deliveryMethod: "webhook",
+  ...overrides,
+});
+
+/** A row saved before connections, as the read returns it: no token of its own. */
+const legacyBotRow = (): SavedTriggerRow =>
+  ({
+    actionParams: {
+      slackDelivery: "bot",
+      slackChannelId: "C0999",
+    },
+    slackTemplate: null,
+    slackTemplateType: "block_kit",
+  }) as unknown as SavedTriggerRow;
+
+/** Opens the connection picker and chooses the named entry. */
+async function chooseConnection({
+  user,
+  name,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  name: RegExp;
+}) {
+  await user.click(screen.getAllByRole("combobox")[0]!);
+  await user.click(await screen.findByRole("option", { name }));
+}
+
+/** Stateful cadence host: the chooser writes through
+ *  `setNotificationCadence` and the value flows back down as
+ *  `notificationCadence` / `cadenceMode`, the way the draft store wires the
+ *  real form owner. */
+function CadenceHarness() {
+  const [cadence, setCadence] =
+    useState<ConfigFormCtx["notificationCadence"]>("immediate");
+  const [slice, setSlice] = useState<SlackSlice>(slackClient.initialSlice());
+  const Form = slackClient.ConfigForm;
+  return (
+    <Form
+      slice={slice}
+      ctx={makeCtx({
+        notificationCadence: cadence,
+        cadenceMode: cadence === "immediate" ? "immediate" : "digest",
+        setNotificationCadence: setCadence,
+      })}
+      onChange={setSlice}
+    />
+  );
+}
+
 describe("SlackConfigForm authoring tiers", () => {
   afterEach(() => cleanup());
 
+  describe("given the receive chooser rendered beside the layouts", () => {
+    /** @scenario "The receive choice decides which layouts are offered" */
+    it("filters the layout list to the chosen mode", async () => {
+      const user = userEvent.setup();
+      render(<CadenceHarness />, { wrapper: Wrapper });
+
+      expect(
+        screen.getByRole("option", { name: /compact notice/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("option", { name: /digest — compact/i }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("radio", { name: /in batches/i }));
+
+      expect(
+        screen.getByRole("option", { name: /digest — compact/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("option", { name: /compact notice/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("is not offered to a report, whose timing is its schedule", () => {
+      renderForm({
+        ctx: makeCtx({ sourceKind: "report", reportSourceKind: "traceQuery" }),
+      });
+
+      expect(
+        screen.queryByText("How do you want to receive messages?"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a fresh block_kit draft", () => {
     describe("when the form first renders", () => {
-      it("shows the guided template gallery", () => {
+      it("shows the guided layout picker", () => {
         renderForm();
 
         expect(
-          screen.getByRole("button", { name: /use compact alert template/i }),
+          screen.getByRole("option", { name: /compact notice/i }),
         ).toBeInTheDocument();
       });
 
@@ -188,8 +360,8 @@ describe("SlackConfigForm authoring tiers", () => {
       renderForm({ onChangeSpy });
 
       fireEvent.click(
-        screen.getByRole("button", {
-          name: new RegExp(`use ${firstOption!.displayName} template`, "i"),
+        screen.getByRole("option", {
+          name: new RegExp(firstOption!.displayName, "i"),
         }),
       );
 
@@ -255,7 +427,7 @@ describe("SlackConfigForm authoring tiers", () => {
   });
 
   describe("when the author switches to plain text", () => {
-    it("reveals the plain text editor and drops the gallery", () => {
+    it("reveals the plain text editor and drops the layout picker", () => {
       renderForm();
 
       fireEvent.click(
@@ -266,85 +438,189 @@ describe("SlackConfigForm authoring tiers", () => {
 
       expect(screen.getByTestId("slack-text-editor")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /use compact alert template/i }),
+        screen.queryByRole("option", { name: /compact notice/i }),
       ).not.toBeInTheDocument();
     });
   });
 });
 
-describe("SlackConfigForm delivery method", () => {
-  afterEach(() => cleanup());
+describe("SlackConfigForm connection", () => {
+  afterEach(() => {
+    cleanup();
+    connectionList.current = [BOT_CONNECTION, WEBHOOK_CONNECTION];
+    connectionList.canManage = true;
+    openDrawerMock.mockReset();
+    goBackMock.mockReset();
+    keepDraftOnReturnMock.mockReset();
+  });
 
-  describe("given a fresh draft (a new automation)", () => {
-    it("is bot-only — channel + token fields, no webhook option", () => {
+  describe("given the connection list has not landed yet", () => {
+    it("waits instead of claiming there is none", () => {
+      connectionList.current = undefined;
       renderForm();
 
-      expect(
-        screen.getByPlaceholderText(/#alerts or c0123/i),
-      ).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
-      // A new automation cannot pick a webhook — no field, no connection toggle.
-      expect(
-        screen.queryByPlaceholderText(/hooks\.slack\.com/i),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("radio", { name: /incoming webhook/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("slack-state-loading")).toBeInTheDocument();
+      expect(screen.queryByText(/no slack connections yet/i)).toBeNull();
     });
   });
 
-  describe("given a saved webhook automation (legacy)", () => {
-    const legacySlice = (): SlackSlice => ({
-      ...slackClient.initialSlice(),
-      deliveryMethod: "webhook",
-      isLegacyWebhook: true,
-      webhook: "https://hooks.slack.com/services/T000/B000/xyz",
+  describe("given the project has no Slack connection", () => {
+    /** @scenario "The author is guided to add a Slack connection" */
+    it("points at the integration settings and asks for no token", () => {
+      connectionList.current = [];
+      renderForm();
+
+      expect(screen.getByText(/no slack connections yet/i)).toBeInTheDocument();
+      const manage = screen.getByRole("link", {
+        name: /manage slack connections/i,
+      });
+      expect(manage).toHaveAttribute("href", "/settings/integrations");
+      // A new tab, so the unsaved automation draft survives the visit.
+      expect(manage).toHaveAttribute("target", "_blank");
+      expect(screen.queryByPlaceholderText(/xoxb-/i)).not.toBeInTheDocument();
     });
+  });
 
-    it("keeps the webhook editable and offers an upgrade to a Slack app", () => {
-      renderForm({ initial: legacySlice() });
-
-      expect(
-        screen.getByPlaceholderText(/hooks\.slack\.com/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("radio", { name: /incoming webhook/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /switch to a slack app/i }),
-      ).toBeInTheDocument();
-    });
-
-    it("can switch to a bot connection", async () => {
+  describe("when the author picks connections", () => {
+    /** @scenario "A bot connection asks for a channel, a webhook does not" */
+    it("asks for a channel for a bot and none for a webhook", async () => {
       const user = userEvent.setup();
-      renderForm({ initial: legacySlice() });
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
 
-      await user.click(screen.getByRole("radio", { name: /slack app/i }));
+      await chooseConnection({ user, name: /alerts bot/i });
+      expect(
+        await screen.findByPlaceholderText(/#alerts or c0123/i),
+      ).toBeInTheDocument();
+      expect(onChangeSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          slackIntegrationId: "conn-bot",
+          deliveryMethod: "bot",
+        }),
+      );
 
-      expect(await screen.findByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
+      await chooseConnection({ user, name: /ops webhook/i });
+      expect(
+        screen.queryByPlaceholderText(/#alerts or c0123/i),
+      ).not.toBeInTheDocument();
+      expect(onChangeSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          slackIntegrationId: "conn-hook",
+          deliveryMethod: "webhook",
+        }),
+      );
+    });
+
+    it("lists channels from the picked connection's workspace", async () => {
+      renderForm({ initial: botSlice() });
+
+      await waitFor(() =>
+        expect(mutateCalls.at(-1)).toEqual({
+          projectId: "project-1",
+          slackIntegrationId: "conn-bot",
+        }),
+      );
     });
   });
 
-  describe("given a bot draft whose token is already stored", () => {
-    it("offers to keep the saved token without retyping", () => {
-      renderForm({ initial: botSlice({ botTokenAlreadySet: true }) });
+  describe("when the author creates a connection from the Slack step", () => {
+    const connectionDrawerProps = () => {
+      const call = openDrawerMock.mock.calls.at(-1);
+      if (call?.[0] !== "slackConnection") {
+        throw new Error(
+          `expected the connection drawer, opened "${call?.[0]}"`,
+        );
+      }
+      return call[1];
+    };
 
-      expect(
-        screen.getByPlaceholderText(/unchanged, leave blank to keep/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /replace token/i }),
-      ).toBeInTheDocument();
+    /** @scenario "A connection created from the automation drawer is selected on return" */
+    it("returns to the draft with the new connection selected", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      await chooseConnection({ user, name: /new slack connection/i });
+      // Leaving is not returning: nothing keeps the draft until it ends.
+      expect(keepDraftOnReturnMock).not.toHaveBeenCalled();
+      const props = connectionDrawerProps();
+      props.onSuccess({
+        connectionId: "conn-new",
+        name: "Ops room",
+        kind: "BOT",
+      });
+      props.onClose();
+
+      expect(onChangeSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          slackIntegrationId: "conn-new",
+          connectionName: "Ops room",
+          deliveryMethod: "bot",
+        }),
+      );
+      expect(keepDraftOnReturnMock).toHaveBeenCalledTimes(1);
+      expect(goBackMock).toHaveBeenCalledTimes(1);
     });
 
-    it("lets the author select a template that needs a Slack app", () => {
-      renderForm({ initial: botSlice({ botTokenAlreadySet: true }) });
+    /** @scenario "Walking away from a new connection keeps the previous choice" */
+    it("keeps the previous connection when closed without saving", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({ initial: webhookSlice(), onChangeSpy });
+
+      await chooseConnection({ user, name: /new slack connection/i });
+      connectionDrawerProps().onClose();
+
+      expect(onChangeSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ slackIntegrationId: "conn-hook" }),
+      );
+      expect(goBackMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("is not offered to an author who cannot add connections", async () => {
+      const user = userEvent.setup();
+      connectionList.canManage = false;
+      renderForm();
+
+      await user.click(screen.getAllByRole("combobox")[0]!);
 
       expect(
-        screen.getByRole("button", {
-          name: /use eval failure banner template/i,
-        }),
-      ).toBeEnabled();
+        screen.queryByRole("option", { name: /new slack connection/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given an automation that still stores its own secret", () => {
+    it("says so and leaves its settings untouched", () => {
+      const slice = slackClient.fromTriggerRow(legacyBotRow());
+      renderForm({ initial: slice });
+
+      expect(screen.getByTestId("slack-legacy-secret")).toHaveTextContent(
+        /uses a slack secret stored on this automation/i,
+      );
+      // The server moves the token the row stores into a connection on save.
+      expect(slackClient.toActionParams(slice)).toEqual({
+        slackDelivery: "bot",
+        slackChannelId: "C0999",
+      });
+    });
+
+    it("writes only the connection once one is picked", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({
+        initial: slackClient.fromTriggerRow(legacyBotRow()),
+        onChangeSpy,
+      });
+
+      await chooseConnection({ user, name: /alerts bot/i });
+
+      const picked = onChangeSpy.mock.lastCall?.[0] as SlackSlice;
+      expect(slackClient.toActionParams(picked)).toEqual({
+        slackIntegrationId: "conn-bot",
+        slackDelivery: "bot",
+        slackChannelId: "C0999",
+      });
     });
   });
 });
@@ -354,6 +630,9 @@ describe("SlackConfigForm channel picker", () => {
     cleanup();
     listedChannels.current = undefined;
     listedGaps.current = [];
+    listedError.current = null;
+    mutationError.current = null;
+    mutateCalls.length = 0;
   });
 
   describe("given a workspace whose channels have loaded", () => {
@@ -669,23 +948,6 @@ describe("SlackConfigForm channel picker", () => {
       });
     });
 
-    // The manifest grants chat:write.public, so public channels need no invite
-    // and private ones do. Telling the author only "invite the bot" sends them
-    // to do the one thing that doesn't help for a public channel, and doesn't
-    // mention the case where it is required.
-    describe("when the author reads the setup steps", () => {
-      it("says public channels need no invite and private ones do", async () => {
-        const user = userEvent.setup();
-        renderForm({ initial: botSlice({ channelId: "" }) });
-
-        await user.click(screen.getByText(/setup steps/i));
-
-        expect(
-          await screen.findByText(/public channels work straight away/i),
-        ).toHaveTextContent(/private channel, add the app to that channel/i);
-      });
-    });
-
     describe("given a saved automation whose channel id is already stored", () => {
       it("shows the channel name rather than the raw id", async () => {
         renderForm({ initial: botSlice({ channelId: "C003" }) });
@@ -696,45 +958,197 @@ describe("SlackConfigForm channel picker", () => {
       });
     });
   });
+
+  // B2: the Reload button genuinely re-fires the mutation, but a failure used
+  // to be swallowed to a console.error with nothing shown in the form, and a
+  // manual reload with no usable token answered "no_token" with no hint at
+  // all. Both now name their cause in the hint line under the field.
+  describe("given a channel-list request that fails", () => {
+    beforeEach(() => {
+      listedChannels.current = [];
+      mutationError.current = new Error("network down");
+    });
+
+    /** @scenario "A channel-list failure names its cause in the form" */
+    it("names the failure in the hint under the field instead of only logging it", async () => {
+      renderForm({ initial: botSlice({ channelId: "" }) });
+
+      const hint = await screen.findByText(/couldn.t load channels/i);
+      expect(hint).toHaveTextContent(/you can still type the channel above/i);
+    });
+  });
+
+  describe("given a channel-list request answered with no_token", () => {
+    beforeEach(() => {
+      // A stable (if empty) array: a fresh `[]` would loop the sync effect.
+      listedChannels.current = [];
+      listedError.current = "no_token";
+    });
+
+    it("names the cause instead of showing nothing", async () => {
+      renderForm({ initial: botSlice({ channelId: "" }) });
+
+      expect(
+        await screen.findByText(/this connection can.t list channels/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when the author clicks Reload", () => {
+    beforeEach(() => {
+      listedChannels.current = [{ id: "C001", name: "alerts" }];
+    });
+
+    it("re-fires the channel listing request", async () => {
+      const user = userEvent.setup();
+      renderForm({ initial: botSlice({ channelId: "" }) });
+
+      // The mount effect already issues one request for the connection.
+      await screen.findByText("#alerts");
+      const callsBeforeReload = mutateCalls.length;
+      expect(callsBeforeReload).toBeGreaterThan(0);
+
+      await user.click(screen.getByRole("button", { name: /reload/i }));
+
+      expect(mutateCalls.length).toBeGreaterThan(callsBeforeReload);
+    });
+  });
 });
 
 describe("Slack client slice contract", () => {
-  describe("given a bot slice", () => {
-    describe("when the channel is set and a token is stored", () => {
-      it("reports the config as complete without a typed token", () => {
-        expect(
-          slackClient.isComplete(botSlice({ botTokenAlreadySet: true })),
-        ).toBe(true);
+  describe("given a bot connection", () => {
+    describe("when the channel is set", () => {
+      it("reports the config as complete", () => {
+        expect(slackClient.isComplete(botSlice())).toBe(true);
+      });
+
+      it("writes the connection and channel, and no secret", () => {
+        expect(slackClient.toActionParams(botSlice())).toEqual({
+          slackIntegrationId: "conn-bot",
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+        });
       });
     });
 
-    describe("when the channel is set but no token exists yet", () => {
+    describe("when the channel is not set", () => {
+      /** @scenario "A bot automation is incomplete without a channel" */
       it("reports the config as incomplete", () => {
-        expect(
-          slackClient.isComplete(botSlice({ botTokenAlreadySet: false })),
-        ).toBe(false);
+        expect(slackClient.isComplete(botSlice({ channelId: "" }))).toBe(false);
       });
     });
 
-    describe("when a token is typed", () => {
-      it("sends the typed token verbatim", () => {
-        const params = slackClient.toActionParams(
-          botSlice({ botToken: "xoxb-fresh", botTokenAlreadySet: false }),
-        ) as { slackDelivery: string; slackBotToken?: string };
+    it("previews the chart, table and banner blocks", () => {
+      expect(slackClient.previewOptions?.({ slice: botSlice() })).toEqual({
+        allowGatedBlocks: true,
+      });
+    });
+  });
 
-        expect(params.slackDelivery).toBe("bot");
-        expect(params.slackBotToken).toBe("xoxb-fresh");
+  describe("given a webhook connection", () => {
+    it("is complete without a channel and writes only the connection", () => {
+      expect(slackClient.isComplete(webhookSlice())).toBe(true);
+      expect(slackClient.toActionParams(webhookSlice())).toEqual({
+        slackIntegrationId: "conn-hook",
+        slackDelivery: "webhook",
       });
     });
 
-    describe("when the stored token is left untouched on edit", () => {
-      it("sends the keep sentinel so the server keeps the stored token", () => {
-        const params = slackClient.toActionParams(
-          botSlice({ botToken: "", botTokenAlreadySet: true }),
-        ) as { slackBotToken?: string };
-
-        expect(params.slackBotToken).toBe(SLACK_BOT_TOKEN_KEPT);
+    /** @scenario "The richer templates are offered only for a bot connection" */
+    it("drops the gated blocks from the preview", () => {
+      expect(slackClient.previewOptions?.({ slice: webhookSlice() })).toEqual({
+        allowGatedBlocks: false,
       });
+    });
+  });
+
+  describe("given no connection yet", () => {
+    it("reports the config as incomplete", () => {
+      expect(slackClient.isComplete(slackClient.initialSlice())).toBe(false);
+    });
+  });
+
+  describe("given a saved row with a connection", () => {
+    it("reads the connection back and carries no legacy secret", () => {
+      const slice = slackClient.fromTriggerRow({
+        actionParams: {
+          slackIntegrationId: "conn-bot",
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+        },
+        slackTemplate: null,
+        slackTemplateType: "block_kit",
+      } as unknown as SavedTriggerRow);
+
+      expect(slice).toMatchObject({
+        slackIntegrationId: "conn-bot",
+        deliveryMethod: "bot",
+        channelId: "C0123",
+        legacyParams: null,
+      });
+    });
+  });
+
+  describe("given the connection's name is known", () => {
+    it("summarises a bot as the connection and its channel", () => {
+      expect(
+        slackClient.summary(botSlice({ connectionName: "Alerts bot" }), {
+          name: "Checkout alert",
+        }),
+      ).toBe("Slack → Alerts bot #C0123");
+    });
+
+    it("summarises a webhook as the connection alone", () => {
+      expect(
+        slackClient.summary(webhookSlice({ connectionName: "Ops webhook" }), {
+          name: "Checkout alert",
+        }),
+      ).toBe("Slack → Ops webhook");
+    });
+
+    it("never writes the name into the action params", () => {
+      expect(
+        slackClient.toActionParams(botSlice({ connectionName: "Alerts bot" })),
+      ).toEqual({
+        slackIntegrationId: "conn-bot",
+        slackDelivery: "bot",
+        slackChannelId: "C0123",
+      });
+    });
+  });
+
+  describe("given the connection's name is not known yet", () => {
+    it("says Slack connection, with the channel for a bot", () => {
+      expect(slackClient.summary(botSlice(), { name: "Checkout alert" })).toBe(
+        "Slack connection #C0123",
+      );
+      expect(
+        slackClient.summary(webhookSlice(), { name: "Checkout alert" }),
+      ).toBe("Slack connection");
+    });
+  });
+});
+
+describe("SlackConfigForm connection name", () => {
+  afterEach(() => {
+    cleanup();
+    connectionList.current = [BOT_CONNECTION, WEBHOOK_CONNECTION];
+  });
+
+  describe("when the author picks a connection", () => {
+    it("carries its name on the slice", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      await chooseConnection({ user, name: /alerts bot/i });
+
+      expect(onChangeSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          slackIntegrationId: "conn-bot",
+          connectionName: "Alerts bot",
+        }),
+      );
     });
   });
 });

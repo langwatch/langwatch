@@ -58,7 +58,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
   Scenario: A verified colleague joins an opted-in organization immediately
     Given "ana" turned on automatic joining for "acme.com"
     When "sam" completes sign-up and verification
-    Then "sam" is a member of "acme" with the organization's default role
+    Then "sam" is a member of "acme" in the seat the arrival earns: the organization's joiner seat, or Developer for an arrival from the terminal
     And "sam" was never shown a waiting screen
 
   @unit
@@ -87,7 +87,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
   Scenario: Walking in still grants only the default role
     Given "ana" turned on automatic joining for "acme.com"
     When "sam" joins automatically
-    Then "sam" holds the organization's default role and nothing more
+    Then "sam" holds the organization's joiner seat and nothing more, or a Developer seat when the arrival was from the terminal
 
   # ── Turning it on is deliberate ────────────────────────────────────────
 

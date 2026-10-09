@@ -21,6 +21,7 @@ import {
   addressRoutesToConnection,
   credentialAccounts,
   localSignUpDecision,
+  signUpPolicy,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import {
@@ -50,6 +51,7 @@ import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
 import type { Session } from "../../auth";
 import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
+import { assertAllowedAuthOrigin } from "../../better-auth/originGate";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
@@ -283,6 +285,11 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx, input }) => {
+      // Before anything is claimed or written: the sign-in that follows is
+      // refused on a foreign origin, and an account created here first would
+      // be left behind with nobody signed in to it.
+      assertAllowedAuthOrigin({ req: ctx.req, baseUrl: env.NEXTAUTH_URL });
+
       const { name, password } = input;
 
       // The same rules the form ran, from the same module, so the two cannot
@@ -338,6 +345,12 @@ export const userRouter = createTRPCRouter({
           retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
+
+      // Who may create an account at all on this installation
+      // (SIGN_UP_MODE, SIGN_UP_ALLOWED_DOMAINS). After the rate limit, so
+      // probing addresses spends the same budget, and before the address
+      // proof is spent, so a refused visitor keeps it.
+      await signUpPolicy().assertSignUp({ email });
 
       // The mailbox proof is the authority to enrol a credential. It is spent
       // before hashing or writing anything, and is bound to this exact
@@ -1370,26 +1383,20 @@ export const userRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const [user, firstProject] = await Promise.all([
+      const [user, firstProjectSlug] = await Promise.all([
         ctx.prisma.user.findUnique({
           where: { id: userId },
           select: { lastHomePath: true },
         }),
-        ctx.prisma.project.findFirst({
-          where: {
-            team: {
-              organizationId: input.organizationId,
-              members: { some: { userId } },
-            },
-            archivedAt: null,
-          },
-          orderBy: { createdAt: "asc" },
-          select: { slug: true },
+        // Never an aggregate: the landing rule lives with the projects.
+        getApp().projects.getLandingProjectSlug({
+          organizationId: input.organizationId,
+          userId,
         }),
       ]);
       return {
         lastHomePath: user?.lastHomePath ?? null,
-        firstProjectSlug: firstProject?.slug ?? null,
+        firstProjectSlug,
         // The governance-home option is shown for any user who could
         // possibly land there via auto-detection — gate on the resolver's
         // own conjunctive check instead of duplicating the logic here.

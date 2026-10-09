@@ -117,6 +117,7 @@ export class PrismaIdentityProjectionRepository
 
     await this.releaseAddressLocks({ userId, state });
     await this.projectAccounts({ userId, state });
+    await this.projectAddressConfirmed({ userId, state });
 
     // Cursor last: it is the commit marker. A crash before this line leaves
     // rows a re-applied event overwrites idempotently; a crash after it is
@@ -294,6 +295,58 @@ export class PrismaIdentityProjectionRepository
     await this.reservations.release({
       userId,
       holdingIdentifierIds: holding,
+    });
+  }
+
+  /**
+   * `User.emailVerified` as the identifiers imply it.
+   *
+   * better-auth reads that column, not the identifiers: it links a single
+   * sign-on arrival to an existing account only when it is true. So an email
+   * identifier proven for the account's own address marks the column, or a
+   * confirmed primary address and an unconfirmed `User` row disagree and the
+   * account can never move to single sign-on.
+   *
+   * Only an `email` identifier counts. It is VERIFIED through the emailed
+   * ceremony or adopted as VERIFIED from this same column, so nothing else
+   * can set it. The column only ever moves to true here; unconfirming an
+   * address is not something a fold decides.
+   */
+  private async projectAddressConfirmed({
+    userId,
+    state,
+  }: {
+    userId: string;
+    state: IdentityFoldState;
+  }): Promise<void> {
+    const proven = Object.values(state.identifiers)
+      .filter(
+        (fact) =>
+          fact.provider === "email" &&
+          (fact.state === "VERIFIED" || fact.state === "PRIMARY") &&
+          fact.value !== null,
+      )
+      .map((fact) => fact.value as string);
+    if (proven.length === 0) return;
+    await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        AND: [
+          // Case-insensitive: rows written before addresses were normalized
+          // may carry capitals.
+          {
+            OR: proven.map((value) => ({
+              email: { equals: value, mode: "insensitive" as const },
+            })),
+          },
+          // Only a row that still says otherwise, so a fold with nothing
+          // new to say writes nothing.
+          {
+            OR: [{ emailVerified: false }, { signupConfirmationPending: true }],
+          },
+        ],
+      },
+      data: { emailVerified: true, signupConfirmationPending: false },
     });
   }
 

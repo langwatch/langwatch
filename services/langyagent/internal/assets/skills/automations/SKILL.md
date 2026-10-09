@@ -1,0 +1,106 @@
+---
+name: automations
+user-prompt: "Alert me on Slack when my agent's error rate goes up"
+description: Set up LangWatch automations, alerts and reports that deliver to Slack, email, a webhook, a dataset or an annotation queue. Use when the user wants to be told when something happens ("alert #support-alerts when errors spike", "email me when a trace gets a thumbs-down"), wants matching traces collected automatically, wants a scheduled report, or wants to pause, resume, test or review an existing automation.
+license: MIT
+compatibility: Requires the LangWatch CLI. Works with Claude Code and similar AI assistants.
+metadata:
+  category: skill
+---
+
+# Set Up Automations, Alerts and Reports
+
+An automation watches something in a LangWatch project and acts when it happens. There are three kinds, all created with `langwatch trigger create`:
+
+- **Automation**: acts on each trace that matches a trace condition (`--filter-query`).
+- **Alert**: watches one series of a custom graph and fires when it crosses a threshold (`--custom-graph-id`, `--graph-alert`, `--alert-type`).
+- **Report**: renders a dashboard, a graph or a table of traces on a schedule (`--report`).
+
+Each one delivers through one action: `SEND_SLACK_MESSAGE`, `SEND_EMAIL`, `SEND_WEBHOOK`, `ADD_TO_DATASET` or `ADD_TO_ANNOTATION_QUEUE`.
+
+## Prerequisites
+
+Read the reference once before the first create, and the command's own help. Only read the docs pages this skill names; never guess a docs path:
+
+```bash
+langwatch docs api-reference/triggers/overview
+langwatch trigger create --help
+```
+
+## Inspect First
+
+List what already exists before creating anything, so you extend an automation instead of duplicating it:
+
+```bash
+langwatch trigger list --format json
+```
+
+A Slack automation already in the list carries the id of the Slack connection it posts through in `actionParams.slackIntegrationId`: that is a connection this project can use.
+
+## Secrets Never Travel Through the Conversation
+
+Slack bot tokens, Slack webhook URLs, webhook signing secrets and webhook header values are credentials. Never ask for one, never accept one pasted into the conversation, never pass `--slack-webhook`, and never repeat a stored value back: reads return them as `[redacted]`, and that is all you ever show. A user who offers one is told, in one line, to add it as a Slack connection on the Automations page instead.
+
+## Deliver to Slack
+
+A Slack automation posts through a **Slack connection** the project can already use, named with `--slack-connection <id>`. A bot connection also needs `--slack-channel`, which takes a channel id (`C0123…`) or its name (`#support-alerts`). An incoming-webhook connection posts to its own channel and needs nothing else.
+
+List the connections this project can use first, by name, kind (`bot` or `webhook`) and scope; the list never carries a secret:
+
+```bash
+langwatch slack-connection list --format json
+```
+
+1. When the user named a connection, take the `id` of the one whose `name` matches; when an existing Slack automation shows the one to reuse, take that. Create with it.
+2. Otherwise, including when the list is empty, create the automation with `--action SEND_SLACK_MESSAGE` and the channel, and no connection. Do not ask a question first, and never offer to take a webhook URL or token as an option. The refusal is expected: the user's panel shows the Slack connections this project can use, each with a button that answers you with its name and id, and, when there is none, a button that opens the Slack connection form on the Automations page. Say in one line that they should pick or add a connection, and stop the turn.
+3. When the answer names a connection id, run the same create again with `--slack-connection <id>`.
+
+Never create, edit, widen or delete a Slack connection yourself: connections are added and scoped by the user on the Automations page, where a new one is scoped to this project unless they choose otherwise.
+
+## Deliver by Email, Webhook, Dataset or Annotation Queue
+
+- Email: `--action SEND_EMAIL --action-params '{"members":["me@example.com"]}'`. "Email me" means the user's own address: the turn names it ("You are talking to …"). Use that; ask with the `question` tool only when no address is given. Never run `langwatch whoami` for it: the worker is not device-logged-in.
+- Webhook: `--action SEND_WEBHOOK --action-params '{"url":"https://…"}'`, only for an https address the user gave for this purpose. Never add headers or a signing secret they would have to paste.
+- Dataset: `--action ADD_TO_DATASET` with `datasetId` and `datasetMapping`; read `langwatch docs datasets/automatically-from-traces` for the mapping.
+- Annotation queue: `--action ADD_TO_ANNOTATION_QUEUE` with `annotators`, each `{"id":"user-<userId>","name":"…"}` or `{"id":"queue-<queueId>","name":"…"}`.
+
+## Write the Condition
+
+For a trace automation, write `--filter-query` in the same syntax the Traces view uses, for example `status:error`; `langwatch trace fields` lists every field. Check it selects what the user means before saving:
+
+```bash
+langwatch trace search --filter '<query>' --format json
+```
+
+An evaluation result is keyed by the MONITOR that ran it, not the evaluator: take the id from `langwatch monitor list --format json`.
+
+A thumbs-down from an end user is a `thumbs_up_down` event, not an annotation: `--filters '{"events.metrics.value":{"thumbs_up_down":{"vote":["-1"]}}}'`. A reviewer's thumbs-down is an annotation; when the user could mean either, ask which. Never guess a filter key: a refused key means read the reference above, not try another spelling.
+
+For an alert, find the graph that plots the metric with `langwatch graph list --format json`; when none does, create one with `langwatch graph create`. `--graph-alert` names the series as `<index>/<metric>/<aggregation>` (for example `0/performance.completion_time/p95`), a comparison `gt`, `gte`, `lt`, `lte` or `eq`, a threshold in the metric's own unit and a window in minutes (1, 5, 15, 30, 60 or 1440). A percentage written as "5%" is the threshold `5` on a percentage series and `0.05` on a rate series: read the graph to tell which.
+
+Analytics has no error-rate metric: never pass `--metric error-rate`. For errors, plot a trace count (`metadata.trace_id` / `cardinality`) on a series filtered to errored traces (`"filters":{"traces.error":["true"]}`) and alert on the count per window; tell the user the threshold is a count, not a percentage.
+
+When `graph create` is refused with `custom_graph_writes_disabled_for_playground`, this project cannot get a new alert graph. Do not create a dashboard widget: an alert cannot watch one. Say so in one line and offer a trace automation on errored traces (`--filter-query 'status:error'`) instead.
+
+## Pause, Resume, Test and Review
+
+```bash
+langwatch trigger disable <id> --format json   # pause
+langwatch trigger enable <id> --format json    # resume
+langwatch trigger test-fire <id> --format json # send a test to the saved destination
+langwatch trigger fires <id> --format json     # what it has done, newest first
+```
+
+"Pause that alert" means the automation you created or showed earlier in the conversation: reuse its id. Prefer pausing to deleting. Deleting an automation is the user's to do on the Automations page.
+
+## Verify
+
+A write only succeeded if its result names what it wrote. The create or update result is the automation as stored: confirm from it that the kind, condition, destination and active state are the ones the user asked for. Run `langwatch trigger get <id> --format json` only when that result did not name them; the panel already shows the created automation, so a read-back just repeats the card.
+
+## Common Mistakes
+
+- Do not take or pass a Slack token, a Slack webhook URL or a signing secret, and do not use `--slack-webhook`.
+- Do not create or scope a Slack connection: send the user to add one.
+- Do not key an evaluation condition by the evaluator id; it is the monitor id.
+- Do not create a duplicate of an automation the list already shows.
+- Do not delete an automation to stop it: pause it.

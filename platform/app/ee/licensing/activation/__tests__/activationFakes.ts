@@ -46,6 +46,8 @@ export class InMemoryActivationCodes implements ActivationCodeRepository {
   readonly rows = new Map<string, ActivationCodeRecord>();
   /** Set on the row whose claim won, for the tests that count winners. */
   claimsWon = 0;
+  /** The hash each code issued through `create` was stored under. */
+  private readonly issuedHashes = new Map<string, string>();
 
   constructor(
     rows: ActivationCodeRecord[],
@@ -54,13 +56,24 @@ export class InMemoryActivationCodes implements ActivationCodeRepository {
     for (const row of rows) this.rows.set(row.id, row);
   }
 
-  async create(): Promise<ActivationCodeRecord> {
-    throw new Error("the fake registry does not issue codes");
+  async create(
+    input: Parameters<ActivationCodeRepository["create"]>[0],
+  ): Promise<ActivationCodeRecord> {
+    const { codeHash, createdById: _createdById, ...fields } = input;
+    const row = codeRecord({
+      ...fields,
+      id: `code-${this.rows.size + 1}`,
+      createdAt: new Date("2026-09-21T12:00:00.000Z"),
+    });
+    this.rows.set(row.id, row);
+    this.issuedHashes.set(row.id, codeHash);
+    return { ...row };
   }
 
   async findByCodeHash(codeHash: string): Promise<ActivationCodeRecord | null> {
     for (const row of this.rows.values()) {
-      if (this.hashOf(row) === codeHash) return { ...row };
+      const stored = this.issuedHashes.get(row.id) ?? this.hashOf(row);
+      if (stored === codeHash) return { ...row };
     }
     return null;
   }

@@ -1,3 +1,4 @@
+import { grantConditionSchema } from "@langwatch/actor";
 import { z } from "zod";
 import {
   grantEventSourceSchema,
@@ -57,6 +58,8 @@ export const attachGrantEntrySchema = z
     roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Present only on a shared project-reader grant (ADR-144). */
+    condition: grantConditionSchema.optional(),
     /** Imported bindings only — the legacy `role` column a `custom:<id>`
      *  roleKey cannot carry (see the schema in events.ts). */
     legacyRole: legacyBindingRoleSchema.optional(),

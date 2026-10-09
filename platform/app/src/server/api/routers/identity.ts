@@ -1,25 +1,24 @@
 import { z } from "zod";
 import {
   accountIdentifiers,
+  signUpVerification,
   ssoTestArrival,
   verificationCeremony,
 } from "~/server/app-layer/identity/runtime";
-import { AuthRateLimitedError } from "~/server/auth/errors";
+import {
+  AuthRateLimitedError,
+  EmailSendingUnavailableError,
+} from "~/server/auth/errors";
+import { hasEmailProvider } from "~/server/mailer/providers";
 import { rateLimit } from "~/server/rateLimit";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { codeChallengeSchema } from "./identity.schemas";
 
 /** How long "not now" lasts, in whole seconds, so a countdown can say a
  *  number rather than "later". */
 function secondsUntil(resetAt: number): number {
   return Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
 }
-
-/**
- * RFC 7636 §4.2: the S256 challenge, base64url of a SHA-256 digest — 43
- * characters from the unreserved set. Checked here rather than trusted,
- * because an unbounded string would be stored and compared as one.
- */
-const codeChallengeSchema = z.string().regex(/^[A-Za-z0-9._~-]{43}$/);
 
 /**
  * The identity surface the app itself calls (D01).
@@ -120,9 +119,25 @@ export const identityRouter = createTRPCRouter({
       reason:
         "lists the session user's own sign-in identifiers; no organization scope applies and no other account is reachable",
     })
-    .query(({ ctx }) =>
-      accountIdentifiers().listIdentifiers({ userId: ctx.session.user.id }),
-    ),
+    .query(async ({ ctx }) => {
+      // The account's own address counts as confirmed when `User.emailVerified`
+      // says so, because that column is what sign-in linking trusts. Read
+      // through the same service the address nudge uses, so the list, the
+      // nudge and sign-in agree about one address.
+      const email = ctx.session.user.email ?? null;
+      const accountAddress = email
+        ? {
+            email,
+            confirmed:
+              (await signUpVerification().addressState({ email })) ===
+              "confirmed",
+          }
+        : null;
+      return accountIdentifiers().listIdentifiers({
+        userId: ctx.session.user.id,
+        accountAddress,
+      });
+    }),
 
   /**
    * When each of the caller's sign-in methods last got them in.
@@ -199,6 +214,11 @@ export const identityRouter = createTRPCRouter({
         "adds an identifier to the session user's own account; no organization scope applies",
     })
     .mutation(async ({ ctx, input }) => {
+      // Adding an address IS sending it a link: without a way to send one the
+      // address could only ever sit there unconfirmed.
+      if (!hasEmailProvider()) {
+        throw new EmailSendingUnavailableError();
+      }
       const limit = await rateLimit({
         key: `identity.addEmailIdentifier:${ctx.session.user.id}`,
         windowSeconds: 60 * 60,
@@ -239,6 +259,9 @@ export const identityRouter = createTRPCRouter({
         "re-sends the session user's own address confirmation; the ceremony proves the identifier is theirs",
     })
     .mutation(async ({ ctx, input }) => {
+      if (!hasEmailProvider()) {
+        throw new EmailSendingUnavailableError();
+      }
       const limit = await rateLimit({
         key: `identity.resendIdentifierConfirmation:${ctx.session.user.id}`,
         windowSeconds: 60 * 60,

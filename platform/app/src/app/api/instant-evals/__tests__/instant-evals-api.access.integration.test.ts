@@ -20,6 +20,8 @@ import {
 } from "./instantEvalsApiHarness";
 
 const flagIsOn = vi.hoisted(() => ({ isEnabled: true }));
+// Whether the flag alone is on, separate from whether a judge is configured.
+const released = vi.hoisted(() => ({ isReleased: false }));
 
 vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
   const original =
@@ -29,6 +31,7 @@ vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
   return {
     ...original,
     instantEvalsEnabled: async () => flagIsOn.isEnabled,
+    instantEvalsReleased: async () => released.isReleased,
   };
 });
 
@@ -48,6 +51,7 @@ beforeEach(() => {
   runs = harness.runs;
   testProjectId = harness.projectId;
   keyAllows = () => true;
+  released.isReleased = false;
 });
 
 describe("Feature: The Instant Eval run over REST", () => {
@@ -107,6 +111,23 @@ describe("Feature: The Instant Eval run over REST", () => {
 
         expect(res.status).toBe(403);
         expect(body.code).toBe("instant_eval_not_enabled");
+        expect(runs.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a released project on a deployment with no judge", () => {
+    describe("when a run is requested", () => {
+      /** @scenario "A released project on a deployment with no judge is told what to configure" */
+      it("answers 403 instant_eval_classifier_not_configured and never reaches the service", async () => {
+        flagIsOn.isEnabled = false;
+        released.isReleased = true;
+
+        const res = await api.post(BASE, { sql: SQL });
+        const body = await res.json();
+
+        expect(res.status).toBe(403);
+        expect(body.code).toBe("instant_eval_classifier_not_configured");
         expect(runs.create).not.toHaveBeenCalled();
       });
     });

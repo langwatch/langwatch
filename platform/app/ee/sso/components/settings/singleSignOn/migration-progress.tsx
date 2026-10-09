@@ -250,7 +250,7 @@ function inheritedDomainLine(entry: {
   } else if (entry.method === "dns-txt" || entry.method === "https-file") {
     proof = "published domain proof";
   } else if (entry.method === "license-token") {
-    proof = "installation licence";
+    proof = "installation license";
   }
 
   return `${entry.domain} (${proof})`;

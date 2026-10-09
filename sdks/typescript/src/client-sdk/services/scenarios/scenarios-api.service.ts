@@ -16,6 +16,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export class ScenariosApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -28,6 +29,7 @@ export class ScenariosApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new ScenariosApiError(message, operation, error);
   }
 

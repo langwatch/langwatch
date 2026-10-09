@@ -30,6 +30,36 @@ const storedSpansSelectLists = (sql: string): string[][] =>
     ([, columns]) => (columns ?? "").split(",").map((column) => column.trim()),
   );
 
+/** Split a SQL list on its top-level commas (not those inside parentheses). */
+const splitTopLevel = (list: string): string[] => {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of list) {
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+    if (char === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+};
+
+/**
+ * The columns each latest-version (`argMax`) trace_summaries dedup carries
+ * beyond its keys, in order: the elements of its `tuple(...) AS __latest_row`.
+ */
+const latestTraceRowColumns = (sql: string): string[][] =>
+  Array.from(
+    sql.matchAll(
+      /tuple\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\) AS __latest_row\s+FROM trace_summaries/g,
+    ),
+  ).map(([, columns]) => splitTopLevel(columns ?? ""));
+
 describe("aggregation-builder", () => {
   beforeEach(() => {
     resetParamCounter();
@@ -56,7 +86,8 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("SELECT");
       expect(result.sql).toContain("FROM trace_summaries");
       expect(result.sql).not.toContain("LIMIT 1 BY");
-      expect(result.sql).toContain("max(UpdatedAt)");
+      expect(result.sql).toContain("argMax(__latest_row, __version)");
+      expect(result.sql).not.toContain("(TenantId, TraceId, UpdatedAt) IN");
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");
@@ -849,6 +880,277 @@ describe("aggregation-builder", () => {
       });
     });
 
+    // @regression issue #6718: two series differing only by their `filters`
+    // compiled to byte-identical SQL, because the per-series loop passed only
+    // metric/aggregation/key/subkey on and the only filter translation was the
+    // graph-wide one. An "errors" series and a "no errors" series therefore
+    // drew the same line, and every alert on a filtered series watched the
+    // wrong number.
+    describe("when a series carries its own filters", () => {
+      const errorSeries = ({
+        values,
+        isPercent,
+      }: {
+        values: string[];
+        isPercent?: boolean;
+      }) => ({
+        metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+        aggregation: "cardinality" as const,
+        filters: { "traces.error": values },
+        ...(isPercent === undefined ? {} : { asPercent: isPercent }),
+      });
+
+      // @scenario "Two series that differ only by their filters produce different queries"
+      it("compiles opposite error filters to different aggregate expressions", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            errorSeries({ values: ["true"] }),
+            errorSeries({ values: ["false"] }),
+          ],
+        });
+
+        expect(result.sql).toContain(
+          "uniqIf(ts.TraceId, ((ts.ContainsErrorStatus = 1)))",
+        );
+        expect(result.sql).toContain(
+          "uniqIf(ts.TraceId, (((ts.ContainsErrorStatus = 0 OR ts.ContainsErrorStatus IS NULL))))",
+        );
+      });
+
+      it("keeps the graph-wide WHERE free of the per-series predicate", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [errorSeries({ values: ["true"] })],
+        });
+
+        // The predicate belongs to one series; putting it in the WHERE would
+        // narrow every other series in the same graph. Slice every WHERE
+        // clause (up to its GROUP BY) rather than matching one formatting of
+        // the predicate, so a re-parenthesised or re-wrapped leak still fails.
+        const whereClauses = [
+          ...result.sql.matchAll(/WHERE([\s\S]*?)GROUP BY/g),
+        ].map((match) => match[1]);
+        expect(whereClauses.length).toBeGreaterThan(0);
+        for (const clause of whereClauses) {
+          expect(clause).not.toContain("ContainsErrorStatus");
+        }
+      });
+
+      it("keeps the column the predicate reads in the deduped trace subquery", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [errorSeries({ values: ["true"] })],
+        });
+
+        expect(latestTraceRowColumns(result.sql)[0]).toContain(
+          "ContainsErrorStatus",
+        );
+      });
+
+      it("parameterizes a span filter and scopes it to its own series", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              filters: { "spans.type": ["llm"] },
+            },
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        });
+
+        expect(result.sql).toMatch(
+          /uniqIf\(ts\.TraceId, \(\(ts\.TraceId IN \(\s*SELECT TraceId FROM stored_spans/,
+        );
+        expect(result.sql).toContain("uniq(ts.TraceId) AS 1__");
+        expect(Object.keys(result.params)).toContain("spanTypes_0");
+      });
+
+      it("hoists the predicate into the CTE on the grouped path", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          groupBy: "metadata.labels" as const,
+          series: [errorSeries({ values: ["true"] })],
+        });
+
+        expect(result.sql).toContain(
+          "ts.ContainsErrorStatus = 1) AS series_filter_0",
+        );
+        expect(result.sql).toContain(
+          "uniqExactIf(trace_id, (series_filter_0))",
+        );
+      });
+
+      it("narrows a per-entity series inside its own subquery instead", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          timeScale: "full" as const,
+          series: [
+            {
+              metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+              aggregation: "sum" as const,
+              pipeline: {
+                field: "user_id" as const,
+                aggregation: "avg" as const,
+              },
+              filters: { "traces.error": ["true"] },
+            },
+          ],
+        });
+
+        // A per-entity average has to lose the non-matching entities entirely,
+        // not keep them as zeros — so the filter goes in that metric's own scan.
+        expect(result.sql).toContain("AND ((ts.ContainsErrorStatus = 1))");
+      });
+
+      // ClickHouse's `-If` combinators do NOT return NULL for an empty match
+      // set when the source column is non-nullable — `minIf` returns 0. A
+      // filtered latency floor would then draw a real-looking 0ms line for
+      // every bucket the filter excluded, where the row parser and ES both
+      // leave a non-additive series absent.
+      describe("when the aggregation is not additive", () => {
+        it("reports no value instead of zero for a bucket nothing matched", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric:
+                  "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+                aggregation: "min" as const,
+                filters: { "traces.error": ["true"] },
+              },
+            ],
+          });
+
+          expect(result.sql).toContain(
+            "if(countIf((ts.ContainsErrorStatus = 1)) > 0, min",
+          );
+          expect(result.sql).toContain(", NULL) AS 0__");
+        });
+
+        it("leaves an additive aggregation unguarded, because zero is the truth there", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [errorSeries({ values: ["true"] })],
+          });
+
+          expect(result.sql).not.toContain("NULL) AS 0__");
+        });
+      });
+
+      describe("when the series is also shown as a percentage", () => {
+        // @scenario "Percentage mode on an unfiltered series leaves the series unchanged"
+        it("leaves an unfiltered series exactly as it was", () => {
+          const withPercent = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+                aggregation: "cardinality" as const,
+                asPercent: true,
+              },
+            ],
+          });
+          resetParamCounter();
+          const without = buildTimeseriesQuery(baseInput);
+
+          expect(withPercent.sql).toBe(without.sql);
+        });
+
+        it("divides the filtered aggregate by the unfiltered one", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [errorSeries({ values: ["true"], isPercent: true })],
+          });
+
+          expect(result.sql).toContain(
+            "if(uniq(ts.TraceId) > 0, (uniqIf(ts.TraceId, ((ts.ContainsErrorStatus = 1)))) / (uniq(ts.TraceId)) * 100, 0)",
+          );
+        });
+
+        it("guards a non-additive percentage the same way as its plain series", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric:
+                  "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+                aggregation: "min" as const,
+                filters: { "traces.error": ["true"] },
+                asPercent: true,
+              },
+            ],
+          });
+
+          // `minIf` over an empty match set returns 0 on a non-nullable
+          // column, so the unguarded ratio would report a real-looking 0%
+          // for a bucket the filter excluded.
+          expect(result.sql).toContain(
+            "if(countIf((ts.ContainsErrorStatus = 1)) > 0, if(min",
+          );
+          expect(result.sql).toContain(", NULL) AS 0__");
+        });
+
+        // @scenario "A percentage on a per-entity average is refused rather than answered wrongly"
+        it("refuses a percentage on a per-entity series", () => {
+          expect(() =>
+            buildTimeseriesQuery({
+              ...baseInput,
+              series: [
+                {
+                  metric:
+                    "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+                  aggregation: "sum" as const,
+                  pipeline: {
+                    field: "user_id" as const,
+                    aggregation: "avg" as const,
+                  },
+                  filters: { "traces.error": ["true"] },
+                  asPercent: true,
+                },
+              ],
+            }),
+          ).toThrowError(
+            expect.objectContaining({
+              code: "analytics_series_percentage_unsupported",
+            }),
+          );
+        });
+      });
+    });
+
+    // @regression issue #6718: grouping by error status read the SPAN-level
+    // StatusCode through a stored_spans JOIN, so a trace with one failing span
+    // and several healthy ones landed in BOTH buckets and the buckets could not
+    // add up to the total. Error status is a trace-level fact.
+    describe("when grouping by error status", () => {
+      it("groups on the trace-level error column", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          groupBy: "error.has_error" as const,
+        });
+
+        expect(result.sql).toContain(
+          "if(ifNull(ts.ContainsErrorStatus, 0) = 1, 'with error', 'without error')",
+        );
+        expect(result.sql).not.toContain("StatusCode");
+      });
+
+      it("stops joining stored_spans for a column the trace already carries", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          groupBy: "error.has_error" as const,
+        });
+
+        expect(result.sql).not.toContain("FROM stored_spans");
+      });
+    });
+
     describe("when the query leaves out trace origins", () => {
       /** @scenario Leaving out an origin keeps the rest of the count intact */
       it("adds a NOT IN on the origin attribute", () => {
@@ -1575,27 +1877,24 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe(projectId);
     });
 
-    it("joins a column-pruned stored_spans subquery", () => {
+    it("joins a stored_spans subquery narrowed to the rag.contexts value", () => {
       const result = buildTopDocumentsQuery(projectId, startDate, endDate);
 
-      // The stored_spans join is a column-pruned subquery (identity columns +
-      // the SpanAttributes the ARRAY JOIN reads), not the raw table with its
-      // full analytics column set.
-      expect(result.sql).toMatch(/JOIN \(SELECT [^)]*FROM stored_spans/);
       expect(result.sql).not.toContain("JOIN stored_spans ");
       expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/);
 
-      // The exact list, not `toContain("SpanAttributes")`. The outer ARRAY JOIN
-      // and the rag.contexts predicate both name SpanAttributes on the `ss`
-      // alias, so a substring check passes even when the subquery does not
-      // select it, and it also cannot see a regression that widens the list.
-      // Both of them: the top-10 part and the total-count part each carry their
-      // own subquery, and pruning one while leaving the other wide would halve
-      // the benefit while every substring assertion stayed green.
-      expect(storedSpansSelectLists(result.sql)).toEqual([
-        ["TenantId", "TraceId", "SpanId", "SpanAttributes"],
-        ["TenantId", "TraceId", "SpanId", "SpanAttributes"],
-      ]);
+      // The JOIN's right side is hashed into memory: it carries the one
+      // attribute the ARRAY JOIN reads, never the whole SpanAttributes map
+      // (every span's inputs, outputs and prompts in range).
+      expect(
+        result.sql.match(/JOIN \(SELECT ([\s\S]+?) FROM stored_spans/)?.[1],
+      ).toBe(
+        "TenantId, TraceId, SpanId, map('langwatch.rag.contexts', SpanAttributes['langwatch.rag.contexts']) AS SpanAttributes",
+      );
+      // ...and only for the spans that have one.
+      expect(result.sql).toMatch(
+        /FROM stored_spans WHERE TenantId = \{tenantId:String\}[^\n]*?AND SpanAttributes\['langwatch\.rag\.contexts'\] != ''/,
+      );
     });
 
     it("prunes the stored_spans join to the StartTime partition window", () => {
@@ -1604,28 +1903,27 @@ describe("aggregation-builder", () => {
       // stored_spans is partitioned by toYearWeek(StartTime); without a
       // StartTime bound the join scans every weekly partition (incl. cold S3).
       // The bound is pushed into the pruned subquery (partition prune before
-      // the join) rather than left on the outer ss alias, for both the top-10
-      // and the total-count parts.
+      // the join) rather than left on the outer ss alias.
       expect(result.sql).not.toContain("ss.StartTime");
       expect(
         result.sql.match(
           /StartTime >= \{startDate:DateTime64\(3\)\} - INTERVAL 2 DAY/g,
         ) ?? [],
-      ).toHaveLength(2);
+      ).toHaveLength(1);
       expect(
         result.sql.match(
           /StartTime < \{endDate:DateTime64\(3\)\} \+ INTERVAL 2 DAY/g,
         ) ?? [],
-      ).toHaveLength(2);
+      ).toHaveLength(1);
     });
 
-    it("includes query for total unique documents", () => {
+    it("counts the distinct documents in the same statement as the top 10", () => {
       const result = buildTopDocumentsQuery(projectId, startDate, endDate);
 
-      // Query has two parts separated by semicolon
-      expect(result.sql).toContain(";");
-      expect(result.sql).toContain("uniq(");
-      expect(result.sql).toContain("AS total");
+      // One scan and one join serve both figures: the total is the number of
+      // document groups, counted before the LIMIT.
+      expect(result.sql).not.toContain(";");
+      expect(result.sql).toContain("count() OVER () AS total");
     });
 
     it("includes filters when provided", () => {
@@ -1654,9 +1952,7 @@ describe("aggregation-builder", () => {
       // The document payload comes from the stored_spans ARRAY JOIN, so the
       // deduped trace_summaries subquery only needs identity/date columns and
       // must not materialise the wide Attributes map.
-      expect(result.sql).toContain(
-        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt FROM trace_summaries",
-      );
+      expect(latestTraceRowColumns(result.sql)).toEqual([["OccurredAt"]]);
     });
 
     it("adds filter-referenced columns to the deduped read so filtered queries stay valid", () => {
@@ -1666,9 +1962,9 @@ describe("aggregation-builder", () => {
 
       // TopicId is referenced by the filter WHERE, so the deduped subquery must
       // also select it (otherwise ClickHouse would reject ts.TopicId).
-      expect(result.sql).toContain(
-        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt, TopicId FROM trace_summaries",
-      );
+      expect(latestTraceRowColumns(result.sql)).toEqual([
+        ["OccurredAt", "TopicId"],
+      ]);
       expect(result.sql).toContain("ts.TopicId IN");
     });
   });
@@ -1779,9 +2075,7 @@ describe("aggregation-builder", () => {
 
       // Feedback payload comes from the stored_spans Events arrays, so the
       // deduped trace_summaries subquery only needs identity/date columns.
-      expect(result.sql).toContain(
-        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt FROM trace_summaries",
-      );
+      expect(latestTraceRowColumns(result.sql)).toEqual([["OccurredAt"]]);
     });
 
     it("adds a filter-referenced Attributes read to the deduped subquery", () => {

@@ -1228,3 +1228,133 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 });
+
+/**
+ * ADR-093 §5a's named Slack connections. A model registered in no regime makes
+ * EVERY query against it throw, so the shapes the repository actually issues
+ * have to be accepted here before they are trusted anywhere else.
+ */
+describe("guardProjectId — SlackIntegration", () => {
+  const projectScope = { scopeType: "PROJECT", scopeId: "project-1" };
+
+  describe("when a query names the shapes the repository issues", () => {
+    it("passes the read by row id", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "findUnique",
+          args: { where: { id: "conn-1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("passes the fingerprint compound unique", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "findUnique",
+          args: {
+            where: {
+              organizationId_scopeType_scopeId_secretFingerprint: {
+                organizationId: "org-1",
+                scopeType: "PROJECT",
+                scopeId: "project-1",
+                secretFingerprint: "fp",
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("passes the organization-anchored listing across both scopes", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "findMany",
+          args: {
+            where: {
+              organizationId: "org-1",
+              OR: [
+                { scopeType: "ORGANIZATION", scopeId: "org-1" },
+                projectScope,
+              ],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("passes the scope-predicate read", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "findMany",
+          args: { where: projectScope },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("passes the id-and-organization delete", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "deleteMany",
+          args: { where: { id: "conn-1", organizationId: "org-1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a create names its owning organization", () => {
+    it("passes", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "create",
+          args: {
+            data: {
+              ...projectScope,
+              name: "Alerts bot",
+              kind: "BOT",
+              organizationId: "org-1",
+              botTokenEncrypted: "enc",
+              secretFingerprint: "fp",
+              secretHint: "abcd",
+              createdById: "user-1",
+              updatedById: "user-1",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a read names no tenant at all", () => {
+    it("is refused by the scope guard, not by some later failure", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "findMany",
+          args: {},
+        }),
+      ).rejects.toThrow(
+        "The findMany action on the SlackIntegration model requires a row id, organizationId, or scope predicate in the where clause.",
+      );
+    });
+  });
+
+  describe("when a create omits the organization anchor", () => {
+    it("is refused by the anchor guard, not by some later failure", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "create",
+          args: { data: { ...projectScope, botTokenEncrypted: "enc" } },
+        }),
+      ).rejects.toThrow(
+        "The create action on the SlackIntegration model requires an organizationId in the data payload.",
+      );
+    });
+  });
+});

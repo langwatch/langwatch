@@ -41,7 +41,7 @@ import { ServiceProviderDetails } from "./ServiceProviderDetails";
  * addresses, bring back what it hands you.
  */
 
-interface RegisterForm {
+export interface RegisterForm {
   providerId: string;
   issuer: string;
   clientId: string;
@@ -52,7 +52,7 @@ interface RegisterForm {
   certificate: string;
 }
 
-const EMPTY_FORM: RegisterForm = {
+export const EMPTY_FORM: RegisterForm = {
   providerId: "",
   issuer: "",
   clientId: "",
@@ -63,7 +63,7 @@ const EMPTY_FORM: RegisterForm = {
   certificate: "",
 };
 
-type UpdateField = (key: keyof RegisterForm) => (value: string) => void;
+export type UpdateField = (key: keyof RegisterForm) => (value: string) => void;
 
 /**
  * The identity-provider half of the form, in the shape the command takes.
@@ -276,7 +276,7 @@ function ProviderPicker({
         </Text>
       </VStack>
       <SimpleGrid
-        columns={{ base: 2, md: 4 }}
+        minChildWidth={PROVIDER_TILE_MIN_WIDTH}
         gap={2}
         role="radiogroup"
         aria-label="Who signs your team in?"
@@ -289,7 +289,7 @@ function ProviderPicker({
           Or connect by protocol, if you already know which one you have.
         </Text>
         <SimpleGrid
-          columns={{ base: 2, md: 4 }}
+          minChildWidth={PROVIDER_TILE_MIN_WIDTH}
           gap={2}
           role="radiogroup"
           aria-label="Connect by protocol"
@@ -299,6 +299,15 @@ function ProviderPicker({
       </VStack>
     </VStack>
   );
+}
+
+function consolePathFor(
+  preset: IdentityProviderPreset,
+  protocol: SsoProtocol,
+): string | null {
+  return protocol === "saml" && preset.samlConsolePath
+    ? preset.samlConsolePath
+    : preset.consolePath;
 }
 
 /** Act two: their console's side — where to create the app, and the
@@ -321,8 +330,8 @@ function ProviderConsoleAct({
             : `Set it up in ${preset.name}`}
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          {preset.consolePath
-            ? `In ${preset.name}, create the app under ${preset.consolePath}, and give it these addresses when it asks.`
+          {consolePathFor(preset, protocol)
+            ? `In ${preset.name}, create the app under ${consolePathFor(preset, protocol)}, and give it these addresses when it asks.`
             : "Create an app for LangWatch in your identity provider, and give it these addresses when it asks."}
         </Text>
       </VStack>
@@ -371,7 +380,7 @@ function CredentialsAct({
         <Text color="fg.muted" fontSize="sm">
           {preset.protocolIsChosen
             ? "These are the values your identity provider's app hands back."
-            : "Two ways to connect — pick whichever your identity provider's app gave you. Either one works."}
+            : "There are two ways to connect. Pick the one your identity provider's app gave you. Either one works."}
         </Text>
       </VStack>
       {/* A tile that IS a protocol has answered this already; asking again
@@ -427,14 +436,17 @@ function CredentialsAct({
   );
 }
 
-function OidcFields({
+export function OidcFields({
   preset,
   form,
   update,
+  secretHint,
 }: {
   preset: IdentityProviderPreset;
   form: RegisterForm;
   update: UpdateField;
+  /** Shown under the secret when a blank one keeps the stored secret. */
+  secretHint?: string;
 }) {
   return (
     <>
@@ -445,6 +457,9 @@ function OidcFields({
           value={form.issuer}
           onChange={(event) => update("issuer")(event.target.value)}
         />
+        {preset.issuerHint && (
+          <Field.HelperText>{preset.issuerHint}</Field.HelperText>
+        )}
       </Field.Root>
       <Field.Root>
         <Field.Label>Client id</Field.Label>
@@ -460,12 +475,13 @@ function OidcFields({
           value={form.clientSecret}
           onChange={(event) => update("clientSecret")(event.target.value)}
         />
+        {secretHint && <Field.HelperText>{secretHint}</Field.HelperText>}
       </Field.Root>
     </>
   );
 }
 
-function SamlFields({
+export function SamlFields({
   preset,
   form,
   update,
@@ -515,6 +531,13 @@ function SamlFields({
     </>
   );
 }
+
+/**
+ * The narrowest a provider tile gets. Wide enough for the longest name
+ * ("Microsoft Entra ID") on one line beside its mark, so the grid drops a
+ * column before a name is cut. A name that still does not fit wraps.
+ */
+const PROVIDER_TILE_MIN_WIDTH = "12rem";
 
 /** One provider the administrator recognises: its own mark where the icon
  *  set has one, its initials where it does not, and the name. */
@@ -574,7 +597,7 @@ function ProviderTile({
           preset.monogram
         )}
       </Box>
-      <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
+      <Text fontSize="sm" fontWeight="medium" lineHeight="short">
         {preset.name}
       </Text>
     </chakra.button>

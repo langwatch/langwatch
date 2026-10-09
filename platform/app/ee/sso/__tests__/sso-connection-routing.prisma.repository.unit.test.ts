@@ -1,3 +1,4 @@
+import { SignInRouterService } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
 import type {
   PrismaClient,
@@ -229,5 +230,82 @@ describe("verified domain holders", () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+/**
+ * The self-hosted front door with no address in hand: an organization's own
+ * connection, registered through setup and gone live, is the one connection
+ * the deployment has, so the router sends the visitor straight to it.
+ *
+ * Spec: specs/identity/signin-router.feature
+ */
+describe("given a self-hosted deployment whose only connection is a live self-serve one", () => {
+  const selfServe: SsoConnection = {
+    ...connection({ id: "connection_keycloak" }),
+    source: "self-serve",
+    idpMetadata: { providerId: "keycloak" },
+  };
+  const password = {
+    id: "password",
+    kind: "password",
+    connectionId: null,
+  } as const;
+
+  const router = () =>
+    new SignInRouterService({
+      domains: {
+        legacy: {
+          findConnectionForDomain: async () => null,
+          listActiveConnections: async () => [],
+        },
+        connections: new SsoConnectionDomainRoutingRepository(
+          {
+            ssoConnection: {
+              findMany: vi.fn().mockResolvedValue([selfServe]),
+            },
+          } as unknown as PrismaClient,
+          ssoMethodDialWith({
+            mountedMethodId: async () => null,
+            engineHoldsProvider: async ({ connectionId }) =>
+              connectionId === selfServe.id,
+          }),
+        ),
+      },
+      policy: {
+        resolvePolicy: async () => ({
+          defaultMethods: [password],
+          localMethods: [password],
+          federationLicensed: true,
+          selfHosted: true,
+        }),
+      },
+      breakGlass: { allow: async () => true },
+      accounts: { findAccountMethods: async () => null },
+      recorder: { decided: () => undefined },
+    });
+
+  describe("when the sign-in page asks with no address", () => {
+    /** @scenario "A self-serve connection that went live is the sole connection" */
+    it("redirects to the connection's own provider", async () => {
+      const decision = await router().route({ identifier: null });
+
+      expect(decision.outcome).toBe("redirect_to_connection");
+      expect(decision.reasonCode).toBe("sole_active_connection");
+      expect(decision.methodSet[0]?.id).toBe(selfServe.id);
+    });
+  });
+
+  describe("when the break-glass parameter is set", () => {
+    /** @scenario "The break-glass path always reaches a local sign-in" */
+    it("offers the local sign-in instead", async () => {
+      const decision = await router().route({
+        identifier: null,
+        breakGlass: true,
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("break_glass");
+    });
   });
 });

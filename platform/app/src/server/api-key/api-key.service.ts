@@ -10,6 +10,7 @@ import {
   parseCustomRolePermissions,
   permissionFormatSchema,
 } from "~/server/app-layer/authz/custom-role-permissions";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { RoleRepository } from "~/server/role/repositories/role.repository";
 import { CUSTOM_ROLE_KIND } from "~/server/role/role-kind";
 import { assertPersonalTeamScopesOwnedBy } from "~/server/role-bindings/personal-team-scope";
@@ -19,6 +20,10 @@ import {
   type ApiKeyWithBindings,
 } from "./api-key.repository";
 import {
+  type ApiKeyLastUsedRecorder,
+  processApiKeyLastUsed,
+} from "./api-key-last-used";
+import {
   generateApiKeyToken,
   hashSecret,
   INGEST_KEY_PREFIX,
@@ -26,6 +31,7 @@ import {
   verifySecret,
 } from "./api-key-token.utils";
 import {
+  AggregateProjectHasNoCredentialError,
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
@@ -116,12 +122,14 @@ export class ApiKeyService {
   private readonly mintLegacyGrant: (args: {
     apiKey: ApiKeyWithBindings;
   }) => void;
+  private readonly lastUsed: ApiKeyLastUsedRecorder;
 
   constructor({
     prisma,
     repo,
     roleRepo,
     mintLegacyGrant = mintLegacyKeyGrant,
+    lastUsed = processApiKeyLastUsed,
   }: {
     prisma: PrismaClient;
     repo: ApiKeyRepository;
@@ -132,11 +140,14 @@ export class ApiKeyService {
      * stack behind it.
      */
     mintLegacyGrant?: (args: { apiKey: ApiKeyWithBindings }) => void;
+    /** Defaults to the process-wide recorder; a test injects its own clock. */
+    lastUsed?: ApiKeyLastUsedRecorder;
   }) {
     this.prisma = prisma;
     this.repo = repo;
     this.roleRepo = roleRepo;
     this.mintLegacyGrant = mintLegacyGrant;
+    this.lastUsed = lastUsed;
   }
 
   static create(prisma: PrismaClient): ApiKeyService {
@@ -761,6 +772,12 @@ export class ApiKeyService {
         { meta: { projectId: binding.scopeId, organizationId } },
       );
     }
+    // ADR-144 decision 7: an aggregate owns no credential, so no key may be
+    // bound to it, whichever surface mints the key. Refused with the same
+    // code the ingest door and the CLI key mint answer.
+    if (isAggregateProjectKind(project.kind)) {
+      throw new AggregateProjectHasNoCredentialError();
+    }
     return { type: "project", id: binding.scopeId, teamId: project.team.id };
   }
 
@@ -980,14 +997,13 @@ export class ApiKeyService {
   }
 
   /**
-   * Fire-and-forget lastUsedAt update. Call after full authorization succeeds.
+   * Fire-and-forget lastUsedAt update, at most once a minute per key per
+   * process. Call after full authorization succeeds.
    */
   markUsed({ id }: { id: string }): void {
-    this.repo.updateLastUsedAt({ id }).catch((err: unknown) => {
-      logger.warn(
-        { err, apiKeyId: id },
-        "failed to update API key lastUsedAt (fire-and-forget)",
-      );
+    this.lastUsed.markUsed({
+      id,
+      write: () => this.repo.updateLastUsedAt({ id }),
     });
   }
 

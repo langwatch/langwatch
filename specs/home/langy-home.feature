@@ -56,6 +56,16 @@ Feature: The Langy home
     And exactly one such canvas is on the page
     And the current announcement reads as a single line across the block's top
 
+  # The block's light bleeds well past its own box on purpose. It lights the
+  # page from behind: a card it reaches stays readable without any stacking
+  # order of its own, in either colour mode.
+  @integration @regression
+  Scenario: The block's light stays behind the cards around it
+    Given the Langy home renders
+    And a card sits directly above the block, within reach of its light
+    Then the card paints above the block's light
+    And the card needs no stacking order of its own to stay readable
+
   # The results carry a line above them in the raised Cmd+K bar, where the
   # field and the list share one card and the line is the boundary between
   # them. Here the results are their own panel under the field, so that line

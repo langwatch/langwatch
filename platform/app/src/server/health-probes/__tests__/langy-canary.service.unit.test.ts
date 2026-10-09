@@ -10,6 +10,7 @@
  * caller is told busy; `buildProductionLangyCanaryDeps` is the one place the
  * real turn service and fold reader are wired, pinned by argument shape.
  */
+import { HandledError } from "@langwatch/handled-error";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { logger, startConversationTurn, awaitTurnSettlement } = vi.hoisted(
@@ -45,6 +46,8 @@ import {
   runLangyCanary,
   type StartedTurn,
 } from "../langy-canary.service";
+
+class FakeHandledError extends HandledError {}
 
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -102,13 +105,45 @@ describe("classifyLangyCanaryOutcome", () => {
     });
   });
 
+  describe("given a turn that failed with a typed chain ending in insufficient_quota", () => {
+    describe("when the settlement is classified", () => {
+      /** @scenario "A failed Langy canary turn reports its cause beside its reason" */
+      it("is turn_failed with cause insufficient_quota", () => {
+        const error = JSON.stringify({
+          code: "langy_agent_errored",
+          reasons: [
+            {
+              code: "llm_upstream_error",
+              reasons: [{ code: "insufficient_quota" }],
+            },
+          ],
+        });
+
+        expect(classifyLangyCanaryOutcome(failed(error))).toEqual({
+          healthy: false,
+          reason: "turn_failed",
+          cause: "insufficient_quota",
+        });
+      });
+    });
+  });
+
   describe("given a turn that settled as stopped", () => {
     describe("when the settlement is classified", () => {
       /** @scenario "A stopped turn is turn_failed" */
       it("is turn_failed even when text came back", () => {
+        expect(classifyLangyCanaryOutcome(stopped("partial"))).toMatchObject({
+          healthy: false,
+          reason: "turn_failed",
+        });
+      });
+
+      /** @scenario "A stopped Langy canary turn reports turn_stopped" */
+      it("names turn_stopped as the cause", () => {
         expect(classifyLangyCanaryOutcome(stopped("partial"))).toEqual({
           healthy: false,
           reason: "turn_failed",
+          cause: "turn_stopped",
         });
       });
     });
@@ -122,6 +157,22 @@ describe("classifyLangyCanaryOutcome", () => {
           healthy: false,
           reason: "empty_reply",
         });
+      });
+    });
+  });
+
+  describe("given a turn that answered with a question card and waits on the user", () => {
+    describe("when the settlement is classified", () => {
+      /** @scenario "A turn that asks the user a question is healthy" */
+      it("is healthy", () => {
+        expect(
+          classifyLangyCanaryOutcome({
+            succeeded: true,
+            outcome: "awaiting_user",
+            text: "What would you like to do?",
+            error: null,
+          }),
+        ).toEqual({ healthy: true });
       });
     });
   });
@@ -147,6 +198,30 @@ describe("runLangyCanary", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+  });
+
+  describe("given a turn that waits on the user", () => {
+    describe("when the canary runs", () => {
+      /** @scenario "A turn that asks the user a question is healthy" */
+      it("is healthy and logs the question it asked", async () => {
+        const outcome = await runLangyCanary({
+          startTurn: vi.fn(async () => STARTED),
+          awaitSettlement: vi.fn(async () => ({
+            succeeded: true as const,
+            outcome: "awaiting_user" as const,
+            text: "Which project?",
+            error: null,
+          })),
+          now: () => 0,
+        });
+
+        expect(outcome).toMatchObject({ healthy: true, ...STARTED });
+        expect(logger.info).toHaveBeenCalledWith(
+          expect.objectContaining({ question: "Which project?" }),
+          expect.any(String),
+        );
+      });
+    });
   });
 
   describe("given two consecutive canary runs", () => {
@@ -278,6 +353,32 @@ describe("runLangyCanary", () => {
         });
         expect(deps.awaitSettlement).not.toHaveBeenCalled();
         expect(logger.error).toHaveBeenCalledOnce();
+      });
+    });
+  });
+
+  describe("given the turn service throws a typed budget_exceeded error", () => {
+    describe("when the canary runs", () => {
+      /** @scenario "A Langy canary turn that cannot start reports the start error's cause" */
+      it("reports turn_failed with cause budget_exceeded", async () => {
+        const deps: LangyCanaryDeps = {
+          startTurn: async () => {
+            throw new FakeHandledError("budget_exceeded", "Budget exceeded.", {
+              httpStatus: 402,
+            });
+          },
+          awaitSettlement: vi.fn(),
+          now: () => 0,
+        };
+
+        const outcome = await runLangyCanary(deps);
+
+        expect(outcome).toEqual({
+          healthy: false,
+          reason: "turn_failed",
+          cause: "budget_exceeded",
+          durationMs: 0,
+        });
       });
     });
   });
@@ -524,6 +625,36 @@ describe("buildProductionLangyCanaryDeps", () => {
           turnId: "turn-1",
           userId: "user-1",
           signal,
+          shouldSettleOnUserWait: true,
+        });
+      });
+    });
+
+    describe("when the production deps await a turn that waits on the user", () => {
+      /** @scenario "A turn that asks the user a question is healthy" */
+      it("settles on the user wait and reports healthy", async () => {
+        const waiting = {
+          succeeded: true as const,
+          outcome: "awaiting_user" as const,
+          text: "Which project?",
+          error: null,
+        };
+        awaitTurnSettlement.mockResolvedValue(waiting);
+        const deps = buildProductionLangyCanaryDeps({
+          projectId: "proj-1",
+          session,
+        });
+
+        const settlement = await deps.awaitSettlement({
+          ...STARTED,
+          signal: new AbortController().signal,
+        });
+
+        expect(awaitTurnSettlement).toHaveBeenCalledWith(
+          expect.objectContaining({ shouldSettleOnUserWait: true }),
+        );
+        expect(classifyLangyCanaryOutcome(settlement)).toEqual({
+          healthy: true,
         });
       });
     });

@@ -231,6 +231,13 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision carries the reason code "sole_active_connection"
 
   @unit
+  Scenario: A self-serve connection that went live is the sole connection
+    Given a self-hosted installation whose only connection is a self-serve one that went live
+    When the sign-in page is requested
+    Then the decision redirects to that connection's own provider
+    And the decision carries the reason code "sole_active_connection"
+
+  @unit
   Scenario: The break-glass path always reaches a local sign-in
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested with the break-glass parameter

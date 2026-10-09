@@ -126,7 +126,7 @@ export const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> =
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> =
   z.object({
-    values: z.array(anyValueSchema),
+    values: z.array(anyValueSchema).optional().default([]),
   });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,11 +135,11 @@ export const keyValueListSchema: z.ZodType<
   z.ZodTypeDef,
   any
 > = z.object({
-  values: z.array(keyValueSchema),
+  values: z.array(keyValueSchema).optional().default([]),
 });
 
 export const resourceSchema = z.object({
-  attributes: z.array(keyValueSchema),
+  attributes: z.array(keyValueSchema).optional().default([]),
   droppedAttributesCount: z.number().optional().nullable(),
   schemaUrl: z.string().optional().nullable(),
 });
@@ -185,10 +185,12 @@ export const statusSchema = z.object({
   code: eStatusCodeSchema.optional().nullable(),
 });
 
+// ProtoJSON omits default-valued fields (zero counts, empty lists), so every
+// such field must accept absence or spec-compliant OTLP/JSON spans are dropped.
 export const eventSchema = z.object({
   timeUnixNano: fixed64Schema,
   name: z.string(),
-  attributes: z.array(keyValueSchema),
+  attributes: z.array(keyValueSchema).optional().default([]),
   droppedAttributesCount: z.number().optional().nullable(),
 });
 
@@ -196,8 +198,8 @@ export const linkSchema = z.object({
   traceId: idSchema,
   spanId: idSchema,
   traceState: z.string().optional().nullable(),
-  attributes: z.array(keyValueSchema),
-  droppedAttributesCount: z.number().nullable(),
+  attributes: z.array(keyValueSchema).optional().default([]),
+  droppedAttributesCount: z.number().optional().nullable().default(0),
   flags: z.number().optional().nullable(),
 });
 
@@ -207,10 +209,13 @@ export const spanSchema = z.object({
   traceState: z.string().nullable().optional(),
   parentSpanId: idSchema.nullable().optional(),
   name: z.string(),
-  kind: eSpanKindSchema,
+  // Absent in ProtoJSON and null from the protobuf decoder when unset (0).
+  kind: eSpanKindSchema
+    .nullish()
+    .transform((kind) => kind ?? ESpanKind.SPAN_KIND_UNSPECIFIED),
   startTimeUnixNano: fixed64Schema,
   endTimeUnixNano: fixed64Schema,
-  attributes: z.array(keyValueSchema),
+  attributes: z.array(keyValueSchema).optional().default([]),
   events: z.array(eventSchema).optional().default([]),
   links: z.array(linkSchema).optional().default([]),
   status: statusSchema
@@ -235,7 +240,7 @@ export const scopeSpansSchema = z.object({
 
 export const resourceSpansSchema = z.object({
   resource: resourceSchema.optional(),
-  scopeSpans: z.array(scopeSpansSchema),
+  scopeSpans: z.array(scopeSpansSchema).optional().default([]),
   schemaUrl: z.string().optional(),
 });
 
