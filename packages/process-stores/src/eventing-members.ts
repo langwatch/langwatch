@@ -271,6 +271,9 @@ function eventingEventStore(options: {
       retention,
     }),
     retention,
+    ...(options.store.classifyEventLogRetention === undefined
+      ? {}
+      : { classifyEventLogRetention: options.store.classifyEventLogRetention }),
   });
 }
 

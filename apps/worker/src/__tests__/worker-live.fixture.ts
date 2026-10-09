@@ -5,6 +5,7 @@
  */
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import { processConfig, Server } from "@langwatch/process";
 
 import { processModules } from "../process-modules.generated.ts";
@@ -76,7 +77,9 @@ export async function bootLiveWorker({
     .withProcessOwnership(false)
     .withSecrets((_config, secrets) => secrets.withEnv())
     .start();
-  const application = await server.container("worker").boot();
+  const application = await server
+    .container("worker")
+    .boot({ classifyEventLogRetention: classifyEventLogRowRetention });
   await server.run(application);
 
   return { application, close: () => server.close() };

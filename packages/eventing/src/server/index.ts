@@ -2,7 +2,10 @@ export {
   EventingClickHouseEventRepository,
   EVENT_LOG_SELECT_COLUMNS,
 } from "./adapters/clickhouse/event-repository.clickhouse.ts";
-export { EventingClickHouseEventStore } from "./adapters/clickhouse/event-store.clickhouse.ts";
+export {
+  EventingClickHouseEventStore,
+  type EventLogRetentionClassifier,
+} from "./adapters/clickhouse/event-store.clickhouse.ts";
 export {
   batchGetCutoffEventIds,
   batchLoadAggregateEvents,

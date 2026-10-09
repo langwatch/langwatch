@@ -1,4 +1,5 @@
 import type { ExecutionTarget } from "@langwatch/eventing";
+import type { EventLogRetentionClassifier } from "@langwatch/eventing/server";
 import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
 
 import type { EventingConfig, EventingGroupQueueConfig } from "./config.ts";
@@ -40,10 +41,18 @@ export function consumingEventing(
   options: EventingRoleOptions & {
     /** The fallback retention for rows whose tenant states none, in days. */
     readonly defaultRetentionDays: number;
+    /** Each event_log row's retention class, as the composition root wires it. */
+    readonly classifyEventLogRetention?: EventLogRetentionClassifier | undefined;
   },
 ): EventingConfig {
   return {
-    store: { kind: "event-log", defaultRetentionDays: options.defaultRetentionDays },
+    store: {
+      kind: "event-log",
+      defaultRetentionDays: options.defaultRetentionDays,
+      ...(options.classifyEventLogRetention === undefined
+        ? {}
+        : { classifyEventLogRetention: options.classifyEventLogRetention }),
+    },
     consumersEnabled: true,
     executionTarget: options.executionTarget,
     processManagerMode: "run",
