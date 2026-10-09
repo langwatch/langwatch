@@ -12,8 +12,10 @@ import (
 // +langy`, `haven up -nlp`), persisted per worktree, shown by status. The zero
 // value is NOT a fresh worktree's default — that is DefaultSelection.
 type Selection struct {
-	Gateway bool `json:"gateway"`
-	NLP     bool `json:"nlp"`
+	// Mode is the sticky deployment mode (`haven up --mode <m>`); "" is none.
+	Mode    string `json:"mode,omitempty"`
+	Gateway bool   `json:"gateway"`
+	NLP     bool   `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.

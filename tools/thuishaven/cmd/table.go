@@ -216,6 +216,7 @@ var baseTable = []commandSpec{
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
+			{long: "--mode", takesValue: true, value: "<mode>", summary: "deployment mode from dev/tests/modes; sticks, none clears"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			if err := rejectRemovedSelectionEnv(); err != nil {
@@ -223,6 +224,13 @@ var baseTable = []commandSpec{
 			}
 			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
 			if err != nil {
+				return err
+			}
+			sel, mode, err := d.orch.ResolveMode(d.worktree, sel, inv.value("--mode"))
+			if err != nil {
+				return err
+			}
+			if err := applyDeploymentMode(&d.opts, mode, d.worktree); err != nil {
 				return err
 			}
 			d.opts.Selection = sel

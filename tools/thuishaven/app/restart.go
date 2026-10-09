@@ -253,6 +253,32 @@ func (o *Orchestrator) ResolveSelection(worktreeDir string, deltas []string) (do
 	return sel, nil
 }
 
+// ResolveMode applies `up --mode` to the sticky selection ("none" clears it),
+// persists a change only once the mode loads, and returns the mode in force
+// (specs/setup/deployment-modes.feature).
+func (o *Orchestrator) ResolveMode(worktreeDir string, sel domain.Selection, requested string) (domain.Selection, domain.DeploymentMode, error) {
+	want := sel.Mode
+	if requested == "none" {
+		want = ""
+	} else if requested != "" {
+		want = requested
+	}
+	var mode domain.DeploymentMode
+	if want != "" {
+		var err error
+		if mode, err = domain.LoadDeploymentMode(worktreeDir, want); err != nil {
+			return sel, mode, err
+		}
+	}
+	if want != sel.Mode {
+		sel.Mode = want
+		if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
+			return sel, mode, fmt.Errorf("saving the deployment mode: %w", err)
+		}
+	}
+	return sel, mode, nil
+}
+
 // restartObservability stops and re-ensures the shared LGTM stack, re-routing
 // its hostname. Telemetry starts fresh — the stack keeps no volume by design.
 func (o *Orchestrator) restartObservability(ctx context.Context) error {

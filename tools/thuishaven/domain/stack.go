@@ -108,6 +108,13 @@ type Stack struct {
 	// in to running DLP: nothing is emitted, so .env governs the check — for the
 	// rare case of exercising DLP locally against real credentials.
 	DisableGoogleDLP bool `json:"disableGoogleDlp,omitempty"`
+	// Mode is the deployment mode `haven up --mode` applied, ModeEnv its values
+	// (appended last to OverlayEnv), ModeOverriddenBy the mode variables the root
+	// .env sets otherwise and so wins, and EffectiveMode what status names.
+	Mode             string   `json:"mode,omitempty"`
+	ModeEnv          []string `json:"modeEnv,omitempty"`
+	ModeOverriddenBy []string `json:"modeOverriddenBy,omitempty"`
+	EffectiveMode    string   `json:"effectiveMode,omitempty"`
 	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant
 	// Evals judge with the app's deterministic stand-in and need no classifier
 	// key or license. Off by default; the instant-eval-mock-judge setting.

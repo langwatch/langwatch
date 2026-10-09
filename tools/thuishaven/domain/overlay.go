@@ -277,7 +277,7 @@ func (s Stack) OverlayEnv() []string {
 	}
 	env = append(env, s.observabilityEnv()...)
 	env = append(env, NodeOptionsEnvFromProcess())
-	return env
+	return append(env, s.ModeEnv...)
 }
 
 // observabilityEnv wires this stack into the shared LGTM collector — the whole

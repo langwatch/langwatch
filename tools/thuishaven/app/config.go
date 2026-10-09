@@ -154,8 +154,12 @@ type PlanOptions struct {
 	// value is the sandboxed (production-like) default: the worker runs in colima
 	// with the per-worker UID sandbox on.
 	LangyTier domain.LangyTier
-	IsStub    bool // verification: echo servers instead of the real apps
-	RepoRoot  string
+	// DeploymentMode is the mode `up --mode` resolved (zero: none);
+	// ModeOverriddenBy the mode variables the root .env overrides.
+	DeploymentMode   domain.DeploymentMode
+	ModeOverriddenBy []string
+	IsStub           bool // verification: echo servers instead of the real apps
+	RepoRoot         string
 }
 
 // RedisDBOverrideFromEnv parses LANGWATCH_HAVEN_REDIS_DB into a Redis DB index,
