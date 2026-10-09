@@ -148,7 +148,7 @@ function DirectorySources({ connections }: { connections: DirectoryFactsRead["co
         caption={
           <Text asChild fontSize="xs" color="orange.fg">
             <Link unstyled href={AUTHENTICATION_PAGE} data-testid="connect-identity-provider">
-              Connect an identity provider →
+              Connect a provider →
             </Link>
           </Text>
         }
@@ -258,7 +258,7 @@ function Fact({
 }) {
   return (
     <Card.Root borderRadius="xl" minWidth={0} height="full">
-      <Card.Body paddingX={4} paddingY={3}>
+      <Card.Body paddingX={3} paddingY={3}>
         <VStack align="start" gap={1} minWidth={0}>
           <HStack gap={1.5} color="fg.muted" whiteSpace="nowrap">
             {icon}
