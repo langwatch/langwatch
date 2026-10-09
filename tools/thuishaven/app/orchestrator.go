@@ -559,9 +559,13 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	o.EnsureGateHookForUp(p.WorktreeDir)
 	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
 	o.ensureLangyWorkerBinary(ctx, st, &opts)
+	isLangyDropped := !opts.Selection.Langy && dropLocalLangyAgent(&st)
 	children := o.planChildren(st, opts, p.WorktreeDir)
 	retireStaleSimsCapture(children)
 	stopBeat()
+	if isLangyDropped {
+		_ = o.store.SaveStack(st)
+	}
 	plan := o.keeperPlan(children, opts.IsForegroundClient)
 	plan.Seed = seed
 	sayPhase(p.StartedAt, "services starting")

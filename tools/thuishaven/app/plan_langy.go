@@ -178,6 +178,19 @@ func (o *Orchestrator) ensureLangyWorkerBinary(ctx context.Context, st domain.St
 	}
 }
 
+// dropLocalLangyAgent zeroes the port of a langyagent this stack meant to run
+// itself, as provision does for one it never selected, so a Langy deselected
+// after provision emits no LANGY_AGENT_URL for a socket nothing listens on.
+func dropLocalLangyAgent(st *domain.Stack) bool {
+	for i, svc := range st.Services {
+		if svc.Name == "langyagent" && !svc.IsFallback && svc.Port != 0 {
+			st.Services[i].Port = 0
+			return true
+		}
+	}
+	return false
+}
+
 // langyContainerOpts are the inputs to the `docker run` command for a
 // containerized langyagent worker (the sandboxed / container-unsafe tiers).
 type langyContainerOpts struct {
