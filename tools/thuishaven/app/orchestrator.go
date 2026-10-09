@@ -628,6 +628,23 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 		return nil, err
 	}
 	jobs := prepShellsFor(st.Layout)
+	if err := o.runBuildJobs(ctx, p, st, jobs, env, since); err != nil {
+		return nil, err
+	}
+	seed := seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed}
+	if jobs.Prepare != "" {
+		return nil, o.migrateThenSeed(ctx, p, st, jobs.Prepare, seed, since)
+	}
+	job, ok := o.seedJob(p, seed)
+	if !ok {
+		return nil, nil
+	}
+	return &KeeperSeed{Job: job, ReadyURL: st.ReadinessURL(), Since: since}, nil
+}
+
+// runBuildJobs runs codegen, which may fail without stopping the up, then the
+// workspace build, which stops it: a lane cannot import a package never built.
+func (o *Orchestrator) runBuildJobs(ctx context.Context, p UpParams, st domain.Stack, jobs prepShells, env []string, since time.Time) error {
 	if jobs.Codegen == "" {
 		fmt.Println("  codegen: left to the app lane, which runs it on its way up")
 	} else {
@@ -636,32 +653,29 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 			o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 		}
 	}
-	if jobs.Build != "" {
-		sayPhase(since, "build")
-		if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "build", Dir: p.WorktreeDir, Shell: jobs.Build, Env: env}); err != nil {
-			return nil, fmt.Errorf("building the workspace packages the services import failed: %w", err)
-		}
+	if jobs.Build == "" {
+		return nil
 	}
-	seed := seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed}
-	if jobs.Prepare == "" {
-		job, ok := o.seedJob(p, seed)
-		if !ok {
-			return nil, nil
-		}
-		return &KeeperSeed{Job: job, ReadyURL: st.ReadinessURL(), Since: since}, nil
+	sayPhase(since, "build")
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "build", Dir: p.WorktreeDir, Shell: jobs.Build, Env: env}); err != nil {
+		return fmt.Errorf("building the workspace packages the services import failed: %w", err)
 	}
-	// Migrations failing on an existing database is the one prep step that must
-	// STOP the up: continuing would boot the app onto a half-migrated schema,
-	// and silently dropping the data to get past it is never haven's call.
+	return nil
+}
+
+// migrateThenSeed is a monolith's blocking migration, then its seed. Migrations
+// failing on an existing database STOP the up: continuing would boot the app onto
+// a half-migrated schema, and silently dropping the data is never haven's call.
+func (o *Orchestrator) migrateThenSeed(ctx context.Context, p UpParams, st domain.Stack, shell string, seed seedRun, since time.Time) error {
 	sayPhase(since, "migrations")
-	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: p.WorktreeDir, Shell: jobs.Prepare, Env: env}); err != nil {
-		return nil, fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: p.WorktreeDir, Shell: shell, Env: seed.Env}); err != nil {
+		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
 	if job, ok := o.seedJob(p, seed); ok {
 		sayPhase(since, "seed")
 		o.runSeedJob(ctx, job)
 	}
-	return nil, nil
+	return nil
 }
 
 // sayPhase prints one line of an up's progress: the time since it began, then
