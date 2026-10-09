@@ -43,3 +43,12 @@ key answers `NoSuchKey`.
   Benchmark: `go test -bench . -benchmem ./services/storagesim`.
 - Limits: single PUT up to 5 GiB, keys up to 1024 bytes; no listing, multipart or
   versioning.
+
+## From a terminal or agent
+
+`--json` on every read; non-zero exit on failure; `--stack <slug>` reads another worktree.
+
+```
+haven storage buckets | objects [bucket] | requests
+haven storage object <bucket> <key> [--raw]     # --raw writes the stored bytes to stdout
+```

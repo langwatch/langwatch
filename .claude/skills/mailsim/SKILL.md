@@ -44,3 +44,12 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 - Bounded: `MAILSIM_MAX_MESSAGES` (default 10000) keeps the newest and evicts the oldest;
   `MAILSIM_MAX_MESSAGE_BYTES` (default 10 MiB) caps one message. Id and recipient lookups
   are indexed. Benchmark: `go test -bench . -benchmem ./services/mailsim`.
+
+## From a terminal or agent
+
+`--json` on every read (default in agent mode); non-zero exit on failure, including a `wait` timeout.
+
+```
+haven mail address | list [--to] [--subject] | get <id> [--html] | links <id>
+haven mail wait [--to] [--subject] [--timeout 30s] | delete <id> | clear
+```

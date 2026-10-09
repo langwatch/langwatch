@@ -62,7 +62,8 @@ hostname through the portless proxy:
 
 The six simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
 idp and storage run by default; llm, voice and analytics come with "haven up +llm
-+voice +analytics". Read one's output with "haven logs <name>".
++voice +analytics". Read one's output with "haven logs <name>". Drive one from a
+terminal with "haven mail|llm|analytics|storage|voice <verb>" (--json on every read).
 
     mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
 
