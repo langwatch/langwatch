@@ -120,6 +120,13 @@ Feature: The new image runs its blocking upgrade behind a holding page
     Then the next submission is answered 429, even with the right token
 
   @unit
+  Scenario: A token submitted from another site or origin is refused and not counted
+    Given the api's upgrade failed and printed a console token
+    When a page on another site or origin submits a token to the console
+    Then it is refused, even with the right token, and no console cookie is set
+    And it does not count towards the five wrong tokens a minute
+
+  @unit
   Scenario: A wrong token is refused without detail
     Given the api's upgrade failed and printed a console token
     When someone submits a different token

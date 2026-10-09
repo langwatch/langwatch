@@ -216,6 +216,51 @@ describe("the upgrade console", () => {
       });
     });
 
+    describe("when a page on another site or origin submits a token", () => {
+      /** @scenario "A token submitted from another site or origin is refused and not counted" */
+      it("refuses it, even the right token, and leaves the wrong-token limit untouched", async () => {
+        const thread = await bootThread();
+        await showConsole(thread);
+        const own = `http://127.0.0.1:${thread.address.port}`;
+        const fromElsewhere: Record<string, string>[] = [
+          { "Sec-Fetch-Site": "cross-site", Origin: "http://drive-by.example" },
+          { Origin: "http://drive-by.example" },
+          { Origin: "null" },
+        ];
+        const refused: Response[] = [];
+        for (const headers of fromElsewhere) {
+          refused.push(
+            await post(thread, UPGRADE_CONSOLE_PATH, { token: TOKEN }, undefined, headers),
+          );
+        }
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const guess = await post(
+            thread,
+            UPGRADE_CONSOLE_PATH,
+            { token: `guess-${attempt}` },
+            undefined,
+            {
+              Origin: "http://drive-by.example",
+            },
+          );
+          expect(guess.status).toBe(403);
+        }
+
+        const opened = await post(thread, UPGRADE_CONSOLE_PATH, { token: TOKEN }, undefined, {
+          "Sec-Fetch-Site": "same-origin",
+          Origin: own,
+        });
+
+        expect(refused.map((response) => response.status)).toEqual([403, 403, 403]);
+        expect(refused.map((response) => response.headers.get("set-cookie"))).toEqual([
+          null,
+          null,
+          null,
+        ]);
+        expect(opened.status).toBe(303);
+      });
+    });
+
     describe("when a request asks for Retry without the console session", () => {
       /** @scenario "A console action without the console session is refused" */
       it("refuses it and asks for no run", async () => {

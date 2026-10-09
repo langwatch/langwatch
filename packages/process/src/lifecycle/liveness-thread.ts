@@ -193,6 +193,11 @@ const openConsole = (req, res, token) => {
 const answerFailed = (req, res) => {
   const path = String(req.url).split("?")[0];
   if (req.method === "POST" && path === workerData.consolePath) {
+    // CONSOLE-TOKEN-ORIGIN: a drive-by page's guesses are refused before they reach the limiter.
+    if (crossSite(req)) {
+      req.resume();
+      return answerConsole(res, 403, consoleHold.loginPage);
+    }
     let body = "";
     req.setEncoding("utf8");
     req.on("data", (chunk) => {
