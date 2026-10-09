@@ -71,7 +71,6 @@ import {
 } from "./report-schedule.commands.ts";
 import {
   reportScheduleEventSchemas,
-  type ReportScheduleEvent,
   reportScheduleConfiguredEventSchema,
   reportSchedulePausedEventSchema,
   reportScheduleResumedEventSchema,
@@ -127,9 +126,6 @@ const triggerMatchRecordedEventSchema = z.object({
   type: z.literal(TRIGGER_MATCH_RECORDED_EVENT_TYPE),
   data: triggerMatchRecordedEventDataSchema,
 });
-
-export type TriggerMatchRecordedEvent = z.infer<typeof triggerMatchRecordedEventSchema>;
-export type AutomationEvent = TriggerMatchRecordedEvent | ReportScheduleEvent;
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)

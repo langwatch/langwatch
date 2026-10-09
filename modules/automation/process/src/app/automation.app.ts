@@ -166,7 +166,6 @@ import {
 const logger = createLogger("langwatch:automation");
 
 export type { AutomationWebhookStoredParams };
-export type { AutomationProjectIdentity };
 
 // ---------------------------------------------------------------------------
 // The technical ports the process supplies: an HTTP client, a
@@ -178,7 +177,7 @@ export type { AutomationProjectIdentity };
  * the schema comes from the process's provider registry, which is compiled
  * against its own copy of zod.
  */
-export type AutomationActionParamsParse =
+type AutomationActionParamsParse =
   | Readonly<{ success: true; data: unknown }>
   | Readonly<{
       success: false;
@@ -186,7 +185,7 @@ export type AutomationActionParamsParse =
     }>;
 
 /** The per-action `actionParams` parser the process's provider registry owns. */
-export interface AutomationActionParamsSchema {
+interface AutomationActionParamsSchema {
   safeParse(value: unknown): AutomationActionParamsParse;
 }
 
