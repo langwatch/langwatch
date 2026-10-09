@@ -21,7 +21,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp } from "react-feather";
+import { ChevronDown, ChevronUp, Eye } from "react-feather";
 import {
   CartesianGrid,
   Label,
@@ -57,6 +57,7 @@ import { titleCase } from "../../utils/stringCasing";
 import { ChartTooltip } from "../analytics/ChartTooltip";
 import { getRunDisplayName } from "../batch-evaluation-results/getRunDisplayName";
 import { FeedbackLink } from "../FeedbackLink";
+import { ExpandedTextDialog } from "../HoverableBigText";
 import { LLMIcon } from "../icons/LLMIcon";
 import { MetadataTag } from "../MetadataTag";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
@@ -569,6 +570,13 @@ export const RunDetails = React.memo(
 
     const [tabIndex, setTabIndex] = useState(0);
     const [displayRawParams, setDisplayRawParams] = useState(false);
+    // The Messages cell always truncates (collapseStringsAfterLength), so
+    // HoverableBigText's overflow-detection click affordance never fires
+    // here — the rendered cell never actually overflows. An explicit expand
+    // button sidesteps that rather than fighting it.
+    const [expandedMessages, setExpandedMessages] = useState<
+      string | undefined
+    >(undefined);
     const hasTrace = dspyStep.data?.examples.some((example) => example.trace);
     const runName = workflowVersion?.commitMessage ?? dspyStepSummary.run_id;
 
@@ -1034,14 +1042,34 @@ export const RunDetails = React.memo(
                         </Table.Cell>
                         <Table.Cell>{llmCall.model}</Table.Cell>
                         <Table.Cell>
-                          <RenderInputOutput
-                            value={JSON.stringify(
-                              llmCall.response?.prompt ??
-                                llmCall.response?.messages,
-                            )}
-                            collapseStringsAfterLength={140}
-                            collapsed={true}
-                          />
+                          <HStack align="start" gap={1}>
+                            <RenderInputOutput
+                              value={JSON.stringify(
+                                llmCall.response?.prompt ??
+                                  llmCall.response?.messages,
+                              )}
+                              collapseStringsAfterLength={140}
+                              collapsed={true}
+                            />
+                            <Button
+                              aria-label="View full message"
+                              size="xs"
+                              variant="ghost"
+                              flexShrink={0}
+                              onClick={() =>
+                                setExpandedMessages(
+                                  JSON.stringify(
+                                    llmCall.response?.prompt ??
+                                      llmCall.response?.messages,
+                                    null,
+                                    2,
+                                  ),
+                                )
+                              }
+                            >
+                              <Eye size={14} />
+                            </Button>
+                          </HStack>
                         </Table.Cell>
                         <Table.Cell>
                           {response ? (
@@ -1077,6 +1105,13 @@ export const RunDetails = React.memo(
             </Table.Root>
           </Tabs.Content>
         </Tabs.Root>
+        <ExpandedTextDialog
+          open={!!expandedMessages}
+          onOpenChange={(open) =>
+            setExpandedMessages(open ? expandedMessages : undefined)
+          }
+          textExpanded={expandedMessages}
+        />
       </VStack>
     );
   },
