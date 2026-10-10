@@ -10,6 +10,7 @@ import { alertSlotRecipe, deepeningMesh, statusMesh } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
 import { optionItemRecipe, optionListContent, optionListSizes } from "./option-list.recipe.ts";
 import { sectionNavigationRailRecipe } from "./section-navigation.recipe.ts";
+import { segmentGroupSlotRecipe } from "./segment-group.recipe.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
 // globals.scss. This file names the families, it does not fetch them.
@@ -803,6 +804,7 @@ export const designSystemConfig = defineConfig({
       }),
     },
     slotRecipes: {
+      segmentGroup: segmentGroupSlotRecipe,
       tooltip: defineSlotRecipe({
         slots: ["content", "arrow", "arrowTip"],
         base: {

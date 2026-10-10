@@ -23,22 +23,8 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
     const data = React.useMemo(() => normalize(items), [items]);
 
     return (
-      <SegmentGroup.Root
-        ref={ref}
-        padding="2px"
-        borderWidth="1px"
-        borderColor="border.control"
-        borderRadius="lg"
-        background="bg.control"
-        css={{ "--segment-radius": "radii.md" }}
-        {...rest}
-      >
-        <SegmentGroup.Indicator
-          background="bg.selected"
-          borderWidth="1px"
-          borderColor="border.control"
-          boxShadow="none"
-        />
+      <SegmentGroup.Root ref={ref} {...rest}>
+        <SegmentGroup.Indicator />
         {data.map((item) => (
           <SegmentGroup.Item
             key={item.value}
