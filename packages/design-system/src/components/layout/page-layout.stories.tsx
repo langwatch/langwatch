@@ -1,7 +1,7 @@
 import { Badge, Box, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { PageLayout } from "./page-layout.tsx";
+import { PageHeadingSizeProvider, PageLayout } from "./page-layout.tsx";
 
 const meta = {
   title: "Navigation and layout/Page layout",
@@ -101,27 +101,36 @@ export const HeaderStates: Story = {
           <Text paddingX={6} color="fg.muted">
             {mode}
           </Text>
-          <PageLayout.Header>
+          <PageLayout.Header
+            actions={<PageLayout.HeaderButton primary>Create key</PageLayout.HeaderButton>}
+          >
             <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
             <Badge variant="subtle">12</Badge>
-            <Spacer />
-            <PageLayout.HeaderButton primary>Create key</PageLayout.HeaderButton>
           </PageLayout.Header>
-          <PageLayout.Header>
-            <Stack gap={0}>
+          <PageLayout.Header
+            actions={<PageLayout.HeaderButton disabled>Export</PageLayout.HeaderButton>}
+          >
+            <Stack gap={0.5} minWidth={0}>
               <PageLayout.Heading>Costs</PageLayout.Heading>
-              <Text fontSize="xs" color="fg.muted">
-                Usage across your organization
-              </Text>
+              <PageLayout.Subtitle>Usage across your organization</PageLayout.Subtitle>
             </Stack>
-            <Spacer />
-            <PageLayout.HeaderButton disabled>Export</PageLayout.HeaderButton>
           </PageLayout.Header>
-          <PageLayout.Header withBorder={false}>
+          <PageLayout.Header
+            withBorder={false}
+            actions={<PageLayout.HeaderButton loading>Refreshing</PageLayout.HeaderButton>}
+          >
             <PageLayout.Heading>Integrations</PageLayout.Heading>
-            <Spacer />
-            <PageLayout.HeaderButton loading>Refreshing</PageLayout.HeaderButton>
           </PageLayout.Header>
+          <PageHeadingSizeProvider size="lg">
+            <PageLayout.Header>
+              <PageLayout.Heading>Account settings</PageLayout.Heading>
+            </PageLayout.Header>
+          </PageHeadingSizeProvider>
+          <Box width="320px">
+            <PageLayout.Header actions={<PageLayout.HeaderButton>Invite</PageLayout.HeaderButton>}>
+              <PageLayout.Heading>Organization members and invitations</PageLayout.Heading>
+            </PageLayout.Header>
+          </Box>
         </Stack>
       ))}
     </HStack>

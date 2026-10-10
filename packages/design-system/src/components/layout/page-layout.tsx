@@ -4,6 +4,7 @@ import type {
   ContainerProps as ChakraContainerProps,
   HeadingProps as ChakraHeadingProps,
   StackProps as ChakraStackProps,
+  TextProps as ChakraTextProps,
 } from "@chakra-ui/react";
 import {
   Button,
@@ -11,8 +12,9 @@ import {
   Container as ChakraContainer,
   Heading as ChakraHeading,
   HStack,
+  Text,
 } from "@chakra-ui/react";
-import { createContext, useContext, type PropsWithChildren } from "react";
+import { createContext, useContext, type PropsWithChildren, type ReactNode } from "react";
 
 // Container component
 interface ContainerProps extends ChakraContainerProps {
@@ -43,19 +45,27 @@ function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren
 // Header component
 interface HeaderProps extends ChakraStackProps {
   withBorder?: boolean;
+  actions?: ReactNode;
 }
 
-function Header({ children, withBorder = true, ...props }: PropsWithChildren<HeaderProps>) {
+function Header({
+  children,
+  withBorder = true,
+  actions,
+  ...props
+}: PropsWithChildren<HeaderProps>) {
   return (
     <HStack
       data-page-header
-      height="48px"
+      minHeight="56px"
       flexShrink={0}
       paddingX={6}
+      paddingY={2}
+      alignItems="center"
       width="full"
       borderBottom={withBorder ? "1px solid" : undefined}
-      borderBottomColor={withBorder ? "border" : undefined}
-      gap={2}
+      borderBottomColor={withBorder ? "border.muted" : undefined}
+      gap={3}
       position="sticky"
       top={0}
       zIndex={10}
@@ -63,6 +73,11 @@ function Header({ children, withBorder = true, ...props }: PropsWithChildren<Hea
       {...props}
     >
       {children}
+      {actions && (
+        <HStack marginStart="auto" flexShrink={0} gap={2}>
+          {actions}
+        </HStack>
+      )}
     </HStack>
   );
 }
@@ -81,10 +96,22 @@ type HeadingProps = Omit<ChakraHeadingProps, "size" | "fontSize">;
 function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
   const size = useContext(PageHeadingSizeContext);
   return (
-    <ChakraHeading as="h1" size={size} {...props}>
+    <ChakraHeading
+      as="h1"
+      size={size}
+      fontWeight="semibold"
+      letterSpacing="-0.01em"
+      minWidth={0}
+      overflowWrap="anywhere"
+      {...props}
+    >
       {children}
     </ChakraHeading>
   );
+}
+
+function Subtitle(props: ChakraTextProps) {
+  return <Text color="fg.muted" fontSize="xs" lineHeight="short" {...props} />;
 }
 
 // Content component
@@ -106,7 +133,13 @@ function HeaderButton({
   ...props
 }: PropsWithChildren<HeaderButtonProps>) {
   return (
-    <Button variant="outline" size="sm" {...(primary ? PRIMARY_PROPS : {})} {...props}>
+    <Button
+      variant="outline"
+      size="sm"
+      flexShrink={0}
+      {...(primary ? PRIMARY_PROPS : {})}
+      {...props}
+    >
       {children}
     </Button>
   );
@@ -118,5 +151,6 @@ export const PageLayout = {
   Header,
   Content,
   Heading,
+  Subtitle,
   HeaderButton,
 };
