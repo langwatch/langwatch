@@ -172,6 +172,7 @@ function RemoveMethodDialog({
       }}
     >
       <Dialog.Content>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>
             {repairConfirmationTitle({
@@ -188,7 +189,7 @@ function RemoveMethodDialog({
           </Text>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="ghost" onClick={onCancel}>
+          <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
           <Button

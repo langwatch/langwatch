@@ -27,7 +27,7 @@ export function RevokeConfirmDialog({
         if (!open) onCancel();
       }}
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Revoke API Key</Dialog.Title>
         </Dialog.Header>

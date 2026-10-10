@@ -82,7 +82,7 @@ export function VirtualKeySecretReveal({
       closeOnInteractOutside={false}
       closeOnEscape={false}
     >
-      <Dialog.Content bg="bg" maxWidth="560px">
+      <Dialog.Content maxWidth="560px">
         <Dialog.Header>
           <Dialog.Title>
             {kind === "rotate" ? "Save your rotated secret" : "Save your virtual key secret"}

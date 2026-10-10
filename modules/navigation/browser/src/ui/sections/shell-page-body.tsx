@@ -274,13 +274,15 @@ export const ShellPageBody = ({
             }
           />
         )}
-        {usage.data?.seatLimitInfo?.status === "exceeded" && (
-          <SeatLimitBanner
-            message={usage.data.seatLimitInfo.message}
-            isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
-            planManagementHref={planManagementHref(deployment.isSaaS)}
-          />
-        )}
+        {/* The plan page carries its own seat note, with the actions this banner links to. */}
+        {usage.data?.seatLimitInfo?.status === "exceeded" &&
+          pathname !== planManagementHref(deployment.isSaaS) && (
+            <SeatLimitBanner
+              message={usage.data.seatLimitInfo.message}
+              isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
+              planManagementHref={planManagementHref(deployment.isSaaS)}
+            />
+          )}
         {usage.data && usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
           <Banner
             status="warning"

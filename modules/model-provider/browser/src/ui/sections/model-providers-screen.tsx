@@ -506,7 +506,7 @@ export default function ModelProvidersScreen() {
             if (!details.open) setProviderToDelete(null);
           }}
         >
-          <Dialog.Content bg="bg">
+          <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title>Delete {providerToDelete?.name}?</Dialog.Title>
             </Dialog.Header>

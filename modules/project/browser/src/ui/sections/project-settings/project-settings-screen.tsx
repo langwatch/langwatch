@@ -478,7 +478,8 @@ function SettingsForm({
         open={showCreateProjectDialog}
         onOpenChange={({ open }) => setShowCreateProjectDialog(open)}
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
+          <Dialog.CloseTrigger />
           <Dialog.Header>
             <Dialog.Title>A project is needed</Dialog.Title>
           </Dialog.Header>
@@ -517,7 +518,8 @@ function SettingsForm({
         open={showLlmOpsSetupDialog && !!project}
         onOpenChange={({ open }) => setShowLlmOpsSetupDialog(open)}
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
+          <Dialog.CloseTrigger />
           <Dialog.Header>
             <Dialog.Title>Set up your project</Dialog.Title>
           </Dialog.Header>
@@ -824,7 +826,8 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
           if (!open) setPendingSharingOff(null);
         }}
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
+          <Dialog.CloseTrigger />
           <Dialog.Header>
             <Dialog.Title>Turn off sharing</Dialog.Title>
           </Dialog.Header>

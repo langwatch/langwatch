@@ -22,6 +22,7 @@ export function RemoveRuleConfirmDialog({
       }}
     >
       <Dialog.Content>
+        <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Delete privacy rule{rule ? ` for ${rule.name}` : ""}?</Dialog.Title>
         </Dialog.Header>

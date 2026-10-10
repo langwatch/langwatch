@@ -279,7 +279,8 @@ function ProjectEditDrawer({
           if (!open) setRevokeQuestion(null);
         }}
       >
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
+          <Dialog.CloseTrigger />
           <Dialog.Header>
             <Dialog.Title>Turn off sharing</Dialog.Title>
           </Dialog.Header>

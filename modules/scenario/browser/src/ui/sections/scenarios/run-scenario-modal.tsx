@@ -37,7 +37,7 @@ export function RunScenarioModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content bg="bg" overflow="visible">
+      <Dialog.Content overflow="visible">
         <Dialog.Header>
           <Dialog.Title>Run Scenario</Dialog.Title>
         </Dialog.Header>
@@ -62,7 +62,7 @@ export function RunScenarioModal({
               Cancel
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
               onClick={handleRun}
               disabled={!selectedTarget}
               loading={isLoading}

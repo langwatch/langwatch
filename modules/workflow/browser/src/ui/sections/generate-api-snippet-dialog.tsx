@@ -116,7 +116,7 @@ export function GenerateApiSnippetDialog({
     <ApiSnippetDialogContext.Provider value={{ open, onOpen: handleOpen, onClose }}>
       {children}
       <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="xl">
-        <Dialog.Content bg="bg">
+        <Dialog.Content>
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
             <VStack alignItems="stretch" gap={3} width="100%">

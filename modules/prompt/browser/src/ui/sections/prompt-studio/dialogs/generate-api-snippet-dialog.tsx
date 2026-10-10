@@ -96,7 +96,6 @@ export function GenerateApiSnippetDialog({
       {children}
       <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="lg">
         <Dialog.Content
-          bg="bg"
           borderWidth="1px"
           borderColor="border"
           borderRadius="lg"

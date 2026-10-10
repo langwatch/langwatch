@@ -135,7 +135,7 @@ function MoveToSuiteDialog({
           </chakra.button>
           <SmallButton
             variant="solid"
-            colorPalette="blue"
+            colorPalette="orange"
             disabled={!value}
             onClick={() => onConfirm(value)}
             data-testid="cases-move-to-suite-confirm"

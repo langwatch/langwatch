@@ -1143,10 +1143,9 @@ export const designSystemConfig = defineConfig({
             textStyle: "md",
             fontWeight: "500",
           },
+          // A dialog panel is opaque: the blur behind it is the backdrop's, never the panel's.
           content: {
-            background:
-              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 60%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
+            background: "bg.panel",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",

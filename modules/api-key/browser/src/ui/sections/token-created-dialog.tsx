@@ -206,7 +206,7 @@ export function TokenCreatedDialog({
         if (!open) onClose();
       }}
     >
-      <Dialog.Content bg="bg">
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Token Created</Dialog.Title>
         </Dialog.Header>
