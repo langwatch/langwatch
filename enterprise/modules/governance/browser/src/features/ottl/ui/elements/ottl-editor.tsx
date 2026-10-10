@@ -11,7 +11,8 @@
  *
  * Validation is async — debounced calls go through
  * `api.ingestionSources.validateOttl` to the gateway's `pkg/ottl`
- * parser. Per-statement errors render inline with line/col coordinates.
+ * parser; the save runs the same check. Errors squiggle at the parser's
+ * line/col with a plain-language message under the statement.
  *
  * Spec: specs/ai-governance/ingestion-sources/claude-code-otlp.feature
  */
@@ -25,13 +26,19 @@ import {
   Spacer,
   Spinner,
   Text,
-  Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  describeOttlError,
+  ottlValidationErrorSchema,
+  type OttlValidationError,
+} from "@langwatch/enterprise-governance-contract";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { FileText, Info, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { GovernanceOttlValidationClient } from "../../model/governance-ottl-validation-client.ts";
+import { OttlStatementInput } from "./ottl-statement-input.tsx";
 
 interface OttlEditorProps {
   organizationId: string;
@@ -43,6 +50,8 @@ interface OttlEditorProps {
   enabled: boolean;
   starterStatements?: readonly string[];
   validationClient: GovernanceOttlValidationClient;
+  /** The save's failure, if any; a parser refusal is drawn onto its statements. */
+  refusal?: unknown;
 }
 
 /**
@@ -58,7 +67,7 @@ type StatementValidity = "valid" | "invalid" | "unknown";
 
 interface PerStatementStatus {
   validity: StatementValidity;
-  message: string | null;
+  error: OttlValidationError | null;
 }
 
 const VALIDATE_DEBOUNCE_MS = 600;
@@ -66,9 +75,27 @@ const VALIDATE_DEBOUNCE_MS = 600;
 /** Shared because they are immutable and never rendered per-index. */
 const UNKNOWN_STATUS: PerStatementStatus = {
   validity: "unknown",
-  message: null,
+  error: null,
 };
-const VALID_STATUS: PerStatementStatus = { validity: "valid", message: null };
+const VALID_STATUS: PerStatementStatus = { validity: "valid", error: null };
+const refusedStatementsSchema = ottlValidationErrorSchema.array();
+
+/** The server indexed only the written statements; this maps its indexes back onto the editor's. */
+function refusedStatements({
+  refusal,
+  statements,
+}: {
+  refusal: unknown;
+  statements: string[];
+}): OttlValidationError[] | null {
+  const parsed = refusedStatementsSchema.safeParse(readHandledError(refusal)?.meta.ottlErrors);
+  if (!parsed.success) return null;
+  const written = statements.flatMap((s, i) => (s.trim().length > 0 ? [i] : []));
+  return parsed.data.map((err) => ({
+    ...err,
+    statementIndex: written[err.statementIndex] ?? err.statementIndex,
+  }));
+}
 
 /**
  * Said once, above the list, because the reason belongs to the check and not
@@ -101,16 +128,12 @@ function readValidation({
   if (result.status === "valid") {
     return { deferredReason: null, statuses: statements.map(() => VALID_STATUS) };
   }
-  const errsByIdx = new Map<number, string>();
-  for (const err of result.errors) {
-    const where = err.line > 0 ? ` (line ${err.line}, col ${err.col})` : "";
-    errsByIdx.set(err.statementIndex, `${err.message}${where}`);
-  }
+  const errsByIdx = new Map(result.errors.map((err) => [err.statementIndex, err]));
   return {
     deferredReason: null,
     statuses: statements.map((_, idx): PerStatementStatus => {
-      const msg = errsByIdx.get(idx);
-      return msg ? { validity: "invalid", message: msg } : VALID_STATUS;
+      const error = errsByIdx.get(idx);
+      return error ? { validity: "invalid", error } : VALID_STATUS;
     }),
   };
 }
@@ -135,6 +158,7 @@ export function OttlEditor({
   enabled,
   starterStatements,
   validationClient,
+  refusal,
 }: OttlEditorProps) {
   const [validationStatus, setValidationStatus] = useState<PerStatementStatus[]>([]);
   const [validating, setValidating] = useState(false);
@@ -147,39 +171,36 @@ export function OttlEditor({
    */
   const [deferredReason, setDeferredReason] = useState<string | null>(null);
 
-  const triggerValidation = useCallback(
-    async (next: string[]) => {
-      const nonEmpty = next.filter((s) => s.trim().length > 0);
-      if (nonEmpty.length === 0) {
-        setValidationError(null);
-        setDeferredReason(null);
-        setValidationStatus(next.map(() => UNKNOWN_STATUS));
-        return;
-      }
-      setValidating(true);
-      try {
-        const result = await validationClient.validate({
-          organizationId,
-          statements: next,
-        });
-        setValidationError(null);
-        const read = readValidation({ result, statements: next });
-        setDeferredReason(read.deferredReason);
-        setValidationStatus(read.statuses);
-      } catch (err) {
-        // The check didn't run — the gateway is unreachable, or the request
-        // failed on the way there. Don't block save, but don't claim a
-        // result either: every statement goes back to `unknown` (neutral
-        // dot, no green) and the reason renders once, above the list.
-        setValidationError(err);
-        setDeferredReason(null);
-        setValidationStatus(next.map(() => UNKNOWN_STATUS));
-      } finally {
-        setValidating(false);
-      }
-    },
-    [organizationId, validationClient],
-  );
+  const triggerValidation = async (next: string[]) => {
+    const nonEmpty = next.filter((s) => s.trim().length > 0);
+    if (nonEmpty.length === 0) {
+      setValidationError(null);
+      setDeferredReason(null);
+      setValidationStatus(next.map(() => UNKNOWN_STATUS));
+      return;
+    }
+    setValidating(true);
+    try {
+      const result = await validationClient.validate({
+        organizationId,
+        statements: next,
+      });
+      setValidationError(null);
+      const read = readValidation({ result, statements: next });
+      setDeferredReason(read.deferredReason);
+      setValidationStatus(read.statuses);
+    } catch (err) {
+      // The check didn't run — the gateway is unreachable, or the request
+      // failed on the way there. Don't block save, but don't claim a
+      // result either: every statement goes back to `unknown` (neutral
+      // dot, no green) and the reason renders once, above the list.
+      setValidationError(err);
+      setDeferredReason(null);
+      setValidationStatus(next.map(() => UNKNOWN_STATUS));
+    } finally {
+      setValidating(false);
+    }
+  };
 
   // Debounced auto-validate on every statement edit. The mutation
   // proxies to the gateway, which is fast — sub-100ms in practice for
@@ -193,6 +214,16 @@ export function OttlEditor({
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statements.join("\n")]);
+
+  // A save the server refused for its OTTL lands on the statements it names.
+  useEffect(() => {
+    const errors = refusedStatements({ refusal, statements });
+    if (!errors) return;
+    setValidationStatus(
+      readValidation({ result: { status: "invalid", errors }, statements }).statuses,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refusal]);
 
   const updateAt = (idx: number, value: string) => {
     const next = statements.slice();
@@ -214,10 +245,7 @@ export function OttlEditor({
 
   const hasStarter = (starterStatements ?? []).length > 0;
   const isEmpty = statements.length === 0;
-  const matchesStarter = useMemo(
-    () => matchesStarterStatements({ starterStatements, statements }),
-    [starterStatements, statements],
-  );
+  const matchesStarter = matchesStarterStatements({ starterStatements, statements });
 
   if (!enabled) return null;
 
@@ -312,6 +340,7 @@ export function OttlEditor({
           const status = validationStatus[idx];
           const isWritten = stmt.trim().length > 0;
           const showError = status?.validity === "invalid" && isWritten;
+          const errorMessage = showError ? problemOf({ statement: stmt, status }) : null;
           return (
             <Box key={idx}>
               <HStack alignItems="start" gap={2}>
@@ -330,16 +359,12 @@ export function OttlEditor({
                   })}
                   flexShrink={0}
                 />
-                <Textarea
-                  size="sm"
-                  rows={2}
-                  fontFamily="mono"
-                  fontSize="xs"
-                  backgroundColor="white"
+                <OttlStatementInput
                   value={stmt}
-                  onChange={(e) => updateAt(idx, e.target.value)}
+                  onChange={(next) => updateAt(idx, next)}
                   placeholder={`set(attributes["langwatch.cost.usd"], attributes["cost_usd"]) where attributes["event.name"] == "api_request"`}
-                  borderColor={showError ? "red.300" : undefined}
+                  error={showError ? status.error : null}
+                  errorMessage={errorMessage}
                 />
                 <IconButton
                   size="xs"
@@ -350,11 +375,7 @@ export function OttlEditor({
                   <Trash2 size={12} />
                 </IconButton>
               </HStack>
-              {showError && (
-                <Text fontSize="xs" color="red.600" marginLeft="14px" marginTop={0.5}>
-                  {status.message}
-                </Text>
-              )}
+              {errorMessage && <ProblemText message={errorMessage} />}
             </Box>
           );
         })}
@@ -366,6 +387,27 @@ export function OttlEditor({
         </Button>
       </HStack>
     </VStack>
+  );
+}
+
+function problemOf({
+  statement,
+  status,
+}: {
+  statement: string;
+  status: PerStatementStatus;
+}): string | null {
+  return status.error ? describeOttlError({ statement, error: status.error }) : null;
+}
+
+/** The plain-language problem, with its backticked code as code chips. */
+function ProblemText({ message }: { message: string }) {
+  return (
+    <Text fontSize="xs" color="fg.error" marginLeft="14px" marginTop={0.5}>
+      {message
+        .split("`")
+        .map((part, i) => (i % 2 === 1 ? <InlineCode key={i}>{part}</InlineCode> : part))}
+    </Text>
   );
 }
 

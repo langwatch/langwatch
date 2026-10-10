@@ -12,6 +12,7 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
 import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
 import {
@@ -83,6 +84,7 @@ function harness() {
     destinations: PullDestinationService.create(),
     providerAccounts,
     diagnostics: new NoDiagnostics(),
+    ottl: MemoryOttlTransformChannel.create(),
   });
 
   const create = async (

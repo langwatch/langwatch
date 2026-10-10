@@ -98,6 +98,17 @@ Feature: AI Gateway Governance — Admin OTTL Authoring
         the gateway `pkg/ottl` parser, plus an error toast)
     And the template's `ottlRules` is NOT updated until validation passes
 
+  @bdd @unit @template-ottl-authoring @editor @validation-on-save
+  Scenario: Saving a source refuses OTTL the gateway parser rejects
+    Given an admin has typed an OTTL statement the parser rejects on a
+        Generic OpenTelemetry source
+    When she saves before the editor's own check has answered
+    Then the server runs the same gateway validation the editor calls
+    And refuses with a validation error naming the statement and what
+        the parser expected, mapped onto that statement in the editor
+    And the source's `parserConfig.ottlStatements` is NOT updated
+    And a check the gateway defers still saves, as the editor says
+
   @bdd @template-ottl-authoring @editor @protected-key-rejection
   Scenario: Save rejects OTTL that would write protected keys
     Given carol has authored OTTL containing
