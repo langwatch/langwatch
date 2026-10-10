@@ -314,7 +314,8 @@ func (build Build) Ensure(ctx context.Context, log string) error {
 	if build.Fresh(commit) {
 		return nil
 	}
-	env := map[string]string{"NODE_OPTIONS": "--max-old-space-size=4096"}
+	// No nx daemon: it outlives the build as an orphan holding half a gigabyte.
+	env := map[string]string{"NODE_OPTIONS": "--max-old-space-size=4096", "NX_DAEMON": "false"}
 	for _, key := range processKeys {
 		if value, ok := os.LookupEnv(key); ok {
 			env[key] = value
