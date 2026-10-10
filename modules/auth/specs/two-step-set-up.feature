@@ -35,6 +35,13 @@ Feature: Setting two-step verification up speaks main's rules and our codes
     Then the route answers as one that does not exist
     But identity's disable, which asks every requiring organization and a current code, still reaches the plugin
 
+  @integration
+  Scenario: An unfinished two-step challenge does not stop the next sign-in
+    Given a person who signed in with their password and left the code step unfinished
+    When they sign in with their password again, or a second person is mid-challenge
+    Then the new challenge is stored beside the old one and the code step is offered
+    # WEB-19201: main stores the challenge's value under a unique column and answers 500 here.
+
   @unit
   Scenario: Too many wrong codes is refused as identity_mfa_locked_out
     Given a two-factor endpoint that refused with better-auth's lockout

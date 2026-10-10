@@ -274,7 +274,8 @@ model User {
 model VerificationToken {
   id         String   @id @default(nanoid())
   identifier String
-  token      String   @unique
+  /// Not unique alone: better-auth stores plain values here (a user id, a counter). See WEB-19201.
+  token      String
   expires    DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
