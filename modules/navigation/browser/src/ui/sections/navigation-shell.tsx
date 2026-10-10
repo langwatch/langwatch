@@ -193,8 +193,7 @@ function ShellContentRow({
             height="full"
             background="bg"
             borderTopLeftRadius="xl"
-            borderTopWidth={0}
-            boxShadow="inset 0 1px 0 var(--chakra-colors-border-muted)"
+            borderTopWidth="1px"
             borderLeftWidth="1px"
             borderStyle="solid"
             // In light mode `border.muted` is the same grey as `bg.page`, so the
@@ -212,9 +211,6 @@ function ShellContentRow({
             maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             position="relative"
             data-tour="main-content"
-            css={{
-              "&:has([data-section-frame])": { borderTopWidth: 0, boxShadow: "none" },
-            }}
           >
             {children}
           </Box>

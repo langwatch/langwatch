@@ -306,6 +306,21 @@ export function SectionNavigationHeader({ children }: { children: ReactNode }) {
       height={SECTION_HEADER_HEIGHT}
       minHeight={SECTION_HEADER_HEIGHT}
       css={{
+        // The hairline stops short of the rail's line by the gap that line leaves under
+        // the header (56px less 48px), so the two meet at the corner with equal space.
+        borderBottomColor: "transparent",
+        _after: {
+          content: '""',
+          position: "absolute",
+          left: "8px",
+          right: 0,
+          bottom: "-1px",
+          height: "1px",
+          background: "border.card",
+          opacity: 0,
+          transition: "opacity 160ms ease",
+        },
+        "&[data-scrolled=true]::after": { opacity: 1 },
         "& h1": {
           fontSize: "sm",
           lineHeight: "20px",
