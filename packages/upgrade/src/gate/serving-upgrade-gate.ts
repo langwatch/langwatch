@@ -490,7 +490,9 @@ export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.Poo
     connectionString: databaseUrl,
     max: 1,
     allowExitOnIdle: true,
-    ...(schema ? { options: `-c search_path="${schema}"` } : {}),
+    ...(schema
+      ? { options: `-c search_path="${schema}" -c TimeZone=UTC` }
+      : { options: "-c TimeZone=UTC" }),
   };
 }
 
