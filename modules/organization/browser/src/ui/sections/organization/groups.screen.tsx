@@ -191,7 +191,7 @@ export default function GroupsScreen() {
                               </Menu.Item>
                               <Menu.Item
                                 value="delete"
-                                color="red.500"
+                                color="red.fg"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setGroupToDelete(g);
