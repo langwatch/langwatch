@@ -1,6 +1,6 @@
 /**
  * The door a module starts an unattended turn through: every refusal comes before anything is
- * counted, claimed or started.
+ * counted, claimed or started, and the count is the turn's to make once it is claimed.
  * @vitest-environment node
  * @see modules/langy/specs/langy-unattended-turn.feature
  */
@@ -16,7 +16,13 @@ import { LangyUnattendedTurnService } from "../langy-unattended-turn.service.ts"
 const PROJECT_ID = "project-1";
 const USER_ID = "user-1";
 
-const users = (found: boolean): LangyActorUserReader => ({
+const users = ({
+  found,
+  deactivated,
+}: {
+  found: boolean;
+  deactivated: boolean;
+}): LangyActorUserReader => ({
   findById: async ({ id }) =>
     found
       ? {
@@ -29,20 +35,29 @@ const users = (found: boolean): LangyActorUserReader => ({
           createdAt: new Date(0),
           updatedAt: new Date(0),
           lastLoginAt: null,
-          deactivatedAt: null,
+          deactivatedAt: deactivated ? new Date(0) : null,
         }
       : null,
 });
 
 function harness({
   userExists = true,
+  deactivated = false,
   kind = "application",
   langyReleased = true,
-}: { userExists?: boolean; kind?: string; langyReleased?: boolean } = {}) {
+  replay = false,
+}: {
+  userExists?: boolean;
+  deactivated?: boolean;
+  kind?: string;
+  langyReleased?: boolean;
+  /** The turn below answers a turn it already took, as it does for a retried run. */
+  replay?: boolean;
+} = {}) {
   const counted: string[] = [];
   const started: StartConversationTurnInput[] = [];
   const service = LangyUnattendedTurnService.create({
-    users: users(userExists),
+    users: users({ found: userExists, deactivated }),
     projects: createApiFixture<Pick<ProjectApi, "findIdentity">>({
       findIdentity: async (id) => ({
         id,
@@ -62,6 +77,8 @@ function harness({
     turns: {
       startUnattendedTurn: async (input) => {
         started.push(input);
+        // The turn counts itself once it is claimed; a replay is answered before that.
+        if (!replay) await input.unattended.countTurn();
         return { conversationId: "conversation-1", turnId: "turn-1" };
       },
     },
@@ -98,9 +115,33 @@ describe("LangyUnattendedTurnService", () => {
           messages: [{ role: "user", parts: [{ type: "text", text: "Read the board." }] }],
           isRetry: false,
           turnContext: {},
-          unattended: { title: "Daily insights - Costs - 2026-10-09" },
+          unattended: {
+            title: "Daily insights - Costs - 2026-10-09",
+            countTurn: expect.any(Function),
+          },
         },
       ]);
+    });
+
+    it("counts nothing itself when the turn below answers a replay", async () => {
+      const { start, counted, started } = harness({ replay: true });
+
+      await start();
+
+      expect(started).toHaveLength(1);
+      expect(counted).toEqual([]);
+    });
+  });
+
+  describe("given a person whose account was deactivated", () => {
+    /** @scenario "A deactivated person is refused an unattended turn" */
+    it("refuses before any turn is counted or started", async () => {
+      const { start, counted, started } = harness({ deactivated: true });
+
+      await expect(start()).rejects.toMatchObject({ code: "langy_unattended_actor_deactivated" });
+
+      expect(counted).toEqual([]);
+      expect(started).toEqual([]);
     });
   });
 

@@ -16,7 +16,7 @@ function harness() {
     insights: createApiFixture<Pick<InsightApi, "requestDailyRun">>({
       requestDailyRun: async (input) => {
         requested.push(input);
-        return { runId: "run-1" };
+        return { requestId: "request-1" };
       },
     }),
   });

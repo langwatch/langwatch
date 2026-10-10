@@ -177,9 +177,15 @@ async function harness() {
       turnContext: {},
     });
 
+  /** The turn as the service below takes it: counted once claimed, then prepared. */
+  const unattendedPrepared = vi.fn();
   const unattendedDispatched = vi
     .spyOn(app.langyService, "startUnattendedTurn")
-    .mockResolvedValue({ conversationId: "conversation_run", turnId: "turn_run" });
+    .mockImplementation(async (input) => {
+      await input.unattended.countTurn();
+      unattendedPrepared();
+      return { conversationId: "conversation_run", turnId: "turn_run" };
+    });
 
   const startUnattendedTurn = (projectId: string) =>
     app.startUnattendedTurn({
@@ -190,7 +196,7 @@ async function harness() {
       title: "Daily insights - Costs - 2026-10-09",
     });
 
-  return { startTurn, dispatched, startUnattendedTurn, unattendedDispatched };
+  return { startTurn, dispatched, startUnattendedTurn, unattendedDispatched, unattendedPrepared };
 }
 
 const FREE_TURNS_PER_MINUTE = resolveRequestBound("langyTurnsPerMinute", "FREE");
@@ -255,19 +261,20 @@ describe("LangyModule.startUnattendedTurn", () => {
   describe("given a project whose unattended turns reached their window", () => {
     /** @scenario "Unattended turns are counted apart from chat turns" */
     it("refuses the next unattended turn while a chat turn in the project still starts", async () => {
-      const { startTurn, dispatched, startUnattendedTurn, unattendedDispatched } = await harness();
+      const { startTurn, dispatched, startUnattendedTurn, unattendedPrepared } = await harness();
       for (let index = 0; index < FREE_UNATTENDED_TURNS_PER_MINUTE; index++) {
         await expect(startUnattendedTurn("project-free")).resolves.toEqual({
           conversationId: "conversation_run",
           turnId: "turn_run",
         });
       }
-      unattendedDispatched.mockClear();
+      unattendedPrepared.mockClear();
 
       const refusal = await startUnattendedTurn("project-free").catch((error: unknown) => error);
 
       expect(refusal).toMatchObject({ code: "langy_turns_rate_limited", httpStatus: 429 });
-      expect(unattendedDispatched).not.toHaveBeenCalled();
+      // The count refuses the turn where it is claimed: nothing past it is prepared.
+      expect(unattendedPrepared).not.toHaveBeenCalled();
       await expect(startTurn("project-free")).resolves.toEqual({
         conversationId: "conversation_1",
         turnId: "turn_1",

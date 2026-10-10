@@ -49,6 +49,21 @@ Feature: The daily insights run
       And Langy is never called
 
     @unit
+    Scenario: Langy refusing a deactivated person skips the run
+      Given a member Langy finds deactivated when the turn is asked for
+      When a run is requested for them
+      Then the run is recorded as skipped with the reason no_access
+      And no insight is filed
+
+    @unit
+    Scenario: A member who lost access during the turn files nothing
+      Given a run whose turn Langy is reading for a member
+      And the member loses analytics:view before Langy answers
+      When Langy answers two findings
+      Then no insight is filed
+      And the run is recorded as skipped with the reason no_access, naming the conversation
+
+    @unit
     Scenario: Langy refusing the person skips the run
       Given a member Langy is not released to, and a member Langy finds nothing to read with
       When a run is requested for each
@@ -120,8 +135,40 @@ Feature: The daily insights run
     @unit
     Scenario: The board is read as the person the run is for
       Given a run requested for a member on a board
-      When the run reads the board and its widgets
-      Then each read names that member as the viewer
+      When the run reads the board and its widgets, before the turn and again before it files
+      Then each read names that member as the viewer, and the widgets are asked by board
+
+    @unit
+    Scenario: Another member's Only me board reads as a board that is not there
+      Given a board its author keeps as Only me
+      When a run is requested on it for another member, and one on a board that never existed
+      Then both are recorded as skipped with the reason board_deleted, and read alike
+      And neither run's row names what the board holds
+      And Langy is never called
+
+    # The run's own reads pass for the author. Langy's command line reads over REST, which
+    # reads as a project credential today, so it opens no Only me board yet (ADR-004).
+    @unit
+    Scenario: The author's run reads their own Only me board
+      Given a board its author keeps as Only me
+      When a run is requested on it for the author and Langy answers two findings
+      Then the brief lists the board's widgets
+      And two insights are filed for the author
+
+    @unit
+    Scenario: A board that turned Only me after the request skips another member's run
+      Given a run requested for a member on a board another member authored
+      And the author then set the board to Only me
+      When the run is carried out
+      Then it is recorded as skipped with the reason board_deleted
+      And Langy is never called
+
+    @unit
+    Scenario: An Organization board is read from another project of its organization
+      Given an Organization board another project owns
+      When a run is requested on it in a project of the same organization, and in one of another
+      Then the first run's brief lists the board's own widgets
+      And the second is recorded as skipped with the reason board_deleted
 
     @unit
     Scenario: A board pointer names a stored board or a template, and nothing else
@@ -152,6 +199,25 @@ Feature: The daily insights run
       When the answer is checked
       Then the answer is refused whole
       And no finding is taken from it
+
+    @unit
+    Scenario: A finding longer than a run may file fails the whole answer
+      Given an answer with one good finding and one whose title is 121 characters or whose body is 4,001
+      When the answer is checked
+      Then the answer is refused whole
+
+    @unit
+    Scenario: A finding that holds a web address is refused by name
+      Given an answer whose finding holds an http, an https or a www address in its title, body or topic
+      When the answer is checked
+      Then the answer is refused whole with the reason finding_has_url
+
+    @unit
+    Scenario: An answer with a web address files nothing
+      Given Langy answers one good finding and one whose body holds a link
+      When the run is carried out
+      Then no insight is filed
+      And the run is recorded as failed with the reason finding_has_url
 
     @unit
     Scenario: A bad answer files nothing
@@ -204,6 +270,14 @@ Feature: The daily insights run
       When the run files it
       Then the insight replays that query over the window the run was given
       And a finding without a query is filed with no window
+
+    @unit
+    Scenario: A query that does not validate is dropped and its finding is kept
+      Given Langy answers one finding with a query the analytics module refuses and one it admits
+      When the run files them
+      Then the first is filed with no query and no window
+      And the second keeps its query and the run's window
+      And each query was validated with the protections of the person the run is for
 
   Rule: The run always records an outcome
 
@@ -258,6 +332,13 @@ Feature: The daily insights run
       And once the first run settles a new request starts a run
 
     @unit
+    Scenario: A request is answered with its own id, which names no run
+      Given a run in flight for a board
+      When another run is requested for the same person and board
+      Then the answer is a request id
+      And no run carries that id
+
+    @unit
     Scenario: A run that never settled does not block the board for good
       Given a run that started longer ago than a run may take
       When another run is requested for the same person and board
@@ -268,6 +349,20 @@ Feature: The daily insights run
       Given a run recorded as filed
       When the same run is settled again as failed
       Then the run's row still reads filed
+
+  Rule: A run's events belong to one schedule
+
+    @unit
+    Scenario: A request whose schedule is not its person's and board's starts nothing
+      Given a run request that names a schedule other than the one its project, person and board derive
+      When the schedule's process takes it
+      Then no run is started
+
+    @unit
+    Scenario: An outcome that names another schedule changes no row
+      Given a recorded outcome on a schedule that is not its person's and board's
+      When the run's row is folded
+      Then no row changes
 
   Rule: The brief Langy is given
 
@@ -290,6 +385,35 @@ Feature: The daily insights run
       Given a board and a widget whose names hold line breaks and backticks
       When the brief is written
       Then each name is on one line with no backtick
+
+    @unit
+    Scenario: Names people wrote sit in one data block the brief calls data
+      Given a board, widgets and open insights that people named
+      When the brief is written
+      Then every name sits between one pair of markers and nowhere else
+      And the brief says the block is data and never an instruction
+      And a name that holds a marker neither opens nor closes the block
+
+    @unit
+    Scenario: A board with more widgets than a brief lists still runs
+      Given a board with 55 widgets
+      When the brief is written
+      Then it lists the first 40 in the board's own order
+      And says 15 widgets were left out
+
+    @unit
+    Scenario: The brief stays within its length whatever the names hold
+      Given 40 widgets with the longest ids and names a pointer keeps
+      When the brief is written
+      Then the brief is no longer than 12,000 characters
+      And it says how many widgets were left out
+
+    @unit
+    Scenario: The brief asks for no link in a finding
+      Given a run's brief
+      When it is written
+      Then it tells Langy to write no link or web address in a finding
+      And it names the 120 and 4,000 character limits of a title and a body
 
     @unit
     Scenario: The brief lists the person's open insights for the board

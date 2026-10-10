@@ -15,6 +15,7 @@ import type { InsightCommandsService } from "../insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "../insight-daily-run-commands.service.ts";
 import { InsightDailyRunService } from "../insight-daily-run.service.ts";
 import type { InsightRunGateService } from "../insight-run-gate.service.ts";
+import type { InsightRunQueryService } from "../insight-run-query.service.ts";
 
 const BOARD = { kind: "dashboard", id: "dashboard-1", name: "Costs" } as const;
 const RUN = {
@@ -59,6 +60,9 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
     }),
     insights: createApiFixture<Pick<InsightRepository, "findForReader">>({
       findForReader: async () => [],
+    }),
+    queries: createApiFixture<Pick<InsightRunQueryService, "keepValid">>({
+      keepValid: async ({ findings }) => [...findings],
     }),
     insightCommands: createApiFixture<Pick<InsightCommandsService, "fileInsight">>({
       fileInsight: async (input) => void filed.push(input),

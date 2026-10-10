@@ -54,6 +54,7 @@ Anything else insight needs belongs to another module and is reached through its
 
 | Name           | Token            | Module                                    |
 | -------------- | ---------------- | ----------------------------------------- |
+| `analytics`    | `AnalyticsApi`   | [analytics](../analytics/README.md)       |
 | `authz`        | `AuthzApi`       | [authz](../authz/README.md)               |
 | `dashboards`   | `DashboardApi`   | [dashboard](../dashboard/README.md)       |
 | `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |

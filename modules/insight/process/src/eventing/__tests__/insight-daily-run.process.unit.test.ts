@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/insight-contract";
 import { describe, expect, it } from "vitest";
 
+import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import {
   INSIGHT_DAILY_RUN_LEASE_MS,
   INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
@@ -27,14 +28,15 @@ import {
 
 const T0 = Date.UTC(2026, 9, 10, 9, 37);
 const BOARD = { kind: "dashboard", id: "dashboard-1", name: "Costs" } as const;
-const SCHEDULE = { scheduleId: "schedule-1", userId: "user-1", board: BOARD };
+const OWNER = { projectId: "project-1", userId: "user-1", board: BOARD };
+const SCHEDULE = { scheduleId: dailyScheduleId(OWNER), userId: OWNER.userId, board: BOARD };
 
-function context(now: number) {
+function context(now: number, { key = SCHEDULE.scheduleId, projectId = OWNER.projectId } = {}) {
   return {
     at: now,
     now,
-    key: SCHEDULE.scheduleId,
-    projectId: "project-1",
+    key,
+    projectId,
     intent: buildIntentAccessor({
       runBoard: { schema: runBoardIntentSchema, run: async () => {} },
     }),
@@ -145,6 +147,41 @@ describe("the daily run process", () => {
 
       expect(held.intents).toEqual([]);
     });
+  });
+});
+
+describe("given a run event that names a schedule other than its own", () => {
+  const otherPerson = dailyScheduleId({ ...OWNER, userId: "user-2" });
+  const otherBoard = dailyScheduleId({ ...OWNER, board: { kind: "dashboard", id: "dashboard-2" } });
+
+  /** @scenario "A request whose schedule is not its person's and board's starts nothing" */
+  it.each([
+    ["another person's schedule", { data: { scheduleId: otherPerson }, at: {} }],
+    ["another board's schedule", { data: { scheduleId: otherBoard }, at: {} }],
+    ["a made-up schedule", { data: { scheduleId: "schedule-1" }, at: { key: "schedule-1" } }],
+    ["its own schedule in another project", { data: {}, at: { projectId: "project-2" } }],
+    ["its own schedule on another's stream", { data: {}, at: { key: otherPerson } }],
+    ["another person on its own schedule", { data: { userId: "user-2" }, at: {} }],
+  ])("starts no run for a request with %s", (_what, { data, at }) => {
+    const evolution = insightRunRequested(
+      INITIAL_INSIGHT_DAILY_RUN_STATE,
+      { ...requested("run-1"), ...data },
+      context(T0, at),
+    );
+
+    expect(evolution).toEqual({ state: INITIAL_INSIGHT_DAILY_RUN_STATE, intents: [] });
+  });
+
+  it("keeps holding the board when an outcome names another schedule", () => {
+    const state = inFlight();
+
+    const after = insightRunSettled(
+      state,
+      { ...settled("run-1"), scheduleId: otherPerson },
+      context(T0 + 60_000),
+    );
+
+    expect(after.state).toBe(state);
   });
 });
 

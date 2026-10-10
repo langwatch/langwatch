@@ -355,6 +355,8 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
         // A fork title is chosen as part of the user's explicit fork action.
         // Keep it sticky so the title process cannot later rename the copy.
         TitleSource: state.Title == null ? LANGY_TITLE_SOURCE.USER : state.TitleSource,
+        // A fork of a run carries the run's history, so it keeps the run's origin.
+        Origin: event.data.origin ?? state.Origin,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.IDLE),
         LastActivityAt: state.LastActivityAt ?? event.occurredAt,
         RunToken: state.RunToken ?? event.data.runToken,

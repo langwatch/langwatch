@@ -88,7 +88,52 @@ describe("checkRunAnswer", () => {
   describe("given an answer with one good finding and one whose title is 300 characters long", () => {
     /** @scenario "One finding over the limits fails the whole answer" */
     it("refuses the answer whole and takes no finding from it", () => {
-      expect(check(answer([good(), good({ title: "x".repeat(300) })]))).toEqual({ ok: false });
+      expect(check(answer([good(), good({ title: "x".repeat(300) })]))).toEqual({
+        ok: false,
+        reason: "bad_output",
+      });
+    });
+  });
+
+  describe("given a finding longer than a run may file", () => {
+    /** @scenario "A finding longer than a run may file fails the whole answer" */
+    it.each([
+      ["a title of 121 characters", good({ title: "x".repeat(121) })],
+      ["a body of 4,001 characters", good({ body: "x".repeat(4_001) })],
+    ])("refuses an answer with %s, good finding and all", (_what, long) => {
+      expect(check(answer([good(), long]))).toEqual({ ok: false, reason: "bad_output" });
+    });
+
+    it("takes a title of 120 characters and a body of 4,000", () => {
+      const atTheLimit = good({ title: "x".repeat(120), body: "y".repeat(4_000) });
+
+      expect(check(answer([atTheLimit])).ok).toBe(true);
+    });
+  });
+
+  describe("given a finding that holds a web address", () => {
+    /** @scenario "A finding that holds a web address is refused by name" */
+    it.each([
+      ["an https link in its body", good({ body: "See https://evil.example/c?d=41 for more." })],
+      ["an http link in its title", good({ title: "Open http://evil.example now" })],
+      ["a www address in its body", good({ body: "Costs doubled, details at www.evil.example." })],
+      ["a link in capitals", good({ body: "Read HTTPS://EVIL.EXAMPLE/leak" })],
+      ["a link inside markdown", good({ body: "[the report](https://evil.example/r)" })],
+      ["an address as its topic", good({ topic: "www.evil.example" })],
+    ])("refuses an answer with %s, by the reason finding_has_url", (_what, linked) => {
+      expect(check(answer([good(), linked]))).toEqual({ ok: false, reason: "finding_has_url" });
+    });
+
+    it("refuses the answer even when the linked finding is past the run's maximum", () => {
+      const findings = [good(), good({ title: "two" }), good({ body: "www.evil.example" })];
+
+      expect(check(answer(findings), 1)).toEqual({ ok: false, reason: "finding_has_url" });
+    });
+
+    it("takes a finding that names a path or a host with no scheme", () => {
+      const plain = good({ body: "Errors on /api/checkout rose; api.shop.example answered 500." });
+
+      expect(check(answer([plain])).ok).toBe(true);
     });
   });
 
@@ -109,7 +154,7 @@ describe("checkRunAnswer", () => {
             ].join("\n")
           : answer([good(extra)]);
 
-      expect(check(text)).toEqual({ ok: false });
+      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 
@@ -124,14 +169,17 @@ describe("checkRunAnswer", () => {
 
     /** @scenario "An answer that hands back the brief's own example is refused" */
     it("refuses an answer that echoes the brief, example block and all", () => {
-      expect(check(brief)).toEqual({ ok: false });
+      expect(check(brief)).toEqual({ ok: false, reason: "bad_output" });
     });
 
     it("refuses the example among findings of the answer's own", () => {
       const exampleTitle = "Checkout errors doubled";
 
       expect(brief).toContain(`"title":"${exampleTitle}"`);
-      expect(check(answer([good(), good({ title: exampleTitle })]))).toEqual({ ok: false });
+      expect(check(answer([good(), good({ title: exampleTitle })]))).toEqual({
+        ok: false,
+        reason: "bad_output",
+      });
     });
   });
 
@@ -144,7 +192,7 @@ describe("checkRunAnswer", () => {
         block(JSON.stringify({ findings: [good()] })),
       ].join("\n");
 
-      expect(check(text)).toEqual({ ok: false });
+      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 
@@ -155,7 +203,7 @@ describe("checkRunAnswer", () => {
       ["a block that never closes", `${FENCE}${INSIGHT_RUN_FINDINGS_FENCE_TAG}\n{"findings":[]}`],
       ["a list in place of the object", block(JSON.stringify([good()]))],
     ])("refuses %s", (_what, text) => {
-      expect(check(text)).toEqual({ ok: false });
+      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 
@@ -169,7 +217,7 @@ describe("checkRunAnswer", () => {
       ],
       ["an answer too long to read", `${"x".repeat(400_001)}\n${block('{"findings":[]}')}`],
     ])("refuses %s", (_what, text) => {
-      expect(check(text)).toEqual({ ok: false });
+      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 
@@ -183,7 +231,7 @@ describe("checkRunAnswer", () => {
     ])("refuses an answer with %s", (_what, bad) => {
       const findings = bad === null ? Array.from({ length: 51 }, () => good()) : [bad];
 
-      expect(check(answer(findings))).toEqual({ ok: false });
+      expect(check(answer(findings))).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 });

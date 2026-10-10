@@ -61,13 +61,17 @@ export const INSIGHT_RUN_SKIP_REASONS = [
 ] as const;
 export type InsightRunSkipReason = (typeof INSIGHT_RUN_SKIP_REASONS)[number];
 
-/** Why a run that reached Langy filed nothing it could trust. */
+/**
+ * Why a run that reached Langy filed nothing it could trust. `finding_has_url`: a finding
+ * held a web address, which a run never files.
+ */
 export const INSIGHT_RUN_FAILURE_REASONS = [
   "turn_failed",
   "turn_stopped",
   "needs_input",
   "timeout",
   "bad_output",
+  "finding_has_url",
   "brief_changed",
   "rate_limited",
   "error",
@@ -112,14 +116,18 @@ export const INSIGHT_RUN_FINDINGS_FENCE_TAG = "langwatch-insights";
 /** A run's answer may name more than it may file, never an unbounded list. */
 export const INSIGHT_RUN_MAX_FINDINGS_IN_ANSWER = 50;
 
+/** A run's finding is a headline and a few paragraphs; shorter than what a person may save. */
+export const INSIGHT_RUN_FINDING_TITLE_MAX = 120;
+export const INSIGHT_RUN_FINDING_BODY_MAX = 4_000;
+
 /**
  * One finding as Langy hands it back. Strict: a key that is not listed here refuses the whole
  * answer, so an answer cannot name an owner, a project or a board.
  */
 export const insightRunFindingSchema = z
   .object({
-    title: insightTitleSchema,
-    body: insightBodySchema,
+    title: insightTitleSchema.max(INSIGHT_RUN_FINDING_TITLE_MAX),
+    body: insightBodySchema.max(INSIGHT_RUN_FINDING_BODY_MAX),
     tone: insightToneSchema,
     topic: insightTopicSchema.optional(),
     validDays: insightValidDaysSchema.default(DEFAULT_INSIGHT_VALID_DAYS),

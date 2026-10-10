@@ -63,6 +63,9 @@ const tips: Record<string, readonly string[]> = {
   langy_unattended_actor_missing: [
     "The person this run acts as no longer exists, so the run has nobody to read as",
   ],
+  langy_unattended_actor_deactivated: [
+    "The person this run acts as was deactivated, so nothing can run for them",
+  ],
   langy_unattended_no_langy_access: [
     "Langy is not released to this person in this project, so nothing can run for them",
   ],
@@ -90,6 +93,9 @@ const tips: Record<string, readonly string[]> = {
   // adapts its next step to them.
   langy_ui_turn_inactive: [
     "UI actions only work while your own turn is running; this command must be run by the agent during a conversation, not standalone",
+  ],
+  langy_ui_run_conversation: [
+    "This conversation is a run's and only reads; answer in text, and do not call `langwatch ui`",
   ],
   langy_ui_action_unknown: [
     "Run `langwatch ui actions` to list the actions the current page accepts",

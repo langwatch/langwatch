@@ -26,6 +26,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",

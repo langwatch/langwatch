@@ -232,13 +232,31 @@ export function langyCandidatePermissions(): AuthzPermission[] {
 }
 
 /**
- * The ceiling of an unattended turn: what Langy may read, and nothing it may write. A run reads
- * customer trace text with nobody watching, so text that steers it must find no write to use.
+ * What an unattended turn's key may hold, each with the read that needs it. A board read is a
+ * widget's definition and its LangWatchQL queries: `analytics:view` opens both doors, and each
+ * other entry is the second permission a LangWatchQL view asks for. Nothing joins by default.
  */
-export function langyReadOnlyPermissions(): AuthzPermission[] {
-  return langyCandidatePermissions().filter(
-    (permission) => splitPermission(permission).action === READ_ACTION,
-  );
+const UNATTENDED_PERMISSION_NEEDS = {
+  "analytics:view": "reads a board and its widgets, and runs a LangWatchQL query",
+  "traces:view": "the LangWatchQL views traces, spans, trace_metrics and topics",
+  "cost:view": "cost columns of those views, and the view costs",
+  "evaluations:view": "the LangWatchQL views evaluations, evaluation_metrics and monitors",
+  "scenarios:view": "the LangWatchQL view simulations",
+  "annotations:view": "the LangWatchQL views annotations and annotation_queue_items",
+  "experiments:view": "the LangWatchQL views experiment_items and experiment_run_results",
+  "prompts:view": "the LangWatchQL views prompts and prompt_versions",
+  "gatewayUsage:view": "the LangWatchQL view gateway_request_spend",
+} as const satisfies Partial<Record<AuthzPermission, string>>;
+
+/**
+ * The ceiling of an unattended turn, and of every turn in a run conversation: an explicit
+ * allowlist, never "every view". A run reads customer trace text with nobody watching, so text
+ * that steers it finds no write to use and little beyond the board to read.
+ */
+export function langyUnattendedPermissions(): AuthzPermission[] {
+  const allowlist = Object.keys(UNATTENDED_PERMISSION_NEEDS) as AuthzPermission[];
+  // Still inside the policy: a permission Langy may no longer hold leaves this list with it.
+  return allowlist.filter((permission) => classifyForLangy(permission).disposition === "granted");
 }
 
 /** Splits `resource:action`, tolerating anything that is not in that shape. */

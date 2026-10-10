@@ -1,10 +1,20 @@
 /**
  * The insight module installed over memory with the peers a daily run asks, each scripted by
  * the test: who exists, who may read, which boards hold which widgets, and what Langy answers.
+ * Who may open a board is not scripted: the dashboard module's own scope rules answer it.
  */
 
+import type { AnalyticsApi, LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DashboardApi } from "@langwatch/dashboard-contract";
+import {
+  type Dashboard,
+  type DashboardApi,
+  DashboardNotFoundError,
+  type DashboardScope,
+  dashboardStanding,
+  type DashboardViewer,
+  DEFAULT_DASHBOARD_SCOPE,
+} from "@langwatch/dashboard-contract";
 import { createTenantId, type IntentContext } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -33,11 +43,31 @@ import { installInsight, PROJECT } from "./insight.fixture.ts";
 export const MEMBER = "user-member";
 export const OTHER_MEMBER = "user-other";
 export const BOARD: InsightRunBoard = { kind: "dashboard", id: "dashboard-1", name: "Costs" };
+export const ORGANIZATION = "organization-1";
+
+/** What the analytics module answers the run's person may see; a query is validated with it. */
+export const PROTECTIONS: LangWatchQLProtections = {
+  canSeeCosts: true,
+  catalogue: { permissions: ["analytics:view", "traces:view"] },
+};
 
 type Project = NonNullable<Awaited<ReturnType<ProjectApi["findById"]>>>;
 type Widget = Awaited<ReturnType<DashboardApi["listDashboardWidgets"]>>[number];
 
 type ScriptedWidget = { id: string; name: string; gridRow?: number; gridColumn?: number };
+
+/**
+ * A stored board. Left out, it is the run's own project's, at the scope Project, with no
+ * author: what every board was before scope existed.
+ */
+type ScriptedBoard = {
+  name: string;
+  widgets: ScriptedWidget[];
+  scope?: DashboardScope;
+  createdById?: string;
+  projectId?: string;
+  organizationId?: string;
+};
 
 /** One finding as Langy writes it; a test adds or removes fields to make it good or bad. */
 export function finding(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -96,17 +126,19 @@ function project({ kind, archived }: { kind: string; archived: boolean }): Proje
 
 function widget({
   boardId,
+  projectId,
   at,
   scripted,
 }: {
   boardId: string;
+  projectId: string;
   at: number;
   scripted: ScriptedWidget;
 }): Widget {
   const instant = Temporal.Instant.fromEpochMilliseconds(0);
   return {
     id: scripted.id,
-    projectId: PROJECT,
+    projectId,
     name: scripted.name,
     definition: { version: 1, code: "", queries: [] },
     createdAt: instant,
@@ -141,7 +173,7 @@ export function runWorld() {
     ]),
     /** Who holds analytics:view in the project. */
     readers: new Set<string>([MEMBER, OTHER_MEMBER]),
-    boards: new Map<string, { name: string; widgets: ScriptedWidget[] }>([
+    boards: new Map<string, ScriptedBoard>([
       [
         BOARD.id,
         {
@@ -155,6 +187,8 @@ export function runWorld() {
     ]),
     /** Thrown by a board read when set, as the dashboard module refuses it. */
     boardReadError: null as Error | null,
+    /** The queries the analytics module refuses, and its refusal to say what the person sees. */
+    lwql: { refused: new Set<string>(), protectionsError: null as Error | null },
     langy: {
       /** Thrown by the start when set, as Langy refuses or fails it. */
       startError: null as Error | null,
@@ -211,33 +245,91 @@ function scriptedLangy(world: RunWorld) {
   return { api, starts, waits, stops, turns };
 }
 
-function scriptedPeers(world: RunWorld) {
-  const boardReads: { read: "board" | "widgets"; viewer: unknown }[] = [];
+function storedBoard({ id, board }: { id: string; board: ScriptedBoard }): Dashboard {
+  return {
+    id,
+    projectId: board.projectId ?? PROJECT,
+    name: board.name,
+    order: 0,
+    description: null,
+    createdById: board.createdById ?? null,
+    scope: board.scope ?? DEFAULT_DASHBOARD_SCOPE,
+    organizationId: board.organizationId ?? null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  };
+}
+
+type BoardRead = { projectId: string; viewer?: DashboardViewer };
+
+/**
+ * The dashboard module's own answer to who opens a board from where, by its real scope rules.
+ * A board the reader may not open is not found, exactly as one that does not exist.
+ */
+function boardReader(world: RunWorld) {
+  const standingOf = ({ board, projectId, viewer }: BoardRead & { board: Dashboard }) =>
+    dashboardStanding({ board, viewer, place: { projectId, organizationId: ORGANIZATION } });
+  const stored = () =>
+    [...world.boards].map(([id, board]) => ({ ...storedBoard({ id, board }), board }));
+  return {
+    open: ({ dashboardId, ...read }: BoardRead & { dashboardId: string }) => {
+      const found = stored().find(({ id }) => id === dashboardId);
+      if (!found || standingOf({ ...read, board: found }) === "none") {
+        throw new DashboardNotFoundError(read.projectId);
+      }
+      return found;
+    },
+    /** The project's own boards the reader may see: a list by project reaches no other. */
+    atHome: (read: BoardRead) =>
+      stored().filter((board) => standingOf({ ...read, board }) === "home"),
+  };
+}
+
+type BoardReadRecord = { read: "board" | "widgets"; viewer: unknown; dashboardId?: string };
+
+function scriptedDashboard(world: RunWorld) {
+  const boardReads: BoardReadRecord[] = [];
+  const boards = boardReader(world);
+  const widgetsOf = (found: Dashboard & { board: ScriptedBoard }) =>
+    found.board.widgets.map((scripted, at) =>
+      widget({ boardId: found.id, projectId: found.projectId, at, scripted }),
+    );
   const dashboard = createApiFixture<DashboardApi>({
     getById: async ({ projectId, dashboardId, viewer }) => {
       boardReads.push({ read: "board", viewer });
       if (world.boardReadError) throw world.boardReadError;
-      const board = world.boards.get(dashboardId);
-      if (!board) throw refusal("dashboard_not_found");
-      return {
-        id: dashboardId,
-        projectId,
-        name: board.name,
-        order: 0,
-        description: null,
-        createdById: null,
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-        graphs: [],
-      };
+      const { board: _board, ...found } = boards.open({ projectId, dashboardId, viewer });
+      return { ...found, graphs: [] };
     },
-    listDashboardWidgets: async ({ viewer }) => {
-      boardReads.push({ read: "widgets", viewer });
-      return [...world.boards.entries()].flatMap(([boardId, board]) =>
-        board.widgets.map((scripted, at) => widget({ boardId, at, scripted })),
-      );
+    listDashboardWidgets: async ({ projectId, dashboardId, viewer }) => {
+      boardReads.push({ read: "widgets", viewer, ...(dashboardId ? { dashboardId } : {}) });
+      return dashboardId === undefined
+        ? boards.atHome({ projectId, viewer }).flatMap(widgetsOf)
+        : widgetsOf(boards.open({ projectId, dashboardId, viewer }));
     },
   });
+  return { dashboard, boardReads };
+}
+
+function scriptedAnalytics(world: RunWorld) {
+  const validations: { sql: string; protections: unknown; timeWindow: unknown }[] = [];
+  const protectionAsks: { userId: string; projectId: string }[] = [];
+  const analytics = createApiFixture<AnalyticsApi>({
+    resolveProtections: async (input) => {
+      protectionAsks.push(input);
+      if (world.lwql.protectionsError) throw world.lwql.protectionsError;
+      return PROTECTIONS;
+    },
+    validateLangWatchQL: ({ sql, protections, timeWindow }) => {
+      validations.push({ sql, protections, timeWindow });
+      if (world.lwql.refused.has(sql)) throw refusal("lwql_not_permitted");
+      return { parameters: [], appFunctions: [] };
+    },
+  });
+  return { analytics, validations, protectionAsks };
+}
+
+function scriptedPeers(world: RunWorld) {
   const user = createApiFixture<UserApi>({
     findById: async ({ id }) => {
       const known = world.users.get(id);
@@ -260,7 +352,7 @@ function scriptedPeers(world: RunWorld) {
     hasProjectPermission: async ({ userId, permission }) =>
       permission === "analytics:view" && world.readers.has(userId),
   });
-  return { dashboard, user, authz, boardReads };
+  return { user, authz };
 }
 
 function intentContext({ attempt }: { attempt: number }): IntentContext {
@@ -276,11 +368,14 @@ function intentContext({ attempt }: { attempt: number }): IntentContext {
 
 export async function installDailyRuns(world: RunWorld = runWorld()) {
   const langy = scriptedLangy(world);
-  const { boardReads, ...peers } = scriptedPeers(world);
+  const { dashboard, boardReads } = scriptedDashboard(world);
+  const { analytics, ...lwql } = scriptedAnalytics(world);
   const installed = await installInsight({
     isEnabled: () => world.flagOn,
     peers: {
-      ...peers,
+      ...scriptedPeers(world),
+      dashboard,
+      analytics,
       langy: langy.api,
       project: { findById: async () => (world.project ? project(world.project) : null) },
     },
@@ -306,6 +401,7 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
     world,
     langy,
     boardReads,
+    lwql,
     scheduleIdOf,
     /** Every outbox message the schedule's process wrote, oldest first. */
     intentsOf: (scope: { userId?: string; board?: InsightRunBoard } = {}) =>

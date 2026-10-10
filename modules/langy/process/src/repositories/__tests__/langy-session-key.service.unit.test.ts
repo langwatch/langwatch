@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { LangySessionKeyMetrics } from "../../features/session-key/services/langy-session-key.service.ts";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
-  LANGY_READ_ONLY_PERMISSIONS,
+  LANGY_UNATTENDED_PERMISSIONS,
   LangySessionKeyService,
 } from "../../features/session-key/services/langy-session-key.service.ts";
 import {
@@ -351,7 +351,7 @@ describe("LangySessionKeyService", () => {
         authz,
         metrics: new SessionKeyMetrics(),
       });
-      const mint = (ceiling?: "full" | "read") =>
+      const mint = (ceiling?: "full" | "unattended") =>
         service.mint({
           session: { user: { id: "user-1" } },
           projectId: "project-1",
@@ -377,18 +377,39 @@ describe("LangySessionKeyService", () => {
         session: { user: { id: "user-1" } },
         projectId: "project-1",
         organizationId: "organization-1",
-        ceiling: "read",
+        ceiling: "unattended",
       });
 
-      expect(LANGY_READ_ONLY_PERMISSIONS).toContain("cost:view");
-      expect(granted).toEqual([["project:view", "traces:view"]]);
+      expect(LANGY_UNATTENDED_PERMISSIONS).toContain("cost:view");
+      expect(granted).toEqual([["traces:view"]]);
+    });
+
+    /** @scenario "An unattended key holds only what reading a board needs" */
+    it("holds the allowlist for a person who holds everything, and no other view", async () => {
+      const { granted, mint } = mintingAs({ grants: memberGrants("admin") });
+
+      await mint();
+      await mint("unattended");
+
+      const [chat, unattended] = granted;
+      expect(unattended).toEqual([...LANGY_UNATTENDED_PERMISSIONS]);
+      expect(unattended).toEqual(
+        expect.arrayContaining(["analytics:view", "traces:view", "cost:view"]),
+      );
+      // What the same person's chat key reads and a run's key does not.
+      for (const outside of ["project:view", "team:view", "datasets:view", "triggers:view"]) {
+        expect(chat).toContain(outside);
+        expect(unattended).not.toContain(outside);
+      }
+      expect(unattended!.some((permission) => permission.startsWith("auditLog:"))).toBe(false);
+      expect(unattended!.some((permission) => permission.startsWith("secrets:"))).toBe(false);
     });
 
     it("keeps the same person's chat key at the full ceiling", async () => {
       const { granted, mint } = mintingAs({ grants: memberGrants("admin") });
 
       await mint();
-      await mint("read");
+      await mint("unattended");
 
       const [chat, unattended] = granted;
       expect(chat).toContain("prompts:update");
@@ -402,14 +423,14 @@ describe("LangySessionKeyService", () => {
       const member = { grants: memberGrants("viewer") };
       const { engine, granted, mint } = mintingAs(member);
 
-      await mint("read");
+      await mint("unattended");
       const minted = granted[0]!;
       expect(minted).toContain("traces:view");
       expect(minted.every((permission) => permission.endsWith(":view"))).toBe(true);
 
       member.grants = memberGrants(null);
 
-      await expect(mint("read")).rejects.toBeInstanceOf(LangySessionKeyScopeError);
+      await expect(mint("unattended")).rejects.toBeInstanceOf(LangySessionKeyScopeError);
       expect(granted).toHaveLength(1);
       // The key minted before the removal is capped by its owner as they are now.
       const earlierKey: CollectedGrants = {

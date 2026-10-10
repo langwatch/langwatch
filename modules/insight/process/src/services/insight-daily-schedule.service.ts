@@ -30,7 +30,11 @@ export class InsightDailyScheduleService {
     return new InsightDailyScheduleService(schedules, commands);
   }
 
-  async requestRun(input: RequestInsightDailyRunInput): Promise<{ runId: string }> {
+  /**
+   * Records the request and answers its id. The id names no run: the schedule's process starts
+   * one for it only when none is in flight for the board, and the worker decides that later.
+   */
+  async requestRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
     const { projectId, userId, board, maxInsights } =
       requestInsightDailyRunInputSchema.parse(input);
     const requestId = generate(KSUID_RESOURCES.INSIGHT_RUN).toString();
@@ -43,8 +47,7 @@ export class InsightDailyScheduleService {
       requestId,
       maxInsights,
     });
-    // An operator's run is named by its request.
-    return { runId: requestId };
+    return { requestId };
   }
 
   findForUser(input: { projectId: string; userId: string }): Promise<InsightDailyRun[]> {

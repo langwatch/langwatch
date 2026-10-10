@@ -90,7 +90,30 @@ function started({ origin }: { origin?: "interactive" | "run" } = {}): LangyConv
   };
 }
 
+function forked({ origin }: { origin?: "interactive" | "run" } = {}): LangyConversationStateEvent {
+  return {
+    type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED,
+    occurredAt: 500,
+    data: {
+      conversationId: CONVERSATION_ID,
+      sourceConversationId: "conv-source",
+      userId: "user-1",
+      title: "Daily insights - Costs (fork)",
+      runToken: "run-token",
+      ...(origin ? { origin } : {}),
+    },
+  };
+}
+
 describe("foldLangyConversationState", () => {
+  describe("when a conversation is forked", () => {
+    /** @scenario "A fork of a run conversation is a run conversation" */
+    it("keeps the origin run for a fork of a run, and reads any other fork as interactive", () => {
+      expect(fold([forked({ origin: "run" })]).Origin).toBe("run");
+      expect(fold([forked()]).Origin).toBe("interactive");
+    });
+  });
+
   describe("when a conversation is started", () => {
     /** @scenario "A conversation started before origins existed is interactive" */
     it("reads an event stored without an origin as interactive", () => {

@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/insight-contract";
 import { z } from "zod";
 
+import { isOwnScheduleId } from "../rules/insight-daily-run.rules.ts";
 import {
   INSIGHT_DAILY_RUN_INTENT,
   INSIGHT_DAILY_RUN_LEASE_MS,
@@ -40,12 +41,28 @@ type InsightDailyRunIntents = {
 };
 type Handler<Data> = EventHandler<InsightDailyRunState, Data, InsightDailyRunIntents>;
 
-/** A request starts one run, unless it is a replay or a run for this board is in flight. */
+/** Whether the event is this process's own: its schedule is the one its person and board derive. */
+function isOwnSchedule(
+  {
+    scheduleId,
+    userId,
+    board,
+  }: Pick<InsightRunRequestedEventData, "scheduleId" | "userId" | "board">,
+  { key, projectId }: { key: string; projectId: string },
+): boolean {
+  return key === scheduleId && isOwnScheduleId({ scheduleId, projectId, userId, board });
+}
+
+/**
+ * A request starts one run, unless it is a replay, a run for this board is in flight, or it
+ * names a schedule that is not its own person's and board's.
+ */
 export const insightRunRequested: Handler<InsightRunRequestedEventData> = (
   state,
   data,
   context,
 ) => {
+  if (!isOwnSchedule(data, context)) return { state, intents: [] };
   const now = Math.max(context.at, context.now);
   const inFlight =
     state.pendingRun !== null && now - state.pendingRun.since < PENDING_RUN_EXPIRY_MS;
@@ -68,7 +85,7 @@ export const insightRunRequested: Handler<InsightRunRequestedEventData> = (
 };
 
 /** The run's outcome is on the record, so another may start. */
-export const insightRunSettled: Handler<InsightRunSettledEventData> = (state, data) => ({
-  state: state.pendingRun?.runId === data.runId ? { ...state, pendingRun: null } : state,
-  intents: [],
-});
+export const insightRunSettled: Handler<InsightRunSettledEventData> = (state, data, context) => {
+  const isSettled = isOwnSchedule(data, context) && state.pendingRun?.runId === data.runId;
+  return { state: isSettled ? { ...state, pendingRun: null } : state, intents: [] };
+};

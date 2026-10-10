@@ -58,10 +58,10 @@ keepInsight(input: { projectId: string; insightId: string } & Reader): Promise<v
 
 #### `requestDailyRun`
 
-Asks for one daily insights run now, for a person on a board. The worker carries it out as that person, as they are then, and records how it ended; the answer names the run.
+Asks for one daily insights run now, for a person on a board. The answer names the request, never a run: the worker starts none for it while a run is in flight for that board.
 
 ```typescript
-requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ runId: string }>;
+requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }>;
 ```
 
 #### `findDailyRuns`

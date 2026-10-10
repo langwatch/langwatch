@@ -3,6 +3,7 @@
  * first, then hands the work to the service, which answers for the caller's own insights only.
  */
 
+import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -35,6 +36,7 @@ import { InsightDailyRunService } from "../services/insight-daily-run.service.ts
 import { InsightDailyScheduleService } from "../services/insight-daily-schedule.service.ts";
 import { InsightRolloutService } from "../services/insight-rollout.service.ts";
 import { InsightRunGateService } from "../services/insight-run-gate.service.ts";
+import { InsightRunQueryService } from "../services/insight-run-query.service.ts";
 import { InsightService } from "../services/insight.service.ts";
 
 type InsightSetup = FeatureSetup<typeof InsightModule.dependencies, undefined, InsightRepositories>;
@@ -52,6 +54,8 @@ export class InsightModule implements InsightApiContract {
     dashboards: DashboardApi,
     /** The turn a daily run reads the board with, as the person and read-only. */
     langy: LangyApi,
+    /** Admits the query a finding keeps, before a reader ever replays it. */
+    analytics: AnalyticsApi,
   };
 
   readonly #insights: InsightService;
@@ -98,6 +102,7 @@ export class InsightModule implements InsightApiContract {
       }),
       langy: dependencies.langy,
       insights: repositories.insights,
+      queries: InsightRunQueryService.create({ analytics: dependencies.analytics }),
       insightCommands: commands,
       runCommands: dailyRunCommands,
     });
@@ -171,7 +176,7 @@ export class InsightModule implements InsightApiContract {
   }
 
   /** With the flag off no run is asked for; one already asked for is skipped when it starts. */
-  async requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ runId: string }> {
+  async requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
     await this.#rollout.assertEnabled(input);
     return this.#dailySchedules.requestRun(input);
   }

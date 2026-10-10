@@ -1,8 +1,11 @@
 Feature: Unattended Langy turns
   A module may start a Langy turn for a person who is not at the keyboard, such as a
   scheduled insights run. The turn acts as that person, with the permissions they hold
-  when it starts, and it can only read: it holds no write permission and no GitHub token.
-  Its conversation is the person's own, marked as a run, and it never notifies them.
+  when it starts, and it can only read: its key holds a short allowlist of view permissions
+  and no GitHub token. Its conversation is the person's own, marked as a run, and it never
+  notifies them. Every later turn in a run conversation keeps the same limits: its history
+  holds trace text nobody vetted. To go on with full powers the person starts a new
+  conversation.
 
   Rule: An unattended turn only reads
 
@@ -10,8 +13,22 @@ Feature: Unattended Langy turns
     Scenario: An unattended turn's key holds view permissions only
       Given a person who may view, update and delete in a project
       When an unattended turn is started for them
-      Then the key the worker gets holds their view permissions
+      Then the key the worker gets holds the view permissions a board read needs, of those they hold
       And it holds no permission whose action is not view
+
+    @unit
+    Scenario: The unattended allowlist is pinned to what a board read needs
+      Given the permissions an unattended key may ask for
+      When the list is read
+      Then it is exactly analytics, traces, cost, evaluations, scenarios, annotations, experiments, prompts and gatewayUsage view
+      And it holds no team, organization, project, audit log, dataset or secret permission
+
+    @unit
+    Scenario: An unattended key holds only what reading a board needs
+      Given a person who holds every permission in a project
+      When a chat key and an unattended key are minted for them
+      Then the unattended key holds the allowlist and nothing else
+      And the chat key holds project, team, dataset and trigger views the unattended key does not
 
     @unit
     Scenario: An unattended key never carries more than the person holds
@@ -48,6 +65,13 @@ Feature: Unattended Langy turns
       When an unattended turn is started for it
       Then it is refused with langy_unattended_actor_missing
       And no turn is started
+
+    @unit
+    Scenario: A deactivated person is refused an unattended turn
+      Given a person whose account was deactivated
+      When an unattended turn is started for them
+      Then it is refused with langy_unattended_actor_deactivated
+      And no turn is counted or started
 
     @unit
     Scenario: A person without Langy access is refused an unattended turn
@@ -113,7 +137,72 @@ Feature: Unattended Langy turns
       Then no push is requested
       And a long turn that completes in a chat conversation still requests one
 
+  Rule: Every turn in a run conversation keeps the unattended limits
+
+    @unit
+    Scenario: A reply in a run conversation keeps the unattended ceiling
+      Given a run conversation of a person, in a project with GitHub connected
+      When the person sends a chat turn in it
+      Then the key is minted from the unattended allowlist
+      And no GitHub token is asked for and the worker's credentials hold none
+
+    @unit
+    Scenario: A reply in a run conversation never borrows a running worker's key
+      Given a run conversation whose worker answers as already running
+      When the person sends a chat turn in it
+      Then a key of its own is still minted for the turn
+      And the turn's handoff carries that key
+
+    @unit
+    Scenario: Opening a run conversation warms a worker with the unattended ceiling
+      Given a person who opens a run conversation, in a project with GitHub connected
+      When its worker is warmed
+      Then the worker's key is minted from the unattended allowlist
+      And it holds no GitHub token
+
+    @unit
+    Scenario: A person continues with full powers in a new conversation
+      Given a person with a run conversation, in a project with GitHub connected
+      When they send a chat turn in a new conversation
+      Then the key is minted with every permission Langy may hold for them
+      And the worker's credentials hold the GitHub token
+
+    @unit
+    Scenario: A fork of a run conversation is a run conversation
+      Given a run conversation and a chat conversation
+      When each is forked
+      Then the fork of the run has the origin run, so its turns keep the unattended limits
+      And the fork of the chat has the origin interactive
+
+    @unit
+    Scenario: A turn in a run conversation is offered no UI action
+      Given a project with UI actions released
+      When an unattended turn is started, or a reply is sent in a run conversation
+      Then the turn's prompt offers no UI action
+      And a chat turn in another conversation is still offered them
+
+    @unit
+    Scenario: A UI action sent from a run conversation is refused
+      Given a run conversation with a turn in flight
+      When its worker sends a UI action
+      Then it is refused with langy_ui_run_conversation
+      And nothing is published to a page or run on the backend
+
+    @unit
+    Scenario: A turn in a run conversation is not copied to the operator's mirror
+      Given a project whose turns are mirrored with their content
+      When an unattended turn is started, or a reply is sent in a run conversation
+      Then the worker's credentials carry the mirror tier skip
+      And a chat turn in another conversation keeps the tier content
+
   Rule: Unattended turns have their own window
+
+    @unit
+    Scenario: A retried unattended turn is counted once
+      Given an unattended turn that was already started
+      When the same turn is started again with the same key and words
+      Then the same turn is answered
+      And the window counts nothing for it
 
     @unit
     Scenario: Unattended turns are counted apart from chat turns

@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { InsightMemoryStore } from "../../repositories/memory/insight-memory.store.ts";
 import { MemoryInsightDailyScheduleProjectionRepository } from "../../repositories/memory/memory.insight-daily-schedule-projection.repository.ts";
+import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import {
   InsightRunRequestedEventSchema,
   InsightRunSettledEventSchema,
@@ -25,7 +26,8 @@ import {
 
 const T0 = Date.UTC(2026, 9, 10, 9, 37);
 const BOARD = { kind: "dashboard", id: "dashboard-1", name: "Costs" } as const;
-const SCHEDULE = { scheduleId: "schedule-1", userId: "user-1", board: BOARD };
+const OWNER = { projectId: "project-1", userId: "user-1", board: BOARD };
+const SCHEDULE = { scheduleId: dailyScheduleId(OWNER), userId: OWNER.userId, board: BOARD };
 const PROJECTION = createInsightDailyScheduleProjection({
   store: MemoryInsightDailyScheduleProjectionRepository.create({
     rows: InsightMemoryStore.create(),
@@ -116,6 +118,30 @@ describe("given a run that settled", () => {
         lastRunConversationId: null,
       });
     });
+  });
+});
+
+describe("given an outcome on a stream that is not its person's and board's", () => {
+  /** @scenario "An outcome that names another schedule changes no row" */
+  it.each([
+    ["another person", { userId: "user-2" }],
+    ["another board", { board: { ...BOARD, id: "dashboard-2" } }],
+  ])("folds nothing for an outcome that names %s", (_what, other) => {
+    const first = applyInsightDailyRunEvent(PROJECTION.init(), settled(T0 + 60_000));
+
+    const forged = settled(T0 + 120_000, { runId: "run-2", ...other });
+
+    expect(applyInsightDailyRunEvent(PROJECTION.init(), forged)).toBe(PROJECTION.init());
+    expect(applyInsightDailyRunEvent(first, forged)).toBe(first);
+  });
+
+  it("folds nothing for the same outcome recorded in another project", () => {
+    const elsewhere = InsightRunSettledEventSchema.parse({
+      ...settled(T0 + 60_000),
+      tenantId: "project-2",
+    });
+
+    expect(applyInsightDailyRunEvent(PROJECTION.init(), elsewhere)).toBe(PROJECTION.init());
   });
 });
 

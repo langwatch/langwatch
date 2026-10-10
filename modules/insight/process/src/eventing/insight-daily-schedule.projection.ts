@@ -12,6 +12,7 @@ import {
   type InsightRunReason,
 } from "@langwatch/insight-contract";
 
+import { isOwnScheduleId } from "../rules/insight-daily-run.rules.ts";
 import type { InsightDailyRunEvent } from "./insight-daily-run.events.ts";
 
 export interface InsightDailyScheduleState {
@@ -50,6 +51,9 @@ export function applyInsightDailyRunEvent(
   // Delivery is at least once: a run settled again keeps the outcome it first recorded.
   if (state.lastRunId === event.data.runId) return state;
   const { userId, board, runId, outcome, reason, filedCount, conversationId } = event.data;
+  // A row is its own person's and board's: an outcome that names another's schedule is not theirs.
+  const owner = { projectId: String(event.tenantId), userId, board };
+  if (!isOwnScheduleId({ scheduleId: event.aggregateId, ...owner })) return state;
   return {
     userId,
     boardKind: board.kind,

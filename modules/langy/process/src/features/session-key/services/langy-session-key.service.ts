@@ -4,8 +4,8 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   langyCandidatePermissions,
   type LangyCredentialSession,
-  langyReadOnlyPermissions,
   LangySessionKeyScopeError,
+  langyUnattendedPermissions,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -20,9 +20,10 @@ export interface LangySessionKeyMetrics {
 
 /**
  * How much of the person's own access a session key may carry: everything Langy may hold for
- * them (`full`, a chat), or only what it may read (`read`, a turn nobody is watching).
+ * them (`full`, a chat), or only the allowlist a board read needs (`unattended`, a turn
+ * nobody is watching and every later turn of its conversation).
  */
-type LangySessionKeyCeiling = "full" | "read";
+type LangySessionKeyCeiling = "full" | "unattended";
 
 type LangySessionKeyMintInput = {
   session: LangyCredentialSession;
@@ -48,12 +49,12 @@ const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
  */
 export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(langyCandidatePermissions());
 
-/** The same ceiling with every write taken out: what an unattended turn's key may ask for. */
-export const LANGY_READ_ONLY_PERMISSIONS = Object.freeze(langyReadOnlyPermissions());
+/** The explicit allowlist an unattended turn's key may ask for: what a board read needs. */
+export const LANGY_UNATTENDED_PERMISSIONS = Object.freeze(langyUnattendedPermissions());
 
 const CEILING_PERMISSIONS = {
   full: LANGY_CANDIDATE_PERMISSIONS,
-  read: LANGY_READ_ONLY_PERMISSIONS,
+  unattended: LANGY_UNATTENDED_PERMISSIONS,
 } as const;
 
 const KEY_DESCRIPTION = {
@@ -62,10 +63,10 @@ const KEY_DESCRIPTION = {
     "Mirrors your own permissions in this project and auto-expires.",
     "Revoked automatically when it lapses.",
   ].join(" "),
-  read: [
+  unattended: [
     "Ephemeral read-only key for a Langy run started on your behalf.",
-    "Holds only what you may view in this project and auto-expires.",
-    "Revoked automatically when it lapses.",
+    "Holds only what reading a dashboard needs, of what you may view in this project,",
+    "and auto-expires. Revoked automatically when it lapses.",
   ].join(" "),
 } as const;
 

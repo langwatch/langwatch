@@ -396,13 +396,19 @@ export class LangyApiIdentityDeniedError extends HandledError {
   }
 }
 
+/** Why an unattended turn's person cannot be acted as. */
+type LangyUnattendedTurnRefusal =
+  | "langy_unattended_actor_missing"
+  | "langy_unattended_actor_deactivated"
+  | "langy_unattended_no_langy_access";
+
 /**
- * An unattended turn's person cannot be acted as: no such user, or Langy is not released to
- * them in the project. Refused before anything is counted, minted or started.
+ * An unattended turn's person cannot be acted as: no such user, a deactivated account, or
+ * Langy is not released to them in the project. Refused before anything is minted or started.
  */
 export class LangyUnattendedTurnRefusedError extends HandledError {
-  declare readonly code: "langy_unattended_actor_missing" | "langy_unattended_no_langy_access";
-  constructor(code: "langy_unattended_actor_missing" | "langy_unattended_no_langy_access") {
+  declare readonly code: LangyUnattendedTurnRefusal;
+  constructor(code: LangyUnattendedTurnRefusal) {
     super(code, "Langy cannot run for this person in this project.", {
       httpStatus: 403,
       fault: "customer",
@@ -444,6 +450,21 @@ export class LangyUiTurnInactiveError extends HandledError {
       },
     );
     this.name = "LangyUiTurnInactiveError";
+  }
+}
+
+/**
+ * The conversation is a run's: a module started it with nobody at a page, and it only reads.
+ * It has no page to act on, so no UI action is published for it (HTTP 409).
+ */
+export class LangyUiRunConversationError extends HandledError {
+  declare readonly code: "langy_ui_run_conversation";
+  constructor() {
+    super("langy_ui_run_conversation", "A run conversation has no page to act on.", {
+      httpStatus: 409,
+      ...remediation("langy_ui_run_conversation"),
+    });
+    this.name = "LangyUiRunConversationError";
   }
 }
 

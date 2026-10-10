@@ -11,7 +11,7 @@ import {
   classifyForLangy,
   LANGY_AUTH_SCOPE_FAMILY_NAMES,
   langyCandidatePermissions,
-  langyReadOnlyPermissions,
+  langyUnattendedPermissions,
   splitPermission,
 } from "../langy-permission-policy.ts";
 
@@ -204,17 +204,57 @@ describe("classifyForLangy", () => {
   });
 });
 
-describe("langyReadOnlyPermissions", () => {
-  describe("when the ceiling of an unattended turn is derived", () => {
-    it("holds every view permission Langy may hold, and no other action", () => {
-      const readOnly = langyReadOnlyPermissions();
-      const views = langyCandidatePermissions().filter(
+describe("langyUnattendedPermissions", () => {
+  describe("when the ceiling of an unattended turn is read", () => {
+    /** @scenario "The unattended allowlist is pinned to what a board read needs" */
+    it("is exactly the list a board read needs, so no permission joins by accident", () => {
+      expect(langyUnattendedPermissions()).toEqual([
+        "analytics:view",
+        "traces:view",
+        "cost:view",
+        "evaluations:view",
+        "scenarios:view",
+        "annotations:view",
+        "experiments:view",
+        "prompts:view",
+        "gatewayUsage:view",
+      ]);
+    });
+
+    it("holds view permissions Langy may hold in a chat, and no other action", () => {
+      const candidates = langyCandidatePermissions();
+
+      for (const permission of langyUnattendedPermissions()) {
+        expect(splitPermission(permission).action).toBe("view");
+        expect(candidates).toContain(permission);
+      }
+    });
+
+    it.each([
+      "team:view",
+      "organization:view",
+      "project:view",
+      "auditLog:view",
+      "datasets:view",
+      "workflows:view",
+      "triggers:view",
+      "playground:view",
+      "virtualKeys:view",
+      "gatewayProviders:view",
+      "webhookEndpoints:view",
+      "complianceExport:view",
+      "secrets:view",
+    ])("leaves %s out", (permission) => {
+      expect(langyUnattendedPermissions()).not.toContain(permission);
+    });
+
+    it("is far shorter than every view permission Langy may hold", () => {
+      const everyView = langyCandidatePermissions().filter(
         (permission) => splitPermission(permission).action === "view",
       );
 
-      expect(readOnly).toEqual(views);
-      expect(readOnly).toContain("traces:view");
-      expect(readOnly.length).toBeGreaterThan(0);
+      expect(everyView.length).toBeGreaterThan(langyUnattendedPermissions().length);
+      expect(everyView).toContain("auditLog:view");
     });
   });
 });

@@ -34,6 +34,7 @@ import {
 import type { InsightCommandsService } from "./insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "./insight-daily-run-commands.service.ts";
 import type { InsightRunGateService, RunGateResult } from "./insight-run-gate.service.ts";
+import type { InsightRunQueryService } from "./insight-run-query.service.ts";
 
 const logger = createLogger("langwatch:insight:daily-run");
 
@@ -68,6 +69,7 @@ type StartedTurn = Readonly<{ conversationId: string; turnId: string }>;
 /** Langy's refusals that no retry changes: each ends the run with its own reason. */
 const START_REFUSALS: Readonly<Record<string, Pick<RunEnd, "outcome" | "reason">>> = {
   langy_unattended_actor_missing: { outcome: "skipped", reason: "user_missing" },
+  langy_unattended_actor_deactivated: { outcome: "skipped", reason: "no_access" },
   langy_unattended_no_langy_access: { outcome: "skipped", reason: "langy_off" },
   langy_insufficient_scope: { outcome: "skipped", reason: "no_access" },
   aggregate_project_is_read_only: { outcome: "skipped", reason: "project_unavailable" },
@@ -89,6 +91,7 @@ type InsightDailyRunMembers = Readonly<{
   gate: Pick<InsightRunGateService, "check">;
   langy: Pick<LangyApi, "startUnattendedTurn" | "awaitTurnSettlement" | "stopTurn">;
   insights: Pick<InsightRepository, "findForReader">;
+  queries: Pick<InsightRunQueryService, "keepValid">;
   insightCommands: Pick<InsightCommandsService, "fileInsight">;
   runCommands: Pick<InsightDailyRunCommandsService, "recordRunStarted" | "settleRun">;
   /** Injected by tests that cannot wait ten minutes. */
@@ -213,8 +216,19 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       maxInsights,
       widgets: ready.gate.widgets,
     });
-    if (!answer.ok) return failed("bad_output", conversationId);
-    for (const [position, finding] of answer.findings.entries()) {
+    if (!answer.ok) return failed(answer.reason, conversationId);
+    // Asked again: the turn took minutes, and a person who lost access since files nothing.
+    const still = await this.members.gate.check({ projectId, userId, board: input.board });
+    if (!still.ok) {
+      return { outcome: "skipped", reason: still.reason, filedCount: 0, conversationId };
+    }
+    const findings = await this.members.queries.keepValid({
+      projectId,
+      userId,
+      window: ready.windows.window,
+      findings: answer.findings,
+    });
+    for (const [position, finding] of findings.entries()) {
       await this.file({
         input,
         ready,
@@ -223,7 +237,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
         source: { conversationId, messageId: settlement.messageId },
       });
     }
-    const filedCount = answer.findings.length;
+    const filedCount = findings.length;
     return {
       outcome: filedCount > 0 ? "filed" : "nothing",
       reason: null,

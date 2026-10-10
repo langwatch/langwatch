@@ -36,7 +36,7 @@ export const insightRunStartedEventDataSchema = z.object({
 });
 export type InsightRunStartedEventData = z.infer<typeof insightRunStartedEventDataSchema>;
 
-/** How the run ended. A skipped run reached no conversation, so it names none. */
+/** How the run ended. A run skipped before Langy took the turn names no conversation. */
 export const insightRunSettledEventDataSchema = z.object({
   ...scheduleRefShape,
   runId: z.string().min(1),

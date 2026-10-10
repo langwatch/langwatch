@@ -21,7 +21,7 @@ export interface LangySessionKeyMintingService {
     session: LangyCredentialSession;
     projectId: string;
     organizationId: string;
-    ceiling?: "full" | "read";
+    ceiling?: "full" | "unattended";
   }): Promise<{ token: string; apiKeyId: string }>;
   revokeManaged(input: {
     apiKeyId: string;

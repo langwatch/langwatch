@@ -120,7 +120,7 @@ startConversationTurn(input: LangyStartConversationTurnInput): Promise<{ convers
 
 #### `startUnattendedTurn`
 
-Starts a read-only turn as the person, in a new conversation marked as a run: view permissions only, as they hold them now, and no GitHub token. A missing person, one without Langy access or one with nothing to read with is refused, and nothing starts.
+Starts a read-only turn as the person, in a new conversation marked as a run: only the view permissions a board read needs, as they hold them now, and no GitHub token. A missing or deactivated person, or one with no Langy access or nothing to read with, is refused.
 
 ```typescript
 startUnattendedTurn(input: LangyStartUnattendedTurnInput): Promise<{ conversationId: string; turnId: string; }>;

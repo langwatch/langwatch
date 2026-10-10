@@ -61,7 +61,9 @@ export class LangyTurnPreparationService {
     identity: { messageId: string };
     isRetry: boolean;
     turnContext: object;
-    unattended?: StartConversationTurnInput["unattended"];
+    /** Keeps the unattended ceiling: an allowlisted key, no GitHub token, no UI action. */
+    readOnly: boolean;
+    unattended?: Pick<NonNullable<StartConversationTurnInput["unattended"]>, "title">;
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     accessStore: LangyTurnServiceDependencies["accessStore"];
     handoffStore: LangyTurnServiceDependencies["handoffStore"];
@@ -79,7 +81,7 @@ export class LangyTurnPreparationService {
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
     });
-    const needsOwnKey = Boolean(args.credentials.githubToken) || args.unattended !== undefined;
+    const needsOwnKey = Boolean(args.credentials.githubToken) || args.readOnly;
     const earlyWorkerProbe = needsOwnKey ? null : this.probeWorker(args, disabledSkillsPromise);
     const results = await this.readPreparation(args, mintedRunToken);
     const disabledSkills = await disabledSkillsPromise;
@@ -251,8 +253,8 @@ export class LangyTurnPreparationService {
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
     probeWorker: () => Promise<boolean>,
   ) {
-    // An unattended turn never borrows a running worker's key, which may hold writes.
-    if (!args.unattended && (await probeWorker())) {
+    // A read-only turn never borrows a running worker's key, which may hold writes.
+    if (!args.readOnly && (await probeWorker())) {
       return;
     }
 
@@ -260,7 +262,7 @@ export class LangyTurnPreparationService {
       session: args.session,
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
-      ...(args.unattended ? { ceiling: "read" as const } : {}),
+      ...(args.readOnly ? { ceiling: "unattended" as const } : {}),
     });
     args.credentials.langwatchApiKey = minted.token;
     args.credentials.langwatchApiKeyId = minted.apiKeyId;
@@ -305,11 +307,10 @@ export class LangyTurnPreparationService {
     const seedBlocks = [transcript, memory].filter(
       (block): block is string => !!block && block.trim().length > 0,
     );
-    // The resolver never rejects on its own — it fails closed internally — so
-    // a rejected slot can only mean the batch itself failed; closed is the
-    // same answer the resolver would have given.
+    // A rejected slot means the batch failed; closed is what the resolver would have answered.
+    // A read-only turn is offered none either way: a run has no page, and its history is unvetted.
     const isUiActionSurfaceOpen =
-      uiActionsOpenResult.status === "fulfilled" ? uiActionsOpenResult.value : false;
+      !args.readOnly && uiActionsOpenResult.status === "fulfilled" && uiActionsOpenResult.value;
     const { prompt, labelled } = LANGY_TURN_SHARED.composeLangyTurnPrompt({
       viewer: args.session.user,
       contextBlock: this.deps.context.render({

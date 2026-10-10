@@ -26,7 +26,10 @@ type RunBoardWidget = Readonly<{
   gridRow: number;
 }>;
 
-/** The dashboard module's two reads a run makes, each as the person the run is for. */
+/**
+ * The dashboard module's two reads a run makes. Each names the board and the person, so the
+ * dashboard module's own scope rules answer both: an Only me board is its author's alone.
+ */
 type RunBoardReader = {
   getById(input: {
     projectId: string;
@@ -35,6 +38,7 @@ type RunBoardReader = {
   }): Promise<{ id: string; name: string }>;
   listDashboardWidgets(input: {
     projectId: string;
+    dashboardId: string;
     viewer: Viewer;
   }): Promise<readonly RunBoardWidget[]>;
 };
@@ -58,8 +62,9 @@ type InsightRunGateMembers = Readonly<{
 }>;
 
 /**
- * The dashboard module's refusals that end a run. `board_unreadable`: dashboards, or the
- * custom charts on them, are off for the project.
+ * The dashboard module's refusals that end a run. A board the person may not see is refused as
+ * `dashboard_not_found`, like one that never existed, so the reason tells them apart from none.
+ * `board_unreadable`: dashboards, or the custom charts on them, are off for the project.
  */
 const BOARD_REFUSALS: Readonly<Record<string, InsightRunSkipReason>> = {
   dashboard_not_found: "board_deleted",
@@ -140,7 +145,13 @@ export class InsightRunGateService {
   }): Promise<RunGateResult> {
     const { dashboards } = this.members;
     const stored = await dashboards.getById({ projectId, dashboardId, viewer });
-    const widgets = (await dashboards.listDashboardWidgets({ projectId, viewer }))
+    // Asked by board: the dashboard module then reads an Organization board's own project.
+    const onBoard = await dashboards.listDashboardWidgets({
+      projectId,
+      dashboardId: stored.id,
+      viewer,
+    });
+    const widgets = onBoard
       .filter((widget) => widget.dashboardId === stored.id)
       .toSorted(inReadingOrder)
       .map(({ id, name }) => ({ id, name: pointerName({ name, fallback: id }) }));

@@ -1,7 +1,7 @@
 /**
  * A turn a module starts for a person who is not at the keyboard, such as a scheduled insights
- * run. It acts as that person as they are now, and it only reads: the turn below it mints a
- * view-only key and asks for no GitHub token. ORDER IS THE CONTRACT: every refusal comes first.
+ * run. It acts as that person as they are now, and it only reads: the turn below it mints an
+ * allowlisted key and asks for no GitHub token. ORDER IS THE CONTRACT: every refusal comes first.
  */
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
@@ -16,14 +16,13 @@ import {
 } from "@langwatch/project-contract";
 
 import { LangyAccessService } from "../../../services/langy-access.service.ts";
-import {
-  LangyActorSessionService,
-  type LangyActorUserReader,
-} from "../../../services/langy-actor-session.service.ts";
+import type { LangyActorUserReader } from "../../../services/langy-actor-session.service.ts";
 import type { StartConversationTurnInput } from "./langy-turn-shared.service.ts";
 import type { LangyTurnsBoundsService } from "./langy-turns-bounds.service.ts";
 
-type UnattendedTurnStart = StartConversationTurnInput & { unattended: { title: string } };
+type UnattendedTurnStart = StartConversationTurnInput & {
+  unattended: NonNullable<StartConversationTurnInput["unattended"]>;
+};
 
 type LangyUnattendedTurnMembers = Readonly<{
   users: LangyActorUserReader;
@@ -49,34 +48,39 @@ export class LangyUnattendedTurnService {
     input: LangyStartUnattendedTurnInput,
   ): Promise<{ conversationId: string; turnId: string }> {
     const { users, projects, featureFlags, bounds, turns } = this.members;
-    const actor = await LangyActorSessionService.create({ users }).resolve({
-      userId: input.userId,
-    });
-    if (!actor.ok) throw new LangyUnattendedTurnRefusedError("langy_unattended_actor_missing");
+    const user = await users.findById({ id: input.userId });
+    if (!user) throw new LangyUnattendedTurnRefusedError("langy_unattended_actor_missing");
+    // Nobody acts for an account that was retired, whatever membership it still holds.
+    if (user.deactivatedAt !== null) {
+      throw new LangyUnattendedTurnRefusedError("langy_unattended_actor_deactivated");
+    }
+    const session = { user: { id: user.id, name: user.name, email: user.email } };
 
     const project = await projects.findIdentity(input.projectId);
     if (!project) throw new ProjectNotFoundError();
     if (isAggregateProjectKind(project.kind)) throw new AggregateProjectIsReadOnlyError();
 
     const hasAccess = await LangyAccessService.create({ featureFlags }).hasAccess({
-      user: actor.session.user,
+      user: session.user,
       projectId: project.id,
       organizationId: project.organizationId,
     });
     if (!hasAccess) throw new LangyUnattendedTurnRefusedError("langy_unattended_no_langy_access");
 
-    await bounds.assertUnattendedTurnWithinBounds({ projectId: project.id });
-
     // Always a conversation of its own: a run never writes into one the person is chatting in.
     return turns.startUnattendedTurn({
       projectId: project.id,
       idempotencyKey: input.idempotencyKey,
-      session: actor.session,
+      session,
       requestedConversationId: null,
       messages: [{ role: "user", parts: [{ type: "text", text: input.text }] }],
       isRetry: false,
       turnContext: {},
-      unattended: { title: input.title },
+      unattended: {
+        title: input.title,
+        // Counted by the turn once it is claimed, so a replay of the same turn counts nothing.
+        countTurn: () => bounds.assertUnattendedTurnWithinBounds({ projectId: project.id }),
+      },
     });
   }
 }

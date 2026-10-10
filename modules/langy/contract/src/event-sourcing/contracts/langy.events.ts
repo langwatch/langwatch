@@ -47,6 +47,8 @@ export const langyConversationForkedEventDataSchema = z.object({
   userId: z.string(),
   title: z.string().nullable(),
   runToken: z.string(),
+  /** Set to `run` when the source is a run: a copy of its history keeps the run's limits. */
+  origin: z.enum(LANGY_CONVERSATION_ORIGINS).optional(),
 });
 export type LangyConversationForkedEventData = z.infer<
   typeof langyConversationForkedEventDataSchema

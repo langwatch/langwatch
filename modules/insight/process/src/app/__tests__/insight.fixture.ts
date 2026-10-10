@@ -3,6 +3,7 @@
  * its real pipeline on an in-memory event store, so a write is folded before the next read.
  */
 
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -48,6 +49,7 @@ export type InsightRunPeers = Readonly<{
   authz?: AuthzApi;
   dashboard?: DashboardApi;
   langy?: LangyApi;
+  analytics?: AnalyticsApi;
 }>;
 
 export async function installInsight({
@@ -82,6 +84,7 @@ export async function installInsight({
       authz: peers.authz ?? createApiFixture<AuthzApi>(),
       dashboard: peers.dashboard ?? createApiFixture<DashboardApi>(),
       langy: peers.langy ?? createApiFixture<LangyApi>(),
+      analytics: peers.analytics ?? createApiFixture<AnalyticsApi>(),
     })
     .boot();
 

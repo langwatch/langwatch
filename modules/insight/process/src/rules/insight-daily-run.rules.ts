@@ -30,6 +30,22 @@ export function dailyScheduleId({
   return `insightschedule_${digest([projectId, userId, board.kind, board.id])}`;
 }
 
+/**
+ * Whether a run event names the schedule its own project, person and board derive. An event
+ * that names any other is refused, so no run acts for a person its schedule is not for.
+ */
+export function isOwnScheduleId({
+  scheduleId,
+  ...owner
+}: {
+  scheduleId: string;
+  projectId: string;
+  userId: string;
+  board: Pick<InsightRunBoard, "kind" | "id">;
+}): boolean {
+  return scheduleId === dailyScheduleId(owner);
+}
+
 /** The id of the insight a run files for its finding at `position`: the same on a retry. */
 export function runInsightId({
   scheduleId,

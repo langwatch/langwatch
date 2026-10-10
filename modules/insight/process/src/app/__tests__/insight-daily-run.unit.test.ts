@@ -17,7 +17,7 @@ import {
   LangyTurnsRateLimitedError,
   LangyUnattendedTurnRefusedError,
 } from "@langwatch/langy-contract";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { dailyRunWindows } from "../../rules/insight-daily-run.rules.ts";
@@ -28,10 +28,12 @@ import {
   installDailyRuns,
   type InstalledDailyRuns,
   MEMBER,
+  ORGANIZATION,
   OTHER_MEMBER,
+  PROTECTIONS,
   refusal,
 } from "./insight-daily-run.fixture.ts";
-import { PROJECT } from "./insight.fixture.ts";
+import { OTHER_PROJECT, PROJECT } from "./insight.fixture.ts";
 
 const { RUN_REQUESTED, RUN_STARTED, RUN_SETTLED } = INSIGHT_DAILY_RUN_EVENT_TYPES;
 const TWO_FINDINGS = answerWith([
@@ -53,17 +55,18 @@ type RunScope = { userId?: string; board?: InsightRunBoard; maxInsights?: 1 | 3 
 
 /** Asks for a run and answers the intent the schedule's process wrote for it. */
 async function request({ userId = MEMBER, board = BOARD, maxInsights }: RunScope = {}) {
-  const { runId } = await installed.app.requestDailyRun({
+  const { requestId } = await installed.app.requestDailyRun({
     projectId: PROJECT,
     userId,
     board,
     ...(maxInsights ? { maxInsights } : {}),
   });
+  // An operator's run is named by its request, once the schedule's process took the request.
   const intent = (await installed.intentsOf({ userId, board })).find(({ payload }) => {
-    return (payload as { runId?: string }).runId === runId;
+    return (payload as { runId?: string }).runId === requestId;
   });
-  if (!intent) throw new Error(`The schedule wrote no intent for run ${runId}`);
-  return { runId, payload: intent.payload as { slot: number; runId: string } };
+  if (!intent) throw new Error(`The schedule wrote no intent for request ${requestId}`);
+  return { runId: requestId, payload: intent.payload as { slot: number; runId: string } };
 }
 
 /** Asks for a run and carries it out once, as a first delivery does. */
@@ -219,6 +222,55 @@ describe("given a person who may not have a run", () => {
     expect(installed.langy.starts).toEqual([]);
   });
 
+  /** @scenario "Langy refusing a deactivated person skips the run" */
+  it("skips with no_access when Langy finds the person deactivated", async () => {
+    installed.world.langy.startError = new LangyUnattendedTurnRefusedError(
+      "langy_unattended_actor_deactivated",
+    );
+
+    await run();
+
+    expect(await lastRunOf()).toMatchObject({
+      outcome: "skipped",
+      reason: "no_access",
+      conversationId: null,
+    });
+    expect(await insightsOf()).toEqual([]);
+  });
+
+  /** @scenario "A member who lost access during the turn files nothing" */
+  it("files nothing and records skipped when the member lost analytics:view while Langy read", async () => {
+    installed.world.langy.settle = async (input) => {
+      installed.world.langy.settle = null;
+      installed.world.readers.delete(MEMBER);
+      return installed.langy.api.awaitTurnSettlement(input);
+    };
+
+    await run();
+
+    expect(installed.langy.starts).toHaveLength(1);
+    expect(await insightsOf()).toEqual([]);
+    expect(await lastRunOf()).toMatchObject({
+      outcome: "skipped",
+      reason: "no_access",
+      filedCount: 0,
+      conversationId: "conversation-1",
+    });
+  });
+
+  it("files nothing when the person was deactivated while Langy read", async () => {
+    installed.world.langy.settle = async (input) => {
+      installed.world.langy.settle = null;
+      installed.world.users.set(MEMBER, { deactivated: true });
+      return installed.langy.api.awaitTurnSettlement(input);
+    };
+
+    await run();
+
+    expect(await insightsOf()).toEqual([]);
+    expect(await lastRunOf()).toMatchObject({ outcome: "skipped", reason: "no_access" });
+  });
+
   /** @scenario "Langy refusing the person skips the run" */
   it("skips with langy_off when Langy is not released to them, and no_access when it finds nothing to read with", async () => {
     installed.world.langy.startError = new LangyUnattendedTurnRefusedError(
@@ -351,12 +403,14 @@ describe("given the board a run is asked for", () => {
   });
 
   /** @scenario "The board is read as the person the run is for" */
-  it("reads the board and its widgets as the member the run is for", async () => {
+  it("reads the board and its widgets as the member the run is for, before the turn and after", async () => {
     await run();
 
     expect(installed.boardReads).toEqual([
       { read: "board", viewer: { userId: MEMBER } },
-      { read: "widgets", viewer: { userId: MEMBER } },
+      { read: "widgets", viewer: { userId: MEMBER }, dashboardId: BOARD.id },
+      { read: "board", viewer: { userId: MEMBER } },
+      { read: "widgets", viewer: { userId: MEMBER }, dashboardId: BOARD.id },
     ]);
   });
 
@@ -377,6 +431,137 @@ describe("given the board a run is asked for", () => {
     expect(text).toContain('- "widget-cost": "Cost per day"');
     expect(text).not.toContain("widget-latency");
     expect((await runsOf())[0]?.board).toEqual({ ...BOARD, name: "Costs and errors" });
+  });
+});
+
+describe("given a board its author keeps as Only me", () => {
+  const PRIVATE: InsightRunBoard = { kind: "dashboard", id: "dashboard-mine", name: "A board" };
+  const stored = (scope: "PRIVATE" | "PROJECT") => ({
+    name: "Acquisition plans",
+    scope,
+    createdById: MEMBER,
+    widgets: [{ id: "widget-mine", name: "Runway" }],
+  });
+
+  beforeEach(() => {
+    installed.world.langy.answer = TWO_FINDINGS;
+    installed.world.boards.set(PRIVATE.id, stored("PRIVATE"));
+  });
+
+  /** @scenario "Another member's Only me board reads as a board that is not there" */
+  it("skips another member's run exactly as it skips a board that never existed", async () => {
+    const absent: InsightRunBoard = { kind: "dashboard", id: "dashboard-none", name: "A board" };
+
+    await run({ userId: OTHER_MEMBER, board: PRIVATE });
+    await run({ userId: OTHER_MEMBER, board: absent });
+
+    const hidden = await lastRunOf({ userId: OTHER_MEMBER, board: PRIVATE });
+    expect(hidden).toMatchObject({
+      outcome: "skipped",
+      reason: "board_deleted",
+      filedCount: 0,
+      conversationId: null,
+    });
+    expect({ ...hidden, at: 0 }).toEqual({
+      ...(await lastRunOf({ userId: OTHER_MEMBER, board: absent })),
+      at: 0,
+    });
+    // The row keeps the name the request gave, never the name the board holds.
+    expect((await runsOf(OTHER_MEMBER)).map(({ board }) => board.name)).toEqual([
+      "A board",
+      "A board",
+    ]);
+    expect(installed.langy.starts).toEqual([]);
+    expect(await insightsOf(OTHER_MEMBER)).toEqual([]);
+  });
+
+  /** @scenario "The author's run reads their own Only me board" */
+  it("files the author's findings from their own Only me board", async () => {
+    await run({ board: PRIVATE });
+
+    expect(await lastRunOf({ board: PRIVATE })).toMatchObject({ outcome: "filed", filedCount: 2 });
+    expect(installed.langy.starts[0]?.text).toContain('- "widget-mine": "Runway"');
+    expect((await runsOf())[0]?.board).toEqual({ ...PRIVATE, name: "Acquisition plans" });
+    expect(installed.boardReads.every(({ viewer }) => viewer !== undefined)).toBe(true);
+  });
+
+  /** @scenario "A board that turned Only me after the request skips another member's run" */
+  it("skips another member's run once the author set the board to Only me", async () => {
+    installed.world.boards.set(PRIVATE.id, stored("PROJECT"));
+    const { payload } = await request({ userId: OTHER_MEMBER, board: PRIVATE });
+
+    installed.world.boards.set(PRIVATE.id, stored("PRIVATE"));
+    await installed.carryOut(payload);
+
+    expect(await lastRunOf({ userId: OTHER_MEMBER, board: PRIVATE })).toMatchObject({
+      outcome: "skipped",
+      reason: "board_deleted",
+    });
+    expect(installed.langy.starts).toEqual([]);
+  });
+
+  it("files nothing for another member when the board turned Only me while Langy read it", async () => {
+    installed.world.boards.set(PRIVATE.id, stored("PROJECT"));
+    installed.world.langy.settle = async (input) => {
+      installed.world.langy.settle = null;
+      installed.world.boards.set(PRIVATE.id, stored("PRIVATE"));
+      return installed.langy.api.awaitTurnSettlement(input);
+    };
+
+    await run({ userId: OTHER_MEMBER, board: PRIVATE });
+
+    expect(await insightsOf(OTHER_MEMBER)).toEqual([]);
+    expect(await lastRunOf({ userId: OTHER_MEMBER, board: PRIVATE })).toMatchObject({
+      outcome: "skipped",
+      reason: "board_deleted",
+      filedCount: 0,
+    });
+  });
+});
+
+describe("given an Organization board another project owns", () => {
+  const SHARED: InsightRunBoard = { kind: "dashboard", id: "dashboard-org", name: "Company" };
+  const owned = (organizationId: string) => ({
+    name: "Company costs",
+    scope: "ORGANIZATION" as const,
+    projectId: OTHER_PROJECT,
+    organizationId,
+    createdById: OTHER_MEMBER,
+    widgets: [{ id: "widget-org", name: "Spend by team" }],
+  });
+
+  /** @scenario "An Organization board is read from another project of its organization" */
+  it("reads the board's own widgets for a board of the run's organization", async () => {
+    installed.world.boards.set(SHARED.id, owned(ORGANIZATION));
+
+    await run({ board: SHARED });
+
+    expect(installed.langy.starts[0]?.text).toContain('- "widget-org": "Spend by team"');
+    expect(await lastRunOf({ board: SHARED })).toMatchObject({ outcome: "nothing" });
+  });
+
+  /** @scenario "An Organization board is read from another project of its organization" */
+  it("skips a board of another organization as a board that is not there", async () => {
+    installed.world.boards.set(SHARED.id, owned("organization-2"));
+
+    await run({ board: SHARED });
+
+    expect(await lastRunOf({ board: SHARED })).toMatchObject({
+      outcome: "skipped",
+      reason: "board_deleted",
+    });
+    expect(installed.langy.starts).toEqual([]);
+  });
+
+  it("skips another project's board that is not shared with the organization", async () => {
+    installed.world.boards.set(SHARED.id, { ...owned(ORGANIZATION), scope: "PROJECT" });
+
+    await run({ board: SHARED });
+
+    expect(await lastRunOf({ board: SHARED })).toMatchObject({
+      outcome: "skipped",
+      reason: "board_deleted",
+    });
   });
 });
 
@@ -416,6 +601,23 @@ describe("given Langy's answer, which is untrusted", () => {
     expect(await lastRunOf()).toMatchObject({
       outcome: "failed",
       reason: "bad_output",
+      filedCount: 0,
+    });
+  });
+
+  /** @scenario "An answer with a web address files nothing" */
+  it("files nothing when a finding holds a link, and records finding_has_url", async () => {
+    installed.world.langy.answer = answerWith([
+      finding(),
+      finding({ title: "Read this", body: "The full report is at https://evil.example/r?d=41" }),
+    ]);
+
+    await run();
+
+    expect(await insightsOf()).toEqual([]);
+    expect(await lastRunOf()).toMatchObject({
+      outcome: "failed",
+      reason: "finding_has_url",
       filedCount: 0,
     });
   });
@@ -482,6 +684,60 @@ describe("given Langy's answer, which is untrusted", () => {
     expect(installed.langy.starts[0]?.text).toContain(
       `Window: ${window.start} to ${window.end} in epoch milliseconds`,
     );
+  });
+});
+
+describe("given a finding's query, which a reader replays later", () => {
+  const iso = (epochMs: number) => Temporal.Instant.fromEpochMilliseconds(epochMs).toString();
+
+  /** @scenario "A query that does not validate is dropped and its finding is kept" */
+  it("files a finding without the query the analytics module refuses, and keeps the one it admits", async () => {
+    installed.world.lwql.refused.add("from api_keys | select secret");
+    installed.world.langy.answer = answerWith([
+      finding({ title: "refused query", lwql: "from api_keys | select secret" }),
+      finding({ title: "admitted query", lwql: "from traces | sum(cost)" }),
+    ]);
+
+    const { payload } = await run();
+
+    const { window } = dailyRunWindows({ slot: payload.slot, timezone: "UTC" });
+    const timeWindow = { start: iso(window.start), end: iso(window.end) };
+    const byTitle = new Map((await insightsOf()).map((entry) => [entry.title, entry]));
+    expect(byTitle.get("refused query")).toMatchObject({
+      body: "Cost on checkout rose from 41 to 96 dollars against the day before.",
+      lwql: null,
+      replay: null,
+    });
+    expect(byTitle.get("admitted query")).toMatchObject({
+      lwql: "from traces | sum(cost)",
+      replay: { ...window, granularitySeconds: 3_600 },
+    });
+    expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 2 });
+    expect(installed.lwql.protectionAsks).toEqual([{ userId: MEMBER, projectId: PROJECT }]);
+    expect(installed.lwql.validations).toEqual([
+      { sql: "from api_keys | select secret", protections: PROTECTIONS, timeWindow },
+      { sql: "from traces | sum(cost)", protections: PROTECTIONS, timeWindow },
+    ]);
+  });
+
+  it("keeps no query when the analytics module will not say what the person may see", async () => {
+    installed.world.lwql.protectionsError = refusal("project_not_found");
+    installed.world.langy.answer = answerWith([finding({ lwql: "from traces | sum(cost)" })]);
+
+    await run();
+
+    expect(await insightsOf()).toEqual([expect.objectContaining({ lwql: null, replay: null })]);
+    expect(installed.lwql.validations).toEqual([]);
+  });
+
+  it("asks the analytics module nothing for an answer that carries no query", async () => {
+    installed.world.langy.answer = TWO_FINDINGS;
+
+    await run();
+
+    expect(await insightsOf()).toHaveLength(2);
+    expect(installed.lwql.protectionAsks).toEqual([]);
+    expect(installed.lwql.validations).toEqual([]);
   });
 });
 
@@ -667,6 +923,24 @@ describe("given delivery at least once", () => {
     await installed.app.requestDailyRun({ projectId: PROJECT, userId: MEMBER, board: BOARD });
 
     expect(await installed.intentsOf()).toHaveLength(1);
+  });
+
+  /** @scenario "A request is answered with its own id, which names no run" */
+  it("answers a request made while a run is in flight with an id no run carries", async () => {
+    const inFlight = await request();
+
+    const answer = await installed.app.requestDailyRun({
+      projectId: PROJECT,
+      userId: MEMBER,
+      board: BOARD,
+    });
+
+    const runIds = (await installed.intentsOf()).map(
+      ({ payload }) => (payload as { runId: string }).runId,
+    );
+    expect(answer).toEqual({ requestId: expect.any(String) });
+    expect(runIds).toEqual([inFlight.runId]);
+    expect(runIds).not.toContain(answer.requestId);
   });
 });
 

@@ -529,6 +529,25 @@ describe("LangyConversationService", () => {
       expect(result[0]).not.toHaveProperty("status");
     });
 
+    /** @scenario "A fork of a run conversation is a run conversation" */
+    it.each([
+      ["a run conversation", "run", { origin: "run" }],
+      ["a chat conversation", "interactive", {}],
+    ])("forks %s into a conversation whose origin is %s", async (_what, origin, named) => {
+      const commands = makeCommands();
+      const repo = makeRepo({
+        getVisibleById: vi.fn().mockResolvedValue(row({ id: "source-1", title: "Costs", origin })),
+      });
+      const svc = LangyConversationService.create({ commands, repository: repo });
+
+      const fork = await svc.forkById({ id: "source-1", projectId: "p1", userId: "alice" });
+
+      expect(fork.conversation.origin).toBe(origin);
+      const sent = vi.mocked(commands.forkConversation).mock.calls[0]![0];
+      expect(sent).toMatchObject({ sourceConversationId: "source-1", userId: "alice", ...named });
+      expect("origin" in sent).toBe(origin === "run");
+    });
+
     /** @scenario "A run conversation shows in the person's history as a run" */
     it("lists a run conversation as a run beside the person's own chats", async () => {
       const repo = makeRepo({
