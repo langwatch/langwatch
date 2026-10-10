@@ -470,3 +470,24 @@ func TestObjectsTravelWithTheirKeys(t *testing.T) {
 		t.Fatalf("planted key: want a refusal naming the object key, never the value; got %v", err)
 	}
 }
+
+func TestRedisFingerprintIgnoresShortTTLKeys(t *testing.T) {
+	durable := RedisKey{Key: "bull:a", Type: "hash", PTTL: -1, Dump: []byte{1}}
+	fingerprint := func(keys ...RedisKey) TableFingerprint {
+		got, err := redisFingerprint(&fakeRedis{keys: keys})(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got["keys"]
+	}
+	base := fingerprint(durable, RedisKey{Key: "fold:x", PTTL: 5000, Dump: []byte{2}})
+	if got := fingerprint(durable, RedisKey{Key: "fold:y", PTTL: 900, Dump: []byte{3}}); got != base {
+		t.Fatalf("short-TTL difference changed the fingerprint: %v vs %v", got, base)
+	}
+	if got := fingerprint(RedisKey{Key: "bull:a", Type: "hash", PTTL: -1, Dump: []byte{9}}); got == base {
+		t.Fatal("durable key difference was not caught")
+	}
+	if _, volatile := splitRedisKeys([]RedisKey{{Key: "fold:x", PTTL: 5000}}); volatile["fold"] != 1 {
+		t.Fatalf("volatile by prefix = %v", volatile)
+	}
+}

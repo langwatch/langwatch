@@ -162,12 +162,32 @@ func redisFingerprint(store Redis) func(context.Context) (map[string]TableFinger
 		if err != nil {
 			return nil, err
 		}
-		rows := make([][]string, 0, len(keys))
-		for _, key := range keys {
+		durable, _ := splitRedisKeys(keys)
+		rows := make([][]string, 0, len(durable))
+		for _, key := range durable {
 			rows = append(rows, []string{key.Key, key.Type, base64.StdEncoding.EncodeToString(key.Dump)})
 		}
 		return map[string]TableFingerprint{"keys": FoldRows(rows)}, nil
 	}
+}
+
+// redisVolatileMargin: keys expiring sooner can vanish between restore and fingerprint.
+const redisVolatileMargin = 10 * 60 * 1000
+
+// splitRedisKeys separates keys that cannot expire inside the comparison window from the
+// rest; volatile counts by key prefix, never hashed.
+func splitRedisKeys(keys []RedisKey) ([]RedisKey, map[string]int) {
+	var durable []RedisKey
+	volatile := map[string]int{}
+	for _, key := range keys {
+		if key.PTTL >= 0 && key.PTTL <= redisVolatileMargin {
+			prefix, _, _ := strings.Cut(key.Key, ":")
+			volatile[prefix]++
+			continue
+		}
+		durable = append(durable, key)
+	}
+	return durable, volatile
 }
 
 // CaptureInput is a capture's directory, sources, producer-given manifest fields and scrub.
