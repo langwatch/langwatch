@@ -178,6 +178,12 @@ Feature: Gateway budget targeting
     # moves only when they say so.
 
   @unit
+  Scenario: A MANUAL budget reads as resetting on request, never at a far-future date
+    Given a budget on the MANUAL window
+    When the budgets list, the budget detail or a key's budget bar shows when it resets
+    Then it reads "on request" and names no date
+
+  @unit
   Scenario: The period floor follows the stored boundary, not the calendar
     Given a MANUAL budget and a calendar budget reset mid-period
     When each budget's spend-read floor is computed

@@ -429,9 +429,9 @@ function BudgetTableRow({
         </Badge>
       </Table.Cell>
       <Table.Cell>
-        {b.window === "TOTAL" ? (
+        {b.window === "TOTAL" || b.window === "MANUAL" ? (
           <Text fontSize="xs" color="fg.muted">
-            never
+            {b.window === "TOTAL" ? "never" : "on request"}
           </Text>
         ) : (
           <Tooltip content={readableDate(b.resetsAt).toLocaleString()}>

@@ -205,6 +205,7 @@ export * from "./process-manager/index.ts";
 export * from "./process-manager/failureDiagnostic.ts";
 export * from "./process-manager/metrics.ts";
 export * from "./process-manager/processRuntime.ts";
+export { HANDOFF_PROCESS_NAME } from "./services/handoff/failedHandoff.ts";
 export * from "./projections/abstractFoldProjection.ts";
 export * from "./projections/foldProjectionExecutor.ts";
 export * from "./projections/foldCache/foldCacheEntry.ts";

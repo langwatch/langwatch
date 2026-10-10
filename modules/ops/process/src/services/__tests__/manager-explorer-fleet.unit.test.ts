@@ -1,5 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { InMemoryProcessStore, type ProcessStore } from "@langwatch/eventing";
+import { HANDOFF_PROCESS_NAME, InMemoryProcessStore, type ProcessStore } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -119,6 +119,16 @@ describe("ManagerExplorerService fleet summary", () => {
       const retired = rows.find((r) => r.processName === "retired.process");
       expect(retired?.pipelineName).toBe("(not registered)");
       expect(retired?.deadMessages).toBe(2);
+    });
+  });
+
+  describe("given dead messages under the eventing hand-off outbox", () => {
+    /** @scenario "The eventing hand-off outbox is named, not shown as unregistered" */
+    it("names the row as the hand-off outbox", async () => {
+      const service = serviceWithCounts([counts(HANDOFF_PROCESS_NAME, { deadMessages: 7 })]);
+      const rows = await service.getFleetSummary();
+      const handoff = rows.find((r) => r.processName === HANDOFF_PROCESS_NAME);
+      expect(handoff?.pipelineName).toBe("(eventing hand-off outbox)");
     });
   });
 });
