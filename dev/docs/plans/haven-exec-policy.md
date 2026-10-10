@@ -178,7 +178,7 @@ The holders and waiters come from the registry `slot explain` already reads;
 the claim gains `class`, `units` and `worktree`. A non-empty
 `~/.cache/langwatch/tsc-slots` shows as `warn`: a run outside the one counter.
 
-## 8. Decisions needed (Alex)
+## 8. Decisions (ruled by Alex, 2026-10-11: D1-D5 as recommended)
 
 | #   | Decision                                                                                 | Recommendation                     | Why                                                                                                         |
 | --- | ---------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
