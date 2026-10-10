@@ -21,6 +21,10 @@ import type { OrganizationTestArrivals } from "./organization-membership.service
 /** The KSUID resource an organization's first team is born under. */
 const TEAM_KSUID_RESOURCE = "team";
 
+/** The hidden system organization's name and its fixed slug, which settles a creation race. */
+const SYSTEM_ORGANIZATION_NAME = "LangWatch system";
+const SYSTEM_ORGANIZATION_SLUG = "langwatch-system";
+
 /** Where every new organization is recorded as `lw.organization.created`; prompt seeds on it. */
 export type OrganizationCreationNotice = Pick<
   OrganizationLifecycleNoticeService,
@@ -160,6 +164,23 @@ export class OrganizationProvisioningService {
     }
 
     return result;
+  }
+
+  /**
+   * The install's one hidden system organization, where the Ops checkup canaries run. Records no
+   * creation notice: nothing nurturing, analytics or onboarding acts on (checkup-canary-project).
+   */
+  ensureSystemOrganization(): Promise<{ id: string }> {
+    const orgId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
+    const teamId = generate(TEAM_KSUID_RESOURCE).toString();
+
+    return this.repo.createSystemOrFind({
+      orgId,
+      orgName: SYSTEM_ORGANIZATION_NAME,
+      orgSlug: SYSTEM_ORGANIZATION_SLUG,
+      teamId,
+      teamSlug: `${SYSTEM_ORGANIZATION_SLUG}-${teamId.substring(teamId.length - 6)}`,
+    });
   }
 
   /**

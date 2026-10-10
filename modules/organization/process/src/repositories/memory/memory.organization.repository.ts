@@ -19,6 +19,7 @@ import {
   type PricingModel,
   type SignInSecurityPolicy,
   type OrganizationCurrency,
+  ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
@@ -57,7 +58,9 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   }
 
   async listAllIds({ after, limit }: OrganizationIdPageInput = {}): Promise<OrganizationIdPage> {
-    const ids = [...this.memory.organizations.keys()]
+    const ids = [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM)
+      .map((row) => row.id)
       .filter((id) => after === undefined || id > after)
       .toSorted();
     if (limit === undefined || ids.length <= limit) return { ids, next: null };

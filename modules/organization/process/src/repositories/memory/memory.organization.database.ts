@@ -5,6 +5,7 @@ import type {
   OrganizationJsonValue,
   OrganizationCurrency,
   OrganizationIntent,
+  OrganizationKind,
   OrganizationUserRole,
   PersonalFeatures,
   PricingModel,
@@ -14,6 +15,8 @@ import type { Instant } from "@langwatch/time";
 
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
+  /** Absent reads as a customer's organization. */
+  kind?: OrganizationKind;
   /** The email domain the organization claims for SSO auto-join (ADR-116). */
   ssoDomain?: string | null;
   ssoProvider?: string | null;

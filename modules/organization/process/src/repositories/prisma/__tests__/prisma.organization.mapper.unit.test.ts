@@ -44,6 +44,7 @@ describe("organizationFromRecord", () => {
     const organization = organizationFromRecord({
       id: "organization_1",
       name: "Acme",
+      kind: "customer",
       phoneNumber: null,
       slug: "acme",
       createdAt: at,

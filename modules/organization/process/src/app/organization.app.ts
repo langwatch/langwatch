@@ -772,6 +772,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.membership.listProvisioningSummaries();
   }
 
+  ensureSystemOrganization(): Promise<{ id: string }> {
+    return this.#dependencies.membership.ensureSystemOrganization();
+  }
+
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null> {
     return this.#dependencies.membership.findProvisioningSummary(organizationId);
   }

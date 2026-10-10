@@ -22,6 +22,7 @@ import {
   type PricingModel,
   type SignInSecurityPolicy,
   type OrganizationCurrency,
+  ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
@@ -76,7 +77,10 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     const rows = await this.database.organization.findMany({
       select: { id: true },
       orderBy: { id: "asc" },
-      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      where: {
+        kind: { not: ORGANIZATION_KIND.SYSTEM },
+        ...(after === undefined ? {} : { id: { gt: after } }),
+      },
       ...(limit === undefined ? {} : { take: limit + 1 }),
     });
     const ids = rows.map((row) => row.id);

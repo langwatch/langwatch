@@ -1116,6 +1116,10 @@ model Team {
 model Organization {
   id                         String               @id @default(nanoid())
   name                       String
+  /// `customer` for every organization a person founds or an operator provisions; `system` for
+  /// the install's one hidden organization the Ops checkup canaries run in, never listed to a person.
+  /// Spec: modules/ops/specs/checkup-canary-project.feature.
+  kind                       String               @default("customer")
   phoneNumber                String?
   slug                       String               @unique
   members                    OrganizationUser[]

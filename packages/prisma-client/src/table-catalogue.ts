@@ -567,6 +567,7 @@ export const prismaModelFieldCatalogue = {
   "Organization": [
     "id",
     "name",
+    "kind",
     "phoneNumber",
     "slug",
     "members",

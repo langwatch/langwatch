@@ -23,6 +23,7 @@ import {
   MemberNotFoundError,
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
+  ORGANIZATION_KIND,
   auditImpersonationMetadataSchema,
 } from "@langwatch/organization-contract";
 import type {
@@ -1140,8 +1141,41 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
   }
 
+  async createSystemOrFind(
+    input: Omit<CreateForProvisioningInput, "pricingModel">,
+  ): Promise<{ id: string }> {
+    const where = { kind: ORGANIZATION_KIND.SYSTEM };
+    const existing = await this.prisma.organization.findFirst({ where, select: { id: true } });
+    if (existing) return existing;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: { id: input.orgId, name: input.orgName, slug: input.orgSlug, ...where },
+          select: { id: true },
+        });
+        await tx.team.create({
+          data: {
+            id: input.teamId,
+            name: input.orgName,
+            slug: input.teamSlug,
+            organizationId: organization.id,
+          },
+        });
+        return organization;
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+        throw error;
+      }
+      const winner = await this.prisma.organization.findFirst({ where, select: { id: true } });
+      if (!winner) throw error;
+      return winner;
+    }
+  }
+
   async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     const organizations = await this.prisma.organization.findMany({
+      where: { kind: { not: ORGANIZATION_KIND.SYSTEM } },
       select: { id: true, name: true, slug: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });
