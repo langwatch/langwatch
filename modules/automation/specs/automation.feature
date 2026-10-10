@@ -398,3 +398,14 @@ Feature: Automation ownership
     When the author test-fires it
     Then the test fire is refused as test_fire_unavailable with the reason, not an internal error
 
+  @unit
+  Scenario: A webhook graph alert reads back with its delivery and its rule
+    Given a graph alert that delivers by webhook, its rule stored beside the delivery
+    When the automation is read or its alert is dispatched
+    Then the delivery and the alert rule are both returned, with the secrets redacted
+
+  @unit
+  Scenario: A graph alert queries its series without the chart's display fields
+    Given a graph alert on a saved chart whose series carries its display name and colour set
+    When the alert is evaluated
+    Then analytics is asked with only the series' query fields, and the evaluation runs
