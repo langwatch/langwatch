@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"maps"
 	"os"
 	"path/filepath"
@@ -220,12 +221,22 @@ func (store *fakeClickHouse) Facts(context.Context) (ClickHouseFacts, error) {
 
 type fakeRedis struct{ keys []RedisKey }
 
-func (store *fakeRedis) Keys(context.Context) ([]RedisKey, error) {
-	return slices.Clone(store.keys), nil
+func (store *fakeRedis) Scan(_ context.Context, visit func(RedisKey) error) error {
+	for _, key := range store.keys {
+		if err := visit(key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (store *fakeRedis) Size(context.Context) (int, error) { return len(store.keys), nil }
-func (store *fakeRedis) Restore(_ context.Context, keys []RedisKey) error {
-	store.keys = append(store.keys, keys...)
+func (store *fakeRedis) Restore(_ context.Context, keys iter.Seq2[RedisKey, error]) error {
+	for key, err := range keys {
+		if err != nil {
+			return err
+		}
+		store.keys = append(store.keys, key)
+	}
 	return nil
 }
 
@@ -406,7 +417,8 @@ func TestManifestMissingFieldIsRefused(t *testing.T) {
 	required, _ := requiredFields()
 	fields := reflect.TypeFor[Manifest]()
 	for index := range fields.NumField() {
-		if tag := strings.Split(fields.Field(index).Tag.Get("json"), ",")[0]; !slices.Contains(required, tag) {
+		parts := strings.Split(fields.Field(index).Tag.Get("json"), ",")
+		if tag := parts[0]; !slices.Contains(required, tag) && !slices.Contains(parts, "omitempty") {
 			t.Errorf("snapshot.schema.json does not require %q", tag)
 		}
 	}
@@ -487,7 +499,7 @@ func TestRedisFingerprintIgnoresShortTTLKeys(t *testing.T) {
 	if got := fingerprint(RedisKey{Key: "bull:a", Type: "hash", PTTL: -1, Dump: []byte{9}}); got == base {
 		t.Fatal("durable key difference was not caught")
 	}
-	if _, volatile := splitRedisKeys([]RedisKey{{Key: "fold:x", PTTL: 5000}}); volatile["fold"] != 1 {
-		t.Fatalf("volatile by prefix = %v", volatile)
+	if !isVolatileRedisKey(RedisKey{Key: "fold:x", PTTL: 5000}) || isVolatileRedisKey(durable) {
+		t.Fatal("volatile split is wrong")
 	}
 }

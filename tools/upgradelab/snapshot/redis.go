@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"net"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -24,8 +24,8 @@ type RedisKey struct {
 
 // Redis is the stack's database index only.
 type Redis interface {
-	Keys(ctx context.Context) ([]RedisKey, error)
-	Restore(ctx context.Context, keys []RedisKey) error
+	Scan(ctx context.Context, visit func(RedisKey) error) error
+	Restore(ctx context.Context, keys iter.Seq2[RedisKey, error]) error
 	Size(ctx context.Context) (int, error)
 }
 
@@ -162,41 +162,34 @@ func (client *respConn) readArray(header string) (any, error) {
 	return items, nil
 }
 
-// Keys reads every key of the index, sorted by name; a key gone since the SCAN is skipped.
-func (redis *RedisRESP) Keys(ctx context.Context) ([]RedisKey, error) {
-	var keys []RedisKey
-	err := redis.session(ctx, func(client *respConn) error {
-		names, err := client.scanNames()
-		if err != nil {
-			return err
-		}
-		for _, name := range names {
-			key, found, err := client.describeKey(name)
+// Scan calls visit for each key of the index in SCAN order, one page of names at a time, so
+// memory stays bounded by one key. A key gone since the SCAN is skipped; ctx is honored per key.
+func (redis *RedisRESP) Scan(ctx context.Context, visit func(RedisKey) error) error {
+	return redis.session(ctx, func(client *respConn) error {
+		for cursor := "0"; ; {
+			page, err := client.scanPage(cursor)
 			if err != nil {
 				return err
 			}
-			if found {
-				keys = append(keys, key)
+			for _, name := range page.names {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				key, found, err := client.describeKey(name)
+				if err != nil {
+					return err
+				}
+				if found {
+					if err := visit(key); err != nil {
+						return err
+					}
+				}
+			}
+			if cursor = page.cursor; cursor == "0" {
+				return nil
 			}
 		}
-		return nil
 	})
-	return keys, err
-}
-
-func (client *respConn) scanNames() ([]string, error) {
-	var names []string
-	for cursor := "0"; ; {
-		page, err := client.scanPage(cursor)
-		if err != nil {
-			return nil, err
-		}
-		cursor, names = page.cursor, append(names, page.names...)
-		if cursor == "0" {
-			slices.Sort(names)
-			return names, nil
-		}
-	}
 }
 
 type scanPage struct {
@@ -247,10 +240,16 @@ func (client *respConn) describeKey(name string) (RedisKey, bool, error) {
 	return RedisKey{Key: name, Type: fmt.Sprint(kind), PTTL: millis, Dump: dump}, found, nil
 }
 
-// Restore writes each key with RESTORE and its remaining TTL (0 keeps it forever).
-func (redis *RedisRESP) Restore(ctx context.Context, keys []RedisKey) error {
+// Restore writes each key with RESTORE and its remaining TTL (0 keeps it forever), one at a time.
+func (redis *RedisRESP) Restore(ctx context.Context, keys iter.Seq2[RedisKey, error]) error {
 	return redis.session(ctx, func(client *respConn) error {
-		for _, key := range keys {
+		for key, err := range keys {
+			if err != nil {
+				return err
+			}
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			ttl := max(key.PTTL, 0)
 			if _, err := client.do("RESTORE", key.Key, strconv.FormatInt(ttl, 10), string(key.Dump)); err != nil {
 				return fmt.Errorf("restore %s: %w", key.Key, err)
