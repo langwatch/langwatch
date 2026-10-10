@@ -41,3 +41,10 @@ Feature: HTTP agent credentials on read and write
     When it is updated to another scheme, host or port with a credential left blank
     Then the update is refused as a handled error and the agent is unchanged
     And the same update with every credential entered again is accepted
+
+  @unit
+  Scenario: A refused HTTP agent test reads in words, never the code
+    Given an HTTP agent test the engine refused with a code the registry knows, such as ssrf_blocked
+    When the test panel shows the failure
+    Then its title is the registry's words, as on main's test panel, with the engine's message beneath
+    And a failure with no known code keeps the title "The test request failed"
