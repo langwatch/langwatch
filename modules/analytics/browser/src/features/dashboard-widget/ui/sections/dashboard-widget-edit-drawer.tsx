@@ -1,7 +1,7 @@
 /**
  * The widget editor: a wide drawer with a live chart preview, Code and
- * Queries tabs, holding no draft state — every value and handler comes
- * from the card that opened it, so both read/write the exact same state.
+ * Queries tabs (plus any a caller adds), holding no draft state — every value
+ * and handler comes from the card that opened it, so both read/write the same state.
  */
 
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
@@ -20,7 +20,17 @@ import {
 import { declaredParamsAreValid } from "./dashboard-widget-query-params-editor.tsx";
 import { EditableWidgetName } from "./editable-widget-name.tsx";
 
-interface DashboardWidgetEditDrawerProps {
+/** The two tabs every widget editor has. */
+type WidgetEditTab = "code" | "queries";
+
+/** A tab a caller adds after Code and Queries, with its own panel. */
+export interface WidgetEditExtraTab<Tab extends string> {
+  value: Tab;
+  label: string;
+  content: ReactNode;
+}
+
+interface DashboardWidgetEditDrawerProps<Tab extends string> {
   open: boolean;
   /** The project the queries' SQL editor reads its schema for. */
   projectId: string;
@@ -40,11 +50,19 @@ interface DashboardWidgetEditDrawerProps {
   isSaving: boolean;
   onClose: () => void;
   onSave: () => void;
-  activeTab: "code" | "queries";
-  onTabChange: (tab: "code" | "queries") => void;
+  activeTab: WidgetEditTab | NoInfer<Tab>;
+  onTabChange: (tab: WidgetEditTab | NoInfer<Tab>) => void;
+  /** Tabs after Code and Queries. */
+  extraTabs?: readonly WidgetEditExtraTab<Tab>[];
+  /** Shown between the preview and the tabs, such as an assistant's suggestions. */
+  assist?: ReactNode;
+  /** The side it opens from; "start" leaves a panel docked on the right in view. */
+  placement?: "start" | "end";
+  /** Room kept free at the far edge, so a panel docked there sits beside the drawer. */
+  reserveEndPx?: number;
 }
 
-export function DashboardWidgetEditDrawer({
+export function DashboardWidgetEditDrawer<Tab extends string = WidgetEditTab>({
   open,
   projectId,
   chart,
@@ -63,7 +81,11 @@ export function DashboardWidgetEditDrawer({
   onSave,
   activeTab,
   onTabChange,
-}: DashboardWidgetEditDrawerProps) {
+  extraTabs = [],
+  assist,
+  placement = "end",
+  reserveEndPx,
+}: DashboardWidgetEditDrawerProps<Tab>) {
   const canSave = isDirty && queryNamesAreValid(queries) && declaredParamsAreValid(queries);
 
   return (
@@ -73,8 +95,13 @@ export function DashboardWidgetEditDrawer({
         if (!e.open) onClose();
       }}
       size="xl"
+      placement={placement}
     >
-      <Drawer.Content display="flex" flexDirection="column">
+      <Drawer.Content
+        display="flex"
+        flexDirection="column"
+        {...(reserveEndPx === void 0 ? {} : { maxWidth: `calc(100vw - ${reserveEndPx}px)` })}
+      >
         <Drawer.Header>
           <EditableWidgetName name={name} id={id} onRename={onNameChange} fontSize="md" />
         </Drawer.Header>
@@ -85,8 +112,14 @@ export function DashboardWidgetEditDrawer({
               {chart}
             </Box>
           )}
+          {assist && (
+            <Box flexShrink={0} marginBottom={3}>
+              {assist}
+            </Box>
+          )}
           <WidgetEditTabs
             projectId={projectId}
+            extraTabs={extraTabs}
             activeTab={activeTab}
             onTabChange={onTabChange}
             code={code}
@@ -121,9 +154,10 @@ export function DashboardWidgetEditDrawer({
   );
 }
 
-/** The Code / Queries tab switcher and its two full-height panels. */
-function WidgetEditTabs({
+/** The Code / Queries tab switcher, any added tabs, and their full-height panels. */
+function WidgetEditTabs<Tab extends string>({
   projectId,
+  extraTabs,
   activeTab,
   onTabChange,
   code,
@@ -134,8 +168,9 @@ function WidgetEditTabs({
   onRun,
 }: {
   projectId: string;
-  activeTab: "code" | "queries";
-  onTabChange: (tab: "code" | "queries") => void;
+  extraTabs: readonly WidgetEditExtraTab<Tab>[];
+  activeTab: WidgetEditTab | Tab;
+  onTabChange: (tab: WidgetEditTab | Tab) => void;
   code: string;
   onCodeChange: (code: string) => void;
   queries: DashboardWidgetQuery[];
@@ -154,7 +189,7 @@ function WidgetEditTabs({
   return (
     <Tabs.Root
       value={activeTab}
-      onValueChange={(e) => onTabChange(e.value as "code" | "queries")}
+      onValueChange={(e) => onTabChange(e.value as WidgetEditTab | Tab)}
       colorPalette="orange"
       size="sm"
       display="flex"
@@ -174,6 +209,11 @@ function WidgetEditTabs({
         <Tabs.Trigger value="queries" data-testid="analytics-widget-tab-queries">
           Queries ({queries.length})
         </Tabs.Trigger>
+        {extraTabs.map(({ value, label }) => (
+          <Tabs.Trigger key={value} value={value}>
+            {label}
+          </Tabs.Trigger>
+        ))}
         <Spacer />
         {activeTab === "queries" && (
           <AddQueryButton queries={queries} onQueriesChange={onQueriesChange} />
@@ -220,6 +260,19 @@ function WidgetEditTabs({
           onRun={onRun}
         />
       </Tabs.Content>
+
+      {extraTabs.map(({ value, content }) => (
+        <Tabs.Content
+          key={value}
+          value={value}
+          flex={1}
+          minHeight={0}
+          overflowY="auto"
+          paddingTop={3}
+        >
+          {content}
+        </Tabs.Content>
+      ))}
     </Tabs.Root>
   );
 }

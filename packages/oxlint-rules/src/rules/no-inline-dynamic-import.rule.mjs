@@ -14,6 +14,12 @@ const MCP_SERVER_STARTUP = /^mcp\/typescript\/src\//;
 // modules/data-privacy/process/src/channels/http/__tests__/http.google-dlp.channel.unit.test.ts.
 const GOOGLE_DLP_CHANNEL =
   /^modules\/data-privacy\/process\/src\/channels\/http\/http\.google-dlp\.channel\.ts$/;
+// The ~600 kB Shiki engine loads on the first highlight, never with a page that could show
+// code; pinned by apps/ui/vite/__tests__/shiki-reach-guard.unit.test.ts (ADR-027).
+const SHIKI_ADAPTER = /^packages\/design-system\/src\/shiki-adapter\.ts$/;
+// A chunk retry asks for the address the failure named, which no static import can say;
+// pinned by packages/browser-host/src/__tests__/chunk-load.unit.test.ts.
+const CHUNK_REFETCH = /^packages\/browser-host\/src\/chunk-refetch\.ts$/;
 const CLI_TSUP_CONFIG = /^sdks\/typescript\/tsup\.config\.ts$/;
 const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/browser\/src\/[^/]+\.ts$/;
 const UI_APPLICATION = /^apps\/ui\/src\//;
@@ -28,6 +34,8 @@ function isExempt(workspacePath) {
     CLI_STARTUP.test(workspacePath) ||
     MCP_SERVER_STARTUP.test(workspacePath) ||
     GOOGLE_DLP_CHANNEL.test(workspacePath) ||
+    SHIKI_ADAPTER.test(workspacePath) ||
+    CHUNK_REFETCH.test(workspacePath) ||
     CLI_TSUP_CONFIG.test(workspacePath) ||
     WEB_PACKAGE_ENTRY.test(workspacePath) ||
     UI_APPLICATION.test(workspacePath) ||
@@ -40,7 +48,8 @@ function isGoverned(file) {
   return !file.isTest && !GENERATED.test(file.workspacePath) && !isExempt(file.workspacePath);
 }
 
-const LAZY = /^lazy$/;
+// `lazyChunk` is `lazy` with the chunk retry (browser-host navigation).
+const LAZY = /^(lazy|lazyChunk)$/;
 
 function isLazyCallee(callee) {
   if (callee.type === "Identifier") return LAZY.test(callee.name);

@@ -17541,6 +17541,66 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyD
 	}
 }
 
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0KindCatalogue GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1KindLangy GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2KindCode GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3KindApi GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault.
 const (
 	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "customer"
@@ -17658,6 +17718,66 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesPara
 	}
 }
 
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0KindCatalogue PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1KindLangy PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2KindCode PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3KindApi PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersType.
 const (
 	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersTypeBoolean PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersType = "boolean"
@@ -17673,6 +17793,66 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersTypeNumber:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0KindCatalogue PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1KindLangy PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2KindCode PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3KindApi PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3KindApi:
 		return true
 	default:
 		return false
@@ -17916,6 +18096,66 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONRes
 	}
 }
 
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind.
+const (
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind enum.
+func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault.
 const (
 	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "customer"
@@ -18057,6 +18297,66 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody
 	}
 }
 
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0KindCatalogue PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1KindLangy PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2KindCode PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3KindApi PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3KindApi:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType.
 const (
 	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeBoolean PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType = "boolean"
@@ -18072,6 +18372,66 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONR
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeNumber:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0KindCatalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1KindLangy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind.
+const (
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind enum.
+func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3KindApi:
 		return true
 	default:
 		return false
@@ -18213,6 +18573,66 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersTypeNumber:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0Kind.
+const (
+	Catalogue PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0Kind = "catalogue"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0Kind) Valid() bool {
+	switch e {
+	case Catalogue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1Kind.
+const (
+	Langy PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1Kind = "langy"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1Kind) Valid() bool {
+	switch e {
+	case Langy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2Kind.
+const (
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2KindCode PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2Kind = "code"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2Kind) Valid() bool {
+	switch e {
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2KindCode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3Kind.
+const (
+	Api PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3Kind = "api"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3Kind enum.
+func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3Kind) Valid() bool {
+	switch e {
+	case Api:
 		return true
 	default:
 		return false
@@ -20865,6 +21285,60 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds2) Valid() bool {
 	}
 }
 
+// Defines values for PostApiV1QueryJSONBodyGranularitySeconds3.
+const (
+	N86400 PostApiV1QueryJSONBodyGranularitySeconds3 = 86400
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1QueryJSONBodyGranularitySeconds3 enum.
+func (e PostApiV1QueryJSONBodyGranularitySeconds3) Valid() bool {
+	switch e {
+	case N86400:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1QueryJSONBodyGranularitySeconds4.
+const (
+	N604800 PostApiV1QueryJSONBodyGranularitySeconds4 = 604800
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1QueryJSONBodyGranularitySeconds4 enum.
+func (e PostApiV1QueryJSONBodyGranularitySeconds4) Valid() bool {
+	switch e {
+	case N604800:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1Query200JSONResponseBodyCompletenessState.
+const (
+	Complete  PostApiV1Query200JSONResponseBodyCompletenessState = "complete"
+	Missing   PostApiV1Query200JSONResponseBodyCompletenessState = "missing"
+	NoTraffic PostApiV1Query200JSONResponseBodyCompletenessState = "no_traffic"
+	Partial   PostApiV1Query200JSONResponseBodyCompletenessState = "partial"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyCompletenessState enum.
+func (e PostApiV1Query200JSONResponseBodyCompletenessState) Valid() bool {
+	switch e {
+	case Complete:
+		return true
+	case Missing:
+		return true
+	case NoTraffic:
+		return true
+	case Partial:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
 	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
@@ -20970,6 +21444,30 @@ func (e PostApiV1Query403JSONResponseBodyFault) Valid() bool {
 	case PostApiV1Query403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1Query403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiV1Query404JSONResponseBodyFault.
+const (
+	PostApiV1Query404JSONResponseBodyFaultCustomer         PostApiV1Query404JSONResponseBodyFault = "customer"
+	PostApiV1Query404JSONResponseBodyFaultPlatform         PostApiV1Query404JSONResponseBodyFault = "platform"
+	PostApiV1Query404JSONResponseBodyFaultPresumedPlatform PostApiV1Query404JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query404JSONResponseBodyFaultProvider         PostApiV1Query404JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiV1Query404JSONResponseBodyFault enum.
+func (e PostApiV1Query404JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiV1Query404JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiV1Query404JSONResponseBodyFaultProvider:
 		return true
 	default:
 		return false
@@ -23486,22 +23984,22 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	Customer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	Platform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	PresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	Provider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
 func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
+	case Customer:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
+	case Platform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
+	case PresumedPlatform:
 		return true
-	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
+	case Provider:
 		return true
 	default:
 		return false
@@ -37895,10 +38393,11 @@ type PostApiAnalyticsJSONBody struct {
 		} `json:"pipeline,omitempty"`
 		Subkey *string `json:"subkey,omitempty"`
 	} `json:"series"`
-	StartDate PostApiAnalyticsJSONBody_StartDate  `json:"startDate"`
-	TimeScale *PostApiAnalyticsJSONBody_TimeScale `json:"timeScale,omitempty"`
-	TimeZone  string                              `json:"timeZone"`
-	TraceIds  *[]string                           `json:"traceIds,omitempty"`
+	ShouldSkipPreviousPeriod *bool                               `json:"shouldSkipPreviousPeriod,omitempty"`
+	StartDate                PostApiAnalyticsJSONBody_StartDate  `json:"startDate"`
+	TimeScale                *PostApiAnalyticsJSONBody_TimeScale `json:"timeScale,omitempty"`
+	TimeZone                 string                              `json:"timeZone"`
+	TraceIds                 *[]string                           `json:"traceIds,omitempty"`
 }
 
 // PostApiAnalyticsJSONBodyEndDate0 defines parameters for PostApiAnalytics.
@@ -38842,10 +39341,11 @@ type PostApiAnalyticsTimeseriesJSONBody struct {
 		} `json:"pipeline,omitempty"`
 		Subkey *string `json:"subkey,omitempty"`
 	} `json:"series"`
-	StartDate PostApiAnalyticsTimeseriesJSONBody_StartDate  `json:"startDate"`
-	TimeScale *PostApiAnalyticsTimeseriesJSONBody_TimeScale `json:"timeScale,omitempty"`
-	TimeZone  string                                        `json:"timeZone"`
-	TraceIds  *[]string                                     `json:"traceIds,omitempty"`
+	ShouldSkipPreviousPeriod *bool                                         `json:"shouldSkipPreviousPeriod,omitempty"`
+	StartDate                PostApiAnalyticsTimeseriesJSONBody_StartDate  `json:"startDate"`
+	TimeScale                *PostApiAnalyticsTimeseriesJSONBody_TimeScale `json:"timeScale,omitempty"`
+	TimeZone                 string                                        `json:"timeZone"`
+	TraceIds                 *[]string                                     `json:"traceIds,omitempty"`
 }
 
 // PostApiAnalyticsTimeseriesJSONBodyEndDate0 defines parameters for PostApiAnalyticsTimeseries.
@@ -42776,6 +43276,44 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Dat
 // GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesParametersType defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionQueriesParametersType string
 
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0 struct {
+	CatalogueId string                                                                                           `json:"catalogueId"`
+	Kind        GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1 struct {
+	Kind GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2 struct {
+	Kind GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3 struct {
+	Kind GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source struct {
+	union json.RawMessage
+}
+
 // GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault string
 
@@ -42790,9 +43328,11 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaul
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody struct {
-	Code    string `json:"code"`
-	Name    string `json:"name"`
-	Queries []struct {
+	Code        string  `json:"code"`
+	Description *string `json:"description,omitempty"`
+	Name        string  `json:"name"`
+	Prompt      *string `json:"prompt,omitempty"`
+	Queries     []struct {
 		Name       string `json:"name"`
 		Parameters *[]struct {
 			Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
@@ -42801,6 +43341,7 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody struct {
 		} `json:"parameters,omitempty"`
 		Sql string `json:"sql"`
 	} `json:"queries"`
+	Source *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source `json:"source,omitempty"`
 }
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersDefault0 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
@@ -42820,6 +43361,44 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Param
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersType defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersType string
 
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0 struct {
+	CatalogueId string                                                                   `json:"catalogueId"`
+	Kind        PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source struct {
+	union json.RawMessage
+}
+
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersDefault0 = string
 
@@ -42836,6 +43415,44 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_De
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersType defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionQueriesParametersType string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0 struct {
+	CatalogueId string                                                                                        `json:"catalogueId"`
+	Kind        PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source struct {
+	union json.RawMessage
+}
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault string
@@ -42881,6 +43498,44 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONRespon
 // GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType string
 
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 struct {
+	CatalogueId string                                                                                                 `json:"catalogueId"`
+	Kind        GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 struct {
+	Kind GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 struct {
+	Kind GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 struct {
+	Kind GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind `json:"kind"`
+}
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind string
+
+// GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source struct {
+	union json.RawMessage
+}
+
 // GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault defines parameters for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault string
 
@@ -42898,9 +43553,10 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONRespon
 
 // PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody struct {
-	Code    *string `json:"code,omitempty"`
-	Name    *string `json:"name,omitempty"`
-	Queries *[]struct {
+	Code        *string `json:"code,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Queries     *[]struct {
 		Name       string `json:"name"`
 		Parameters *[]struct {
 			Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Queries_Parameters_Default `json:"default,omitempty"`
@@ -42909,6 +43565,7 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody st
 		} `json:"parameters,omitempty"`
 		Sql string `json:"sql"`
 	} `json:"queries,omitempty"`
+	Source *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source `json:"source,omitempty"`
 }
 
 // PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodyQueriesParametersDefault0 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
@@ -42928,6 +43585,44 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Qu
 // PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodyQueriesParametersType defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodyQueriesParametersType string
 
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0 struct {
+	CatalogueId string                                                                              `json:"catalogueId"`
+	Kind        PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1 struct {
+	Kind PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2 struct {
+	Kind PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3 struct {
+	Kind PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source struct {
+	union json.RawMessage
+}
+
 // PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 = string
 
@@ -42944,6 +43639,44 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResp
 
 // PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersType string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 struct {
+	CatalogueId string                                                                                                   `json:"catalogueId"`
+	Kind        PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 struct {
+	Kind PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 struct {
+	Kind PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 struct {
+	Kind PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind `json:"kind"`
+}
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3Kind string
+
+// PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
+type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source struct {
+	union json.RawMessage
+}
 
 // PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault defines parameters for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId.
 type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault string
@@ -42981,6 +43714,44 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersType defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionQueriesParametersType string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0 struct {
+	CatalogueId string                                                                                                           `json:"catalogueId"`
+	Kind        PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3 defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3 struct {
+	Kind PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3Kind `json:"kind"`
+}
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3Kind defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3Kind string
+
+// PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
+type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source struct {
+	union json.RawMessage
+}
 
 // PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard.
 type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault string
@@ -43459,8 +44230,11 @@ type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyScope string
 type PostApiV1QueryJSONBody struct {
 	GranularitySeconds *PostApiV1QueryJSONBody_GranularitySeconds                          `json:"granularitySeconds,omitempty"`
 	Parameters         *map[string]*PostApiV1QueryJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
-	Sql                string                                                              `json:"sql"`
-	TimeWindow         *struct {
+
+	// ProjectId Narrows the run to this one project, which the key must hold analytics:view on. Without it the run spans every project the key can read.
+	ProjectId  *string `json:"projectId,omitempty"`
+	Sql        string  `json:"sql"`
+	TimeWindow *struct {
 		End   PostApiV1QueryJSONBody_TimeWindow_End   `json:"end"`
 		Start PostApiV1QueryJSONBody_TimeWindow_Start `json:"start"`
 	} `json:"timeWindow,omitempty"`
@@ -43474,6 +44248,12 @@ type PostApiV1QueryJSONBodyGranularitySeconds1 float32
 
 // PostApiV1QueryJSONBodyGranularitySeconds2 defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBodyGranularitySeconds2 float32
+
+// PostApiV1QueryJSONBodyGranularitySeconds3 defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBodyGranularitySeconds3 float32
+
+// PostApiV1QueryJSONBodyGranularitySeconds4 defines parameters for PostApiV1Query.
+type PostApiV1QueryJSONBodyGranularitySeconds4 float32
 
 // PostApiV1QueryJSONBody_GranularitySeconds defines parameters for PostApiV1Query.
 type PostApiV1QueryJSONBody_GranularitySeconds struct {
@@ -43522,6 +44302,9 @@ type PostApiV1QueryJSONBody_TimeWindow_Start struct {
 	union json.RawMessage
 }
 
+// PostApiV1Query200JSONResponseBodyCompletenessState defines parameters for PostApiV1Query.
+type PostApiV1Query200JSONResponseBodyCompletenessState string
+
 // PostApiV1Query200JSONResponseBodyDiagnosticsCode defines parameters for PostApiV1Query.
 type PostApiV1Query200JSONResponseBodyDiagnosticsCode string
 
@@ -43533,6 +44316,9 @@ type PostApiV1Query401JSONResponseBodyFault string
 
 // PostApiV1Query403JSONResponseBodyFault defines parameters for PostApiV1Query.
 type PostApiV1Query403JSONResponseBodyFault string
+
+// PostApiV1Query404JSONResponseBodyFault defines parameters for PostApiV1Query.
+type PostApiV1Query404JSONResponseBodyFault string
 
 // PostApiV1Query422JSONResponseBodyFault defines parameters for PostApiV1Query.
 type PostApiV1Query422JSONResponseBodyFault string
@@ -88944,6 +89730,120 @@ func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody
 	return err
 }
 
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyDataDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersDefault0 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Parameters_Default as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersDefault0
 func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Parameters_Default) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersDefault0() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersDefault0, error) {
 	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodyQueriesParametersDefault0
@@ -89028,6 +89928,120 @@ func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Pa
 }
 
 func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsJSONBody_Source) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -89120,6 +90134,120 @@ func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBod
 	return err
 }
 
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
 func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0, error) {
 	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
@@ -89204,6 +90332,120 @@ func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONRes
 }
 
 func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 returns the union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3() (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3, error) {
+	var body GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 overwrites any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 performs a merge with any union data inside the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergeGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -89296,6 +90538,120 @@ func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBod
 	return err
 }
 
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBodySource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdJSONBody_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
 func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0, error) {
 	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionQueriesParametersDefault0
@@ -89380,6 +90736,120 @@ func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONR
 }
 
 func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 returns the union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as a PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) AsPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3() (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3, error) {
+	var body PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 overwrites any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source as the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) FromPatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3 performs a merge with any union data inside the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source, using the provided PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MergePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3(v PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -89472,6 +90942,120 @@ func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboar
 	return err
 }
 
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3 returns the union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as a PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) AsPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3() (PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3, error) {
+	var body PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3 overwrites any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source as the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) FromPostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3 performs a merge with any union data inside the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source, using the provided PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) MergePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3(v PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBodyDefinitionSource3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiV1QueryJSONBodyGranularitySeconds0 returns the union data inside the PostApiV1QueryJSONBody_GranularitySeconds as a PostApiV1QueryJSONBodyGranularitySeconds0
 func (t PostApiV1QueryJSONBody_GranularitySeconds) AsPostApiV1QueryJSONBodyGranularitySeconds0() (PostApiV1QueryJSONBodyGranularitySeconds0, error) {
 	var body PostApiV1QueryJSONBodyGranularitySeconds0
@@ -89540,6 +91124,58 @@ func (t *PostApiV1QueryJSONBody_GranularitySeconds) FromPostApiV1QueryJSONBodyGr
 
 // MergePostApiV1QueryJSONBodyGranularitySeconds2 performs a merge with any union data inside the PostApiV1QueryJSONBody_GranularitySeconds, using the provided PostApiV1QueryJSONBodyGranularitySeconds2
 func (t *PostApiV1QueryJSONBody_GranularitySeconds) MergePostApiV1QueryJSONBodyGranularitySeconds2(v PostApiV1QueryJSONBodyGranularitySeconds2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1QueryJSONBodyGranularitySeconds3 returns the union data inside the PostApiV1QueryJSONBody_GranularitySeconds as a PostApiV1QueryJSONBodyGranularitySeconds3
+func (t PostApiV1QueryJSONBody_GranularitySeconds) AsPostApiV1QueryJSONBodyGranularitySeconds3() (PostApiV1QueryJSONBodyGranularitySeconds3, error) {
+	var body PostApiV1QueryJSONBodyGranularitySeconds3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1QueryJSONBodyGranularitySeconds3 overwrites any union data inside the PostApiV1QueryJSONBody_GranularitySeconds as the provided PostApiV1QueryJSONBodyGranularitySeconds3
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) FromPostApiV1QueryJSONBodyGranularitySeconds3(v PostApiV1QueryJSONBodyGranularitySeconds3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1QueryJSONBodyGranularitySeconds3 performs a merge with any union data inside the PostApiV1QueryJSONBody_GranularitySeconds, using the provided PostApiV1QueryJSONBodyGranularitySeconds3
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) MergePostApiV1QueryJSONBodyGranularitySeconds3(v PostApiV1QueryJSONBodyGranularitySeconds3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiV1QueryJSONBodyGranularitySeconds4 returns the union data inside the PostApiV1QueryJSONBody_GranularitySeconds as a PostApiV1QueryJSONBodyGranularitySeconds4
+func (t PostApiV1QueryJSONBody_GranularitySeconds) AsPostApiV1QueryJSONBodyGranularitySeconds4() (PostApiV1QueryJSONBodyGranularitySeconds4, error) {
+	var body PostApiV1QueryJSONBodyGranularitySeconds4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiV1QueryJSONBodyGranularitySeconds4 overwrites any union data inside the PostApiV1QueryJSONBody_GranularitySeconds as the provided PostApiV1QueryJSONBodyGranularitySeconds4
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) FromPostApiV1QueryJSONBodyGranularitySeconds4(v PostApiV1QueryJSONBodyGranularitySeconds4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiV1QueryJSONBodyGranularitySeconds4 performs a merge with any union data inside the PostApiV1QueryJSONBody_GranularitySeconds, using the provided PostApiV1QueryJSONBodyGranularitySeconds4
+func (t *PostApiV1QueryJSONBody_GranularitySeconds) MergePostApiV1QueryJSONBodyGranularitySeconds4(v PostApiV1QueryJSONBodyGranularitySeconds4) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -137830,8 +139466,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -137843,8 +139485,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -137856,8 +139504,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -137869,8 +139523,14 @@ type GetApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -137943,8 +139603,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                           `json:"code"`
@@ -137956,8 +139622,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                           `json:"code"`
@@ -137969,8 +139641,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON409 *struct {
 		Code      string                                           `json:"code"`
@@ -137982,8 +139660,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                           `json:"code"`
@@ -137995,8 +139679,14 @@ type PostApiGatewayV1BudgetsResponse struct {
 		Retryable bool                                             `json:"retryable"`
 		SpanId    *string                                          `json:"span_id,omitempty"`
 		Tips      *[]string                                        `json:"tips,omitempty"`
-		TraceId   *string                                          `json:"trace_id,omitempty"`
-		Type      string                                           `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138069,8 +139759,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                 `json:"code"`
@@ -138082,8 +139778,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                 `json:"code"`
@@ -138095,8 +139797,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                 `json:"code"`
@@ -138108,8 +139816,14 @@ type DeleteApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138183,8 +139897,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -138196,8 +139916,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -138209,8 +139935,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -138222,8 +139954,14 @@ type GetApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138296,8 +140034,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                `json:"code"`
@@ -138309,8 +140053,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                `json:"code"`
@@ -138322,8 +140072,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                `json:"code"`
@@ -138335,8 +140091,14 @@ type PatchApiGatewayV1BudgetsByIdResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138409,8 +140171,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -138422,8 +140190,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -138435,8 +140209,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -138448,8 +140228,14 @@ type PostApiGatewayV1BudgetsByIdResetResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138513,8 +140299,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                             `json:"code"`
@@ -138526,8 +140318,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                             `json:"code"`
@@ -138539,8 +140337,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                             `json:"code"`
@@ -138552,8 +140356,14 @@ type GetApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138614,8 +140424,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -138627,8 +140443,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -138640,8 +140462,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON409 *struct {
 		Code      string                                              `json:"code"`
@@ -138653,8 +140481,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -138666,8 +140500,14 @@ type PostApiGatewayV1CacheRulesResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138728,8 +140568,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -138741,8 +140587,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -138754,8 +140606,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -138767,8 +140625,14 @@ type DeleteApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138829,8 +140693,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                 `json:"code"`
@@ -138842,8 +140712,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                 `json:"code"`
@@ -138855,8 +140731,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                 `json:"code"`
@@ -138868,8 +140750,14 @@ type GetApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -138930,8 +140818,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                   `json:"code"`
@@ -138943,8 +140837,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                   `json:"code"`
@@ -138956,8 +140856,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                   `json:"code"`
@@ -138969,8 +140875,14 @@ type PatchApiGatewayV1CacheRulesByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139056,8 +140968,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -139069,8 +140987,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -139082,8 +141006,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -139095,8 +141025,14 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139138,8 +141074,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                            `json:"code"`
@@ -139151,8 +141093,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                            `json:"code"`
@@ -139164,8 +141112,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                            `json:"code"`
@@ -139177,8 +141131,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                            `json:"code"`
@@ -139190,8 +141150,14 @@ type GetApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                              `json:"retryable"`
 		SpanId    *string                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                         `json:"tips,omitempty"`
-		TraceId   *string                                           `json:"trace_id,omitempty"`
-		Type      string                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139233,8 +141199,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                             `json:"code"`
@@ -139246,8 +141218,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                             `json:"code"`
@@ -139259,8 +141237,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                             `json:"code"`
@@ -139272,8 +141256,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                             `json:"code"`
@@ -139285,8 +141275,14 @@ type PostApiGatewayV1ProvidersResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139328,8 +141324,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                   `json:"code"`
@@ -139341,8 +141343,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                   `json:"code"`
@@ -139354,8 +141362,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                                   `json:"code"`
@@ -139367,8 +141381,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                   `json:"code"`
@@ -139380,8 +141400,14 @@ type DeleteApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                     `json:"retryable"`
 		SpanId    *string                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                `json:"tips,omitempty"`
-		TraceId   *string                                                  `json:"trace_id,omitempty"`
-		Type      string                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139423,8 +141449,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                  `json:"code"`
@@ -139436,8 +141468,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                  `json:"code"`
@@ -139449,8 +141487,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON410 *struct {
 		Code      string                                                  `json:"code"`
@@ -139462,8 +141506,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                  `json:"code"`
@@ -139475,8 +141525,14 @@ type PatchApiGatewayV1ProvidersByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139527,8 +141583,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -139540,8 +141602,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -139553,8 +141621,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -139566,8 +141640,14 @@ type GetApiGatewayV1SpendEventsResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139619,8 +141699,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                     `json:"code"`
@@ -139632,8 +141718,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                     `json:"code"`
@@ -139645,8 +141737,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                     `json:"code"`
@@ -139658,8 +141756,14 @@ type PostApiGatewayV1SpendEventsReplayResponse struct {
 		Retryable bool                                                       `json:"retryable"`
 		SpanId    *string                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                    `json:"trace_id,omitempty"`
-		Type      string                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139733,8 +141837,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                 `json:"code"`
@@ -139746,8 +141856,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                 `json:"code"`
@@ -139759,8 +141875,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                 `json:"code"`
@@ -139772,8 +141894,14 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 		Retryable bool                                                   `json:"retryable"`
 		SpanId    *string                                                `json:"span_id,omitempty"`
 		Tips      *[]string                                              `json:"tips,omitempty"`
-		TraceId   *string                                                `json:"trace_id,omitempty"`
-		Type      string                                                 `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139852,8 +141980,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                              `json:"code"`
@@ -139865,8 +141999,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                              `json:"code"`
@@ -139878,8 +142018,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                              `json:"code"`
@@ -139891,8 +142037,14 @@ type GetApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                `json:"retryable"`
 		SpanId    *string                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                           `json:"tips,omitempty"`
-		TraceId   *string                                             `json:"trace_id,omitempty"`
-		Type      string                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -139976,8 +142128,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                               `json:"code"`
@@ -139989,8 +142147,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                               `json:"code"`
@@ -140002,8 +142166,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON409 *struct {
 		Code      string                                               `json:"code"`
@@ -140015,8 +142185,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                               `json:"code"`
@@ -140028,8 +142204,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 		Retryable bool                                                 `json:"retryable"`
 		SpanId    *string                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                            `json:"tips,omitempty"`
-		TraceId   *string                                              `json:"trace_id,omitempty"`
-		Type      string                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140105,8 +142287,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                  `json:"code"`
@@ -140118,8 +142306,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                  `json:"code"`
@@ -140131,8 +142325,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                  `json:"code"`
@@ -140144,8 +142344,14 @@ type GetApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                    `json:"retryable"`
 		SpanId    *string                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                               `json:"tips,omitempty"`
-		TraceId   *string                                                 `json:"trace_id,omitempty"`
-		Type      string                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140221,8 +142427,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                    `json:"code"`
@@ -140234,8 +142446,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                    `json:"code"`
@@ -140247,8 +142465,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                    `json:"code"`
@@ -140260,8 +142484,14 @@ type PatchApiGatewayV1VirtualKeysByIdResponse struct {
 		Retryable bool                                                      `json:"retryable"`
 		SpanId    *string                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                   `json:"trace_id,omitempty"`
-		Type      string                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140337,8 +142567,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                          `json:"code"`
@@ -140350,8 +142586,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                          `json:"code"`
@@ -140363,8 +142605,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                          `json:"code"`
@@ -140376,8 +142624,14 @@ type PostApiGatewayV1VirtualKeysByIdDisableResponse struct {
 		Retryable bool                                                            `json:"retryable"`
 		SpanId    *string                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                         `json:"trace_id,omitempty"`
-		Type      string                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140453,8 +142707,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                         `json:"code"`
@@ -140466,8 +142726,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                         `json:"code"`
@@ -140479,8 +142745,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                         `json:"code"`
@@ -140492,8 +142764,14 @@ type PostApiGatewayV1VirtualKeysByIdEnableResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140569,8 +142847,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                         `json:"code"`
@@ -140582,8 +142866,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                         `json:"code"`
@@ -140595,8 +142885,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                         `json:"code"`
@@ -140608,8 +142904,14 @@ type PostApiGatewayV1VirtualKeysByIdRevokeResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140686,8 +142988,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                         `json:"code"`
@@ -140699,8 +143007,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                         `json:"code"`
@@ -140712,8 +143026,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                         `json:"code"`
@@ -140725,8 +143045,14 @@ type PostApiGatewayV1VirtualKeysByIdRotateResponse struct {
 		Retryable bool                                                           `json:"retryable"`
 		SpanId    *string                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                        `json:"trace_id,omitempty"`
-		Type      string                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -140776,8 +143102,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                       `json:"code"`
@@ -140789,8 +143121,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                       `json:"code"`
@@ -140802,8 +143140,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                       `json:"code"`
@@ -140815,8 +143159,14 @@ type GetApiGatewayV1VirtualKeysByIdSpendResponse struct {
 		Retryable bool                                                         `json:"retryable"`
 		SpanId    *string                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                      `json:"trace_id,omitempty"`
-		Type      string                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -142859,8 +145209,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                             `json:"code"`
@@ -142872,8 +145228,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                             `json:"code"`
@@ -142885,8 +145247,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                             `json:"code"`
@@ -142898,8 +145266,14 @@ type DeleteApiAgentCacheByNameResponse struct {
 		Retryable bool                                               `json:"retryable"`
 		SpanId    *string                                            `json:"span_id,omitempty"`
 		Tips      *[]string                                          `json:"tips,omitempty"`
-		TraceId   *string                                            `json:"trace_id,omitempty"`
-		Type      string                                             `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -142944,8 +145318,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -142957,8 +145337,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -142970,8 +145356,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -142983,8 +145375,14 @@ type GetApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -143029,8 +145427,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -143042,8 +145446,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -143055,8 +145465,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -143068,8 +145484,14 @@ type PutApiAgentCacheByNameResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -143115,8 +145537,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                `json:"code"`
@@ -143128,8 +145556,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                `json:"code"`
@@ -143141,8 +145575,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                `json:"code"`
@@ -143154,8 +145594,14 @@ type PostApiAgentCacheByNameClaimResponse struct {
 		Retryable bool                                                  `json:"retryable"`
 		SpanId    *string                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                             `json:"tips,omitempty"`
-		TraceId   *string                                               `json:"trace_id,omitempty"`
-		Type      string                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -150261,8 +152707,14 @@ type CancelInstantEvalRunResponse struct {
 		Retryable bool                                          `json:"retryable"`
 		SpanId    *string                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                     `json:"tips,omitempty"`
-		TraceId   *string                                       `json:"trace_id,omitempty"`
-		Type      string                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -151931,6 +154383,7 @@ type GetOrganizationMemberAccessResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		DirectBindings []struct {
+			CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 			CustomRoleName *string                                                               `json:"customRoleName"`
 			Id             string                                                                `json:"id"`
 			Permissions    []string                                                              `json:"permissions"`
@@ -151941,6 +154394,7 @@ type GetOrganizationMemberAccessResponse struct {
 		} `json:"directBindings"`
 		Groups []struct {
 			Bindings []struct {
+				CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 				CustomRoleName *string                                                               `json:"customRoleName"`
 				Id             string                                                                `json:"id"`
 				Permissions    []string                                                              `json:"permissions"`
@@ -152238,8 +154692,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                              `json:"code"`
@@ -152251,8 +154711,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                              `json:"code"`
@@ -152264,8 +154730,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                              `json:"code"`
@@ -152277,8 +154749,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                `json:"retryable"`
 		SpanId    *string                                                             `json:"span_id,omitempty"`
 		Tips      *[]string                                                           `json:"tips,omitempty"`
-		TraceId   *string                                                             `json:"trace_id,omitempty"`
-		Type      string                                                              `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152337,8 +154815,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                               `json:"code"`
@@ -152350,8 +154834,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                               `json:"code"`
@@ -152363,8 +154853,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                               `json:"code"`
@@ -152376,8 +154872,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsChartsResponse struct {
 		Retryable bool                                                                 `json:"retryable"`
 		SpanId    *string                                                              `json:"span_id,omitempty"`
 		Tips      *[]string                                                            `json:"tips,omitempty"`
-		TraceId   *string                                                              `json:"trace_id,omitempty"`
-		Type      string                                                               `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152419,8 +154921,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152432,8 +154940,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152445,8 +154959,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152458,8 +154978,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                          `json:"code"`
@@ -152471,8 +154997,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                            `json:"retryable"`
 		SpanId    *string                                                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                                                       `json:"tips,omitempty"`
-		TraceId   *string                                                                         `json:"trace_id,omitempty"`
-		Type      string                                                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152531,8 +155063,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152544,8 +155082,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152557,8 +155101,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152570,8 +155120,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                       `json:"code"`
@@ -152583,8 +155139,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                         `json:"retryable"`
 		SpanId    *string                                                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                                                    `json:"tips,omitempty"`
-		TraceId   *string                                                                      `json:"trace_id,omitempty"`
-		Type      string                                                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152643,8 +155205,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152656,8 +155224,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152669,8 +155243,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152682,8 +155262,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                         `json:"code"`
@@ -152695,8 +155281,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152738,8 +155330,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152751,8 +155349,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152764,8 +155368,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152777,8 +155387,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                   `json:"code"`
@@ -152790,8 +155406,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse str
 		Retryable bool                                                                                     `json:"retryable"`
 		SpanId    *string                                                                                  `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                `json:"tips,omitempty"`
-		TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-		Type      string                                                                                   `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152850,8 +155472,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152863,8 +155491,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152876,8 +155510,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152889,8 +155529,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                `json:"code"`
@@ -152902,8 +155548,14 @@ type PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse struct
 		Retryable bool                                                                                  `json:"retryable"`
 		SpanId    *string                                                                               `json:"span_id,omitempty"`
 		Tips      *[]string                                                                             `json:"tips,omitempty"`
-		TraceId   *string                                                                               `json:"trace_id,omitempty"`
-		Type      string                                                                                `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -152940,8 +155592,10 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -152950,7 +155604,8 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 					} `json:"parameters,omitempty"`
 					Sql string `json:"sql"`
 				} `json:"queries"`
-				Version float32 `json:"version"`
+				Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                                         `json:"version"`
 			} `json:"definition"`
 			GridColumn  int    `json:"gridColumn"`
 			GridRow     int    `json:"gridRow"`
@@ -152971,8 +155626,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                        `json:"code"`
@@ -152984,8 +155645,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                        `json:"code"`
@@ -152997,8 +155664,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                        `json:"code"`
@@ -153010,8 +155683,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                          `json:"retryable"`
 		SpanId    *string                                                                       `json:"span_id,omitempty"`
 		Tips      *[]string                                                                     `json:"tips,omitempty"`
-		TraceId   *string                                                                       `json:"trace_id,omitempty"`
-		Type      string                                                                        `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153047,8 +155726,10 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -153057,7 +155738,8 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 				} `json:"parameters,omitempty"`
 				Sql string `json:"sql"`
 			} `json:"queries"`
-			Version float32 `json:"version"`
+			Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
+			Version float32                                                                                     `json:"version"`
 		} `json:"definition"`
 		GridColumn  int    `json:"gridColumn"`
 		GridRow     int    `json:"gridRow"`
@@ -153077,8 +155759,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                         `json:"code"`
@@ -153090,8 +155778,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                         `json:"code"`
@@ -153103,8 +155797,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                         `json:"code"`
@@ -153116,8 +155816,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse struct {
 		Retryable bool                                                                           `json:"retryable"`
 		SpanId    *string                                                                        `json:"span_id,omitempty"`
 		Tips      *[]string                                                                      `json:"tips,omitempty"`
-		TraceId   *string                                                                        `json:"trace_id,omitempty"`
-		Type      string                                                                         `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153159,8 +155865,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153172,8 +155884,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153185,8 +155903,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153198,8 +155922,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                     `json:"code"`
@@ -153211,8 +155941,14 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse s
 		Retryable bool                                                                                       `json:"retryable"`
 		SpanId    *string                                                                                    `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                  `json:"tips,omitempty"`
-		TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-		Type      string                                                                                     `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153248,8 +155984,10 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -153258,7 +155996,8 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 				} `json:"parameters,omitempty"`
 				Sql string `json:"sql"`
 			} `json:"queries"`
-			Version float32 `json:"version"`
+			Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+			Version float32                                                                                              `json:"version"`
 		} `json:"definition"`
 		GridColumn  int    `json:"gridColumn"`
 		GridRow     int    `json:"gridRow"`
@@ -153278,8 +156017,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153291,8 +156036,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153304,8 +156055,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153317,8 +156074,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                  `json:"code"`
@@ -153330,8 +156093,14 @@ type GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse stru
 		Retryable bool                                                                                    `json:"retryable"`
 		SpanId    *string                                                                                 `json:"span_id,omitempty"`
 		Tips      *[]string                                                                               `json:"tips,omitempty"`
-		TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-		Type      string                                                                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153367,8 +156136,10 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -153377,7 +156148,8 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 				} `json:"parameters,omitempty"`
 				Sql string `json:"sql"`
 			} `json:"queries"`
-			Version float32 `json:"version"`
+			Source  *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+			Version float32                                                                                                `json:"version"`
 		} `json:"definition"`
 		GridColumn  int    `json:"gridColumn"`
 		GridRow     int    `json:"gridRow"`
@@ -153397,8 +156169,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153410,8 +156188,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153423,8 +156207,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153436,8 +156226,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                    `json:"code"`
@@ -153449,8 +156245,14 @@ type PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse st
 		Retryable bool                                                                                      `json:"retryable"`
 		SpanId    *string                                                                                   `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                 `json:"tips,omitempty"`
-		TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-		Type      string                                                                                    `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -153486,8 +156288,10 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		CreatedAt   string  `json:"createdAt"`
 		DashboardId *string `json:"dashboardId"`
 		Definition  struct {
-			Code    string `json:"code"`
-			Queries []struct {
+			Code        string  `json:"code"`
+			Description *string `json:"description,omitempty"`
+			Prompt      *string `json:"prompt,omitempty"`
+			Queries     []struct {
 				Name       string `json:"name"`
 				Parameters *[]struct {
 					Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -153496,7 +156300,8 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 				} `json:"parameters,omitempty"`
 				Sql string `json:"sql"`
 			} `json:"queries"`
-			Version float32 `json:"version"`
+			Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+			Version float32                                                                                                        `json:"version"`
 		} `json:"definition"`
 		GridColumn  int    `json:"gridColumn"`
 		GridRow     int    `json:"gridRow"`
@@ -153516,8 +156321,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153529,8 +156340,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153542,8 +156359,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON404 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153555,8 +156378,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                                                                            `json:"code"`
@@ -153568,8 +156397,14 @@ type PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboardRes
 		Retryable bool                                                                                              `json:"retryable"`
 		SpanId    *string                                                                                           `json:"span_id,omitempty"`
 		Tips      *[]string                                                                                         `json:"tips,omitempty"`
-		TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-		Type      string                                                                                            `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -154818,6 +157653,24 @@ type PostApiV1QueryResponse struct {
 			Name string `json:"name"`
 			Type string `json:"type"`
 		} `json:"columns,omitempty"`
+		Completeness *struct {
+			Buckets *[]struct {
+				N     float32 `json:"n"`
+				Start string  `json:"start"`
+			} `json:"buckets,omitempty"`
+			Fields []struct {
+				Field   string  `json:"field"`
+				Label   string  `json:"label"`
+				Present float32 `json:"present"`
+			} `json:"fields"`
+			State    PostApiV1Query200JSONResponseBodyCompletenessState `json:"state"`
+			Total    float32                                            `json:"total"`
+			Unit     string                                             `json:"unit"`
+			Unpriced *struct {
+				Count  float32  `json:"count"`
+				Models []string `json:"models"`
+			} `json:"unpriced,omitempty"`
+		} `json:"completeness,omitempty"`
 		Diagnostics *[]struct {
 			Code    PostApiV1Query200JSONResponseBodyDiagnosticsCode `json:"code"`
 			Message string                                           `json:"message"`
@@ -154844,8 +157697,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                  `json:"code"`
@@ -154857,8 +157716,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                  `json:"code"`
@@ -154870,8 +157735,33 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON404 *struct {
+		Code      string                                  `json:"code"`
+		DocsUrl   *string                                 `json:"docs_url,omitempty"`
+		Fault     *PostApiV1Query404JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                  `json:"message"`
+		Meta      *map[string]interface{}                 `json:"meta,omitempty"`
+		Reasons   *[]interface{}                          `json:"reasons,omitempty"`
+		Retryable bool                                    `json:"retryable"`
+		SpanId    *string                                 `json:"span_id,omitempty"`
+		Tips      *[]string                               `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON422 *struct {
 		Code      string                                  `json:"code"`
@@ -154883,8 +157773,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                  `json:"code"`
@@ -154896,8 +157792,14 @@ type PostApiV1QueryResponse struct {
 		Retryable bool                                    `json:"retryable"`
 		SpanId    *string                                 `json:"span_id,omitempty"`
 		Tips      *[]string                               `json:"tips,omitempty"`
-		TraceId   *string                                 `json:"trace_id,omitempty"`
-		Type      string                                  `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -155036,8 +157938,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                          `json:"code"`
@@ -155049,8 +157957,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                          `json:"code"`
@@ -155062,8 +157976,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                          `json:"code"`
@@ -155075,8 +157995,14 @@ type GetApiV1QueryReferenceResponse struct {
 		Retryable bool                                            `json:"retryable"`
 		SpanId    *string                                         `json:"span_id,omitempty"`
 		Tips      *[]string                                       `json:"tips,omitempty"`
-		TraceId   *string                                         `json:"trace_id,omitempty"`
-		Type      string                                          `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -155151,8 +158077,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON401 *struct {
 		Code      string                                       `json:"code"`
@@ -155164,8 +158096,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON403 *struct {
 		Code      string                                       `json:"code"`
@@ -155177,8 +158115,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 	JSON500 *struct {
 		Code      string                                       `json:"code"`
@@ -155190,8 +158134,14 @@ type GetApiV1QuerySchemaResponse struct {
 		Retryable bool                                         `json:"retryable"`
 		SpanId    *string                                      `json:"span_id,omitempty"`
 		Tips      *[]string                                    `json:"tips,omitempty"`
-		TraceId   *string                                      `json:"trace_id,omitempty"`
-		Type      string                                       `json:"type"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
 	}
 }
 
@@ -165336,8 +168286,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165355,8 +168311,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165374,8 +168336,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165393,8 +168361,14 @@ func ParseGetApiGatewayV1BudgetsResponse(rsp *http.Response) (*GetApiGatewayV1Bu
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165469,8 +168443,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165488,8 +168468,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165507,8 +168493,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165526,8 +168518,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165545,8 +168543,14 @@ func ParsePostApiGatewayV1BudgetsResponse(rsp *http.Response) (*PostApiGatewayV1
 			Retryable bool                                             `json:"retryable"`
 			SpanId    *string                                          `json:"span_id,omitempty"`
 			Tips      *[]string                                        `json:"tips,omitempty"`
-			TraceId   *string                                          `json:"trace_id,omitempty"`
-			Type      string                                           `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165621,8 +168625,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165640,8 +168650,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165659,8 +168675,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165678,8 +168700,14 @@ func ParseDeleteApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*DeleteApiG
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165755,8 +168783,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165774,8 +168808,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165793,8 +168833,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165812,8 +168858,14 @@ func ParseGetApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165888,8 +168940,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165907,8 +168965,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165926,8 +168990,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -165945,8 +169015,14 @@ func ParsePatchApiGatewayV1BudgetsByIdResponse(rsp *http.Response) (*PatchApiGat
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166021,8 +169097,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166040,8 +169122,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166059,8 +169147,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166078,8 +169172,14 @@ func ParsePostApiGatewayV1BudgetsByIdResetResponse(rsp *http.Response) (*PostApi
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166145,8 +169245,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166164,8 +169270,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166183,8 +169295,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166202,8 +169320,14 @@ func ParseGetApiGatewayV1CacheRulesResponse(rsp *http.Response) (*GetApiGatewayV
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166266,8 +169390,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166285,8 +169415,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166304,8 +169440,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166323,8 +169465,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166342,8 +169490,14 @@ func ParsePostApiGatewayV1CacheRulesResponse(rsp *http.Response) (*PostApiGatewa
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166406,8 +169560,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166425,8 +169585,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166444,8 +169610,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166463,8 +169635,14 @@ func ParseDeleteApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*DeleteA
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166527,8 +169705,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166546,8 +169730,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166565,8 +169755,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166584,8 +169780,14 @@ func ParseGetApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166648,8 +169850,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166667,8 +169875,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166686,8 +169900,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166705,8 +169925,14 @@ func ParsePatchApiGatewayV1CacheRulesByIdResponse(rsp *http.Response) (*PatchApi
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166794,8 +170020,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166813,8 +170045,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166832,8 +170070,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166851,8 +170095,14 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166896,8 +170146,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166915,8 +170171,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166934,8 +170196,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166953,8 +170221,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -166972,8 +170246,14 @@ func ParseGetApiGatewayV1ProvidersResponse(rsp *http.Response) (*GetApiGatewayV1
 			Retryable bool                                              `json:"retryable"`
 			SpanId    *string                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                         `json:"tips,omitempty"`
-			TraceId   *string                                           `json:"trace_id,omitempty"`
-			Type      string                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167017,8 +170297,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167036,8 +170322,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167055,8 +170347,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167074,8 +170372,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167093,8 +170397,14 @@ func ParsePostApiGatewayV1ProvidersResponse(rsp *http.Response) (*PostApiGateway
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167138,8 +170448,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167157,8 +170473,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167176,8 +170498,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167195,8 +170523,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167214,8 +170548,14 @@ func ParseDeleteApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*DeleteAp
 			Retryable bool                                                     `json:"retryable"`
 			SpanId    *string                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                `json:"tips,omitempty"`
-			TraceId   *string                                                  `json:"trace_id,omitempty"`
-			Type      string                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167259,8 +170599,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167278,8 +170624,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167297,8 +170649,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167316,8 +170674,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167335,8 +170699,14 @@ func ParsePatchApiGatewayV1ProvidersByIdResponse(rsp *http.Response) (*PatchApiG
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167389,8 +170759,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167408,8 +170784,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167427,8 +170809,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167446,8 +170834,14 @@ func ParseGetApiGatewayV1SpendEventsResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167501,8 +170895,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167520,8 +170920,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167539,8 +170945,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167558,8 +170970,14 @@ func ParsePostApiGatewayV1SpendEventsReplayResponse(rsp *http.Response) (*PostAp
 			Retryable bool                                                       `json:"retryable"`
 			SpanId    *string                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                    `json:"trace_id,omitempty"`
-			Type      string                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167635,8 +171053,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167654,8 +171078,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167673,8 +171103,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167692,8 +171128,14 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 			Retryable bool                                                   `json:"retryable"`
 			SpanId    *string                                                `json:"span_id,omitempty"`
 			Tips      *[]string                                              `json:"tips,omitempty"`
-			TraceId   *string                                                `json:"trace_id,omitempty"`
-			Type      string                                                 `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167774,8 +171216,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167793,8 +171241,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167812,8 +171266,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167831,8 +171291,14 @@ func ParseGetApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*GetApiGateway
 			Retryable bool                                                `json:"retryable"`
 			SpanId    *string                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                           `json:"tips,omitempty"`
-			TraceId   *string                                             `json:"trace_id,omitempty"`
-			Type      string                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167918,8 +171384,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167937,8 +171409,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167956,8 +171434,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167975,8 +171459,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -167994,8 +171484,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 			Retryable bool                                                 `json:"retryable"`
 			SpanId    *string                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                            `json:"tips,omitempty"`
-			TraceId   *string                                              `json:"trace_id,omitempty"`
-			Type      string                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168073,8 +171569,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168092,8 +171594,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168111,8 +171619,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168130,8 +171644,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*GetApiGat
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
-			TraceId   *string                                                 `json:"trace_id,omitempty"`
-			Type      string                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168209,8 +171729,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168228,8 +171754,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168247,8 +171779,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168266,8 +171804,14 @@ func ParsePatchApiGatewayV1VirtualKeysByIdResponse(rsp *http.Response) (*PatchAp
 			Retryable bool                                                      `json:"retryable"`
 			SpanId    *string                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                   `json:"trace_id,omitempty"`
-			Type      string                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168345,8 +171889,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168364,8 +171914,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168383,8 +171939,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168402,8 +171964,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdDisableResponse(rsp *http.Response) (*P
 			Retryable bool                                                            `json:"retryable"`
 			SpanId    *string                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                         `json:"trace_id,omitempty"`
-			Type      string                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168481,8 +172049,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168500,8 +172074,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168519,8 +172099,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168538,8 +172124,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdEnableResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168617,8 +172209,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168636,8 +172234,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168655,8 +172259,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168674,8 +172284,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRevokeResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168754,8 +172370,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168773,8 +172395,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168792,8 +172420,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168811,8 +172445,14 @@ func ParsePostApiGatewayV1VirtualKeysByIdRotateResponse(rsp *http.Response) (*Po
 			Retryable bool                                                           `json:"retryable"`
 			SpanId    *string                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                        `json:"trace_id,omitempty"`
-			Type      string                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168864,8 +172504,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168883,8 +172529,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168902,8 +172554,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -168921,8 +172579,14 @@ func ParseGetApiGatewayV1VirtualKeysByIdSpendResponse(rsp *http.Response) (*GetA
 			Retryable bool                                                         `json:"retryable"`
 			SpanId    *string                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                      `json:"trace_id,omitempty"`
-			Type      string                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -170983,8 +174647,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171002,8 +174672,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171021,8 +174697,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171040,8 +174722,14 @@ func ParseDeleteApiAgentCacheByNameResponse(rsp *http.Response) (*DeleteApiAgent
 			Retryable bool                                               `json:"retryable"`
 			SpanId    *string                                            `json:"span_id,omitempty"`
 			Tips      *[]string                                          `json:"tips,omitempty"`
-			TraceId   *string                                            `json:"trace_id,omitempty"`
-			Type      string                                             `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171088,8 +174776,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171107,8 +174801,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171126,8 +174826,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171145,8 +174851,14 @@ func ParseGetApiAgentCacheByNameResponse(rsp *http.Response) (*GetApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171193,8 +174905,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171212,8 +174930,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171231,8 +174955,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171250,8 +174980,14 @@ func ParsePutApiAgentCacheByNameResponse(rsp *http.Response) (*PutApiAgentCacheB
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171299,8 +175035,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171318,8 +175060,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171337,8 +175085,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -171356,8 +175110,14 @@ func ParsePostApiAgentCacheByNameClaimResponse(rsp *http.Response) (*PostApiAgen
 			Retryable bool                                                  `json:"retryable"`
 			SpanId    *string                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                             `json:"tips,omitempty"`
-			TraceId   *string                                               `json:"trace_id,omitempty"`
-			Type      string                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -178920,8 +182680,14 @@ func ParseCancelInstantEvalRunResponse(rsp *http.Response) (*CancelInstantEvalRu
 			Retryable bool                                          `json:"retryable"`
 			SpanId    *string                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                     `json:"tips,omitempty"`
-			TraceId   *string                                       `json:"trace_id,omitempty"`
-			Type      string                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -180641,6 +184407,7 @@ func ParseGetOrganizationMemberAccessResponse(rsp *http.Response) (*GetOrganizat
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			DirectBindings []struct {
+				CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 				CustomRoleName *string                                                               `json:"customRoleName"`
 				Id             string                                                                `json:"id"`
 				Permissions    []string                                                              `json:"permissions"`
@@ -180651,6 +184418,7 @@ func ParseGetOrganizationMemberAccessResponse(rsp *http.Response) (*GetOrganizat
 			} `json:"directBindings"`
 			Groups []struct {
 				Bindings []struct {
+					CappedBySeat   bool                                                                  `json:"cappedBySeat"`
 					CustomRoleName *string                                                               `json:"customRoleName"`
 					Id             string                                                                `json:"id"`
 					Permissions    []string                                                              `json:"permissions"`
@@ -180942,8 +184710,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -180961,8 +184735,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -180980,8 +184760,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -180999,8 +184785,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response)
 			Retryable bool                                                                `json:"retryable"`
 			SpanId    *string                                                             `json:"span_id,omitempty"`
 			Tips      *[]string                                                           `json:"tips,omitempty"`
-			TraceId   *string                                                             `json:"trace_id,omitempty"`
-			Type      string                                                              `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181061,8 +184853,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181080,8 +184878,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181099,8 +184903,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181118,8 +184928,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsChartsResponse(rsp *http.Response
 			Retryable bool                                                                 `json:"retryable"`
 			SpanId    *string                                                              `json:"span_id,omitempty"`
 			Tips      *[]string                                                            `json:"tips,omitempty"`
-			TraceId   *string                                                              `json:"trace_id,omitempty"`
-			Type      string                                                               `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181163,8 +184979,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181182,8 +185004,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181201,8 +185029,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181220,8 +185054,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181239,8 +185079,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *ht
 			Retryable bool                                                                            `json:"retryable"`
 			SpanId    *string                                                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                                                       `json:"tips,omitempty"`
-			TraceId   *string                                                                         `json:"trace_id,omitempty"`
-			Type      string                                                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181301,8 +185147,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181320,8 +185172,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181339,8 +185197,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181358,8 +185222,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181377,8 +185247,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *http.
 			Retryable bool                                                                         `json:"retryable"`
 			SpanId    *string                                                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                                                    `json:"tips,omitempty"`
-			TraceId   *string                                                                      `json:"trace_id,omitempty"`
-			Type      string                                                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181439,8 +185315,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181458,8 +185340,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181477,8 +185365,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181496,8 +185390,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181515,8 +185415,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181560,8 +185466,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181579,8 +185491,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181598,8 +185516,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181617,8 +185541,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181636,8 +185566,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementRespons
 			Retryable bool                                                                                     `json:"retryable"`
 			SpanId    *string                                                                                  `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                `json:"tips,omitempty"`
-			TraceId   *string                                                                                  `json:"trace_id,omitempty"`
-			Type      string                                                                                   `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181698,8 +185634,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181717,8 +185659,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181736,8 +185684,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181755,8 +185709,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181774,8 +185734,14 @@ func ParsePutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse(r
 			Retryable bool                                                                                  `json:"retryable"`
 			SpanId    *string                                                                               `json:"span_id,omitempty"`
 			Tips      *[]string                                                                             `json:"tips,omitempty"`
-			TraceId   *string                                                                               `json:"trace_id,omitempty"`
-			Type      string                                                                                `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181808,8 +185774,10 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 				CreatedAt   string  `json:"createdAt"`
 				DashboardId *string `json:"dashboardId"`
 				Definition  struct {
-					Code    string `json:"code"`
-					Queries []struct {
+					Code        string  `json:"code"`
+					Description *string `json:"description,omitempty"`
+					Prompt      *string `json:"prompt,omitempty"`
+					Queries     []struct {
 						Name       string `json:"name"`
 						Parameters *[]struct {
 							Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -181818,7 +185786,8 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 						} `json:"parameters,omitempty"`
 						Sql string `json:"sql"`
 					} `json:"queries"`
-					Version float32 `json:"version"`
+					Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBody_Data_Definition_Source `json:"source,omitempty"`
+					Version float32                                                                                         `json:"version"`
 				} `json:"definition"`
 				GridColumn  int    `json:"gridColumn"`
 				GridRow     int    `json:"gridRow"`
@@ -181845,8 +185814,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181864,8 +185839,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181883,8 +185864,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181902,8 +185889,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *http
 			Retryable bool                                                                          `json:"retryable"`
 			SpanId    *string                                                                       `json:"span_id,omitempty"`
 			Tips      *[]string                                                                     `json:"tips,omitempty"`
-			TraceId   *string                                                                       `json:"trace_id,omitempty"`
-			Type      string                                                                        `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181935,8 +185928,10 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -181945,7 +185940,8 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 					} `json:"parameters,omitempty"`
 					Sql string `json:"sql"`
 				} `json:"queries"`
-				Version float32 `json:"version"`
+				Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                                     `json:"version"`
 			} `json:"definition"`
 			GridColumn  int    `json:"gridColumn"`
 			GridRow     int    `json:"gridRow"`
@@ -181971,8 +185967,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -181990,8 +185992,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182009,8 +186017,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182028,8 +186042,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsResponse(rsp *htt
 			Retryable bool                                                                           `json:"retryable"`
 			SpanId    *string                                                                        `json:"span_id,omitempty"`
 			Tips      *[]string                                                                      `json:"tips,omitempty"`
-			TraceId   *string                                                                        `json:"trace_id,omitempty"`
-			Type      string                                                                         `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182073,8 +186093,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182092,8 +186118,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182111,8 +186143,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182130,8 +186168,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182149,8 +186193,14 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespo
 			Retryable bool                                                                                       `json:"retryable"`
 			SpanId    *string                                                                                    `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                  `json:"tips,omitempty"`
-			TraceId   *string                                                                                    `json:"trace_id,omitempty"`
-			Type      string                                                                                     `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182182,8 +186232,10 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -182192,7 +186244,8 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 					} `json:"parameters,omitempty"`
 					Sql string `json:"sql"`
 				} `json:"queries"`
-				Version float32 `json:"version"`
+				Source  *GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                                              `json:"version"`
 			} `json:"definition"`
 			GridColumn  int    `json:"gridColumn"`
 			GridRow     int    `json:"gridRow"`
@@ -182218,8 +186271,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182237,8 +186296,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182256,8 +186321,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182275,8 +186346,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182294,8 +186371,14 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse
 			Retryable bool                                                                                    `json:"retryable"`
 			SpanId    *string                                                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                                                               `json:"tips,omitempty"`
-			TraceId   *string                                                                                 `json:"trace_id,omitempty"`
-			Type      string                                                                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182327,8 +186410,10 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -182337,7 +186422,8 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 					} `json:"parameters,omitempty"`
 					Sql string `json:"sql"`
 				} `json:"queries"`
-				Version float32 `json:"version"`
+				Source  *PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                                                `json:"version"`
 			} `json:"definition"`
 			GridColumn  int    `json:"gridColumn"`
 			GridRow     int    `json:"gridRow"`
@@ -182363,8 +186449,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182382,8 +186474,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182401,8 +186499,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182420,8 +186524,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182439,8 +186549,14 @@ func ParsePatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdRespon
 			Retryable bool                                                                                      `json:"retryable"`
 			SpanId    *string                                                                                   `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                 `json:"tips,omitempty"`
-			TraceId   *string                                                                                   `json:"trace_id,omitempty"`
-			Type      string                                                                                    `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182472,8 +186588,10 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			CreatedAt   string  `json:"createdAt"`
 			DashboardId *string `json:"dashboardId"`
 			Definition  struct {
-				Code    string `json:"code"`
-				Queries []struct {
+				Code        string  `json:"code"`
+				Description *string `json:"description,omitempty"`
+				Prompt      *string `json:"prompt,omitempty"`
+				Queries     []struct {
 					Name       string `json:"name"`
 					Parameters *[]struct {
 						Default *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Queries_Parameters_Default `json:"default,omitempty"`
@@ -182482,7 +186600,8 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 					} `json:"parameters,omitempty"`
 					Sql string `json:"sql"`
 				} `json:"queries"`
-				Version float32 `json:"version"`
+				Source  *PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard200JSONResponseBody_Definition_Source `json:"source,omitempty"`
+				Version float32                                                                                                        `json:"version"`
 			} `json:"definition"`
 			GridColumn  int    `json:"gridColumn"`
 			GridRow     int    `json:"gridRow"`
@@ -182508,8 +186627,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182527,8 +186652,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182546,8 +186677,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182565,8 +186702,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -182584,8 +186727,14 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboa
 			Retryable bool                                                                                              `json:"retryable"`
 			SpanId    *string                                                                                           `json:"span_id,omitempty"`
 			Tips      *[]string                                                                                         `json:"tips,omitempty"`
-			TraceId   *string                                                                                           `json:"trace_id,omitempty"`
-			Type      string                                                                                            `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184138,6 +188287,24 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 				Name string `json:"name"`
 				Type string `json:"type"`
 			} `json:"columns,omitempty"`
+			Completeness *struct {
+				Buckets *[]struct {
+					N     float32 `json:"n"`
+					Start string  `json:"start"`
+				} `json:"buckets,omitempty"`
+				Fields []struct {
+					Field   string  `json:"field"`
+					Label   string  `json:"label"`
+					Present float32 `json:"present"`
+				} `json:"fields"`
+				State    PostApiV1Query200JSONResponseBodyCompletenessState `json:"state"`
+				Total    float32                                            `json:"total"`
+				Unit     string                                             `json:"unit"`
+				Unpriced *struct {
+					Count  float32  `json:"count"`
+					Models []string `json:"models"`
+				} `json:"unpriced,omitempty"`
+			} `json:"completeness,omitempty"`
 			Diagnostics *[]struct {
 				Code    PostApiV1Query200JSONResponseBodyDiagnosticsCode `json:"code"`
 				Message string                                           `json:"message"`
@@ -184170,8 +188337,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184189,8 +188362,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184208,13 +188387,44 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Code      string                                  `json:"code"`
+			DocsUrl   *string                                 `json:"docs_url,omitempty"`
+			Fault     *PostApiV1Query404JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                  `json:"message"`
+			Meta      *map[string]interface{}                 `json:"meta,omitempty"`
+			Reasons   *[]interface{}                          `json:"reasons,omitempty"`
+			Retryable bool                                    `json:"retryable"`
+			SpanId    *string                                 `json:"span_id,omitempty"`
+			Tips      *[]string                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {
@@ -184227,8 +188437,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184246,8 +188462,14 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 			Retryable bool                                    `json:"retryable"`
 			SpanId    *string                                 `json:"span_id,omitempty"`
 			Tips      *[]string                               `json:"tips,omitempty"`
-			TraceId   *string                                 `json:"trace_id,omitempty"`
-			Type      string                                  `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184388,8 +188610,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184407,8 +188635,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184426,8 +188660,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184445,8 +188685,14 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 			Retryable bool                                            `json:"retryable"`
 			SpanId    *string                                         `json:"span_id,omitempty"`
 			Tips      *[]string                                       `json:"tips,omitempty"`
-			TraceId   *string                                         `json:"trace_id,omitempty"`
-			Type      string                                          `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184523,8 +188769,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184542,8 +188794,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184561,8 +188819,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -184580,8 +188844,14 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			Retryable bool                                         `json:"retryable"`
 			SpanId    *string                                      `json:"span_id,omitempty"`
 			Tips      *[]string                                    `json:"tips,omitempty"`
-			TraceId   *string                                      `json:"trace_id,omitempty"`
-			Type      string                                       `json:"type"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

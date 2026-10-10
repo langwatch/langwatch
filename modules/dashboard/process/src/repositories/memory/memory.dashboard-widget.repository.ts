@@ -58,6 +58,9 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         version: DASHBOARD_WIDGET_DEFINITION_VERSION,
         code: input.input.code,
         queries: [...input.input.queries],
+        ...(input.input.description === undefined ? {} : { description: input.input.description }),
+        ...(input.input.prompt === undefined ? {} : { prompt: input.input.prompt }),
+        ...(input.input.source === undefined ? {} : { source: input.input.source }),
       },
       createdAt: nowInstant(),
       updatedAt: nowInstant(),
@@ -78,6 +81,9 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
     if (!definition.success) {
       throw new DashboardWidgetDefinitionInvalidError(current.id, { reasons: [definition.error] });
     }
+    const description = input.input.description ?? definition.data.description;
+    const prompt = input.input.prompt ?? definition.data.prompt;
+    const source = input.input.source ?? definition.data.source;
     const updated: DashboardWidgetRow = {
       ...current,
       ...(input.input.name === undefined ? {} : { name: input.input.name }),
@@ -85,6 +91,9 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         version: DASHBOARD_WIDGET_DEFINITION_VERSION,
         code: input.input.code ?? definition.data.code,
         queries: input.input.queries ?? definition.data.queries,
+        ...(description === undefined ? {} : { description }),
+        ...(prompt === undefined ? {} : { prompt }),
+        ...(source === undefined ? {} : { source }),
       },
       updatedAt: nowInstant(),
     };

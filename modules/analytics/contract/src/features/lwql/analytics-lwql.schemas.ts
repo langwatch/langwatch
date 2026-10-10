@@ -7,7 +7,7 @@ import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwat
 import { defineMiddlewareContext, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
+import { LWQL_ACCEPTED_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
 import { lwqlTimeWindowSchema, type LangWatchQLProtections } from "./analytics.lwql.ts";
 import { MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
 
@@ -82,14 +82,14 @@ export const lwqlParameterValueSchema: LwqlParameterValueSchema =
 
 /**
  * The datapoint step a caller may request, as every door accepts it — one of
- * the offered {@link LWQL_GRANULARITY_STEPS}, nothing else, so an off-list
+ * the {@link LWQL_ACCEPTED_GRANULARITY_STEPS}, nothing else, so an off-list
  * value is a schema rejection rather than the service's backstop.
  */
 const lwqlGranularityStepSchemaDefinition = z.union(
-  LWQL_GRANULARITY_STEPS.map((step) => z.literal(step)) as [
-    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
-    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
-    ...z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>[],
+  LWQL_ACCEPTED_GRANULARITY_STEPS.map((step) => z.literal(step)) as [
+    z.ZodLiteral<(typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number]>,
+    z.ZodLiteral<(typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number]>,
+    ...z.ZodLiteral<(typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number]>[],
   ],
 );
 export interface LwqlGranularityStepSchema extends Named<

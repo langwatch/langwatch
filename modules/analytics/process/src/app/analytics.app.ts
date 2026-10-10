@@ -93,7 +93,7 @@ import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } fro
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -844,6 +844,15 @@ export class AnalyticsModule
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean> {
     return lwqlEnabled({
+      featureFlags: this.#dependencies.featureFlags,
+      projectId: input.projectId,
+      projects: this.#dependencies.projects,
+    });
+  }
+
+  /** Whether this project's rollout admits it to the Dashboards area at all. */
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean> {
+    return dashboardsEnabled({
       featureFlags: this.#dependencies.featureFlags,
       projectId: input.projectId,
       projects: this.#dependencies.projects,

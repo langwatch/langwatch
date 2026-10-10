@@ -15,6 +15,7 @@ import type {
   UiOperationsToken,
   UiTokenIdentity,
 } from "./declarations.ts";
+import { loadChunk } from "./navigation.ts";
 
 /** One lender of an extension point, with its component. */
 export type UiLentComponent<Props> = Readonly<{ owner: string; Component: ComponentType<Props> }>;
@@ -45,7 +46,7 @@ export function useLentOperations<Operations>(
     const lend = declarations.lent(token)[0]?.lend;
     if (lend === undefined || !("load" in lend)) return undefined;
     return async () => {
-      const loaded = await lend.load();
+      const loaded = await loadChunk(() => lend.load());
       if (!isDefaultOf<Operations>(loaded))
         throw new Error(`Lent operations ${token.key} did not load.`);
       return loaded.default;
@@ -89,7 +90,7 @@ function lentComponents<Props>({
   return declarations.lent(token).flatMap(({ module, lend }) => {
     if (!("load" in lend)) return [];
     const Component: unknown = lazy(async () => {
-      const loaded = await lend.load();
+      const loaded = await loadChunk(() => lend.load());
       if (!isDefaultOf<ComponentType<object>>(loaded)) {
         throw new Error(`Lent component ${token.key} did not load a component.`);
       }

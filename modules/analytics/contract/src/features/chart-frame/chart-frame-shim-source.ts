@@ -8,6 +8,7 @@ import {
   CHART_FRAME_HEARTBEAT_INTERVAL_MS,
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
+  CHART_QUERY_MAX_RETRIES,
 } from "./chart-frame-protocol.ts";
 import {
   createChartQueryRunner,
@@ -165,7 +166,9 @@ export function buildShimScript(): string {
    *    'refetchError' / 'isRefetchError'. 'isError' means there is nothing
    *    to show, never that a refresh over a good chart failed;
    *  - a failure the host marks retryable (the query service was busy) is
-   *    retried a few times with backoff and jitter before it counts.
+   *    retried a few times with backoff and jitter before it counts;
+   *  - 'completeness' is the server's report on what the rows are missing
+   *    (empty buckets, absent fields, unpriced cost), null until known.
    * It also refetches on its own whenever the dashboard context (time
    * window, granularity) changes, via the same feed LW.onDashboardContextChange
    * exposes directly - a widget using this hook stays live without its
@@ -179,6 +182,7 @@ export function buildShimScript(): string {
     var stateHook = React.useState({
       status: "pending",
       data: null,
+      completeness: null,
       error: null,
       refetchError: null,
       isFetching: true
@@ -200,6 +204,7 @@ export function buildShimScript(): string {
           return planChartQueryRetry({
             rejection: args.rejection,
             retriesUsed: args.retriesUsed,
+            maxRetries: ${CHART_QUERY_MAX_RETRIES},
             random: Math.random
           });
         },
@@ -210,7 +215,14 @@ export function buildShimScript(): string {
       runRef.current = runner.run;
       // A genuine identity change (new name/params) starts over from
       // scratch rather than keeping the previous query's stale data/error.
-      setState({ status: "pending", data: null, error: null, refetchError: null, isFetching: true });
+      setState({
+        status: "pending",
+        data: null,
+        completeness: null,
+        error: null,
+        refetchError: null,
+        isFetching: true
+      });
       runner.run();
       var unsubscribe = LW.onDashboardContextChange(runner.run);
 
@@ -225,6 +237,7 @@ export function buildShimScript(): string {
 
     return {
       data: state.data,
+      completeness: state.completeness,
       isLoading: state.status === "pending" && state.isFetching,
       isFetching: state.isFetching,
       isError: state.status === "error",

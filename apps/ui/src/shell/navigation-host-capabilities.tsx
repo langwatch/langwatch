@@ -4,6 +4,7 @@
  * there is no join offer, and user's second-factor enrolment gate.
  */
 
+import { lazyChunk, loadChunk } from "@langwatch/browser-host/navigation";
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { JoinOfferToken, type JoinOfferProps } from "@langwatch/organization-client";
 import { userWeb } from "@langwatch/user-browser/declaration";
@@ -11,12 +12,18 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 
 // Fetched with the shell, not on first render: main drew the offer statically, and a
 // chunk requested only after the join queries resolve arrives seconds after sign-in.
-const joinOfferChunk = loadLentJoinOffer();
-const secureAccountNudgeChunk = userWeb.installation.capabilities.secureAccountNudge.load();
+const joinOfferChunk = loadChunk(loadLentJoinOffer);
+const secureAccountNudgeChunk = loadChunk(
+  userWeb.installation.capabilities.secureAccountNudge.load,
+);
 const JoinYourTeamTakeover = lazy(() => joinOfferChunk);
 const SecureAccountNudge = lazy(() => secureAccountNudgeChunk);
-const TeamAccessWaiting = lazy(organizationWeb.installation.capabilities.teamAccessWaiting.load);
-const organizationMfaGateChunk = userWeb.installation.capabilities.organizationMfaGate.load();
+const TeamAccessWaiting = lazyChunk<TeamAccessWaitingProps>(
+  organizationWeb.installation.capabilities.teamAccessWaiting.load,
+);
+const organizationMfaGateChunk = loadChunk(
+  userWeb.installation.capabilities.organizationMfaGate.load,
+);
 const OrganizationMfaGate = lazy(() => organizationMfaGateChunk);
 
 function isJoinOffer(loaded: unknown): loaded is { default: ComponentType<JoinOfferProps> } {
@@ -52,13 +59,15 @@ export function joinOffer({
   );
 }
 
+interface TeamAccessWaitingProps {
+  organizationName: string;
+  onCheckAccess: () => void;
+}
+
 export function teamAccessWaiting({
   organizationName,
   onCheckAccess,
-}: {
-  organizationName: string;
-  onCheckAccess: () => void;
-}): ReactNode {
+}: TeamAccessWaitingProps): ReactNode {
   return (
     <Suspense fallback={null}>
       <TeamAccessWaiting organizationName={organizationName} onCheckAccess={onCheckAccess} />

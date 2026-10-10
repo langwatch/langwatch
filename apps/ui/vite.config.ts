@@ -7,8 +7,10 @@ import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
 
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
+import { chunkImportRetry } from "./vite/chunk-import-retry";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
+import { entryCoreChunkGroup, hostMountsChunkGroup } from "./vite/entry-core-chunks";
 import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { mailPreview } from "./vite/mail-preview";
@@ -16,11 +18,38 @@ import { publicConfigPages } from "./vite/public-config-from-api";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
+import { shikiReachGuard } from "./vite/shiki-reach-guard";
 
 // This package declares `"type": "module"`, so Vite bundles the config as ESM
 // and `__dirname` does not exist. `import.meta.dirname` is the same directory.
 const here = import.meta.dirname;
 const repoRoot = path.resolve(here, "../..");
+
+/** Names the chunk a module must land in, or undefined for Rolldown's default split. */
+function manualChunkFor(id: string): string | undefined {
+  // Every `import()` calls the preload helper. Left unassigned, Rolldown puts it in the
+  // first manual chunk that uses it (shiki), so the entry imported 600 kB of highlighter
+  // on every page just to lazy-load a screen.
+  if (id.includes("vite/preload-helper")) return "preload-helper";
+  // Shiki chunk-splitting lives in the Design System's `shiki-chunking` module
+  // (dependency-free) so its guard test can exercise the real logic.
+  return shikiManualChunk(id);
+}
+
+// A named chunk swallows the modules it depends on, first come first served, so a shared
+// helper landed wherever Rolldown looked first. Priorities make it deterministic: the small
+// chunks claim their modules before the shiki chunk can, highest first.
+const NAMED_CHUNKS = ["preload-helper", "hast-helpers", "shiki-langs", "shiki"] as const;
+// The first-paint core comes last, so it never takes a module a named chunk claims.
+const CHUNK_GROUPS = [
+  ...NAMED_CHUNKS.map((name, index) => ({
+    name,
+    test: (id: string) => manualChunkFor(id) === name,
+    priority: NAMED_CHUNKS.length - index + 1,
+  })),
+  entryCoreChunkGroup({ priority: 1 }),
+  hostMountsChunkGroup({ priority: 1 }),
+];
 
 type PackageExportTarget = string | { default?: string };
 
@@ -286,6 +315,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
       pushServiceWorker(),
+      shikiReachGuard(),
+      chunkImportRetry({ repoRoot }),
     ],
     resolve: {
       // ONE zod instance for the app AND linked workspace packages
@@ -328,11 +359,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
         // ended up eager across 22 modules.
         onwarn: failOnIneffectiveDynamicImport,
         output: {
-          manualChunks(id: string) {
-            // Shiki chunk-splitting lives in the Design System's `shiki-chunking`
-            // module (dependency-free) so its guard test can exercise the real logic.
-            return shikiManualChunk(id);
-          },
+          codeSplitting: { groups: CHUNK_GROUPS },
         },
       },
     },
@@ -424,14 +451,16 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
-        // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
-        "^/mcp(?:\\?.*)?$": {
+        // The API process serves the sandboxed chart frame in production; in
+        // dev the frontend owns the root, so it needs its own entry or it
+        // falls through to the SPA and every widget frame renders blank.
+        "^/sandbox/chart-frame(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,
         },
-        // The widget chart frame is the API's framed document; unproxied it falls to the SPA shell.
-        "^/sandbox/chart-frame(?:\\?.*)?$": {
+        // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
+        "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,

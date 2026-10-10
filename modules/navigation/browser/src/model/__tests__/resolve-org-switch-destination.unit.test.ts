@@ -21,6 +21,16 @@ describe("resolveOrgSwitchDestination", () => {
       ).toBe("/gateway/virtual-keys");
     });
 
+    it("stays in Dashboards, on the new organization's project", () => {
+      expect(
+        resolveOrgSwitchDestination({
+          currentProduct: "dashboards",
+          reachableProducts: ["llm-ops", "dashboards"],
+          projectSlug: "beta-app",
+        }),
+      ).toBe("/beta-app/dashboards");
+    });
+
     it("falls through when the product has no home to offer", () => {
       // LLM Ops without a project resolves no home; the next candidate wins.
       expect(

@@ -2,6 +2,7 @@ import { Box, chakra } from "@langwatch/design-system/primitives";
 import { motion } from "motion/react";
 import { type ComponentProps, type ReactNode, type RefObject } from "react";
 
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   FLOATING_PEEK_NEAR_PX,
   SIDEBAR_PEEK_NEAR_PX,
@@ -82,6 +83,7 @@ export function LangyPanelFrame({
 }) {
   const { floating, reduceMotion, isDrawerCompanion } = placement;
   const touchable = (isOpen || peek.peeking) && !peek.dismissed;
+  const markPanelShown = useLangyStore((s) => s.markPanelShown);
   return (
     <MotionBox
       ref={panelRef}
@@ -117,6 +119,10 @@ export function LangyPanelFrame({
       variants={panelVariants(floating)}
       style={{ translate: peek.translate }}
       transition={panelTransition({ reduceMotion, isOpen })}
+      // A closed panel is hidden, and a hidden field refuses focus: say when it can take it.
+      onAnimationComplete={() => {
+        if (isOpen) markPanelShown();
+      }}
       css={panelSizeCss({ floating, reduceMotion })}
       {...panelPlacementChrome({
         floating,

@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import {
   createDashboardTestAnalytics,
   createDashboardTestApp,
+  createDashboardTestRepositoriesWithBoard,
 } from "../../app/__tests__/dashboard.fixture.ts";
 import { dashboardWidgetTrpcTransport } from "../dashboard-widget.trpc.ts";
 
@@ -95,7 +96,8 @@ describe("the dashboard widgets tRPC namespace", () => {
   describe("when the create drawer saves a widget on a dashboard", () => {
     /** @scenario "The create drawer places a new widget on the dashboard it names through dashboardWidgets.create" */
     it("places it on that dashboard and answers main's widget shape", async () => {
-      const { call } = mounted(createDashboardTestApp());
+      const repositories = await createDashboardTestRepositoriesWithBoard();
+      const { call } = mounted(createDashboardTestApp({ repositories }));
 
       const created = dashboardWidgetTrpcSchema.parse(
         await call("create", { ...WIDGET, dashboardId: "dashboard-1" }),
@@ -128,7 +130,8 @@ describe("the dashboard widgets tRPC namespace", () => {
 
   describe("when the update and assignDashboard mutations succeed", () => {
     it("answers success, as main did", async () => {
-      const { call } = mounted(createDashboardTestApp());
+      const repositories = await createDashboardTestRepositoriesWithBoard();
+      const { call } = mounted(createDashboardTestApp({ repositories }));
       const created = dashboardWidgetTrpcSchema.parse(await call("create", WIDGET));
 
       await expect(

@@ -110,6 +110,7 @@ describe("foldSpanIntoTraceAnalytics", () => {
         },
       }),
       spanCost: 0.25,
+      spanUnpriced: false,
     });
 
     it("counts the span, names the trace and takes its window", () => {
@@ -142,6 +143,7 @@ describe("foldSpanIntoTraceAnalytics", () => {
           state,
           span: span({ name: "langwatch.track_event" }),
           spanCost: 1,
+          spanUnpriced: false,
         }),
       ).toBe(state);
     });
@@ -155,6 +157,7 @@ describe("foldSpanIntoTraceAnalytics", () => {
           spanAttributes: { [ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION]: true },
         }),
         spanCost: 2,
+        spanUnpriced: false,
       });
       expect(next.totalCost).toBeNull();
     });

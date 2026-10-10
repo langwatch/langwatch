@@ -1,9 +1,16 @@
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
-import { Boxes, Building2, type LucideIcon, UserRound, Waypoints } from "lucide-react";
+import {
+  Boxes,
+  Building2,
+  LayoutDashboard,
+  type LucideIcon,
+  UserRound,
+  Waypoints,
+} from "lucide-react";
 
 /** Product registry; Settings excluded (no switcher, no memory, own shell) */
-export type ProductId = "me" | "llm-ops" | "gateway" | "governance";
+export type ProductId = "me" | "llm-ops" | "dashboards" | "gateway" | "governance";
 
 export type ProductScopeKind = "personal" | "project" | "organization";
 
@@ -31,7 +38,18 @@ export interface ProductDefinition {
   gates: ProductAccessGate[];
 }
 
+// The switcher lists products in this order. Dashboards leads: it is the overview every
+// other product feeds, so it is the first place to look.
 export const PRODUCTS: readonly ProductDefinition[] = [
+  {
+    id: "dashboards",
+    label: "Dashboards",
+    pitch: "Your saved dashboards, in one place",
+    icon: LayoutDashboard,
+    scopeKind: "project",
+    homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}/dashboards` : null),
+    gates: [{ flag: "release_dashboards" }, { permission: "analytics:view" }],
+  },
   {
     id: "me",
     label: "Me",
@@ -95,6 +113,12 @@ export function productById(id: ProductId): ProductDefinition {
   return product;
 }
 
+/** Whether a product works inside one project, so the top bar offers the project picker. */
+export function isProjectScopedProduct(id: ProductId | null): boolean {
+  if (!id) return false;
+  return PRODUCTS.find((candidate) => candidate.id === id)?.scopeKind === "project";
+}
+
 /** Checks if product is org-scoped; registry owns scope so fifth product means one edit */
 export function isOrganizationScopedProduct(id: ProductId | null): boolean {
   if (!id) return false;
@@ -140,8 +164,9 @@ export function productFromPathname(pathname: string): ProductId | null {
     return null;
   }
   // Everything else is a /:project page (including the next-router
-  // "/[project]/*" pattern spelling).
-  return "llm-ops";
+  // "/[project]/*" pattern spelling); its Dashboards area is its own product.
+  const [, , area] = pathname.split("/");
+  return area === "dashboards" ? "dashboards" : "llm-ops";
 }
 
 /** Settings detour: settings and ops pages; both org-scoped, render settings sidebar */

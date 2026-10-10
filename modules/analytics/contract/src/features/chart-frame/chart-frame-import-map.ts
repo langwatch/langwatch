@@ -130,8 +130,12 @@ export const CHART_FRAME_GLOBAL_EXPORTS = {
     "ProjectionBars",
     "Sparkline",
     "StackedBars",
+    "averageOf",
     "interpolateColor",
+    "isLowerBound",
+    "mergeBuckets",
     "parseHexRgb",
+    "toNumber",
   ],
 } as const satisfies Record<string, readonly string[]>;
 

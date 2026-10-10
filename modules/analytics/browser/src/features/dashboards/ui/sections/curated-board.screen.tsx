@@ -1,0 +1,102 @@
+/**
+ * `/[project]/dashboards/curated/[templateId]`: a From LangWatch board, a template live and
+ * read-only. Nothing is stored until "Duplicate to edit" in the sidebar menu
+ * (dashboards-v2.feature).
+ */
+
+import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+
+import {
+  DashboardRefetchIntervalContext,
+  useDashboardAutoRefresh,
+} from "../../../../behavior/use-dashboard-auto-refresh.ts";
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
+import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
+import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
+import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
+import { CURATED_SEGMENT } from "../../model/boards.ts";
+import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.ts";
+import { BoardHeader } from "../blocks/board-header.tsx";
+import { BoardPage } from "../blocks/board-page.tsx";
+import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
+import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
+import { DashboardsGate } from "./dashboards-gate.tsx";
+
+function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
+  const host = useAnalyticsHost();
+  const projectId = host.project()?.id ?? "";
+  const saved = useSavedDashboards();
+  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const subject = boardSubject({
+    board: {
+      id: `${CURATED_SEGMENT}/${board.templateId}`,
+      name: board.name,
+      templateId: board.templateId,
+    },
+    widgets: board.widgets,
+  });
+  useBoardOnScreen({ boardId: subject.id });
+  const langy = useLangyAsk();
+
+  return (
+    <BoardPage
+      header={
+        <BoardHeader
+          name={board.name}
+          description={board.job}
+          isFromLangWatch
+          action={null}
+          periodControl={
+            <BoardPeriodControl
+              range={range}
+              grain={grain}
+              refresh={autoRefresh.option}
+              onRangeChange={setRange}
+              onGrainChange={setGrain}
+              onRefreshChange={autoRefresh.setOption}
+              onRefreshNow={autoRefresh.refreshNow}
+            />
+          }
+        />
+      }
+    >
+      <BoardLangy board={subject} period={period} />
+      <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
+        <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
+          <CuratedWidgetsGrid
+            projectId={projectId}
+            projectSlug={saved.projectSlug}
+            templateId={board.templateId}
+            boardName={board.name}
+            widgets={board.widgets}
+            period={period}
+            onAskLangy={
+              langy.enabled
+                ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
+                : undefined
+            }
+          />
+        </DashboardRefreshedAtContext.Provider>
+      </DashboardRefetchIntervalContext.Provider>
+    </BoardPage>
+  );
+}
+
+function Curated() {
+  const templateId = useAnalyticsHost().route().params.templateId ?? "";
+  const board = curatedBoardById(templateId);
+  if (!board) return <UiPageNotFound />;
+  return <OpenCuratedBoard key={board.templateId} board={board} />;
+}
+
+export default function CuratedBoardScreen() {
+  return (
+    <DashboardsGate>
+      <Curated />
+    </DashboardsGate>
+  );
+}

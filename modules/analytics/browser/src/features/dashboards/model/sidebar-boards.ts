@@ -1,0 +1,141 @@
+/**
+ * What the Dashboards sidebar lists, each board in exactly one group: My dashboard and the
+ * team's unstarred boards by name, the member's stars in their own order, the organization's
+ * boards other projects own, then the From LangWatch boards not starred. Pure.
+ * @see modules/dashboard/specs/dashboards-v2.feature
+ */
+
+import type { DashboardStar } from "@langwatch/dashboard-contract";
+
+import type { ScopedBoard } from "./board-scope.ts";
+import { curatedBoardPath, dashboardsPath, myDashboardId } from "./boards.ts";
+import type { CuratedBoard } from "./curated-boards.ts";
+
+/** A stored board, as much of it as the sidebar reads. */
+export interface SidebarBoard extends ScopedBoard {
+  readonly description: string | null;
+  /** The owning project, named only where the board is listed in another project. */
+  readonly ownerProject: { readonly name: string } | null;
+}
+
+/** One of the member's stars as the server answers it, in their order. */
+export type MemberStar =
+  | { readonly kind: "board"; readonly board: SidebarBoard }
+  | { readonly kind: "template"; readonly templateId: string };
+
+/** A starred row: a stored board, or a From LangWatch board. */
+export type StarredRow =
+  | { readonly kind: "board"; readonly board: SidebarBoard }
+  | { readonly kind: "template"; readonly curated: CuratedBoard };
+
+export interface SidebarGroups {
+  readonly myBoard: SidebarBoard | undefined;
+  readonly yourBoards: readonly SidebarBoard[];
+  readonly starred: readonly StarredRow[];
+  /** The Organization boards other projects own, unstarred, by name. */
+  readonly fromOrganization: readonly SidebarBoard[];
+  readonly fromLangWatch: readonly CuratedBoard[];
+}
+
+/** The reference a star is written with. */
+export function starRefOf(star: MemberStar | StarredRow): DashboardStar {
+  if (star.kind === "board") return { kind: "board", dashboardId: star.board.id };
+  return {
+    kind: "template",
+    templateId: "templateId" in star ? star.templateId : star.curated.templateId,
+  };
+}
+
+/** Whether two references name the same star. */
+export function sameStar(left: DashboardStar, right: DashboardStar): boolean {
+  if (left.kind === "board" && right.kind === "board")
+    return left.dashboardId === right.dashboardId;
+  if (left.kind === "template" && right.kind === "template") {
+    return left.templateId === right.templateId;
+  }
+  return false;
+}
+
+const byName = (a: SidebarBoard, b: SidebarBoard) => a.name.localeCompare(b.name);
+
+export function sidebarGroups({
+  boards,
+  organizationBoards = [],
+  stars,
+  curated,
+  userId,
+}: {
+  /** The project's own boards the member may see. */
+  boards: readonly SidebarBoard[];
+  /** The Organization boards other projects own. */
+  organizationBoards?: readonly SidebarBoard[];
+  stars: readonly MemberStar[];
+  curated: readonly CuratedBoard[];
+  userId: string | undefined;
+}): SidebarGroups {
+  const myId = myDashboardId({ boards, userId });
+  const starredBoardIds = new Set(
+    stars.flatMap((star) => (star.kind === "board" ? [star.board.id] : [])),
+  );
+  const starredTemplateIds = new Set(
+    stars.flatMap((star) => (star.kind === "template" ? [star.templateId] : [])),
+  );
+  const curatedById = new Map(curated.map((board) => [board.templateId, board]));
+
+  // The listed row names the owning project, which a star's own row does not.
+  const listedById = new Map([...boards, ...organizationBoards].map((board) => [board.id, board]));
+
+  const starred = stars.flatMap((star): StarredRow[] => {
+    if (star.kind === "board") {
+      const board = listedById.get(star.board.id) ?? star.board;
+      return board.id === myId ? [] : [{ kind: "board", board }];
+    }
+    const board = curatedById.get(star.templateId);
+    return board ? [{ kind: "template", curated: board }] : [];
+  });
+
+  return {
+    myBoard: boards.find(({ id }) => id === myId),
+    yourBoards: boards
+      .filter((board) => board.id !== myId && !starredBoardIds.has(board.id))
+      .toSorted(byName),
+    starred,
+    fromOrganization: organizationBoards
+      .filter((board) => !starredBoardIds.has(board.id))
+      .toSorted(byName),
+    fromLangWatch: curated.filter(({ templateId }) => !starredTemplateIds.has(templateId)),
+  };
+}
+
+/** One starred dashboard as another product's sidebar links it. */
+export interface StarredLink {
+  readonly key: string;
+  readonly name: string;
+  readonly href: string;
+}
+
+/**
+ * Every star, My dashboard included, in the member's order, as links into Dashboards; a star
+ * on a From LangWatch board no longer offered is left out.
+ */
+export function starredLinks({
+  stars,
+  curated,
+  projectSlug,
+}: {
+  stars: readonly MemberStar[];
+  curated: readonly CuratedBoard[];
+  projectSlug: string;
+}): StarredLink[] {
+  const curatedById = new Map(curated.map((board) => [board.templateId, board]));
+  return stars.flatMap((star): StarredLink[] => {
+    if (star.kind === "board") {
+      const { id, name } = star.board;
+      return [{ key: `board-${id}`, name, href: dashboardsPath({ projectSlug, dashboardId: id }) }];
+    }
+    const board = curatedById.get(star.templateId);
+    if (!board) return [];
+    const href = curatedBoardPath({ projectSlug, templateId: board.templateId });
+    return [{ key: `template-${board.templateId}`, name: board.name, href }];
+  });
+}

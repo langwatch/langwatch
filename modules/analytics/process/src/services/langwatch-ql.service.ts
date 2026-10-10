@@ -29,6 +29,7 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
+import { scopeLangWatchQLToOrigins } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import {
   langWatchQLExecutionParameters,
@@ -43,6 +44,7 @@ import {
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
+import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
@@ -59,6 +61,7 @@ const lwqlCapability = LangWatchQLCapabilityService.create();
 const timeWindows = LangWatchQLTimeWindowService.create();
 const lwqlSchema = LangWatchQLSchemaService.create();
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
+const lwqlCompleteness = LangWatchQLCompletenessService.create();
 const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
@@ -194,6 +197,9 @@ export class LangWatchQLService {
       // dataset must stay gated so that naming it unqualified — where no table
       // reference reveals which dataset it came from — is refused too.
       gatedColumns: catalogShapes.gatedColumns({ protections, views: this.views }),
+      // What would lift each of those, so a refusal can say "you may not see this" apart from
+      // "this query is broken". It names a permission, never a value.
+      gatedColumnGates: catalogShapes.gatedColumnGates({ protections, views: this.views }),
       // An app function returning captured content is as restricted as a
       // column holding it, so the gate reads the same permissions.
       heldPermissions: [...catalogShapes.heldPermissions(protections)],
@@ -315,6 +321,7 @@ export class LangWatchQLService {
     timeWindow,
     granularitySeconds,
     onBudgetOverflow,
+    excludeOrigins = [],
     isInstantEvalsEnabled,
     signal,
   }: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
@@ -350,15 +357,38 @@ export class LangWatchQLService {
       throw new LangWatchQLUnavailableError();
     }
 
-    return this.executeValidated({
+    const tenantCapability = lwqlCapability.tenantCapabilitySet({
+      secrets: projects.map((project) => project.lwqlKey),
+    });
+    // Only a statement that follows the window reads within it; one with its own range, such
+    // as month to date, would lose Langy traces older than the window from the origin lookup.
+    const followedWindow = validation.followsTimeWindow ? timeWindow : void 0;
+    const result = await this.executeValidated({
       executor,
       projects,
       protections,
       sql,
       validation,
       granularity,
+      tenantCapability,
+      excludeOrigins,
+      ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
     });
+    // After the main query, never beside it: a refused or failed query costs no second read.
+    const completeness = await lwqlCompleteness.assess({
+      executor,
+      tenantCapability,
+      validation,
+      database: this.deps.database,
+      views: this.views,
+      excludeOrigins,
+      timeWindow: followedWindow,
+      granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
+    });
+
+    if (completeness.kind !== "reported") return result;
+    return { ...result, completeness: completeness.completeness };
   }
 
   /**
@@ -383,6 +413,9 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
+    tenantCapability,
+    excludeOrigins,
+    timeWindow,
     signal,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
@@ -391,6 +424,11 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
+    readonly tenantCapability: string;
+    /** The origins the surface leaves out of every view the statement reads. */
+    readonly excludeOrigins: readonly string[];
+    /** The window the statement follows, which bounds the origin lookup; absent, none does. */
+    readonly timeWindow?: LangWatchQLTimeWindow;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     // The resolved record plus the step this run was bucketed at, when the
@@ -399,18 +437,22 @@ export class LangWatchQLService {
     const executionParameters = langWatchQLExecutionParameters({ validation, granularity });
 
     const execution = await executor.execute({
-      // The submitted statement with one edit and no other: a default `LIMIT` when the caller
-      // named none, so an unbounded query is capped rather than streamed.
-      sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: this.limits.maxRows }),
+      // The submitted statement with a default `LIMIT` when the caller named none, so an
+      // unbounded query is capped rather than streamed, and the origins the surface left out.
+      sql: scopeLangWatchQLToOrigins({
+        sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: this.limits.maxRows }),
+        excludeOrigins,
+        database: this.deps.database,
+        views: this.views,
+        ...(timeWindow ? { timeWindow } : {}),
+      }),
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half — it predates the
       // granularity merge, so passing it drops `period_granularity_seconds`
       // from every statement that declares one.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
-      tenantCapability: lwqlCapability.tenantCapabilitySet({
-        secrets: projects.map((project) => project.lwqlKey),
-      }),
+      tenantCapability,
     });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
@@ -451,6 +493,7 @@ export class LangWatchQLService {
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
+        excludeOrigins,
       },
       "LangWatchQL executed",
     );

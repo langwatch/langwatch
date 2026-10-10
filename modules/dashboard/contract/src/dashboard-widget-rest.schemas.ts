@@ -4,9 +4,12 @@
  */
 import {
   dashboardWidgetCodeSchema,
+  dashboardWidgetDescriptionSchema,
   dashboardWidgetNameSchema,
+  dashboardWidgetPromptSchema,
   dashboardWidgetQueriesSchema,
   dashboardWidgetQuerySchema,
+  dashboardWidgetSourceSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
@@ -15,6 +18,10 @@ const createDashboardWidgetSchemaDefinition = z.object({
   name: dashboardWidgetNameSchema,
   code: dashboardWidgetCodeSchema,
   queries: dashboardWidgetQueriesSchema,
+  description: dashboardWidgetDescriptionSchema.optional(),
+  prompt: dashboardWidgetPromptSchema.optional(),
+  /** Where the widget came from; the API records `{ kind: "api" }` when the body names none. */
+  source: dashboardWidgetSourceSchema.optional(),
 });
 export interface CreateDashboardWidgetSchema extends Named<
   typeof createDashboardWidgetSchemaDefinition
@@ -27,16 +34,13 @@ const updateDashboardWidgetSchemaDefinition = z
     name: dashboardWidgetNameSchema.optional(),
     code: dashboardWidgetCodeSchema.optional(),
     queries: dashboardWidgetQueriesSchema.optional(),
+    description: dashboardWidgetDescriptionSchema.optional(),
+    source: dashboardWidgetSourceSchema.optional(),
   })
-  // A PATCH naming nothing is a mistake worth reporting, and `code` without
-  // `queries` (or the reverse) would write half a definition.
+  // A PATCH naming nothing is a mistake worth reporting; a field it leaves out keeps its value.
   .refine(
-    (body) => body.name !== undefined || (body.code !== undefined && body.queries !== undefined),
-    "Provide a name, a full { code, queries } definition, or both.",
-  )
-  .refine(
-    (body) => (body.code === undefined) === (body.queries === undefined),
-    "code and queries must be provided together.",
+    (body) => Object.values(body).some((value) => value !== undefined),
+    "Provide at least one of name, code, queries, description or source.",
   )
   .meta({ minProperties: 1 });
 export interface UpdateDashboardWidgetSchema extends Named<
@@ -62,6 +66,9 @@ const dashboardWidgetResourceSchemaDefinition = z.object({
     version: z.number(),
     code: z.string(),
     queries: z.array(dashboardWidgetQuerySchema),
+    description: z.string().optional(),
+    prompt: z.string().optional(),
+    source: dashboardWidgetSourceSchema.optional(),
   }),
   createdAt: z.string(),
   updatedAt: z.string(),

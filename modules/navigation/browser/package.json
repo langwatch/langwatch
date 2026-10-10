@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/analytics-client": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/browser": "workspace:*",

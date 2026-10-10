@@ -358,6 +358,10 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       DashboardId: { source: "id" },
       Name: { source: "name" },
       Order: { source: "order" },
+      Description: { source: "description", content: "output" },
+      CreatedById: { source: "createdById" },
+      scope: "omit", // an Only me board is not in the view at all; see the visibility overrides
+      organizationId: "omit", // set only once a board is shared with the organization
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -1129,7 +1133,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Language: { source: "language", content: "output" },
       Framework: { source: "framework", content: "output" },
       Kind: { source: "kind" },
-      aggregateRule: "omit",
+      aggregateRule: "omit", // not offered until the project module decides how its rule reads
       FirstMessage: { source: "firstMessage" },
       Integrated: { source: "integrated" },
       CreatedAt: { source: "createdAt" },
@@ -1560,7 +1564,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       licenseTokenHash: "omit", // secret
       LicenseInstanceId: { source: "licenseInstanceId" },
       LicenseExpiresAt: { source: "licenseExpiresAt" },
-      licenseId: "omit",
+      licenseId: "omit", // not offered until gateway decides how its licence columns read
     },
   }),
   webhook_endpoint_deliveries: defineTableCatalogue({

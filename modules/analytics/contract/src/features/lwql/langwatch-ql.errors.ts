@@ -103,6 +103,25 @@ export class LangWatchQLUnknownIdentifierError extends HandledError {
 }
 
 /**
+ * ClickHouse refused the statement as written (an aggregate in WHERE, a type clash) for a
+ * reason the static validator cannot see. The fault is the caller's SQL: a 400, never a 500.
+ * The refusal echoes the query, so it rides in `reasons` for the logs only.
+ */
+export class LangWatchQLInvalidQueryError extends HandledError {
+  declare readonly code: "lwql_invalid_query";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("lwql_invalid_query", "The database rejected the query as written.", {
+      httpStatus: 400,
+      fault: "customer",
+      ...remediation("lwql_invalid_query"),
+      ...options,
+    });
+    this.name = "LangWatchQLInvalidQueryError";
+  }
+}
+
+/**
  * Access denied on a provisioned executor—our grants incomplete, not customer
  * admin issue.
  */

@@ -52,6 +52,8 @@ export type SpanTokenAccumulationState = Pick<
   | "totalCompletionTokenCount"
   | "totalCost"
   | "nonBilledCost"
+  | "unpricedSpanCount"
+  | "unpricedModels"
   | "tokensEstimated"
   | "timeToFirstTokenMs"
   | "timeToLastTokenMs"
@@ -62,6 +64,8 @@ export interface SpanTokenAccumulation {
   totalCompletionTokenCount: number | null;
   totalCost: number | null;
   nonBilledCost: number | null;
+  unpricedSpanCount: number;
+  unpricedModels: string[];
   tokensEstimated: boolean;
   timeToFirstTokenMs: number | null;
   timeToLastTokenMs: number | null;
@@ -280,18 +284,47 @@ export function extractSpanTokenTiming(span: NormalizedSpan): SpanTokenTiming {
 }
 
 /**
+ * Counts the span when its zero cost is unknown rather than free: it reports usage that no
+ * price rule covers. A span priced at zero by a rule, a positive cost, or a skipped span is
+ * not counted. Models stay distinct and sorted, stable however spans arrive.
+ */
+function accumulateUnpriced({
+  state,
+  span,
+  cost,
+  spanUnpriced,
+}: {
+  state: SpanTokenAccumulationState;
+  span: NormalizedSpan;
+  cost: number;
+  spanUnpriced: boolean;
+}): { unpricedSpanCount: number; unpricedModels: string[] } {
+  const counted = state.unpricedSpanCount ?? 0;
+  const models = state.unpricedModels ?? [];
+  const isUnpriced = !isSpanTokenAccumulationSkipped(span) && cost <= 0 && spanUnpriced;
+  if (!isUnpriced) return { unpricedSpanCount: counted, unpricedModels: [...models] };
+  const model = extractSpanModels(span)[0];
+  const withModel =
+    model === undefined || models.includes(model) ? models : [...models, model].toSorted();
+  return { unpricedSpanCount: counted + 1, unpricedModels: [...withModel] };
+}
+
+/**
  * Fold one span's tokens, cost and token timing into trace totals. `spanCost`
- * is the span's price, looked up by the caller; a skipped span adds nothing.
+ * is the span's price and `spanUnpriced` whether no price rule covers it, both
+ * looked up by the caller; a skipped span adds nothing.
  */
 export function accumulateSpanTokens({
   state,
   span,
   spanCost,
+  spanUnpriced,
   totalDurationMs,
 }: {
   state: SpanTokenAccumulationState;
   span: NormalizedSpan;
   spanCost: number;
+  spanUnpriced: boolean;
   totalDurationMs: number;
 }): SpanTokenAccumulation {
   const metrics = isSpanTokenAccumulationSkipped(span)
@@ -331,6 +364,7 @@ export function accumulateSpanTokens({
     totalCompletionTokenCount: totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
     totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
     nonBilledCost: nonBilledCost > 0 ? Number(nonBilledCost.toFixed(6)) : null,
+    ...accumulateUnpriced({ state, span, cost: metrics.cost, spanUnpriced }),
     tokensEstimated: state.tokensEstimated || metrics.estimated,
     timeToFirstTokenMs,
     timeToLastTokenMs,

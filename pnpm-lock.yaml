@@ -1973,6 +1973,9 @@ importers:
       '@langwatch/topic-process':
         specifier: workspace:*
         version: link:../../modules/topic/process
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../modules/trace/contract
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:../../modules/trace/process
@@ -5190,6 +5193,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
+      '@langwatch/csv':
+        specifier: workspace:*
+        version: link:../../../packages/csv
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
@@ -5211,6 +5217,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../../langy/client
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -7241,12 +7253,18 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -7256,6 +7274,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -11408,6 +11429,9 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
+      '@langwatch/analytics-client':
+        specifier: workspace:*
+        version: link:../../analytics/client
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api

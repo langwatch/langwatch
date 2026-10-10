@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   extractUnknownIdentifier,
+  isClickHouseInvalidQueryError,
   isClickHouseResultTooLargeError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
@@ -63,5 +64,51 @@ describe("extractUnknownIdentifier", () => {
     it("names the column, and nothing else from the message", () => {
       expect(extractUnknownIdentifier(raised())).toBe("trace_idd");
     });
+  });
+});
+
+describe("isClickHouseInvalidQueryError", () => {
+  const refusals = [
+    ["ILLEGAL_AGGREGATION", "184"],
+    ["NOT_AN_AGGREGATE", "215"],
+    ["SYNTAX_ERROR", "62"],
+    ["ILLEGAL_TYPE_OF_ARGUMENT", "43"],
+    ["TYPE_MISMATCH", "53"],
+    ["NUMBER_OF_ARGUMENTS_DOESNT_MATCH", "42"],
+    ["NO_COMMON_TYPE", "386"],
+    ["AMBIGUOUS_COLUMN_NAME", "352"],
+    ["NOT_FOUND_COLUMN_IN_BLOCK", "10"],
+    ["BAD_ARGUMENTS", "36"],
+    ["ILLEGAL_COLUMN", "44"],
+    ["CANNOT_CONVERT_TYPE", "70"],
+    ["CANNOT_PARSE_TEXT", "6"],
+    ["CANNOT_PARSE_INPUT_ASSERTION_FAILED", "27"],
+  ] as const;
+
+  /** @scenario "A query the database rejects as written is refused as the caller's fault" */
+  it.each(refusals)("recognises %s by driver properties", (name, code) => {
+    expect(
+      isClickHouseInvalidQueryError(Object.assign(new Error("boom"), { code, type: name })),
+    ).toBe(true);
+  });
+
+  /** @scenario "A query the database rejects as written is refused as the caller's fault" */
+  it.each(refusals)("recognises %s from raw HTTP text", (name, code) => {
+    expect(
+      isClickHouseInvalidQueryError(new Error(`Code: ${code}. DB::Exception: refused. (${name})`)),
+    ).toBe(true);
+  });
+
+  /** @scenario "A query the database rejects as written is refused as the caller's fault" */
+  it("does not read a code token out of the echoed query", () => {
+    expect(
+      isClickHouseInvalidQueryError(
+        new Error("Code: 47. DB::Exception: SELECT 'ILLEGAL_AGGREGATION' (UNKNOWN_IDENTIFIER)"),
+      ),
+    ).toBe(false);
+  });
+
+  it("is false for a non-error", () => {
+    expect(isClickHouseInvalidQueryError("Code: 184.")).toBe(false);
   });
 });

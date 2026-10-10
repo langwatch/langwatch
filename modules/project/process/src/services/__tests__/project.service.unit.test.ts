@@ -200,6 +200,10 @@ class StubOrganizationService {
   >(async () => ({ id: "team_1", isPersonal: false }));
   readonly createdTeams: CreateOrganizationTeamInput[] = [];
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
+  findMemberTeamIds = vi.fn<
+    (input: { organizationId: string; userId: string }) => Promise<string[]>
+  >(async () => []);
+
   readonly staffedTeams: {
     input: Parameters<OrganizationApi["createTeamWithMembers"]>[0];
     by: Parameters<OrganizationApi["createTeamWithMembers"]>[1];
@@ -435,6 +439,7 @@ const createService = (
       getOldestTeamId: () => organizations.getOldestTeamId(),
       createTeam: (input) => organizations.createTeam(input),
       addTeamMember: (input) => organizations.addTeamMember(input),
+      findMemberTeamIds: (input) => organizations.findMemberTeamIds(input),
       createTeamWithMembers: (input, by) => organizations.staffNewTeam(input, by),
       getTeam: async (input) => {
         const team = await organizations.findActiveTeam(input);
@@ -1295,6 +1300,59 @@ describe("ProjectService", () => {
     };
     expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(expected);
     expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(expected);
+  });
+
+  describe("when asked isTeamMember", () => {
+    describe("given an unknown project", () => {
+      it("reports false without asking the organisation roster", async () => {
+        const repository = new StubRepository();
+        const organizations = new StubOrganizationService();
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: "missing",
+            userId: "user_1",
+          }),
+        ).resolves.toBe(false);
+        expect(organizations.findMemberTeamIds).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the user belongs to another team in the same organisation", () => {
+      it("reports false", async () => {
+        const repository = new StubRepository();
+        repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+        const organizations = new StubOrganizationService();
+        organizations.findMemberTeamIds.mockResolvedValue(["team_other"]);
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: applicationProject.id,
+            userId: "user_1",
+          }),
+        ).resolves.toBe(false);
+      });
+    });
+
+    describe("when the user belongs to the project's team", () => {
+      it("reports true and asks the roster for that organisation and user", async () => {
+        const repository = new StubRepository();
+        repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+        const organizations = new StubOrganizationService();
+        organizations.findMemberTeamIds.mockResolvedValue(["team_other", "team_1"]);
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: applicationProject.id,
+            userId: "user_1",
+          }),
+        ).resolves.toBe(true);
+        expect(organizations.findMemberTeamIds).toHaveBeenCalledWith({
+          organizationId: "org",
+          userId: "user_1",
+        });
+      });
+    });
   });
 });
 

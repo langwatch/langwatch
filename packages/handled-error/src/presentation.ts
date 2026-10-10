@@ -441,6 +441,11 @@ const presentations = {
         : "Check the column names against the dataset's columns.";
     },
   },
+  lwql_invalid_query: {
+    title: "The database couldn't run this query",
+    describe: () =>
+      "The SQL reads, but the database rejected it as written, for example an aggregate in WHERE or mismatched types. Adjust the query and try again.",
+  },
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
@@ -572,6 +577,19 @@ const presentations = {
   dashboard_not_found: {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  dashboard_read_only_here: {
+    title: "This dashboard is read-only here",
+    describe: () =>
+      "Another project owns it, so it can be changed only there. Duplicate it to get a copy you can edit in this project.",
+  },
+  dashboard_scope_author_only: {
+    title: "Only the person who made this dashboard can change its scope",
+    describe: () => "Ask them to change who can see it, or duplicate it to get your own copy.",
+  },
+  dashboards_not_enabled: {
+    title: "Dashboards aren't switched on here",
+    describe: () => "This project doesn't have Dashboards enabled yet.",
   },
   dashboard_reorder_unknown_ids: {
     title: "Some of those dashboards are gone",

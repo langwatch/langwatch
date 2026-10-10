@@ -1,8 +1,18 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
+import {
+  LANGY_CONVERSATION_TURN_STATUS,
+  type LangyEventCursor,
+  type LangyMessageDto,
+} from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import {
+  type InterruptedTurn,
+  isTurnErrorOutlived,
+} from "../../model/logic/outlived-turn-error.ts";
 import {
   explainLangyError,
   type LangyErrorPresentation,
@@ -148,4 +158,72 @@ export function useLangyGithubRedrive({
     redrivenRef.current = true;
     retryTurn();
   }, [utils, organizationId, retryTurn]);
+}
+
+/** The turn the error arrived in, read off the store at that moment. */
+function interruptedTurnNow(): InterruptedTurn | null {
+  const { activeTurnId, turnProjection } = useLangyStore.getState();
+  if (!activeTurnId) return null;
+  const recordedHere = turnProjection.turnId === activeTurnId;
+  return {
+    turnId: activeTurnId,
+    completedAlready:
+      recordedHere && turnProjection.turn?.Status === LANGY_CONVERSATION_TURN_STATUS.COMPLETED,
+  };
+}
+
+/**
+ * A live error the record outlived clears itself: a dropped stream or a stumble while drawing it
+ * is not a failed turn. Once the transcript read carries the completed turn, its recorded answer
+ * replaces the cut-off one and the card goes. A turn that really failed keeps its card.
+ */
+export function useLangyOutlivedTurnError({
+  error,
+  transcriptMessages,
+  transcriptCursor,
+  isFetchingTranscript,
+  clearError,
+  applyHistoryToEngine,
+}: {
+  error: Error | undefined;
+  transcriptMessages: LangyMessageDto[];
+  transcriptCursor: LangyEventCursor | null;
+  isFetchingTranscript: boolean;
+  clearError: () => void;
+  applyHistoryToEngine: (messages: LangyMessageDto[]) => void;
+}) {
+  const recorded = useLangyStore((s) => s.turnProjection);
+  const interruptedRef = useRef<{ error: Error; turn: InterruptedTurn | null } | null>(null);
+  useEffect(() => {
+    if (!error) {
+      interruptedRef.current = null;
+      return;
+    }
+    const previous = interruptedRef.current;
+    const interrupted =
+      previous && previous.error === error ? previous : { error, turn: interruptedTurnNow() };
+    interruptedRef.current = interrupted;
+    if (isFetchingTranscript) return;
+    const outlived = isTurnErrorOutlived({
+      interrupted: interrupted.turn,
+      recorded: {
+        turnId: recorded.turnId,
+        status: recorded.turn?.Status ?? null,
+        cursor: recorded.cursor,
+      },
+      transcriptCursor,
+    });
+    if (!outlived) return;
+    interruptedRef.current = null;
+    applyHistoryToEngine(transcriptMessages);
+    clearError();
+  }, [
+    error,
+    recorded,
+    transcriptMessages,
+    transcriptCursor,
+    isFetchingTranscript,
+    clearError,
+    applyHistoryToEngine,
+  ]);
 }

@@ -26,6 +26,46 @@ export class DashboardNotFoundError extends HandledError {
   }
 }
 
+/**
+ * A write to an Organization board from a project that does not own it. The reader can see the
+ * board there, so not-found would be a lie; the owning project alone edits it.
+ */
+export class DashboardReadOnlyHereError extends HandledError {
+  declare readonly code: "dashboard_read_only_here";
+
+  constructor(projectId: string) {
+    super("dashboard_read_only_here", "This dashboard is read-only in this project", {
+      httpStatus: 403,
+      meta: { projectId },
+    });
+    this.name = "DashboardReadOnlyHereError";
+  }
+}
+
+/** A change of scope by anyone but the board's author; a project administrator is refused too. */
+export class DashboardScopeAuthorOnlyError extends HandledError {
+  declare readonly code: "dashboard_scope_author_only";
+
+  constructor() {
+    super("dashboard_scope_author_only", "Only the dashboard's author can change its scope", {
+      httpStatus: 403,
+    });
+    this.name = "DashboardScopeAuthorOnlyError";
+  }
+}
+
+/** A Dashboards-area procedure called while `release_dashboards` is off for the project. */
+export class DashboardsNotEnabledError extends HandledError {
+  declare readonly code: "dashboards_not_enabled";
+
+  constructor() {
+    super("dashboards_not_enabled", "Dashboards are not enabled for this project", {
+      httpStatus: 403,
+    });
+    this.name = "DashboardsNotEnabledError";
+  }
+}
+
 /** A graph the project does not have. */
 export class GraphNotFoundError extends HandledError {
   declare readonly code: "graph_not_found";

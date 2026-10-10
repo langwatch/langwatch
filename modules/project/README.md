@@ -11,7 +11,7 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | project                                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:288` (51 operations) |
+| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:290` (52 operations) |
 | Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:87`                                     |
 | Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:69`                                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |

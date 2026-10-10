@@ -9,28 +9,39 @@ import type {
   analyticsLwqlTrpc,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
+  DashboardScope,
+  DashboardScopeImpact,
+  DashboardScopeProjects,
+  DashboardSourcePresence,
+  DashboardStar,
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
   dashboardWidgetTrpcRowSchema,
+  dashboardWidgetTrpcSchema,
   graphDetailSchema,
   graphListItemSchema,
   savedViewTrpc,
+  starredDashboardSchema,
 } from "@langwatch/dashboard-contract";
 import type { z } from "zod";
 
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
+import type { AnalyticsScopeGraph } from "../model/analytics-personal-project.ts";
 import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
 /** Dashboard owns these wire schemas; WireOf maps persisted values to their wire representation. */
 type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
 type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
+type StarredDashboardRow = WireOf<z.infer<typeof starredDashboardSchema>>;
 type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;
 type GraphDetail = WireOf<z.infer<typeof graphDetailSchema>>;
 type DashboardWidgetRow = WireOf<z.infer<typeof dashboardWidgetTrpcRowSchema>>;
+type DashboardWidget = WireOf<z.infer<typeof dashboardWidgetTrpcSchema>>;
 
 /** The project every analytics procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -169,7 +180,13 @@ type BorrowedProcedures = {
     };
   };
   dashboards: {
-    getAll: { query: { input: ProjectScope; output: DashboardSummaryRow[] } };
+    getAll: {
+      query: {
+        /** `includeOrganization` adds the Organization boards other projects own. */
+        input: ProjectScope & { includeOrganization?: boolean };
+        output: DashboardSummaryRow[];
+      };
+    };
     getById: {
       query: {
         input: ProjectScope & { dashboardId: string };
@@ -177,7 +194,10 @@ type BorrowedProcedures = {
       };
     };
     create: {
-      mutation: { input: ProjectScope & { name: string }; output: DashboardRow };
+      mutation: {
+        input: ProjectScope & { name: string };
+        output: DashboardRow;
+      };
     };
     rename: {
       mutation: {
@@ -188,6 +208,7 @@ type BorrowedProcedures = {
     delete: {
       mutation: { input: ProjectScope & { dashboardId: string }; output: unknown };
     };
+    // Legacy Analytics reports ordering; the Dashboards feature uses favourites.
     reorderDashboards: {
       mutation: {
         input: ProjectScope & { dashboardIds: string[] };
@@ -196,6 +217,46 @@ type BorrowedProcedures = {
     };
     getOrCreateFirst: {
       query: { input: ProjectScope; output: DashboardRow | null };
+    };
+    updateDetails: {
+      mutation: {
+        input: ProjectScope & {
+          dashboardId: string;
+          name?: string;
+          description?: string | null;
+        };
+        output: DashboardRow;
+      };
+    };
+    setScope: {
+      mutation: {
+        input: ProjectScope & { dashboardId: string; scope: DashboardScope };
+        output: DashboardRow;
+      };
+    };
+    scopeImpact: {
+      query: { input: ProjectScope & { dashboardId: string }; output: DashboardScopeImpact };
+    };
+    scopeProjects: {
+      query: { input: ProjectScope & { dashboardId: string }; output: DashboardScopeProjects };
+    };
+    listStarred: {
+      query: { input: ProjectScope; output: StarredDashboardRow[] };
+    };
+    star: {
+      mutation: { input: ProjectScope & { star: DashboardStar }; output: { success: true } };
+    };
+    unstar: {
+      mutation: { input: ProjectScope & { star: DashboardStar }; output: { success: true } };
+    };
+    reorderStars: {
+      mutation: {
+        input: ProjectScope & { stars: DashboardStar[] };
+        output: { success: true };
+      };
+    };
+    sourcePresence: {
+      query: { input: ProjectScope; output: DashboardSourcePresence };
     };
   };
   graphs: {
@@ -254,7 +315,13 @@ type BorrowedProcedures = {
     };
   };
   dashboardWidgets: {
-    list: { query: { input: ProjectScope; output: DashboardWidgetRow[] } };
+    list: {
+      query: {
+        /** With `dashboardId`: that board's widgets, read from the project that owns it. */
+        input: ProjectScope & { dashboardId?: string };
+        output: DashboardWidgetRow[];
+      };
+    };
     create: {
       mutation: {
         input: ProjectScope & {
@@ -262,8 +329,11 @@ type BorrowedProcedures = {
           name: string;
           code: string;
           queries: unknown[];
+          description?: string;
+          prompt?: string;
+          source?: DashboardWidgetSource;
         };
-        output: unknown;
+        output: DashboardWidget;
       };
     };
     update: {
@@ -311,6 +381,10 @@ type BorrowedProcedures = {
         input: { isDemo?: boolean };
         output: unknown;
       };
+    };
+    /** The shell's scope skeleton, narrowed to what this family reads; shares its cache. */
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: AnalyticsScopeGraph };
     };
   };
   project: {

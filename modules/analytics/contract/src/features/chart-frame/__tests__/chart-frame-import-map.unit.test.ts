@@ -63,5 +63,13 @@ describe("the chart frame import map", () => {
       expect([...CHART_FRAME_GLOBAL_EXPORTS.LWCharts].toSorted()).toEqual(members);
       expect(buildGlobalModuleSource("LWCharts")).toContain(`{ ${members.join(", ")} }`);
     });
+
+    /** @scenario "The charts library reads instants without the Temporal polyfill" */
+    it("carries no Temporal polyfill, which alone was most of every frame's script", () => {
+      const script = buildChartsLibScript();
+
+      expect(script).not.toContain("Temporal");
+      expect(script.length).toBeLessThan(40_000);
+    });
   });
 });

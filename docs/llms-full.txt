@@ -41500,6 +41500,343 @@ Both can also be created with `langwatch trigger create --graph-alert` and `--re
 
 ---
 
+# FILE: ./features/dashboards.mdx
+
+---
+title: Dashboards
+description: Build boards of charts over your LangWatch data, or start one from the Agent health template for an at-a-glance view of your project.
+---
+
+## Turn on Dashboards
+
+Dashboards is a product in the product switcher at the top left of LangWatch.
+It sits behind the `release_dashboards` feature flag, which is off by default.
+
+## Your first board
+
+Opening Dashboards opens your board called "My dashboard", and it starts in your
+starred boards. If you have no such board yet, LangWatch makes one for you. It
+starts at the scope Only me, so only you see it. You can change its scope like
+any other board's (see [Who can see a board](#who-can-see-a-board)).
+
+## The sidebar
+
+The sidebar lists, in order:
+
+- **Your dashboards**: your "My dashboard" first, then the project's other
+  boards by name. The **+** next to the heading makes a blank board at once and
+  opens it.
+- **Starred**: the boards you starred, in your own order. Stars are yours alone.
+  The menu of a starred board has Move up and Move down.
+- **From your organisation**: the heading reads "From" and your organisation's
+  name. It lists the boards that other projects of your organisation set to
+  Organization, by name, and shows only when there is such a board.
+- **From LangWatch**: boards LangWatch made for you. Click the heading to fold
+  the group; it stays folded until you click it again.
+
+A board set to Only me has a small lock next to its name, and a board set to
+Organization has a building. A Project board has no mark.
+
+The **⋮** menu of a board offers Star or Unstar, Rename, Duplicate and Delete.
+On a board you made it also offers the three scope choices. On a board you
+cannot edit it offers Star or Unstar and **Duplicate to edit**. "My dashboard"
+cannot be renamed or deleted.
+
+Under that, the sidebar lists, in order:
+
+- **Your dashboards**: your "My dashboard" first, then the project's other
+  boards by name. The **+** next to the heading makes a blank board at once and
+  opens it.
+- **Starred**: the boards you starred, in your own order. Stars are yours alone.
+  The menu of a starred board has Move up and Move down.
+- **From LangWatch**: boards LangWatch made for you. Click the heading to fold
+  the group; it stays folded until you click it again.
+
+The **⋮** menu of a board offers Star or Unstar, Rename, Duplicate and Delete.
+"My dashboard" cannot be renamed or deleted.
+
+## Start from a template
+
+A board without widgets shows the ask bar, suggested questions, and "Or start
+from a template" with the three From LangWatch boards and a **View all
+templates** link. The templates library lists every ready template by Grow,
+Protect, Profit and Trust, with a search box and filters for the category and
+the agent type.
+
+**Add to this project** on a card creates a new board named after the template
+(numbered "Agent health 2" and so on if the name is taken), at the scope Project,
+with the template's widgets. A template you already added shows **Added**,
+linking to its board.
+
+When Langy is enabled for your project, Langy opens with the template's report
+prompt ready in the composer, unsent. The prompt also asks Langy to check what
+the board needs that your project has not set up yet, and names the widgets
+that wait for that data. Without Langy the board is made and no
+prompt is drafted.
+
+A widget whose data is not set up yet says what is missing and links to the
+page that sets it up, such as evaluations, scenarios or feedback.
+
+The Agent health template holds five widgets:
+
+- This period
+- Status today
+- Needs attention
+- Top request my agent cannot serve
+- Conversations resolved per day
+
+A new board is yours like any other: every widget on it can be edited,
+duplicated, moved, resized or deleted, and your changes do not affect the
+template.
+
+## From LangWatch boards
+
+The From LangWatch group in the sidebar holds Release check, "Can I trust my
+numbers?" and Where my agent breaks. Each is a template shown live over your
+data and read-only: you cannot move, edit or add anything on it, and LangWatch
+stores no copy.
+
+To change one, open its **⋮** menu in the sidebar and pick **Duplicate to
+edit**. That makes your own board named "<name> (copy)" with the template's
+widgets and opens it. The board's header has no such button.
+
+## Period and grain
+
+Every board has a period, from Live (the last hour) up to one year, defaulting
+to 30 days, and a grain: auto, minute, hour, day or week. A grain is offered only
+when it fits the period, and a grain that does not fit is greyed out. Every widget
+on the board reads over that period and grain.
+
+## Keep the data fresh
+
+The header has one period control. Its menu has three columns, Range, Grain and
+Refresh, and ends with **Refresh now**, which reloads every widget on the board.
+The Refresh column reloads every widget every minute, every 5 minutes, or never
+(Off).
+
+Pick **Live** for the last hour, rolling and refreshed every minute. The other
+refresh choices are greyed out until you pick another range.
+
+## Building your own board
+
+On a board, you can rename it from the sidebar menu and add a description.
+**Add a widget** opens the picker; **I'll build it myself** there opens the
+widget editor, where you write the widget's code and its LangWatchQL queries.
+Move a widget by its drag handle and resize it from its corner. Each widget's
+menu offers:
+
+- **Edit with Langy**: asks Langy to change the widget. Only when Langy is available.
+- **Edit code**: opens the widget editor on that widget's code and queries.
+- **Copy widget id** and **Copy API snippet**: copy what the REST API needs to
+  edit the widget.
+- **Set an alert** and **Send as a report**: draft Langy to alert on, or
+  schedule, that widget. Only when Langy is available.
+- **Duplicate**: adds a copy of the widget.
+- **Delete**: removes the widget.
+
+## Who can see a board
+
+Every board has a scope, shown next to its title:
+
+- **Only me**: only you see the board.
+- **Project**: everyone in the project sees it. A new board starts here.
+- **Organization**: everyone in your organisation sees it, in each of their
+  projects. In each project the board shows that project's own data, and each
+  member sees what their role lets them see.
+
+Only the member who made a board can change its scope, from the control next
+to the title or from the board's **⋮** menu in the sidebar. A project admin
+cannot. Everyone else sees the scope as a badge. Who can edit or delete a board
+does not change: that still follows your role's analytics permissions.
+
+LangWatch asks you to confirm a change only when somebody loses the board: when
+you set a board to Only me that other members starred, and when you lower a
+board from Organization. Every other change happens at once, and the note that
+follows has an **Undo**. Other members' stars are kept, and come back if you
+widen the scope again.
+
+The project where a board was made owns it. An Organization board can be edited
+only in that project. In every other project it is read-only: you cannot add,
+move, edit or delete a widget, and the header says which project owns the board.
+To change it, pick **Duplicate to edit** in the board's **⋮** menu in the
+sidebar. That makes your own copy in the project you are in.
+
+An Organization board also has a **Project** control in its header. It names the
+project whose data you see, and lists the projects of your organisation that you
+can open. Pick one to open the same board under that project.
+
+If you open the address of a board that you may not see, the page says "This
+dashboard is not available". The board was deleted, or the member who made it
+set its scope to Only me.
+
+A project API key reads the project's boards except the ones set to Only me.
+
+Alerts and scheduled reports do not read a board set to Only me either. An alert
+or a report on a chart of such a board sends no chart until you widen the
+board's scope.
+
+## Asking questions
+
+Every board has an ask bar under its header, reading "What do you want to
+know?". On a stored board, clicking it opens **Add a widget** with the cursor in
+its search. On a From LangWatch board, the bar opens Langy when Langy is
+available, with the board as context and no question sent yet.
+
+The picker lists suggested questions, grouped by the question tree, with a
+search and filters for the category and the agent type. Picking one adds that
+question's widget to the board, below the widgets already there. When Langy is
+enabled for your project, Langy then opens with the question's prompt ready in
+the composer, with the board as context, so you can read it and send it with one
+click.
+
+Without Langy the picker still lists every question, and picking one adds its
+widget. The pinned **Ask Langy** footer, and the **Ask** button next to the
+search field, send your own question to Langy directly.
+
+On a board that already has widgets, the **Add a widget** box below the widgets
+and the **Add a widget** button in the header both open the picker. Every widget
+has an **Ask Langy** button when Langy is available; it drafts a prompt with the
+widget's name, its queries and the period.
+
+## How the data is read
+
+All board data is read with LangWatchQL, LangWatch's query layer over your
+traces, evaluations and cost data.
+
+## Build boards from your own AI agent
+
+Your coding assistant can build and edit LangWatch dashboards for you, through
+the [LangWatch MCP server](/integration/mcp).
+
+### Connect the MCP server
+
+Connect Claude Code, Cursor, or another MCP-capable assistant to LangWatch
+first. Follow the [LangWatch MCP Server setup guide](/integration/mcp) to add
+the server and set your API key.
+
+### Dashboard tools
+
+Once connected, your agent has these dashboard tools:
+
+- `platform_list_dashboards`: list every dashboard in the project.
+- `platform_get_dashboard`: read one dashboard, including its widgets.
+- `platform_create_dashboard`: create a new, empty dashboard.
+- `platform_rename_dashboard`: rename a dashboard.
+- `platform_delete_dashboard`: delete a dashboard and its widgets.
+- `run_query`: run one read-only LangWatchQL (LWQL) statement and see the rows
+  it returns. Use this to check a query before it goes into a widget.
+- `add_dashboard_widget`: create a custom widget and add it to a dashboard.
+- `update_dashboard_widget`: change a widget's name, code, queries or
+  description. Pass the dashboard id, the widget id, and only the fields to
+  change. Every field you leave out keeps its value.
+
+### The widget definition format
+
+A widget has two parts:
+
+- **`code`**: a TSX source file. It runs sandboxed in the browser and renders
+  the widget's chart or panel.
+- **`queries`**: up to 8 named LangWatchQL statements the code can read from.
+  Pass them as `{ "<name>": "<LWQL SQL>" }`, or as a list of `{ name, sql }`
+  entries.
+
+Ask your agent to validate each query with `run_query` before it calls
+`add_dashboard_widget`. A query only actually runs once the widget renders
+inside the sandbox, so catching a mistake in the SQL earlier, with
+`run_query`, is faster than catching it on the dashboard.
+
+### The LW widget API
+
+Inside `code`, a global `LW` object gives the widget everything it needs:
+
+- `LW.dashboardContext`: the dashboard's current time window, granularity,
+  timezone and theme.
+- `LW.params`: the widget's own author-declared parameter values.
+- `LW.theme`: the dashboard's current colour theme (`"light"` or `"dark"`).
+- `LW.query(name, params?)`: runs one of the widget's named queries and
+  returns its rows.
+- `LW.useChartQuery(name, params?)`: the React hook version of `LW.query`.
+  Gives `data`, `completeness`, `isLoading`, `isFetching`, `isError`, `error`,
+  `status`, and `refetch`, and refetches automatically when the dashboard's
+  time window or granularity changes. Use this instead of `LW.query` in most
+  widgets.
+- `LW.setHeight(px)`: resizes the widget's frame once its content's height is
+  known.
+- `LW.onDashboardContextChange(callback)` / `LW.useDashboardContext()`:
+  subscribe to, or read, the dashboard's live context.
+- `LW.useParams()`: read the widget's author-declared parameter values.
+- `LW.error(err)`: report an error without throwing.
+- `LW.navigate(target, params?)`: navigate the host to an allowlisted target,
+  such as a trace list or a single trace.
+
+### Missing data: the `completeness` report
+
+A query that follows the dashboard's time window also returns a
+`completeness` report next to its rows. `POST /api/v1/query` returns it too
+when you pass a `timeWindow`. Use it so a widget never shows missing data as
+zero.
+
+```ts
+completeness: {
+  state: "complete" | "partial" | "missing" | "no_traffic";
+  unit: string;   // what `total` counts: "traces", "spans", "evaluations"
+  total: number;  // rows of that view in the window
+  fields: { field: string; label: string; present: number }[];
+  buckets?: { start: string; n: number }[];        // ISO start, UTC
+  unpriced?: { count: number; models: string[] };
+}
+```
+
+- `state`: `no_traffic` means no rows arrived in the period. `missing` means a
+  field the query reads is on no row: show a setup step that names the field
+  to send. `partial` means some rows lack a field, or some cost has no price.
+- `fields`: one entry per field the query reads that can be empty, with how
+  many of `total` rows carry it.
+- `buckets`: only when the query follows the dashboard granularity. It lists
+  every bucket in the window, including empty ones at the start and the end,
+  with `n: 0`. Draw an empty bucket as a gap for a rate, an average or a
+  percentile, never as 0. A count may be 0.
+- `unpriced`: only when the query reads cost. `count` is the rows with at
+  least one span whose model has no price, and `models` names those models. A
+  cost total with unpriced rows is a lower bound: show it as "$830+".
+  Traces recorded before LangWatch started tracking this report no unpriced
+  spans, so on older periods the absence of `unpriced` rows is not proof that
+  every span was priced.
+
+The report is absent when the query does not follow the dashboard's time
+window, when it reads a per-minute rollup view, or when it could not be built.
+Treat an absent report as "unknown", not as "complete".
+
+### Example prompt
+
+```
+Add a widget to my Agent health board that shows p95 latency by model
+for the last 7 days.
+```
+
+Your agent will validate the LWQL with `run_query`, write the widget's TSX
+code against `LW.useChartQuery`, and call `add_dashboard_widget` to add it to
+the board.
+
+### Edit a widget through the REST API
+
+The same edit works without MCP. Send a `PATCH` with your project API key and
+only the fields to change:
+
+```bash
+curl -X PATCH "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/dashboard-widgets/$WIDGET_ID" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Errors per day", "code": "<the widget code>"}'
+```
+
+The body takes any of `name`, `code`, `queries` and `description`. The answer
+is the updated widget. Each widget also records where it came from in
+`definition.source`: a catalogue template, Langy, the code editor or the API.
+A widget you create through the API without a `source` is recorded as `api`.
+
+---
+
 # FILE: ./features/embedded-analytics.mdx
 
 ---
@@ -59527,7 +59864,7 @@ More worked examples: `platform/app/scripts/north-star-widgets/`.
 
 ### Drill-down: `LW.navigate`
 
-`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget — `target` is `"traces"` or `"trace"`, and `params` is keyed by filter field ids (e.g. `"metadata.user_id"`) that the host resolves into the Trace Explorer URL.
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"` and `"codingSessions"` open that page of the project and take no params.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
@@ -74546,9 +74883,9 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
 | `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
 | `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
-| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. | `output` | one row per CustomGraphId | `CreatedAt` |
+| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable. | `output` | one row per CustomGraphId | `CreatedAt` |
 | `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
-| `dashboards` | Rows of the Dashboard table, one row per DashboardId. | None | one row per DashboardId | `CreatedAt` |
+| `dashboards` | Rows of the Dashboard table, one row per DashboardId. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
 | `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
 | `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
 | `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |

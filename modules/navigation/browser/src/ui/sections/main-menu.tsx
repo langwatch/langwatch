@@ -27,7 +27,7 @@ import { SidebarSection } from "./sidebar-section.tsx";
 /**
  * The project navigation sections the LLM Ops sidebar renders. The Govern group
  * is gone because the product switcher replaces it, and the Ops group because
- * the settings menu holds the operations pages.
+ * the settings menu holds the operations pages. Dashboards is its own product.
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,

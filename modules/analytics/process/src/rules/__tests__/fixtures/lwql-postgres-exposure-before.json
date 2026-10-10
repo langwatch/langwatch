@@ -204,6 +204,8 @@
     ["DashboardId", "id", []],
     ["Name", "name", []],
     ["Order", "order", []],
+    ["Description", "description", ["output"]],
+    ["CreatedById", "createdById", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]
   ],

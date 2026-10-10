@@ -142,6 +142,20 @@ const TRACES: UngatedViewDefinition = {
       sourceColumns: ["TotalCost"],
     },
     {
+      name: "UnpricedSpanCount",
+      type: "UInt32",
+      description:
+        "Spans whose model has no price, so their cost is unknown rather than zero. 0 on traces stored before this was recorded.",
+      sourceColumns: ["UnpricedSpanCount"],
+    },
+    {
+      name: "UnpricedModels",
+      type: "Array(LowCardinality(String))",
+      description:
+        "The models of those unpriced spans, sorted. Empty on traces stored before this was recorded.",
+      sourceColumns: ["UnpricedModels"],
+    },
+    {
       name: "TokensEstimated",
       type: "Bool",
       description: "Whether token counts were estimated rather than reported by the provider.",
@@ -281,6 +295,7 @@ const SPANS: UngatedViewDefinition = {
       type: "Nullable(String)",
       description: "Parent span, null for the root span.",
       sourceColumns: ["ParentSpanId"],
+      nullIsValue: true,
     },
     {
       name: "StartTime",
@@ -503,6 +518,7 @@ const EVALUATIONS: UngatedViewDefinition = {
       type: "Nullable(DateTime64(3))",
       description: "When the run was archived, null while it is live.",
       sourceColumns: ["ArchivedAt"],
+      nullIsValue: true,
     },
     {
       name: "CapturedInputs",
@@ -629,6 +645,7 @@ const SIMULATIONS: UngatedViewDefinition = {
       type: "Nullable(DateTime64(3))",
       description: "When the run was archived, null while it is live.",
       sourceColumns: ["ArchivedAt"],
+      nullIsValue: true,
     },
     {
       name: "MessageContents",
@@ -772,6 +789,20 @@ const TRACE_METRICS: UngatedViewDefinition = {
       unit: "USD",
       description: "Cost of the trace that is not billed, in USD.",
       sourceColumns: ["NonBilledCost"],
+    },
+    {
+      name: "UnpricedSpanCount",
+      type: "UInt32",
+      description:
+        "Spans whose model has no price, so their cost is unknown rather than zero. 0 on traces stored before this was recorded.",
+      sourceColumns: ["UnpricedSpanCount"],
+    },
+    {
+      name: "UnpricedModels",
+      type: "Array(LowCardinality(String))",
+      description:
+        "The models of those unpriced spans, sorted. Empty on traces stored before this was recorded.",
+      sourceColumns: ["UnpricedModels"],
     },
     {
       name: "TotalDurationMs",
@@ -2529,6 +2560,8 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       Labels: "inherit",
       TotalCost: { access: { allOf: ["cost:view"] } },
       NonBilledCost: { access: { allOf: ["cost:view"] } },
+      UnpricedSpanCount: { access: { allOf: ["cost:view"] } },
+      UnpricedModels: { access: { allOf: ["cost:view"] } },
       TotalDurationMs: "inherit",
       TimeToFirstTokenMs: "inherit",
       TokensPerSecond: "inherit",

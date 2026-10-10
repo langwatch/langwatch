@@ -494,3 +494,34 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given the live connection drops before Langy can say what went wrong
     When the turn's failure is already on the conversation's record
     Then the user sees the card naming that recorded failure, not a generic apology
+
+  # A broken stream is not a failed turn. On a flaky link the worker's relay
+  # reconnects and the answer then arrives in bursts; every streamed piece was
+  # one synchronous re-render, so a burst nested past React's update limit,
+  # which threw inside the stream and showed the generic card under an answer
+  # that went on to complete. The card is for turns that failed, nothing else.
+  @integration
+  Scenario: A burst of streamed text does not fail the turn
+    Given Langy is streaming an answer
+    When many pieces of the answer arrive at once, as they do after a connection catches up
+    Then the whole answer shows
+    And no error card appears
+
+  @unit
+  Scenario: An error the turn outlived clears itself
+    Given the stream broke while Langy was answering and an error card is showing
+    When the conversation's record shows that turn completed and the transcript carries its answer
+    Then the error card goes
+    And the recorded answer replaces the cut-off one
+
+  @unit
+  Scenario: A turn that really failed keeps its error card
+    Given the stream broke while Langy was answering and an error card is showing
+    When the conversation's record shows that turn failed
+    Then the error card stays
+
+  @unit
+  Scenario: The previous turn's completion never clears an error about a new message
+    Given the last turn had already completed when a new message failed to send
+    When the record still shows that last turn completed
+    Then the error card about the new message stays

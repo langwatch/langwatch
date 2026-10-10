@@ -368,6 +368,8 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     labels: [],
     totalCost: null,
     nonBilledCost: null,
+    unpricedSpanCount: 0,
+    unpricedModels: [],
     totalDurationMs: 0,
     timeToFirstTokenMs: null,
     tokensPerSecond: null,

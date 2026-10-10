@@ -69,6 +69,13 @@ export interface LangWatchQLQueryBlock {
    * Names the block groups by, lowercased and stripped of any qualifier.
    */
   readonly groupByColumns: readonly string[];
+  /** Every name this block reads in any clause, lowercased leaf segments; aliases included. */
+  readonly referencedColumns: readonly string[];
+  /**
+   * Names the block's `SELECT` list reads, lowercased leaf segments. With
+   * {@link groupByColumns}, the values a result is made of, as opposed to the rows it picks.
+   */
+  readonly projectedColumns: readonly string[];
   /**
    * Whether the block collapses rows with an aggregate. `false` for an aggregate used with
    * `OVER`: a window function reads a frame and returns one value per row, which is the
@@ -149,6 +156,8 @@ export interface BlockAccumulator {
   readonly joins: LangWatchQLJoinEdge[];
   readonly filteredColumns: string[];
   readonly groupByColumns: string[];
+  readonly referencedColumns: string[];
+  readonly projectedColumns: string[];
   /** Alias of each app function column in this block's SELECT list, to the function's name. */
   readonly appFunctionAliases: ReadonlyMap<string, string>;
   hasGroupBy: boolean;

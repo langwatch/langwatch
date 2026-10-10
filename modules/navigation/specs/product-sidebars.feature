@@ -167,3 +167,22 @@ Feature: Product sidebars
     When the pointer moves away and the menu closes
     Then the Support entry does not keep focus
     But a keyboard close keeps focus on the Support entry
+
+  # Owner list, 2026-10-08. Analytics lends the group and draws it only when the member has
+  # starred a dashboard in the project in scope; navigation places it.
+  @integration
+  Scenario: Starred dashboards show in the other products' sidebars
+    Given I can reach Dashboards and I have starred dashboards in this project
+    When I am in LLM Ops, Gateway, Governance or Me
+    Then the sidebar shows a small "Starred dashboards" group under the product's own pages
+    And each entry opens that dashboard
+    And the Dashboards sidebar keeps its own Starred group instead
+    And a member who cannot reach Dashboards, or has starred none, sees no such group
+
+  @integration
+  Scenario: Starred dashboards in other products' sidebars stop at 7
+    Given I have starred more than 7 dashboards in this project
+    When I am in LLM Ops, Gateway, Governance or Me
+    Then the "Starred dashboards" group lists the first 7, in my order
+    And one more row reads "All starred (N)", with N the number starred, and opens Dashboards
+    And with 7 starred or fewer there is no such row

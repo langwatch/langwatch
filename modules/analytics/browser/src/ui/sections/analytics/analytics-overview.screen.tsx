@@ -7,25 +7,18 @@ import {
   Grid,
   Heading,
   HStack,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowUpRight, Plus } from "lucide-react";
-import { useMemo } from "react";
 import { BarChart2 } from "react-feather";
 
-import { useTopUsedDocuments } from "../../../behavior/use-analytics-documents.ts";
 import { useDashboards } from "../../../behavior/use-dashboards.ts";
-import { useFilterParams } from "../../../behavior/use-filter-params.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
-import {
-  DocumentsCountsSummary,
-  DocumentsCountsTable,
-} from "../../../ui/sections/documents-counts-table.tsx";
+import { DocumentsMetrics } from "../../../ui/sections/documents-metrics.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { LLMMetrics } from "../../../ui/sections/llm-metrics.tsx";
 import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
@@ -65,56 +58,6 @@ function AnalyticsContent() {
         <FilterSidebar hideTopics={true} />
       </HStack>
     </AnalyticsLayout>
-  );
-}
-
-function DocumentsMetrics() {
-  const { filterParams, queryOpts } = useFilterParams();
-  const params = useMemo(() => ({ filterParams, queryOpts }), [filterParams, queryOpts]);
-  const documents = useTopUsedDocuments(params);
-
-  const count = documents.data?.totalUniqueDocuments;
-
-  // A failed query says nothing about whether there are documents, so the section stays up
-  // and its panels show the error with a Retry.
-  if (!documents.error && (!count || count === 0)) {
-    return null;
-  }
-
-  return (
-    <>
-      <HStack width="full" align="top">
-        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
-          Documents
-        </Heading>
-      </HStack>
-      <Card.Root width="full">
-        <Card.Body>
-          <Tabs.Root variant="plain" defaultValue="total-documents">
-            <Tabs.List gap={12}>
-              <Tabs.Trigger value="total-documents" paddingX={0} paddingBottom={4}>
-                <VStack align="start">
-                  <Text color="fg">Total documents</Text>
-                  <Box textStyle="2xl" color="fg" fontWeight="bold">
-                    <DocumentsCountsSummary params={params} />
-                  </Box>
-                </VStack>
-              </Tabs.Trigger>
-              <Tabs.Indicator
-                mt="-1.5px"
-                height="4px"
-                bg="orange.solid"
-                borderRadius="1px"
-                bottom={0}
-              />
-            </Tabs.List>
-            <Tabs.Content value="total-documents">
-              <DocumentsCountsTable params={params} />
-            </Tabs.Content>
-          </Tabs.Root>
-        </Card.Body>
-      </Card.Root>
-    </>
   );
 }
 

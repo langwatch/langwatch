@@ -22,6 +22,7 @@ import type {
 import type {
   DashboardWidgetDefinition,
   DashboardWidgetQuery,
+  DashboardWidgetSource,
 } from "./features/dashboard-widget/dashboard-widget-definition.ts";
 import type {
   LangWatchQLCaller,
@@ -60,6 +61,12 @@ export interface DashboardWidget {
 export interface DashboardWidgetDefinitionInput {
   readonly code: string;
   readonly queries: readonly DashboardWidgetQuery[];
+  /** What the card's info tip says; a widget without one shows no tip. */
+  readonly description?: string;
+  /** What Langy is drafted with when asked about the widget; Langy falls back without one. */
+  readonly prompt?: string;
+  /** Where the widget came from; an update without one keeps the stored source. */
+  readonly source?: DashboardWidgetSource;
 }
 
 /** The callable analytics capability shared by process peers. */
@@ -165,6 +172,8 @@ export interface AnalyticsApi {
   ): Promise<readonly Record<string, unknown>[]>;
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+  /** Whether this project's rollout admits it to the Dashboards area at all. */
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
   /** What one signed-in member may see of a project's content and spend. */
   resolveProtections(input: { userId: string; projectId: string }): Promise<LangWatchQLProtections>;
   /**

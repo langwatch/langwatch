@@ -67,6 +67,46 @@ type LwRow<N extends string> = N extends keyof LwQueryRowMap
   ? LwQueryRowMap[N]
   : Record<string, unknown>;
 
+/** One nullable field the query reads, and how many of the counted rows carry it. */
+interface LwCompletenessField {
+  readonly field: string;
+  /** Plain words for it, e.g. "total cost". */
+  readonly label: string;
+  readonly present: number;
+}
+
+/** One bucket of the window: its UTC start as an ISO instant, and the rows that fell in it. */
+interface LwCompletenessBucket {
+  readonly start: string;
+  readonly n: number;
+}
+
+/**
+ * How much of the data a query reads is present, so missing never shows as zero.
+ * - \`complete\`: every field present on every row.
+ * - \`partial\`: a field or a price is missing on some rows; say so in the hover.
+ * - \`missing\`: a field the query needs is on no row; show the setup step.
+ * - \`no_traffic\`: no rows in the window at all; say "No traces in this period".
+ */
+interface LwQueryCompleteness {
+  readonly state: "complete" | "partial" | "missing" | "no_traffic";
+  /** What \`total\` counts: "traces", "spans", "evaluations". */
+  readonly unit: string;
+  readonly total: number;
+  readonly fields: readonly LwCompletenessField[];
+  /**
+   * Only when the query follows the board granularity: EVERY bucket in the window, empty
+   * ones with \`n\` 0. Draw an empty bucket as a gap for a rate, average or percentile.
+   */
+  readonly buckets?: readonly LwCompletenessBucket[];
+  /**
+   * Only when the query reads cost: rows with at least one unpriced span, and their models.
+   * A cost total with unpriced rows is a lower bound ("$830+"): ask \`isLowerBound\` from
+   * "@langwatch/charts".
+   */
+  readonly unpriced?: { readonly count: number; readonly models: readonly string[] };
+}
+
 /** What a resolved \`LW.query(...)\` (and \`useChartQuery\`'s \`data\`) carries. */
 interface LwQueryResult<Row = Record<string, unknown>> {
   readonly columns: readonly LwQueryColumn[];
@@ -77,6 +117,8 @@ interface LwQueryResult<Row = Record<string, unknown>> {
   readonly followsGranularity: boolean;
   readonly granularitySeconds?: number;
   readonly coarsenedFromSeconds?: number;
+  /** What the rows are missing; absent when the server could not tell (no time window). */
+  readonly completeness?: LwQueryCompleteness;
 }
 
 /** What a rejected \`LW.query(...)\` throws as (and \`useChartQuery\`'s \`error\`). */
@@ -91,12 +133,25 @@ interface LwQueryError extends Error {
 type LwLogSource = "console" | "error" | "unhandledrejection" | "lw.error";
 
 /** Route keys \`LW.navigate\` accepts — an allowlist the host resolves to a real URL. */
-type LwNavigableTarget = "traces" | "trace";
+type LwNavigableTarget =
+  | "traces"
+  | "trace"
+  | "scenarios"
+  | "onlineEvaluations"
+  | "annotations"
+  | "gatewayVirtualKeys"
+  | "codingSessions";
 
 /** Return shape of \`LW.useChartQuery\`, matching TanStack Query's \`useQuery\` naming. */
 interface LwChartQueryState<Row = Record<string, unknown>> {
   /** \`result.rows\` once loaded, else \`null\`. */
   readonly data: readonly Row[] | null;
+  /**
+   * \`result.completeness\` with those rows, else \`null\`. A failed refetch keeps the last
+   * good one with its rows. Read it before drawing a zero: an empty bucket or an absent field
+   * is a gap, never 0.
+   */
+  readonly completeness: LwQueryCompleteness | null;
   /** True only on the first load (no data yet), not on background refetches. */
   readonly isLoading: boolean;
   /** True for the initial load AND every refetch (dashboard context change, manual \`refetch()\`). */

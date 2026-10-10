@@ -44,6 +44,7 @@ export * from "./features/github/github-command.ts";
 export * from "./langy-permission-policy.ts";
 export * from "./langy-turn-context.ts";
 export * from "./langy-slice.ts";
+export * from "./langy-ask.ts";
 export * from "./langy.dtos.ts";
 export * from "./features/local-control/langy.local-notices.ts";
 export * from "./langy.config.ts";

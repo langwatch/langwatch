@@ -23,6 +23,10 @@ const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 const MAX_CODE_LENGTH = 200_000;
 /** A widget name is a label, not a document — the persisted column is short. */
 const MAX_WIDGET_NAME_LENGTH = 200;
+/** What the card's info tip says: a few sentences, never a document. */
+const MAX_WIDGET_DESCRIPTION_LENGTH = 2_000;
+/** What Langy is drafted with: a paragraph of instructions, never a document. */
+const MAX_WIDGET_PROMPT_LENGTH = 2_000;
 
 /**
  * Every author-declared parameter name starting with this prefix is rejected — the prefix,
@@ -145,11 +149,36 @@ export interface DashboardWidgetQueriesSchema extends Named<
 > {}
 export const dashboardWidgetQueriesSchema: DashboardWidgetQueriesSchema =
   dashboardWidgetQueriesSchemaDefinition;
+/** Optional on every definition: widgets saved before it existed carry none. */
+export const dashboardWidgetDescriptionSchema = z
+  .string()
+  .min(1)
+  .max(MAX_WIDGET_DESCRIPTION_LENGTH);
+/** Optional like the description: widgets saved before it, and Langy-made ones, carry none. */
+export const dashboardWidgetPromptSchema = z.string().min(1).max(MAX_WIDGET_PROMPT_LENGTH);
+/**
+ * Where a widget came from: a catalogue template, Langy, the code editor, or the REST/MCP API.
+ * Optional like the description: widgets saved before it carry none.
+ */
+const dashboardWidgetSourceSchemaDefinition = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("catalogue"), catalogueId: z.string().min(1).max(200) }),
+  z.object({ kind: z.literal("langy") }),
+  z.object({ kind: z.literal("code") }),
+  z.object({ kind: z.literal("api") }),
+]);
+export interface DashboardWidgetSourceSchema extends Named<
+  typeof dashboardWidgetSourceSchemaDefinition
+> {}
+export const dashboardWidgetSourceSchema: DashboardWidgetSourceSchema =
+  dashboardWidgetSourceSchemaDefinition;
 
 const dashboardWidgetDefinitionSchemaDefinition = z.object({
   version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
   code: dashboardWidgetCodeSchema,
   queries: dashboardWidgetQueriesSchema,
+  description: dashboardWidgetDescriptionSchema.optional(),
+  prompt: dashboardWidgetPromptSchema.optional(),
+  source: dashboardWidgetSourceSchema.optional(),
 });
 export interface DashboardWidgetDefinitionSchema extends Named<
   typeof dashboardWidgetDefinitionSchemaDefinition
@@ -162,6 +191,7 @@ export type DashboardWidgetQueryParameterDeclaration = z.infer<
 >;
 export type DashboardWidgetQuery = z.infer<typeof dashboardWidgetQuerySchema>;
 export type DashboardWidgetDefinition = z.infer<typeof dashboardWidgetDefinitionSchema>;
+export type DashboardWidgetSource = z.infer<typeof dashboardWidgetSourceSchema>;
 
 /** A bound parameter's value, as `LW.query`'s caller may supply it. */
 export type DashboardWidgetQueryParamValue = string | number | boolean;

@@ -8,6 +8,134 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LangWatch</title>
+    <!-- Boot recovery: specs/ui/boot-recovery.feature. First in <head>, so it listens before
+         the tags Vite injects below; plain script, because it must run when no chunk did.
+         Its events are UI_BOOT_EVENTS in @langwatch/browser-host/navigation. -->
+    <script id="ui-boot-recovery">
+      (function () {
+        var KEY = "ui-boot-attempt";
+        // Reloads in a row that fetched nothing new; one that did is progress, since the
+        // HTTP cache keeps every file that arrived (assets are immutable).
+        var MAX_STUCK = 6;
+        var MAX_TRIES = 20;
+        var STALL_MS = 30000;
+        var saved = String(read() || "0,0").split(",");
+        var stuck = Number(saved[0]) || 0;
+        var tries = Number(saved[1]) || 0;
+        var parsed = null;
+        var done = false;
+        var lastProgress = Date.now();
+        var note = null;
+        var timer = 0;
+
+        function read() {
+          try {
+            return sessionStorage.getItem(KEY);
+          } catch (e) {
+            return null;
+          }
+        }
+        function write(value) {
+          try {
+            if (value === null) sessionStorage.removeItem(KEY);
+            else sessionStorage.setItem(KEY, value);
+            return true;
+          } catch (e) {
+            return false;
+          }
+        }
+        function say(text, offerRetry) {
+          if (!note) {
+            note = document.createElement("div");
+            note.setAttribute("role", "status");
+            note.style.cssText =
+              "position:fixed;inset:0 0 auto 0;padding:24px 16px;text-align:center;" +
+              "font:15px/1.5 system-ui,sans-serif;color:#444;background:#fff;z-index:2147483647";
+            document.documentElement.appendChild(note);
+          }
+          note.textContent = text;
+          if (!offerRetry) return;
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "Try again";
+          button.style.cssText = "display:block;margin:12px auto 0;padding:6px 14px;font:inherit";
+          button.onclick = function () {
+            location.reload();
+          };
+          note.appendChild(button);
+        }
+        function retrying(stuckReloads) {
+          var n = Math.max(stuckReloads, 1);
+          return "Slow connection, retrying (" + n + " of " + MAX_STUCK + ")...";
+        }
+        // API answers arrive on every load, so only code counts as progress.
+        function fetchedSomething() {
+          var entries = performance.getEntriesByType("resource");
+          for (var i = 0; i < entries.length; i++) {
+            if (entries[i].transferSize > 0 && entries[i].name.indexOf("/assets/") !== -1)
+              return true;
+          }
+          return false;
+        }
+        function standDown() {
+          done = true;
+          clearInterval(timer);
+          removeEventListener("error", onResourceError, true);
+        }
+        function retry() {
+          if (done) return;
+          standDown();
+          var nextStuck = fetchedSomething() ? 0 : stuck + 1;
+          // The counter is what stops a loop; with no storage, ask instead of reloading.
+          if (nextStuck <= MAX_STUCK && tries < MAX_TRIES && write(nextStuck + "," + (tries + 1))) {
+            say(retrying(nextStuck));
+            location.reload();
+            return;
+          }
+          write(null);
+          say("Could not load. Check your connection.", true);
+        }
+        // Only the tags the server sent count: the parser has inserted them all by
+        // "interactive", and no script of ours has run yet.
+        function isBootTag(el) {
+          var tag = el && el.tagName;
+          var boot =
+            (tag === "SCRIPT" && el.src) || (tag === "LINK" && /\bstylesheet\b/.test(el.rel));
+          return Boolean(boot) && (parsed === null || parsed.indexOf(el) !== -1);
+        }
+        function onResourceError(event) {
+          if (isBootTag(event.target)) retry();
+        }
+        document.addEventListener("readystatechange", function () {
+          if (document.readyState !== "interactive" || parsed !== null) return;
+          parsed = Array.prototype.slice.call(
+            document.querySelectorAll("script[src], link[rel~='stylesheet']"),
+          );
+        });
+        addEventListener("error", onResourceError, true);
+        addEventListener("ui:chunk-failed", function (event) {
+          if (done) return;
+          event.preventDefault();
+          retry();
+        });
+        addEventListener("ui:mounted", function () {
+          if (done) return;
+          standDown();
+          write(null);
+          if (note) note.remove();
+        });
+        // A request that hangs never fails; nothing finishing for this long counts as one.
+        try {
+          new PerformanceObserver(function () {
+            lastProgress = Date.now();
+          }).observe({ type: "resource", buffered: true });
+        } catch (e) {}
+        timer = setInterval(function () {
+          if (Date.now() - lastProgress > STALL_MS) retry();
+        }, 1000);
+        if (tries > 0) say(retrying(stuck));
+      })();
+    </script>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="64x64" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>

@@ -25,8 +25,14 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
+import {
+  createDashboardTestAnalytics,
+  createDashboardTestProjects,
+  DASHBOARDS_ROLLED_OUT,
+} from "../../app/__tests__/dashboard.fixture.ts";
 import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
+import { PrismaDashboardRepository } from "../../repositories/prisma/prisma.dashboard.repository.ts";
+import { DashboardAccessService } from "../dashboard-access.service.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -110,6 +116,12 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     service = DashboardWidgetService.create({
       repository: PrismaDashboardWidgetRepository.create({ prisma: database() }),
       analytics: createDashboardTestAnalytics(),
+      // Answers from the real table, so a board of another project reads as absent.
+      boards: DashboardAccessService.create({
+        repository: PrismaDashboardRepository.create({ prisma: database() }),
+        projects: createDashboardTestProjects(),
+        rollout: DASHBOARDS_ROLLED_OUT,
+      }),
     });
     organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${randomUUID()}` },

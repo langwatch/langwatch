@@ -4,7 +4,11 @@
  * one `lw:init` over `postMessage` with a transferred `MessagePort`; the rest travels the port.
  */
 
-import type { LangWatchQLDiagnostic, LangWatchQLStatistics } from "../lwql/analytics.lwql.ts";
+import type {
+  LangWatchQLDiagnostic,
+  LangWatchQLStatistics,
+  QueryCompleteness,
+} from "../lwql/analytics.lwql.ts";
 
 export type ChartFrameTheme = "light" | "dark";
 
@@ -67,6 +71,8 @@ export interface ChartQueryResult {
   readonly followsGranularity: boolean;
   readonly granularitySeconds?: number;
   readonly coarsenedFromSeconds?: number;
+  /** What the rows are missing; absent when the server could not tell. */
+  readonly completeness?: QueryCompleteness;
 }
 
 /**
@@ -79,6 +85,11 @@ export interface ChartQueryError {
   readonly message: string;
   /** Set when the same request is expected to succeed shortly; the hook retries it. */
   readonly retryable?: boolean;
+  /**
+   * Set when the query was refused only because the reader may not see what it reads: the gates
+   * they lack, such as "cost:view". The host then shows "no access", not a failure.
+   */
+  readonly missingGates?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +155,15 @@ export interface LwSetHeightMessage {
  * semi-trusted and a raw destination would be an open redirect.
  * @see useDashboardWidgetChartNavigate
  */
-export const NAVIGABLE_TARGETS = ["traces", "trace"] as const;
+export const NAVIGABLE_TARGETS = [
+  "traces",
+  "trace",
+  "scenarios",
+  "onlineEvaluations",
+  "annotations",
+  "gatewayVirtualKeys",
+  "codingSessions",
+] as const;
 export type NavigableTarget = (typeof NAVIGABLE_TARGETS)[number];
 
 export interface LwNavigateMessage {
@@ -195,6 +214,8 @@ export const CHART_FRAME_MAX_HEIGHT_PX = 640;
  */
 export const CHART_FRAME_HEARTBEAT_INTERVAL_MS = 2000;
 export const CHART_FRAME_HEARTBEAT_TIMEOUT_MS = 10000;
+/** How often the frame retries a retryable query failure before it counts; the host reads it. */
+export const CHART_QUERY_MAX_RETRIES = 3;
 
 /**
  * The one structural mapping from the server's result to the wire payload.
@@ -209,6 +230,7 @@ export function toChartQueryResult(result: {
   readonly followsGranularity: boolean;
   readonly granularitySeconds?: number;
   readonly coarsenedFromSeconds?: number;
+  readonly completeness?: QueryCompleteness;
 }): ChartQueryResult {
   return {
     columns: result.columns.map((column) => ({
@@ -226,5 +248,21 @@ export function toChartQueryResult(result: {
     ...(result.coarsenedFromSeconds !== undefined
       ? { coarsenedFromSeconds: result.coarsenedFromSeconds }
       : {}),
+    ...(result.completeness !== undefined
+      ? { completeness: cloneCompleteness(result.completeness) }
+      : {}),
+  };
+}
+
+/** A plain copy, so only the contract's fields cross the port. */
+function cloneCompleteness(completeness: QueryCompleteness): QueryCompleteness {
+  const { state, unit, total, fields, buckets, unpriced } = completeness;
+  return {
+    state,
+    unit,
+    total,
+    fields: fields.map(({ field, label, present }) => ({ field, label, present })),
+    ...(buckets ? { buckets: buckets.map(({ start, n }) => ({ start, n })) } : {}),
+    ...(unpriced ? { unpriced: { count: unpriced.count, models: [...unpriced.models] } } : {}),
   };
 }

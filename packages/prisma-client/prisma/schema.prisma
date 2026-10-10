@@ -2200,19 +2200,68 @@ model DatasetRecord {
   @@index([projectId, datasetId])
 }
 
+/// Who sees a dashboard, named as the prompt scope is, with one more level.
+enum DashboardScope {
+  /// Its author alone: "Only me".
+  PRIVATE
+  PROJECT
+  /// Every project of the owning project's organization, each with its own data.
+  ORGANIZATION
+}
+
 model Dashboard {
   id        String        @id @default(nanoid())
+  /// The project that owns the board; only there can it be edited.
   projectId String
   project   Project       @relation(fields: [projectId], references: [id])
   name      String
+  /// Legacy board sort position. The Dashboards v2 app orders boards by a
+  /// member's favourites and never writes this; kept because the legacy
+  /// Analytics reports section and the REST reorder endpoint still write it,
+  /// and a rolling deploy's older image still reads it.
   order     Int           @default(0)
+  /// Free text under the board's name; null until a member writes one.
+  description String?
+  /// The member who created it; null for boards that predate the column.
+  createdById String?
+  /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
+  scope          DashboardScope @default(PROJECT)
+  /// The owning project's organization, stamped when the board is first set to
+  /// ORGANIZATION; null before. No relation, per the database rule.
+  organizationId String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @default(now()) @updatedAt
   graphs    CustomGraph[]
 
   @@index([projectId])
   @@index([projectId, order])
+  // A project's list also reads the organization's shared boards; scope in the
+  // index keeps that lookup selective, as on LlmPromptConfig.
+  @@index([organizationId, scope])
   @@map("Dashboard")
+}
+
+/// A member's star, in their own order within a project: a board or a From
+/// LangWatch template. Personal: one member's stars never show to another. No
+/// foreign key (per the database rule): the dashboard service removes a board's
+/// favourites when it deletes the board, so a star never outlives its dashboard.
+model DashboardFavourite {
+  id          String   @id @default(nanoid())
+  userId      String
+  /// Null when the star is a template.
+  dashboardId String?
+  /// The starred From LangWatch template id; null when the star is a board.
+  templateId  String?
+  projectId   String
+  /// The member's drag order among their own stars in the project.
+  position    Int
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, dashboardId])
+  @@unique([userId, projectId, templateId])
+  @@index([userId, projectId, position])
+  @@index([dashboardId])
+  @@map("DashboardFavourite")
 }
 
 model SavedView {

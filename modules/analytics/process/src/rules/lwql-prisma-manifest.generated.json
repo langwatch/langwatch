@@ -8106,7 +8106,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "The project that owns the board; only there can it be edited."
         },
         {
           "name": "project",
@@ -8142,7 +8142,43 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "Legacy board sort position. The Dashboards v2 app orders boards by a\nmember's favourites and never writes this; kept because the legacy\nAnalytics reports section and the REST reorder endpoint still write it,\nand a rolling deploy's older image still reads it."
+        },
+        {
+          "name": "description",
+          "columnName": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Free text under the board's name; null until a member writes one."
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member who created it; null for boards that predate the column."
+        },
+        {
+          "name": "scope",
+          "columnName": "scope",
+          "type": "DashboardScope",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Who sees it. Only the author changes it; a board with no author stays PROJECT."
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The owning project's organization, stamped when the board is first set to\nORGANIZATION; null before. No relation, per the database rule."
         },
         {
           "name": "createdAt",
@@ -8175,6 +8211,79 @@
             "references": [],
             "to": "CustomGraph"
           }
+        }
+      ]
+    },
+    {
+      "name": "DashboardFavourite",
+      "tableName": "DashboardFavourite",
+      "documentation": "A member's star, in their own order within a project: a board or a From\nLangWatch template. Personal: one member's stars never show to another. No\nforeign key (per the database rule): the dashboard service removes a board's\nfavourites when it deletes the board, so a star never outlives its dashboard.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "dashboardId",
+          "columnName": "dashboardId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Null when the star is a template."
+        },
+        {
+          "name": "templateId",
+          "columnName": "templateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The starred From LangWatch template id; null when the star is a board."
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "position",
+          "columnName": "position",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The member's drag order among their own stars in the project."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         }
       ]
     },
@@ -25006,6 +25115,14 @@
         "TRACE",
         "PROJECT",
         "BATCH"
+      ]
+    },
+    {
+      "name": "DashboardScope",
+      "values": [
+        "PRIVATE",
+        "PROJECT",
+        "ORGANIZATION"
       ]
     },
     {

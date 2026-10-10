@@ -64,6 +64,31 @@ export const langWatchQLDiagnosticSchema: LangWatchQLDiagnosticSchema =
   langWatchQLDiagnosticSchemaDefinition;
 export type LangWatchQLDiagnostic = z.infer<typeof langWatchQLDiagnosticSchema>;
 
+/**
+ * How much of the data a query reads is present, so a widget never shows missing as zero.
+ * @see modules/analytics/specs/analytics-query-completeness.feature
+ */
+const queryCompletenessSchemaDefinition = z.object({
+  /** complete: every field fully present; partial: some field or price missing on some rows;
+   *  missing: a field the query needs is on no row; no_traffic: no rows in the window at all. */
+  state: z.enum(["complete", "partial", "missing", "no_traffic"]),
+  /** What `total` counts: the rows of the view the query reads ("traces", "spans",
+   *  "evaluations"). */
+  unit: z.string(),
+  total: z.number(),
+  /** One entry per nullable field the query reads, with how many of `total` carry it. */
+  fields: z.array(z.object({ field: z.string(), label: z.string(), present: z.number() })),
+  /** Only when the query follows the board granularity: EVERY bucket in the window, empty ones
+   *  with n 0. */
+  buckets: z.array(z.object({ start: z.string(), n: z.number() })).optional(),
+  /** Only when the query reads cost: rows with at least one unpriced span, and those models. */
+  unpriced: z.object({ count: z.number(), models: z.array(z.string()) }).optional(),
+});
+export interface QueryCompletenessSchema extends Named<typeof queryCompletenessSchemaDefinition> {}
+export const queryCompletenessSchema: QueryCompletenessSchema = queryCompletenessSchemaDefinition;
+export type QueryCompleteness = z.infer<typeof queryCompletenessSchema>;
+export type QueryCompletenessState = QueryCompleteness["state"];
+
 /** The complete result envelope returned by the query transport. */
 const langWatchQLQueryResultSchemaDefinition = z
   .object({
@@ -75,6 +100,8 @@ const langWatchQLQueryResultSchemaDefinition = z
     followsGranularity: z.boolean(),
     granularitySeconds: z.number().optional(),
     coarsenedFromSeconds: z.number().optional(),
+    /** Absent when the run had no time window or read no catalogued view, and on a failure. */
+    completeness: queryCompletenessSchema.optional(),
   })
   .strict();
 export interface LangWatchQLQueryResultSchema extends Named<
@@ -253,6 +280,8 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /** Trace origins the surface leaves out of every view the statement reads; none when absent. */
+  excludeOrigins?: readonly string[];
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
 }>;

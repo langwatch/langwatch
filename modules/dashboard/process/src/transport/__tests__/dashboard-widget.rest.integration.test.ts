@@ -13,7 +13,11 @@ import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "../../app/__tests__/dashboard.fixture.ts";
-import { dashboardWidgetRest, dashboardWidgetUrl } from "../dashboard-widget.rest.ts";
+import {
+  dashboardWidgetCallerSource,
+  dashboardWidgetRest,
+  dashboardWidgetUrl,
+} from "../dashboard-widget.rest.ts";
 
 const CODE = "export default function Widget() { return null; }";
 const SQL = "SELECT count() AS value FROM analytics.traces";
@@ -36,6 +40,7 @@ function mountKey() {
     app: () => app,
     middlewareContext: [
       bindMiddlewareContext(dashboardWidgetUrl, () => "https://app.langwatch.test/dashboards"),
+      bindMiddlewareContext(dashboardWidgetCallerSource, () => ({ kind: "api" as const })),
     ],
     onError: canonicalErrorResponse,
   });

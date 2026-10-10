@@ -11,8 +11,11 @@ import {
 import {
   dashboardWidgetCodeSchema,
   dashboardWidgetDefinitionSchema,
+  dashboardWidgetDescriptionSchema,
   dashboardWidgetNameSchema,
+  dashboardWidgetPromptSchema,
   dashboardWidgetQueriesSchema,
+  dashboardWidgetSourceSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
@@ -79,8 +82,12 @@ export const dashboardWidgetTrpcSuccessSchema: DashboardWidgetTrpcSuccessSchema 
   dashboardWidgetTrpcSuccessSchemaDefinition;
 
 export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
+  /**
+   * The project's widgets, or with `dashboardId` one board's: also an Organization board
+   * another project owns, which stores its widgets there.
+   */
   .query("list")
-  .withInput(projectScopeSchema)
+  .withInput(z.object({ ...projectScopeSchema.shape, dashboardId: z.string().optional() }))
   .withOutput(dashboardWidgetTrpcRowSchema.array())
 
   .mutation("create")
@@ -91,6 +98,9 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       name: dashboardWidgetNameSchema,
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
+      description: dashboardWidgetDescriptionSchema.optional(),
+      prompt: dashboardWidgetPromptSchema.optional(),
+      source: dashboardWidgetSourceSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSchema)
@@ -103,6 +113,8 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       name: dashboardWidgetNameSchema.optional(),
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
+      /** Kept as stored when absent. */
+      source: dashboardWidgetSourceSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSuccessSchema)

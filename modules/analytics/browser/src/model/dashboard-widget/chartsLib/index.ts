@@ -1,10 +1,13 @@
 /**
  * `@langwatch/charts`, bundled into the sandboxed frame as `window.LWCharts` (see
  * `chart-frame-document.ts`). Reads `window.React`/`window.Recharts` so hooks share the author's
- * instance.
+ * instance. How it keeps missing data off the screen: features/dashboards/WIDGET_STANDARD.md.
  */
 
+import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import type * as RechartsLibrary from "recharts";
+
+import { parseIsoInstant, utcParts } from "./utc-instant.ts";
 
 type Row = Record<string, unknown>;
 
@@ -111,11 +114,15 @@ function isNumeric(value: unknown): boolean {
   return typeof value === "number" && !isNaN(value);
 }
 
+function parseInstantEpochMs(value: unknown): number | undefined {
+  return typeof value === "string" ? parseIsoInstant(value) : undefined;
+}
+
 /** A column reads as time-like by name, or by its first value parsing as a date. */
 function isTimeLikeColumn(data: Row[], key: string): boolean {
   if (/date|time|timestamp|day|hour|week|month|bucket/i.test(key)) return true;
   const sample = data[0]?.[key];
-  if (typeof sample === "string" && !isNaN(Date.parse(sample))) return true;
+  if (parseInstantEpochMs(sample) !== undefined) return true;
   return false;
 }
 
@@ -128,7 +135,9 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
   const timeLike = isTimeLikeColumn(data, key);
   let spansMultipleDays = false;
   if (timeLike) {
-    const times = data.map((row) => Date.parse(String(row[key]))).filter((t) => !isNaN(t));
+    const times = data
+      .map((row) => parseInstantEpochMs(row[key]))
+      .filter((t): t is number => t !== undefined);
     if (times.length > 0) {
       spansMultipleDays = Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
     }
@@ -136,16 +145,16 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
   return (value: unknown): string => {
     const raw = String(value);
     if (!timeLike) return raw;
-    const parsed = Date.parse(raw);
-    if (isNaN(parsed)) return raw;
-    const date = new Date(parsed);
+    const instant = parseInstantEpochMs(raw);
+    if (instant === undefined) return raw;
+    const date = utcParts(instant);
     if (spansMultipleDays) {
-      const mm = String(date.getMonth() + 1).padStart(2, "0");
-      const dd = String(date.getDate()).padStart(2, "0");
+      const mm = String(date.month).padStart(2, "0");
+      const dd = String(date.day).padStart(2, "0");
       return `${mm}-${dd}`;
     }
-    const hh = String(date.getHours()).padStart(2, "0");
-    const min = String(date.getMinutes()).padStart(2, "0");
+    const hh = String(date.hour).padStart(2, "0");
+    const min = String(date.minute).padStart(2, "0");
     return `${hh}:${min}`;
   };
 }
@@ -164,9 +173,151 @@ function numericColumns(data: Row[], exclude: string[]): string[] {
   return cols.filter((col) => !exclude.includes(col) && data.some((row) => isNumeric(row[col])));
 }
 
-function toNumber(value: unknown): number {
+/** A value as a number, or null when it is missing: a gap is never drawn as 0. */
+export function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
-  return isNaN(n) ? 0 : n;
+  return Number.isFinite(n) ? n : null;
+}
+
+// ---------------------------------------------------------------------------
+// Buckets: every bucket of the window, from the query's completeness report
+// ---------------------------------------------------------------------------
+
+/** A count may be a real 0; a measure (rate, average, percentile) with no data is a gap. */
+export type SeriesKind = "count" | "measure";
+
+/** A series key, or a key with its kind. A bare key is a measure, the safe default. */
+export type SeriesSpec = string | { key: string; kind?: SeriesKind };
+
+export interface CompletenessBucket {
+  start: string;
+  n: number;
+}
+
+/** `2026-10-07 00:00:00[.000]` as LangWatchQL returns it, read as UTC. */
+const CLICKHOUSE_INSTANT = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/;
+
+/** A bucket value as epoch milliseconds; rows and the report spell instants differently. */
+function bucketEpochMs(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const naive = CLICKHOUSE_INSTANT.exec(value.trim());
+  return parseInstantEpochMs(naive ? `${naive[1]}T${naive[2]}Z` : value.trim());
+}
+
+function clickHouseInstant(epochMs: number): string {
+  const utc = utcParts(epochMs);
+  const two = (part: number) => String(part).padStart(2, "0");
+  const date = `${utc.year}-${two(utc.month)}-${two(utc.day)}`;
+  return `${date} ${two(utc.hour)}:${two(utc.minute)}:${two(utc.second)}`;
+}
+
+function seriesKey(spec: SeriesSpec): string {
+  return typeof spec === "string" ? spec : spec.key;
+}
+
+function emptyBucketRow({
+  x,
+  epochMs,
+  series,
+}: {
+  x: string;
+  epochMs: number;
+  series: readonly SeriesSpec[];
+}): Row {
+  const row: Row = { [x]: clickHouseInstant(epochMs) };
+  for (const spec of series) {
+    row[seriesKey(spec)] = typeof spec !== "string" && spec.kind === "count" ? 0 : null;
+  }
+  return row;
+}
+
+/**
+ * The rows with every bucket of the window present, in time order: a bucket with no row gets
+ * one, its count series 0 and its measure series null. Without buckets the rows come back as
+ * they are. A row whose x is not an instant is kept, after the others.
+ */
+export function mergeBuckets({
+  rows,
+  buckets,
+  x,
+  series = [],
+}: {
+  rows: readonly Row[];
+  buckets: readonly CompletenessBucket[] | null | undefined;
+  x: string;
+  series?: readonly SeriesSpec[];
+}): Row[] {
+  if (!buckets || buckets.length === 0) return [...rows];
+  const byBucket = new Map<number, Row[]>();
+  const unplaced: Row[] = [];
+  for (const row of rows) {
+    const epochMs = bucketEpochMs(row[x]);
+    if (epochMs === undefined) {
+      unplaced.push(row);
+      continue;
+    }
+    byBucket.set(epochMs, [...(byBucket.get(epochMs) ?? []), row]);
+  }
+  for (const bucket of buckets) {
+    const epochMs = bucketEpochMs(bucket.start);
+    if (epochMs === undefined || byBucket.has(epochMs)) continue;
+    byBucket.set(epochMs, [emptyBucketRow({ x, epochMs, series })]);
+  }
+  const placed = [...byBucket.entries()]
+    .toSorted(([left], [right]) => left - right)
+    .flatMap(([, bucketRows]) => bucketRows);
+  return [...placed, ...unplaced];
+}
+
+/** Unpriced spans leave every cost sum short, whichever cost column the query reads. */
+const COST_FIELD = /cost/i;
+
+/**
+ * Whether a sum over `field` is a lower bound, so its figure reads "$830+": the data is
+ * partial and some rows lack the field, or it is a cost and some traces have no price.
+ * Never put a "+" on an average or a rate.
+ */
+export function isLowerBound({
+  completeness,
+  field,
+}: {
+  completeness: QueryCompleteness | null | undefined;
+  field: string;
+}): boolean {
+  if (completeness?.state !== "partial") return false;
+  const present =
+    completeness.fields.find((candidate) => candidate.field === field)?.present ??
+    completeness.total;
+  const unpriced = COST_FIELD.test(field) ? (completeness.unpriced?.count ?? 0) : 0;
+  return present < completeness.total || unpriced > 0;
+}
+
+/**
+ * The mean of `key` over the rows that have it, so an empty bucket never pulls a big number
+ * down. With `weight` (a row count column), each row counts by its weight. Null when no row has
+ * a value.
+ */
+export function averageOf({
+  rows,
+  key,
+  weight,
+}: {
+  rows: readonly Row[];
+  key: string;
+  weight?: string;
+}): number | null {
+  let total = 0;
+  let count = 0;
+  for (const row of rows) {
+    const value = toNumber(row[key]);
+    const rowWeight = weight === undefined ? 1 : (toNumber(row[weight]) ?? 0);
+    if (value === null || rowWeight <= 0) continue;
+    total += value * rowWeight;
+    count += rowWeight;
+  }
+  return count > 0 ? total / count : null;
 }
 
 /** Index of the first row whose x value is at/after `projectionFrom`. -1 if none. */
@@ -261,14 +412,15 @@ export interface SparklineProps {
   height?: number;
 }
 
-function sparklinePoints(data: Row[] | number[], y?: string): { value: number }[] {
+// A null point breaks the line: the chart never invents a 0 for a missing value.
+function sparklinePoints(data: Row[] | number[], y?: string): { value: number | null }[] {
   if (data.length === 0) return [];
-  if (typeof data[0] === "number") {
-    return (data as number[]).map((value) => ({ value }));
+  if (!data.some((item) => typeof item === "object" && item !== null)) {
+    return (data as unknown[]).map((value) => ({ value: toNumber(value) }));
   }
   const rows = data as Row[];
   const key = y ?? numericColumns(rows, [])[0];
-  return rows.map((row) => ({ value: key ? toNumber(row[key]) : 0 }));
+  return rows.map((row) => ({ value: key ? toNumber(row[key]) : null }));
 }
 
 export function Sparkline({ data, y, color, height = 40 }: SparklineProps) {
@@ -289,6 +441,7 @@ export function Sparkline({ data, y, color, height = 40 }: SparklineProps) {
         fillOpacity: 0.15,
         strokeWidth: 1.5,
         dot: false,
+        connectNulls: false,
         isAnimationActive: false,
       }),
     ),
@@ -368,6 +521,124 @@ export interface AreaTimeseriesProps {
   projectionFrom?: string | number;
   colors?: string[];
   height?: number;
+  /** How the hover prints a value. */
+  format?: MetricFormat;
+  /** What the hover says over a bucket with no data, from its date: "No evals ran on Oct 7". */
+  gapLabel?: (date: string) => string;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Oct 7", or "Oct 7, 14:00" for a bucket that starts inside a day; UTC, as the axis is. */
+function bucketDate(value: unknown): string {
+  const epochMs = bucketEpochMs(value);
+  if (epochMs === undefined) return cellText(value);
+  const utc = utcParts(epochMs);
+  const day = `${MONTHS[utc.month - 1]} ${utc.day}`;
+  if (utc.hour === 0 && utc.minute === 0) return day;
+  return `${day}, ${String(utc.hour).padStart(2, "0")}:${String(utc.minute).padStart(2, "0")}`;
+}
+
+const GAP_BRIDGE = "__gap";
+
+/**
+ * A two-point series across each gap of each key with a point on both sides, drawn as a faint
+ * dashed line so the trend still reads where the area breaks.
+ */
+function withGapBridges({ rows, keys }: { rows: Row[]; keys: readonly string[] }): {
+  rows: Row[];
+  bridges: { key: string; of: number }[];
+} {
+  const bridged = rows.map((row) => ({ ...row }));
+  const bridges: { key: string; of: number }[] = [];
+  keys.forEach((key, of) => {
+    let last = -1;
+    bridged.forEach((row, index) => {
+      const value = toNumber(row[key]);
+      if (value === null) return;
+      const before = bridged[last];
+      if (before && index - last > 1) {
+        const bridge = `${key}${GAP_BRIDGE}${bridges.length}`;
+        before[bridge] = toNumber(before[key]);
+        row[bridge] = value;
+        bridges.push({ key: bridge, of });
+      }
+      last = index;
+    });
+  });
+  return { rows: bridged, bridges };
+}
+
+/** The hover for a time chart: each series' value, "no data" for a gap, and the gap's own words. */
+function gapAwareTooltip({
+  keys,
+  palette,
+  format,
+  gapLabel,
+}: {
+  keys: readonly string[];
+  palette: string[];
+  format?: MetricFormat;
+  gapLabel: (date: string) => string;
+}) {
+  return ({
+    active,
+    label,
+    payload,
+  }: {
+    active?: boolean;
+    label?: unknown;
+    payload?: readonly { payload?: Row }[];
+  }) => {
+    const row = payload?.[0]?.payload;
+    if (!active || !row) return null;
+    const c = chrome();
+    const date = bucketDate(label);
+    const box = {
+      background: c.tooltipBg,
+      border: `1px solid ${c.tooltipBorder}`,
+      borderRadius: 6,
+      padding: "6px 10px",
+      fontSize: 12,
+      color: c.text,
+    };
+    if (keys.every((key) => toNumber(row[key]) === null)) {
+      return h("div", { style: { ...box, color: c.axis } }, gapLabel(date));
+    }
+    return h(
+      "div",
+      { style: box },
+      h("div", { style: { fontSize: 11, color: c.axis, marginBottom: 2 } }, date),
+      ...keys.map((key, index) => {
+        const value = toNumber(row[key]);
+        return h(
+          "div",
+          { key, style: { display: "flex", alignItems: "center", gap: 6 } },
+          h("span", {
+            style: {
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: colorAt(palette, index),
+            },
+          }),
+          h("span", { style: { color: c.axis } }, key),
+          h(
+            "span",
+            {
+              style: {
+                marginLeft: "auto",
+                paddingLeft: 12,
+                fontWeight: value === null ? 400 : 600,
+                color: value === null ? c.axis : c.text,
+              },
+            },
+            value === null ? "no data" : formatValue(value, format),
+          ),
+        );
+      }),
+    );
+  };
 }
 
 /**
@@ -406,6 +677,8 @@ export function AreaTimeseries({
   projectionFrom,
   colors,
   height = DEFAULT_HEIGHT,
+  format,
+  gapLabel = (date) => `No data on ${date}`,
 }: AreaTimeseriesProps) {
   const R = recharts();
   const c = chrome();
@@ -413,7 +686,27 @@ export function AreaTimeseries({
   const keys = Array.isArray(series) ? series : [series];
   const splitAt = projectionIndex(data, x, projectionFrom);
 
-  const rows = splitActualFromProjected({ data, keys, splitAt });
+  // A bridge over a stacked area would sit at its own value, not on the stack, so none there.
+  const { rows, bridges } = withGapBridges({
+    rows: splitActualFromProjected({ data, keys, splitAt }),
+    keys: stacked ? [] : keys,
+  });
+  const bridgeLines = bridges.map((bridge) =>
+    h(R.Line, {
+      key: bridge.key,
+      dataKey: bridge.key,
+      stroke: colorAt(palette, bridge.of),
+      strokeOpacity: 0.45,
+      strokeWidth: 1.2,
+      strokeDasharray: "3 3",
+      dot: false,
+      activeDot: false,
+      connectNulls: true,
+      legendType: "none",
+      tooltipType: "none",
+      isAnimationActive: false,
+    }),
+  );
 
   const areas = keys.flatMap((key, index) => {
     const color = colorAt(palette, index);
@@ -459,7 +752,7 @@ export function AreaTimeseries({
         R.ResponsiveContainer,
         { width: "100%", height: "100%" },
         h(
-          R.AreaChart,
+          R.ComposedChart,
           { data: rows, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
           h(R.CartesianGrid, { stroke: c.grid, vertical: false }),
           h(R.XAxis, {
@@ -477,13 +770,12 @@ export function AreaTimeseries({
             tick: { fill: c.axis, fontSize: 11 },
             tickFormatter: compactNumber,
           }),
+          // filterNull off: a bucket with no data still hovers, to say so.
           h(R.Tooltip, {
-            contentStyle: {
-              background: c.tooltipBg,
-              border: `1px solid ${c.tooltipBorder}`,
-            },
-            labelStyle: { color: c.text },
+            filterNull: false,
+            content: gapAwareTooltip({ keys, palette, format, gapLabel }),
           }),
+          ...bridgeLines,
           ...areas,
         ),
       ),
@@ -842,6 +1134,13 @@ export function Donut({
 // Leaderboard
 // ---------------------------------------------------------------------------
 
+/** Larger first, a missing value after every known one. */
+function compareDescending(left: number | null, right: number | null): number {
+  if (left === null) return right === null ? 0 : 1;
+  if (right === null) return -1;
+  return right - left;
+}
+
 export interface LeaderboardProps {
   data: Row[];
   labelKey: string;
@@ -850,6 +1149,34 @@ export interface LeaderboardProps {
   format?: MetricFormat;
   height?: number;
   navigateTo?: { target: string; params: (row: Row) => object };
+  /**
+   * The report's unpriced models, for a cost list by model: each gets a "no price" row with a
+   * dash for its cost, never $0, added when the data has no row for it.
+   */
+  unpriced?: { models: readonly string[] };
+}
+
+/** The rows with each unpriced model's value cleared, and a row for any model they lack. */
+function withUnpricedRows({
+  data,
+  labelKey,
+  valueKey,
+  models,
+}: {
+  data: Row[];
+  labelKey: string;
+  valueKey: string;
+  models: ReadonlySet<string>;
+}): Row[] {
+  const listed = new Set(data.map((row) => cellText(row[labelKey])));
+  return [
+    ...data.map((row) =>
+      models.has(cellText(row[labelKey])) ? { ...row, [valueKey]: null } : row,
+    ),
+    ...[...models]
+      .filter((model) => !listed.has(model))
+      .map((model) => ({ [labelKey]: model, [valueKey]: null })),
+  ];
 }
 
 export function Leaderboard({
@@ -860,11 +1187,20 @@ export function Leaderboard({
   format,
   height,
   navigateTo,
+  unpriced,
 }: LeaderboardProps) {
   const c = chrome();
   const palette = paletteFor();
-  const ranked = [...data].toSorted((a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]));
-  const scaleMax = max ?? Math.max(1, ...ranked.map((row) => toNumber(row[valueKey])));
+  const noPrice = new Set(unpriced?.models ?? []);
+  const rows = withUnpricedRows({ data, labelKey, valueKey, models: noPrice });
+  // Rows with no value sort last and draw no bar: a missing value is not a 0.
+  const ranked = rows.toSorted((a, b) =>
+    compareDescending(toNumber(a[valueKey]), toNumber(b[valueKey])),
+  );
+  const known = ranked
+    .map((row) => toNumber(row[valueKey]))
+    .filter((value): value is number => value !== null);
+  const scaleMax = max ?? Math.max(1, ...known);
 
   return h(
     "div",
@@ -879,7 +1215,7 @@ export function Leaderboard({
     },
     ...ranked.map((row, index) => {
       const value = toNumber(row[valueKey]);
-      const widthPct = Math.max(2, Math.min(100, (value / scaleMax) * 100));
+      const widthPct = value === null ? 0 : Math.max(2, Math.min(100, (value / scaleMax) * 100));
       const clickable = typeof navigateTo?.params === "function";
       return h(
         "div",
@@ -905,6 +1241,8 @@ export function Leaderboard({
             style: { fontSize: 12, color: c.text, minWidth: 96, flexShrink: 0 },
           },
           cellText(row[labelKey]),
+          noPrice.has(cellText(row[labelKey])) &&
+            h("span", { style: { marginLeft: 6, color: c.axis } }, "no price"),
         ),
         h(
           "div",
@@ -952,6 +1290,8 @@ export interface HeatmapProps {
   xLabels?: string[];
   yLabels?: string[];
   colorScale?: [string, string];
+  /** "count": a cell with no row is 0. "measure" (default): it is a gap, drawn empty. */
+  kind?: SeriesKind;
   height?: number;
 }
 
@@ -991,17 +1331,22 @@ export function Heatmap({
   xLabels,
   yLabels,
   colorScale,
+  kind = "measure",
   height = DEFAULT_HEIGHT,
 }: HeatmapProps) {
+  const c = chrome();
   const cols = xLabels ?? (xKey === "hour" ? DEFAULT_HOUR_LABELS : undefined);
   const rows = yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
   const xValues = cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
   const yValues = rows ?? Array.from(new Set(data.map((row) => String(row[yKey]))));
   const scale = colorScale ?? heatmapScale();
-  const values = data.map((row) => toNumber(row[valueKey]));
+  const values = data
+    .map((row) => toNumber(row[valueKey]))
+    .filter((value): value is number => value !== null);
   const maxValue = Math.max(1, ...values);
+  const absent = kind === "count" ? 0 : null;
 
-  const lookup = new Map<string, number>();
+  const lookup = new Map<string, number | null>();
   data.forEach((row) => {
     lookup.set(`${String(row[xKey])}\u0000${String(row[yKey])}`, toNumber(row[valueKey]));
   });
@@ -1020,7 +1365,15 @@ export function Heatmap({
       },
       ...yValues.flatMap((yValue, yIndex) =>
         xValues.map((xValue, xIndex) => {
-          const raw = lookup.get(`${xValue}\u0000${yValue}`) ?? 0;
+          const cell = `${xValue}\u0000${yValue}`;
+          const raw = lookup.has(cell) ? (lookup.get(cell) ?? null) : absent;
+          if (raw === null) {
+            return h("div", {
+              key: `${yIndex}-${xIndex}`,
+              title: `${yValue} / ${xValue}: no data`,
+              style: { aspectRatio: "1", borderRadius: 2, border: `1px dashed ${c.grid}` },
+            });
+          }
           const t = maxValue > 0 ? raw / maxValue : 0;
           return h("div", {
             key: `${yIndex}-${xIndex}`,
@@ -1092,7 +1445,7 @@ function Table({ data, height }: { data: Row[]; height?: number }) {
                     color: c.text,
                   },
                 },
-                cellText(row[col]),
+                isMissingNumber(row[col]) ? "–" : cellText(row[col]),
               ),
             ),
           ),
@@ -1116,6 +1469,8 @@ export interface LwqlChartProps {
   series?: string;
   colors?: string[];
   height?: number;
+  /** The report's unpriced models; a leaderboard lists each with "no price". */
+  unpriced?: { models: readonly string[] };
 }
 
 interface InferredShape {
@@ -1171,6 +1526,7 @@ export function LwqlChart({
   series,
   colors,
   height = DEFAULT_HEIGHT,
+  unpriced,
 }: LwqlChartProps) {
   const inferred = inferShape(data, x, y);
   const resolvedKind = kind ?? inferred.kind;
@@ -1208,6 +1564,7 @@ export function LwqlChart({
         labelKey: resolvedX,
         valueKey: (resolvedY[0] as string) ?? "",
         height,
+        unpriced,
       });
     case "table":
     default:
