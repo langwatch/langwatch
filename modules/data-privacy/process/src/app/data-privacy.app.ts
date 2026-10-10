@@ -163,6 +163,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
       repository: repositories.policies,
       scopes: projectScopes,
       lineage: dependencies.permissions,
+      departments: repositories.directory,
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
 
