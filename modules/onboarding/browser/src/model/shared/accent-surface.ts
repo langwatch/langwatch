@@ -19,13 +19,13 @@ const toConditional = ({ light, dark }: ColorModePair) => ({
  * `orange.950` so the card still reads as lifted off the panel behind it.
  */
 export const SELECTED_SURFACE_BG = {
-  light: "orange.50",
-  dark: "orange.950/30",
+  light: "accent.subtle",
+  dark: "accent.subtle",
 } as const satisfies ColorModePair;
 
 export const SELECTED_SURFACE_BORDER = {
-  light: "orange.400",
-  dark: "orange.800",
+  light: "accent.emphasized",
+  dark: "accent.emphasized",
 } as const satisfies ColorModePair;
 
 /**
@@ -33,13 +33,13 @@ export const SELECTED_SURFACE_BORDER = {
  * small shape and needs the extra contrast to hold its edge.
  */
 export const ACCENT_CHIP_BG = {
-  light: "orange.50",
-  dark: "orange.950/40",
+  light: "accent.subtle",
+  dark: "accent.muted",
 } as const satisfies ColorModePair;
 
 export const ACCENT_CHIP_BORDER = {
-  light: "orange.100",
-  dark: "orange.900",
+  light: "accent.muted",
+  dark: "accent.muted",
 } as const satisfies ColorModePair;
 
 export const selectedSurfaceBg = toConditional(SELECTED_SURFACE_BG);

@@ -147,9 +147,9 @@ function welcomeTakeoverProps({
 }
 
 function progressDotColor({ index, currentIndex }: { index: number; currentIndex: number }) {
-  if (index === currentIndex) return "orange.400";
-  if (index < currentIndex) return "orange.300";
-  return "gray.200";
+  if (index === currentIndex) return "accent.solid";
+  if (index < currentIndex) return "accent.muted";
+  return "bg.control";
 }
 
 function buildSignUpData({

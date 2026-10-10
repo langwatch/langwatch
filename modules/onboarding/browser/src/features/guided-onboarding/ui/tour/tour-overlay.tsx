@@ -94,8 +94,8 @@ export function TourSpotlight({
         width: spot.w,
         height: spot.h,
         boxShadow: handoff
-          ? "0 0 0 200vmax rgb(15 15 30 / 0.5)"
-          : "0 0 0 200vmax rgb(15 15 30 / 0.35)",
+          ? "0 0 0 200vmax var(--chakra-colors-bg-scrim)"
+          : "0 0 0 200vmax var(--chakra-colors-bg-scrim)",
         opacity: handoff === "fading" ? 0 : 1,
         transition,
       }}
@@ -134,13 +134,13 @@ export function TourCursor({
         width="20"
         height="20"
         viewBox="0 0 24 24"
-        style={{ filter: "drop-shadow(0 2px 3px rgb(0 0 0 / 0.25))" }}
+        style={{ filter: "drop-shadow(0 2px 3px var(--chakra-colors-bg-scrim))" }}
         aria-hidden="true"
       >
         <path
           d="M5.5 3.2L19.2 11.4c.5.3.4 1-.2 1.2l-5.7 1.6c-.2.05-.35.2-.42.38l-2 5.5c-.22.6-1.08.58-1.26-.04L5 4.1c-.15-.55.4-1.05.9-.9z"
-          fill="#ed8926"
-          stroke="#fff"
+          fill="var(--chakra-colors-accent-solid)"
+          stroke="var(--chakra-colors-bg-card)"
           strokeWidth="1.4"
         />
       </svg>
@@ -150,12 +150,12 @@ export function TourCursor({
         marginLeft={3}
         gap={1}
         borderRadius="full"
-        background="#ed8926"
+        background="accent.solid"
         paddingX={2}
         paddingY={0.5}
         fontSize="10.5px"
         fontWeight="semibold"
-        color="white"
+        color="orange.contrast"
         boxShadow="md"
       >
         (langy)
@@ -171,7 +171,7 @@ export function TourCursor({
           borderRadius="full"
           borderWidth="2px"
           borderStyle="solid"
-          borderColor="#ed8926"
+          borderColor="accent.solid"
           opacity={arrived ? 0.6 : 0}
           animation={arrived ? "ping 1s cubic-bezier(0, 0, 0.2, 1) 1" : undefined}
         />
@@ -208,7 +208,7 @@ export function TourCaption({
       borderWidth="1px"
       borderStyle="solid"
       borderColor="border"
-      background="bg.surface"
+      background="bg.card"
       padding={4}
       boxShadow="2xl"
       style={{ left: caption.x, top: caption.y }}
@@ -274,7 +274,7 @@ export function TourCaption({
             cursor="pointer"
             borderRadius="lg"
             background="fg"
-            color="bg.surface"
+            color="fg.inverted"
             paddingX={3}
             paddingY={1.5}
             fontSize="12px"
