@@ -139,6 +139,17 @@ function refuseDirectEmailSignUp(pathname: string): void {
 }
 
 /**
+ * Seals the plugin's raw `/two-factor/disable`: turning it off belongs to identity's
+ * `twoStepVerification.disable`, which refuses where an organization requires it and
+ * re-proves a current code. Server-side calls carry no request URL and pass.
+ */
+export function refuseDirectTwoStepDisable(pathname: string): void {
+  if (!pathname.endsWith("/two-factor/disable")) return;
+
+  throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+}
+
+/**
  * Whether a licensed deployment should refuse this credential route, the
  * ADR-027 gate site #3 decision.
  * ADR-117 §4 is what changed here, and only in mechanism: the question used to
@@ -309,6 +320,7 @@ function createBeforeRequestHook({
 
     await refuseLockedOutAddress({ pathname, body: ctx.body, signInLockout });
     refuseDirectEmailSignUp(pathname);
+    refuseDirectTwoStepDisable(pathname);
     await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
 
     await refuseConnectionGovernedReset({ pathname, body: ctx.body, addressRoutesToConnection });
