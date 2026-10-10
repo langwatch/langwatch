@@ -281,7 +281,7 @@ export function fireGuidedOnboardingPostHog({
 }
 
 /** The same for every delivery of one source event, so PostHog keeps exactly one of them. */
-function postHogUuidFor(sourceEventId: string): string {
+export function postHogUuidFor(sourceEventId: string): string {
   const hex = createHash("sha256").update(`nurturing-guided-turn:${sourceEventId}`).digest("hex");
   const variant = ((Number.parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16);
   return [
