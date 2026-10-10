@@ -81,7 +81,7 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 		return InlineCredentials{
 			Provider: "vertex_ai",
 			VertexAI: pickStrings(params,
-				"vertex_credentials", "vertex_project", "vertex_location",
+				"vertex_credentials", "vertex_project", "vertex_location", "api_base",
 			),
 		}, nil
 	case "gemini":
@@ -91,7 +91,7 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 		// credential is an AI Studio key for the Gemini API.
 		return InlineCredentials{
 			Provider: "gemini",
-			Gemini:   pickStrings(params, "api_key", "project_id", "region"),
+			Gemini:   pickStrings(params, "api_key", "project_id", "region", "api_base"),
 		}, nil
 	case "xai", "groq", "cerebras", "deepseek":
 		return InlineCredentials{

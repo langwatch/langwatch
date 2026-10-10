@@ -158,4 +158,8 @@ func TestVertexBaseURLOverrideTakesTheDerivedGeminiProvider(t *testing.T) {
 	if endpoint.baseURL != "http://127.0.0.1:21651/v1/projects/p1/locations/us-central1/publishers/google" || !endpoint.keyless {
 		t.Fatalf("vertex override endpoint: %+v", endpoint)
 	}
+	cred.APIKey = `{"type":"service_account"}`
+	if endpoint, _ := compatEndpointForCred(cred); !endpoint.keyless {
+		t.Fatal("service-account JSON in the key slot is never sent as an API key")
+	}
 }

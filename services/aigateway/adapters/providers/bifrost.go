@@ -1878,8 +1878,9 @@ const geminiCompatPrefix = "gemini-url-"
 // location. See specs/model-providers/google-agent-platform.feature.
 func geminiAgentPlatformEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
 	endpoint := anthropicCompatEndpoint{
-		baseURL:  geminiCompatBaseURL(cred),
-		keyless:  cred.ProviderID == domain.ProviderVertex && strings.TrimSpace(cred.APIKey) == "",
+		baseURL: geminiCompatBaseURL(cred),
+		// A Vertex credential's key slot holds service-account JSON, never an API key.
+		keyless:  cred.ProviderID == domain.ProviderVertex,
 		baseType: bfschemas.Gemini,
 	}
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))

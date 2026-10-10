@@ -580,6 +580,10 @@ func LLMProviderEnv(resolved map[string]string, port int) []string {
 	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
 		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
 	}
+	// The seed adds Gemini and Vertex rows at llmsim unless .env names a real account.
+	if resolved["HAVEN_SEED_LLMSIM_BASE_URL"] == "" {
+		env = append(env, "HAVEN_SEED_LLMSIM_BASE_URL="+base)
+	}
 	for _, p := range []struct{ key, url, value string }{
 		{"OPENAI_API_KEY", "OPENAI_BASE_URL", base + "/v1"},
 		{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", base},

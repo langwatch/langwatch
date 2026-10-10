@@ -68,6 +68,40 @@ export function llmsimCustomModels({
   return LLMSIM_ERROR_MODELS;
 }
 
+/** A placeholder service account: llmsim checks no credential, and the gateway sends none to it. */
+const LLMSIM_VERTEX_SERVICE_ACCOUNT = JSON.stringify({
+  type: "service_account",
+  project_id: "llmsim",
+});
+
+/**
+ * Gemini and Vertex rows aimed at llmsim when haven routes there (HAVEN_SEED_LLMSIM_BASE_URL).
+ * `base_url` is the generic key the gateway wire reads for any provider; a real key in the
+ * environment wins, so a developer's own Gemini or Vertex account is never redirected.
+ */
+export function llmsimProviderKeys({
+  provider,
+  environment,
+}: {
+  provider: string;
+  environment: Readonly<Record<string, string | undefined>>;
+}): Record<string, string> | undefined {
+  const base = environment.HAVEN_SEED_LLMSIM_BASE_URL;
+  if (!base) return undefined;
+  if (provider === "gemini" && !environment.GEMINI_API_KEY) {
+    return { GEMINI_API_KEY: "llmsim", base_url: base };
+  }
+  if (provider === "vertex_ai" && !environment.GOOGLE_APPLICATION_CREDENTIALS) {
+    return {
+      GOOGLE_APPLICATION_CREDENTIALS: LLMSIM_VERTEX_SERVICE_ACCOUNT,
+      VERTEXAI_PROJECT: "llmsim",
+      VERTEXAI_LOCATION: "us-central1",
+      base_url: base,
+    };
+  }
+  return undefined;
+}
+
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
 const ORG_NAME = "Local Dev Organization";
@@ -670,6 +704,7 @@ async function seedModelProviderFromEnv({
   organizationId,
   encryption,
   allowLoopback,
+  simKeys,
 }: {
   prisma: PrismaClient;
   provider: string;
@@ -678,9 +713,10 @@ async function seedModelProviderFromEnv({
   organizationId: string;
   encryption: Encryption;
   allowLoopback: boolean;
+  simKeys?: Record<string, string>;
 }): Promise<void> {
   const names = providerKeyNames(def);
-  const keys: Record<string, string> = {};
+  const keys: Record<string, string> = { ...simKeys };
   for (const name of names) {
     const value = name ? envMap[name] : undefined;
     if (name && value) keys[name] = value;
@@ -756,7 +792,8 @@ async function seedModelProvidersFromEnv({
   for (const [provider, def] of Object.entries(modelProviders)) {
     // "custom" has no inferable identity from the environment; skip it.
     if (provider === "custom") continue;
-    if (!environment[def.apiKey]) continue;
+    const simKeys = llmsimProviderKeys({ provider, environment });
+    if (!environment[def.apiKey] && !simKeys) continue;
     await seedModelProviderFromEnv({
       prisma,
       provider,
@@ -765,6 +802,7 @@ async function seedModelProvidersFromEnv({
       organizationId,
       encryption,
       allowLoopback: voice.allowLoopbackVoiceProviders,
+      simKeys,
     });
   }
 }

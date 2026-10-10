@@ -92,6 +92,13 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then Gemini and Vertex answer {"error": {code, message, status}} with RESOURCE_EXHAUSTED for 429
     And Bedrock answers X-Amzn-ErrorType ThrottlingException or ValidationException, which the AWS SDK maps
 
+  Scenario: haven seeds Gemini and Vertex providers at llmsim
+    Given a worktree started with haven up +llm whose .env names no Gemini or Vertex account
+    When the stack is seeded
+    Then the organization gets a Gemini row and a Vertex row whose base_url is llmsim's address
+    And a model call on either, through the gateway or the playground, reaches llmsim
+    But a Gemini key or Vertex service account the .env names is seeded as it is, with no base_url
+
   Scenario: Langy mode echoes a plain message
     Given the model is "langy-echo" or the call carries X-Llmsim-Mode "langy"
     When the last user message is plain text
