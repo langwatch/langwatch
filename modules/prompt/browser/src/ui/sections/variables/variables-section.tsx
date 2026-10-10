@@ -293,7 +293,7 @@ function VariableList({
   renderSourceIcon,
 }: VariableListProps) {
   return variables.length === 0 ? (
-    <Text fontSize="13px" color="fg.subtle">
+    <Text textStyle="bodySm" color="fg.subtle">
       No variables defined
     </Text>
   ) : (
@@ -461,7 +461,7 @@ const VariableRow = ({
           height={ROW_HEIGHT}
           flexShrink={0}
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
 
           borderColor={hasError ? "border.error" : undefined}
           data-testid={`variable-name-input-${variable.identifier}`}
@@ -470,7 +470,7 @@ const VariableRow = ({
         <HStack gap={1} height={ROW_HEIGHT} minWidth="120px" flexShrink={0}>
           <Text
             fontFamily="mono"
-            fontSize="13px"
+            textStyle="bodySm"
             cursor={readOnly ? "default" : "pointer"}
             onClick={readOnly ? undefined : onStartEdit}
             border="1px solid"
@@ -506,7 +506,7 @@ const VariableRow = ({
           <Text
             color="fg.subtle"
             fontFamily="mono"
-            fontSize="13px"
+            textStyle="bodySm"
             lineHeight={ROW_HEIGHT}
             flexShrink={0}
           >
@@ -539,7 +539,7 @@ const VariableRow = ({
               flex={1}
               minWidth={0}
               fontFamily="mono"
-              fontSize="13px"
+              textStyle="bodySm"
               lineHeight="20px"
               paddingY="6px"
               variant="flushed"

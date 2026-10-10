@@ -400,7 +400,7 @@ function MenuSourceGroup({
             onClick={() => onSelectIndex(optionIndex)}
           >
             <VariableTypeIcon type={field.type} size={12} />
-            <Text fontSize="13px" fontFamily="mono" flex={1}>
+            <Text textStyle="mono" flex={1}>
               {field.name}
             </Text>
             <VariableTypeBadge type={field.type} size="xs" />
@@ -434,7 +434,7 @@ function MenuCreateOption({
       onClick={() => onCreateVariable?.(normalizedQuery)}
     >
       <Plus size={12} color="var(--chakra-colors-blue-fg)" />
-      <Text fontSize="13px" color="fg.info">
+      <Text textStyle="bodySm" color="fg.info">
         Create variable "{`{{${normalizedQuery}}}`}"
       </Text>
     </HStack>

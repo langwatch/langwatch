@@ -69,7 +69,7 @@ export function SaveVersionDialog({
     >
       <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title>Save Version</Dialog.Title>
+          <Dialog.Title>Save version</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body>

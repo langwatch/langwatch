@@ -64,7 +64,7 @@ export function PromptReplicateDialog({
       <Dialog.Content onClick={(event) => event.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
-          <Dialog.Title>Replicate Prompt</Dialog.Title>
+          <Dialog.Title>Replicate prompt</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body paddingBottom={6}>
           <VStack gap={4} align="start">
@@ -72,7 +72,7 @@ export function PromptReplicateDialog({
               {`"${promptName}" will be copied into the project you choose.`}
             </Text>
             <Field.Root>
-              <Field.Label>Target Project</Field.Label>
+              <Field.Label>Target project</Field.Label>
               <Select.Root
                 collection={projectCollection}
                 value={selectedProjectId}

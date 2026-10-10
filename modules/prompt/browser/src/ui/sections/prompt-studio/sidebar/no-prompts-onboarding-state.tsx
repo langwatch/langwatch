@@ -1,4 +1,5 @@
-import { Box, Button, Center, EmptyState, HStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Button, Center } from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyNotice } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { LuSparkles } from "react-icons/lu";
@@ -26,29 +27,22 @@ export function NoPromptsOnboardingState() {
 
   return (
     <Center width="full" height="full" bg="bg.panel">
-      <EmptyState.Root>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <LuSparkles />
-          </EmptyState.Indicator>
-          <EmptyState.Title>Create Your First Prompt</EmptyState.Title>
-          <EmptyState.Description>
-            Get started on the prompt playground to design, test, and optimize your AI prompts in
-            one place.
-          </EmptyState.Description>
-          <HStack gap={2}>
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="prompt-new-button"
-              onClick={() => void createDraftPrompt()}
-            >
-              Create First Prompt
-            </Button>
-            <SetupWithAgentButton surface="prompts" />
-          </HStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <NoDataInfoBlock
+        icon={<LuSparkles />}
+        title="Create your first prompt"
+        description="Design, test and optimise your prompts in the playground."
+        primaryAction={
+          <Button
+            colorPalette="orange"
+            size="sm"
+            data-testid="prompt-new-button"
+            onClick={() => void createDraftPrompt()}
+          >
+            Create first prompt
+          </Button>
+        }
+        secondaryAction={<SetupWithAgentButton surface="prompts" />}
+      />
     </Center>
   );
 }

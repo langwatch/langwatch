@@ -101,11 +101,10 @@ export function DatasetCellDisplay({
       data-testid={`cell-${row}-${columnId}`}
       height="100%"
       minHeight="20px"
-      fontSize={displayValue.isJson ? "12px" : "13px"}
+      textStyle={displayValue.isJson ? "monoSm" : "bodySm"}
       whiteSpace="pre-wrap"
       wordBreak="break-word"
       opacity={isEditing ? 0 : 1}
-      fontFamily={displayValue.isJson ? "mono" : void 0}
       position="relative"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -115,7 +114,7 @@ export function DatasetCellDisplay({
           <>
             {displayValue.text}
             {displayValue.truncated && (
-              <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
+              <Box as="span" color="fg.subtle" textStyle="micro" marginLeft={1}>
                 (truncated)
               </Box>
             )}

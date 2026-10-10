@@ -5,7 +5,8 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { Box, Button, Circle, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, Circle, HStack, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PromptEditorDrawerToken, type PromptEditorDrawerProps } from "@langwatch/prompt-client";
@@ -132,7 +133,7 @@ function EditorTitle({
   versionBadge: ReactNode;
   hasUnsavedChanges: boolean;
 }) {
-  if (!handle) return <Drawer.Title>New Prompt</Drawer.Title>;
+  if (!handle) return <Drawer.Title>New prompt</Drawer.Title>;
   return (
     <>
       <HStack asChild gap={1} cursor="pointer" _hover={{ "& .edit-icon": { display: "block" } }}>
@@ -398,12 +399,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     </FormProvider>
   );
 
-  const loadingContent =
-    promptId && promptQuery.isLoading ? (
-      <HStack justify="center" paddingY={8}>
-        <Spinner size="md" />
-      </HStack>
-    ) : null;
+  const loadingContent = promptId && promptQuery.isLoading ? <SkeletonRows rows={5} /> : null;
 
   if (props.headless) return loadingContent ?? formBodyContent;
 

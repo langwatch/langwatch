@@ -221,7 +221,7 @@ export const OutputsSection = ({
 
       {/* Outputs List */}
       {outputs.length === 0 ? (
-        <Text fontSize="13px" color="fg.subtle">
+        <Text textStyle="bodySm" color="fg.subtle">
           No outputs defined
         </Text>
       ) : (
@@ -378,14 +378,14 @@ const OutputRow = ({
           size="sm"
           width="100px"
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
           borderColor={hasError ? "red.emphasized" : undefined}
           data-testid={`output-name-input-${output.identifier}`}
         />
       ) : (
         <Text
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
           cursor={readOnly ? "default" : "pointer"}
           onClick={readOnly ? undefined : onStartEdit}
           border="1px solid"

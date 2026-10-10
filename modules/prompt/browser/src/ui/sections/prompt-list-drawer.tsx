@@ -1,10 +1,9 @@
+import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 /**
- * "Choose Prompt": the picker every flow opens, a REGISTERED drawer
+ * "Choose prompt": the picker every flow opens, a REGISTERED drawer
  * belonging to the family that owns prompts. KNOWN GAP: "New Prompt"
  * still asks for `promptEditor`, whose own navigation isn't wired here yet.
  */
-
-import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
@@ -12,11 +11,11 @@ import {
   Collapsible,
   HStack,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import {
   PromptEditorDrawerToken,
   PromptListDrawerToken,
@@ -129,7 +128,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
                   <LuArrowLeft size={20} />
                 </Button>
               )}
-              <Drawer.Title>Choose Prompt</Drawer.Title>
+              <Drawer.Title>Choose prompt</Drawer.Title>
             </HStack>
             <Button
               size="sm"
@@ -184,11 +183,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
               paddingX={6}
               paddingBottom={4}
             >
-              {isLoading && (
-                <HStack justify="center" paddingY={8}>
-                  <Spinner size="md" />
-                </HStack>
-              )}
+              {isLoading && <SkeletonRows rows={5} />}
               {!isLoading && !hasPrompts && <EmptyState onCreateNew={onCreateNew} />}
               {!isLoading && hasPrompts && filteredCount === 0 && (
                 <VStack paddingY={8} gap={2} textAlign="center">

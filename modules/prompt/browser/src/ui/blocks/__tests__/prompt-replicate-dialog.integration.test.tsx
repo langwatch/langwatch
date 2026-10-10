@@ -22,7 +22,7 @@ vi.mock("@langwatch/design-system/select", () => {
   }) => (
     <div>
       <select
-        aria-label="Target Project"
+        aria-label="Target project"
         value={value[0] ?? ""}
         onChange={(event) => onValueChange({ value: [event.target.value] })}
       >
@@ -78,7 +78,7 @@ describe("the Replicate dialog on a prompt", () => {
 
     expect(screen.getAllByText("(no permission)")).toHaveLength(1);
 
-    fireEvent.change(screen.getByLabelText("Target Project"), {
+    fireEvent.change(screen.getByLabelText("Target project"), {
       target: { value: "project-viewer" },
     });
     const replicate = screen.getByRole("button", { name: "Replicate" });
@@ -93,7 +93,7 @@ describe("the Replicate dialog on a prompt", () => {
     const onCopy = vi.fn().mockResolvedValue(undefined);
     renderDialog(onCopy);
 
-    fireEvent.change(screen.getByLabelText("Target Project"), {
+    fireEvent.change(screen.getByLabelText("Target project"), {
       target: { value: "project-admin" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Replicate" }));

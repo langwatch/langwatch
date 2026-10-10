@@ -17,7 +17,16 @@ export function PromptStudioScreen() {
     <PromptConfigProvider>
       <PromptPlaygroundChatProvider>
         <HStack width="full" height="full" gap={0} position="relative">
-          <VStack position="relative" top={0} left={0} width="250px" height="full" flexShrink={0}>
+          <VStack
+            position="relative"
+            top={0}
+            left={0}
+            width="250px"
+            height="full"
+            flexShrink={0}
+            borderRightWidth="1px"
+            borderColor="border"
+          >
             <PageLayout.Header withBorder={false}>
               <PageLayout.Heading>Prompts</PageLayout.Heading>
             </PageLayout.Header>
