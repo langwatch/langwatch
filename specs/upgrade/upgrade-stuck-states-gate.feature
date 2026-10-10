@@ -1,7 +1,7 @@
 # Stuck states in the serving gate, the background runner and the reader (stuck-states review,
 # section B). Each scenario is a way an upgrade could stop moving with nobody told what to do.
-# The two @unimplemented scenarios wait on a ruling: what the api answers when the ledger and the
-# schema disagree (B2), and how long a background step may run before the sweep moves on (B4).
+# Rulings: ARCHITECTURE.md section 7, "No stuck states" (STUCK-STATES). The B4 deadline scenario
+# is built by another lane and stays @unimplemented here.
 
 Feature: An upgrade never sticks in the gate, the background runner or the status
   As an operator upgrading a LangWatch installation
@@ -41,16 +41,26 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
     When the upgrade status is read
     Then the installation needs attention, with the reason "failed-run"
 
-  # B2: decision pending.
-  @unimplemented
+  # B2: an admitted api answers a 500 that logs the disagreement (STUCK-STATES).
+  @unit
   Scenario: A missing table on a ledger that says current is not reported as upgrading
-    Given every blocking step the image declares is done
+    Given the api's gate has admitted it, so the ledger is current
     And the Postgres schema lacks a table the image reads
     When a request reads that table
-    Then the api does not answer "upgrade_in_progress" forever
-    And the operator is told the schema and the ledger disagree
+    Then the api answers 500 internal_error, never "upgrade_in_progress"
+    And the error it logs says "schema and ledger disagree" and names the table
+    And before the gate admits, the same read answers 503 "upgrade_in_progress"
 
-  # B4: decision pending.
+  # B1 tail: a failure with no failed step row backs off, never "waits for a Retry" (STUCK-STATES).
+  @unit
+  Scenario: A failed run with no failed step retries on a backoff, saying why
+    Given a worker whose upgrade runs fail and leave no failed step row
+    When it retries
+    Then it waits 10 s, then 20 s, then 40 s, doubling up to at most 5 minutes
+    And each line says it retries, in how long, and the run's last line of output
+    And no line says it waits for a Retry
+
+  # B4: ruled (15-minute deadline); built by another lane.
   @unimplemented
   Scenario: A background step that never returns does not starve the steps after it
     Given a background step whose run neither finishes nor fails

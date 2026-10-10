@@ -184,4 +184,48 @@ describe("admitAfterFirstInstall", () => {
       expect(waitedForRetry).toBe(3);
     });
   });
+
+  describe("given runs that fail with no failed step row", () => {
+    /** @scenario "A failed run with no failed step retries on a backoff, saying why" */
+    it("retries on a doubling wait, saying it retries and the run's last line, never a Retry", async () => {
+      const said: string[] = [];
+      const waits: number[] = [];
+      const exits = [1, 1, 1, 0];
+      const answers = [behind(), behind(), behind(), behind(), current];
+      const verdict = await admitAfterFirstInstall({
+        gate: { admit: async () => answers.shift() ?? current },
+        firstInstall: async () => ({
+          exitCode: exits.shift() ?? 0,
+          logTail: ["preflight refused: a failed Prisma migration"],
+        }),
+        warn: (message) => void said.push(message),
+        wait: async (ms) => void waits.push(ms),
+      });
+
+      expect(verdict).toEqual(current);
+      expect(waits).toEqual([10_000, 20_000, 40_000]);
+      const retries = said.filter((line) => line.includes("retries it in"));
+      expect(retries).toHaveLength(3);
+      expect(retries[0]).toContain("preflight refused: a failed Prisma migration");
+      expect(said.filter((line) => line.includes("waits for a Retry"))).toEqual([]);
+    });
+
+    /** @scenario "A failed run with no failed step retries on a backoff, saying why" */
+    it("never waits longer than five minutes between tries", async () => {
+      const waits: number[] = [];
+      let runs = 0;
+      await admitAfterFirstInstall({
+        gate: { admit: async () => (runs < 8 ? behind() : current) },
+        firstInstall: async () => {
+          runs += 1;
+          return { exitCode: 1, logTail: [] };
+        },
+        warn: () => undefined,
+        wait: async (ms) => void waits.push(ms),
+      });
+
+      expect(Math.max(...waits)).toBe(300_000);
+      expect(waits.at(-1)).toBe(300_000);
+    });
+  });
 });

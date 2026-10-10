@@ -31,6 +31,7 @@ export {
   PlatformPermissionDeniedError,
   PlatformSurfaceHiddenError,
   ScopeInputMismatchError,
+  setLedgerCurrent,
   UnsupportedMediaTypeError,
 } from "./errors.ts";
 

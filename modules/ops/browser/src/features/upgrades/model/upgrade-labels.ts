@@ -16,6 +16,7 @@ const REASONS_FIXED_BY_UPGRADING = new Set([
   "image-newer",
   "no-upgrade-recorded",
   "blocking-steps-pending",
+  "failed-run",
 ]);
 
 const STATUS_TONES: Record<string, UpgradeTone> = {
