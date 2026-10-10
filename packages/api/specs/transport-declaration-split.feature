@@ -294,7 +294,7 @@ Feature: Transport declaration split
     When a caller presents a credential the door verifies
     Then the handler is handed the scope the door resolved
     And a caller presenting a missing or bad credential is answered with no actor and no scope, never a 401
-    And a door failing for a reason that is not a refusal still fails the request
+    And a door failing for a reason that is not a refusal is logged and answered with no actor and no scope
 
   @integration
   Scenario: A route whose resource names its own owner resolves the scope in its handler

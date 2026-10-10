@@ -2681,14 +2681,15 @@ describe("a route that answers a refused credential as none", () => {
   });
 
   /** @scenario "A route answers a credential its door refuses as no credential" */
-  it("still fails the request when the door fails for a reason that is not a refusal", async () => {
+  it("answers unattributed when the door fails for a reason that is not a refusal", async () => {
     const response = await fileReport(
       anonymousBugReportsApp(() => {
         throw new Error("the key store is down");
       }),
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "none" });
   });
 });
 

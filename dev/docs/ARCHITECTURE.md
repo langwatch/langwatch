@@ -328,7 +328,8 @@ document, is the authority on filenames):
 - `transport/` — declarations only (§8).
 - `rules/` — pure functions and constants; no clock, no I/O. Value types (data
   bags and the pure functions over them) live here too, not as `*Service`
-  classes and not in a new slot (Alex, 2026-09-28).
+  classes and not in a new slot (Alex, 2026-09-28). Building SQL text with no I/O is a pure
+  decision and may live in `rules/` (Alex 2026-10-10 TRACE-QUERY-SQL).
 - Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
   The prefix is the owning subject's name without hyphens: `slackintegration` (Alex, 2026-09-30).
@@ -1856,8 +1857,8 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   (OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
 - `optionalCredential({ reason, refused: "anonymous" })` answers a credential the door refuses as none: the
-  door's `identify` runs, a refusal hands no actor and no scope, any other failure still fails the request
-  (the bug-report intake, Alex 2026-10-10 W02-BUG-INTAKE).
+  door's `identify` runs, a refusal hands no actor and no scope, and any other failure is logged and answered
+  as anonymous too (the bug-report intake, Alex 2026-10-10 W02-BUG-INTAKE, W02-INTAKE-OUTAGE).
 - A branch living in a handler moves into the module as an `*Api` operation carrying that logic
   unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
   shape is still asked for (Alex, 2026-09-24). `ScenarioApi.launchRun` is such a port, one-to-one with

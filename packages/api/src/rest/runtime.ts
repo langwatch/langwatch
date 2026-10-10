@@ -2129,9 +2129,13 @@ function anonymousOnRefusal(route: RestTransportRoute<unknown>): boolean {
   return route.access?.kind === "optional" && route.access.refused === "anonymous";
 }
 
+/** The logger an anonymous-on-refusal door reports a failure that is not a refusal through. */
+const anonymousDoorLogger = createLogger("langwatch:api:anonymous-door");
+
 /**
- * The caller the door verifies, or nobody: a missing or refused credential is answered as
- * none, so the route still serves. A failure that is not a refusal still fails the request.
+ * The caller the door verifies, or nobody: a missing, refused or unverifiable credential is
+ * answered as none, so the route still serves. A failure that is not a refusal is logged
+ * (Alex 2026-10-10 W02-INTAKE-OUTAGE).
  */
 async function anonymousCallerOf({
   door,
@@ -2143,8 +2147,10 @@ async function anonymousCallerOf({
   try {
     return await requireIdentify(door)({ request });
   } catch (error) {
-    if (HandledError.isHandled(error)) return null;
-    throw error;
+    if (!HandledError.isHandled(error)) {
+      anonymousDoorLogger.warn({ error }, "the door failed; answering the caller as anonymous");
+    }
+    return null;
   }
 }
 
