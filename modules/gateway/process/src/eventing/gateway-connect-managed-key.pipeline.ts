@@ -7,9 +7,13 @@ import {
   CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
   connectCredentialIssuedEventDataSchema,
   MANAGED_KEY_INVALIDATED_EVENT_TYPE,
+  MANAGED_KEY_LICENSE_SET_EVENT_TYPE,
   MANAGED_KEY_RETIRED_EVENT_TYPE,
+  MANAGED_KEY_SERVICES_SET_EVENT_TYPE,
   managedKeyInvalidatedEventDataSchema,
+  managedKeyLicenseSetEventDataSchema,
   managedKeyRetiredEventDataSchema,
+  managedKeyServicesSetEventDataSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import {
   defineAggregate,
@@ -23,6 +27,7 @@ import {
   GATEWAY_CONNECT_MANAGED_KEY_AGGREGATE_TYPE,
   type GatewayManagedKeyProvisionedEventData,
 } from "@langwatch/gateway-contract";
+import { Temporal } from "@langwatch/time";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
@@ -43,7 +48,10 @@ export type GatewayConnectManagedKeyPipeline = StaticPipelineDefinition<
 export function buildGatewayConnectManagedKeyPipeline({
   managedKeys,
 }: {
-  managedKeys: Pick<ConnectManagedKeyService, "provisionForLicense" | "retire" | "invalidate">;
+  managedKeys: Pick<
+    ConnectManagedKeyService,
+    "provisionForLicense" | "retire" | "invalidate" | "setLicense" | "setConnectServices"
+  >;
 }): GatewayConnectManagedKeyPipeline {
   return (
     definePipeline({
@@ -72,6 +80,27 @@ export function buildGatewayConnectManagedKeyPipeline({
         data: managedKeyInvalidatedEventDataSchema,
         handle: ({ virtualKeyId, organizationId }) =>
           managedKeys.invalidate({ virtualKeyId, organizationId }),
+      })
+      // Rewrites the key's licence whole, so a redelivery writes the same values again.
+      .withPeerSubscriber("gatewayConnectManagedKeyLicenseSet", {
+        eventType: MANAGED_KEY_LICENSE_SET_EVENT_TYPE,
+        data: managedKeyLicenseSetEventDataSchema,
+        handle: ({ virtualKeyId, organizationId, tokenHash, instanceId, expiresAt }) =>
+          managedKeys.setLicense({
+            virtualKeyId,
+            organizationId,
+            tokenHash,
+            instanceId,
+            expiresAt:
+              expiresAt === null ? null : Temporal.Instant.fromEpochMilliseconds(expiresAt),
+          }),
+      })
+      // Replaces the key's services whole, so a redelivery writes the same list again.
+      .withPeerSubscriber("gatewayConnectManagedKeyServicesSet", {
+        eventType: MANAGED_KEY_SERVICES_SET_EVENT_TYPE,
+        data: managedKeyServicesSetEventDataSchema,
+        handle: ({ virtualKeyId, organizationId, services }) =>
+          managedKeys.setConnectServices({ virtualKeyId, organizationId, services }),
       })
       .build()
   );

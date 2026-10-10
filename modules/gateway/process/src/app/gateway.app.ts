@@ -2210,39 +2210,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#dependencies.virtualKeys.revoke(input);
   }
 
-  revokeManagedInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    actorId: string;
-  }): Promise<void> {
-    return this.#connectManagedKeyService().retire(input);
-  }
-
-  invalidateManagedInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-  }): Promise<void> {
-    return this.#connectManagedKeyService().invalidate(input);
-  }
-
-  setManagedKeyConnectServicesInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    services: readonly string[];
-  }): Promise<void> {
-    return this.#connectManagedKeyService().setConnectServices(input);
-  }
-
-  setManagedKeyLicenseInternal(input: {
-    virtualKeyId: string;
-    organizationId: string;
-    tokenHash: string;
-    instanceId: string | null;
-    expiresAt: Instant | null;
-  }): Promise<void> {
-    return this.#connectManagedKeyService().setLicense(input);
-  }
-
   setConnectUpstreamInternal(input: GatewayConnectUpstream): Promise<void> {
     return this.#connectUpstreamService().set(input);
   }

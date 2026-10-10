@@ -87,6 +87,31 @@ export const managedKeyInvalidatedEventDataSchema = z.object({
 });
 export type ManagedKeyInvalidatedEventData = z.infer<typeof managedKeyInvalidatedEventDataSchema>;
 
+export const MANAGED_KEY_LICENSE_SET_EVENT_TYPE = "lw.licensing.managed_key_license_set" as const;
+export const MANAGED_KEY_SERVICES_SET_EVENT_TYPE = "lw.licensing.managed_key_services_set" as const;
+
+/** The licence a managed key serves, by its token's registry hash only; gateway rewrites it. */
+export const managedKeyLicenseSetEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  virtualKeyId: z.string().min(1),
+  tokenHash: z.string().min(1),
+  instanceId: z.string().min(1).nullable(),
+  expiresAt: z.number().int().nullable(),
+});
+export type ManagedKeyLicenseSetEventData = z.infer<typeof managedKeyLicenseSetEventDataSchema>;
+
+/** The platform services a managed key may serve, replaced whole; gateway rewrites them. */
+export const managedKeyServicesSetEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+  virtualKeyId: z.string().min(1),
+  services: z.array(z.string().min(1)),
+});
+export type ManagedKeyServicesSetEventData = z.infer<typeof managedKeyServicesSetEventDataSchema>;
+
 export const CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE =
   "lw.licensing.connect_credential_issued" as const;
 

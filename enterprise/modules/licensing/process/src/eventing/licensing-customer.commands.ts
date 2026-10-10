@@ -20,9 +20,15 @@ import {
   LICENSING_CUSTOMER_AGGREGATE_TYPE,
   LICENSING_CUSTOMER_EVENT_VERSION,
   MANAGED_KEY_INVALIDATED_EVENT_TYPE,
+  MANAGED_KEY_LICENSE_SET_EVENT_TYPE,
   MANAGED_KEY_RETIRED_EVENT_TYPE,
+  MANAGED_KEY_SERVICES_SET_EVENT_TYPE,
   managedKeyInvalidatedEventDataSchema,
   type ManagedKeyInvalidatedEventData,
+  managedKeyLicenseSetEventDataSchema,
+  type ManagedKeyLicenseSetEventData,
+  managedKeyServicesSetEventDataSchema,
+  type ManagedKeyServicesSetEventData,
   managedKeyRetiredEventDataSchema,
   type ManagedKeyRetiredEventData,
   SELF_HOSTED_CUSTOMER_LICENSED_EVENT_TYPE,
@@ -329,6 +335,93 @@ export class RecordManagedKeyInvalidatedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: ManagedKeyInvalidatedEventData): string {
+    return payload.organizationId;
+  }
+}
+
+const RECORD_MANAGED_KEY_LICENSE_SET_COMMAND_TYPE =
+  "lw.licensing.record_managed_key_license_set" as const;
+const RECORD_MANAGED_KEY_SERVICES_SET_COMMAND_TYPE =
+  "lw.licensing.record_managed_key_services_set" as const;
+
+export const managedKeyLicenseSetEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(MANAGED_KEY_LICENSE_SET_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: managedKeyLicenseSetEventDataSchema,
+});
+export type ManagedKeyLicenseSetEvent = z.infer<typeof managedKeyLicenseSetEventSchema>;
+
+export const managedKeyServicesSetEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(MANAGED_KEY_SERVICES_SET_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: managedKeyServicesSetEventDataSchema,
+});
+export type ManagedKeyServicesSetEvent = z.infer<typeof managedKeyServicesSetEventSchema>;
+
+/** Records the licence a managed key serves; gateway rewrites the key's licence from the fact. */
+export class RecordManagedKeyLicenseSetCommand implements CommandHandler<
+  Command<ManagedKeyLicenseSetEventData>,
+  ManagedKeyLicenseSetEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MANAGED_KEY_LICENSE_SET_COMMAND_TYPE,
+    managedKeyLicenseSetEventDataSchema,
+    "Record the licence a managed key serves",
+  );
+
+  handle(command: Command<ManagedKeyLicenseSetEventData>): ManagedKeyLicenseSetEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ManagedKeyLicenseSetEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: MANAGED_KEY_LICENSE_SET_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:managed_key_license_set:${data.virtualKeyId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ManagedKeyLicenseSetEventData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records the services a managed key may serve; gateway rewrites the key's services from it. */
+export class RecordManagedKeyServicesSetCommand implements CommandHandler<
+  Command<ManagedKeyServicesSetEventData>,
+  ManagedKeyServicesSetEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MANAGED_KEY_SERVICES_SET_COMMAND_TYPE,
+    managedKeyServicesSetEventDataSchema,
+    "Record the platform services a managed key may serve",
+  );
+
+  handle(command: Command<ManagedKeyServicesSetEventData>): ManagedKeyServicesSetEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ManagedKeyServicesSetEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: MANAGED_KEY_SERVICES_SET_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:managed_key_services_set:${data.virtualKeyId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ManagedKeyServicesSetEventData): string {
     return payload.organizationId;
   }
 }

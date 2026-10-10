@@ -6,7 +6,9 @@ import type {
   LicenseStoredEventData,
   LicenseSyncFinishedEventData,
   ManagedKeyInvalidatedEventData,
+  ManagedKeyLicenseSetEventData,
   ManagedKeyRetiredEventData,
+  ManagedKeyServicesSetEventData,
   SelfHostedCustomerLicensedEventData,
 } from "@langwatch/enterprise-licensing-contract";
 import { LICENSING_CUSTOMER_AGGREGATE_TYPE } from "@langwatch/enterprise-licensing-contract";
@@ -41,15 +43,21 @@ import {
   licenseSyncFinishedEventSchema,
   type ManagedKeyInvalidatedEvent,
   managedKeyInvalidatedEventSchema,
+  type ManagedKeyLicenseSetEvent,
+  managedKeyLicenseSetEventSchema,
   type ManagedKeyRetiredEvent,
   managedKeyRetiredEventSchema,
+  type ManagedKeyServicesSetEvent,
+  managedKeyServicesSetEventSchema,
   RecordConnectServiceSwitchedCommand,
   RecordContractTermsChangedCommand,
   RecordLicenseClearedCommand,
   RecordLicenseStoredCommand,
   RecordLicenseSyncFinishedCommand,
   RecordManagedKeyInvalidatedCommand,
+  RecordManagedKeyLicenseSetCommand,
   RecordManagedKeyRetiredCommand,
+  RecordManagedKeyServicesSetCommand,
   RecordSelfHostedCustomerLicensedCommand,
   selfHostedCustomerLicensedEventSchema,
   type SelfHostedCustomerLicensedEvent,
@@ -65,6 +73,8 @@ export type LicensingCustomerPipeline = StaticPipelineDefinition<
   | LicenseClearedEvent
   | ManagedKeyRetiredEvent
   | ManagedKeyInvalidatedEvent
+  | ManagedKeyLicenseSetEvent
+  | ManagedKeyServicesSetEvent
   | ConnectCredentialIssuedEvent
   | ContractTermsChangedEvent,
   Record<string, Projection>,
@@ -75,6 +85,8 @@ export type LicensingCustomerPipeline = StaticPipelineDefinition<
   | { name: "recordLicenseCleared"; payload: LicenseClearedEventData }
   | { name: "recordManagedKeyRetired"; payload: ManagedKeyRetiredEventData }
   | { name: "recordManagedKeyInvalidated"; payload: ManagedKeyInvalidatedEventData }
+  | { name: "recordManagedKeyLicenseSet"; payload: ManagedKeyLicenseSetEventData }
+  | { name: "recordManagedKeyServicesSet"; payload: ManagedKeyServicesSetEventData }
   | { name: "recordConnectCredentialIssued"; payload: ConnectCredentialIssuedEventData }
   | { name: "recordContractTermsChanged"; payload: ContractTermsChangedEventData }
 >;
@@ -98,6 +110,8 @@ export function buildLicensingCustomerPipeline({
         licenseClearedEventSchema,
         managedKeyRetiredEventSchema,
         managedKeyInvalidatedEventSchema,
+        managedKeyLicenseSetEventSchema,
+        managedKeyServicesSetEventSchema,
         connectCredentialIssuedEventSchema,
         contractTermsChangedEventSchema,
       ])
@@ -108,6 +122,8 @@ export function buildLicensingCustomerPipeline({
       .withCommand("recordLicenseCleared", RecordLicenseClearedCommand)
       .withCommand("recordManagedKeyRetired", RecordManagedKeyRetiredCommand)
       .withCommand("recordManagedKeyInvalidated", RecordManagedKeyInvalidatedCommand)
+      .withCommand("recordManagedKeyLicenseSet", RecordManagedKeyLicenseSetCommand)
+      .withCommand("recordManagedKeyServicesSet", RecordManagedKeyServicesSetCommand)
       .withCommand("recordConnectCredentialIssued", RecordConnectCredentialIssuedCommand)
       .withCommand("recordContractTermsChanged", RecordContractTermsChangedCommand)
       // C3B-ORDER: attaches under the row's guard; a redelivery finds the key already attached.

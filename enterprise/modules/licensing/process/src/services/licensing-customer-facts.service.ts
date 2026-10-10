@@ -135,6 +135,50 @@ export class LicensingCustomerFactsService {
     });
   }
 
+  /** Gateway rewrites the key's licence from this fact; names the token by its registry hash. */
+  async managedKeyLicenseSet({
+    virtualKeyId,
+    organizationId,
+    tokenHash,
+    instanceId,
+    expiresAt,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant;
+  }): Promise<void> {
+    await this.commands().recordManagedKeyLicenseSet.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      virtualKeyId,
+      tokenHash,
+      instanceId,
+      expiresAt: expiresAt.epochMilliseconds,
+    });
+  }
+
+  /** Gateway replaces the key's platform services from this fact; empty serves none. */
+  async managedKeyServicesSet({
+    virtualKeyId,
+    organizationId,
+    services,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+    services: readonly string[];
+  }): Promise<void> {
+    await this.commands().recordManagedKeyServicesSet.send({
+      tenantId: organizationId,
+      occurredAt: nowInstant().epochMilliseconds,
+      organizationId,
+      virtualKeyId,
+      services: [...services],
+    });
+  }
+
   /** Gateway provisions the licence's managed key from this fact; names the token by hash only. */
   async connectCredentialIssued({
     organizationId,

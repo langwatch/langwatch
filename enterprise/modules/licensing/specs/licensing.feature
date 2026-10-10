@@ -321,6 +321,20 @@ Feature: Enterprise licensing lifecycle
       And a managed-key-invalidated fact naming the other key and its organisation
 
     @unit
+    Scenario: Licensing records a managed key's licence as a fact gateway applies
+      Given a licence resolved to its managed key
+      When licensing records the licence that key serves
+      Then it records a managed-key-licence-set fact naming the key, its token's registry hash, the bound install and the term's end, never the token
+      And gateway rewrites that key's licence from the fact, the same values however often it arrives
+
+    @unit
+    Scenario: Licensing records a managed key's services as a fact gateway applies
+      Given a licence resolved to its managed key
+      When licensing records the platform services that key may serve
+      Then it records a managed-key-services-set fact naming the key and the whole service list
+      And gateway replaces that key's services from the fact, the same list however often it arrives
+
+    @unit
     Scenario: Licensing records a licence's connect credential issued as a fact for gateway to provision
       Given a bound licence with no managed key
       When its token is resolved

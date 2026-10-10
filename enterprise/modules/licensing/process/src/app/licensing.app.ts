@@ -295,7 +295,6 @@ export class LicensingModule implements LicensingApiContract {
       infrastructure: licenseRegistryOver({
         repositories,
         customerFacts,
-        gateway: dependencies.gateway,
         signingKey: licensePrivateKey,
       }),
       instances: selfHostedInstancesOver({ repositories }),
@@ -845,7 +844,6 @@ function licenseRegistryParts({
  */
 function licenseRegistryOver({
   repositories,
-  gateway,
   signingKey,
   customerFacts,
 }: {
@@ -858,12 +856,10 @@ function licenseRegistryOver({
     | "selfHostedCustomerLicensed"
     | "managedKeyRetired"
     | "managedKeyInvalidated"
+    | "managedKeyLicenseSet"
+    | "managedKeyServicesSet"
     | "connectCredentialIssued"
     | "contractTermsChanged"
-  >;
-  gateway: Pick<
-    GatewayApi,
-    "setManagedKeyConnectServicesInternal" | "setManagedKeyLicenseInternal"
   >;
   signingKey: string | undefined;
 }): LicenseRegistryInfrastructure {
@@ -881,8 +877,8 @@ function licenseRegistryOver({
       issue: (issued) => customerFacts.connectCredentialIssued(issued),
       retire: (key) => customerFacts.managedKeyRetired(key),
       invalidate: (key) => customerFacts.managedKeyInvalidated(key),
-      setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
-      setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
+      setConnectServices: (key) => customerFacts.managedKeyServicesSet(key),
+      setLicense: (key) => customerFacts.managedKeyLicenseSet(key),
     },
     // Connect syncs the budget from the fact, so licensing writes none (C3a-S2).
     contractBudgets: { sync: (input) => customerFacts.contractTermsChanged(input) },
