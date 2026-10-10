@@ -1,6 +1,6 @@
 // Member avatar; family-local copy; broken-image guard tracks URL not boolean.
 
-import { Avatar } from "@chakra-ui/react";
+import { Avatar } from "@langwatch/design-system/avatar";
 import { type AvatarRootProps } from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { useState } from "react";

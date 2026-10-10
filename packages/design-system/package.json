@@ -466,6 +466,10 @@
     "./app-shell": {
       "types": "./dist/components/layout/app-shell.d.ts",
       "default": "./src/components/layout/app-shell.tsx"
+    },
+    "./charts": {
+      "types": "./dist/charts.d.ts",
+      "default": "./src/charts.ts"
     }
   },
   "scripts": {
@@ -476,6 +480,7 @@
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
+    "@chakra-ui/charts": "^3.36.0",
     "@langwatch/time": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "lodash-es": "catalog:",

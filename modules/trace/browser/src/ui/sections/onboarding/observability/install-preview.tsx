@@ -1,4 +1,4 @@
-import { createShikiAdapter } from "@chakra-ui/react";
+import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
   ClientOnly,
@@ -8,8 +8,6 @@ import {
   useTabs,
 } from "@langwatch/design-system/primitives";
 import type React from "react";
-import { useMemo } from "react";
-import { createHighlighter } from "shiki";
 
 import type { InstallMatrix } from "./codegen/registry.tsx";
 
@@ -31,17 +29,7 @@ export function InstallPreview({ install }: InstallPreviewProps): React.ReactEle
 
   const tabs = useTabs({ defaultValue: tabItems[0]?.key });
 
-  const shikiAdapter = useMemo(() => {
-    return createShikiAdapter<Awaited<ReturnType<typeof createHighlighter>>>({
-      async load() {
-        return createHighlighter({
-          langs: ["bash"],
-          themes: ["github-dark", "github-light"],
-        });
-      },
-      theme: colorMode === "dark" ? "github-dark" : "github-light",
-    });
-  }, [colorMode]);
+  const shikiAdapter = useShikiAdapter(colorMode);
 
   if (tabItems[0] && !tabItems.find((t) => t.key === tabs.value)) {
     tabs.setValue(tabItems[0].key);

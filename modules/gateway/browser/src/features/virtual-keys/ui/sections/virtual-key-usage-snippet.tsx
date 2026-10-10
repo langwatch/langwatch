@@ -1,4 +1,4 @@
-import { createShikiAdapter } from "@chakra-ui/react";
+import { ensureShikiLangLoaded, useShikiAdapter } from "@langwatch/design-system/shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
   ClientOnly,
@@ -10,8 +10,7 @@ import {
   useTabs,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { useMemo } from "react";
-import { createHighlighter } from "shiki";
+import { useEffect, useMemo } from "react";
 
 import { useGatewayDeployment } from "../../../../behavior/gateway-session.ts";
 import { resolveSnippetGatewayBaseUrl } from "../../model/gateway-snippet-url.ts";
@@ -173,17 +172,11 @@ func main() {
   const activeTab = tabItems.find((t) => t.key === tabs.value) ?? tabItems[0]!;
   const otherTabs = tabItems.filter((t) => t.key !== tabs.value);
 
-  const shikiAdapter = useMemo(() => {
-    return createShikiAdapter<Awaited<ReturnType<typeof createHighlighter>>>({
-      async load() {
-        return createHighlighter({
-          langs: ["typescript", "python", "go", "bash"],
-          themes: ["github-dark", "github-light"],
-        });
-      },
-      theme: colorMode === "dark" ? "github-dark" : "github-light",
-    });
-  }, [colorMode]);
+  const shikiAdapter = useShikiAdapter(colorMode);
+  // The shared highlighter loads Go on demand; the other tabs' languages load with it.
+  useEffect(() => {
+    void ensureShikiLangLoaded("go");
+  }, []);
 
   return (
     <VStack align="stretch" gap={2}>

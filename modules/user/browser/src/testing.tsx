@@ -3,7 +3,7 @@
  * Provides faked infrastructure and records interactions for assertions.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
@@ -365,9 +365,9 @@ function PersonalHostHarness({
  */
 export function personalWorkspaceHostWrapper(host: FakePersonalWorkspaceHost) {
   return ({ children }: { children: ReactNode }) => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemTestProvider>
       <PersonalHostHarness host={host}>{children}</PersonalHostHarness>
-    </ChakraProvider>
+    </DesignSystemTestProvider>
   );
 }
 

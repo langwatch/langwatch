@@ -1,4 +1,4 @@
-import { Select } from "@chakra-ui/react";
+import { Select } from "@langwatch/design-system/select";
 import {
   Box,
   Button,
@@ -6,7 +6,6 @@ import {
   Flex,
   HStack,
   Input,
-  Portal,
   Text,
   Textarea,
   VStack,
@@ -107,17 +106,13 @@ export function SpanEditorPanel() {
             <Select.Trigger>
               <Select.ValueText />
             </Select.Trigger>
-            <Portal>
-              <Select.Positioner>
-                <Select.Content>
-                  {SPAN_TYPES.map((t) => (
-                    <Select.Item key={t} item={t}>
-                      {SPAN_TYPE_ICONS[t]} {t}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Positioner>
-            </Portal>
+            <Select.Content>
+              {SPAN_TYPES.map((t) => (
+                <Select.Item key={t} item={t}>
+                  {SPAN_TYPE_ICONS[t]} {t}
+                </Select.Item>
+              ))}
+            </Select.Content>
           </Select.Root>
         </Box>
       </Flex>
@@ -164,15 +159,11 @@ export function SpanEditorPanel() {
             <Select.Trigger>
               <Select.ValueText />
             </Select.Trigger>
-            <Portal>
-              <Select.Positioner>
-                <Select.Content>
-                  <Select.Item item="ok">OK</Select.Item>
-                  <Select.Item item="error">Error</Select.Item>
-                  <Select.Item item="unset">Unset</Select.Item>
-                </Select.Content>
-              </Select.Positioner>
-            </Portal>
+            <Select.Content>
+              <Select.Item item="ok">OK</Select.Item>
+              <Select.Item item="error">Error</Select.Item>
+              <Select.Item item="unset">Unset</Select.Item>
+            </Select.Content>
           </Select.Root>
         </Box>
       </Flex>

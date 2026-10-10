@@ -1,4 +1,4 @@
-import { Stat } from "@chakra-ui/react";
+import { Stat } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Badge,

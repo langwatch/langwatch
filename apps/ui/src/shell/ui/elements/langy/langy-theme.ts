@@ -1,4 +1,4 @@
-import { defineConfig } from "@chakra-ui/react";
+import { defineConfig } from "@langwatch/design-system/system";
 
 /**
  * Langy's colour theme — a real Chakra config, not overrides. Two
