@@ -25,8 +25,9 @@ func TestMarkedPresetsCarryTheirMark(t *testing.T) {
 		"seed-offload":      {"seed: offload", "data:image/png;base64,iVBOR"},
 		"seed-conversation": {"seed: conversation turn", "seed-conversation-thread"},
 		"seed-multimodal":   {"seed: multimodal", "image_url"},
-		// The coding-agent fold names a session from this prompt (CA-26).
-		"claude-code-events": {"claude_code.user_prompt", "Fix the flaky checkout test", "session.id"},
+		// The fold names a session from this prompt (CA-26); its branch is storage-seed's demo PR #101.
+		"claude-code-events": {"claude_code.user_prompt", "Fix the flaky checkout test", "session.id",
+			"langwatch.session_context", "langwatch-seed", "fix/flaky-checkout-test"},
 	} {
 		body := markedJSON(t, name)
 		for _, w := range wants {

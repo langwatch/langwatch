@@ -38,6 +38,7 @@ import {
   type SeedRole,
 } from "./seed-authz.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
+import { seedGithubFixture } from "./seed-github-fixture.ts";
 import {
   buildAdminUserUpsertArgs,
   resolveSeedEmailDomain,
@@ -380,6 +381,7 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
       userId: user.id,
       environment,
     });
+    await seedGithubFixture({ prisma, organizationId: organization.id });
   }
 
   // Only the non-secret default ingestion key is shown in full; anything else is redacted.

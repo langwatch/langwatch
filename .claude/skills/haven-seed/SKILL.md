@@ -54,6 +54,8 @@ Exit codes: 0 done, 1 a check failed, 2 refused before writing, 4 stalled.
 - `haven db seed <preset>` and `haven db reset <preset>` take the presets (`haven-db`): `demo` runs
   `haven db seed --size tiny --persona startup`; `bare`, `onboarding`, `post-onboarding` are
   storage-seed switches.
+- GitHub pull-request fixture (no App): `haven db seed demo` maps PRs #101 (open) and #102 (merged) on
+  `langwatch-seed/checkout` to the local dev org; `haven sim telemetry send --preset claude-code-events` gives a session on #101's branch.
 - The seed guard refuses (exit 2) when a database URL the seed would connect to points
   anywhere but local dev, so it cannot seed a real database named by `.env`.
 - Pointers only: the generator is `tools/seedgen`, the design is `dev/docs/plans/seed-2026-10-09.md`,

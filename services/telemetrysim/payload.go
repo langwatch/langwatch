@@ -175,6 +175,12 @@ var presets = append([]Preset{
 		{Body: "claude_code.tool_result", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, OffsetMs: 3900, Attrs: []Attr{
 			{"event.name", "claude_code.tool_result"}, {"session.id", "$session"}, {"tool_name", "Bash"}, {"success", true},
 		}},
+		// The hook's companion event: its branch has a pull request in storage-seed's demo GitHub fixture.
+		{Body: "langwatch.session_context", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, OffsetMs: 4000, Attrs: []Attr{
+			{"event.name", "langwatch.session_context"}, {"session.id", "$session"}, {"coding_agent.name", "claude_code"},
+			{"vcs.repository.host", "github.com"}, {"vcs.repository.owner", "langwatch-seed"},
+			{"vcs.repository.name", "checkout"}, {"vcs.ref.head.name", "fix/flaky-checkout-test"},
+		}},
 	}},
 	{Name: "logs", Signal: SignalLogs, Service: "telemetrysim-app", Logs: []LogShape{
 		{Body: "request handled", Severity: logspb.SeverityNumber_SEVERITY_NUMBER_INFO, Attrs: []Attr{{"http.route", "/api/chat"}, {"session.id", "$session"}}},

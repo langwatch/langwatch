@@ -73,6 +73,15 @@ Feature: Seed presets — a database that is ready to look at
     When the prompt and the HTTP agent are opened
     Then both load the way the product reads them, ready to use
 
+  # No GitHub App runs locally: the demo preset writes the connection and two
+  # mapped pull requests, and telemetrysim's claude-code-events session runs on
+  # the open one's branch, so the coding-agent pull-request reads answer.
+  @unit
+  Scenario: The demo preset maps pull requests to a seeded GitHub connection
+    Given the demo preset has been seeded
+    When a claude-code-events session is sent into the local dev project
+    Then its branch names an open pull request the pull-request usage reads find
+
   # The seed design (dev/docs/plans/seed-2026-10-09.md, 9.2) replaces the demo
   # content with the startup persona. The scenario above is retired with
   # storage-seed's HAVEN_SEED_PRESET=demo content when that is removed.
