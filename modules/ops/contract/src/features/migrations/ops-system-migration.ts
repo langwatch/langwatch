@@ -194,6 +194,8 @@ const opsMigrationOverviewSchemaDefinition = z.object({
   availableOnThisInstallation: z.boolean(),
   /** Whether every organization is in the cohort with no operator action. */
   enrolledAutomatically: z.boolean(),
+  /** Whose rows the step migrates (ADR-101 §6); only organization holds are held organizations. */
+  tenant: z.enum(["organization", "user"]),
   counts: opsMigrationStatusCountsSchema,
   /**
    * The rollout gauge. Null when there is nothing to enroll — off cloud, and

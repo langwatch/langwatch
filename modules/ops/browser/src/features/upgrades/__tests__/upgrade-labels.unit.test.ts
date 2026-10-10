@@ -131,11 +131,23 @@ describe("heldOrganizationCount()", () => {
     it("counts each organization once", () => {
       expect(
         heldOrganizationCount([
-          { attention: [{ tenantId: "org-a" }, { tenantId: "org-b" }] },
-          { attention: [{ tenantId: "org-a" }] },
-          { attention: [] },
+          { tenant: "organization", attention: [{ tenantId: "org-a" }, { tenantId: "org-b" }] },
+          { tenant: "organization", attention: [{ tenantId: "org-a" }] },
+          { tenant: "organization", attention: [] },
         ]),
       ).toBe(2);
+    });
+  });
+
+  describe("when a user-rooted step holds users", () => {
+    /** @scenario "Users a user-rooted step holds are not counted as held organizations" */
+    it("counts only organization-rooted holds", () => {
+      expect(
+        heldOrganizationCount([
+          { tenant: "organization", attention: [{ tenantId: "org-a" }] },
+          { tenant: "user", attention: [{ tenantId: "user-1" }, { tenantId: "user-2" }] },
+        ]),
+      ).toBe(1);
     });
   });
 });

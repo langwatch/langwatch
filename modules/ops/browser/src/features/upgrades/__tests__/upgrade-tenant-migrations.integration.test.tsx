@@ -18,6 +18,7 @@ const LONG_STEP = [
     requiresOperatorConfirmation: false,
     availableOnThisInstallation: true,
     enrolledAutomatically: true,
+    tenant: "organization",
     counts: { finalized: 4, migrated: 0, parked: 2, rolled_back: 0 },
     enrollment: null,
     attention: [],

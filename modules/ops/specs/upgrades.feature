@@ -70,6 +70,13 @@ Feature: Ops shows an installation's release upgrades, read-only
     When the overview counts the held organizations
     Then it counts 2
 
+  # User-rooted holds are users, not organizations (Alex, 2026-10-11, D2).
+  @unit
+  Scenario: Users a user-rooted step holds are not counted as held organizations
+    Given one organization held by an organization step and two users held by a user step
+    When the overview counts the held organizations
+    Then it counts 1
+
   @integration
   Scenario: On cloud, held organizations turn Up to date into needs attention linking to the Organizations tab
     Given an installation that is up to date on cloud

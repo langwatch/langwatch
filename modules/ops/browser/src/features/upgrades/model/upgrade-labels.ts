@@ -216,12 +216,21 @@ export function upgradeStateLine(
   return { text: `${status.label}: ${status.summary}`, tone: toneOf(status.tone), retry: false };
 }
 
-/** Organizations a tenant step holds or parks, each counted once however many steps hold it. */
+/**
+ * Organizations a tenant step holds or parks, each counted once however many steps hold it. A
+ * user-rooted step's holds are users, listed on the Organizations tab but never counted here.
+ */
 export function heldOrganizationCount(
-  migrations: readonly { attention: readonly { tenantId: string }[] }[],
+  migrations: readonly {
+    tenant: "organization" | "user";
+    attention: readonly { tenantId: string }[];
+  }[],
 ): number {
-  return new Set(migrations.flatMap((migration) => migration.attention.map((row) => row.tenantId)))
-    .size;
+  return new Set(
+    migrations
+      .filter((migration) => migration.tenant === "organization")
+      .flatMap((migration) => migration.attention.map((row) => row.tenantId)),
+  ).size;
 }
 
 /** Steps grouped by release in the reader's order; a step with no release goes last. */

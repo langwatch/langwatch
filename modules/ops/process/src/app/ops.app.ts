@@ -1674,7 +1674,7 @@ export class OpsModule implements OpsApi {
   }
 
   /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
-  executeSystemMigrationPass(input: { redrive: boolean }): Promise<void> {
+  executeSystemMigrationPass(input: { redrive: boolean; followUp: boolean }): Promise<void> {
     return this.#dependencies.systemMigrations.executePass(input);
   }
 
