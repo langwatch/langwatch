@@ -685,9 +685,9 @@ const ConversationRow = memo(function ConversationRow({
                 "@keyframes tracesCurrentRowPulse": {
                   "0%": {
                     backgroundColor:
-                      "color-mix(in srgb, var(--chakra-colors-blue-500) 18%, transparent)",
+                      "color-mix(in srgb, var(--chakra-colors-blue-solid) 18%, transparent)",
                     boxShadow:
-                      "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-500) 25%, transparent)",
+                      "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-solid) 25%, transparent)",
                   },
                   "100%": {
                     backgroundColor: "transparent",
