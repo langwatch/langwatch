@@ -72,12 +72,13 @@ langy`): no Markov text; llmsim does what the last user message says.
 
 ## Switches
 
-| Switch                                            | Effect                                          |
-| ------------------------------------------------- | ----------------------------------------------- |
-| `X-Llmsim-Seed: <value>`                          | pins the random source, whatever the prompt     |
-| `X-Llmsim-Seed: random`                           | a fresh source per call (load and fuzz tests)   |
-| `X-Llmsim-Error: 429` / model `...error-500...`   | answers that status in the caller's error shape |
-| `X-Llmsim-Mode: langy` / model `...langy-echo...` | Langy mode                                      |
+| Switch                                            | Effect                                                                                             |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `X-Llmsim-Seed: <value>`                          | pins the random source, whatever the prompt                                                        |
+| `X-Llmsim-Seed: random`                           | a fresh source per call (load and fuzz tests)                                                      |
+| `X-Llmsim-Error: 429` / model `...error-500...`   | answers that status in the caller's error shape                                                    |
+| `X-Llmsim-Mode: langy` / model `...langy-echo...` | Langy mode                                                                                         |
+| model `...delay-<ms>...`                          | waits that long before the first byte (max 5 min); a caller that hangs up first is recorded as 499 |
 
 The gateway forwards no custom headers upstream, so through the product use
 the model-name forms. The console's settings tab sets a forced error and a
