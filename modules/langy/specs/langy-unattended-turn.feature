@@ -226,3 +226,17 @@ Feature: Unattended Langy turns
       Given a turn that completed with an answer
       When a caller waits for the turn to settle
       Then the settlement carries the answer's message id and its parts beside its text
+
+    # A run waits in the process that folds the conversation, never in the one that sends.
+    @unit
+    Scenario: A wait in the process that folds the conversation reads its own event log
+      Given a process that folds langy conversations
+      When a turn's answer is recorded in the conversation's event log
+      Then a wait for that turn in the same process reads the answer from that log
+
+    @unit
+    Scenario: A process that only sends reads an empty tail and never asks its event store
+      Given a process that only sends langy commands, whose event store refuses reads
+      When a conversation's events are read there
+      Then the tail is empty
+      And the event store is never asked

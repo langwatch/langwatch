@@ -12,6 +12,7 @@ import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
   EventingCommands,
   EventingParticipation,
+  PriorEventsRead,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
@@ -125,6 +126,7 @@ import {
   type LangyGuidedOnboardingPipeline,
 } from "../eventing/langy-guided-onboarding.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
+import { LangyConversationEventLogService } from "../features/conversation/services/langy-conversation-event-log.service.ts";
 import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
 import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
 import {
@@ -217,6 +219,8 @@ type LangyAppDependencies = {
   panelEgress: LangyPanelEgressService;
   /** The pipeline's senders, bound once the process registers it (§9). */
   conversationCommands: LangyConversationCommandSenders;
+  /** The conversation's own event log; bound only where the role holds a readable one. */
+  conversationEvents: LangyConversationEventLogService;
   /** The consume half of the pipeline: its folds, process manager and reactions. */
   conversationProcessing: EventingLangyConversationAdapter;
   /** langy_guided_onboarding, built once; its senders are bound when the process registers it. */
@@ -310,9 +314,11 @@ export class LangyModule implements LangyApiContract {
       sessionKeys,
     });
     const commands = LangyConversationCommandSenders.create();
+    const conversationEvents = LangyConversationEventLogService.create();
     const langy = adapter.build({
       ...built,
       commands,
+      events: conversationEvents,
     });
     const workspace = LangyLocalWorkspaceService.create({
       users: setup.dependencies.users,
@@ -495,6 +501,7 @@ export class LangyModule implements LangyApiContract {
       }),
       panelEgress: LangyPanelEgressService.create({ access, langy }),
       conversationCommands: commands,
+      conversationEvents,
       conversationProcessing,
       guidedOnboarding: {
         pipeline: buildLangyGuidedOnboardingPipeline(),
@@ -622,6 +629,14 @@ export class LangyModule implements LangyApiContract {
       failAgentResponse: (data) => senders.failAgentResponse(data),
       generateConversationTitle: (data) => senders.generateConversationTitle(data),
     });
+  }
+
+  /**
+   * Hands the conversation reads the pipeline's own event log. Only a draining role calls
+   * it: a turn's settlement is read from that log, and a sending role's log refuses reads.
+   */
+  connectConversationEventLog(read: PriorEventsRead): void {
+    this.dependencies.conversationEvents.connect(read);
   }
 
   /** The pipeline `langy_guided_onboarding` registers, built once by {@link create}. */
