@@ -35,7 +35,7 @@ const outsideAuth = (at) => !at.pathname.startsWith("/auth/");
 
 // Signs in only when the form is there: a held session sends /auth/signin on to the app.
 async function signIn(page) {
-  await page.goto(`${url}/auth/signin`, { timeout: 30_000 });
+  await page.goto(`${url}/auth/signin`, { timeout: 30_000, waitUntil: "domcontentloaded" });
   const form = page
     .locator('input[type="email"]:enabled, input[name="email"]:not([type="hidden"]):enabled')
     .first();
@@ -58,6 +58,11 @@ async function signIn(page) {
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  // The lab has no internet: web fonts answer empty CSS, so a stalled DNS lookup never holds
+  // the page.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+    route.fulfill({ contentType: "text/css", body: "" }),
+  );
   let step = "start";
   page.on(
     "console",
@@ -123,7 +128,7 @@ try {
       ];
       for (const [name, path] of pages) {
         step = name;
-        await page.goto(`${url}${path}`, { timeout: 30_000 });
+        await page.goto(`${url}${path}`, { timeout: 30_000, waitUntil: "domcontentloaded" });
         await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
         if (name === "traces") {
           step = "trace-drawer";

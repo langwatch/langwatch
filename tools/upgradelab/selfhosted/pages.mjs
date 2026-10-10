@@ -14,7 +14,7 @@ const browser = await chromium.launch();
 async function capture(page, name, path, settle) {
   const file = `${phase}-${name}.png`;
   try {
-    await page.goto(`${url}${path}`, { timeout: 30_000 });
+    await page.goto(`${url}${path}`, { timeout: 30_000, waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
     if (settle) await settle();
     await page.screenshot({ path: join(shots, file), fullPage: true });
@@ -27,6 +27,8 @@ async function capture(page, name, path, settle) {
 
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds the page.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.fulfill({ contentType: "text/css", body: "" }));
   await capture(page, "holding", "/");
   await capture(page, "signin", "/auth/signin");
   if (signIn) {
