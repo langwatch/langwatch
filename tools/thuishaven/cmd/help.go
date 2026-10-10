@@ -36,6 +36,7 @@ EXAMPLES
     haven up +analytics          # catch PostHog and Customer.io calls in analyticssim
     haven up +outbound           # catch Slack, webhook and SQS sends in outboundsim
     haven up +telemetry          # send, load or fuzz OTLP traffic with telemetrysim
+    haven up +lambda             # run studio on the per-project Lambda path via lambdasim
     haven sims --json            # every simulator: running here, console, verbs, skill
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
@@ -63,15 +64,15 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-The nine simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
-idp, storage, payment and telemetry run by default; llm, voice, analytics and outbound come with
-"haven up +llm +voice +analytics +outbound". Billing uses paymentsim unless .env sets a Stripe
+The ten simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp, storage, payment and telemetry run by default; llm, voice, analytics, outbound and lambda come with
+"haven up +llm +voice +analytics +outbound +lambda". Billing uses paymentsim unless .env sets a Stripe
 key; "haven up" prints which. "haven sims --json" lists every one: running
 here or not, its console, its verbs and its skill. Read one's output with "haven logs
-<name>". Drive one from a terminal with "haven mail|idp|llm|analytics|outbound|payment|storage|voice|telemetry
+<name>". Drive one from a terminal with "haven mail|idp|llm|analytics|outbound|payment|storage|voice|telemetry|lambda
 <verb>" (--json on every read).
 
-    mail|idp|storage|llm|voice|analytics|outbound|telemetry.portless.langwatch.localhost
+    mail|idp|storage|llm|voice|analytics|outbound|telemetry|lambda.portless.langwatch.localhost
 
 Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 

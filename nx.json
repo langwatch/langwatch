@@ -309,6 +309,15 @@
       },
       {
         "filter": {
+          "projects": ["@langwatch/lambdasim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/lambdasim/web/dist"]
+      },
+      {
+        "filter": {
           "plugin": "./dev/nx/go-plugin.mjs"
         },
         "cache": true,

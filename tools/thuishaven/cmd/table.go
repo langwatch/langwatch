@@ -442,6 +442,16 @@ var baseTable = []commandSpec{
 		run: runOutbound,
 	},
 	{
+		name:    "lambda",
+		summary: "lambdasim's NLP Lambda invocations: info | calls | call <id> | clear | set --error <kind>",
+		args:    "<info|calls|call|clear|set> [id]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--error", takesValue: true, value: "<kind>", summary: "set: force throttled, not-found, function-error or service on every invoke (none turns it off)"},
+		),
+		run: runLambda,
+	},
+	{
 		name:    "payment",
 		summary: "paymentsim, the Stripe stand-in: status | customers | subscriptions | checkouts | invoices | events | usage | complete | retry | advance | fail | clear-failures | deliver | hold | release | reset",
 		args:    "<status|customers|subscriptions|checkouts|invoices|events|usage|complete|retry|advance|fail|clear-failures|deliver|hold|release|reset> [id]",

@@ -85,6 +85,11 @@ const PaymentService = "payment"
 // telemetry.<slug>.langwatch.localhost. Opt-in like voice and llm.
 const TelemetryService = "telemetry"
 
+// LambdaService is the NLP Lambda fleet stand-in (services/lambdasim), routed at
+// lambda.<slug>.langwatch.localhost. Opt-in: it moves studio runs onto the
+// per-project Lambda path, which a developer must never get by surprise.
+const LambdaService = "lambda"
+
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
 // same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)

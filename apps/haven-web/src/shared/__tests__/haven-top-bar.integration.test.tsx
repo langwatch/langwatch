@@ -60,7 +60,9 @@ describe("<HavenTopBar/>", () => {
         "LLM",
         "Analytics",
         "Outbound",
+        "Payment",
         "Telemetry",
+        "Lambda",
       ]);
       expect(menuItems({ menu: "Tools" })).toEqual(["Grafana"]);
     });

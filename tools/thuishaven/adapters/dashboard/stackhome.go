@@ -480,7 +480,7 @@ func (s *Server) recentErrors(slug string, lanes []string, tails map[string][]lo
 // which from a checkout file, so a row offers no restart of its own for them.
 var simulators = map[string]bool{
 	domain.IdPService: true, domain.MailService: true, domain.StorageService: true, domain.VoiceService: true,
-	domain.LLMService: true, domain.AnalyticsService: true, domain.OutboundService: true, domain.PaymentService: true, domain.TelemetryService: true,
+	domain.LLMService: true, domain.AnalyticsService: true, domain.OutboundService: true, domain.PaymentService: true, domain.TelemetryService: true, domain.LambdaService: true,
 }
 
 // surfaceLanes are the captures a surface's process may write to: a

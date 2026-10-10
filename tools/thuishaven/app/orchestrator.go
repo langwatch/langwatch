@@ -1254,6 +1254,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Payment
 	case domain.TelemetryService:
 		return opts.Selection.Telemetry
+	case domain.LambdaService:
+		return opts.Selection.Lambda
 	default:
 		return true
 	}

@@ -9,6 +9,7 @@ import { basename, dirname, join } from "node:path";
 const simulatorConsoles = [
   "analyticssim",
   "idpsim",
+  "lambdasim",
   "llmsim",
   "mailsim",
   "outboundsim",
@@ -57,7 +58,7 @@ const binary = (root) => {
 const consoleInputs = { tags: ["haven-console"], namedInputs: { goBuild: [] } };
 
 export const createNodes = [
-  "{go.work,cmd/*/main.go,infra/clickhouse-serverless/cmd/*/main.go,apps/{analyticssim,haven,idpsim,llmsim,mailsim,outboundsim,paymentsim,storagesim,telemetrysim,voicesim}-web/package.json}",
+  "{go.work,cmd/*/main.go,infra/clickhouse-serverless/cmd/*/main.go,apps/{analyticssim,haven,idpsim,lambdasim,llmsim,mailsim,outboundsim,paymentsim,storagesim,telemetrysim,voicesim}-web/package.json}",
   (files, _options, context) =>
     files.map((file) => {
       if (file.endsWith("package.json"))

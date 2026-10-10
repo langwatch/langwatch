@@ -86,6 +86,10 @@ type Selection struct {
 	// small Go process that sends nothing until asked, and its console is
 	// always routed. Worktrees that don't want it say `haven up -telemetry`.
 	Telemetry bool `json:"telemetry"`
+	// Lambda is the NLP Lambda fleet stand-in (lambdasim). Off by default: it
+	// names a fleet, so studio runs take the per-project Lambda path through
+	// lambdasim to this stack's nlpgo. `haven up +lambda` once.
+	Lambda bool `json:"lambda"`
 }
 
 // IsBuiltUI is the default UI mode: app.<slug> is the api serving a production
@@ -101,7 +105,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "design-system", "mail-room", "langevals"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -203,6 +207,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Payment = on
 	case TelemetryService:
 		sel.Telemetry = on
+	case LambdaService:
+		sel.Lambda = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -246,6 +252,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Payment = local
 		case TelemetryService:
 			sel.Telemetry = local
+		case LambdaService:
+			sel.Lambda = local
 		}
 	}
 	return sel
@@ -312,6 +320,7 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Outbound, OutboundService)
 	add(s.Payment, PaymentService)
 	add(s.Telemetry, TelemetryService)
+	add(s.Lambda, LambdaService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	add(s.Langevals, LangevalsService)

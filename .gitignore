@@ -43,6 +43,9 @@ dist/
 !/services/voicesim/web/dist/
 /services/voicesim/web/dist/*
 !/services/voicesim/web/dist/.gitkeep
+!/services/lambdasim/web/dist/
+/services/lambdasim/web/dist/*
+!/services/lambdasim/web/dist/.gitkeep
 !/services/llmsim/web/dist/
 /services/llmsim/web/dist/*
 !/services/llmsim/web/dist/.gitkeep

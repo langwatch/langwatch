@@ -244,6 +244,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "services/outboundsim",
   "services/paymentsim",
   "services/telemetrysim",
+  "services/lambdasim",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",

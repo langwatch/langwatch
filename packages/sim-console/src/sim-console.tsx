@@ -11,7 +11,8 @@ export type SimKind =
   | "analytics"
   | "outbound"
   | "payment"
-  | "telemetry";
+  | "telemetry"
+  | "lambda";
 
 export type SimTab = { id: string; label: string; count?: number };
 
