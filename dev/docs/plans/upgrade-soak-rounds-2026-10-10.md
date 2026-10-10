@@ -125,6 +125,7 @@ once, then the public upgrade guide and register (plan-upgrade-snapshots §7).
 - Q3 compose and helm in round 5; the npx server later.
 - Q4 exit bar: each cell green three rounds in a row on one snapshot.
 - Effort: planning, review and orchestration at high effort; execution lanes Opus at medium effort or Sonnet.
+- Retired tables stay (Alex): `DataPrivacyProjectScope` and `DataRetentionProjectScope` (no reader or writer since 0454a359fd) are kept, made unreachable from code, marked deprecated with removal in a future release, and shown as such in the Updates panel.
 
 ## 7. The data: one snapshot per shape
 
@@ -178,7 +179,9 @@ reason; 22 of 37 are `pending` today (W2's acceptance).
 ## 8. The runs
 
 Every run: quiet host (load ≤ 40), built code, restore the snapshot, boot main, baseline A, traffic
-on, cut, switch, settle, judge, report, a #8553 row `UP-<round>-<cell>`. Rerun the same run until it
+on, cut, switch, settle, judge, report, a #8553 row `UP-<round>-<cell>`. Every report carries
+screenshots of Ops > Upgrades (the update dashboard) at each phase (behind, upgrading, finishing in
+background, up to date), attached to the run's #8553 comment. Rerun the same run until it
 is green three times.
 
 ### 8.1 Traffic during every run (from 30 s before the cut until 2 min after ready)
