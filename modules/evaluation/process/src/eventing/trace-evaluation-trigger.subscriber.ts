@@ -10,6 +10,7 @@ import {
   spanSchema,
   SYNTHETIC_TRACE_SPAN_NAMES,
   type TraceSummaryData,
+  type TraceSummaryLookupInput,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -38,7 +39,7 @@ interface TraceEvaluationTriggerEvent {
 
 interface TraceEvaluationTriggerDeps {
   /** Trace's folded summary, read at handling (§9: the folded state is read through TraceApi). */
-  findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
+  findSummary: (input: TraceSummaryLookupInput) => Promise<TraceSummaryData | null>;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   monitors: { getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> };
   /** Evaluation's own executeEvaluation sender, which owns the delay and the dedup. */
@@ -80,7 +81,12 @@ export function createTraceEvaluationTrigger(
   event: TraceEvaluationTriggerEvent;
 }) => Promise<void> {
   return async ({ tenantId, traceId, event }) => {
-    const foldState = await deps.findSummary({ projectId: tenantId, traceId });
+    // Anchored on the event's own time: each retry of a not-yet-folded summary stays bounded.
+    const foldState = await deps.findSummary({
+      projectId: tenantId,
+      traceId,
+      occurredAtMs: event.occurredAt,
+    });
     if (!foldState) {
       throw new Error(
         `trace ${traceId} has no folded summary yet; retrying the evaluation trigger`,

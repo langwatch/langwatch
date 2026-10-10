@@ -5,5 +5,6 @@ export abstract class TraceSummaryReaderRepository {
   abstract findSummary(input: {
     tenantId: string;
     traceId: string;
+    occurredAtMs?: number;
   }): Promise<TraceSummaryData | null>;
 }

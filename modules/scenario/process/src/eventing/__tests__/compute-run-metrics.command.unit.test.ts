@@ -86,6 +86,20 @@ function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSumma
 }
 
 describe("ComputeRunMetricsCommand", () => {
+  describe("when the summary is pulled from trace", () => {
+    it("anchors the read on the command's own time", async () => {
+      const deps = makeDeps();
+      const cmd = makeCommand({ retryCount: 0 });
+
+      await new ComputeRunMetricsCommand(deps).handle(cmd);
+
+      expect(deps.traceSummaryStore.get).toHaveBeenCalledWith(
+        "trace-1",
+        expect.objectContaining({ occurredAtMs: cmd.data.occurredAt }),
+      );
+    });
+  });
+
   describe("when trace summary exists but has no metrics yet", () => {
     /** @scenario "Pull-mode command schedules deferred retry for missing traces" */
     it("schedules a deferred retry instead of silently returning", async () => {

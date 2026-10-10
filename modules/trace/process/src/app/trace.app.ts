@@ -345,6 +345,10 @@ import type { TraceProjectedReadRepository } from "../repositories/trace-project
 import { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
+import {
+  TRACE_SUMMARY_LOOKUP_FORWARD_MS,
+  TRACE_SUMMARY_LOOKUP_LOOKBACK_MS,
+} from "../repositories/trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
@@ -3926,13 +3930,24 @@ class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
   async findSummary({
     tenantId,
     traceId,
+    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
+    occurredAtMs?: number;
   }): Promise<TraceSummaryData | null> {
+    // An anchored read is bounded and its miss final; no anchor keeps the resolving read.
     const read = await this.#store.get(traceId, {
       aggregateId: traceId,
       tenantId: createTenantId(tenantId),
+      ...(occurredAtMs === undefined
+        ? {}
+        : {
+            readWindow: {
+              fromMs: occurredAtMs - TRACE_SUMMARY_LOOKUP_LOOKBACK_MS,
+              toMs: occurredAtMs + TRACE_SUMMARY_LOOKUP_FORWARD_MS,
+            },
+          }),
     });
 
     return read.kind === "folded" ? read.state : null;

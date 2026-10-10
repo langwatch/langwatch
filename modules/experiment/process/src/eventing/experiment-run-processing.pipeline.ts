@@ -103,7 +103,11 @@ interface ClickhouseExperimentRunProcessingRepository {
   /** The progress fold's reaction: each event's frames, live on the run's channel. */
   runFrames: ExperimentRunProgressSubscriber;
   /** Trace's settled experiment trace, read back and folded into its run's cost. */
-  traceMetricsSync: (input: { tenantId: string; traceId: string }) => Promise<void>;
+  traceMetricsSync: (input: {
+    tenantId: string;
+    traceId: string;
+    occurredAt?: number;
+  }) => Promise<void>;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
 }
@@ -197,6 +201,7 @@ export function buildExperimentRunProcessingPipeline(
         deps.traceMetricsSync({
           tenantId: String(context.tenantId),
           traceId: String(context.aggregateId),
+          occurredAt: context.occurredAt,
         }),
     })
     .withLaneAliases(MAIN_TRACE_METRICS_LANE_ALIASES);

@@ -20,6 +20,11 @@ export interface FindByTraceIdOptions {
   window?: { fromMs: number; toMs: number };
 }
 
+/** How far before its anchor an event's trace may have started: the fold's own read window. */
+export const TRACE_SUMMARY_LOOKUP_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+/** How far after its anchor a trace may sit: clock skew between a span and its trace's start. */
+export const TRACE_SUMMARY_LOOKUP_FORWARD_MS = 24 * 60 * 60 * 1000;
+
 /** A single-trace summary read; the proof fences the tenants it may see (ADR-177). */
 export type FindByTraceIdParams = {
   authorization: Authorization;

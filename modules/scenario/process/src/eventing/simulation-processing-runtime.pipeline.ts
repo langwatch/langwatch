@@ -161,6 +161,7 @@ export class SimulationProcessingRuntimeAdapter {
             const summary = await traces.findSummary({
               projectId: String(context.tenantId),
               traceId,
+              occurredAtMs: context.occurredAtMs,
             });
             return summary ? { kind: "folded", state: summary } : { kind: "empty" };
           },

@@ -196,8 +196,12 @@ function subscriber(options: {
   const isEnabled = vi.fn(async () => options.guardDisabled ?? false);
   const listMonitors = vi.fn(async (_projectId: string) => options.monitors ?? [monitor()]);
   const folded: { state: TraceSummaryData | null } = { state: null };
+  const lookups: { occurredAtMs?: number }[] = [];
   const trigger = createTraceEvaluationTrigger({
-    findSummary: async () => folded.state,
+    findSummary: async (input) => {
+      lookups.push(input);
+      return folded.state;
+    },
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled }),
     monitors: {
       getEnabledOnMessageMonitors: (projectId) =>
@@ -206,7 +210,7 @@ function subscriber(options: {
     queueTraceEvaluation: (data) => dispatch.send(data),
     metrics,
   });
-  return { built: { trigger, folded }, dispatch, metrics, isEnabled, listMonitors };
+  return { built: { trigger, folded }, dispatch, metrics, isEnabled, listMonitors, lookups };
 }
 
 /** Delivers one trace event to the trigger over the given folded summary. */
@@ -228,6 +232,19 @@ async function run(
 }
 
 describe("createTraceEvaluationTrigger", () => {
+  describe("given a span event", () => {
+    describe("when the trigger reads the trace's summary", () => {
+      it("anchors the lookup on the span's own time, never on now", async () => {
+        const { built, lookups } = subscriber({});
+        const event = spanEvent();
+
+        await run(built, event, foldState());
+
+        expect(lookups).toEqual([expect.objectContaining({ occurredAtMs: event.occurredAt })]);
+      });
+    });
+  });
+
   describe("given an evaluator's own span", () => {
     describe("when the causality depth says the span came from an evaluation", () => {
       /**
