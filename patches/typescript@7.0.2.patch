@@ -1,16 +1,107 @@
 diff --git a/lib/tsc.js b/lib/tsc.js
-index eb869b715737e45fcf1af33d1af3157b59ba08de..0dc346959d92f8f80d059096f49e773a3234994d 100644
+index eb869b715737e45fcf1af33d1af3157b59ba08de..2c973d62e353bed759301b730242519df15a53bb 100644
 --- a/lib/tsc.js
 +++ b/lib/tsc.js
-@@ -5,6 +5,11 @@ import { execFileSync } from "node:child_process";
+@@ -2,21 +2,97 @@
+ 
+ import getExePath from "#getExePath";
+ import { execFileSync } from "node:child_process";
++import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { homedir } from "node:os";
++import { join } from "node:path";
  
  const exe = getExePath();
  
-+// LangWatch: every compile is capped unless the caller says otherwise
-+// (dev/docs/plans/typescript-cpu-and-check-time.md step 1).
+-if (process.platform !== "win32" && typeof process.execve === "function") {
+-    // > v22.15.0
++// LangWatch: every compile is capped unless the caller says otherwise, and waits for
++// one of LANGWATCH_TSC_SLOTS (default 2) machine-wide slots, whichever worktree or
++// tool started it (dev/docs/plans/typescript-cpu-and-check-time.md step 1).
 +process.env.GOMAXPROCS ??= "2";
 +process.env.GOMEMLIMIT ??= "2GiB";
 +
- if (process.platform !== "win32" && typeof process.execve === "function") {
-     // > v22.15.0
++const args = process.argv.slice(2);
++const exempt = args.some((arg) => /^(-w|--watch|-v|--version|-h|--help|--lsp)$/.test(arg));
++const slots = Number(process.env.LANGWATCH_TSC_SLOTS ?? "2");
++const slotDir = join(homedir(), ".cache", "langwatch", "tsc-slots");
++
++function ownerAlive(lock) {
++    let pid;
      try {
+-        process.execve(exe, [exe, ...process.argv.slice(2)]);
++        pid = Number(readFileSync(join(lock, "pid"), "utf8"));
+     }
+     catch {
+-        // may not be available, ignore the error and fallback
++        return Date.now() - statSync(lock).mtimeMs < 10_000;
++    }
++    try {
++        process.kill(pid, 0);
++        return true;
++    }
++    catch (error) {
++        return error.code === "EPERM";
++    }
++}
++
++function tryTake(lock) {
++    try {
++        mkdirSync(lock);
++        writeFileSync(join(lock, "pid"), String(process.pid));
++        return true;
++    }
++    catch {
++        try {
++            if (!ownerAlive(lock)) rmSync(lock, { recursive: true, force: true });
++        }
++        catch {
++            // another waiter reclaimed it first
++        }
++        return false;
++    }
++}
++
++function acquire() {
++    mkdirSync(slotDir, { recursive: true });
++    const pause = new Int32Array(new SharedArrayBuffer(4));
++    let told = false;
++    for (;;) {
++        for (let index = 0; index < slots; index++) {
++            const lock = join(slotDir, `slot-${index}`);
++            if (tryTake(lock)) return lock;
++        }
++        if (!told) {
++            process.stderr.write(`tsc: waiting for a machine-wide slot (${slots} in use; LANGWATCH_TSC_SLOTS)\n`);
++            told = true;
++        }
++        Atomics.wait(pause, 0, 0, 500);
++    }
++}
++
++if (exempt || !(slots > 0) || process.env.LANGWATCH_TSC_SLOT) {
++    if (process.platform !== "win32" && typeof process.execve === "function") {
++        // > v22.15.0
++        try {
++            process.execve(exe, [exe, ...args]);
++        }
++        catch {
++            // may not be available, ignore the error and fallback
++        }
++    }
++}
++else {
++    const lock = acquire();
++    process.env.LANGWATCH_TSC_SLOT = lock;
++    const release = () => rmSync(lock, { recursive: true, force: true });
++    process.on("exit", release);
++    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
++        process.on(signal, () => process.exit(128));
+     }
+ }
+ 
+ try {
+-    execFileSync(exe, process.argv.slice(2), { stdio: "inherit" });
++    execFileSync(exe, args, { stdio: "inherit" });
+ }
+ catch (e) {
+     if (e.status) {
