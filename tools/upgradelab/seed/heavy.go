@@ -20,7 +20,7 @@ type HeavyInput struct {
 	Seed                 int64
 	Anchor               time.Time
 	Spans                int // 0 is seedgen's medium: about 300k
-	Workers              int // concurrent doors; default 8
+	Workers              int // concurrent doors; default 32 (8 left main's api idle, waiting on round trips)
 	Log                  io.Writer
 }
 
@@ -60,7 +60,7 @@ func Heavy(ctx context.Context, in HeavyInput) (HeavyResult, error) {
 	if err != nil {
 		return result, err
 	}
-	run := &heavyRun{door: door, plan: plan, live: live, workers: max(in.Workers, 8), count: count}
+	run := &heavyRun{door: door, plan: plan, live: live, workers: max(in.Workers, 32), count: count}
 	return result, errors.Join(append(run.telemetry(ctx), run.product(ctx)...)...)
 }
 
@@ -223,6 +223,7 @@ func heavyProject(ctx context.Context, door *seedgen.Door, slug string) (string,
 }
 
 // heavyActions are every product and REST kind with a door, for one project; the suite follows its scenario.
+// No retention: these orgs are on the free plan, where main refuses it (403); the S product seed covers it.
 func heavyActions(projectID, label string) []seedgen.Action {
 	scope := map[string]any{"scopeType": "PROJECT", "scopeId": projectID}
 	rows := []struct {
@@ -230,7 +231,6 @@ func heavyActions(projectID, label string) []seedgen.Action {
 		input any
 	}{
 		{seedgen.KindProductPrivacy, map[string]any{"projectId": projectID, "scope": scope, "personalOnly": false, "config": map[string]any{}}},
-		{seedgen.KindProductRetention, map[string]any{"projectId": projectID, "scope": scope, "category": "traces", "retentionDays": 63}},
 		{seedgen.KindProductWorkflow, map[string]any{"projectId": projectID, "commitMessage": "heavy seed", "dsl": map[string]any{
 			"spec_version": "1.4", "name": "heavy workflow " + label, "icon": "🧪", "description": "heavy seed", "version": "1.0",
 			"default_llm": map[string]any{"model": "openai/gpt-5"}, "template_adapter": "default", "enable_tracing": true,
