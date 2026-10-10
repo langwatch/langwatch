@@ -14,7 +14,11 @@ are the source of truth; this plan orders them after the nx-sync layout landed).
 | api app program | 4,314 files, 929k lines, almost all emitted `.d.ts`; own check 0.8s |
 | Emitted `*.server.d.ts` / `*.trpc.d.ts` (2026-09) | 20-540x their source |
 | Cold root build (2026-09-23, quiet host) | 183s wall, ~1,100 CPU-s, ~5.9 GB peak |
-| nx-sync commit (`build(typescript): adopt nx sync`) | last recorded 1,160 errors, 616 of them TS6305 |
+| nx-sync commit (`build(typescript): adopt nx sync`) | last recorded 1,160 errors; full capped run on HEAD: 43 (39 one Card variant type) |
+| Capped root check (`GOMAXPROCS=2`) | 110-150% CPU, 3.5 GB peak (was ~400%) |
+| Longest reference chain | 27 configs (~25 sequential compiles); 2026-09 figure was 17 |
+| Same, without the 142 build-config refs to test-only `vitest-config` and 190 declared-but-unimported workspace deps | 21 |
+| What remains | 8 contracts in a row, real imports: organization → project → data-privacy → evaluation → evaluator → trace → instant-eval → analytics |
 
 ## Steps
 
@@ -35,7 +39,10 @@ are the source of truth; this plan orders them after the nx-sync layout landed).
    printed but not checked twice. Needs a ruling (below).
 6. **Smaller declarations.** Named schemas and interfaces instead of inlined Zod
    types (in flight in another session; `perf(contracts)` commits).
-7. **Trial `assumeChangesOnlyAffectDirectDependencies`** for local incremental
+7. **Shorter chains.** Drop workspace deps no source imports (190, list from
+   `git grep` per package) and keep `vitest-config` out of build references:
+   27 → 21. The contract run that remains is `contract-graph-flattening.md`.
+8. **Trial `assumeChangesOnlyAffectDirectDependencies`** for local incremental
    runs only; keep CI exact.
 
 Not doing: `isolatedDeclarations` (ruled out, `typescript-tidy-projects.md`

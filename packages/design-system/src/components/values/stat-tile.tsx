@@ -3,10 +3,11 @@
  * a large figure, an optional meter against a limit, an optional hint. Tiles
  * sit in a `StatTileGrid`. Presentational only: no fetching, no module words.
  */
-import { Card, HStack, SimpleGrid, Skeleton, Stat, Text, VStack } from "@chakra-ui/react";
+import { HStack, SimpleGrid, Skeleton, Stat, Text, VStack } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { Card, type CardVariant } from "../layout/card.tsx";
 import { MeterBar } from "./meter-bar.tsx";
 
 export interface StatTileMeter {
@@ -17,7 +18,7 @@ export interface StatTileMeter {
 
 export interface StatTileProps {
   label: string;
-  variant?: Card.RootProps["variant"];
+  variant?: CardVariant;
   icon?: ReactNode;
   /** Under the figure, clamped to two lines. */
   hint?: string;

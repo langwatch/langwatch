@@ -1,7 +1,8 @@
-import { Card, Heading, HStack, SimpleGrid, Stack, Text } from "@chakra-ui/react";
+import { Heading, HStack, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FieldInfoTooltip } from "../components/forms/field-info-tooltip.tsx";
+import { Card } from "../components/layout/card.tsx";
 
 const meta = {
   title: "Primitives/Card",
