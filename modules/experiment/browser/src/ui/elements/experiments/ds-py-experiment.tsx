@@ -3,6 +3,7 @@ import type { UiHostProject } from "@langwatch/browser-host/use-organization-tea
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { Money } from "@langwatch/design-system/money";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Box,
@@ -165,13 +166,11 @@ export function DSPyExperiment({
       />
       <Box width="calc(100vw - 391px)" height="full" position="relative">
         <VStack align="start" width="100%" maxWidth="1200px" height="full" gap={8} padding={6}>
-          <HStack width="full" align="end">
-            <Heading as="h1" size="lg">
-              {experiment.name ?? experiment.slug}
-            </Heading>
+          <PageLayout.Header>
+            <PageLayout.Heading>{experiment.name ?? experiment.slug}</PageLayout.Heading>
             <Spacer />
             <FeedbackLink />
-          </HStack>
+          </PageLayout.Header>
           {runsView === "loading" && <Skeleton width="100%" height="30px" />}
           {runsView === "error" && (
             <Alert.Root status="error">

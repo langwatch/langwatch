@@ -1,9 +1,9 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
 import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
-  Button,
   Card,
   Container,
   Heading,
@@ -313,27 +313,25 @@ export default function BatchEvaluation({
   return (
     <Box background="bg.surface" width="full" height="full" paddingTop={14}>
       <Container maxW={"calc(100vw - 200px)"}>
-        <HStack width="full" verticalAlign={"middle"} paddingBottom={6}>
-          <VStack align="start">
-            <Heading as={"h1"} size="lg">
-              {experiment.name ?? experiment.slug}
-            </Heading>
-            <Text>Dataset: {data[0]?.dataset.name ?? ""}</Text>
+        <PageLayout.Header>
+          <VStack align="start" gap={0}>
+            <PageLayout.Heading>{experiment.name ?? experiment.slug}</PageLayout.Heading>
+            <Text color="fg.muted" fontSize="xs">
+              Dataset: {data[0]?.dataset.name ?? ""}
+            </Text>
           </VStack>
 
           <Spacer />
-          <Button
-            colorPalette="black"
+          <PageLayout.HeaderButton
             minWidth="fit-content"
-            variant="ghost"
             onClick={() => evaluations.data && downloadCSV()}
           >
             Download Results CSV{" "}
             <Icon marginLeft={2}>
               <Download />
             </Icon>
-          </Button>
-        </HStack>
+          </PageLayout.HeaderButton>
+        </PageLayout.Header>
       </Container>
       <HStack
         align="center"

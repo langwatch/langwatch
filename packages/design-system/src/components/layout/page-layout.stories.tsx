@@ -1,4 +1,4 @@
-import { Box, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Badge, Box, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { PageLayout } from "./page-layout.tsx";
@@ -81,5 +81,49 @@ export const LongTitleAndNarrowWidth: Story = {
         <PageLayout.Heading>Organization members and invitations</PageLayout.Heading>
       </PageLayout.Header>
     </Box>
+  ),
+};
+
+/** Compare the shared bar in both modes without changing route-owned title sizing. */
+export const HeaderStates: Story = {
+  render: () => (
+    <HStack align="start" gap={6} wrap="wrap">
+      {(["light", "dark"] as const).map((mode) => (
+        <Stack
+          key={mode}
+          className={mode}
+          color="fg"
+          bg="bg.panel"
+          width="480px"
+          gap={4}
+          paddingY={4}
+        >
+          <Text paddingX={6} color="fg.muted">
+            {mode}
+          </Text>
+          <PageLayout.Header>
+            <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
+            <Badge variant="subtle">12</Badge>
+            <Spacer />
+            <PageLayout.HeaderButton primary>Create key</PageLayout.HeaderButton>
+          </PageLayout.Header>
+          <PageLayout.Header>
+            <Stack gap={0}>
+              <PageLayout.Heading>Costs</PageLayout.Heading>
+              <Text fontSize="xs" color="fg.muted">
+                Usage across your organization
+              </Text>
+            </Stack>
+            <Spacer />
+            <PageLayout.HeaderButton disabled>Export</PageLayout.HeaderButton>
+          </PageLayout.Header>
+          <PageLayout.Header withBorder={false}>
+            <PageLayout.Heading>Integrations</PageLayout.Heading>
+            <Spacer />
+            <PageLayout.HeaderButton loading>Refreshing</PageLayout.HeaderButton>
+          </PageLayout.Header>
+        </Stack>
+      ))}
+    </HStack>
   ),
 };
