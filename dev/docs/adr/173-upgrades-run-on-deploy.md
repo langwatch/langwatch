@@ -165,6 +165,26 @@ pre-roster-rollback` records a rollback and reopens done background steps. The c
 The pure rule is `preRosterWriters` in `packages/upgrade/src/serving-roster/pre-roster.ts`;
 scenarios in `specs/upgrade/cloud-automatic.feature` and `specs/upgrade/upgrade-command.feature`.
 
+### 7. Amendment 2026-10-10: the Upgrades surface shows only what an install can know (UPGRADE-UI-2)
+
+An install knows its own image and ledger; it cannot know what a later release holds until that
+image runs. So (Alex, 2026-10-10):
+
+- **No pre-upgrade preview page.** It could only describe the running image. A newer release is
+  named only from cloud's usage-report reply (`latest_release`, U8-Q-U3), with a release-notes link,
+  and hidden when usage reporting is off or the install is air-gapped. No new outbound call.
+- **Layout.** Tabs Overview, Runs, Steps, Organizations, plus Dataplanes when targets exist. The
+  Overview names the running version and one state (up to date, upgrading with "n of m", needs
+  attention with Retry, refused with its message) and the operator steps of this version. A run
+  opens as a drawer from Runs (Phases, Steps, Log); no back buttons, no command hints.
+- **Names.** A build that is not a release reads "Development build" with
+  `<newest contained release>+<short commit>`, never "unreleased". History imported from before
+  upgrade tracking reads "3.18.1 and earlier"; the seed run is "Imported history", raw JSON only
+  behind a details toggle.
+- **Organizations, not tenants.** Tenant steps are called organisations on every deployment, and
+  all the tooling (run a pass, run for an organisation, roll back, enrol) shows on cloud and
+  self-hosted alike.
+
 ## Alternatives considered
 
 - **Number cloud builds** (a build counter beside the `git-<sha>`). Ordering builds
