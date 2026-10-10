@@ -144,3 +144,10 @@ Feature: The analytics pages
     Given an address already carrying another overlay's parameters
     When a trace is opened
     Then every parameter the previous overlay left behind is removed
+
+  @integration
+  Scenario: A link to a missing dashboard says so
+    Given the reports address names a dashboard id the project does not have
+    When the reports page loads its dashboards
+    Then it says the dashboard does not exist
+    And it does not offer the empty dashboard's "Add your custom graphs here"

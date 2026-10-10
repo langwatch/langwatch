@@ -26,6 +26,8 @@ export class FakeWorkflowHost implements WorkflowHostSlice {
   backs = 0;
   readonly queryWrites: QueryWrite[] = [];
   readonly successes: WorkflowSuccessNotice[] = [];
+  readonly warnings: WorkflowSuccessNotice[] = [];
+  readonly infos: WorkflowSuccessNotice[] = [];
   readonly failures: WorkflowFailureNotice[] = [];
 
   constructor(
@@ -76,6 +78,14 @@ export class FakeWorkflowHost implements WorkflowHostSlice {
 
   succeeded(notice: WorkflowSuccessNotice): void {
     this.successes.push(notice);
+  }
+
+  warned(notice: WorkflowSuccessNotice): void {
+    this.warnings.push(notice);
+  }
+
+  informed(notice: WorkflowSuccessNotice): void {
+    this.infos.push(notice);
   }
 
   failed(failure: WorkflowFailureNotice): void {

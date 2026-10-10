@@ -8097,7 +8097,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "The project that owns the board; only there can it be edited."
         },
         {
           "name": "project",
@@ -8152,6 +8152,24 @@
           "isList": false,
           "isOptional": true,
           "documentation": "The member who created it; null for boards that predate the column."
+        },
+        {
+          "name": "scope",
+          "columnName": "scope",
+          "type": "DashboardScope",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Who sees it. Only the author changes it; a board with no author stays PROJECT."
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The owning project's organization, stamped when the board is first set to\nORGANIZATION; null before. No relation, per the database rule."
         },
         {
           "name": "createdAt",
@@ -25867,6 +25885,14 @@
         "TRACE",
         "PROJECT",
         "BATCH"
+      ]
+    },
+    {
+      "name": "DashboardScope",
+      "values": [
+        "PRIVATE",
+        "PROJECT",
+        "ORGANIZATION"
       ]
     },
     {

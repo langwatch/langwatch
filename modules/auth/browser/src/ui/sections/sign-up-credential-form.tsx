@@ -140,12 +140,14 @@ export function SignUpCredentialForm({
 
     setIsSigningIn(true);
     let message: string | null = null;
+    let leaving = false;
     try {
       const response = await signIn("credentials", {
         email,
         password: values.password,
         callbackUrl,
       });
+      leaving = response?.ok === true;
       message =
         credentialSignInFailure({
           response,
@@ -154,7 +156,8 @@ export function SignUpCredentialForm({
     } catch {
       message = authFailureMessage({ fallback: ACCOUNT_CREATED_FALLBACK });
     } finally {
-      setIsSigningIn(false);
+      // A signed-in account is loading its next page; the button stays busy until it has (WEB-708).
+      if (!leaving) setIsSigningIn(false);
     }
 
     if (message) {
@@ -166,7 +169,7 @@ export function SignUpCredentialForm({
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-      <VStack width="full" align="stretch" gap="13px">
+      <VStack width="full" align="stretch" gap="10px">
         {/* Every failure shows in one place, at the top. The marker below is a
             false positive, not an exemption: `onSubmit`'s local assigned from
             `?.message` taints a literal title, which the raw-message scanner
@@ -222,7 +225,10 @@ export function SignUpCredentialForm({
                 // starts using the first. A manager that fills both fields at
                 // once fires this too, so an autofilled sign-up never has to
                 // wait for a focus that never happens.
-                onChange: () => setIsChoosingPassword(true),
+                onChange: () => {
+                  setIsChoosingPassword(true);
+                  form.clearErrors("password");
+                },
               })}
               onFocus={() => setIsChoosingPassword(true)}
             />
@@ -239,7 +245,10 @@ export function SignUpCredentialForm({
               <PasswordInput
                 id={id}
                 autoComplete="new-password"
-                registration={form.register("confirmPassword", blurJudged("confirmPassword"))}
+                registration={form.register("confirmPassword", {
+                  ...blurJudged("confirmPassword"),
+                  onChange: () => form.clearErrors("confirmPassword"),
+                })}
               />
             )}
           </FrontDoorField>

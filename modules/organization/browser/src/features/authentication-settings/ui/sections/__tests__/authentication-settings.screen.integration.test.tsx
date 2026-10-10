@@ -135,7 +135,7 @@ describe("given an administrator on the Authentication page", () => {
   });
 
   describe("when the page renders its title", () => {
-    it("sits above the rail, as on the Identity provider and Connectors pages", () => {
+    it("sits in the content column beside the rail, not inside it", () => {
       renderWithOrganizationHost(
         <AuthenticationSettingsScreen />,
         hostWith({ grants: ["sso:view", "organization:manage"] }),
@@ -144,7 +144,7 @@ describe("given an administrator on the Authentication page", () => {
       const title = screen.getByRole("heading", { level: 1, name: "Authentication" });
       const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
       expect(rail.contains(title)).toBe(false);
-      expect(title.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(title.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     });
   });
 

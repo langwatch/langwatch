@@ -200,13 +200,31 @@ export class BrowserUiFeedback extends UiFeedback {
     super();
   }
 
-  succeeded({ title, description, id, action }: UiSuccessNotice): void {
+  succeeded(notice: UiSuccessNotice): void {
+    this.notify({ notice, type: "success" });
+  }
+
+  warned(notice: UiSuccessNotice): void {
+    this.notify({ notice, type: "warning" });
+  }
+
+  informed(notice: UiSuccessNotice): void {
+    this.notify({ notice, type: "info" });
+  }
+
+  private notify({
+    notice: { title, description, id, action },
+    type,
+  }: {
+    notice: UiSuccessNotice;
+    type: "success" | "warning" | "info";
+  }): void {
     this.target.create({
       ...(id ? { id } : {}),
       title,
       ...(description ? { description } : {}),
       ...(action ? { action: { label: action.label, onClick: action.run } } : {}),
-      type: "success",
+      type,
     });
   }
 

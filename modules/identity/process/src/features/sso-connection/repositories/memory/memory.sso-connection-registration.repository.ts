@@ -31,4 +31,18 @@ export class MemorySsoConnectionRegistrationRepository extends SsoConnectionRegi
     this.store.ssoRegistrationSlots.set(`${candidate.organizationId}:${candidate.kind}`, candidate);
     return candidate;
   }
+
+  async release({
+    organizationId,
+    commandId,
+  }: {
+    organizationId: string;
+    commandId: string;
+  }): Promise<void> {
+    for (const [key, slot] of this.store.ssoRegistrationSlots) {
+      if (slot.organizationId !== organizationId || slot.commandId !== commandId) continue;
+      if (this.store.ssoConnections.has(slot.connectionId)) continue;
+      this.store.ssoRegistrationSlots.delete(key);
+    }
+  }
 }

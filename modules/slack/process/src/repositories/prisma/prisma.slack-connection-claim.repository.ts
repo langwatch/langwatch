@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
+import { z } from "zod";
 
 import {
   SlackConnectionClaimRepository,
@@ -8,7 +9,7 @@ import {
 } from "../slack-connection-claim.repository.ts";
 
 /** Only the model this repository touches. */
-export type SlackConnectionClaimDatabase = Pick<PrismaClient, "slackConnectionClaim">;
+export type SlackConnectionClaimDatabase = Pick<PrismaClient, "slackConnectionClaim" | "$queryRaw">;
 
 const claimSelect = {
   connectionId: true,
@@ -17,6 +18,16 @@ const claimSelect = {
   organizationId: true,
   projectId: true,
 } as const;
+
+const claimRowsSchema = z.array(
+  z.object({
+    connectionId: z.string(),
+    claimantId: z.string(),
+    claimantLabel: z.string(),
+    organizationId: z.string(),
+    projectId: z.string(),
+  }),
+);
 
 export class PrismaSlackConnectionClaimRepository extends SlackConnectionClaimRepository {
   static readonly tables = prismaTables("SlackConnectionClaim");
@@ -77,6 +88,7 @@ export class PrismaSlackConnectionClaimRepository extends SlackConnectionClaimRe
     });
   }
 
+  /** Every organization's claims: the claimant's release sweep pages the whole table. */
   async findPage({
     after,
     limit,
@@ -84,18 +96,17 @@ export class PrismaSlackConnectionClaimRepository extends SlackConnectionClaimRe
     after?: SlackConnectionClaimKey;
     limit: number;
   }): Promise<SlackConnectionClaimRow[]> {
-    return this.prisma.slackConnectionClaim.findMany({
-      where: after
-        ? {
-            OR: [
-              { connectionId: { gt: after.connectionId } },
-              { connectionId: after.connectionId, claimantId: { gt: after.claimantId } },
-            ],
-          }
-        : {},
-      orderBy: [{ connectionId: "asc" }, { claimantId: "asc" }],
-      take: limit,
-      select: claimSelect,
-    });
+    const afterConnectionId = after?.connectionId ?? null;
+    const afterClaimantId = after?.claimantId ?? null;
+    const rows = await this.prisma.$queryRaw<unknown[]>`
+      SELECT "connectionId", "claimantId", "claimantLabel", "organizationId", "projectId"
+      FROM "slack_connection_claim"
+      WHERE ${afterConnectionId}::text IS NULL
+         OR ("connectionId", "claimantId") > (${afterConnectionId}::text, ${afterClaimantId}::text)
+      ORDER BY "connectionId" ASC, "claimantId" ASC
+      LIMIT ${limit}
+      -- @tenancy: Slack claim reconcile cross-tenant sweep (upgrade step, worker)
+    `;
+    return claimRowsSchema.parse(rows);
   }
 }

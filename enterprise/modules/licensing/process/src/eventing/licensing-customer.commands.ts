@@ -1,4 +1,7 @@
 import {
+  CONTRACT_TERMS_CHANGED_EVENT_TYPE,
+  contractTermsChangedEventDataSchema,
+  type ContractTermsChangedEventData,
   CONNECT_CREDENTIAL_ISSUED_EVENT_TYPE,
   connectCredentialIssuedEventDataSchema,
   type ConnectCredentialIssuedEventData,
@@ -372,6 +375,50 @@ export class RecordConnectCredentialIssuedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: ConnectCredentialIssuedEventData): string {
+    return payload.organizationId;
+  }
+}
+
+const RECORD_CONTRACT_TERMS_CHANGED_COMMAND_TYPE =
+  "lw.licensing.record_contract_terms_changed" as const;
+
+export const contractTermsChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(CONTRACT_TERMS_CHANGED_EVENT_TYPE),
+  version: z.literal(LICENSING_CUSTOMER_EVENT_VERSION),
+  data: contractTermsChangedEventDataSchema,
+});
+export type ContractTermsChangedEvent = z.infer<typeof contractTermsChangedEventSchema>;
+
+/** Records that a customer's contract terms may have moved; connect syncs the budget from it. */
+export class RecordContractTermsChangedCommand implements CommandHandler<
+  Command<ContractTermsChangedEventData>,
+  ContractTermsChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_CONTRACT_TERMS_CHANGED_COMMAND_TYPE,
+    contractTermsChangedEventDataSchema,
+    "Record that a customer's contract terms may have moved",
+  );
+
+  handle(command: Command<ContractTermsChangedEventData>): ContractTermsChangedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ContractTermsChangedEvent>({
+        aggregateType: LICENSING_CUSTOMER_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: CONTRACT_TERMS_CHANGED_EVENT_TYPE,
+        version: LICENSING_CUSTOMER_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:contract_terms_changed:${data.operatorId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: ContractTermsChangedEventData): string {
     return payload.organizationId;
   }
 }

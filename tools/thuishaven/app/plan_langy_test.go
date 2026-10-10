@@ -186,6 +186,11 @@ func TestLangyChildHostTier(t *testing.T) {
 }
 
 func TestEnsureLangyWorkerBinary(t *testing.T) {
+	bunDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bunDir, "bun"), []byte("#!/bin/sh\n"), 0o700); err != nil { //nolint:gosec // the fixture needs the exec bit
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bunDir)
 	run := func(t *testing.T, sup *fakeSupervisor, withBinary bool, tier domain.LangyTier) PlanOptions {
 		t.Helper()
 		repo := t.TempDir()
@@ -226,6 +231,18 @@ func TestEnsureLangyWorkerBinary(t *testing.T) {
 		}
 	})
 
+	// @scenario "A Langy that cannot build for want of bun says how to fix it"
+	t.Run("skips the build and deselects Langy when bun is missing", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		sup := &fakeSupervisor{}
+		if run(t, sup, false, domain.LangyTierHostUnsafe).Selection.Langy {
+			t.Fatal("Langy still selected with no bun to build its worker")
+		}
+		if len(sup.shells) != 0 {
+			t.Fatalf("a build ran with no bun: %v", sup.shells)
+		}
+	})
+
 	t.Run("does nothing when the binary exists or the tier is a container", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		run(t, sup, true, domain.LangyTierHostUnsafe)
@@ -234,4 +251,21 @@ func TestEnsureLangyWorkerBinary(t *testing.T) {
 			t.Fatalf("unexpected build: %v", sup.shells)
 		}
 	})
+}
+
+// @scenario "A Langy that cannot start leaves the app no dead agent address"
+func TestDropLocalLangyAgentLeavesNoAgentURL(t *testing.T) {
+	st := domain.Stack{Slug: "demo", Services: []domain.Service{{Name: "app", Port: 4000}, {Name: "langyagent", Port: 4123}}}
+	if !dropLocalLangyAgent(&st) {
+		t.Fatal("a local langyagent port was not dropped")
+	}
+	for _, line := range st.OverlayEnv() {
+		if strings.HasPrefix(line, "LANGY_AGENT_URL=") || strings.HasPrefix(line, "LANGY_INTERNAL_SECRET=") {
+			t.Fatalf("overlay still names the agent after Langy was skipped: %q", line)
+		}
+	}
+	fallback := domain.Stack{Services: []domain.Service{{Name: "langyagent", Port: 4124, IsFallback: true}}}
+	if dropLocalLangyAgent(&fallback) || fallback.Services[0].Port != 4124 {
+		t.Fatal("a baseline stack's langyagent was dropped")
+	}
 }

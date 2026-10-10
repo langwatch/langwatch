@@ -15,7 +15,7 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
-import type { BoardPeriod } from "../../model/board-period.ts";
+import type { BoardQueryContext } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
@@ -51,13 +51,16 @@ export function BoardWidgetCard({
   dashboardId: string;
   /** The board's name, which an exported file is named for. */
   boardName: string;
-  period: BoardPeriod;
+  period: BoardQueryContext;
   isWriting: boolean;
   langy?: WidgetCardLangy;
-  /** Opens the board's editor on this widget, drafting the edit in Langy when asked to. */
-  onEdit: (input: { withLangy: boolean }) => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
+  /**
+   * Opens the board's editor on this widget, drafting the edit in Langy when asked to. Absent,
+   * with the two below, on a board the reader cannot edit: the card is then view-only.
+   */
+  onEdit?: (input: { withLangy: boolean }) => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 }) {
   const host = useAnalyticsHost();
   const clipboard = useWidgetClipboard({ dashboardId });
@@ -66,7 +69,7 @@ export function BoardWidgetCard({
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
-  const { periodStart, periodEnd, granularitySeconds } = period;
+  const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -78,28 +81,30 @@ export function BoardWidgetCard({
       description={widget.definition.description}
       controls={
         <>
-          <Box
-            className={CHART_GRID_DRAG_HANDLE_CLASS}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            boxSize={6}
-            borderRadius="md"
-            cursor="grab"
-            color="fg.subtle"
-            title="Drag to move"
-            _hover={{ color: "fg", background: "bg.muted" }}
-          >
-            <GripVertical size={14} aria-hidden />
-          </Box>
+          {onEdit && (
+            <Box
+              className={CHART_GRID_DRAG_HANDLE_CLASS}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              boxSize={6}
+              borderRadius="md"
+              cursor="grab"
+              color="fg.subtle"
+              title="Drag to move"
+              _hover={{ color: "fg", background: "bg.muted" }}
+            >
+              <GripVertical size={14} aria-hidden />
+            </Box>
+          )}
           {langyOnData && <AskLangyButton name={widget.name} onClick={langyOnData.ask} />}
           <WidgetMenu
             name={widget.name}
             disabled={isWriting}
-            onEditWithLangy={langyOnData && (() => onEdit({ withLangy: true }))}
-            onEditCode={canEditCode ? () => onEdit({ withLangy: false }) : undefined}
+            onEditWithLangy={langyOnData && onEdit && (() => onEdit({ withLangy: true }))}
+            onEditCode={canEditCode && onEdit ? () => onEdit({ withLangy: false }) : undefined}
             onCopyId={() => clipboard.copyId(widget.id)}
-            onCopyApiSnippet={() => clipboard.copyApiSnippet(widget.id)}
+            onCopyApiSnippet={onEdit && (() => clipboard.copyApiSnippet(widget.id))}
             exportCsv={csvExport.item}
             onSetAlert={langyOnData && (() => langyOnData.setUp("alert"))}
             onSendReport={langyOnData && (() => langyOnData.setUp("report"))}
@@ -119,6 +124,7 @@ export function BoardWidgetCard({
         maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
+        excludeOrigins={excludeOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
         {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}

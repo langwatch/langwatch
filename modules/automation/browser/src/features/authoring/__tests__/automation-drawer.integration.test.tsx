@@ -79,6 +79,9 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
       getTriggerById: {
         useQuery: () => mockGetTriggerByIdQuery(),
       },
+      previewTriggerEmail: {
+        useQuery: () => ({ data: undefined }),
+      },
       testFireTemplate: {
         useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
       },
@@ -341,6 +344,35 @@ describe("AutomationDrawer", () => {
         expect(mockToastCreate).not.toHaveBeenCalledWith(
           expect.objectContaining({ title: expect.stringMatching(/complete the setup/) }),
         );
+      });
+    });
+
+    describe("when the delivery is a webhook with an http URL", () => {
+      /** @scenario "Saving a webhook with an http URL names https as the reason" */
+      it("says the webhook URL must use https", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+        act(() => {
+          const store = useAutomationStore.getState();
+          store.dispatch({ type: "SET_ACTION", value: TriggerAction.SEND_WEBHOOK });
+          store.dispatch({ type: "SET_NAME", value: "Ping" });
+          store.dispatch({
+            type: "SET_SLICE",
+            action: TriggerAction.SEND_WEBHOOK,
+            slice: {
+              ...useAutomationStore.getState().draft.slices[TriggerAction.SEND_WEBHOOK],
+              url: "http://example.com/hooks",
+            },
+          });
+          store.setStep("review");
+        });
+
+        await user.click(await screen.findByRole("button", { name: "Create automation" }));
+
+        expect(mockToastCreate).toHaveBeenCalledWith({
+          title: expect.stringMatching(/the webhook URL must use https\.$/),
+          type: "warning",
+        });
       });
     });
 

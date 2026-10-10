@@ -4,8 +4,11 @@
  * @see specs/team-settings.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { updateTeam } = vi.hoisted(() => ({ updateTeam: vi.fn() }));
 
 vi.mock("../../../../behavior/organization-api.ts", () => {
   const team = {
@@ -13,7 +16,16 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
     name: "Local Dev Team",
     slug: "local-dev-team",
     organizationId: "org-1",
-    members: [],
+    members: [
+      {
+        userId: "user-1",
+        teamId: "team-1",
+        role: "ADMIN",
+        assignedRoleId: null,
+        assignedRole: null,
+        user: { id: "user-1", name: "Admin", email: "admin@example.com", image: null },
+      },
+    ],
     projects: [],
   };
   const mutation = { useMutation: () => ({ mutate: vi.fn(), isPending: false }) };
@@ -29,10 +41,11 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
         getTeamWithMembers: {
           useQuery: () => ({ data: team, isLoading: false, error: null }),
         },
-        update: mutation,
+        update: { useMutation: () => ({ mutate: updateTeam, isPending: false }) },
         archiveById: mutation,
       },
       project: { archiveById: mutation },
+      role: { getAll: { useQuery: () => ({ data: [], isLoading: false }) } },
       organization: {
         getAllOrganizationMembers: { useQuery: () => ({ data: [] }) },
       },
@@ -62,6 +75,28 @@ describe("given the team settings page", () => {
       const link = await screen.findByRole("link", { name: "Manage organization members" });
 
       expect(link).toHaveAttribute("href", "/settings/members");
+    });
+  });
+
+  describe("when the reader renames the team", () => {
+    /** @scenario "Renaming a team saves the new name" */
+    it("saves the new name without a save button", async () => {
+      renderWithOrganizationHost(<TeamDetailScreen />, new TeamAddressHost());
+      const name = await screen.findByTestId("team-form-name");
+
+      fireEvent.input(name, { target: { value: "Renamed Team" } });
+      await userEvent.type(name, "{Enter}");
+
+      await waitFor(() =>
+        expect(updateTeam).toHaveBeenLastCalledWith(
+          {
+            teamId: "team-1",
+            name: "Renamed Team",
+            members: [{ userId: "user-1", role: "ADMIN", customRoleId: undefined }],
+          },
+          expect.anything(),
+        ),
+      );
     });
   });
 });

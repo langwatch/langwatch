@@ -10,8 +10,9 @@ import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StubAnalyticsHost } from "../../../../testing.tsx";
+import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../../testing.tsx";
 import {
+  HOME_BOARD,
   NO_PROCEDURES,
   renderDashboards,
 } from "../../__tests__/render-dashboards.test-helpers.tsx";
@@ -19,6 +20,7 @@ import DashboardBoardScreen from "../../ui/sections/dashboard-board.screen.tsx";
 import { SUGGESTED_QUESTIONS } from "../model/board-langy.ts";
 
 const BOARD = {
+  ...HOME_BOARD,
   id: "board-1",
   name: "Weekly review",
   description: null,
@@ -47,7 +49,7 @@ function inMemoryServer() {
 }
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
-const MEMBER = ["analytics:view", "cost:view", "traces:view", "langy:create"];
+const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];
 /** The bar's own words, which name its field. */
 const ASK_BAR = "What do you want to know?";
 const WRITES = /^dashboards\.(?!getAll|listStarred|sourcePresence)|^dashboardWidgets\.(?!list)/;

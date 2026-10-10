@@ -19,6 +19,7 @@ import type {
 } from "@langwatch/navigation-contract";
 import type { ReactNode } from "react";
 
+import { langyDockRoom } from "./langy-dock-room";
 import { joinOffer, organizationMfaGate, teamAccessWaiting } from "./navigation-host-capabilities";
 import type { UiRootHostServices } from "./ui-root-host-services";
 
@@ -230,6 +231,10 @@ export function browserNavigationHosts(port: NavigationHostClass): BrowserNaviga
 
     openDrawerByToken<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
       this.actions.openDrawerByToken(drawer, props);
+    }
+
+    override langyDockRoom(input: { render: (inset: number) => ReactNode }): ReactNode {
+      return langyDockRoom(input);
     }
 
     override joinOffer(input: { currentOrganizationId: string | null | undefined }): ReactNode {

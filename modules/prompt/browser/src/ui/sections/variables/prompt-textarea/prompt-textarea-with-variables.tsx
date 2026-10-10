@@ -392,10 +392,11 @@ export const PromptTextAreaWithVariables = ({
 
   const [isHovered, setIsHovered] = useState(false);
 
-  const { localValue, handleValueChange, setValueImmediate } = useDebouncedTextarea({
-    value,
-    onChange,
-  });
+  const { localValue, handleValueChange, setValueImmediate, flushPendingChange } =
+    useDebouncedTextarea({
+      value,
+      onChange,
+    });
 
   const { existingVariableIds, invalidVariables, isKnownVariable } = useVariableUsage({
     variables,
@@ -535,7 +536,10 @@ export const PromptTextAreaWithVariables = ({
             reservedBottomPadding,
           })}
           onFocus={paintOnFocusChange(true)}
-          onBlur={paintOnFocusChange(false)}
+          onBlur={(e) => {
+            flushPendingChange();
+            paintOnFocusChange(false)(e);
+          }}
         >
           {renderText}
         </RichTextarea>

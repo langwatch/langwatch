@@ -12,7 +12,7 @@ import { useLent, useLentHooks } from "@langwatch/browser-host/lent";
 import { SampleChoiceToken } from "@langwatch/enterprise-governance-client";
 import { GuidedOnboardingToken, type LangyGuidedOnboarding } from "@langwatch/langy-client";
 import { SidebarToken } from "@langwatch/navigation-client";
-import { JoinOfferToken } from "@langwatch/organization-client";
+import { JoinInsteadToken, JoinOfferToken } from "@langwatch/organization-client";
 import { useMemo, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
 
@@ -219,9 +219,19 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
   const reading = route.reading();
   // `useLent` makes the component once per declaration set, so the offer is not remounted.
   const LentJoinOffer = useLent(JoinOfferToken);
+  const LentJoinInstead = useLent(JoinInsteadToken);
   const joinOffers = useMemo(
-    () => (LentJoinOffer ? [{ key: JoinOfferToken.owner, JoinOffer: LentJoinOffer }] : []),
-    [LentJoinOffer],
+    () =>
+      LentJoinOffer
+        ? [
+            {
+              key: JoinOfferToken.owner,
+              JoinOffer: LentJoinOffer,
+              ...(LentJoinInstead ? { JoinInstead: LentJoinInstead } : {}),
+            },
+          ]
+        : [],
+    [LentJoinOffer, LentJoinInstead],
   );
 
   const lentLangy = useLentHooks(GuidedOnboardingToken);

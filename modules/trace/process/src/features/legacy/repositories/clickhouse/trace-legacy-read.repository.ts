@@ -454,11 +454,11 @@ function buildSearchFilter({
 
   // Non-root span names live in `stored_spans`, probed with the same
   // correlated EXISTS shape the span filters in `filter-conditions.ts`
-  // use. The StartTime bound keeps it partition-pruned instead of
-  // cold-scanning every weekly partition, matching `buildSpanTimeBound`.
+  // use, bound to the tenant itself so the tenant guard sees its own read scoped.
+  // The StartTime bound keeps it partition-pruned, matching `buildSpanTimeBound`.
   const spanNameSearch = `EXISTS (
                     SELECT 1 FROM stored_spans sp
-                    WHERE sp.TenantId = ts.TenantId
+                    WHERE sp.TenantId = {tenantId:String}
                       AND sp.TraceId = ts.TraceId
                       AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
                       AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})

@@ -6,10 +6,12 @@ import type { UiFailureNotice, UiSuccessNotice } from "./capabilities.ts";
 
 /**
  * Whatever answers a report — the application's feedback host service, or a
- * feature host that already answers the same two questions.
+ * feature host that already answers the same questions.
  */
 export type UiFeedbackSink = {
   succeeded(notice: UiSuccessNotice): void;
+  warned(notice: UiSuccessNotice): void;
+  informed(notice: UiSuccessNotice): void;
   failed(failure: UiFailureNotice): void;
 };
 
@@ -73,12 +75,15 @@ export const toaster = {
       });
       return toast.id;
     }
-    mounted.succeeded({
+    const notice = {
       title: title(toast),
       description:
         toast.title && typeof toast.description === "string" ? toast.description : void 0,
       id: toast.id,
-    });
+    };
+    if (toast.type === "warning") mounted.warned(notice);
+    else if (toast.type === "info") mounted.informed(notice);
+    else mounted.succeeded(notice);
     return toast.id;
   },
 

@@ -5,6 +5,7 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
+import type { DashboardScope } from "@langwatch/dashboard-contract";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -12,19 +13,22 @@ import { describe, expect, it } from "vitest";
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import { FROM_LANGWATCH_ABOUT } from "../model/curated-boards.ts";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
-import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const board = ({
   id,
   name,
   createdById = "user-1",
+  scope = "PROJECT",
 }: {
   id: string;
   name: string;
   createdById?: string;
+  scope?: DashboardScope;
 }) => ({
+  ...HOME_BOARD,
+  scope,
   id,
-  projectId: "proj-1",
   name,
   order: 0,
   description: null,
@@ -35,12 +39,13 @@ const board = ({
   _count: { graphs: 0 },
 });
 
-const MINE = board({ id: "board-mine", name: "My dashboard" });
+const MINE = board({ id: "board-mine", name: "My dashboard", scope: "PRIVATE" });
 const WEEKLY = board({ id: "board-1", name: "Weekly review" });
 const LATENCY = board({ id: "board-2", name: "Latency" });
 const COSTS = board({ id: "board-3", name: "Costs", createdById: "user-2" });
+/** Another member's My dashboard, which the server lists only once its author widened it. */
 const THEIRS = board({ id: "board-theirs", name: "My dashboard", createdById: "user-2" });
-const BOARDS = [WEEKLY, MINE, LATENCY, COSTS, THEIRS];
+const BOARDS = [WEEKLY, MINE, LATENCY, COSTS];
 
 type Star =
   | { kind: "board"; dashboard: ReturnType<typeof board> }
@@ -70,7 +75,15 @@ const ACK_PATHS = [
 ];
 
 /** Answers the board list, the stars and the writes, keeping every call for the test. */
-function project({ stars = STARS, listFails = false }: { stars?: Star[]; listFails?: boolean }) {
+function project({
+  stars = STARS,
+  listFails = false,
+  boards = BOARDS,
+}: {
+  stars?: Star[];
+  listFails?: boolean;
+  boards?: ReturnType<typeof board>[];
+}) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
@@ -79,7 +92,7 @@ function project({ stars = STARS, listFails = false }: { stars?: Star[]; listFai
         ? Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403))
         : Promise.resolve(stars);
     }
-    if (call.path === "dashboards.getAll") return Promise.resolve(BOARDS);
+    if (call.path === "dashboards.getAll") return Promise.resolve(boards);
     if (call.path === "dashboards.create") {
       return Promise.resolve({ ...board({ id: "board-new", name: "Untitled" }) });
     }
@@ -95,7 +108,12 @@ function project({ stars = STARS, listFails = false }: { stars?: Star[]; listFai
 function renderSection({
   openPath = "",
   ...options
-}: { openPath?: string; stars?: Star[]; listFails?: boolean } = {}) {
+}: {
+  openPath?: string;
+  stars?: Star[];
+  listFails?: boolean;
+  boards?: ReturnType<typeof board>[];
+} = {}) {
   const host = new StubAnalyticsHost({ flags: { release_dashboards: true } });
   const { calls, answer } = project(options);
   renderDashboards({ element: <SavedDashboardsSection openPath={openPath} />, host, answer });
@@ -128,13 +146,16 @@ describe("the Dashboards sidebar", () => {
     });
 
     /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
-    it("leaves another member's My dashboard out", async () => {
-      renderSection();
+    it("lists another member's My dashboard once its author widened it, after the member's own", async () => {
+      renderSection({ boards: [...BOARDS, THEIRS] });
 
       const yours = within(await listNamed("Your dashboards")).getAllByRole("link");
-      expect(yours.map((link) => link.getAttribute("href"))).not.toContain(
+      expect(yours.map((link) => link.getAttribute("href"))).toEqual([
+        "/test-project/dashboards/board-mine",
+        "/test-project/dashboards/board-3",
         "/test-project/dashboards/board-theirs",
-      );
+        "/test-project/dashboards/board-1",
+      ]);
     });
 
     /** @scenario "AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order" */
@@ -283,6 +304,25 @@ describe("the Dashboards sidebar", () => {
         "aria-disabled",
         "true",
       );
+    });
+
+    /** @scenario "AC163 My dashboard cannot be deleted" */
+    it("offers the three scope choices on My dashboard, Only me ticked", async () => {
+      const { user } = renderSection();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for My dashboard" }));
+      const choices = await screen.findAllByRole("menuitemradio");
+
+      expect(
+        choices.map((choice) => [
+          choice.getAttribute("aria-label"),
+          choice.getAttribute("aria-checked"),
+        ]),
+      ).toEqual([
+        ["Only me", "true"],
+        ["Project", "false"],
+        ["Organization", "false"],
+      ]);
     });
 
     /** @scenario "AC107 Sidebar menu: each board offers its actions in order" */

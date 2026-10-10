@@ -4,7 +4,12 @@
  */
 import { z } from "zod";
 
-import { dashboardIdSchema, dashboardNameSchema, dashboardSchema } from "./dashboard.ts";
+import {
+  dashboardIdSchema,
+  dashboardNameSchema,
+  dashboardProjectSchema,
+  dashboardSchema,
+} from "./dashboard.ts";
 import { graphSchema } from "./graph.ts";
 
 /**
@@ -19,6 +24,8 @@ export const dashboardTrpcSummarySchema = z
     ...dashboardSchema.shape,
     _count: z.object({ graphs: z.number().int().nonnegative() }).strict(),
     isStarred: z.boolean(),
+    /** The project that owns an Organization board listed in another project; null at home. */
+    ownerProject: dashboardProjectSchema.nullable(),
   })
   .strict();
 

@@ -29,9 +29,14 @@ export function useFavourites() {
           kind: "board",
           board: {
             id: star.dashboard.id,
+            projectId: star.dashboard.projectId,
             name: star.dashboard.name,
             description: star.dashboard.description,
             createdById: star.dashboard.createdById,
+            scope: star.dashboard.scope,
+            organizationId: star.dashboard.organizationId,
+            // A star's row names no owner; the sidebar reads it off the listed board.
+            ownerProject: null,
           },
         }
       : { kind: "template", templateId: star.templateId },

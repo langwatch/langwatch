@@ -16,7 +16,9 @@ import {
   type AutomationApi,
   type AutomationApiCreateInput,
   type AutomationApiListSlackChannelsInput,
+  type AutomationApiPreviewEmailInput,
   type AutomationApiTestFireInput,
+  type AutomationEmailPreview,
   type AutomationApiToggleTriggerInput,
   type AutomationApiUpdateTriggerFiltersInput,
   type AutomationApiUpsertInput,
@@ -1211,6 +1213,11 @@ export class AutomationModule implements AutomationApi {
     author: AutomationTestFireAuthor,
   ): Promise<TestFireResult> {
     return this.#authoring.testFire({ input, author });
+  }
+
+  /** The email an authoring draft would send, rendered without delivery. */
+  previewTriggerEmail(input: AutomationApiPreviewEmailInput): Promise<AutomationEmailPreview> {
+    return this.#authoring.previewEmail(input);
   }
 
   // -- email suppression (ADR-031) -------------------------------------------

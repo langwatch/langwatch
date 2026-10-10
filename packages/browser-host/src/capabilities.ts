@@ -105,6 +105,10 @@ export type UiFailureNotice = {
 /** Tells the user how something they did turned out. */
 export abstract class UiFeedback {
   abstract succeeded(notice: UiSuccessNotice): void;
+  /** A caution, not a failure: a refusal to go on or a partial result. */
+  abstract warned(notice: UiSuccessNotice): void;
+  /** A plain fact about what happened, neither a success nor a caution. */
+  abstract informed(notice: UiSuccessNotice): void;
   abstract failed(failure: UiFailureNotice): void;
 }
 
@@ -219,6 +223,14 @@ export abstract class UiSession {
 
 class UnavailableUiFeedback extends UiFeedback {
   succeeded(): never {
+    throw new UiHostServiceUnavailableError("feedback");
+  }
+
+  warned(): never {
+    throw new UiHostServiceUnavailableError("feedback");
+  }
+
+  informed(): never {
     throw new UiHostServiceUnavailableError("feedback");
   }
 

@@ -27,6 +27,7 @@ import {
   type SecretsChoice,
   selectionToAudience,
 } from "../data-privacy-rule-config.ts";
+import { ruleHasChange } from "../data-privacy-rule-form.ts";
 
 const inheritDispositions: RuleFormState["dispositions"] = {
   input: "inherit",
@@ -93,11 +94,12 @@ function resolved(overrides: Partial<ResolvedDataPrivacy> = {}): ResolvedDataPri
 
 describe("buildRuleConfig", () => {
   describe("given every control left on inherit", () => {
-    /** @scenario Saving a rule with everything inheriting stores a rule that sets no fields */
-    it("produces an empty config that changes nothing", () => {
+    /** @scenario A new rule with everything inheriting cannot be saved */
+    it("produces an empty config that a new rule cannot save", () => {
       const config = build({});
 
       expect(isEmptyRuleConfig(config)).toBe(true);
+      expect(ruleHasChange({ config, editingRule: null })).toBe(false);
     });
   });
 

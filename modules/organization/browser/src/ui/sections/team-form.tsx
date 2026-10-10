@@ -25,6 +25,7 @@ import {
   type SubmitHandler,
   type UseFormReturn,
   useFieldArray,
+  useFormState,
   useWatch,
 } from "react-hook-form";
 
@@ -44,6 +45,7 @@ import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-
 import { Select } from "@langwatch/design-system/select";
 
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
+import { memberLabel } from "../../model/member-label.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
 import {
   TeamRoleSelect,
@@ -194,7 +196,9 @@ export const TeamForm = ({
   isLoading: boolean;
 }) => {
   const toaster = useOrganizationToaster();
-  const { register, control, handleSubmit, getFieldState } = form;
+  const { control, handleSubmit } = form;
+  // A subscription, so a refused submit re-renders the field as invalid (WEB-5602).
+  const { errors } = useFormState({ control, name: "name" });
   const members = useFieldArray({
     control,
     name: "members",
@@ -232,7 +236,7 @@ export const TeamForm = ({
   const userOptions = useMemo(
     () =>
       users.data?.map((user) => ({
-        label: `${user.name} (${user.email})`,
+        label: memberLabel(user),
         value: user.id,
       })) ?? [],
     [users.data],
@@ -261,16 +265,17 @@ export const TeamForm = ({
           <HorizontalFormControl
             label="Name"
             helper="The name of your team"
-            invalid={!!getFieldState("name").error}
+            invalid={!!errors.name}
           >
-            <Input
-              width="full"
-              type="text"
-              data-testid="team-form-name"
-              {...register("name", {
-                required: true,
-                validate: (value) => value.trim().length > 0,
-              })}
+            {/* A Controller, not register(): the React Compiler memoises register()
+                past form.reset, so typing never reached the form (WEB-5603). */}
+            <Controller
+              control={control}
+              name="name"
+              rules={{ required: true, validate: (value) => value.trim().length > 0 }}
+              render={({ field }) => (
+                <Input width="full" type="text" data-testid="team-form-name" {...field} />
+              )}
             />
             <Field.ErrorText>Name is required</Field.ErrorText>
           </HorizontalFormControl>

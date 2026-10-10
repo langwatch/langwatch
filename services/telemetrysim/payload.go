@@ -10,6 +10,7 @@ import (
 	"hash/fnv"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -432,41 +433,39 @@ func marshal(msg proto.Message, enc Encoding) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var doc any
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	if err := dec.Decode(&doc); err != nil {
+	// Compact drops protojson's deliberately unstable whitespace, so the same message gives the
+	// same bytes; rewriting ids in place avoids decoding the whole document (seedgen's hot path).
+	var compact bytes.Buffer
+	compact.Grow(len(raw))
+	if err := json.Compact(&compact, raw); err != nil {
 		return nil, err
 	}
-	hexIDs(doc)
-	return json.Marshal(doc)
+	return hexIDs(compact.Bytes()), nil
 }
 
-func hexIDs(node any) {
-	switch n := node.(type) {
-	case map[string]any:
-		for key, v := range n {
-			if !hexID(n, key, v) {
-				hexIDs(v)
-			}
-		}
-	case []any:
-		for _, v := range n {
-			hexIDs(v)
-		}
-	}
-}
+var idKeys = [][]byte{[]byte(`"traceId`), []byte(`"spanId`), []byte(`"parentSpanId`)}
 
-// hexID rewrites an id field's base64 string as hex and reports whether key was an id.
-func hexID(n map[string]any, key string, v any) bool {
-	s, ok := v.(string)
-	if !ok || (key != "traceId" && key != "spanId" && key != "parentSpanId") {
-		return false
+// hexIDs rewrites every OTLP id field's base64 value as hex, as OTLP/JSON wants. An id inside a
+// string value has escaped quotes, so it never matches; a value that is not base64 is kept.
+func hexIDs(doc []byte) []byte {
+	marker := []byte(`Id":"`)
+	out := make([]byte, 0, len(doc)+len(doc)/8)
+	for {
+		at := bytes.Index(doc, marker)
+		if at < 0 {
+			return append(out, doc...)
+		}
+		head, start := doc[:at+2], at+len(marker)
+		end := bytes.IndexByte(doc[start:], '"')
+		isID := slices.ContainsFunc(idKeys, func(key []byte) bool { return bytes.HasSuffix(head, key) })
+		raw, err := base64.StdEncoding.DecodeString(string(doc[start : start+max(end, 0)]))
+		if end < 0 || !isID || err != nil {
+			out, doc = append(out, doc[:start]...), doc[start:]
+			continue
+		}
+		out = hex.AppendEncode(append(out, doc[:start]...), raw)
+		doc = doc[start+end:]
 	}
-	if raw, err := base64.StdEncoding.DecodeString(s); err == nil {
-		n[key] = hex.EncodeToString(raw)
-	}
-	return true
 }
 
 // fuzzCase is one batch under mutation: its message, encoded body and type.

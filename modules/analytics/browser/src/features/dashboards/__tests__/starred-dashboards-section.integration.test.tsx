@@ -13,11 +13,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import { StarredDashboardsSection } from "../ui/sections/starred-dashboards-section.tsx";
-import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const LATENCY = {
+  ...HOME_BOARD,
   id: "board-1",
-  projectId: "proj-1",
   name: "Latency",
   order: 0,
   description: null,

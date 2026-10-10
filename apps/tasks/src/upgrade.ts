@@ -58,7 +58,7 @@ import { applyRelease, SteppingError } from "@langwatch/upgrade/stepping";
 
 import type { TaskInput } from "./config.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
-import { withTasksApp } from "./module-task.ts";
+import { runModuleTask, withTasksApp } from "./module-task.ts";
 
 /** Overrides for writers before the serving roster (Round 47 E2; ADR-173, amendment 2026-10-08). */
 const PRE_ROSTER_COMMANDS = ["old-writers-gone", "pre-roster-rollback"] as const;
@@ -530,6 +530,11 @@ function reconcilers({ input }: { input: TaskInput }): UpgradeReconciler[] {
         }),
     })),
     { name: "langwatchql", run: () => lwqlProvision({ ...input, failOnError: true }) },
+    {
+      name: "system-migrations-pass-request",
+      run: () =>
+        runModuleTask({ name: "request-system-migrations-pass", args: [], signal: input.signal }),
+    },
   ];
 }
 

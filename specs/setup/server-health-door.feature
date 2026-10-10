@@ -90,3 +90,10 @@ Feature: The process boundary's built-in health door
       Given the server has finished closing
       When "/healthz" is requested
       Then the request is refused
+
+    @unit
+    Scenario: An embedded server frees its door when a drain outruns its budget
+      Given a server that does not own its process, as the dev runtime hosts the worker
+      And a hosted component whose drain never finishes
+      When the server closes and the drain passes its budget
+      Then the health door's port is free for the next generation to bind

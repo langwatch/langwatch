@@ -1,7 +1,7 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Link } from "@langwatch/browser-host/link";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
-import { Box, IconButton } from "@langwatch/design-system/primitives";
+import { Box, Flex, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
 import { motion } from "motion/react";
@@ -22,6 +22,8 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   showBackButton?: boolean;
   onBack?: () => void;
   skipHref?: string;
+  /** Quiet actions under the card, outside it. */
+  below?: React.ReactNode;
 }
 
 /** The branded card size each step width stands at. */
@@ -37,6 +39,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   showBackButton,
   onBack,
   skipHref,
+  below,
 }) => {
   const analytics = useUiAnalytics();
   const host = useOnboardingHost();
@@ -140,9 +143,12 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         </MotionBox>
       )}
 
-      <BrandedCard title={title} intro={subTitle} size={CARD_SIZES[widthVariant]}>
-        {loading ? <SpookyScarySkeleton loading /> : children}
-      </BrandedCard>
+      <Flex direction="column" align="center" gap={5} my="auto" w="full">
+        <BrandedCard title={title} intro={subTitle} size={CARD_SIZES[widthVariant]}>
+          {loading ? <SpookyScarySkeleton loading /> : children}
+        </BrandedCard>
+        {below}
+      </Flex>
     </BrandedCardPage>
   );
 };

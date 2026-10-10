@@ -44,6 +44,11 @@ function fieldProblems(error: unknown): Record<string, string> {
 
 type Picked = { id: string; name: string | null };
 
+/** A member's name, or their email when the account has none (WEB-998). */
+function memberName(user: { name: string | null; email?: string | null } | undefined): string {
+  return user?.name ?? user?.email ?? "Unknown user";
+}
+
 function togglePicked(list: Picked[], entry: Picked): Picked[] {
   return list.some((picked) => picked.id === entry.id)
     ? list.filter((picked) => picked.id !== entry.id)
@@ -225,7 +230,14 @@ export function AnnotationQueueEditor({
                 >
                   <Popover.Trigger asChild>
                     <PickedTrigger
-                      picked={participants}
+                      picked={participants.map((participant) => ({
+                        ...participant,
+                        name:
+                          participant.name ??
+                          memberName(
+                            members.find((member) => member.user.id === participant.id)?.user,
+                          ),
+                      }))}
                       placeholder="Add Participants"
                       data-testid="annotation-queue-editor-participants"
                     />
@@ -253,14 +265,14 @@ export function AnnotationQueueEditor({
                                 setParticipants((current) =>
                                   togglePicked(current, {
                                     id: member.user.id,
-                                    name: member.user.name,
+                                    name: memberName(member.user),
                                   }),
                                 )
                               }
                             >
                               <Check size={16} color={isPicked ? "green" : "transparent"} />
-                              <ReviewerAvatar size="2xs" name={member.user.name ?? ""} />
-                              <Text fontSize="sm">{member.user.name}</Text>
+                              <ReviewerAvatar size="2xs" name={memberName(member.user)} />
+                              <Text fontSize="sm">{memberName(member.user)}</Text>
                             </Button>
                           );
                         })}

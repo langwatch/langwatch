@@ -1,7 +1,7 @@
 /**
- * The Dashboards sidebar navigation draws, lent through `SavedDashboardsToken` (§10.1):
- * "Your dashboards" with its "+", My dashboard and the team's boards, then the member's
- * stars, then From LangWatch. Analytics keeps the reads and writes.
+ * The Dashboards sidebar navigation draws, lent through `SavedDashboardsToken` (§10.1): "Your
+ * dashboards" with its "+", then the member's stars, the organization's boards other projects
+ * own and From LangWatch. Each row's menu offers what this reader may do with that board.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
@@ -22,11 +22,14 @@ import { ChevronRight, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { useBoardAccess, useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
+import { type ScopeRequest, useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useCuratedFold } from "../../behavior/use-curated-fold.ts";
 import { useDuplicateCurated } from "../../behavior/use-duplicate-curated.ts";
 import { useFavourites } from "../../behavior/use-favourites.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
+import { fromOrganizationLabel, fromOrganizationTip } from "../../model/board-scope.ts";
 import {
   curatedBoardPath,
   dashboardsPath,
@@ -50,7 +53,9 @@ import {
   SavedDashboardRow,
   type StarActions,
 } from "../blocks/saved-dashboard-row.tsx";
+import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { WidgetInfoTip } from "../blocks/widget-info-tip.tsx";
+import { ScopeMark } from "../elements/scope-mark.tsx";
 
 const GROUP_LABEL_STYLE = {
   fontSize: "9px",
@@ -99,6 +104,7 @@ function BoardRow({
   isRenaming,
   onRenaming,
   onDelete,
+  onScope,
   place,
   shown,
   index,
@@ -108,30 +114,46 @@ function BoardRow({
   isRenaming: boolean;
   onRenaming: (isRenaming: boolean) => void;
   onDelete: () => void;
+  onScope: (request: ScopeRequest) => void;
 }) {
   const saved = useSavedDashboards();
   const favourites = useFavourites();
   const fromTemplate = useBoardFromTemplate();
+  const { access, names } = useBoardAccess(board);
   const star: DashboardStar = { kind: "board", dashboardId: board.id };
+  const duplicate = () =>
+    void fromTemplate.duplicateBoard({
+      board,
+      existingNames: saved.boards.map(({ name }) => name),
+    });
   return (
     <SavedDashboardRow
       name={board.name}
       href={dashboardsPath({ projectSlug: saved.projectSlug, dashboardId: board.id })}
       isActive={place.kind === "board" && place.dashboardId === board.id}
+      mark={<ScopeMark scope={board.scope} organization={names.organization} />}
       actions={{
         ...starActionsFor({ favourites, star, index, shown }),
         isRenaming,
-        ...(isMine ? {} : { onRenameStart: () => onRenaming(true), onDelete }),
+        // My dashboard keeps its name and cannot be deleted; its scope is not locked.
+        ...(access.scopeLock === "none"
+          ? { scope: { value: board.scope, names, onPick: (to) => onScope({ board, names, to }) } }
+          : {}),
+        ...(access.canEdit ? { rename: isMine ? {} : { onStart: () => onRenaming(true) } } : {}),
+        ...(access.canDuplicate
+          ? {
+              duplicate: {
+                label: access.canEdit ? "Duplicate" : "Duplicate to edit",
+                onDuplicate: duplicate,
+              },
+            }
+          : {}),
+        ...(access.canDelete ? { remove: isMine ? {} : { onDelete } } : {}),
         onRenameCommit: (name) => {
           onRenaming(false);
           saved.renameBoard({ dashboardId: board.id, name });
         },
         onRenameCancel: () => onRenaming(false),
-        onDuplicate: () =>
-          void fromTemplate.duplicateBoard({
-            board,
-            existingNames: saved.boards.map(({ name }) => name),
-          }),
       }}
     />
   );
@@ -155,18 +177,21 @@ function CuratedRow({ curated, place, shown, index }: RowPlace & { curated: Cura
   );
 }
 
-/** "Your dashboards" and "Starred", or their loading and error states. */
+/** "Your dashboards", "Starred" and the organization's boards, or their loading or error state. */
 function BoardGroups({
   groups,
   place,
   onDelete,
+  onScope,
 }: {
   groups: SidebarGroups;
   place: DashboardsPlace;
   onDelete: (board: SidebarBoard) => void;
+  onScope: (request: ScopeRequest) => void;
 }) {
   const saved = useSavedDashboards();
   const favourites = useFavourites();
+  const { organizationName } = useBoardReader();
   const [renamingId, setRenamingId] = useState<string | undefined>();
   const shown = groups.starred.map(starRefOf);
   const loadError = saved.loadError ?? favourites.loadError;
@@ -198,6 +223,7 @@ function BoardGroups({
       isRenaming={renamingId === board.id}
       onRenaming={(isRenaming) => setRenamingId(isRenaming ? board.id : void 0)}
       onDelete={() => onDelete(board)}
+      onScope={onScope}
       {...extra}
     />
   );
@@ -226,6 +252,16 @@ function BoardGroups({
           <RowList label="Starred dashboards">{groups.starred.map(starredRow)}</RowList>
         </>
       )}
+      {groups.fromOrganization.length > 0 && (
+        <>
+          <GroupLabel title={fromOrganizationTip(organizationName)}>
+            {fromOrganizationLabel(organizationName)}
+          </GroupLabel>
+          <RowList label={fromOrganizationLabel(organizationName)}>
+            {groups.fromOrganization.map((board) => boardRow(board))}
+          </RowList>
+        </>
+      )}
     </>
   );
 }
@@ -235,11 +271,14 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
   const saved = useSavedDashboards();
   const favourites = useFavourites();
   const fold = useCuratedFold();
+  const scope = useBoardScope();
+  const { mayCreate } = useBoardReader();
   const [pendingDelete, setPendingDelete] = useState<SidebarBoard | undefined>();
   const { projectSlug } = saved;
   const place = dashboardsPlace(openPath ?? "");
   const groups = sidebarGroups({
     boards: saved.boards,
+    organizationBoards: saved.organizationBoards,
     stars: favourites.stars,
     curated: CURATED_BOARDS,
     userId: host.userId(),
@@ -262,10 +301,17 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
     <VStack align="stretch" gap={0.5} width="full" marginTop={3.5}>
       <HStack paddingX={2} marginBottom={0.5} gap={1}>
         <Text {...GROUP_LABEL_STYLE}>Your dashboards</Text>
-        <NewDashboardButton isCreating={saved.isCreating} onCreate={saved.createBoard} />
+        {mayCreate && (
+          <NewDashboardButton isCreating={saved.isCreating} onCreate={saved.createBoard} />
+        )}
       </HStack>
 
-      <BoardGroups groups={groups} place={place} onDelete={setPendingDelete} />
+      <BoardGroups
+        groups={groups}
+        place={place}
+        onDelete={setPendingDelete}
+        onScope={scope.request}
+      />
 
       {groups.fromLangWatch.length > 0 && (
         <>
@@ -318,13 +364,19 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
         loading={saved.isDeleting}
         onConfirm={confirmDelete}
       />
+      <ScopeConfirmDialog
+        words={scope.asking}
+        isChanging={scope.isChanging}
+        onConfirm={scope.confirm}
+        onCancel={scope.cancel}
+      />
     </VStack>
   );
 }
 
-function GroupLabel({ children }: { children: ReactNode }) {
+function GroupLabel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <Text {...GROUP_LABEL_STYLE} paddingX={2} marginTop={1} marginBottom={0.5}>
+    <Text {...GROUP_LABEL_STYLE} paddingX={2} marginTop={1} marginBottom={0.5} title={title}>
       {children}
     </Text>
   );

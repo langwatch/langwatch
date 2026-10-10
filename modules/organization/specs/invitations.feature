@@ -134,3 +134,32 @@ Feature: Invitation acceptance and role recomputation
     When the batch is created
     Then the invitations are created and the batch's fact names no invitees
     And the failure is reported
+
+  # The signed-out invite landing (auth.inviteLanding) reads the invitation through
+  # OrganizationApi.getInviteLanding; the code is the authorization (WEB-860).
+  @unit
+  Scenario: A pending invitation's link names the organization and who asked
+    Given a pending invitation to "Acme" sent by "Ana"
+    When its link is opened
+    Then the landing names "Acme" and "Ana" and says it is not yet accepted
+
+  @unit
+  Scenario: A revoked or unknown invitation link reads as not found
+    Given an invitation that was revoked, and a code that names none
+    When either link is opened
+    Then both are refused as not found, naming no organization
+
+  @unit
+  Scenario: An expired invitation link is refused as expired and can ask for a fresh one
+    Given a pending invitation whose expiry has passed
+    When its link is opened
+    Then it is refused as expired
+    And asking for a fresh one tells the organization's admins with a link to the members settings
+
+  # Main renders the invite landing for a visitor with no session; the shell must not
+  # send that visitor to sign-in first (WEB-860).
+  @unit
+  Scenario: The invite landing renders for a visitor with no session
+    Given a visitor with no session
+    When they open the invitation link at "/invite/accept"
+    Then the address is one that renders without a session

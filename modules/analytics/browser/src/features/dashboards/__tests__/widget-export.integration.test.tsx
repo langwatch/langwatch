@@ -31,17 +31,18 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
-import type { BoardPeriod } from "../model/board-period.ts";
+import type { BoardQueryContext } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard } from "../ui/sections/board-widget-card.tsx";
 import { CuratedWidgetCard } from "../ui/sections/curated-widget-card.tsx";
 import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 /** 2026-10-01T00:00:00Z to 2026-10-08T00:00:00Z: seven whole UTC days. */
-const PERIOD: BoardPeriod = {
+const PERIOD: BoardQueryContext = {
   periodStart: Date.UTC(2026, 9, 1),
   periodEnd: Date.UTC(2026, 9, 8),
   granularitySeconds: 86_400,
+  excludeOrigins: ["langy"],
 };
 const DEFINITION = {
   version: 1 as const,
@@ -144,6 +145,7 @@ function curatedCard({ answer }: { answer: UiProcedureAnswer }) {
         rowSpan={4}
         timeWindow={{ start: PERIOD.periodStart, end: PERIOD.periodEnd }}
         granularitySeconds={PERIOD.granularitySeconds}
+        excludeOrigins={PERIOD.excludeOrigins}
       />
     ),
     host,

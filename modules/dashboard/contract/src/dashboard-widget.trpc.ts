@@ -67,8 +67,12 @@ export const dashboardWidgetTrpcRowSchema = z.object({
 export const dashboardWidgetTrpcSuccessSchema = z.object({ success: z.literal(true) });
 
 export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
+  /**
+   * The project's widgets, or with `dashboardId` one board's: also an Organization board
+   * another project owns, which stores its widgets there.
+   */
   .query("list")
-  .withInput(projectScopeSchema)
+  .withInput(z.object({ ...projectScopeSchema.shape, dashboardId: z.string().optional() }))
   .withOutput(dashboardWidgetTrpcRowSchema.array())
 
   .mutation("create")

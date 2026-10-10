@@ -11,6 +11,9 @@ import { moduleApi } from "@langwatch/module";
 
 import type {
   Dashboard,
+  DashboardScope,
+  DashboardScopeImpact,
+  DashboardScopeProjects,
   DashboardSourcePresence,
   DashboardStar,
   DashboardSummary,
@@ -42,14 +45,17 @@ export interface DashboardUsageCount {
 /** Flat operations a door or a peer calls once the dashboard app is composed. */
 export interface DashboardApi {
   /**
-   * Every board in the project; `viewer` is the member reading, so each row's
-   * `isStarred` is their own. Without a viewer no board is starred.
+   * The project's boards the viewer may see, with their own `isStarred`; a project credential
+   * (no viewer) sees no Only me board. `includeOrganization` adds the Organization boards other
+   * projects of the organization own, each with its `ownerProject`.
    */
   getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
     viewer?: DashboardViewer;
+    includeOrganization?: boolean;
   }): Promise<DashboardSummary[]>;
+  /** One board the viewer may open here: the project's own, or the organization's. */
   getById(input: {
     projectId: string;
     dashboardId: string;
@@ -111,6 +117,25 @@ export interface DashboardApi {
     name?: string;
     description?: string | null;
   }): Promise<Dashboard>;
+  /** Dashboards area: the author alone changes who sees a board, in the project that owns it. */
+  setDashboardScope(input: {
+    projectId: string;
+    dashboardId: string;
+    scope: DashboardScope;
+    viewer: DashboardViewer;
+  }): Promise<Dashboard>;
+  /** Dashboards area: how many other members starred the author's board. */
+  getDashboardScopeImpact(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardScopeImpact>;
+  /** Dashboards area: the projects an Organization board opens under for this member. */
+  listDashboardScopeProjects(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardScopeProjects>;
   /** Dashboards area: whether each Flight Deck source ever recorded a row, as this member reads. */
   getSourcePresence(input: {
     projectId: string;
@@ -163,9 +188,10 @@ export interface DashboardApi {
    * definition analytics owns and whose placement this feature stores.
    */
   assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
-  /** Every custom chart widget in the project. */
+  /** The project's custom chart widgets, or one board's, the organization's boards included. */
   listDashboardWidgets(input: {
     projectId: string;
+    dashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget[]>;
   getDashboardWidget(input: {

@@ -44,6 +44,12 @@ The seeded admin login, slugs and access tokens are fixed. `haven seed` ends by
 printing all of them, masked (`--reveal` shows the values, `--json` gives one
 object); `haven env --reveal` has the same credentials.
 
+`haven auth <admin|email>` signs in to this stack's own app through the normal email
+sign-in with the credentials above and writes a Playwright storage-state file (mode 600) without printing the password; it refuses any app that is not `*.localhost`.
+`haven browser open|snap|shot|eval|close --lane <name> --as <who>` drives one shared
+headless shell per stack with a signed-in context per lane, for agent testers: see the
+`haven` skill.
+
 Stripe is paymentsim on every local and CI stack: `haven up` runs it and points
 billing at it unless `.env` or the shell sets `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, in which case your keys are used.
@@ -239,14 +245,21 @@ needs the worker binary (`pnpm --filter @langwatch/langyworker build:binary`).
 
 Plain `pnpm dev` and `haven up` run one `app` lane: `tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
 unchanged, still proxying `/api`) and loads the api and worker through a Vite
-module runner, under the same `dev-supervisor.mjs --watch` as the split backend
-lane. `LANGWATCH_DEV_ONE_PROCESS=0` (plain `pnpm dev`, or `haven up -f` with it
+module runner and re-links them in process on a change. A host that recycles itself
+exits 75 and the `dev` script's loop (or haven's lane) starts a fresh one. `LANGWATCH_DEV_ONE_PROCESS=0` (plain `pnpm dev`, or `haven up -f` with it
 exported or in `.env`) splits it back into a `ui` lane and a `backend` lane
 (haven: `api`). Ports are the same either way. Under haven the same switch also
 folds the simulators into the `go` lane (`=0` gives them a `sims` lane);
 `LANGWATCH_GO_ONE_PROCESS` is a deprecated alias, warned once and refused when it
 disagrees. The Go lane is watched by default (`haven go-watch` rebuilds and swaps
-the child); `LANGWATCH_GO_WATCH=0` or `haven up --watch=false` turns it off.
+the child); `LANGWATCH_GO_WATCH=0` turns it off.
+
+**Holding a stack.** Commits and cherry-picks reload the backend under anyone using the
+stack. `haven up --watch=false -f` holds it: no Go rebuilds and no backend reloads
+(`LANGWATCH_DEV_WATCH=0` in the Node lane; Vite HMR still works), and the hold sticks for the
+stack (`haven up --watch -f` lifts it). `haven reload [app|api|worker]` then re-links the
+backend in place on demand (SIGUSR2; the UI and sessions stay up) and returns when the host
+logs `backend reload finished`. A changed env still needs `haven up -f`.
 
 A backend edit that touches a loaded file re-links only what it reaches, then
 drains the old generation (worker, then api) and boots the new one; the browser
@@ -308,3 +321,5 @@ See `dev/docs/best_practices/local-observability.md`. With the stack down,
 
 Locally built binaries land only in `.bin/<name>/<name>` (git- and
 Docker-ignored). Release pipelines pass their own `--outfile`.
+
+haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or observability, sandboxed Langy, `haven play`). When it starts the VM it records that in its home (`colima-<profile>.json`), and `haven down` or the daemon stops it once no stack needs a container and none is running; `haven status` then adds "stopped by haven". A VM you started yourself is never stopped.

@@ -137,6 +137,8 @@ export interface EventingHost {
   holdConsumers?(): void;
   /** Starts consuming; the kernel calls it when the booted runtime starts. */
   startConsumers?(): void;
+  /** Takes no new work and waits for in-flight work, before the runtime closes peer Apis. */
+  stopConsumers?(): Promise<void>;
   /** Wakes one process manager's outbox in this process; absent where none runs. */
   notifyOutbox?(processName: string): void;
   /** Every pipeline registered so far, read at call time; absent where none can be listed. */
@@ -360,15 +362,18 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
   };
 }
 
-/** The consumer hold and start pair a host offers, copied only whole. */
+/** The consumer hold and start pair a host offers, copied only whole, with its drain. */
 function consumerControls(
   host: Partial<EventingHost>,
   candidate: object,
-): Pick<EventingHost, "holdConsumers" | "startConsumers"> {
+): Pick<EventingHost, "holdConsumers" | "startConsumers" | "stopConsumers"> {
   return typeof host.holdConsumers === "function" && typeof host.startConsumers === "function"
     ? {
         holdConsumers: host.holdConsumers.bind(candidate),
         startConsumers: host.startConsumers.bind(candidate),
+        ...(typeof host.stopConsumers === "function"
+          ? { stopConsumers: host.stopConsumers.bind(candidate) }
+          : {}),
       }
     : {};
 }
@@ -380,12 +385,13 @@ function consumerControls(
 export function eventingConsumers(eventing: EventingHost | undefined): RuntimeService[] {
   if (eventing?.holdConsumers === void 0 || eventing.startConsumers === void 0) return [];
   eventing.holdConsumers();
-  // The eventing member closes what these consumers opened, after the drain.
+  // Drain-first (record §4): in-flight handlers finish while peer Apis are still open.
+  const drains = eventing.participation === "consume";
   return [
     {
       name: "eventing consumers",
       start: () => eventing.startConsumers?.(),
-      stop: () => void 0,
+      stop: () => (drains ? eventing.stopConsumers?.() : void 0),
     },
   ];
 }

@@ -1,17 +1,10 @@
 import { fileURLToPath } from "node:url";
 
-import { moduleVitestTestOptions } from "@langwatch/vitest-config";
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
+import { mergeConfig } from "vitest/config";
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      "@langwatch/api-key-contract": fileURLToPath(
-        new URL("../contract/src/index.ts", import.meta.url),
-      ),
-    },
-  },
-  test: moduleVitestTestOptions({
+export default mergeConfig(
+  defineModuleVitestConfig({
     kind: "jsdom",
     // The suites mock the package's own api binding and blocks with different
     // shapes; a shared registry lets one file's mock leak into the next.
@@ -26,4 +19,13 @@ export default defineConfig({
       testTimeout: 30_000,
     },
   }),
-});
+  {
+    resolve: {
+      alias: {
+        "@langwatch/api-key-contract": fileURLToPath(
+          new URL("../contract/src/index.ts", import.meta.url),
+        ),
+      },
+    },
+  },
+);

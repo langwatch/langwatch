@@ -4,6 +4,7 @@ import type {
   SignedInWith,
 } from "@langwatch/identity-contract";
 import { moduleApi } from "@langwatch/module";
+import type { InviteLanding } from "@langwatch/organization-contract";
 import type {
   UpdateUserEmailInput,
   UserCaller,
@@ -30,7 +31,6 @@ import type {
 } from "./federated-password.ts";
 import type {
   AddressConfirmation,
-  InviteLanding,
   PriorSession,
   SignUpEnrollment,
   SignUpVerificationRequest,

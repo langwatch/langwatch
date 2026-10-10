@@ -161,6 +161,7 @@ describe("the tasks process installation", () => {
         "credentials-reseal",
         "grant-platform-operator",
         "system-migrations-pass",
+        "request-system-migrations-pass",
         "backfill-organization-presence-setting",
         "backfill-project-created",
         "backfill-project-presence-setting",

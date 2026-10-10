@@ -48,7 +48,7 @@ const WORKER_ENTRY = fileURLToPath(import.meta.resolve("@langwatch/worker"));
 const WATCH_ROOTS = ["apps/api/src", "apps/worker/src", "packages", "modules", "enterprise"];
 const IGNORED_PATH = /(^|\/)(node_modules|dist|\.git|__tests__)(\/|$)/;
 const CODE_FILE = /\.[cm]?[jt]sx?$/;
-/** Non-zero, so dev-supervisor's restart-after-ready starts a fresh process (EX_TEMPFAIL). */
+/** Non-zero, so the dev script's loop or haven's lane starts a fresh process (EX_TEMPFAIL). */
 const RECYCLE_EXIT_CODE = 75;
 
 const write = (line: string): void => void process.stderr.write(line);
@@ -56,16 +56,15 @@ const envPositive = ({ name, fallback }: { name: string; fallback: number }): nu
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 };
-// LANGWATCH_DEV_RELOAD=process hands every reload to the supervisor's whole-process restart.
-const isWatching =
-  !["0", "false", "off"].includes((process.env.LANGWATCH_DEV_WATCH ?? "").trim().toLowerCase()) &&
-  process.env.LANGWATCH_DEV_RELOAD?.trim() !== "process";
-// Only the api lane's supervisor (LANGWATCH_DEV_RELOAD=module) restarts a host that exits
-// after ready.
-const isRecycleArmed = process.env.LANGWATCH_DEV_RELOAD?.trim() === "module";
+// LANGWATCH_DEV_WATCH=0 holds the backend: no reload on a file change, only on `haven reload`.
+// The UI's Vite HMR is unaffected.
+const isWatching = !["0", "false", "off"].includes(
+  (process.env.LANGWATCH_DEV_WATCH ?? "").trim().toLowerCase(),
+);
+// A recycled host exits 75 after ready; the dev script's loop (or haven's lane) starts a fresh one.
 const recycleLimits = {
   maxGenerations: envPositive({ name: "LANGWATCH_DEV_RECYCLE_GENERATIONS", fallback: 50 }),
-  maxRssMiB: envPositive({ name: "LANGWATCH_DEV_RECYCLE_RSS_MIB", fallback: 4_096 }),
+  maxRssMiB: envPositive({ name: "LANGWATCH_DEV_RECYCLE_RSS_MIB", fallback: 8_192 }),
 };
 const rssMiB = (): number => Math.round(process.memoryUsage.rss() / 1_048_576);
 
@@ -83,6 +82,8 @@ let isRetryOwed = false;
 let reloading: Promise<void> = Promise.resolve();
 let stopping: Promise<void> | undefined;
 const watchers: FSWatcher[] = [];
+/** Files changed while the stack is held, applied by the next on-demand reload. */
+const held = new Set<string>();
 
 const stop = (code: number): Promise<void> => {
   stopping ??= (async () => {
@@ -121,7 +122,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
-/** Hands over to a fresh process: the supervisor restarts a host exiting non-zero after ready. */
+/** Hands over to a fresh process: the dev script's loop restarts a host exiting 75. */
 function recycle(reason: string): void {
   const record = { level: "info", msg: "backend recycling", reason, generation, rssMiB: rssMiB() };
   process.stdout.write(`${JSON.stringify(record)}\n`);
@@ -163,9 +164,9 @@ function startBackendVite(): Promise<ViteDevServer> {
   });
 }
 
-/** Why to recycle, not re-link; armed once a generation was ready under a restarting supervisor. */
+/** Why to recycle, not re-link; armed once a generation was ready. */
 function boundReached(): string | undefined {
-  if (!isRecycleArmed || generation === 0) return undefined;
+  if (generation === 0) return undefined;
   return recycleReason({ generation, rssMiB: rssMiB(), limits: recycleLimits });
 }
 
@@ -193,7 +194,7 @@ async function disposeOld({
       isDrainFailed: true,
       limits: recycleLimits,
     });
-    if (!isRecycleArmed || !reason) return 0;
+    if (!reason) return 0;
     recycle(reason);
     return undefined;
   }
@@ -369,15 +370,25 @@ export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
     },
   });
   // Watched before the first boot, so an edit landing while it runs queues one follow-up.
-  if (isWatching) {
-    watchBackend({
-      onFile: (file) => {
-        const isLoaded = runner?.evaluatedModules.getModulesByFile(file) !== undefined;
-        if (!isLoaded && !(isRetryOwed && CODE_FILE.test(file))) return;
-        ssr.moduleGraph.onFileChange(file);
-        trigger.note(file);
-      },
+  // Held (LANGWATCH_DEV_WATCH=0): edits wait in `held` until `haven reload` sends SIGUSR2.
+  watchBackend({
+    onFile: (file) => {
+      const isLoaded = runner?.evaluatedModules.getModulesByFile(file) !== undefined;
+      if (!isLoaded && !(isRetryOwed && CODE_FILE.test(file))) return;
+      ssr.moduleGraph.onFileChange(file);
+      if (isWatching) trigger.note(file);
+      else held.add(file);
+    },
+  });
+  process.on("SIGUSR2", () => {
+    const files = [...held];
+    held.clear();
+    reloading = reloading.then(async () => {
+      await reload(files);
+      process.stdout.write(
+        `${JSON.stringify({ level: "info", msg: "backend reload finished", generation, changedFiles: files.length })}\n`,
+      );
     });
-  }
+  });
   await trigger.boot();
 }

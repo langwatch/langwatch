@@ -802,7 +802,15 @@ function useVirtualizedTurnList({
   useScrollFocusedTurnInVirtualizer({ virtualizer, parsedTurns, focusTraceId });
   const isBlinking = useFocusedTurnBlink(focusTraceId);
 
-  return { virtualizer, railLayout, attachScroller, isBlinking };
+  // Values, not the virtualizer: the React Compiler caches reads of its stable instance.
+  return {
+    virtualItems: virtualizer.getVirtualItems(),
+    totalSize: virtualizer.getTotalSize(),
+    measureElement: virtualizer.measureElement,
+    railLayout,
+    attachScroller,
+    isBlinking,
+  };
 }
 
 /**
@@ -822,11 +830,12 @@ const VirtualizedTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | n
   focusTraceId,
   showSessionCheckboxes,
 }) => {
-  const { virtualizer, railLayout, attachScroller, isBlinking } = useVirtualizedTurnList({
-    parsedTurns,
-    currentTraceId,
-    focusTraceId,
-  });
+  const { virtualItems, totalSize, measureElement, railLayout, attachScroller, isBlinking } =
+    useVirtualizedTurnList({
+      parsedTurns,
+      currentTraceId,
+      focusTraceId,
+    });
   const underReview = turnUnderReview({ parsedTurns, focusTraceId });
 
   return (
@@ -846,13 +855,13 @@ const VirtualizedTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | n
             <SystemPromptBanner text={systemPrompt} />
           </Box>
         )}
-        <Box height={`${virtualizer.getTotalSize()}px`} width="full" position="relative">
-          {virtualizer.getVirtualItems().map((row) => {
+        <Box height={`${totalSize}px`} width="full" position="relative">
+          {virtualItems.map((row) => {
             const p = parsedTurns[row.index]!;
             return (
               <Box
                 key={row.key}
-                ref={virtualizer.measureElement}
+                ref={measureElement}
                 data-index={row.index}
                 position="absolute"
                 top={0}

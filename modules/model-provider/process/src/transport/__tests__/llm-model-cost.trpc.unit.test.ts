@@ -12,6 +12,7 @@ import {
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ModelCostPreviewSpanReader } from "../../features/model-cost/services/model-cost-preview.service.ts";
 import { llmModelCostTrpcTransport } from "../llm-model-cost.trpc.ts";
 import {
   mountableModelProviderApp,
@@ -43,7 +44,7 @@ function mount(
   options: {
     modelProviders?: Partial<ModelProviderApi>;
     permits?: ModelProviderTestDecision;
-    spans?: unknown;
+    spans?: ModelCostPreviewSpanReader;
   } = {},
 ) {
   const { app, repositories } = mountableModelProviderApp({
@@ -116,14 +117,19 @@ describe("the llmModelCost tRPC namespace", () => {
     });
   });
 
-  describe("given a process that composed no span reader", () => {
+  describe("given the trace module saw a model in the window", () => {
     describe("when the preview is asked for", () => {
-      it("says the deployment cannot answer rather than reporting no matches", async () => {
-        const { caller } = mount({ spans: {} });
+      it("answers trace's models rather than refusing as unavailable", async () => {
+        const { caller } = mount({
+          spans: {
+            readModelUsageStats: async () => [{ model: "gpt-5", spanCount: 3, lastSeenMs: 1 }],
+            readRecentSpansByModels: async () => [],
+          },
+        });
 
         await expect(
           caller.previewMatchingSpans({ projectId: PROJECT_ID, regex: "gpt-5" }),
-        ).rejects.toMatchObject({ message: expect.stringContaining("not available") });
+        ).resolves.toMatchObject({ matchedModels: [{ model: "gpt-5", spanCount: 3 }] });
       });
     });
   });

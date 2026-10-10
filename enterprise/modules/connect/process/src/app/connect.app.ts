@@ -16,6 +16,10 @@ import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 
+import {
+  buildConnectContractBudgetPipeline,
+  type ConnectContractBudgetPipeline,
+} from "../eventing/connect-contract-budget.pipeline.ts";
 import { ConnectSpendBufferService } from "../services/connect-spend-buffer.service.ts";
 import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
@@ -46,16 +50,20 @@ export class ConnectModule implements ConnectApiContract {
 
   readonly #hosted: HostedServicesService;
   readonly #spend: ConnectSpendBufferService;
+  readonly #contractBudgets: ContractBudgetService;
 
   private constructor({
     hosted,
     spend,
+    contractBudgets,
   }: {
     hosted: HostedServicesService;
     spend: ConnectSpendBufferService;
+    contractBudgets: ContractBudgetService;
   }) {
     this.#hosted = hosted;
     this.#spend = spend;
+    this.#contractBudgets = contractBudgets;
   }
 
   static async create({ dependencies, resources }: ConnectSetup): Promise<ConnectModule> {
@@ -64,8 +72,14 @@ export class ConnectModule implements ConnectApiContract {
       recorder: { recordSpend: (entry) => instantEval.recordSpendForHostedCalls(entry) },
       logger,
     });
+    const contractBudgets = ContractBudgetService.create({
+      store: ContractBudgetStoreService.create({ gateway }),
+      terms: licensing,
+      systemActorId: SYSTEM_ACTORS.connectLicense,
+    });
     const app = new ConnectModule({
       spend,
+      contractBudgets,
       hosted: HostedServicesService.create({
         licenses: licensing,
         judge: {
@@ -75,11 +89,7 @@ export class ConnectModule implements ConnectApiContract {
         },
         spend,
         usage: HostedUsageReaderService.create({ gateway, scopes }),
-        contractBudgets: ContractBudgetService.create({
-          store: ContractBudgetStoreService.create({ gateway }),
-          terms: licensing,
-          systemActorId: SYSTEM_ACTORS.connectLicense,
-        }),
+        contractBudgets,
       }),
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
@@ -101,6 +111,11 @@ export class ConnectModule implements ConnectApiContract {
 
   setHostedBudgetCap(input: { caller: HostedCaller; payload: unknown }): Promise<HostedCapAnswer> {
     return this.#hosted.setBudget(input);
+  }
+
+  /** The connect_contract_budget pipeline, which syncs the budget from licensing's terms fact. */
+  contractBudgetPipeline(): ConnectContractBudgetPipeline {
+    return buildConnectContractBudgetPipeline({ contractBudgets: this.#contractBudgets });
   }
 
   /** Writes hosted spend the buffer still holds. Called by the drain. */

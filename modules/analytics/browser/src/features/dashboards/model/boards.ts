@@ -24,19 +24,6 @@ export function myDashboardId({
   )?.id;
 }
 
-/** Another member's "My dashboard": theirs, so it is left out of this member's list. */
-export function isOthersDashboard({
-  board,
-  userId,
-}: {
-  board: { name: string; createdById: string | null };
-  userId: string | undefined;
-}): boolean {
-  return (
-    board.name === MY_DASHBOARD_NAME && board.createdById !== null && board.createdById !== userId
-  );
-}
-
 /** The address of the area, or of one board in it. */
 export function dashboardsPath({
   projectSlug,

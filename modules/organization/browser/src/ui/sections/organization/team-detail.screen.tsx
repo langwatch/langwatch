@@ -42,6 +42,7 @@ import {
   useOrganizationToaster,
   useShowErrorToast,
 } from "../../../behavior/organization-feedback.ts";
+import { memberLabel } from "../../../model/member-label.ts";
 
 // Type guards for safe access to custom role data
 function isValidCustomRole(role: unknown): role is {
@@ -86,7 +87,7 @@ function memberToRoleFormOption(assignedRole: unknown, builtInRole: TeamUserRole
 function teamMemberToFormMember(member: TeamWithProjectsAndMembers["members"][number]) {
   return {
     userId: {
-      label: `${member.user.name} (${member.user.email})`,
+      label: memberLabel(member.user),
       value: member.user.id,
     },
     role: memberToRoleFormOption(member.assignedRole, member.role),

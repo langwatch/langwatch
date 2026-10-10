@@ -152,6 +152,7 @@ type fakeSystem struct {
 	alive           map[int]bool
 	starts          map[int]string
 	terminated      []int
+	reloaded        []int
 	groupTerminated []int
 	groupKilled     []int
 	pidsByPort      map[int][]int
@@ -192,6 +193,7 @@ func (f *fakeSystem) Terminate(pid int) {
 		f.alive[pid] = false
 	}
 }
+func (f *fakeSystem) Reload(pid int)         { f.reloaded = append(f.reloaded, pid) }
 func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
 func (f *fakeSystem) KillGroup(pid int) {
 	f.groupKilled = append(f.groupKilled, pid)

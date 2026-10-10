@@ -30,6 +30,7 @@ import { useState } from "react";
 import { scimApi } from "../../behavior/scim-api.ts";
 import { chosenConnectionOf, isActiveConnection } from "../../model/connection-lifecycle.ts";
 import { connectionLabel } from "../../model/display-formatters.ts";
+import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../elements/copy-input.tsx";
 
@@ -64,16 +65,29 @@ export function ProvisioningTokens({
         </Text>
       </VStack>
 
-      {(list.isError || connections.isError) && (
-        <HandledErrorAlert
-          error={list.error ?? connections.error}
-          fallbackTitle="We couldn't load your provisioning tokens"
-          onRetry={() => {
-            void list.refetch();
-            void connections.refetch();
-          }}
-        />
-      )}
+      {(list.isError || connections.isError) &&
+        isEnterpriseGateError(list.error ?? connections.error) && (
+          <Alert.Root status="info" data-testid="scim-enterprise-gate">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Directory sync is an Enterprise feature</Alert.Title>
+              <Alert.Description>
+                Provisioning tokens come with the Enterprise plan. Contact sales to upgrade.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+      {(list.isError || connections.isError) &&
+        !isEnterpriseGateError(list.error ?? connections.error) && (
+          <HandledErrorAlert
+            error={list.error ?? connections.error}
+            fallbackTitle="We couldn't load your provisioning tokens"
+            onRetry={() => {
+              void list.refetch();
+              void connections.refetch();
+            }}
+          />
+        )}
 
       <Card.Root width="full" overflow="hidden">
         <Card.Body paddingY={0} paddingX={0} overflowX="auto">

@@ -70,7 +70,7 @@ export function useRoutingPolicyDrawerForm({
   const policy = policyQuery.data;
   useEffect(() => {
     if (!policy) return;
-    reset(routingPolicyToFormValues(policy));
+    reset(routingPolicyToFormValues(policy), { keepFieldsRef: true });
   }, [policy, reset]);
 
   const values = watch();

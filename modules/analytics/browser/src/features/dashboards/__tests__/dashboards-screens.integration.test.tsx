@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import DashboardsIndexScreen from "../ui/sections/dashboards-index.screen.tsx";
-import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const FLAG_ON = { release_dashboards: true };
 const FLAG_OFF = { release_dashboards: false };
@@ -27,6 +27,7 @@ const listed = ({
   name?: string;
   createdById?: string;
 }) => ({
+  ...HOME_BOARD,
   id,
   name,
   description: null,

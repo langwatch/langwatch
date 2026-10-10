@@ -28,6 +28,12 @@ export abstract class TopicHostApi {
 
   abstract succeeded(notice: TopicSuccessNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: TopicSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: TopicSuccessNotice): void;
+
   abstract failed(failure: TopicFailureNotice): void;
 }
 

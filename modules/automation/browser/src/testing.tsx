@@ -62,6 +62,8 @@ export type AutomationHostRecording = {
   datasetHandovers: AutomationDatasetHandover[];
   slackConnectionHandovers: AutomationSlackConnectionHandover[];
   successes: AutomationSuccessNotice[];
+  warnings: AutomationSuccessNotice[];
+  infos: AutomationSuccessNotice[];
   failures: AutomationFailureNotice[];
 };
 
@@ -115,6 +117,8 @@ export class FakeAutomationHost extends AutomationHost {
         datasetHandovers: [],
         slackConnectionHandovers: [],
         successes: [],
+        warnings: [],
+        infos: [],
         failures: [],
       },
       query: options.query ?? {},
@@ -246,6 +250,14 @@ export class FakeAutomationHost extends AutomationHost {
 
   succeeded(notice: AutomationSuccessNotice): void {
     this.recording.successes.push(notice);
+  }
+
+  warned(notice: AutomationSuccessNotice): void {
+    this.recording.warnings.push(notice);
+  }
+
+  informed(notice: AutomationSuccessNotice): void {
+    this.recording.infos.push(notice);
   }
 
   failed(failure: AutomationFailureNotice): void {

@@ -18,6 +18,7 @@ import {
   DatasetTooLargeToSearchError,
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
+import { z } from "zod";
 
 import type { DatasetContent } from "../app/dataset.app.ts";
 
@@ -27,6 +28,9 @@ import type { DatasetContent } from "../app/dataset.app.ts";
  * of the s3_jsonl layout already expects.
  */
 const RECORD_KSUID_RESOURCE = "record";
+
+/** The stored row carries columns the Dataset omits (sourceStoredObjectId): strip, not refuse. */
+const storedDatasetSchema = z.object(datasetSchema.shape);
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
@@ -402,7 +406,7 @@ export class DatasetContentService implements DatasetContent {
       slug,
       storage: this.storage,
     });
-    return datasetSchema.parse(updated);
+    return storedDatasetSchema.parse(updated);
   }
 
   private assertReady(dataset: Dataset): void {

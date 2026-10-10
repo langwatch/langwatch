@@ -713,7 +713,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       a separator, Rename, Duplicate, a separator and Delete, each with its icon
     And Delete is in red
     And a From LangWatch board offers Star or Unstar, the moves when starred, and "Duplicate to edit"
-    And there is no Share action anywhere
+    And there is no Share action anywhere; who sees a board is its scope (AC178)
 
   @integration
   Scenario: AC107b Sidebar menu: reorder is bounded by the Starred list's ends
@@ -753,11 +753,185 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When another member lists their starred boards
     Then that board is not among them
 
+  # ---------------------------------------------------------------------------
+  # Board scope: Only me, Project, Organization (owner decisions, 2026-10-09).
+  # A board belongs to one project and has a scope, as a prompt does. An
+  # Organization board is one shared definition: in each project of the
+  # organization it shows that project's data, with the reader's own permissions.
+  # AC159 "No sharing control appears anywhere" is retired by these.
+  # Not built: share links or pages, named people or groups, folders, and
+  # boards that mix several projects.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me
+    When a member creates a board, duplicates one or adds one from a template
+    Then its scope is Project, and the project it was made in owns it
+    And a member's My dashboard is made with the scope Only me
+    And a board made with a project credential has the scope Project
+
+  @unit @integration
+  Scenario: AC171 Scope: an Only me board exists for its author alone
+    Given a board its author set to Only me
+    When another member of the project, or a project credential, lists the boards or the
+      starred boards, opens the board by its id, renames, deletes, reorders, stars or copies it,
+      or reads, adds, edits, moves or deletes a widget, graph or saved chart on it
+    Then every one of these answers as it does for a board that does not exist
+    And the author lists it, opens it and edits it as before
+    And a LangWatchQL query reads neither the board nor what is placed on it, for any caller:
+      a query names no reader, so the "dashboards" and "custom_graphs" views leave them out
+
+  @unit @integration
+  Scenario: AC172 Scope: an Organization board is listed in every project of its organization
+    Given a board its author set to Organization
+    When a member with analytics:view lists the boards of another project of the same organization
+    Then the board is listed there, marked as owned by the other project
+    And it opens there by its id, with its widgets, for a member and for a project credential
+    And a project of another organization neither lists it nor opens it
+
+  @unit @integration
+  Scenario: AC173 Scope: an Organization board is read-only outside the project that owns it
+    Given an Organization board opened in a project that does not own it
+    When the reader renames it, describes it, deletes it, changes its scope,
+      or adds, edits, moves or deletes a widget on it
+    Then the server refuses each write and the board is unchanged
+    And the same writes are accepted in the project that owns it
+    And a member may star it, and copy it into the project they are in
+
+  @unit
+  Scenario: AC174 Scope: only the author changes a board's scope
+    Given a board made by one member
+    When another member, a project administrator or a project credential changes its scope
+    Then the server refuses with "dashboard_scope_author_only" and the scope is unchanged
+    And a board with no recorded author keeps the scope Project
+    And who may edit or delete a board is still the analytics permissions' to say
+
+  @unit
+  Scenario: AC175 Scope: any board can be set to Only me, My dashboard like any other
+    Given a member with several boards of their own
+    Then they can set every one of them to Only me, with no limit
+    And they can set their My dashboard to Project or Organization, and back to Only me
+
+  @unit
+  Scenario: AC176 Scope: a narrower scope keeps other members' stars
+    Given a board other members starred
+    When its author sets it to Only me
+    Then it leaves the other members' starred lists
+    And their stars come back when the author widens the scope again
+    And a star on an Organization board is one star: it shows in every project that lists the board
+
+  @unit @integration
+  Scenario: AC177 Scope control: the board header shows the scope beside the title
+    Given a board opened by its author in the project that owns it
+    Then a control beside the title names the scope, "Only me", "Project" or "Organization",
+      with a lock, people or building icon, as the prompt scope picker does
+    When they open it
+    Then it is titled "Scope" with "Who can see this dashboard.", and offers Only me "Only you",
+      Project "Everyone in <project>" and Organization "Everyone in <organization>, in each of
+      their projects", with a tick on the current one
+    And a reader who is not the author sees the same value as a badge that cannot be opened,
+      whose hover says only the person who made the dashboard can change its scope
+
   @integration
-  Scenario: AC159 No sharing control appears anywhere
-    Given any board, row or board header
-    When the member looks for a visibility or share control
-    Then there is none, and every board is visible to the whole project
+  Scenario: AC178 Scope control: the sidebar menu offers the same three choices
+    When the author opens the "⋮" menu of their board in the sidebar
+    Then under "Scope" it offers Only me, Project and Organization with a tick on the current one
+    And their My dashboard offers the same three
+    And a board they did not make, or one another project owns, offers none
+
+  @unit @integration
+  Scenario: AC179 Scope change: it asks first only when someone loses the board
+    When the author sets a board to Only me that other members starred
+    Then a confirmation says how many other people starred it before anything changes
+    When the author lowers a board from Organization to Project or Only me
+    Then a confirmation says the other projects will no longer see it
+    And cancelling either leaves the scope as it was
+
+  @unit @integration
+  Scenario: AC180 Scope change: any other change is made at once and offers Undo
+    When the author widens a board, or sets a board nobody else starred to Only me
+    Then the scope changes at once, with no confirmation
+    And a note names the new audience and offers "Undo", which puts the scope back
+
+  @unit @integration
+  Scenario: AC181 Sidebar: scope marks and the organization's group
+    Then an Only me board carries a small lock by its name and an Organization board a building
+    And a Project board carries no mark
+    And the Organization boards other projects own sit in their own group "From <organization>",
+      by name, after Starred and before From LangWatch, unless the member starred them
+    And with no such board there is no such group
+
+  @unit @integration
+  Scenario: AC182 Organization board: the Project chip says whose data it shows
+    Given an Organization board
+    Then its header has a chip "Project <project>", naming the project whose data is on screen
+    When the reader opens the chip
+    Then it lists the projects of the organization they can open, one to choose, with no
+      "All projects", and marks the project that owns the board "owner"
+    And choosing one opens the same board under that project
+    And a Project or Only me board has no such chip
+
+  @integration
+  Scenario: AC183 A board the reader may not open is not available
+    Given the address of a board that was deleted, or that its author set to Only me
+    When a member who is not its author opens it
+    Then the page reads "This dashboard is not available" and "It was deleted, or the person who
+      made it set its scope to Only me. If you need it, ask them to set it to Project."
+    And it shows nothing of the board's name, description or widgets
+
+  @unit @integration
+  Scenario: AC184 View-only: a board the reader cannot edit offers no edit control
+    Given an Organization board opened in a project that does not own it,
+      or any board opened by a member without analytics:update
+    Then there is no "Add a widget", no add card, no widget menu action that edits, duplicates
+      or deletes, and nothing can be moved or resized
+    And the widget menu still offers "Copy widget id" and "Export CSV", which change nothing
+    And the description cannot be edited, and the sidebar menu offers no Rename and no Delete
+    And outside the owning project the header reads "<organization> · owned by <project>"
+
+  @integration
+  Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy
+    Given a board the reader cannot edit, and a reader with analytics:create
+    When they pick "Duplicate to edit" in the board's sidebar menu
+    Then a copy with every widget is made in the project they are in, at the scope Project,
+      with them as its author, and it opens
+    And a reader without analytics:create is offered no copy
+    And the board's header has no such button, as on a From LangWatch board
+
+  @unit @integration
+  Scenario: AC186 Scope: the migration keeps today's audience
+    Given the boards that exist before the scope column
+    When the scope migration runs
+    Then every board has the scope Project, except each member's own "My dashboard", which is Only me
+    And the migration only adds: a column with a default, a nullable column and an index
+
+  @unit @integration
+  Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board
+    Given a chart-builder graph on a board its author set to Only me
+    When a member attaches a graph alert to that graph, or schedules a report on the graph or the board
+    Then the alert is refused as it is for a graph the project does not have
+    And the report is sent as it is for a board or a graph that does not exist: no chart, no title
+    And the automations list names no such graph beside an alert that watches one
+    And an alert or a report already there reads the graph again once the author widens the board
+    # Automation has no reader at send time, so it stands where a project credential does (AC171).
+
+  @integration
+  Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere
+    Given an Organization board whose project was archived
+    When a member of another project of the organization lists the boards, opens it by its id
+      or reads their starred boards
+    Then it is in none of them, and their star on it is kept but not listed
+    And the archived project still reaches its own board
+
+  @unit
+  Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
+    Given a project where Dashboards is switched off
+    When a member's My dashboard is made there
+    Then its scope is Project, since nothing there offers the scope to widen it
+    When a member or a project credential of that project lists or opens an Organization board
+      another project owns
+    Then every answer is the one a board that does not exist gets
+    And the project that owns a board lists and opens it whether Dashboards is on there or not
 
   # ---------------------------------------------------------------------------
   # Sidebar, My dashboard, From LangWatch and the ask bar (langwatch/tasks#911)
@@ -776,6 +950,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When they open /[project]/dashboards
     Then one "My dashboard" is made for them and opens
     And it is in their Starred list, stored as their star, and in nobody else's
+    And its scope is Only me, so the server lists it for nobody else (AC170, AC171)
     # Existing members' My dashboards get the same star once, by migration: favourites had not
     # shipped, so none of them could have unstarred one
 
@@ -795,7 +970,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit @integration
   Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name
     Then the member's My dashboard comes first
-    And the project's other boards follow by name, leaving out starred ones and other members' My dashboards
+    And the project's other boards follow by name, leaving out starred ones
+    And another member's My dashboard is listed only once its author widened its scope (AC175)
 
   @unit @integration
   Scenario: AC161c Starred shows only when the member has stars, in their own order
@@ -813,6 +989,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC163 My dashboard cannot be deleted
     When the member opens the "⋮" menu of their My dashboard
     Then Rename and Delete are disabled
+    And its scope is not locked: the menu offers the three scope choices (AC178)
 
   @integration
   Scenario: AC164 From LangWatch folds only when the member clicks it
@@ -1164,6 +1341,63 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Owner list, 2026-10-08
 
   # ---------------------------------------------------------------------------
+  # Dashboards show your agent, not Langy's work for you
+  # ---------------------------------------------------------------------------
+  # Why: Langy's own turns trace into the member's project with origin "langy" (ADR-061).
+  # Counted, they move volume, cost, latency and error widgets because the member used Langy.
+  # The project home and the Explorer already leave them out; Dashboards follow (owner, 2026-10-09).
+  # How: analytics ADR-003. This is the server half and the board's default. The built-in Source
+  # parameter that shows the default in the board header and lets the member change it comes next.
+
+  @integration
+  Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default
+    Given a project with traces from its own agent and traces with origin "langy"
+    When a member opens any board, My dashboard and From LangWatch boards included
+    Then every widget counts only the traces whose origin is not "langy"
+    And so do the spans, evaluations and other rows that belong to those traces
+    And the widget editor's preview counts the same rows as the card
+    # Why one place: the board's query context sets it, so no widget can forget it, whether it
+    # comes from the catalogue, from Langy or from the code editor
+
+  @unit @integration
+  Scenario: AC191 Langy: a widget's own origin filter keeps its meaning
+    Given a widget that already reads only production origins, such as Running costs
+    When it runs on a board that leaves out Langy's conversations
+    Then it reads the same rows it read before
+    # Why: the board removes Langy rows first; a row that passes still meets the widget's own
+    # filter, so the board never widens or reverses a deliberate filter
+
+  @unit
+  Scenario: AC192 Langy: data that is Langy's own is not filtered
+    Given a widget that reads Langy's own usage events or conversation messages
+    When it runs on a board
+    Then it still reads every row
+    # Why: those rows are about Langy itself, not traces in the member's project
+
+  @unit @integration
+  Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later
+    Given the context a board runs every query with
+    Then it names the origins it leaves out as a list, "langy" by default
+    And an empty list makes every widget read Langy's conversations too
+    # Why a list: the built-in Source parameter planned for the header can then show the default
+    # and pick origins without a new shape on the wire
+
+  @unit
+  Scenario: AC194 Langy: a query run outside a board is not scoped
+    Given a LangWatchQL statement run from anywhere but a board, such as the REST query API
+    When the run names no origins to leave out
+    Then the statement runs as written and reads Langy's conversations too
+    # Why: the rule is the board's alone. The Traces list keeps its own rule (ADR-061)
+
+  @unit
+  Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
+    Given a widget that reads trace_metrics_by_minute or model_usage_by_minute
+    When it runs on a board
+    Then it still counts Langy's spans
+    # Known gap: the rollups are written per span before a trace's origin is known, so they
+    # carry no origin; a follow-up would add one
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -1210,9 +1444,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107c-107e: "Templates library: cards like the prototype" (changed by langwatch/tasks#911 on 2026-10-07: compact cards with no labels, so AC107e is gone; the finder's own scenarios are in dashboards-finder.feature) → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board
   # AC 107-109: "Sidebar menu" (changed by langwatch/tasks#911: stars replace sharing and the default board; Share and Set as default are gone, Move up/down added) → Scenario: AC107 Sidebar menu: each board offers its actions in order; Scenario: AC107b Sidebar menu: reorder is bounded by the Starred list's ends; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
-  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member; Scenario: AC159 No sharing control appears anywhere
+  # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing but My dashboard is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member (AC159 "No sharing control appears anywhere" is retired by AC170-186)
+  # AC 170-186: "Board scope: Only me, Project, Organization" (owner decisions, 2026-10-09) → Scenario: AC170 Scope: a new board starts at Project and My dashboard at Only me; Scenario: AC171 Scope: an Only me board exists for its author alone; Scenario: AC172 Scope: an Organization board is listed in every project of its organization; Scenario: AC173 Scope: an Organization board is read-only outside the project that owns it; Scenario: AC174 Scope: only the author changes a board's scope; Scenario: AC175 Scope: any board can be set to Only me, My dashboard like any other; Scenario: AC176 Scope: a narrower scope keeps other members' stars; Scenario: AC177 Scope control: the board header shows the scope beside the title; Scenario: AC178 Scope control: the sidebar menu offers the same three choices; Scenario: AC179 Scope change: it asks first only when someone loses the board; Scenario: AC180 Scope change: any other change is made at once and offers Undo; Scenario: AC181 Sidebar: scope marks and the organization's group; Scenario: AC182 Organization board: the Project chip says whose data it shows; Scenario: AC183 A board the reader may not open is not available; Scenario: AC184 View-only: a board the reader cannot edit offers no edit control; Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy; Scenario: AC186 Scope: the migration keeps today's audience
+  # AC 187-189: "Board scope: what the access-control review closed" (2026-10-09: automation reads, archived projects, projects with Dashboards off) → Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board; Scenario: AC188 Scope: an Organization board of an archived project is listed nowhere; Scenario: AC189 Scope: board scope reaches only a project where Dashboards is switched on
   # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts starred) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred for them; Scenario: AC160c A member who unstars My dashboard keeps it unstarred; Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
+  # AC 190-195: "Dashboards show your agent, not Langy's work for you" (owner, 2026-10-09) → Scenario: AC190 Langy: every widget on a board leaves out Langy's conversations by default; Scenario: AC191 Langy: a widget's own origin filter keeps its meaning; Scenario: AC192 Langy: data that is Langy's own is not filtered; Scenario: AC193 Langy: the origins a board leaves out are a list a board parameter can set later; Scenario: AC194 Langy: a query run outside a board is not scoped; Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet

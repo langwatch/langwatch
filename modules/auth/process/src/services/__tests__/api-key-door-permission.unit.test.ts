@@ -27,6 +27,7 @@ const PROJECT = {
   organizationId: ORGANIZATION_ID,
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
 };
 
 const projectTokens = new Map<string, ResolvedApiKeyCredential>([

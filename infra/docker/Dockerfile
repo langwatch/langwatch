@@ -78,6 +78,9 @@ COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
 # agentic-e2e depends on @langwatch/e2e-stack (workspace:*), so `pnpm prune`
 # needs that manifest too.
 COPY dev/tests/e2e-stack/package.json ./dev/tests/e2e-stack/
+# apps/tasks devDepends on @langwatch/seedgen-runner (haven loads it by LANGWATCH_TASK_MODULES;
+# prod never does), so the filtered install and `pnpm prune` need its manifest, not its source.
+COPY tools/seedgen/runner/package.json ./tools/seedgen/runner/
 # The SDK, in full, because the app declares `langwatch: workspace:*` and so
 # imports THIS copy rather than a published release. Manifest-only was enough
 # while the app resolved the registry tarball; now the app's bundle cannot be

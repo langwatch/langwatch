@@ -28,18 +28,21 @@ export function WidgetMenu({
   disabled: boolean;
   /** Opens the editor with an edit drafted in Langy; absent when Langy is not available. */
   onEditWithLangy?: () => void;
-  /** Absent when the reader may not see the widget's data and may not edit widgets either. */
+  /**
+   * Absent, with the API snippet, Duplicate and Delete, on a board the reader cannot edit, and
+   * when the reader may not see the widget's data and may not edit widgets either.
+   */
   onEditCode?: () => void;
   onCopyId: () => void;
-  onCopyApiSnippet: () => void;
+  onCopyApiSnippet?: () => void;
   /** Absent when the widget has nothing of its own to export. */
   exportCsv?: WidgetCsvExportItem;
   /** Drafts an alert on this widget in Langy; absent when Langy is not available. */
   onSetAlert?: () => void;
   /** Drafts a scheduled report of this widget in Langy; absent when Langy is not available. */
   onSendReport?: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
@@ -58,9 +61,11 @@ export function WidgetMenu({
         <Menu.Item value="copy-id" onClick={onCopyId}>
           <Hash size={14} /> Copy widget id
         </Menu.Item>
-        <Menu.Item value="copy-api" onClick={onCopyApiSnippet}>
-          <Braces size={14} /> Copy API snippet
-        </Menu.Item>
+        {onCopyApiSnippet && (
+          <Menu.Item value="copy-api" onClick={onCopyApiSnippet}>
+            <Braces size={14} /> Copy API snippet
+          </Menu.Item>
+        )}
         {exportCsv && (
           <>
             <Menu.Separator />
@@ -78,13 +83,17 @@ export function WidgetMenu({
             <Send size={14} /> Send as a report
           </Menu.Item>
         )}
-        <Menu.Separator />
-        <Menu.Item value="duplicate" onClick={onDuplicate}>
-          <Copy size={14} /> Duplicate
-        </Menu.Item>
-        <Menu.Item value="delete" color="fg.error" onClick={onDelete}>
-          <Trash2 size={14} /> Delete
-        </Menu.Item>
+        {(onDuplicate || onDelete) && <Menu.Separator />}
+        {onDuplicate && (
+          <Menu.Item value="duplicate" onClick={onDuplicate}>
+            <Copy size={14} /> Duplicate
+          </Menu.Item>
+        )}
+        {onDelete && (
+          <Menu.Item value="delete" color="fg.error" onClick={onDelete}>
+            <Trash2 size={14} /> Delete
+          </Menu.Item>
+        )}
       </Menu.Content>
     </Menu.Root>
   );

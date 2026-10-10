@@ -29,6 +29,10 @@ export function useJoinOffer({
   // welcome screen's alone: a dashboard has an organization in view (ADR-171 v6).
   const onboarding = currentOrganizationId === null;
   const offer = identityClient.identity.joinRequests.offer.useQuery();
+  // Names the wait after a request made from the organization form, past a decline.
+  const lookup = identityClient.identity.joinRequests.lookup.useQuery(void 0, {
+    enabled: onboarding,
+  });
   const mine = identityClient.identity.joinRequests.mine.useQuery();
   const invitations = api.invite.pendingForMe.useQuery({}, { enabled: onboarding });
   const dismissOffer = identityClient.identity.joinRequests.dismissOffer.useMutation();
@@ -108,6 +112,7 @@ export function useJoinOffer({
   const view = settled
     ? joinOfferView({
         decision: offer.data,
+        ...(lookup.data ? { lookup: lookup.data } : {}),
         waitingOn: mine.data ?? [],
         currentOrganizationId,
         invitation: onboarding && !invitationSetAside ? (invitations.data?.[0] ?? null) : null,

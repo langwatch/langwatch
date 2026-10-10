@@ -11,13 +11,13 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StubAnalyticsHost } from "../../../testing.tsx";
+import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
-const MEMBER = ["analytics:view", "cost:view", "traces:view", "langy:create"];
+const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];
 const WRITES = /^dashboards\.(?!getAll|listStarred|sourcePresence)|^dashboardWidgets\.(?!list)/;
 
 /** No stored boards; every call is kept, so a write would show. */

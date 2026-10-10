@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+import react from "@vitejs/plugin-react";
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 
 // Absolute so it resolves the same regardless of the consuming package's cwd.
@@ -95,5 +96,9 @@ export function moduleVitestTestOptions(
 }
 
 export function defineModuleVitestConfig(options: ModuleVitestConfigOptions): ViteUserConfig {
-  return defineConfig({ test: moduleVitestTestOptions(options) });
+  return defineConfig({
+    // The UI ships through the React Compiler (apps/ui/vite.config.ts); jsdom suites test the same output.
+    plugins: options.kind === "jsdom" ? [react({ compiler: true })] : [],
+    test: moduleVitestTestOptions(options),
+  });
 }

@@ -16,7 +16,9 @@ import {
   type UpdateTriggerCommand,
   type AutomationApiCreateInput,
   type AutomationApiListSlackChannelsInput,
+  type AutomationApiPreviewEmailInput,
   type AutomationApiTestFireInput,
+  type AutomationEmailPreview,
   type AutomationApiToggleTriggerInput,
   type AutomationApiUpdateTriggerFiltersInput,
   type AutomationApiUpsertInput,
@@ -390,6 +392,12 @@ export class AutomationAuthoringService {
   }
 
   /** Renders and delivers one test notification to the author themselves. */
+  async previewEmail(input: AutomationApiPreviewEmailInput): Promise<AutomationEmailPreview> {
+    const project = await this.collaborators.rules.getProjectIdentity(input.projectId);
+
+    return this.collaborators.automation.previewEmail({ ...input, project });
+  }
+
   async testFire(args: {
     input: AutomationApiTestFireInput;
     author: AutomationTestFireAuthor;

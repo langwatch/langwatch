@@ -578,6 +578,15 @@ const presentations = {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  dashboard_read_only_here: {
+    title: "This dashboard is read-only here",
+    describe: () =>
+      "Another project owns it, so it can be changed only there. Duplicate it to get a copy you can edit in this project.",
+  },
+  dashboard_scope_author_only: {
+    title: "Only the person who made this dashboard can change its scope",
+    describe: () => "Ask them to change who can see it, or duplicate it to get your own copy.",
+  },
   dashboards_not_enabled: {
     title: "Dashboards aren't switched on here",
     describe: () => "This project doesn't have Dashboards enabled yet.",
@@ -1377,6 +1386,13 @@ const presentations = {
     title: "That save would delete the stored credentials",
     describe: () =>
       "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
+  },
+  model_provider_invalid: {
+    title: "That provider can't be saved",
+    describe: (error) =>
+      strEq(error, "reason", "endpoint_not_allowed")
+        ? "The base URL can't be used. Check it is a full address such as https://inference.acme.internal/v1 that resolves to a public host, then save again."
+        : "Check the provider's fields, then save again.",
   },
   model_provider_custom_keys_missing: {
     title: "This provider has no credentials saved",

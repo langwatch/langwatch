@@ -26,7 +26,7 @@ export const agentWeb = defineBrowserModule("agent")
   .withDrawers({
     agentList: {
       load: async () => ({
-        default: (await import("./ui/sections/agent-list-drawer.tsx")).AgentListDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx")).RoutedAgentListDrawer,
       }),
     },
     agentHistory: {

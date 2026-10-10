@@ -55,6 +55,14 @@ Feature: The fence a customer-supplied webhook leaves through
       And a scheme that is neither http nor https is still refused
 
     @unit
+    Scenario: An endpoint save is judged by the rule its delivery is judged by
+      Given a process composed with the escape hatch off
+      When an endpoint is saved with a loopback or private address, or a non-default port
+      Then the save is refused before anything is stored
+      And a process composed with the escape hatch on saves an https endpoint on a
+        local non-default port
+
+    @unit
     Scenario: A send refuses a fenced address before it opens a connection
       Given a webhook sender over the packaged fence
       When a dispatch names a loopback, private, link-local, metadata or

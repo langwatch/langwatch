@@ -10,7 +10,13 @@ import {
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  createDashboardTestProjects,
+  DASHBOARDS_ROLLED_OUT,
+} from "../../app/__tests__/dashboard.fixture.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
+import { DashboardAccessService } from "../dashboard-access.service.ts";
+import { DashboardStarService } from "../dashboard-star.service.ts";
 import type { WorkbenchAccess } from "../dashboard.service.ts";
 import { DashboardService } from "../dashboard.service.ts";
 
@@ -24,12 +30,19 @@ class FixedWorkbenchAccess implements WorkbenchAccess {
 
 function serviceWith(workbenchEnabled = true) {
   const repository = MemoryDashboardRepository.create();
+  const access = DashboardAccessService.create({
+    repository,
+    projects: createDashboardTestProjects(),
+    rollout: DASHBOARDS_ROLLED_OUT,
+  });
 
   return {
     repository,
+    stars: DashboardStarService.create({ repository, access }),
     service: DashboardService.create({
       repository,
       workbenchAccess: new FixedWorkbenchAccess(workbenchEnabled),
+      access,
     }),
   };
 }
@@ -185,7 +198,7 @@ describe("DashboardService", () => {
   describe("given a member creates a dashboard", () => {
     /** @scenario "AC156 No board is starred unless the member stars it" */
     it("stars it for nobody, the creator included", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
 
       const created = await service.create({
         projectId: PROJECT,
@@ -194,9 +207,9 @@ describe("DashboardService", () => {
       });
 
       expect(created.createdById).toBe("member-1");
-      await expect(
-        service.listStarred({ projectId: PROJECT, userId: "member-1" }),
-      ).resolves.toEqual([]);
+      await expect(stars.listStarred({ projectId: PROJECT, userId: "member-1" })).resolves.toEqual(
+        [],
+      );
       const [listed] = await service.getAll({
         projectId: PROJECT,
         graphCountScope: "builder",
@@ -209,19 +222,19 @@ describe("DashboardService", () => {
   describe("given a member's My dashboard is made", () => {
     const myDashboard = (service: DashboardService) =>
       service.create({ projectId: PROJECT, name: MY_DASHBOARD_NAME, createdById: "member-1" });
-    const starredIds = async (service: DashboardService, userId: string) =>
-      (await service.listStarred({ projectId: PROJECT, userId })).map((entry) =>
+    const starredIds = async (stars: DashboardStarService, userId: string) =>
+      (await stars.listStarred({ projectId: PROJECT, userId })).map((entry) =>
         entry.kind === "board" ? entry.dashboard.id : entry.templateId,
       );
 
     /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
     it("stars it for its maker and for nobody else", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
 
       const created = await myDashboard(service);
 
-      await expect(starredIds(service, "member-1")).resolves.toEqual([created.id]);
-      await expect(starredIds(service, "member-2")).resolves.toEqual([]);
+      await expect(starredIds(stars, "member-1")).resolves.toEqual([created.id]);
+      await expect(starredIds(stars, "member-2")).resolves.toEqual([]);
       const [listed] = await service.getAll({
         projectId: PROJECT,
         graphCountScope: "builder",
@@ -232,10 +245,10 @@ describe("DashboardService", () => {
 
     /** @scenario "AC160c A member who unstars My dashboard keeps it unstarred" */
     it("keeps it unstarred once its maker unstars it", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
       const created = await myDashboard(service);
 
-      await service.unstar({
+      await stars.unstar({
         projectId: PROJECT,
         userId: "member-1",
         star: { kind: "board", dashboardId: created.id },
@@ -246,34 +259,34 @@ describe("DashboardService", () => {
         viewer: { userId: "member-1" },
       });
 
-      await expect(starredIds(service, "member-1")).resolves.toEqual([]);
+      await expect(starredIds(stars, "member-1")).resolves.toEqual([]);
     });
 
     it("stars nobody when the board has no maker", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
 
       await service.create({ projectId: PROJECT, name: MY_DASHBOARD_NAME });
 
-      await expect(starredIds(service, "member-1")).resolves.toEqual([]);
+      await expect(starredIds(stars, "member-1")).resolves.toEqual([]);
     });
   });
 
   describe("given one member's stars", () => {
     const board = (dashboardId: string) => ({ kind: "board" as const, dashboardId });
     const template = (templateId: string) => ({ kind: "template" as const, templateId });
-    const listed = async (service: DashboardService, userId: string) =>
-      (await service.listStarred({ projectId: PROJECT, userId })).map((entry) =>
+    const listed = async (stars: DashboardStarService, userId: string) =>
+      (await stars.listStarred({ projectId: PROJECT, userId })).map((entry) =>
         entry.kind === "board" ? entry.dashboard.id : `template:${entry.templateId}`,
       );
 
     /** @scenario "AC157 Stars are per member" */
     it("does not show them to another member", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
       const created = await service.create({ projectId: PROJECT, name: "Reports" });
-      await service.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
+      await stars.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
 
-      await expect(listed(service, "a")).resolves.toEqual([created.id]);
-      await expect(listed(service, "b")).resolves.toEqual([]);
+      await expect(listed(stars, "a")).resolves.toEqual([created.id]);
+      await expect(listed(stars, "b")).resolves.toEqual([]);
 
       const forB = await service.getAll({
         projectId: PROJECT,
@@ -284,82 +297,82 @@ describe("DashboardService", () => {
     });
 
     it("appends a star at the end and is idempotent", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
       const first = await service.create({ projectId: PROJECT, name: "One" });
       const second = await service.create({ projectId: PROJECT, name: "Two" });
       const third = await service.create({ projectId: PROJECT, name: "Three" });
 
-      await service.star({ projectId: PROJECT, userId: "a", star: board(first.id) });
-      await service.star({ projectId: PROJECT, userId: "a", star: board(third.id) });
-      await service.star({ projectId: PROJECT, userId: "a", star: board(second.id) });
+      await stars.star({ projectId: PROJECT, userId: "a", star: board(first.id) });
+      await stars.star({ projectId: PROJECT, userId: "a", star: board(third.id) });
+      await stars.star({ projectId: PROJECT, userId: "a", star: board(second.id) });
       // Starring twice changes nothing.
-      await service.star({ projectId: PROJECT, userId: "a", star: board(third.id) });
+      await stars.star({ projectId: PROJECT, userId: "a", star: board(third.id) });
 
-      await expect(listed(service, "a")).resolves.toEqual([first.id, third.id, second.id]);
+      await expect(listed(stars, "a")).resolves.toEqual([first.id, third.id, second.id]);
     });
 
     /** @scenario "AC165 A star can point at a From LangWatch board" */
     it("round-trips a template star without checking it against a list", async () => {
-      const { service } = serviceWith();
+      const { stars } = serviceWith();
 
-      await service.star({ projectId: PROJECT, userId: "a", star: template("llm-costs") });
-      await service.star({ projectId: PROJECT, userId: "a", star: template("llm-costs") });
+      await stars.star({ projectId: PROJECT, userId: "a", star: template("llm-costs") });
+      await stars.star({ projectId: PROJECT, userId: "a", star: template("llm-costs") });
 
-      await expect(listed(service, "a")).resolves.toEqual(["template:llm-costs"]);
+      await expect(listed(stars, "a")).resolves.toEqual(["template:llm-costs"]);
     });
 
     /** @scenario "AC165 A star can point at a From LangWatch board" */
     it("lists boards and templates in the order they were starred", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
       const created = await service.create({ projectId: PROJECT, name: "One" });
 
-      await service.star({ projectId: PROJECT, userId: "a", star: template("t1") });
-      await service.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
+      await stars.star({ projectId: PROJECT, userId: "a", star: template("t1") });
+      await stars.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
 
-      await expect(listed(service, "a")).resolves.toEqual(["template:t1", created.id]);
+      await expect(listed(stars, "a")).resolves.toEqual(["template:t1", created.id]);
     });
 
     /** @scenario "AC155 Move up and Move down reorder the member's stars" */
     it("unstars a board or a template and reorders both kinds", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
       const a = await service.create({ projectId: PROJECT, name: "A" });
       const b = await service.create({ projectId: PROJECT, name: "B" });
       for (const star of [board(a.id), board(b.id), template("t1")]) {
-        await service.star({ projectId: PROJECT, userId: "u", star });
+        await stars.star({ projectId: PROJECT, userId: "u", star });
       }
 
-      await service.unstar({ projectId: PROJECT, userId: "u", star: board(b.id) });
-      await expect(listed(service, "u")).resolves.toEqual([a.id, "template:t1"]);
+      await stars.unstar({ projectId: PROJECT, userId: "u", star: board(b.id) });
+      await expect(listed(stars, "u")).resolves.toEqual([a.id, "template:t1"]);
 
-      await service.reorderStars({
+      await stars.reorderStars({
         projectId: PROJECT,
         userId: "u",
         stars: [template("t1"), board(a.id)],
       });
-      await expect(listed(service, "u")).resolves.toEqual(["template:t1", a.id]);
+      await expect(listed(stars, "u")).resolves.toEqual(["template:t1", a.id]);
 
-      await service.unstar({ projectId: PROJECT, userId: "u", star: template("t1") });
-      await expect(listed(service, "u")).resolves.toEqual([a.id]);
+      await stars.unstar({ projectId: PROJECT, userId: "u", star: template("t1") });
+      await expect(listed(stars, "u")).resolves.toEqual([a.id]);
     });
 
     /** @scenario "AC26 Deleting a board removes it from every member's stars" */
     it("removes the board from every member's stars when it is deleted", async () => {
-      const { service } = serviceWith();
+      const { service, stars } = serviceWith();
       const created = await service.create({ projectId: PROJECT, name: "Shared" });
-      await service.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
-      await service.star({ projectId: PROJECT, userId: "b", star: board(created.id) });
+      await stars.star({ projectId: PROJECT, userId: "a", star: board(created.id) });
+      await stars.star({ projectId: PROJECT, userId: "b", star: board(created.id) });
 
       await service.delete({ projectId: PROJECT, dashboardId: created.id });
 
-      await expect(listed(service, "a")).resolves.toEqual([]);
-      await expect(listed(service, "b")).resolves.toEqual([]);
+      await expect(listed(stars, "a")).resolves.toEqual([]);
+      await expect(listed(stars, "b")).resolves.toEqual([]);
     });
 
     it("refuses a star on a board the project does not have", async () => {
-      const { service } = serviceWith();
+      const { stars } = serviceWith();
 
       await expect(
-        service.star({ projectId: PROJECT, userId: "a", star: board("missing") }),
+        stars.star({ projectId: PROJECT, userId: "a", star: board("missing") }),
       ).rejects.toBeInstanceOf(DashboardNotFoundError);
     });
   });

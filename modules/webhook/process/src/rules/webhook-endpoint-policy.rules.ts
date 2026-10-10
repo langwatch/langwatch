@@ -13,6 +13,7 @@ import {
   sqsCredentialMode,
   type WebhookUrlProblemCode,
 } from "./webhook-destination.rules.ts";
+import { judgeWebhookUrl } from "./webhook-url-policy.rules.ts";
 
 export type WebhookEndpointConfigurationInput = {
   allowInsecureLocalUrls?: boolean;
@@ -87,6 +88,11 @@ export const WEBHOOK_KEPT_SECRET = "__langwatch_kept_secret__";
 export function assertValidUrl(url: string, configuration: WebhookEndpointConfiguration): void {
   const problem = findUrlProblem(url, configuration.allowInsecureLocalUrls);
   if (problem) throw new WebhookEndpointValidationError(URL_PROBLEM_MESSAGES[problem]);
+  const verdict = judgeWebhookUrl({
+    url,
+    allowInsecureLocal: configuration.allowInsecureLocalUrls,
+  });
+  if (!verdict.admitted) throw new WebhookEndpointValidationError(`url refused: ${verdict.reason}`);
 }
 
 export function assertValidEvents(enabledEvents: string[]): void {

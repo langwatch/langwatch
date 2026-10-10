@@ -752,10 +752,9 @@ export const useLangyStore = defineSlice<LangyState>({
     // the overflow menu (user-picked, persisted).
     panelMode: "sidebar",
     setPanelMode: (panelMode) => set({ panelMode }),
-    // `fold` is the default: the two-tone brand fold IS the panel's design, and
-    // shipping the undecorated surface as the default meant nobody saw it unless they
-    // went looking in a menu. `plain` stays one toggle away.
-    panelEffect: "fold",
+    // The panel surface is plain by default on every deployment; the fold stays one
+    // toggle away in the overflow menu (user-picked, persisted).
+    panelEffect: "plain",
     setPanelEffect: (panelEffect) => set({ panelEffect }),
 
     dockShellClaims: 0,

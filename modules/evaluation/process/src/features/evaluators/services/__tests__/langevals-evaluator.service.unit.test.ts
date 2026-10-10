@@ -135,6 +135,30 @@ describe("LangevalsEvaluatorService", () => {
     });
   });
 
+  describe("given a comparison evaluator run over its candidates", () => {
+    /** @scenario "An evaluator's declared extra fields reach langevals as sent" */
+    it("sends the declared candidates and row index, and drops an undeclared field", async () => {
+      const fetchMock = vi.fn((_url: string, _init: { body: string }) =>
+        Promise.resolve(Response.json([{ status: "processed", score: 1, label: "a" }])),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const candidates = [
+        { id: "a", output: "first" },
+        { id: "b", output: "second" },
+      ];
+
+      await httpService().evaluate({
+        ...params,
+        evaluatorType: "langevals/select_best_compare",
+        data: { input: "q", candidates, row_index: 2, stray: "x" },
+      });
+
+      const [row] = JSON.parse(fetchMock.mock.calls[0]![1].body).data;
+      expect(row).toMatchObject({ input: "q", candidates, row_index: 2 });
+      expect(row).not.toHaveProperty("stray");
+    });
+  });
+
   describe("given langevals answers with something that is not an evaluation result", () => {
     /** @scenario "A langevals answer that is not an evaluation result fails the run naming the evaluator" */
     it("fails with an unexpected-response error carrying the validation issues", async () => {

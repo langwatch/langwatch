@@ -10,7 +10,7 @@ import { useMemo } from "react";
 import { useWidgetDraft } from "../../dashboard-widget/behavior/use-widget-draft.ts";
 import { useWidgetPreview } from "../../dashboard-widget/behavior/use-widget-preview.ts";
 import { BLANK_WIDGET } from "../model/blank-widget.ts";
-import type { BoardPeriod } from "../model/board-period.ts";
+import type { BoardQueryContext } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 
 export function useBoardWidgetEditor({
@@ -18,14 +18,14 @@ export function useBoardWidgetEditor({
   projectId,
   projectSlug,
   dashboardId,
-  period: { periodStart, periodEnd, granularitySeconds },
+  period: { periodStart, periodEnd, granularitySeconds, excludeOrigins },
 }: {
   /** The saved widget, or null for a new one. */
   widget: BoardWidget | null;
   projectId: string;
   projectSlug: string;
   dashboardId: string;
-  period: BoardPeriod;
+  period: BoardQueryContext;
 }) {
   const seed = widget
     ? { name: widget.name, code: widget.definition.code, queries: widget.definition.queries }
@@ -42,6 +42,7 @@ export function useBoardWidgetEditor({
     projectSlug,
     timeWindow,
     granularitySeconds,
+    excludeOrigins,
     dashboardId,
     ...(widget ? { widgetId: widget.id, widgetName: widget.name } : {}),
   });

@@ -30,6 +30,7 @@ type Runtime struct {
 	profile string
 	limits  domain.ColimaLimits
 	lanes   Lanes
+	home    string // haven's home; where the started-by-haven record lives
 }
 
 // New builds a Runtime for a profile. limits are only applied when haven has to
@@ -41,6 +42,13 @@ func New(profile string, limits domain.ColimaLimits, lanes Lanes) *Runtime {
 		profile = "default"
 	}
 	return &Runtime{profile: profile, limits: limits, lanes: lanes}
+}
+
+// WithHome sets haven's home directory, where Runtime records that haven (not
+// the user) started the VM, so only such a VM is ever stopped again.
+func (r *Runtime) WithHome(home string) *Runtime {
+	r.home = home
+	return r
 }
 
 // Profile is the colima profile this runtime drives.
@@ -74,6 +82,10 @@ func (r *Runtime) Ensure(ctx context.Context) (dockerHost string, err error) {
 	}
 
 	isFound, isRunning := r.profileState(ctx)
+	if !isRunning {
+		// Recorded before the start: a start that dies halfway still leaves a VM haven made.
+		r.recordStart()
+	}
 	switch {
 	case isRunning:
 	case isFound:

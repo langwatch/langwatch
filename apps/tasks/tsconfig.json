@@ -249,6 +249,9 @@
       "path": "../../modules/topic/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/trace/process/tsconfig.build.json"
     },
     {

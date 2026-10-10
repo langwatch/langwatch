@@ -7,6 +7,7 @@ import {
   SavedWorkbenchChartNotFoundError,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
+  type DashboardScope,
   type DashboardStar,
   type DashboardUsageCount,
   type StarredDashboard,
@@ -15,11 +16,13 @@ import { Temporal, toDate } from "@langwatch/time";
 
 import type {
   DashboardGraphKind,
+  DashboardReach,
   DashboardRecord,
   DashboardRepository,
   DashboardSummaryRecord,
   DashboardUpdate,
   GraphRecord,
+  MemberStars,
   SavedWorkbenchChartRecord,
 } from "../dashboard.repository.ts";
 
@@ -61,11 +64,17 @@ export class MemoryDashboardRepository implements DashboardRepository {
   #favourites: StoredFavourite[] = [];
   #clock = 0;
   #favouriteId = 0;
+  #archivedProjectIds: ReadonlySet<string>;
 
-  private constructor() {}
+  private constructor(archivedProjectIds: ReadonlySet<string>) {
+    this.#archivedProjectIds = archivedProjectIds;
+  }
 
-  static create(): MemoryDashboardRepository {
-    return new MemoryDashboardRepository();
+  /** The twin holds no project rows, so a test names the archived ones in a set it keeps. */
+  static create(
+    options: { archivedProjectIds?: ReadonlySet<string> } = {},
+  ): MemoryDashboardRepository {
+    return new MemoryDashboardRepository(options.archivedProjectIds ?? new Set());
   }
 
   async countUsage({
@@ -80,26 +89,27 @@ export class MemoryDashboardRepository implements DashboardRepository {
     };
   }
 
-  async findAllDashboards(input: {
-    projectId: string;
-    graphKinds: readonly DashboardGraphKind[];
-  }): Promise<DashboardSummaryRecord[]> {
-    return this.#dashboards
-      .filter((dashboard) => dashboard.projectId === input.projectId)
-      .toSorted((left, right) => left.order - right.order)
-      .map((dashboard) => ({
-        ...dashboard,
-        graphCount: this.#charts.filter(
-          (chart) => chart.dashboardId === dashboard.id && input.graphKinds.includes(chart.kind),
-        ).length,
-      }));
+  async findAllDashboards(
+    input: DashboardReach & { graphKinds: readonly DashboardGraphKind[] },
+  ): Promise<DashboardSummaryRecord[]> {
+    const ordered = this.#dashboards
+      .filter((dashboard) => this.#reaches(input, dashboard))
+      .toSorted((left, right) => left.order - right.order || left.name.localeCompare(right.name));
+    const isOwn = (dashboard: DashboardRecord) => dashboard.projectId === input.projectId;
+    return [...ordered.filter(isOwn), ...ordered.filter((row) => !isOwn(row))].map((dashboard) => ({
+      ...dashboard,
+      graphCount: this.#charts.filter(
+        (chart) => chart.dashboardId === dashboard.id && input.graphKinds.includes(chart.kind),
+      ).length,
+    }));
   }
 
-  async findDashboard(input: {
-    projectId: string;
-    dashboardId: string;
-  }): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
-    const dashboard = this.#dashboard(input);
+  async findDashboard(
+    input: DashboardReach & { dashboardId: string },
+  ): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
+    const dashboard = this.#dashboards.find(
+      (row) => row.id === input.dashboardId && this.#reaches(input, row),
+    );
     if (!dashboard) return undefined;
 
     const graphs = this.#charts
@@ -110,10 +120,12 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return { ...dashboard, graphs };
   }
 
-  async findFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
-    return this.#dashboards
-      .filter((dashboard) => dashboard.projectId === input.projectId)
-      .toSorted((left, right) => left.order - right.order)[0];
+  async findDashboards(
+    input: DashboardReach & { dashboardIds: string[] },
+  ): Promise<DashboardRecord[]> {
+    return this.#dashboards.filter(
+      (dashboard) => input.dashboardIds.includes(dashboard.id) && this.#reaches(input, dashboard),
+    );
   }
 
   async findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
@@ -122,26 +134,20 @@ export class MemoryDashboardRepository implements DashboardRepository {
       .toSorted((left, right) => right.order - left.order)[0];
   }
 
-  async findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]> {
-    return this.#dashboards
-      .filter(
-        (dashboard) =>
-          dashboard.projectId === input.projectId && input.dashboardIds.includes(dashboard.id),
-      )
-      .map((dashboard) => dashboard.id);
-  }
-
   async createDashboard(input: {
     id: string;
     projectId: string;
     name: string;
     order: number;
     createdById?: string | null;
+    scope?: DashboardScope;
   }): Promise<DashboardRecord> {
     const dashboard = dashboardSchema.parse({
       ...input,
       description: null,
       createdById: input.createdById ?? null,
+      scope: input.scope ?? "PROJECT",
+      organizationId: null,
       createdAt: this.#now(),
       updatedAt: this.#now(),
     });
@@ -177,7 +183,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return dashboard;
   }
 
-  async findStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]> {
+  async findStarred(input: MemberStars): Promise<StarredDashboard[]> {
     return this.#starred(input).flatMap((favourite): StarredDashboard[] => {
       if (favourite.templateId !== null) {
         return [{ kind: "template", templateId: favourite.templateId }];
@@ -187,15 +193,23 @@ export class MemoryDashboardRepository implements DashboardRepository {
     });
   }
 
-  async findStarredDashboardIds(input: { projectId: string; userId: string }): Promise<string[]> {
+  async findStarredDashboardIds(input: MemberStars): Promise<string[]> {
     return this.#starred(input).flatMap((favourite) =>
       favourite.dashboardId === null ? [] : [favourite.dashboardId],
     );
   }
 
-  async addStar(input: { projectId: string; userId: string; star: DashboardStar }): Promise<void> {
+  async addStar(input: {
+    projectId: string;
+    userId: string;
+    star: DashboardStar;
+    listedInProjectId?: string;
+  }): Promise<void> {
     if (this.#favourite(input)) return;
-    const position = this.#starred(input).length;
+    const listedIn = [input.projectId, input.listedInProjectId ?? input.projectId];
+    const positions = this.#favourites
+      .filter((row) => row.userId === input.userId && listedIn.includes(row.projectId))
+      .map((row) => row.position);
     this.#favouriteId += 1;
     this.#favourites.push({
       id: `fav_${this.#favouriteId}`,
@@ -203,7 +217,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
       projectId: input.projectId,
       dashboardId: input.star.kind === "board" ? input.star.dashboardId : null,
       templateId: input.star.kind === "template" ? input.star.templateId : null,
-      position,
+      position: Math.max(-1, ...positions) + 1,
     });
   }
 
@@ -216,29 +230,53 @@ export class MemoryDashboardRepository implements DashboardRepository {
     this.#favourites = this.#favourites.filter((row) => row !== found);
   }
 
-  async reorderStars(input: {
-    projectId: string;
-    userId: string;
-    stars: DashboardStar[];
-  }): Promise<void> {
+  async reorderStars(input: MemberStars & { stars: DashboardStar[] }): Promise<void> {
     for (const [position, star] of input.stars.entries()) {
       const favourite = this.#favourite({ ...input, star });
       if (favourite) favourite.position = position;
     }
   }
 
-  /** The member's favourites in this project, in position order. */
-  #starred(input: { projectId: string; userId: string }): StoredFavourite[] {
+  async countOtherStars(input: {
+    projectId: string;
+    dashboardId: string;
+    userId: string;
+  }): Promise<number> {
+    return this.#favourites.filter(
+      (row) =>
+        row.projectId === input.projectId &&
+        row.dashboardId === input.dashboardId &&
+        row.userId !== input.userId,
+    ).length;
+  }
+
+  /** Whether a read from this project, and its organization when named, reaches the board. */
+  #reaches(reach: DashboardReach, dashboard: DashboardRecord): boolean {
+    if (dashboard.projectId === reach.projectId) return true;
+    return (
+      reach.organizationId !== undefined &&
+      dashboard.scope === "ORGANIZATION" &&
+      dashboard.organizationId === reach.organizationId &&
+      !this.#archivedProjectIds.has(dashboard.projectId)
+    );
+  }
+
+  /** The member's favourites as this project lists them, in position order. */
+  #starred(input: MemberStars): StoredFavourite[] {
+    const shared = (input.sharedProjectIds ?? []).filter(
+      (projectId) => !this.#archivedProjectIds.has(projectId),
+    );
     return this.#favourites
-      .filter((row) => row.projectId === input.projectId && row.userId === input.userId)
+      .filter(
+        (row) =>
+          row.userId === input.userId &&
+          (row.projectId === input.projectId ||
+            (row.dashboardId !== null && shared.includes(row.projectId))),
+      )
       .toSorted((left, right) => left.position - right.position);
   }
 
-  #favourite(input: {
-    projectId: string;
-    userId: string;
-    star: DashboardStar;
-  }): StoredFavourite | undefined {
+  #favourite(input: MemberStars & { star: DashboardStar }): StoredFavourite | undefined {
     return this.#starred(input).find((row) =>
       input.star.kind === "board"
         ? row.dashboardId === input.star.dashboardId

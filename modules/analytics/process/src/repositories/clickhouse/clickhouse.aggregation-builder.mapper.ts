@@ -677,7 +677,8 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
           GROUP BY TenantId, TraceId
         )
         ARRAY JOIN buckets AS bucket
-        WHERE SpanModelKey != 'unknown'
+        WHERE ((
+          SpanModelKey != 'unknown'
           OR SpanModelCost > 0
           OR SpanModelNonBilledCost > 0
           OR SpanModelPromptTokens > 0
@@ -685,6 +686,7 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
           OR SpanModelCacheReadTokens > 0
           OR SpanModelCacheWriteTokens > 0
           OR SpanModelReasoningTokens > 0
+        ))
       ) ${smd} ON ${ts}.TenantId = ${smd}.TenantId AND ${ts}.TraceId = ${smd}.TraceId`;
 }
 
@@ -696,7 +698,7 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
 function spanModelPartitionMissExpr(): string {
   const ts = tableAliases.trace_summaries;
   const smd = SPAN_MODEL_ALIAS;
-  return `(${smd}.SpanModelKey IS NULL OR ${smd}.SpanModelKey = '' OR ${ts}.SpanCount > ${MAX_PROCESSED_SPANS} OR ${smd}.TraceSpanCount < ${ts}.SpanCount)`;
+  return `((${smd}.SpanModelKey IS NULL OR ${smd}.SpanModelKey = '' OR ${ts}.SpanCount > ${MAX_PROCESSED_SPANS} OR ${smd}.TraceSpanCount < ${ts}.SpanCount))`;
 }
 
 /**

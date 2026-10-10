@@ -243,16 +243,20 @@ function useResetOnDefaultsChange({
     if (currentDefaults !== prevDefaultsRef.current) {
       prevDefaultsRef.current = currentDefaults;
       if (defaultValues) {
-        reset({
-          name: "",
-          situation: "",
-          criteria: [],
-          labels: [],
-          parameters: [],
-          callerVoice: DEFAULT_CALLER_VOICE,
-          testSuiteId: null,
-          ...defaultValues,
-        });
+        reset(
+          {
+            name: "",
+            situation: "",
+            criteria: [],
+            labels: [],
+            parameters: [],
+            callerVoice: DEFAULT_CALLER_VOICE,
+            testSuiteId: null,
+            ...defaultValues,
+          },
+          // The compiled form never re-calls register(), so the reset keeps its fields (WEB-5030).
+          { keepFieldsRef: true },
+        );
       }
     }
   }, [defaultValues, reset]);

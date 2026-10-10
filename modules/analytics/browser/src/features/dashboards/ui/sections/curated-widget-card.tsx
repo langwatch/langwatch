@@ -24,6 +24,7 @@ export function CuratedWidgetCard({
   rowSpan,
   timeWindow,
   granularitySeconds,
+  excludeOrigins,
   onAskLangy,
 }: {
   widget: BoardTemplateWidget;
@@ -36,6 +37,8 @@ export function CuratedWidgetCard({
   rowSpan: number;
   timeWindow: { start: number; end: number };
   granularitySeconds: BoardPeriod["granularitySeconds"];
+  /** Trace origins the board leaves out of every query this widget runs. */
+  excludeOrigins: readonly string[];
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;
 }) {
@@ -67,6 +70,7 @@ export function CuratedWidgetCard({
         maxHeight={widgetBodyHeightPx(rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
+        excludeOrigins={excludeOrigins}
         onFaceChange={setFace}
         onExportChange={csvExport.onExportChange}
       />

@@ -356,22 +356,6 @@ Raises the prepaid commit a renewal or top-up invoice agreed.
 raiseContractCommit(input: { organizationId: string; byUsdCents: number; operatorId: string; }): Promise<IssuedLicenseView>;
 ```
 
-#### `syncContractBudget`
-
-Re-derives the contract budget's cap from the license terms.
-
-```typescript
-syncContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
-#### `resetContractBudget`
-
-Starts a new budget window: spend so far no longer counts.
-
-```typescript
-resetContractBudget(input: { organizationId: string; operatorId: string }): Promise<void>;
-```
-
 #### `findConnectServicesForManagedKey`
 
 The hosted services the active license behind one managed key is entitled to, empty when no active license names that key. The gateway resolves a CONNECT key's scope through this and never reads `IssuedLicense` itself.
@@ -621,19 +605,20 @@ Declared at `src/eventing/license-sync.pipeline.ts:57`.
 
 ### Pipeline `licensing_customer` (aggregate `licensing_customer`)
 
-Declared at `src/eventing/licensing-customer.pipeline.ts:83`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`, `connectCredentialIssuedEventSchema`.
+Declared at `src/eventing/licensing-customer.pipeline.ts:89`. Events: `selfHostedCustomerLicensedEventSchema`, `connectServiceSwitchedEventSchema`, `licenseSyncFinishedEventSchema`, `licenseStoredEventSchema`, `licenseClearedEventSchema`, `managedKeyRetiredEventSchema`, `managedKeyInvalidatedEventSchema`, `connectCredentialIssuedEventSchema`, `contractTermsChangedEventSchema`.
 
 | Kind            | Name                               | Handles                                                                                    | Declared at                                       |
 | --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| command         | `recordSelfHostedCustomerLicensed` | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:97`  |
-| command         | `recordConnectServiceSwitched`     | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:98`  |
-| command         | `recordLicenseSyncFinished`        | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:99`  |
-| command         | `recordLicenseStored`              | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:100` |
-| command         | `recordLicenseCleared`             | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:101` |
-| command         | `recordManagedKeyRetired`          | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:102` |
-| command         | `recordManagedKeyInvalidated`      | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:103` |
-| command         | `recordConnectCredentialIssued`    | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:104` |
-| peer subscriber | `licensingManagedKeyProvisioned`   | `lw.gateway.managed_key_provisioned` from [gateway](../../../../modules/gateway/README.md) | `src/eventing/licensing-customer.pipeline.ts:106` |
+| command         | `recordSelfHostedCustomerLicensed` | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:104` |
+| command         | `recordConnectServiceSwitched`     | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:105` |
+| command         | `recordLicenseSyncFinished`        | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:106` |
+| command         | `recordLicenseStored`              | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:107` |
+| command         | `recordLicenseCleared`             | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:108` |
+| command         | `recordManagedKeyRetired`          | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:109` |
+| command         | `recordManagedKeyInvalidated`      | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:110` |
+| command         | `recordConnectCredentialIssued`    | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:111` |
+| command         | `recordContractTermsChanged`       | –                                                                                          | `src/eventing/licensing-customer.pipeline.ts:112` |
+| peer subscriber | `licensingManagedKeyProvisioned`   | `lw.gateway.managed_key_provisioned` from [gateway](../../../../modules/gateway/README.md) | `src/eventing/licensing-customer.pipeline.ts:114` |
 
 ### Tasks
 
@@ -647,8 +632,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:176`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:177`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:175`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:176`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

@@ -194,14 +194,22 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 	// The simulators' provider settings (mail, storage, voice, analytics, LLM),
 	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
 	// below, so a monolith checkout's one lane gets them too.
+	p.base = append(p.base, simulatorsEnv(opts.Selection, st, repoDir)...)
+	return p
+}
+
+// simulatorsEnv is every selected simulator's provider settings. The lanes and the
+// seed both take it: the seed writes the LLM base URLs into the provider rows.
+func simulatorsEnv(sel domain.Selection, st domain.Stack, repoDir string) []string {
+	var env []string
 	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.LLMService} {
 		for _, svc := range st.Services {
 			if svc.Name == name {
-				p.base = append(p.base, simulatorBaseEnv(opts.Selection, svc, repoDir)...)
+				env = append(env, simulatorBaseEnv(sel, svc, repoDir)...)
 			}
 		}
 	}
-	return p
+	return env
 }
 
 // simulatorBaseEnv points the product at a selected simulator — but never over
@@ -251,6 +259,9 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	env := append(domain.LaneDatabaseEnv(p.base, lane),
 		"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
 		p.o.compileCacheEnv(p.st.Slug))
+	if p.opts.Selection.Held {
+		env = append(env, "LANGWATCH_DEV_WATCH=0")
+	}
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
 		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {

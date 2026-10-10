@@ -57,7 +57,7 @@ async function codeOf(call: Promise<unknown>): Promise<unknown> {
 
 describe("Dashboards v1 on the server", () => {
   describe("given boards created by different members", () => {
-    /** @scenario "AC18 Every board in the project is visible to every member" */
+    /** @scenario "AC18 Every Project board is visible to every member of the project" */
     it("lists and opens every board for every member", async () => {
       const app = appWith();
       const mine = await app.create({
@@ -83,7 +83,7 @@ describe("Dashboards v1 on the server", () => {
       ).resolves.toMatchObject({ id: theirs.id });
     });
 
-    /** @scenario "AC26 Any member with the edit permission can edit any board" */
+    /** @scenario "AC26 Any member with the edit permission can edit any board they can see" */
     it("lets any member rename, describe and delete a board another member created", async () => {
       const app = appWith();
       const board = await app.create({
@@ -144,7 +144,7 @@ describe("Dashboards v1 on the server", () => {
       return { app, repositories, board, placed, unplaced };
     }
 
-    /** @scenario "AC18 Blocks on any board are reachable to every member" */
+    /** @scenario "AC18 Blocks on a Project board are reachable to every member" */
     it("lists, reads and writes every block for every member", async () => {
       const { app, board, placed, unplaced } = await boardWithBlocks();
       const listedFor = async (viewer?: { userId: string }) =>
@@ -164,7 +164,7 @@ describe("Dashboards v1 on the server", () => {
       ).resolves.toBeUndefined();
     });
 
-    /** @scenario "AC18 Saved charts on any board are reachable to every member" */
+    /** @scenario "AC18 Saved charts on a Project board are reachable to every member" */
     it("lists and reads the placed chart for every member and a project credential", async () => {
       const { app } = await boardWithBlocks();
       const listedFor = async (viewer?: { userId: string }) =>

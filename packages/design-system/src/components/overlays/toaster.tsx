@@ -12,7 +12,7 @@ import {
   Toast,
 } from "@chakra-ui/react";
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 /** How many cards a collapsed stack shows: the newest and two peeking behind it. */
 export const STACK_DEPTH = 3;
@@ -43,11 +43,11 @@ export const toaster: Omit<CreateToasterReturn, "create"> & {
 };
 
 const STATUS = {
-  error: { fg: "red.fg", action: "orange.fg", filled: true },
-  warning: { fg: "yellow.fg", action: "orange.fg", filled: true },
-  success: { fg: "green.fg", action: "green.fg", filled: true },
-  info: { fg: "fg.muted", action: "orange.fg", filled: false },
-  loading: { fg: "fg.muted", action: "orange.fg", filled: false },
+  error: { fg: "red.fg", filled: true },
+  warning: { fg: "yellow.fg", filled: true },
+  success: { fg: "green.fg", filled: true },
+  info: { fg: "fg.muted", filled: false },
+  loading: { fg: "fg.muted", filled: false },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
@@ -56,10 +56,13 @@ const statusOf = (type: string | undefined): ToastStatus =>
 const onPanelOnly = (status: ToastStatus, color: string) =>
   STATUS[status].filled ? { _light: "inherit", _dark: color } : color;
 
-export const toastActionColor = (type: string | undefined) => {
-  const status = statusOf(type);
-  return onPanelOnly(status, STATUS[status].action);
-};
+/** Secondary actions wear the toast's own foreground, quieter than its title, in both modes. */
+export const toastActionStyle = {
+  color: "inherit",
+  opacity: 0.8,
+  "&:hover": { opacity: 1 },
+  "--toast-trigger-bg": "transparent",
+} as const;
 
 function StatusGlyph({ status }: { status: ToastStatus }) {
   const props = { size: 15, "aria-hidden": true } as const;
@@ -147,9 +150,29 @@ export function Toaster({
 }: {
   renderMeta?: (meta: Record<string, unknown> | undefined) => ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest("[data-toast-region]"))
+        setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
   return (
     <Portal>
-      <ChakraToaster toaster={toaster} insetInline={{ mdDown: "4" }}>
+      <ChakraToaster
+        data-toast-region=""
+        toaster={toaster}
+        insetInline={{ mdDown: "4" }}
+        data-fan={open ? undefined : ""}
+        onClick={(event) => {
+          if (event.target instanceof Element && event.target.closest("button")) return;
+          setOpen(true);
+        }}
+        onMouseLeave={() => setOpen(false)}
+      >
         {(toast) => {
           const status = statusOf(toast.type);
           const stack = toaster.getVisibleToasts();
@@ -169,7 +192,7 @@ export function Toaster({
                     alignSelf="flex-start"
                     fontSize="12px"
                     fontWeight="560"
-                    css={{ color: toastActionColor(toast.type) }}
+                    css={toastActionStyle}
                   >
                     {toast.action.label}
                   </Toast.ActionTrigger>

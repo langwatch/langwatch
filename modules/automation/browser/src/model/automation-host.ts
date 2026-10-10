@@ -132,6 +132,12 @@ export abstract class AutomationHost {
 
   abstract succeeded(notice: AutomationSuccessNotice): void;
 
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: AutomationSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: AutomationSuccessNotice): void;
+
   abstract failed(failure: AutomationFailureNotice): void;
 
   /** One line of copy for a failure, for the surfaces too tight for a toast. */

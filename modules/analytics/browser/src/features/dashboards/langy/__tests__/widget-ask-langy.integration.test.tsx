@@ -11,14 +11,16 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StubAnalyticsHost } from "../../../../testing.tsx";
+import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../../testing.tsx";
 import {
+  HOME_BOARD,
   NO_PROCEDURES,
   renderDashboards,
 } from "../../__tests__/render-dashboards.test-helpers.tsx";
 import DashboardBoardScreen from "../../ui/sections/dashboard-board.screen.tsx";
 
 const BOARD = {
+  ...HOME_BOARD,
   id: "board-1",
   name: "Weekly review",
   description: null,
@@ -69,7 +71,7 @@ function inMemoryServer() {
 }
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
-const MEMBER = ["analytics:view", "cost:view", "traces:view"];
+const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS];
 const LANGY_MEMBER = [...MEMBER, "langy:create"];
 const ASK_TRAFFIC = "Ask Langy about Traffic";
 

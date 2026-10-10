@@ -31,6 +31,8 @@ export type UiTestHost = {
   navigate(to: string, options?: { replace?: boolean }): void;
   back?(): void;
   succeeded?(notice: UiSuccessNotice): void;
+  warned?(notice: UiSuccessNotice): void;
+  informed?(notice: UiSuccessNotice): void;
   failed?(failure: UiFailureNotice): void;
 };
 
@@ -92,6 +94,14 @@ class HostUiFeedback extends UiFeedback {
 
   succeeded(notice: UiSuccessNotice): void {
     this.host.succeeded?.(notice);
+  }
+
+  warned(notice: UiSuccessNotice): void {
+    this.host.warned?.(notice);
+  }
+
+  informed(notice: UiSuccessNotice): void {
+    this.host.informed?.(notice);
   }
 
   failed(failure: UiFailureNotice): void {

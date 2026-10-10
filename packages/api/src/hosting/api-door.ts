@@ -190,6 +190,11 @@ export type TrpcAuditSink = Readonly<{
     targetId?: string;
     /** The human behind an impersonated call, as `impersonatorId`. */
     metadata?: Record<string, string>;
+    /** The operator behind an impersonated call, in the column an incident filters on. */
+    actorUserId?: string;
+    /** Where the call came from, as the door resolved it, and the caller's browser. */
+    ipAddress?: string;
+    userAgent?: string;
   }): Promise<void> | void;
   /**
    * The organization holding a project or team, null when none does. A procedure declaring

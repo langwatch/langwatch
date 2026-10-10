@@ -58,8 +58,11 @@ export function auditScopeIds(input: unknown): {
 const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
 const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
 
+/** Main's self-audited paths: the handler writes a richer row, with the previous value. */
+const SELF_AUDITED_PATHS = new Set(["identity.joinRequests.setJoining"]);
+
 export function isAuditLogExempt(path: string): boolean {
-  if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;
+  if (AUDIT_LOG_EXEMPT_PATHS.has(path) || SELF_AUDITED_PATHS.has(path)) return true;
 
   return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
 }

@@ -11,13 +11,32 @@ It sits behind the `release_dashboards` feature flag, which is off by default.
 ## Your first board
 
 Opening Dashboards opens your board called "My dashboard", and it starts in your
-starred boards. If you have no such board yet, LangWatch makes one for you, called "My dashboard", that only you can
-see.
+starred boards. If you have no such board yet, LangWatch makes one for you. It
+starts at the scope Only me, so only you see it. You can change its scope like
+any other board's (see [Who can see a board](#who-can-see-a-board)).
 
 ## The sidebar
 
-The sidebar has a quick search box and the list of saved boards, grouped into
-Mine, Team and Organisation. The **+** button creates a new board.
+The sidebar lists, in order:
+
+- **Your dashboards**: your "My dashboard" first, then the project's other
+  boards by name. The **+** next to the heading makes a blank board at once and
+  opens it.
+- **Starred**: the boards you starred, in your own order. Stars are yours alone.
+  The menu of a starred board has Move up and Move down.
+- **From your organisation**: the heading reads "From" and your organisation's
+  name. It lists the boards that other projects of your organisation set to
+  Organization, by name, and shows only when there is such a board.
+- **From LangWatch**: boards LangWatch made for you. Click the heading to fold
+  the group; it stays folded until you click it again.
+
+A board set to Only me has a small lock next to its name, and a board set to
+Organization has a building. A Project board has no mark.
+
+The **⋮** menu of a board offers Star or Unstar, Rename, Duplicate and Delete.
+On a board you made it also offers the three scope choices. On a board you
+cannot edit it offers Star or Unstar and **Duplicate to edit**. "My dashboard"
+cannot be renamed or deleted.
 
 Under that, the sidebar lists, in order:
 
@@ -41,7 +60,7 @@ Protect, Profit and Trust, with a search box and filters for the category and
 the agent type.
 
 **Add to this project** on a card creates a new board named after the template
-(numbered "Agent health 2" and so on if the name is taken), visible only to you,
+(numbered "Agent health 2" and so on if the name is taken), at the scope Project,
 with the template's widgets. A template you already added shows **Added**,
 linking to its board.
 
@@ -111,8 +130,46 @@ menu offers:
 - **Duplicate**: adds a copy of the widget.
 - **Delete**: removes the widget.
 
-A board's visibility is Only me, Team or Organisation. Only the board's
-creator or a project admin can change its visibility or delete it.
+## Who can see a board
+
+Every board has a scope, shown next to its title:
+
+- **Only me**: only you see the board.
+- **Project**: everyone in the project sees it. A new board starts here.
+- **Organization**: everyone in your organisation sees it, in each of their
+  projects. In each project the board shows that project's own data, and each
+  member sees what their role lets them see.
+
+Only the member who made a board can change its scope, from the control next
+to the title or from the board's **⋮** menu in the sidebar. A project admin
+cannot. Everyone else sees the scope as a badge. Who can edit or delete a board
+does not change: that still follows your role's analytics permissions.
+
+LangWatch asks you to confirm a change only when somebody loses the board: when
+you set a board to Only me that other members starred, and when you lower a
+board from Organization. Every other change happens at once, and the note that
+follows has an **Undo**. Other members' stars are kept, and come back if you
+widen the scope again.
+
+The project where a board was made owns it. An Organization board can be edited
+only in that project. In every other project it is read-only: you cannot add,
+move, edit or delete a widget, and the header says which project owns the board.
+To change it, pick **Duplicate to edit** in the board's **⋮** menu in the
+sidebar. That makes your own copy in the project you are in.
+
+An Organization board also has a **Project** control in its header. It names the
+project whose data you see, and lists the projects of your organisation that you
+can open. Pick one to open the same board under that project.
+
+If you open the address of a board that you may not see, the page says "This
+dashboard is not available". The board was deleted, or the member who made it
+set its scope to Only me.
+
+A project API key reads the project's boards except the ones set to Only me.
+
+Alerts and scheduled reports do not read a board set to Only me either. An alert
+or a report on a chart of such a board sends no chart until you widen the
+board's scope.
 
 ## Asking questions
 

@@ -240,6 +240,8 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /** Trace origins the surface leaves out of every view the statement reads; none when absent. */
+  excludeOrigins?: readonly string[];
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
 }>;
