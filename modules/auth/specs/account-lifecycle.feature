@@ -72,6 +72,13 @@ Feature: Account changes that end credentials
       Then the account storage sign-in reads no longer holds it
       And removing the last remaining way in is refused
 
+    @unit
+    Scenario: A passkey counts as another way in when the password is removed
+      Given an account on identity holding a password, a passkey and a confirmed address
+      When its holder removes the password
+      Then identity's detach guard decides, not a count of account rows
+      And the password is removed while the guard keeps a way back
+
   Rule: An address change writes through user, then ends the sessions that cached the old one
 
     @unit

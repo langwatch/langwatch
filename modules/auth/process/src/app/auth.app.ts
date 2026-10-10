@@ -193,7 +193,7 @@ const logger = createLogger("langwatch:auth");
 type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
-  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
+  identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail">;
   /** The sign-up policy, and the invitation an invite link lands on (organization's). */
   organizations: SignUpPolicy & Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite">;
   /** The account writes auth's lifecycle doors run before ending credentials. */
@@ -459,7 +459,10 @@ export class AuthModule implements AuthApiContract {
       auth: this,
       issuesOwnPasswords: () => this.#issuesOwnPasswords,
     });
-    this.#ownSignInMethods = OwnSignInMethodService.create({ credentials: credentialAccounts });
+    this.#ownSignInMethods = OwnSignInMethodService.create({
+      credentials: credentialAccounts,
+      identity: dependencies.identity,
+    });
     this.#registrations = CredentialRegistrationService.create({
       users: dependencies.users,
       organizations: dependencies.organizations,

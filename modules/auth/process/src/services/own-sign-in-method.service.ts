@@ -3,6 +3,7 @@
  * identity branch detaches it where sign-in reads (ADR-116), never only the legacy row.
  * Spec: modules/auth/specs/account-lifecycle.feature.
  */
+import type { IdentityApi } from "@langwatch/identity-contract";
 import {
   UserLastAuthenticationMethodError,
   UserLinkedAccountNotFoundError,
@@ -11,24 +12,36 @@ import {
 
 import type { CredentialAccounts } from "./own-password.service.ts";
 
+type SignInMethodAccounts = Pick<CredentialAccounts, "listAccountIds" | "deleteAccount">;
+
 export class OwnSignInMethodService {
   private constructor(
-    private readonly credentials: Pick<CredentialAccounts, "listAccountIds" | "deleteAccount">,
+    private readonly credentials: SignInMethodAccounts,
+    private readonly identity: Pick<IdentityApi, "resolveEmail">,
   ) {}
 
   static create({
     credentials,
+    identity,
   }: {
-    credentials: Pick<CredentialAccounts, "listAccountIds" | "deleteAccount">;
+    credentials: SignInMethodAccounts;
+    identity: Pick<IdentityApi, "resolveEmail">;
   }): OwnSignInMethodService {
-    return new OwnSignInMethodService(credentials);
+    return new OwnSignInMethodService(credentials, identity);
   }
 
-  /** Refuses the last way in; the identity branch's detach guard still answers for the rest. */
+  /**
+   * A legacy account refuses its last account row, as main's does. A moved account asks identity's
+   * detach guard, which the account delete runs, so a passkey or an address counts as a way back.
+   */
   async unlink(input: UnlinkUserAccountInput): Promise<void> {
-    const accountIds = await this.credentials.listAccountIds({ userId: input.userId });
+    const [accountIds, email] = await Promise.all([
+      this.credentials.listAccountIds({ userId: input.userId }),
+      this.identity.resolveEmail({ userId: input.userId }),
+    ]);
+    const onIdentity = email.kind === "resolved";
 
-    if (accountIds.length <= 1) throw new UserLastAuthenticationMethodError();
+    if (!onIdentity && accountIds.length <= 1) throw new UserLastAuthenticationMethodError();
     if (!accountIds.includes(input.accountId)) {
       throw new UserLinkedAccountNotFoundError(input.accountId);
     }
