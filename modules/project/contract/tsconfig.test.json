@@ -6,10 +6,20 @@
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
   "include": [
-    "src/**/*.ts",
+    "src/**/__tests__/**/*.ts",
+    "src/**/__mocks__/**/*.ts",
+    "src/**/tests/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.*.ts",
+    "src/**/*.stories.ts",
+    "src/**/*.stories.*.ts",
+    "src/**/*.bench.ts",
+    "src/**/*.bench.*.ts",
+    "src/**/__bench__/**/*.ts",
     "../../project/contract/tests/project.service.unit.test.ts",
-    "../../project/contract/src/project.service.ts",
-    "../../project/contract/src/index.ts"
+    "../../project/contract/src/project.service.ts"
   ],
   "references": [
     {

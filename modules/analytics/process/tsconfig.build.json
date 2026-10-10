@@ -47,9 +47,6 @@
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/span-normalisation/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
@@ -72,9 +69,6 @@
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/limiter/tsconfig.build.json"
@@ -107,9 +101,6 @@
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
-      "path": "../../coding-agent/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
@@ -130,5 +121,15 @@
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/coding-agent-contract",
+        "@langwatch/model-provider-contract",
+        "@langwatch/span-normalisation"
+      ]
+    }
+  }
 }

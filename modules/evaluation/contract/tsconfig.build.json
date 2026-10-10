@@ -22,28 +22,31 @@
   ],
   "references": [
     {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../evaluator/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/secrets/tsconfig.build.json"
+      "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../topic/contract/tsconfig.build.json"
     },
     {
-      "path": "../../trace/contract/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/secrets"]
+    }
+  }
 }

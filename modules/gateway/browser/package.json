@@ -21,7 +21,6 @@
   "dependencies": {
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
-    "@langwatch/authorization": "workspace:*",
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",
@@ -50,6 +49,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",

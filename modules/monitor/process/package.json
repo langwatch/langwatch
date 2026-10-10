@@ -41,7 +41,6 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "nanoid": "catalog:",
@@ -50,6 +49,7 @@
   "devDependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@trpc/server": "catalog:",

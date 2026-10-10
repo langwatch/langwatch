@@ -56,7 +56,6 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -90,6 +89,7 @@
   "devDependencies": {
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

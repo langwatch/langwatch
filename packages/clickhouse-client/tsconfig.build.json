@@ -24,22 +24,22 @@
   ],
   "references": [
     {
-      "path": "../authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../clickhouse-markers/tsconfig.build.json"
+      "path": "../time/tsconfig.build.json"
     },
     {
       "path": "../limiter/tsconfig.build.json"
     },
     {
-      "path": "../observability/tsconfig.build.json"
+      "path": "../clickhouse-markers/tsconfig.build.json"
     },
     {
-      "path": "../task/tsconfig.build.json"
-    },
-    {
-      "path": "../time/tsconfig.build.json"
+      "path": "../authorization/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/observability", "@langwatch/task"]
+    }
+  }
 }

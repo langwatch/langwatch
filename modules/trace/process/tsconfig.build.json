@@ -61,9 +61,6 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/redaction/tsconfig.build.json"
-    },
-    {
       "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
@@ -89,9 +86,6 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"
@@ -128,9 +122,6 @@
     },
     {
       "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
       "path": "../../data-retention/contract/tsconfig.build.json"
@@ -175,7 +166,16 @@
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/monitor-contract", "@langwatch/redaction"]
+    }
+  }
 }

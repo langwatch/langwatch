@@ -41,7 +41,6 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
-    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
@@ -63,6 +62,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

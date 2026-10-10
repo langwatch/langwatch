@@ -24,16 +24,10 @@
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/plans/tsconfig.build.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../client/tsconfig.build.json"
-    },
-    {
-      "path": "../../billing/contract/tsconfig.build.json"
     },
     {
       "path": "../../billing/client/tsconfig.build.json"
@@ -49,12 +43,17 @@
     },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/authz/contract/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/authz-contract",
+        "@langwatch/enterprise-billing-contract",
+        "@langwatch/plans",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

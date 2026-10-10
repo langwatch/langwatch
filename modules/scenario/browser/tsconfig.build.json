@@ -81,9 +81,6 @@
       "path": "../../feature-flag/client/tsconfig.build.json"
     },
     {
-      "path": "../../experiment/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
@@ -109,9 +106,12 @@
     },
     {
       "path": "../../agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/experiment-contract", "@langwatch/vitest-config"]
+    }
+  }
 }

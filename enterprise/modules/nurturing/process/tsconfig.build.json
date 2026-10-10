@@ -63,9 +63,6 @@
       "path": "../../../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/langy/contract/tsconfig.build.json"
     },
     {
@@ -90,16 +87,20 @@
       "path": "../../../../modules/auth/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/test-harness/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/process-stores/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/module",
+        "@langwatch/process-stores",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

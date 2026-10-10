@@ -32,7 +32,6 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
@@ -43,6 +42,7 @@
   },
   "devDependencies": {
     "@langwatch/authz-process": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",

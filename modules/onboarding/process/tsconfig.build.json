@@ -30,9 +30,6 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/secrets/tsconfig.build.json"
-    },
-    {
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
@@ -78,9 +75,6 @@
       "path": "../../dashboard/contract/tsconfig.build.json"
     },
     {
-      "path": "../../automation/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -90,10 +84,16 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/secrets/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/automation-contract", "@langwatch/vitest-config"]
+    }
+  }
 }

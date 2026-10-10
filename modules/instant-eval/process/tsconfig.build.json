@@ -33,22 +33,13 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/task/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
@@ -87,12 +78,6 @@
       "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -105,13 +90,23 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
-      "path": "../../instant-eval-judge/process/tsconfig.build.json"
+      "path": "../../../packages/process-stores/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/clickhouse-client",
+        "@langwatch/config",
+        "@langwatch/instant-eval-judge-process",
+        "@langwatch/plans",
+        "@langwatch/task",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

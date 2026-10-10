@@ -46,9 +46,6 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/task/tsconfig.build.json"
-    },
-    {
       "path": "../../suite/contract/tsconfig.build.json"
     },
     {
@@ -83,9 +80,6 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
@@ -148,10 +142,7 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
-      "path": "../../organization/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../model-provider/process/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/egress/tsconfig.build.json"
@@ -162,5 +153,15 @@
     {
       "path": "../../../packages/authorization/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/model-provider-process",
+        "@langwatch/organization-contract",
+        "@langwatch/task"
+      ]
+    }
+  }
 }

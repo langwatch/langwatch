@@ -53,7 +53,6 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
@@ -63,6 +62,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

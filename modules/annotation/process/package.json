@@ -29,7 +29,6 @@
   "dependencies": {
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
@@ -38,7 +37,6 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
@@ -56,6 +54,7 @@
   },
   "devDependencies": {
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

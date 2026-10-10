@@ -5,7 +5,12 @@
     "noEmit": true,
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "preview/**/*.ts"],
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "preview/**/*.ts"
+  ],
   "references": [
     {
       "path": "./tsconfig.build.json"

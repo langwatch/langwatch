@@ -8,11 +8,9 @@
     "test:ui": "playwright test --ui",
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
-  "dependencies": {
-    "@langwatch/e2e-stack": "workspace:*",
-    "@langwatch/enterprise-licensing-process": "workspace:*"
-  },
   "devDependencies": {
+    "@langwatch/e2e-stack": "workspace:*",
+    "@langwatch/enterprise-licensing-process": "workspace:*",
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",

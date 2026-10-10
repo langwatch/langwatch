@@ -6,8 +6,16 @@
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
+    "src/**/__tests__/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.*.ts",
+    "src/**/__tests__/**/*.tsx",
+    "src/**/*.test.tsx",
+    "src/**/*.test.*.tsx",
+    "src/**/*.spec.tsx",
+    "src/**/*.spec.*.tsx",
     "gallery/**/*.ts",
     "gallery/**/*.tsx",
     "vitest.config.ts"

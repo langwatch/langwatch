@@ -45,9 +45,6 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/process/tsconfig.build.json"
     },
     {
@@ -102,9 +99,6 @@
       "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
@@ -123,7 +117,7 @@
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
-      "path": "../../prompt/process/tsconfig.build.json"
+      "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
@@ -131,5 +125,11 @@
     {
       "path": "../../../packages/authorization/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/config", "@langwatch/prompt-process"]
+    }
+  }
 }

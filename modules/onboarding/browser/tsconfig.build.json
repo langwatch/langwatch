@@ -24,9 +24,6 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../project/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {
@@ -54,16 +51,10 @@
       "path": "../../langy/client/tsconfig.build.json"
     },
     {
-      "path": "../../identity/client/tsconfig.build.json"
-    },
-    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/error-views/tsconfig.build.json"
     },
     {
       "path": "../../../enterprise/modules/governance/client/tsconfig.build.json"
@@ -85,9 +76,17 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/error-views",
+        "@langwatch/identity-client",
+        "@langwatch/project-contract",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

@@ -32,7 +32,6 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/eventing": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -50,6 +49,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/node": "catalog:",

@@ -78,13 +78,16 @@
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/authorization/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+      "path": "../../../../packages/authorization/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
 }

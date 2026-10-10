@@ -24,7 +24,6 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/process": "workspace:*",

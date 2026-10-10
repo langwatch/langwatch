@@ -21,9 +21,14 @@
   ],
   // @langwatch/skills is a dependency for generate:langy-skills, which reads its files; it
   // emits no declarations, and a reference would make its sources an unbuilt project's output.
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": ["@langwatch/skills"]
+      "ignoredDependencies": [
+        "@langwatch/project-contract",
+        "@langwatch/skills",
+        "@langwatch/vitest-config"
+      ]
     }
   },
   "references": [
@@ -44,9 +49,6 @@
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
@@ -113,9 +115,6 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

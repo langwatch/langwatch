@@ -22,9 +22,11 @@
     "**/testing.ts",
     "**/testing.tsx"
   ],
-  "references": [
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+  "references": [],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
     }
-  ]
+  }
 }

@@ -72,25 +72,28 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
+      "path": "../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/time/tsconfig.build.json"
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/authz-contract"]
+    }
+  }
 }

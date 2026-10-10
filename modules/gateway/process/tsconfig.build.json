@@ -77,9 +77,6 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/process/tsconfig.build.json"
     },
     {
@@ -105,9 +102,6 @@
     },
     {
       "path": "../../langy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../instant-eval-judge/contract/tsconfig.build.json"
@@ -155,6 +149,9 @@
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
       "path": "../../instant-eval/process/tsconfig.build.json"
     },
     {
@@ -169,5 +166,11 @@
     {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/ksuid"]
+    }
+  }
 }

@@ -36,10 +36,13 @@
 
   "references": [
     {
-      "path": "../../sdks/typescript"
-    },
-    {
       "path": "../time/tsconfig.build.json"
     }
-  ]
+  ],
+  // The SDK builds before every typecheck (workspace:typecheck dependsOn langwatch:build).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["langwatch"]
+    }
+  }
 }

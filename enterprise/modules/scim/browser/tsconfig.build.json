@@ -30,9 +30,6 @@
       "path": "../../../../modules/organization/client/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/identity/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/identity/client/tsconfig.build.json"
     },
     {
@@ -61,9 +58,12 @@
     },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/identity-contract", "@langwatch/vitest-config"]
+    }
+  }
 }

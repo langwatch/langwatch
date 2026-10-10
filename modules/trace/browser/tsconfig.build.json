@@ -39,9 +39,6 @@
       "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/span-normalisation/tsconfig.build.json"
-    },
-    {
       "path": "../../share/contract/tsconfig.build.json"
     },
     {
@@ -93,9 +90,6 @@
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
-      "path": "../../evaluator/client/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -135,10 +129,16 @@
       "path": "../../annotation/client/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/evaluator-client", "@langwatch/vitest-config"]
+    }
+  }
 }

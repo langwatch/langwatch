@@ -27,9 +27,6 @@
       "path": "../../../../packages/upgrade/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/trace/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
@@ -37,9 +34,6 @@
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/scenario/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/project/contract/tsconfig.build.json"
@@ -58,9 +52,6 @@
     },
     {
       "path": "../../../../modules/ops/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/observability/tsconfig.build.json"
@@ -93,9 +84,6 @@
       "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/evaluation/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
     },
     {
@@ -117,13 +105,20 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/instant-eval-judge/process/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/evaluation-contract",
+        "@langwatch/instant-eval-judge-process",
+        "@langwatch/onboarding-contract",
+        "@langwatch/scenario-contract",
+        "@langwatch/trace-contract",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

@@ -6,8 +6,13 @@
     "composite": false,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": [],
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/**/tests/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "tests/**/*.ts"
+  ],
 
   "references": [
     {

@@ -37,9 +37,6 @@
       "path": "../../../../packages/module/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -56,12 +53,16 @@
     },
     {
       "path": "../../../../modules/api-key/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
     }
-  ]
+  ],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/api",
+        "@langwatch/model-provider-contract",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

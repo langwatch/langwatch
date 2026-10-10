@@ -11,15 +11,15 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
 
-  "references": [
-    {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
-    },
-    {
-      "path": "../test-harness/tsconfig.build.json"
+  "references": [],
+  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/test-harness",
+        "@langwatch/time",
+        "@langwatch/vitest-config"
+      ]
     }
-  ]
+  }
 }
