@@ -27,6 +27,7 @@ import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
+import { formatRate } from "../../model/cost-rate-text.ts";
 import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
 import {
   filterAndSortCosts,
@@ -41,15 +42,12 @@ import {
 } from "../../model/model-provider-host.ts";
 import { RegexHighlight } from "../elements/regex-highlight.tsx";
 
-const exactRate = (rate: number) =>
-  rate.toLocaleString("fullwide", { useGrouping: false, maximumSignificantDigits: 20 });
-
 /** One rate as US dollars per million tokens; the exact per-token figure sits in the tooltip. */
 function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
     <Table.Cell padding={0}>
       {rate !== undefined && (
-        <Tooltip content={`$${exactRate(rate)} per token`}>
+        <Tooltip content={`$${formatRate(rate)} per token`}>
           <Text
             as="span"
             display="inline-block"
