@@ -347,7 +347,7 @@ import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import {
   TRACE_SUMMARY_LOOKUP_FORWARD_MS,
-  TRACE_SUMMARY_LOOKUP_LOOKBACK_MS,
+  TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS,
 } from "../repositories/trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
@@ -3915,7 +3915,7 @@ class TraceComposedIngressCommand extends TraceIngressCommand {
 }
 
 /** The trace tree's summary, read from the folded `trace_summaries` projection. */
-class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
+export class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
   static create(store: FoldProjectionStore<TraceSummaryData>): FoldedTraceSummaryReader {
     return new FoldedTraceSummaryReader(store);
   }
@@ -3936,21 +3936,25 @@ class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
     traceId: string;
     occurredAtMs?: number;
   }): Promise<TraceSummaryData | null> {
-    // An anchored read is bounded and its miss final; no anchor keeps the resolving read.
-    const read = await this.#store.get(traceId, {
-      aggregateId: traceId,
-      tenantId: createTenantId(tenantId),
-      ...(occurredAtMs === undefined
-        ? {}
-        : {
-            readWindow: {
-              fromMs: occurredAtMs - TRACE_SUMMARY_LOOKUP_LOOKBACK_MS,
-              toMs: occurredAtMs + TRACE_SUMMARY_LOOKUP_FORWARD_MS,
-            },
-          }),
-    });
+    const context = { aggregateId: traceId, tenantId: createTenantId(tenantId) };
+    if (occurredAtMs === undefined) {
+      const read = await this.#store.get(traceId, context);
+      return read.kind === "folded" ? read.state : null;
+    }
 
-    return read.kind === "folded" ? read.state : null;
+    // Anchored: each step is one bounded read, narrowest first; a miss at the widest is final.
+    for (const lookbackMs of TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS) {
+      const read = await this.#store.get(traceId, {
+        ...context,
+        readWindow: {
+          fromMs: occurredAtMs - lookbackMs,
+          toMs: occurredAtMs + TRACE_SUMMARY_LOOKUP_FORWARD_MS,
+        },
+      });
+      if (read.kind === "folded") return read.state;
+    }
+
+    return null;
   }
 }
 
