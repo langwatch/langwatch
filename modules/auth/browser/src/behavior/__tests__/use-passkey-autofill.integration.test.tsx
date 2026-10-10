@@ -273,6 +273,28 @@ describe("given a deployment that offers passkeys", () => {
       });
     });
 
+    describe("and the request failed in this browser before any credential was sent", () => {
+      /** @scenario "A browser with no passkey never hears that a passkey failed" */
+      it.each([
+        ["ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY"],
+        ["AUTH_CANCELLED"],
+        ["ERROR_INVALID_DOMAIN"],
+      ])("says nothing for %s", async (code) => {
+        passkeyMock.mockResolvedValueOnce({
+          data: null,
+          error: { code, status: 400, statusText: "BAD_REQUEST" },
+        });
+        const onError = vi.fn();
+        const { getByLabelText } = render(<Door enabled onError={onError} />);
+
+        fireEvent.pointerDown(getByLabelText("Email"));
+        await waitFor(() => expect(passkeyMock).toHaveBeenCalled());
+        await flush();
+
+        expect(onError).not.toHaveBeenCalled();
+      });
+    });
+
     describe("and nobody supplied an error channel at all", () => {
       it("does not throw for a refusal with nowhere to go", async () => {
         passkeyMock.mockResolvedValueOnce({
