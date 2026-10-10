@@ -42,9 +42,13 @@ function projectAdmin() {
     shares: { countTraceShares: async () => 3 },
     audit: new SilentAudit(),
   });
-  const run = (method: "update" | "getOne", params: AdminOperationInput["params"]) =>
+  const run = (
+    method: AdminOperationInput["method"],
+    params: AdminOperationInput["params"],
+    resource: AdminOperationInput["resource"] = "project",
+  ) =>
     service.execute({
-      resource: "project",
+      resource,
       method,
       params,
       actorId: "olive",
@@ -80,6 +84,21 @@ describe("InstanceAdminService project update", () => {
 
       expect(switches[0]?.revokeExistingLinks).toBe(true);
       expect(repository.writes.map((write) => write.method)).toEqual(["getOne"]);
+    });
+  });
+
+  describe("when the switch arrives anywhere but one project's update", () => {
+    it.each([
+      ["project", "updateMany", { ids: ["project-1"], data: { traceSharingEnabled: false } }],
+      ["organization", "update", { id: "org-1", data: { traceSharingEnabled: false } }],
+    ] as const)("refuses a %s %s and writes nothing", async (resource, method, params) => {
+      const { repository, switches, run } = projectAdmin();
+
+      await expect(run(method, params, resource)).rejects.toMatchObject({
+        meta: { fieldErrors: { traceSharingEnabled: expect.any(Array) } },
+      });
+      expect(switches).toEqual([]);
+      expect(repository.writes).toEqual([]);
     });
   });
 

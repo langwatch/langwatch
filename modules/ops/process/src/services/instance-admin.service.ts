@@ -110,6 +110,16 @@ export class InstanceAdminService {
       });
     }
     if (
+      "traceSharingEnabled" in (parsed.params.data ?? {}) &&
+      !(parsed.resource === "project" && ["create", "update"].includes(parsed.method))
+    ) {
+      throw new ValidationError("Trace sharing is switched one project at a time", {
+        meta: {
+          fieldErrors: { traceSharingEnabled: ["Edit each project, so its links are handled."] },
+        },
+      });
+    }
+    if (
       parsed.resource === "user" &&
       parsed.method === "create" &&
       "deactivatedAt" in (parsed.params.data ?? {})

@@ -5,7 +5,7 @@
  */
 
 import { readUiStorage } from "@langwatch/browser-host/storage";
-import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
+import { explorerHiddenOrigins } from "@langwatch/trace-contract";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
@@ -143,12 +143,20 @@ export function useFilterParams() {
       startDate: startDate.epochMilliseconds,
       endDate: endDate.epochMilliseconds,
       filters,
-      // Langy's own turns are not the customer's traffic; the Explorer hides them too.
-      excludeOrigins: [LANGY_TRACE_ORIGIN],
+      // The Explorer's own rule: Langy's turns stay out unless the query names `origin`.
+      excludeOrigins: explorerHiddenOrigins(query.query),
       ...(typeof queryParams.query === "string" ? { query: queryParams.query } : {}),
       ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
     }),
-    [project?.id, startDate, endDate, filters, queryParams.query, queryParams.negateFilters],
+    [
+      project?.id,
+      startDate,
+      endDate,
+      filters,
+      query.query,
+      queryParams.query,
+      queryParams.negateFilters,
+    ],
   );
 
   const { nonEmptyFilters, filterCount, hasAnyFilters } = countFilters(filters);

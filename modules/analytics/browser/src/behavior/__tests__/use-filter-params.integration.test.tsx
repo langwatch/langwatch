@@ -21,4 +21,16 @@ describe("the analytics read scope", () => {
 
     expect(result.current.filterParams.excludeOrigins).toEqual(["langy"]);
   });
+
+  it("keeps Langy's turns when the query names origin, as the Trace Explorer does", () => {
+    const host = new StubAnalyticsHost({
+      route: { params: {}, query: { period: "7d", query: "origin:langy" } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <AnalyticsTestHarness host={host}>{children}</AnalyticsTestHarness>
+    );
+    const { result } = renderHook(() => useFilterParams(), { wrapper });
+
+    expect(result.current.filterParams.excludeOrigins).toEqual([]);
+  });
 });
