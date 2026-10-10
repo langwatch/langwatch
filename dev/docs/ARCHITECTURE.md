@@ -1666,6 +1666,12 @@ read through a narrow single-event read seat beside the producer-only store, wit
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
 
+**A trace summary lookup is anchored on its event's time** (Alex, 2026-10-10): a summary is filed
+under its trace's start, which never moves, so a lookup reads windows widening back from the span's
+own occurredAt (3, 7, 21, 30 days, plus 1 day forward), stops at the first hit, and never scans every
+partition. Parked for later: a trace id to start-time index (Postgres or Redis) for one exact read,
+and a default retention-period bound on every ClickHouse read.
+
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
 (trace's and gateway's); a read only one statement can answer (a subquery over an owner's table) is a
