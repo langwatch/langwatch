@@ -911,10 +911,10 @@ describe("the guided tour's spotlight targets", () => {
   });
 
   describe("when a Gateway page renders", () => {
-    it("marks the Virtual Keys entry", () => {
+    it("marks the Virtual keys entry", () => {
       renderShell({ readings: { pathname: "/gateway/virtual-keys" } });
 
-      expect(tourTarget("nav-virtual-keys")).toHaveAccessibleName("Virtual Keys");
+      expect(tourTarget("nav-virtual-keys")).toHaveAccessibleName("Virtual keys");
     });
   });
 });
