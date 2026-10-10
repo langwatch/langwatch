@@ -407,6 +407,23 @@ machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
 `ingestPlaySeed`); it is the seam those seeds return through, and every
 shipped preset's list is empty until they do.
 
+**Keyed API calls.** `haven api <METHOD> <path> [--body file|-] [--header k:v]
+[--json] [--stack slug]` calls this stack's REST API (`LANGWATCH_API_URL`, the
+loopback API port) as the seeded project, sending the seeded project key
+(`HAVEN_SEED_LANGWATCH_API_KEY`) as `X-Auth-Token`. The key never prints: the
+output is the status line, the response headers with `Authorization`,
+`Set-Cookie` and `X-Auth-Token` redacted, and the body, and any echo of the key
+in a header or the body becomes `<redacted>`. `haven api whoami` names the
+project and the key, never its value. Only the seeded `local-dev-project` has a
+key haven holds; `--project` naming another is refused. The key is shared by
+every stack on the machine, so there is no `key rotate`: set
+`LANGWATCH_LOCAL_API_KEY` and reseed to change it.
+
+```bash
+haven api GET /api/prompts --json
+echo '{"name":"x"}' | haven api POST /api/datasets --body -
+```
+
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
 container and the observability stack are memory-capped (the container tier by
 cgroup, the native tier by `GOMEMLIMIT`; the colima VM is sized at creation), and the managed Redis gets a `maxmemory` ceiling

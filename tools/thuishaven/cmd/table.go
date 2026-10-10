@@ -534,6 +534,7 @@ var baseTable = []commandSpec{
 	},
 	querySpec(),
 	seedSpec(),
+	apiSpec(),
 	telemetrySpec(),
 	authSpec(),
 	browserSpec(),
@@ -819,6 +820,8 @@ func closestCommands(input string) []string {
 		}
 	}
 	sort.Strings(out)
+	isPrefix := func(name string) bool { return strings.HasPrefix(name, input) || strings.HasPrefix(input, name) }
+	sort.SliceStable(out, func(i, j int) bool { return isPrefix(out[i]) && !isPrefix(out[j]) })
 	if len(out) > 3 {
 		out = out[:3]
 	}
