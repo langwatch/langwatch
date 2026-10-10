@@ -353,3 +353,11 @@ Feature: Canonical user lifecycle
     Then neither offers to create a passkey
     And each says "Your organization's single sign-on handles sign-in for this account."
     And the offer still includes two-step verification when that is on offer
+
+  @integration
+  Scenario: A person whose organization's single sign-on governs sign-in is not offered a password
+    Given one of "ivy"'s confirmed addresses routes to "acme"'s single sign-on connection
+    And "ivy" holds no password
+    When "ivy" opens her Password settings
+    Then they do not offer to set a password
+    And say "Your organization's single sign-on handles sign-in for this account."
