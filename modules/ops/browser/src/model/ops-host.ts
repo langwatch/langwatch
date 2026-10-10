@@ -31,6 +31,8 @@ export type OpsSuccessNotice = {
 export type OpsFailureNotice = {
   error: unknown;
   fallbackTitle: string;
+  /** A sentence for a refusal the screen made itself, with no code to look up. */
+  description?: string;
   id?: string;
 };
 
@@ -81,6 +83,12 @@ export abstract class OpsHostApi {
   abstract navigate(to: string): void;
 
   abstract succeeded(notice: OpsSuccessNotice): void;
+
+  /** A caution that is not a failure, drawn as a warning. */
+  abstract warned(notice: OpsSuccessNotice): void;
+
+  /** A plain fact, drawn as information. */
+  abstract informed(notice: OpsSuccessNotice): void;
 
   abstract failed(failure: OpsFailureNotice): void;
 }

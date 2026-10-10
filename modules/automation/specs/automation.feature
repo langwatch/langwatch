@@ -354,3 +354,16 @@ Feature: Automation ownership
     Given a caller who may view automations but not change them
     When they list a Slack connection's channels or test-fire a template
     Then both are refused before the service runs, the door asking triggers:update as main's did
+
+  @unit
+  Scenario: Slack deliveries reach the configured Slack addresses
+    Given a process whose Slack API base and webhook origin name a stand-in
+    When an automation posts through a bot connection and through an incoming webhook
+    Then chat.postMessage reaches the stand-in's Web API base
+    And the webhook send reaches the same webhook path under the stand-in's origin
+
+  @unit
+  Scenario: Slack deliveries reach Slack itself by default
+    Given a process that names no Slack addresses
+    When an automation posts through a bot connection and through an incoming webhook
+    Then chat.postMessage reaches https://slack.com/api and the webhook reaches https://hooks.slack.com

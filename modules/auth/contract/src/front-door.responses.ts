@@ -42,20 +42,6 @@ export const signUpVerificationResultSchema = z
 export type SignUpVerificationResult = z.infer<typeof signUpVerificationResultSchema>;
 
 /**
- * What an invitation link may say to whoever opens it: which organization is
- * asking, and who asked — enough to decide, but nothing that makes a guessed
- * code worth guessing (no address, no role, no membership).
- */
-export const inviteLandingSchema = z
-  .object({
-    organizationName: z.string(),
-    inviterName: z.string().nullable(),
-    alreadyAccepted: z.boolean(),
-  })
-  .strict();
-export type InviteLanding = z.infer<typeof inviteLandingSchema>;
-
-/**
  * The caller's own address and whether it is confirmed; null where the session carries none.
  * `canSendConfirmation` is false where this installation has no way to send email.
  */

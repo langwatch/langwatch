@@ -140,6 +140,8 @@ describe("the real-browser test lane", () => {
         "modules/analytics/browser",
         "modules/experiment/browser",
         "modules/model-provider/browser",
+        "modules/navigation/browser",
+        "modules/organization/browser",
         "modules/project/browser",
         "modules/secret/browser",
         "modules/user/browser",

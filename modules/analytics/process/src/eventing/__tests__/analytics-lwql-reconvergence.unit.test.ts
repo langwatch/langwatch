@@ -74,7 +74,14 @@ describe("given the access-model reconvergence watch", () => {
     const run = (owner: LwqlAccessModelOwner | Error) => {
       const converge = vi.fn(() => Promise.resolve());
       const probe = () => (owner instanceof Error ? Promise.reject(owner) : Promise.resolve(owner));
-      return { converge, done: runLwqlReconvergence({ probe, converge })({ final: false }) };
+      const fillKeyMap = () => Promise.resolve();
+      return {
+        converge,
+        done: runLwqlReconvergence({ probe, converge, fillKeyMap })({
+          final: false,
+          fillKeyMap: false,
+        }),
+      };
     };
 
     /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
@@ -99,9 +106,11 @@ describe("given the access-model reconvergence watch", () => {
             resolve();
           }, 5);
         });
-      await runLwqlReconvergence({ probe: () => Promise.resolve("none"), converge })({
-        final: false,
-      });
+      await runLwqlReconvergence({
+        probe: () => Promise.resolve("none"),
+        converge,
+        fillKeyMap: () => Promise.resolve(),
+      })({ final: false, fillKeyMap: false });
       order.push("intent resolved");
       expect(order).toEqual(["converged", "intent resolved"]);
     });
@@ -110,6 +119,54 @@ describe("given the access-model reconvergence watch", () => {
       const { converge, done } = run(new Error("ECONNREFUSED"));
       await done;
       expect(converge).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the worker has just booted", () => {
+    /** @scenario "Each worker boot fills the key-map rows a project lacks" */
+    it("asks the first probe of the boot, and only that one, to fill the key map", () => {
+      const first = wake(
+        LWQL_RECONVERGENCE_INITIAL_STATE,
+        BOOTED_AT + LWQL_RECONVERGENCE_INITIAL_DELAY_MS,
+      );
+      expect(first.reconverge.mock.calls[0]?.[1]).toMatchObject({ fillKeyMap: true });
+      const state = first.evolution.state;
+      const second = wake(state, state.nextAt);
+      expect(second.reconverge.mock.calls[0]?.[1]).toMatchObject({ fillKeyMap: false });
+    });
+
+    it("fills before probing, and still probes when the fill fails", async () => {
+      const order: string[] = [];
+      const probe = vi.fn(async (): Promise<LwqlAccessModelOwner> => {
+        order.push("probed");
+        return "none";
+      });
+      const fillKeyMap = vi.fn(async () => {
+        order.push("filled");
+      });
+      const converge = vi.fn(() => Promise.resolve());
+      await runLwqlReconvergence({ probe, converge, fillKeyMap })({
+        final: false,
+        fillKeyMap: true,
+      });
+      expect(order).toEqual(["filled", "probed"]);
+
+      const failing = vi.fn(() => Promise.reject(new Error("ECONNREFUSED")));
+      await runLwqlReconvergence({ probe, converge, fillKeyMap: failing })({
+        final: false,
+        fillKeyMap: true,
+      });
+      expect(converge).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not fill on a later probe", async () => {
+      const fillKeyMap = vi.fn(() => Promise.resolve());
+      await runLwqlReconvergence({
+        probe: () => Promise.resolve("config_store"),
+        converge: () => Promise.resolve(),
+        fillKeyMap,
+      })({ final: false, fillKeyMap: false });
+      expect(fillKeyMap).not.toHaveBeenCalled();
     });
   });
 });

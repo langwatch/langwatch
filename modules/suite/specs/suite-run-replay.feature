@@ -51,6 +51,13 @@ Feature: Open suite runs are caught up with scenario's runs after the cut
     Then that tenant's suite runs are not read again
 
   @unit
+  Scenario: The replay reads every project holding suites through the tenancy guard
+    Given suites in two projects
+    When the replay step lists the projects holding suites
+    Then the tenancy guard admits the one read, declared as a walk of every project
+    And each project is returned once
+
+  @unit
   Scenario: The worker collects suite's replay step as a background step
     Given suite installed in a worker process
     When the worker collects its modules' migration steps

@@ -1,8 +1,7 @@
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 /**
- * The SSO connection ledger writer, in the shape the identity, join-request and grants ledgers
- * have (ADR-110): the staged command is the sole appender. This writer touches no event log, so
- * it commits from a process that only sends commands; the queued run appends and folds.
+ * The SSO connection ledger writer, in the identity ledger's shape (ADR-110): it stages the command
+ * and waits for the fold. The queued run is the sole appender; the api has no log to append to.
  */
 import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
@@ -125,7 +124,6 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
     };
   }
 
-  /** The events the command states, returned to the caller after the queue has taken it. */
   async commit({
     command,
     facts,

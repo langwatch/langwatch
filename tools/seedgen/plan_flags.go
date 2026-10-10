@@ -1,11 +1,14 @@
 package seedgen
 
 import (
+	"cmp"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -38,6 +41,17 @@ const MaxSpans = 2_000_000
 // MaxDays bounds --days.
 const MaxDays = 365
 
+// MaxConversations and MaxTurns bound the long threads: one conversation is one chunk in one hour.
+const (
+	MaxConversations = 20
+	MaxTurns         = 50
+	DefaultTurns     = 15 // a conversation view virtualizes from twelve turns (WEB-5701)
+)
+
+// MaxReach is how far back telemetry may start: the trace backfill ceiling
+// (SPAN_BACKFILL_MAX_PAST_DAYS); --age plus --days stays within it.
+const MaxReach = 365
+
 // Flags are the seed's inputs; the same Flags give the same plan.
 type Flags struct {
 	Size     string    `json:"size"`
@@ -48,7 +62,72 @@ type Flags struct {
 	Seed     int64     `json:"seed"`
 	Anchor   time.Time `json:"anchor"`
 	Shape    string    `json:"shape"`
-	DryRun   bool      `json:"-"`
+	// Admin is the stack's seeded admin email: a member with an admin grant in every org the seed creates.
+	Admin string `json:"admin,omitempty"`
+	// Orgs, when set, replace the tier's shared orgs (--org, repeatable).
+	Orgs []OrgSpec `json:"orgs,omitempty"`
+	// Conversations is how many long threads each project gets, of Turns traces sharing one
+	// gen_ai.conversation.id; they come out of the span budget.
+	Conversations int `json:"conversations"`
+	Turns         int `json:"turns"`
+	// Into sends telemetry only, into one existing ORG_ID/PROJECT_ID; no identity is created.
+	Into   string `json:"into,omitempty"`
+	DryRun bool   `json:"-"`
+}
+
+// OrgSpec is one --org: name=..,plan=..,users=N[,persona=..]; users counts the owner.
+type OrgSpec struct {
+	Name    string `json:"name"`
+	Plan    string `json:"plan"`
+	Users   int    `json:"users"`
+	Persona string `json:"persona"`
+}
+
+// OrgPlans are the plans an --org may name; licence and saas arrive with slice S6.
+var OrgPlans = []string{"free"}
+
+// MaxOrgUsers bounds users= in one --org.
+const MaxOrgUsers = 500
+
+var orgNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+
+// ParseOrgSpec reads one --org value; every refusal names the flag and what it accepts.
+func ParseOrgSpec(value string) (OrgSpec, error) {
+	spec := OrgSpec{Plan: "free", Users: 3, Persona: "startup"}
+	refuse := func(accepts string) error { return &FlagError{Flag: "org", Value: value, Accepts: accepts} }
+	for part := range strings.SplitSeq(value, ",") {
+		key, field, ok := strings.Cut(part, "=")
+		if !ok {
+			return spec, refuse("name=..,plan=..,users=N,persona=.. pairs")
+		}
+		switch key {
+		case "name":
+			spec.Name = field
+		case "plan":
+			spec.Plan = field
+		case "persona":
+			spec.Persona = field
+		case "users":
+			n, err := strconv.Atoi(field)
+			if err != nil {
+				return spec, refuse(fmt.Sprintf("users=1 to %d", MaxOrgUsers))
+			}
+			spec.Users = n
+		default:
+			return spec, refuse("the keys name, plan, users and persona")
+		}
+	}
+	switch {
+	case !orgNamePattern.MatchString(spec.Name):
+		return spec, refuse("name= of lowercase letters, digits and hyphens")
+	case !slices.Contains(OrgPlans, spec.Plan):
+		return spec, refuse("plan=" + strings.Join(OrgPlans, "|") + " (licence and saas plans are not built yet)")
+	case spec.Users < 1 || spec.Users > MaxOrgUsers:
+		return spec, refuse(fmt.Sprintf("users=1 to %d", MaxOrgUsers))
+	case !slices.Contains(Personas, spec.Persona):
+		return spec, refuse("persona=" + strings.Join(Personas, "|"))
+	}
+	return spec, nil
 }
 
 // FlagError refuses a flag before anything is written: exit 2, naming the flag and what it accepts.
@@ -71,16 +150,29 @@ func ParseFlags(args []string, anchor time.Time) (Flags, error) {
 	private := set.Int("private", -1, "")
 	seed := set.Int64("seed", 1, "")
 	anchorText := set.String("anchor", "", "")
+	age := set.String("age", "0d", "")
+	conversations := set.Int("conversations", 1, "")
+	turns := set.Int("turns", DefaultTurns, "")
 	shape := set.String("shape", "saas", "")
+	admin := set.String("admin", "", "")
+	into := set.String("into", "", "")
+	var orgs []OrgSpec
+	var orgRefusal error
+	set.Func("org", "", func(value string) error {
+		spec, err := ParseOrgSpec(value)
+		orgs, orgRefusal = append(orgs, spec), err
+		return err
+	})
 	dryRun := set.Bool("dry-run", false, "")
 	if err := set.Parse(args); err != nil {
-		return Flags{}, err
+		return Flags{}, cmp.Or(orgRefusal, err) // flag wraps a Func error with %v
 	}
 	if set.NArg() > 0 {
 		return Flags{}, fmt.Errorf("unexpected argument %q", set.Arg(0))
 	}
 	flags := Flags{Size: *size, Spans: *spans, Days: *days, Private: *private, Seed: *seed, Shape: *shape,
-		DryRun: *dryRun, Anchor: anchor.UTC()}
+		DryRun: *dryRun, Anchor: anchor.UTC(), Admin: *admin, Orgs: orgs, Into: *into,
+		Conversations: *conversations, Turns: *turns}
 	if *anchorText != "" {
 		parsed, err := time.Parse(time.RFC3339, *anchorText)
 		if err != nil {
@@ -88,6 +180,11 @@ func ParseFlags(args []string, anchor time.Time) (Flags, error) {
 		}
 		flags.Anchor = parsed.UTC()
 	}
+	ageDays, err := strconv.Atoi(strings.TrimSuffix(*age, "d"))
+	if err != nil || ageDays < 0 || ageDays+flags.Days > MaxReach {
+		return Flags{}, &FlagError{Flag: "age", Value: *age, Accepts: fmt.Sprintf("Nd, with N + --days at most %d", MaxReach)}
+	}
+	flags.Anchor = flags.Anchor.Add(-time.Duration(ageDays) * 24 * time.Hour)
 	flags.Personas = Personas
 	if *personas != "all" {
 		flags.Personas = strings.Split(*personas, ",")
@@ -107,6 +204,7 @@ func (f Flags) withDefaults() (Flags, error) {
 	if f.Private == -1 {
 		f.Private = tier.Private
 	}
+	f.Turns = cmp.Or(f.Turns, DefaultTurns)
 	personas, refusals := f.validate()
 	f.Personas = personas
 	return f, errors.Join(refusals...)
@@ -123,6 +221,13 @@ func (f Flags) validate() ([]string, []error) {
 		refusals = append(refusals, &FlagError{Flag: "days", Value: fmt.Sprint(f.Days),
 			Accepts: fmt.Sprintf("1 to %d", MaxDays)})
 	}
+	if f.Conversations < 0 || f.Conversations > MaxConversations {
+		refusals = append(refusals, &FlagError{Flag: "conversations", Value: fmt.Sprint(f.Conversations),
+			Accepts: fmt.Sprintf("0 to %d per project", MaxConversations)})
+	}
+	if f.Turns < 1 || f.Turns > MaxTurns {
+		refusals = append(refusals, &FlagError{Flag: "turns", Value: fmt.Sprint(f.Turns), Accepts: fmt.Sprintf("1 to %d", MaxTurns)})
+	}
 	if f.Private < 0 {
 		refusals = append(refusals, &FlagError{Flag: "private", Value: fmt.Sprint(f.Private), Accepts: "0 or more"})
 	}
@@ -134,6 +239,12 @@ func (f Flags) validate() ([]string, []error) {
 			refusals = append(refusals, &FlagError{Flag: "persona", Value: persona,
 				Accepts: "all or a list of " + strings.Join(Personas, ", ")})
 		}
+	}
+	if org, project, ok := strings.Cut(f.Into, "/"); f.Into != "" && (!ok || org == "" || project == "") {
+		refusals = append(refusals, &FlagError{Flag: "into", Value: f.Into, Accepts: "ORG_ID/PROJECT_ID"})
+	}
+	if f.Into != "" && len(f.Orgs) > 0 {
+		refusals = append(refusals, &FlagError{Flag: "into", Value: f.Into, Accepts: "no --org: --into seeds an org that exists"})
 	}
 	if f.Anchor.IsZero() {
 		refusals = append(refusals, &FlagError{Flag: "anchor", Accepts: "an RFC3339 instant"})

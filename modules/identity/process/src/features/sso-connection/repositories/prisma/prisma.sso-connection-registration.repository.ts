@@ -71,4 +71,34 @@ export class PrismaSsoConnectionRegistrationRepository extends SsoConnectionRegi
       return candidate;
     });
   }
+
+  async release({
+    organizationId,
+    commandId,
+  }: {
+    organizationId: string;
+    commandId: string;
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        -- @tenancy: organization-scoped advisory lock keyed by the bound organization id
+        SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 1397968719))
+      `;
+      const claimed = await tx.ssoConnectionRegistrationSlot.findMany({
+        where: { organizationId, commandId },
+        select: { connectionId: true },
+      });
+      const standing = await tx.ssoConnection.findMany({
+        where: { id: { in: claimed.map((slot) => slot.connectionId) } },
+        select: { id: true },
+      });
+      await tx.ssoConnectionRegistrationSlot.deleteMany({
+        where: {
+          organizationId,
+          commandId,
+          connectionId: { notIn: standing.map((row) => row.id) },
+        },
+      });
+    });
+  }
 }

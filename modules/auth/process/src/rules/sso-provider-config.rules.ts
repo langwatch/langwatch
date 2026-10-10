@@ -4,7 +4,7 @@
  * over both forms — a plaintext row written before the seal passes through.
  */
 import { isSealedProviderConfig, type SsoProviderConfigCipher } from "@langwatch/identity-contract";
-import type { DBAdapter } from "better-auth/types";
+import type { DBAdapter, DBTransactionAdapter } from "better-auth/types";
 
 /** The engine's own name for the table identity projects. */
 const SSO_PROVIDER_MODEL = "ssoProvider";
@@ -36,13 +36,11 @@ function openedRow<Row>(row: Row, model: string, cipher: SsoProviderConfigCipher
   });
 }
 
-export function openingSsoProviderConfigs({
-  adapter,
-  cipher,
-}: {
-  adapter: DBAdapter;
-  cipher: SsoProviderConfigCipher;
-}): DBAdapter {
+/** The reads that hand a provider row back, opened; a transaction's adapter opens them too. */
+function openingReads<Adapter extends DBTransactionAdapter>(
+  adapter: Adapter,
+  cipher: SsoProviderConfigCipher,
+): Adapter {
   return {
     ...adapter,
     async findOne<Row>(data: Parameters<DBAdapter["findOne"]>[0]): Promise<Row | null> {
@@ -53,11 +51,23 @@ export function openingSsoProviderConfigs({
       const rows = await adapter.findMany<Row>(data);
       return rows.map((row) => openedRow(row, data.model, cipher));
     },
-    // The engine locks a provider by updating it, then compares the row that
-    // update returns against the one it read.
+    // The account-link lock re-reads the row through update and compares its documents.
     async update<Row>(data: Parameters<DBAdapter["update"]>[0]): Promise<Row | null> {
       const row = await adapter.update<Row>(data);
       return row === null ? null : openedRow(row, data.model, cipher);
     },
+  };
+}
+
+export function openingSsoProviderConfigs({
+  adapter,
+  cipher,
+}: {
+  adapter: DBAdapter;
+  cipher: SsoProviderConfigCipher;
+}): DBAdapter {
+  return {
+    ...openingReads(adapter, cipher),
+    transaction: (callback) => adapter.transaction((trx) => callback(openingReads(trx, cipher))),
   };
 }

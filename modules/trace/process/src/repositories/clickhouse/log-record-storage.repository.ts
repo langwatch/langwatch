@@ -207,16 +207,17 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
         FROM ${LOG_RECORDS_TABLE} FINAL
         WHERE TenantId = {tenantId:String}
           AND CorrelationTraceId = {traceId:String}
-          AND ${LOG_RECORDS_TABLE}.TimeUnixMs >= {from:DateTime64(3)}
-          AND ${LOG_RECORDS_TABLE}.TimeUnixMs <= {to:DateTime64(3)}
+          AND ${LOG_RECORDS_TABLE}.TimeUnixMs >= {windowStart:DateTime64(3)}
+          AND ${LOG_RECORDS_TABLE}.TimeUnixMs <= {windowEnd:DateTime64(3)}
         ORDER BY TimeUnixNano ASC, RecordId ASC
         LIMIT {limit:UInt64}
       `,
       query_params: {
         tenantId,
         traceId,
-        from: clickHouseTimestamp(center - LOG_RECORDS_LOOKBACK_MS),
-        to: clickHouseTimestamp(center + LOG_RECORDS_LOOKAHEAD_MS),
+        // Not `from`/`to`: the tenant guard reads a bare `{from:` as a FROM clause and refuses the read.
+        windowStart: clickHouseTimestamp(center - LOG_RECORDS_LOOKBACK_MS),
+        windowEnd: clickHouseTimestamp(center + LOG_RECORDS_LOOKAHEAD_MS),
         limit,
       },
       format: "JSONEachRow",

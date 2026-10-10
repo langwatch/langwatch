@@ -419,7 +419,7 @@ describe("the sync control of the Agents page", () => {
 
       await userEvent.click(control);
 
-      const [notice] = host.recording.successes;
+      const [notice] = host.recording.infos;
       expect(notice?.description).toContain("No connected provider is scheduled to be asked");
       expect(notice?.description).not.toMatch(/asked 0/i);
       expect(control).toBeEnabled();

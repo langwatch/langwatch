@@ -80,6 +80,8 @@ function capabilityWorkflowHost({
     navigate: (to) => navigation.navigate(to),
     back: () => navigation.back(),
     succeeded: (notice) => feedback.succeeded(notice),
+    warned: (notice) => feedback.warned(notice),
+    informed: (notice) => feedback.informed(notice),
     failed: (failure) => feedback.failed(failure),
   };
 }

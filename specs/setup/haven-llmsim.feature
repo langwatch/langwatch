@@ -103,6 +103,12 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then an llm lane runs llmsim on a port haven allocated
     And the overlay sets OPENAI_BASE_URL and ANTHROPIC_BASE_URL to it, with a dummy key where none is set
 
+  Scenario: The seed writes the llmsim base URLs into the seeded providers
+    Given a stack that runs the llm lane
+    When haven runs the storage seed for it
+    Then the seed's environment carries OPENAI_BASE_URL and ANTHROPIC_BASE_URL pointing at llmsim
+    So that the seeded OpenAI and Anthropic provider rows reach llmsim, not the vendor
+
   Scenario: A developer's own provider base URL wins over llmsim
     Given .env names OPENAI_BASE_URL
     When the developer runs "haven up +llm"

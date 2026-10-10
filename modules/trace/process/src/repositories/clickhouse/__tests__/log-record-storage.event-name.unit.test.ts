@@ -1,3 +1,4 @@
+import { checkTenantScope } from "@langwatch/clickhouse-client";
 import { buildCodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -69,5 +70,30 @@ describe("given a codex session whose events name themselves the OTel Event API 
 
       expect(logs[0]?.attributes["event.name"]).toBe("codex.tool_result");
     });
+  });
+});
+
+describe("given the Terminal replay reading a session's logs", () => {
+  /** @scenario "The Terminal replay's log read passes the tenant guard" */
+  it("sends a statement the tenant guard accepts (WEB-5506)", async () => {
+    const query = vi.fn(
+      async (_request: { query: string; query_params: Record<string, unknown> }) => ({
+        json: async () => [],
+      }),
+    );
+    const repository = LogRecordStorageClickHouseRepository.create((async () => ({
+      query,
+    })) as never);
+
+    await repository.findLogRecordsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
+
+    const request = query.mock.calls[0]?.[0];
+    expect(
+      checkTenantScope({
+        sql: request?.query ?? "",
+        params: request?.query_params,
+        tenantId: "project-1",
+      }),
+    ).toBeNull();
   });
 });

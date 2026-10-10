@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -4788,35 +4789,13 @@ function ClaudeCodeEnvBlockPanel({
 }
 
 /** The smoke-test curl, and how to read what it returns. */
-function TestCurlPanel({
-  curl,
-  copied,
-  onCopy,
-}: {
-  curl: string;
-  copied: boolean;
-  onCopy: (value: string) => void;
-}) {
+function TestCurlPanel({ curl }: { curl: string }) {
   return (
     <VStack align="stretch" gap={1}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
         Test it now - paste this into a terminal
       </Text>
-      <Box position="relative">
-        <Code display="block" padding={3} fontSize="xs" whiteSpace="pre" overflowX="auto">
-          {curl}
-        </Code>
-        <Button
-          size="xs"
-          variant="outline"
-          position="absolute"
-          top={2}
-          right={2}
-          onClick={() => onCopy(curl)}
-        >
-          <Copy size={12} /> {copied ? "Copied" : "Copy"}
-        </Button>
-      </Box>
+      <CodePreview code={curl} language="bash" filename="terminal" />
       <Text fontSize="xs" color="fg.muted">
         Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
         <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse - check
@@ -4909,7 +4888,7 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
             {isClaudeCode && (
               <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />
             )}
-            {testCurl && <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />}
+            {testCurl && <TestCurlPanel curl={testCurl} />}
             <SecretGraceNotice />
           </VStack>
         </DialogBody>

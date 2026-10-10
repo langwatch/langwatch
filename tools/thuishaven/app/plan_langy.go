@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -165,6 +166,12 @@ func (o *Orchestrator) ensureLangyWorkerBinary(ctx context.Context, st domain.St
 	if !opts.Selection.Langy || st.LangyTier.RunsInContainer() || isExecutableFile(langyWorkerBinaryPath(opts.RepoRoot)) {
 		return
 	}
+	if _, err := exec.LookPath("bun"); err != nil {
+		fmt.Println("  langyagent: bun is missing: run `haven install`. Langy is off for this run.")
+		o.log.Warn("bun is missing — skipping langyagent", zap.Error(err))
+		opts.Selection.Langy = false
+		return
+	}
 	dir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
 	_ = os.MkdirAll(dir, 0o700)
 	logPath := filepath.Join(dir, "langy-worker-build.log")
@@ -176,6 +183,19 @@ func (o *Orchestrator) ensureLangyWorkerBinary(ctx context.Context, st domain.St
 		o.log.Warn("langy-worker build failed — skipping langyagent", zap.String("log", logPath), zap.Error(err))
 		opts.Selection.Langy = false
 	}
+}
+
+// dropLocalLangyAgent zeroes the port of a langyagent this stack meant to run
+// itself, as provision does for one it never selected, so a Langy deselected
+// after provision emits no LANGY_AGENT_URL for a socket nothing listens on.
+func dropLocalLangyAgent(st *domain.Stack) bool {
+	for i, svc := range st.Services {
+		if svc.Name == "langyagent" && !svc.IsFallback && svc.Port != 0 {
+			st.Services[i].Port = 0
+			return true
+		}
+	}
+	return false
 }
 
 // langyContainerOpts are the inputs to the `docker run` command for a

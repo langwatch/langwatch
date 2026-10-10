@@ -1,3 +1,5 @@
+import type { SlackServerConfig } from "@langwatch/slack-contract";
+
 import type { SlackChannels } from "../slack.channels.ts";
 import { HttpSlackWebApiChannel } from "./http.slack-web-api.channel.ts";
 
@@ -5,7 +7,7 @@ import { HttpSlackWebApiChannel } from "./http.slack-web-api.channel.ts";
 export class HttpSlackChannels {
   static readonly requires = [] as const;
 
-  static create(): SlackChannels {
-    return { webApi: HttpSlackWebApiChannel.create() };
+  static create({ config }: { config: SlackServerConfig }): SlackChannels {
+    return { webApi: HttpSlackWebApiChannel.create({ apiBase: config.slackApiBase }) };
   }
 }

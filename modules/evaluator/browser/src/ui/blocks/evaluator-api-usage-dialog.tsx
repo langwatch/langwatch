@@ -5,6 +5,7 @@
  */
 import type { WireOf } from "@langwatch/api/web";
 import { Link } from "@langwatch/browser-host/link";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, HStack, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -16,7 +17,6 @@ import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import { langwatchEndpoint, langwatchEndpointEnv } from "../../model/langwatch-endpoint.ts";
-import { CodeSnippet } from "../elements/code-snippet.tsx";
 
 export type EvaluatorApiUsageDialogProps = {
   evaluator: WireOf<Evaluator> | null;
@@ -267,7 +267,7 @@ EOF
 
             {/* Code Block */}
             <Box borderRadius="md" overflow="hidden" width="full">
-              <CodeSnippet code={getCode()} language={getLanguageForHighlight()} />
+              <CodePreview code={getCode()} language={getLanguageForHighlight()} />
             </Box>
 
             {/* Help text */}

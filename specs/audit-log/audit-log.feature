@@ -158,7 +158,8 @@ Feature: Unified Audit Log
   @integration
   Scenario: A row written by a system actor says so rather than naming nobody
     Given a row whose userId is null, written by a background job
-    Then the User column reads "User not found" rather than rendering empty
+    Then the User column reads "System" rather than rendering empty or a lookup failure
+    And a row whose userId names a user that no longer resolves reads "User not found"
 
   @integration
   Scenario: An empty audit history says so

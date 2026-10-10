@@ -574,6 +574,12 @@ Feature: Staged automation authoring drawer
       When the user tries to save
       Then the reason asks for at least one annotator rather than to complete the setup
 
+    @integration
+    Scenario: Saving a webhook with an http URL names https as the reason
+      Given the automation delivers to a webhook whose URL starts with http://
+      When the user tries to save
+      Then the reason says the webhook URL must use https
+
   Rule: Editing reuses the same staged drawer
 
     Scenario: Editing an existing automation pre-fills every section

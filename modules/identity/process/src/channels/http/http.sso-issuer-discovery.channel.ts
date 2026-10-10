@@ -1,7 +1,10 @@
+import { lookup } from "node:dns/promises";
+
 import {
   createSsrfUrlValidator,
   type EgressTlsPolicy,
   type FencedFetchOptions,
+  isBlockedCloudDomain,
   RedirectRefusedError,
   type SsrfUrlValidator,
   type SsrfValidationResult,
@@ -62,6 +65,36 @@ class DiscoveryDowngradedError extends Error {
   }
 }
 
+/** Every address a name resolves to; injected so a test never asks a resolver. */
+export type HostLookup = (hostname: string) => Promise<readonly string[]>;
+
+const systemLookup: HostLookup = async (hostname) =>
+  (await lookup(hostname, { all: true })).map(({ address }) => address);
+
+/**
+ * The fence for a vouched origin. Its exact name is the operator's word, so the
+ * internal-name refusal (`.internal`, `.localhost`) is not asked of it; the address
+ * is pinned and the fenced fetch still refuses a metadata address at connect.
+ */
+export function vouchedOriginValidator(resolve: HostLookup = systemLookup): SsrfUrlValidator {
+  const fence = createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] });
+  return async (url) => {
+    const parsed = new URL(url);
+    if (!isBlockedCloudDomain(parsed.hostname)) return fence(url);
+    const destination = {
+      originalUrl: url,
+      hostname: parsed.hostname,
+      port: Number(parsed.port) || 443,
+      protocol: parsed.protocol,
+      path: parsed.pathname + parsed.search,
+    };
+    const [resolvedIp] = await resolve(parsed.hostname).catch(() => []);
+    return resolvedIp
+      ? { ...destination, type: "allowlisted", resolvedIp }
+      : { ...destination, type: "unresolved", reason: "dns-failed" };
+  };
+}
+
 /** A vouched origin whose name answered nothing: vouching is not evidence of an address. */
 class VouchedOriginUnresolvableError extends Error {
   constructor() {
@@ -116,8 +149,7 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
           blockLocal: options.policy.blockLocal,
           allowedHosts: [...options.policy.allowedHosts],
         }),
-      validateVouched:
-        options.validateVouched ?? createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] }),
+      validateVouched: options.validateVouched ?? vouchedOriginValidator(),
       dialableInternalOrigins: options.dialableInternalOrigins ?? (() => []),
       fetchValidated: options.fetchValidated ?? fetchValidatedDestination,
       tls: { rejectUnauthorized: options.policy.verifyTls },

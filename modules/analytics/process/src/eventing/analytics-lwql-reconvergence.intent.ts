@@ -11,13 +11,20 @@ interface LwqlReconvergenceRunDeps {
   readonly probe: () => Promise<LwqlAccessModelOwner>;
   /** The whole self-provisioning run; logs and swallows its own failure. */
   readonly converge: () => Promise<void>;
+  /** Writes each project's missing key-map row; level-triggered, so a rerun inserts nothing. */
+  readonly fillKeyMap: () => Promise<unknown>;
 }
 
 /** Re-provisions only when neither the config store nor an app-owned model holds the identity. */
 export function runLwqlReconvergence(
   deps: LwqlReconvergenceRunDeps,
-): (payload: { final: boolean }) => Promise<void> {
-  return async ({ final }): Promise<void> => {
+): (payload: { final: boolean; fillKeyMap: boolean }) => Promise<void> {
+  return async ({ final, fillKeyMap }): Promise<void> => {
+    if (fillKeyMap) {
+      await deps.fillKeyMap().catch((error: unknown) => {
+        logger.warn({ error }, "lwql key-map fill at boot failed; the next boot fills again");
+      });
+    }
     const owner = await deps.probe().catch((): LwqlAccessModelOwner => "config_store");
     if (owner === "config_store" && final) {
       logger.warn(

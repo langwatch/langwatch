@@ -119,9 +119,11 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
   if (!isMeasured) return <>{children}</>;
   const measure = measureOf(pathname);
   const isLeftAligned = LEFT_ALIGNED_PAGES.includes(pathname);
-  const inset = isLeftAligned
-    ? "var(--chakra-spacing-8)"
-    : `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`;
+  // A section rail runs edge to edge, so authentication has no inset at all.
+  const isFullBleed = isPathUnder({ pathname, base: "/settings/authentication" });
+  const centred = `max(var(--chakra-spacing-6), calc((100% - ${measure}) / 2))`;
+  const left = isLeftAligned ? "var(--chakra-spacing-8)" : centred;
+  const inset = isFullBleed ? "0px" : left;
   return (
     <Box
       data-page-measure={measure}
@@ -129,17 +131,18 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       flex={1}
       minHeight={0}
       overflowY="auto"
-      paddingBottom={16}
+      paddingBottom={isFullBleed ? 0 : 16}
       // The header's border spans the card; its title, actions and every block
       // under it sit in one column of the measure, centred in the card.
       // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
       css={{
         "--page-inset": inset,
-        "& [data-page-header]": { paddingInline: "var(--page-inset)" },
-        "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
-          width: "calc(100% - 2 * var(--page-inset))",
-          marginInline: "var(--page-inset)",
-        },
+        "& [data-page-header]:not([data-section-frame] *)": { paddingInline: "var(--page-inset)" },
+        "& [data-page-header] ~ :not(button):not([data-section-frame] *), &:not(:has([data-page-header])) > :not(button)":
+          {
+            width: "calc(100% - 2 * var(--page-inset))",
+            marginInline: "var(--page-inset)",
+          },
         "& [data-page-container]": { paddingInline: 0 },
       }}
     >

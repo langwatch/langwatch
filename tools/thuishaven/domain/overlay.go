@@ -468,8 +468,8 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 }
 
 // OutboundProviderEnv points the product's four internal Slack channel settings
-// at outboundsim's haven route and admits local webhook URLs, each only when
-// the resolved environment leaves it unset.
+// and its Slack Web API and webhook addresses at outboundsim's haven route, and
+// admits local webhook URLs, each only when the resolved environment leaves it unset.
 func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 	var env []string
 	for _, c := range []struct{ key, bucket string }{
@@ -480,6 +480,11 @@ func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 	} {
 		if resolved[c.key] == "" {
 			env = append(env, c.key+"="+endpoint+"/services/T0SIM/"+c.bucket+"/x")
+		}
+	}
+	for _, a := range [][2]string{{"SLACK_API_BASE", endpoint + "/api"}, {"SLACK_WEBHOOK_BASE", endpoint}} {
+		if resolved[a[0]] == "" {
+			env = append(env, a[0]+"="+a[1])
 		}
 	}
 	if resolved["WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS"] == "" {

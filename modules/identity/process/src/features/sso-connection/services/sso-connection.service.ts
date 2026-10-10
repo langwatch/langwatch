@@ -346,6 +346,13 @@ export class SsoConnectionService {
       return [];
     }
 
-    return this.ledger.commit({ command, facts });
+    try {
+      return await this.ledger.commit({ command, facts });
+    } catch (error) {
+      // A registration guard claimed a slot before the commit; a commit that failed frees it.
+      const { organizationId, commandId } = command.data;
+      await this.guards.releaseRegistrationSlot({ organizationId, commandId });
+      throw error;
+    }
   }
 }

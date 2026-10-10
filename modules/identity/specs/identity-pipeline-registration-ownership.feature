@@ -44,3 +44,10 @@ Feature: Identity's four pipelines are declared, and connected by the process
     Given this process never built identity's join-request or identity pipeline
     When a join-request command commits, or a person's identity history is read
     Then it is refused naming the pipeline, and no command is staged
+
+  @unit
+  Scenario: An SSO connection command commits on a process that only produces commands
+    Given the api process, which sends commands and holds no event log
+    When an SSO connection command states a fact, such as registering a connection
+    Then the command is staged for the worker, which appends and folds it
+    And the caller gets the command's facts without the api appending anything

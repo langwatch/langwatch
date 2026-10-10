@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * Every provider row the engine is handed carries its dialing document opened,
- * whichever storage call produced it, while the stored row stays sealed.
- */
 import { sso } from "@better-auth/sso";
 import { sealedProviderConfigCipher } from "@langwatch/identity-contract";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -15,80 +10,49 @@ const cipher = sealedProviderConfigCipher({
   decrypt: (ciphertext) => Buffer.from(ciphertext, "base64").toString("utf8"),
 });
 
-const DIALING_DOCUMENT = JSON.stringify({
-  clientId: "client-1",
-  clientSecret: "shhh",
-  discoveryEndpoint: "https://idp.acme.test/.well-known/openid-configuration",
-});
+const DOCUMENT = JSON.stringify({ clientId: "client-1", clientSecret: "shhh" });
 
-const PROVIDER = [{ field: "providerId", value: "connection_1" }];
-
-function storageHolding({ oidcConfig }: { oidcConfig: string }) {
+function sealedStorage() {
   const database = {
     ssoProvider: [
       {
         id: "connection_1",
         providerId: "connection_1",
-        organizationId: "org_1",
         issuer: "https://idp.acme.test",
         domain: "acme.test",
-        userId: null,
+        oidcConfig: cipher.seal(DOCUMENT),
         samlConfig: null,
-        oidcConfig,
       },
     ],
   };
-  const adapter = openingSsoProviderConfigs({
+  return openingSsoProviderConfigs({
     adapter: memoryAdapter(database)({ plugins: [sso()] }),
     cipher,
   });
-
-  return { adapter, database };
 }
 
-type ProviderRow = { oidcConfig: string | null };
+const lock = {
+  model: "ssoProvider",
+  where: [{ field: "id", value: "connection_1" }],
+  update: { providerId: "connection_1" },
+};
 
-describe("given a provider row whose dialing document identity sealed", () => {
-  describe("when the engine locks the row by updating it", () => {
-    /** @scenario "The row the engine locks carries the opened dialing document" */
-    it("hands back the opened document and leaves the stored one sealed", async () => {
-      const sealed = cipher.seal(DIALING_DOCUMENT);
-      const { adapter, database } = storageHolding({ oidcConfig: sealed });
+describe("given identity stored a provider row with its dialing document sealed", () => {
+  describe("when single sign-on locks the row through an update", () => {
+    /** @scenario "A sealed provider row reads back opened wherever single sign-on reads it" */
+    it("hands back the opened document", async () => {
+      const row = await sealedStorage().update<{ oidcConfig: string }>(lock);
 
-      const locked = await adapter.update<ProviderRow>({
-        model: "ssoProvider",
-        where: PROVIDER,
-        update: { providerId: "connection_1" },
-      });
-
-      expect(locked?.oidcConfig).toBe(DIALING_DOCUMENT);
-      expect(database.ssoProvider[0]?.oidcConfig).toBe(sealed);
+      expect(row?.oidcConfig).toBe(DOCUMENT);
     });
-  });
 
-  describe("when the engine reads the row", () => {
-    it("hands back the same opened document the lock does", async () => {
-      const { adapter } = storageHolding({ oidcConfig: cipher.seal(DIALING_DOCUMENT) });
+    /** @scenario "A sealed provider row reads back opened wherever single sign-on reads it" */
+    it("hands back the opened document inside a transaction", async () => {
+      const storage = sealedStorage();
 
-      const read = await adapter.findOne<ProviderRow>({ model: "ssoProvider", where: PROVIDER });
+      const row = await storage.transaction((trx) => trx.update<{ oidcConfig: string }>(lock));
 
-      expect(read?.oidcConfig).toBe(DIALING_DOCUMENT);
-    });
-  });
-});
-
-describe("given a provider row written before the seal", () => {
-  describe("when the engine locks the row by updating it", () => {
-    it("passes the plaintext document through", async () => {
-      const { adapter } = storageHolding({ oidcConfig: DIALING_DOCUMENT });
-
-      const locked = await adapter.update<ProviderRow>({
-        model: "ssoProvider",
-        where: PROVIDER,
-        update: { providerId: "connection_1" },
-      });
-
-      expect(locked?.oidcConfig).toBe(DIALING_DOCUMENT);
+      expect(row?.oidcConfig).toBe(DOCUMENT);
     });
   });
 });

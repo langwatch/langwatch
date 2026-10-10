@@ -225,6 +225,9 @@ type System interface {
 	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
 	// bounces one supervised child (its supervisor restarts it on exit).
 	TerminateGroup(pid int)
+	// Reload sends pid SIGUSR2, the Node host's "reload on demand" signal
+	// (tools/dev-runtime); the process keeps running.
+	Reload(pid int)
 	// KillGroup SIGKILLs pid's whole process group — `down -f`'s hard stop for
 	// a stack that must die now (or won't die gracefully).
 	KillGroup(pid int)

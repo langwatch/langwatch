@@ -77,11 +77,13 @@ export default function SsoSetupScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Identity provider</PageLayout.Heading>
-      </PageLayout.Header>
       <SectionNavigationFrame
         label="Authentication"
+        header={
+          <PageLayout.Header>
+            <PageLayout.Heading>Identity provider</PageLayout.Heading>
+          </PageLayout.Header>
+        }
         links={AUTHENTICATION_LINKS}
         activeHref="/settings/authentication/provider"
         onNavigate={(href) => navigation?.navigate(href)}

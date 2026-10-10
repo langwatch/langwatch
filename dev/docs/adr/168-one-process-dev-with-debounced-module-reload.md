@@ -276,3 +276,15 @@ most 5 s for B1, peak RSS at most today's Node total plus 15%, flat connection c
 3. Should the npx CLI (`apps/server`) also run api and worker in one process, without watch?
 4. Does "dev-env" mean the compose quickstart? If so, retire `make quickstart` and ADR-004's
    compose presets separately.
+
+## Amendment 2026-10-10: the supervisor is gone
+
+`dev/scripts/dev-supervisor.mjs`, its tests and `reload-burst.mjs` are deleted; the host reloads
+in-process, so its restart-on-change was redundant. Where its duties went: reload and recycle stay
+in `tools/dev-runtime` (the `dev` scripts loop while the host exits 75); lane restart and teardown
+belong to haven; crash collapsing is haven's logfmt, and the crash log, split-mode reload
+(`apps/api` and `apps/worker` run `main.ts` once) and launcher-death teardown for bare `pnpm dev`
+(Ctrl-C ends the foreground run) are dropped. `haven up --watch=false` holds a stack (sticky;
+`LANGWATCH_DEV_WATCH=0`, UI HMR kept) and `haven reload` sends the host SIGUSR2 to re-link the
+backend on demand. `LANGWATCH_DEV_RELOAD`, `_SUPERVISOR`, `_READY_PATTERN`, `_RAW_CRASH` and
+`_CRASH_LOG` no longer exist.

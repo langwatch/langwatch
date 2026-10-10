@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Readable, Writable } from "node:stream";
 
 import type { AuthzApi, AuthzAttachBindingsInput } from "@langwatch/authz-contract";
@@ -6,10 +8,13 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { LogApi } from "@langwatch/log-contract";
 import type { MetricApi } from "@langwatch/metric-contract";
+import type { FullyLoadedOrganization, OrganizationApi } from "@langwatch/organization-contract";
 import { type BootedApplication, loadTaskModules } from "@langwatch/process";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import * as runner from "../index.ts";
@@ -56,9 +61,37 @@ function seedApis(overrides: Partial<{ [Name in keyof SeedApis]: SeedApis[Name] 
         rejectedDataPoints: 0,
       })),
     }),
+    user: createApiFixture<UserApi>({
+      findByEmail: vi.fn(async () => null),
+      create: vi.fn(async ({ email }: { email: string }) => profileOf({ id: `user_${email}` })),
+      setFirstPassword: vi.fn(async () => "set" as const),
+    }),
+    organization: createApiFixture<OrganizationApi>({
+      getAllForUser: vi.fn(async () => []),
+      createAndAssign: vi.fn(async () => ({
+        organization: { id: "org_new", name: "acme" },
+        team: { id: "team_new", slug: "acme", name: "acme" },
+      })),
+      createMembership: vi.fn(async () => ({
+        outcome: "created" as const,
+        seat: "MEMBER" as const,
+        pending: false,
+      })),
+      changeMemberRole: vi.fn(async () => ({ teamsLeftWithoutAdmin: [] })),
+      addTeamMember: vi.fn(async () => undefined),
+    }),
+    project: createApiFixture<ProjectApi>({
+      listByTeam: vi.fn(async () => []),
+      create: vi.fn(async () => projectOf({ id: "project_new", name: "support" })),
+    }),
     ...overrides,
   };
 }
+
+const profileOf = (fields: Pick<UserProfile, "id">): UserProfile =>
+  createApiFixture<UserProfile & object>(fields);
+const projectOf = (fields: Pick<Project, "id" | "name">): Project =>
+  createApiFixture<Project & object>(fields);
 
 async function applyLines({
   lines,
@@ -105,7 +138,7 @@ describe("seed:apply", () => {
       importModule: () => Promise.resolve(runner),
     });
     expect(tasks.map((task) => task.name)).toEqual(["seed:apply"]);
-    expect(resolved).toBe(5);
+    expect(resolved).toBe(8);
   });
 
   /** @scenario "Each action kind calls its one module API operation" */
@@ -174,6 +207,245 @@ describe("seed:apply", () => {
     expect(apis.metric.collectOtlpMetrics).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: "p_1", organizationId: "org_1" }),
     );
+  });
+
+  /** @scenario "Seeded users, orgs, projects and memberships go through the module APIs" */
+  it("creates users, orgs, projects and memberships through the module APIs, as the owner", async () => {
+    const apis = seedApis();
+    const replies = await applyLines({
+      apis,
+      lines: [
+        {
+          id: "r/1",
+          kind: "user.create",
+          ref: "$user:acme/owner",
+          key: "acme.u1@seed.test",
+          input: { email: "acme.u1@seed.test", role: "ADMIN", state: "accepted" },
+        },
+        {
+          id: "r/2",
+          kind: "org.create",
+          ref: "$org:acme",
+          as: "user_1",
+          input: { name: "acme", persona: "startup", team: "main" },
+        },
+        {
+          id: "r/3",
+          kind: "project.create",
+          ref: "$project:acme/support",
+          org: "org_new",
+          as: "user_1",
+          input: { name: "support", team: "team_new" },
+        },
+        {
+          id: "r/4",
+          kind: "member.add",
+          org: "org_new",
+          as: "user_1",
+          input: { user: "user_2", role: "EXTERNAL", team: "team_new", teamRole: "VIEWER" },
+        },
+      ],
+    });
+    expect(new Map(replies.map((reply) => [reply.id, reply]))).toEqual(
+      new Map([
+        ["r/1", { id: "r/1", ok: true, refs: { "$user:acme/owner": "user_acme.u1@seed.test" } }],
+        [
+          "r/2",
+          { id: "r/2", ok: true, refs: { "$org:acme": "org_new", "$team:acme/main": "team_new" } },
+        ],
+        ["r/3", { id: "r/3", ok: true, refs: { "$project:acme/support": "project_new" } }],
+        ["r/4", { id: "r/4", ok: true }],
+      ]),
+    );
+    expect(apis.organization.createAndAssign).toHaveBeenCalledWith(
+      { orgName: "acme" },
+      { id: "user_1" },
+    );
+    expect(apis.project.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: "org_new", teamId: "team_new", name: "support" }),
+      { id: "user_1" },
+    );
+    const owner = { type: "user", id: "user_1" };
+    expect(apis.organization.createMembership).toHaveBeenCalledWith({
+      organizationId: "org_new",
+      userId: "user_2",
+      seat: "MEMBER",
+      admittedBy: { actor: owner, commandId: "r/4" },
+    });
+    expect(apis.organization.changeMemberRole).toHaveBeenCalledWith(
+      { organizationId: "org_new", userId: "user_2", role: "EXTERNAL" },
+      { id: "user_1" },
+    );
+    expect(apis.organization.addTeamMember).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: "team_new",
+        userId: "user_2",
+        role: "VIEWER",
+        caller: owner,
+      }),
+    );
+  });
+
+  /** @scenario "Seeded users, orgs, projects and memberships go through the module APIs" */
+  it("finds what an earlier run created instead of creating it again", async () => {
+    const organization = createApiFixture<FullyLoadedOrganization & object>({
+      id: "org_old",
+      name: "acme",
+      teams: [
+        createApiFixture<FullyLoadedOrganization["teams"][number] & object>({
+          id: "team_old",
+          isPersonal: false,
+        }),
+      ],
+    });
+    const apis = seedApis({
+      user: createApiFixture<UserApi>({
+        findByEmail: vi.fn(async () => profileOf({ id: "user_old" })),
+        create: vi.fn(),
+        setFirstPassword: vi.fn(async () => "already_set" as const),
+      }),
+      organization: createApiFixture<OrganizationApi>({
+        getAllForUser: vi.fn(async () => [organization]),
+        createAndAssign: vi.fn(),
+      }),
+      project: createApiFixture<ProjectApi>({
+        listByTeam: vi.fn(async () => [projectOf({ id: "project_old", name: "support" })]),
+        create: vi.fn(),
+      }),
+    });
+    const replies = await applyLines({
+      apis,
+      lines: [
+        {
+          id: "r/1",
+          kind: "user.create",
+          ref: "$user:a",
+          input: { email: "a@seed.test", role: "MEMBER", state: "accepted" },
+        },
+        {
+          id: "r/2",
+          kind: "org.create",
+          ref: "$org:acme",
+          as: "user_old",
+          input: { name: "acme", team: "main" },
+        },
+        {
+          id: "r/3",
+          kind: "project.create",
+          ref: "$project:p",
+          org: "org_old",
+          as: "user_old",
+          input: { name: "support", team: "team_old" },
+        },
+      ],
+    });
+    expect(replies.flatMap((reply) => (reply.ok ? [reply.refs] : []))).toEqual(
+      expect.arrayContaining([
+        { "$user:a": "user_old" },
+        { "$org:acme": "org_old", "$team:acme/main": "team_old" },
+        { "$project:p": "project_old" },
+      ]),
+    );
+    expect(apis.user.create).not.toHaveBeenCalled();
+    expect(apis.organization.createAndAssign).not.toHaveBeenCalled();
+    expect(apis.project.create).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A trace chunk older than 31 days asks the trace owner's backfill reach" */
+  it("asks the trace owner's backfill reach for a chunk older than 31 days, and only then", async () => {
+    const apis = seedApis();
+    const at = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+    const chunk = (id: string, daysAgo: number) => ({
+      id,
+      kind: "trace.otlp",
+      org: "o",
+      project: "p",
+      at: at(daysAgo),
+      input: { resourceSpans: [] },
+    });
+    await applyLines({ apis, lines: [chunk("r/1", 90), chunk("r/2", 3)] });
+    expect(apis.trace.otlpTraces).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "p", backfillMaxPastDays: 91 }),
+    );
+    expect(apis.trace.otlpTraces).toHaveBeenCalledWith({
+      tenantId: "p",
+      traceRequest: { resourceSpans: [] },
+    });
+  });
+
+  /** @scenario "The persona counts haven seed prints are what it created" */
+  it("refuses a trace chunk whose spans the owner dropped", async () => {
+    const apis = seedApis({
+      trace: createApiFixture<TraceApi>({ otlpTraces: vi.fn(async () => ({ rejectedSpans: 2 })) }),
+    });
+    const [reply] = await applyLines({
+      apis,
+      lines: [
+        { id: "r/1", kind: "trace.otlp", org: "o", project: "p", input: { resourceSpans: [] } },
+      ],
+    });
+    expect(reply).toEqual({ id: "r/1", ok: false, code: "otlp_spans_rejected" });
+  });
+
+  /** @scenario "Seeded users share one dev password" */
+  it("sets the shared password hash on accepted users only", async () => {
+    const apis = seedApis();
+    let written = "";
+    const output = new Writable({
+      write(chunk, _encoding, done) {
+        written += String(chunk);
+        done();
+      },
+    });
+    const line = (id: string, state: string) =>
+      JSON.stringify({
+        id,
+        kind: "user.create",
+        ref: `$user:${id}`,
+        input: { email: `${id.replace("/", "")}@seed.test`, role: "MEMBER", state },
+      });
+    const hashFile = join(mkdtempSync(join(tmpdir(), "seed-apply-")), "password.hash");
+    writeFileSync(hashFile, "$2b$10$hash\n");
+    await new SeedApplyTask({
+      apis,
+      input: Readable.from([`${line("r/1", "accepted")}\n${line("r/2", "invited")}`]),
+      output,
+    }).run({ args: ["--password-hash-file", hashFile], signal: new AbortController().signal });
+    expect(written.trim().split("\n")).toHaveLength(2);
+    expect(apis.user.setFirstPassword).toHaveBeenCalledTimes(1);
+    expect(apis.user.setFirstPassword).toHaveBeenCalledWith({
+      id: "user_r1@seed.test",
+      passwordHash: "$2b$10$hash",
+    });
+  });
+
+  /** @scenario "The persona counts haven seed prints are what it created" */
+  it("refuses a membership whose seat waits, so it is never counted", async () => {
+    const apis = seedApis({
+      organization: createApiFixture<OrganizationApi>({
+        createMembership: vi.fn(async () => ({
+          outcome: "created" as const,
+          seat: "EXTERNAL" as const,
+          pending: true,
+        })),
+        changeMemberRole: vi.fn(),
+        addTeamMember: vi.fn(),
+      }),
+    });
+    const [reply] = await applyLines({
+      apis,
+      lines: [
+        {
+          id: "r/1",
+          kind: "member.add",
+          org: "o",
+          as: "u",
+          input: { user: "v", role: "MEMBER", team: "t", teamRole: "MEMBER" },
+        },
+      ],
+    });
+    expect(reply).toEqual({ id: "r/1", ok: false, code: "seat_unavailable" });
+    expect(apis.organization.addTeamMember).not.toHaveBeenCalled();
   });
 
   /** @scenario "Each action kind calls its one module API operation" */

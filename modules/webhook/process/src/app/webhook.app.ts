@@ -35,7 +35,10 @@ import type { WebhookEndpointRepository } from "../repositories/webhook-endpoint
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import type { WebhookDispatchResult as DeliveryDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
-import { webhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
+import {
+  webhookEndpointConfiguration,
+  type WebhookEndpointConfiguration,
+} from "../rules/webhook-endpoint-policy.rules.ts";
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
 import { WebhookDeliveryMaintenanceService } from "../services/webhook-delivery-maintenance.service.ts";
 import { WebhookDeliveryRequestService } from "../services/webhook-delivery-request.service.ts";
@@ -142,6 +145,8 @@ export interface WebhookAppDependencies {
   endpointStream?: WebhookEndpointStreamService;
   /** One attempt to a customer URL for another module's outbox (ADR-167 step 1). */
   requests?: WebhookRequestService;
+  /** The operator's admission switches, read from config; strict when absent. */
+  configuration?: WebhookEndpointConfiguration;
 }
 
 type WebhookSetup = FeatureSetup<
@@ -192,6 +197,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
 
     const app = new WebhookModule({
       endpoints: input.repositories.endpoints,
+      configuration: webhookEndpointConfiguration(input.config),
       events: WebhookEventsService.create({
         projects: input.dependencies.projects,
         spend: input.dependencies.gateway,
@@ -414,7 +420,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
   get #endpointSaves(): WebhookEndpointService {
     return WebhookEndpointService.create({
       endpoints: this.#dependencies.endpoints,
-      configuration: webhookEndpointConfiguration(),
+      configuration: this.#dependencies.configuration ?? webhookEndpointConfiguration(),
     });
   }
 

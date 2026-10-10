@@ -8,7 +8,7 @@
 // than in eight children each inventing a pretty console of its own.
 //
 // A line that is not that JSON (a raw Node stack frame under
-// LANGWATCH_DEV_RAW_CRASH=1, a Vite banner, a `dev-supervisor: restarting`
+// LANGWATCH_DEV_RAW_CRASH=1, a Vite banner, a leftover wrapper
 // line) is passed through under the same lane column, so a mixed stream
 // still lines up. procsupervisor's own restart-loop line ("exited —
 // restarting in 1s") is not one of these: it is a structured warn record

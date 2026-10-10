@@ -98,7 +98,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   failed = [];
-  setUiFeedbackHost({ succeeded: () => {}, failed: (notice) => void failed.push(notice) });
+  setUiFeedbackHost({
+    succeeded: () => {},
+    warned: () => {},
+    informed: () => {},
+    failed: (notice) => void failed.push(notice),
+  });
   cache.views = [
     { id: "view-1", name: "Old View", filters: {}, query: null },
     { id: "view-2", name: "Other View", filters: {}, query: null },

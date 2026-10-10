@@ -4,6 +4,7 @@ import { showErrorToast } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { CodePreview } from "@langwatch/design-system/code-preview";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import {
   API_KEY_PLACEHOLDER,
@@ -16,7 +17,6 @@ import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
-import { RenderCode } from "../workflow/code/render-code.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 // Sample values for the fields a Go example can send, in the order the request
@@ -275,7 +275,7 @@ export function EvaluationManualIntegration({
               />
             )}
             <Box className="markdown" width="full">
-              <RenderCode
+              <CodePreview
                 code={`# Set your API key and endpoint URL
 API_KEY="${token ?? API_KEY_PLACEHOLDER}"
 
@@ -304,7 +304,7 @@ EOF`}
             </Box>
             <Text>Response:</Text>
             <Box className="markdown" width="full">
-              <RenderCode
+              <CodePreview
                 code={JSON.stringify(
                   {
                     status: "processed",
@@ -408,13 +408,13 @@ function PythonInstructions({ async, snippet }: { async: boolean; snippet: Snipp
         Add this import at the top of the file where the LLM call happens:
       </Text>
       <Box className="markdown" width="full">
-        <RenderCode code={`import langwatch`} language="python" />
+        <CodePreview code={`import langwatch`} language="python" />
       </Box>
       {(!isOutputMandatory || !isGuardrail) && (
         <>
           <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
           <Box className="markdown" width="full">
-            <RenderCode
+            <CodePreview
               code={`def llm_step():
   ... # your existing code
 
@@ -483,7 +483,7 @@ function TypeScriptInstructions({ snippet }: { snippet: SnippetContext }) {
         <>
           <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
           <Box className="markdown" width="full">
-            <RenderCode
+            <CodePreview
               code={`import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
@@ -542,7 +542,7 @@ function GoInstructions({ snippet }: { snippet: SnippetContext }) {
         <>
           <Text fontSize="14px">{nextStepInstruction({ isGuardrail, isOutputMandatory })}</Text>
           <Box className="markdown" width="full">
-            <RenderCode
+            <CodePreview
               code={buildGoEvaluationSnippet({
                 name,
                 checkSlug,

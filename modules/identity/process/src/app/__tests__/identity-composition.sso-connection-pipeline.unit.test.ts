@@ -63,7 +63,7 @@ function testGraph(directoryMove: TestDirectoryMove = new TestDirectoryMove()): 
   return composeSsoConnectionGraph({
     repositories: liveRepositories(testDatabase()),
     breakGlass: new StubBreakGlassBindings(true),
-    // No senders: this process has not built the pipeline, so nothing commits.
+    // No senders: this process has not connected the pipeline, so nothing commits.
     commands: ConnectedIdentityEventing.create(),
     directoryMove,
     licensing: licensingFixture(),

@@ -96,9 +96,8 @@ const signUpVerificationBodySchema = z.object({
 });
 
 const confirmedAddressSchema = z.object({
-  result: z.object({
-    data: z.object({ addressProof: z.string().min(1), email: z.string().email() }),
-  }),
+  addressProof: z.string().min(1),
+  email: z.string().email(),
 });
 
 /**
@@ -125,15 +124,17 @@ export async function requestSignUpAddressProof(
   if (!answer.sent) return answer.addressProof;
 
   const token = await findSignUpTokenFor(email);
-  const confirmationResponse = await request.post("/api/trpc/auth.completeSignUpVerification", {
+  // The same Better Auth endpoint the sign-up screen posts a `?verify=` link to.
+  const confirmationResponse = await request.post("/api/auth/sign-up/confirm-address", {
+    headers: originGatedRequestHeaders(),
     data: { token },
   });
   const confirmationBody: unknown = await confirmationResponse.json().catch(() => null);
   const confirmation = confirmedAddressSchema.safeParse(confirmationBody);
-  const confirmed = confirmation.success ? confirmation.data.result.data : null;
+  const confirmed = confirmation.success ? confirmation.data : null;
   if (!confirmationResponse.ok() || !confirmed || confirmed.email !== email) {
     throw new Error(
-      `completeSignUpVerification failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
+      `sign-up/confirm-address failed for ${email}: ${confirmationResponse.status()} ${JSON.stringify(confirmationBody).slice(0, 300)}`,
     );
   }
 

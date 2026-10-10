@@ -210,6 +210,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			o.reapOrphanNxDaemons()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
+			o.stopColimaIfIdle(ctx)
 		}
 	}
 }

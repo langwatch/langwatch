@@ -3785,9 +3785,20 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceIngestionUnavailableError();
     }
 
-    return ingestion
-      .handleOtlpTraceRequest(input.tenantId, input.traceRequest, DEFAULT_PII_REDACTION_LEVEL)
-      .then((result) => result ?? {});
+    const collecting =
+      input.backfillMaxPastDays === undefined
+        ? ingestion.handleOtlpTraceRequest(
+            input.tenantId,
+            input.traceRequest,
+            DEFAULT_PII_REDACTION_LEVEL,
+          )
+        : ingestion.handleOtlpTraceBackfill({
+            tenantId: input.tenantId,
+            traceRequest: input.traceRequest,
+            piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+            backfillMaxPastDays: input.backfillMaxPastDays,
+          });
+    return collecting.then((result) => result ?? {});
   }
 }
 

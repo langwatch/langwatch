@@ -17,6 +17,7 @@ import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
+import { SystemMigrationsPassRequestTask } from "#tasks/system-migrations-pass-request.task";
 import { SystemMigrationsPassTask } from "#tasks/system-migrations-pass.task";
 import { adminRest } from "#transport/admin.rest";
 import { checkupRest } from "#transport/checkup.rest";
@@ -79,6 +80,9 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
       }),
       GrantPlatformOperatorTask.create({ operators: app }),
       SystemMigrationsPassTask.create({ pass: () => app.systemMigrationPass() }),
+      SystemMigrationsPassRequestTask.create({
+        request: () => app.requestSystemMigrationPassAfterUpgrade(),
+      }),
     ])
     .withMigrations(({ app, repositories }) => [
       // Blocking, so the moved step finds its finished tenants before any pass runs (S6-COPY).

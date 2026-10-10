@@ -81,6 +81,9 @@ function ReportsContent() {
 
   const currentDashboard = dashboardsQuery.data?.find((d) => d.id === activeDashboardId);
   const dashboardTitle = currentDashboard?.name ?? "Reports";
+  // A link to a deleted or mistyped dashboard says so, rather than drawing an empty grid.
+  const isMissingDashboard =
+    !!urlDashboardId && dashboardsQuery.data !== undefined && !currentDashboard;
 
   // Graphs for the active dashboard
   const graphsQuery = useDashboardGraphs({ projectId, dashboardId: activeDashboardId });
@@ -245,8 +248,20 @@ function ReportsContent() {
         />
       )}
 
+      {isMissingDashboard && (
+        <Alert.Root status="warning" variant="surface" marginBottom={6}>
+          <Alert.Indicator />
+          <VStack align="start">
+            <Alert.Title>This dashboard doesn&apos;t exist</Alert.Title>
+            <Alert.Description>
+              <Text as="span">It may have been deleted. Pick another dashboard from the menu.</Text>
+            </Alert.Description>
+          </VStack>
+        </Alert.Root>
+      )}
+
       {/* Empty state */}
-      {hasNoGraphs && (
+      {hasNoGraphs && !isMissingDashboard && (
         <Alert.Root status="info" variant="surface" marginBottom={6}>
           <Alert.Indicator />
           <VStack align="start">

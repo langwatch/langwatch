@@ -34,7 +34,9 @@ export function QueueParticipants({
   annotators: QueueParticipant[];
   setAnnotators: (annotators: QueueParticipant[]) => void;
   queues: readonly { id: string; name: string }[];
-  members: readonly { user: { id: string; name: string | null; image: string | null } }[];
+  members: readonly {
+    user: { id: string; name: string | null; email?: string | null; image: string | null };
+  }[];
   /** Opens the queue editor on a new queue. */
   onCreateQueue: () => void;
   onSend: () => void;
@@ -48,7 +50,7 @@ export function QueueParticipants({
       image: null as string | null,
     })),
     ...members.map((member) => ({
-      label: member.user.name ?? "",
+      label: member.user.name ?? member.user.email ?? "Unknown user",
       value: `user-${member.user.id}`,
       image: member.user.image,
     })),

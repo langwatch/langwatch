@@ -191,6 +191,20 @@ Feature: tRPC framework boundary
     And a process that cannot say which organization holds a project is refused at the mount, naming the procedure
 
   @unit
+  Scenario: A recorded mutation keeps where it came from and who really made it
+    Given a signed-in caller's mutation is answered through the tRPC door
+    When its audit row is written
+    Then the row carries the address the door resolved for the request and the caller's user agent, as on main
+    And under an impersonation the operator is named in the row's actor column as well as its metadata
+
+  @unit
+  Scenario: A mutation that audits itself is recorded once
+    Given a mutation whose handler writes its own audit row with the value it replaced, such as an organization's joining setting
+    When it is answered
+    Then the generic audit row stands down, as main's self-audited paths did, so the change is not recorded twice
+    And every other mutation still writes the generic row
+
+  @unit
   Scenario: A procedure chooses its permission from its parsed input
     Given a procedure whose permission depends on a value its input carries, such as the tier a scope names
     When it declares a map from each value of that field to the permission it asks, and the tier and input field of the scope it is asked at (Alex, 2026-10-05, E3)

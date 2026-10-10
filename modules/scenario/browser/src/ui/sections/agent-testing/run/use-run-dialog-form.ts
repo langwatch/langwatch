@@ -765,6 +765,7 @@ function useRunDialogTargeting({
     };
     setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
     setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("agentVoiceEditor", { onSave: onAgentSaved });
     setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
     openDrawer("agentTypeSelector");
   }, [openDrawer, setFlowCallbacks, setTarget]);

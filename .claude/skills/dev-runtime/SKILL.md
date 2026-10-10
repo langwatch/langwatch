@@ -23,7 +23,7 @@ as shipped"). The open questions at the foot of the ADR that remain are Alex's, 
 | Split               | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `LANGWATCH_DEV_ONE_PROCESS=0 pnpm dev`                          | re-links only what a change reaches, in process (see below) |
 | One process (default) | one `app` lane: Vite, api and worker                             | `pnpm dev`, or `pnpm dev:one` alone                             | re-links only what a change reaches, in process             |
 
-- `pnpm dev` is `dev-supervisor.mjs` over `dev/scripts/dev-stack.sh`, which runs the lanes
+- `pnpm dev` runs `dev/scripts/dev-stack.sh`, which runs the lanes
   through `concurrently`: `ui`, `go`, `langy`, then `backend` (or `app`). It runs the upgrade
   (`start:prepare:db`, `pnpm task upgrade`) once before any lane starts. Run it from the root.
 - Under haven the same switch applies, and it also folds the simulators into the Go lane:
@@ -41,12 +41,12 @@ as shipped"). The open questions at the foot of the ADR that remain are Alex's, 
 - `app.entrypoint.main.ts`: starts the UI's Vite server (`apps/ui/vite.config.ts`,
   unchanged, `/api` still proxied) and loads api and worker through a Vite module runner.
 - `app.entrypoint.ts --backend-only`: the split shape's api lane (`pnpm --filter
-@langwatch/dev-runtime dev`), the same host without the UI's Vite server. The supervisor
-  keeps the process: it restarts it only for a crash after `backend ready`. An edit to the
+@langwatch/dev-runtime dev`), the same host without the UI's Vite server. The `dev` script's loop
+  restarts it only when it exits 75 (a recycle). An edit to the
   host's own `src/` (Node loaded it natively) logs that it applies on the next restart:
   `haven restart app`.
 - `backend.entrypoint.main.ts`: api and worker in one Node process with no reload
-  (`pnpm start`, and the `LANGWATCH_DEV_RELOAD=process` fallback's boot shape).
+  (`pnpm start`).
 - `backend.reload.ts`: finds the loaded modules a changed file reaches
   (`staleModuleIds`) and drops only those; reloads are debounced, never held.
 - `backend.process.ts`: `startBackend` boots the api and the worker together (the api never waits on the upgrade
@@ -62,17 +62,16 @@ generation serving. A failed boot waits for the next change. Each generation log
 
 | Variable                            | Effect                                                                         |
 | ----------------------------------- | ------------------------------------------------------------------------------ |
-| `LANGWATCH_DEV_WATCH=0`             | one-shot, no reload (diff tools measure a stack that must not move)            |
+| `LANGWATCH_DEV_WATCH=0`             | held: no reload on a change; `haven reload` (SIGUSR2) applies them (haven sets it on `up --watch=false`) |
 | `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`   | quiet window before a reload (2000)                                            |
 | `LANGWATCH_DEV_WATCH_MAX_WAIT_MS`   | never defer longer than this after the first change (30000)                    |
-| `LANGWATCH_DEV_RELOAD=process`      | api lane: back to the supervisor's whole-process restart per change            |
 | `LANGWATCH_DEV_RECYCLE_GENERATIONS` | api lane: after this many generations, the next edit restarts the process (50) |
 | `LANGWATCH_DEV_RECYCLE_RSS_MIB`     | api lane: past this RSS, the next edit restarts the process (4096)             |
 
 There is no agent-turn hold (retired 2026-10-09, ADR-168): the debounce alone coalesces a
 turn's edits, and `haven hmr` is a no-op. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
 a `.json` outside `src/`, or a package the watched command cannot reach. The authority for
-these is `dev/scripts/dev-supervisor.mjs` and ADR-168 "Step 1, as shipped".
+this is `tools/dev-runtime/src/app.entrypoint.main.ts` (the supervisor script is gone, ADR-168 amendment 2026-10-10).
 
 ## Ports
 

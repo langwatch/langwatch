@@ -81,7 +81,12 @@ describe("useAnnotationMutations", () => {
     mocks.create.mockReset();
     mocks.toast.mockReset();
     failed = [];
-    setUiFeedbackHost({ succeeded: () => {}, failed: (notice) => void failed.push(notice) });
+    setUiFeedbackHost({
+      succeeded: () => {},
+      warned: () => {},
+      informed: () => {},
+      failed: (notice) => void failed.push(notice),
+    });
   });
 
   afterEach(() => {

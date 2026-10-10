@@ -123,3 +123,24 @@ Feature: Model Provider service
     When a legacy model-provider migration runs
     Then it reads every project-scoped provider in one query of its own table
     And it never lists projects
+
+  @unit
+  Scenario: The key seal sweep reads every provider through the tenancy guard
+    Given providers scoped to projects in two organizations
+    When the key seal step reads the project-scoped providers
+    Then the tenancy guard admits the one read, declared as a sweep of every organization
+    And each provider's stored columns are returned
+
+  @unit
+  Scenario: A malformed custom base URL is refused by name before anything is probed
+    Given a custom OpenAI-compatible provider form
+    When the base URL is "not a url"
+    Then the credential schema refuses it with a message naming the base URL
+    And a full URL is accepted
+
+  @unit
+  Scenario: A refused endpoint on save says why
+    Given a provider save whose base URL the egress fence refuses
+    When the save is refused as a model_provider_invalid error
+    Then the error carries the reason "endpoint_not_allowed"
+    And the browser explains that the base URL cannot be used

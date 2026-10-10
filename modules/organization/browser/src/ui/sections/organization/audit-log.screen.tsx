@@ -410,7 +410,7 @@ function AuditLogRow({
           </VStack>
         ) : (
           <Text fontSize="sm" color="fg.subtle">
-            User not found
+            {log.userId ? "User not found" : "System"}
           </Text>
         )}
       </Table.Cell>

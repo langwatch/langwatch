@@ -124,6 +124,9 @@ func (System) TerminateGroup(pid int) {
 	System{}.Terminate(pid)
 }
 
+// Reload signals pid to reload in place.
+func (System) Reload(pid int) { _ = syscall.Kill(pid, syscall.SIGUSR2) }
+
 // PIDsOnPort lists the pids LISTENing on a TCP port, via lsof (macOS has no
 // /proc; lsof is the same "ask the OS's own tool" approach used elsewhere).
 func (System) PIDsOnPort(port int) []int {

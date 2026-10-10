@@ -117,7 +117,8 @@ describe("when a run is asked for while one is already underway", () => {
     fireEvent.click(screen.getByRole("button", { name: /run topic clustering/i }));
 
     expect(host.failures).toHaveLength(0);
-    expect(host.successes.at(-1)?.title).toBe("A run is already in progress");
+    expect(host.successes).toHaveLength(0);
+    expect(host.infos.at(-1)?.title).toBe("A run is already in progress");
   });
 });
 

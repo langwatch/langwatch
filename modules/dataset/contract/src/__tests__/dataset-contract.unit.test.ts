@@ -22,6 +22,19 @@ describe("Dataset contract", () => {
     ).toHaveLength(3);
   });
 
+  /** @scenario A dataset stored with upload confirm columns still lists */
+  it("reads columns an upload stored with their source header, dropping the header", () => {
+    expect(
+      datasetColumnsSchema.parse([
+        { name: "question", type: "string", sourceHeader: "question" },
+        { name: "answer", type: "string", sourceHeader: "answer" },
+      ]),
+    ).toEqual([
+      { name: "question", type: "string" },
+      { name: "answer", type: "string" },
+    ]);
+  });
+
   it("keeps record ids optional at the create boundary", () => {
     expect(datasetRecordInputSchema.parse({ question: "hello" })).toEqual({
       question: "hello",

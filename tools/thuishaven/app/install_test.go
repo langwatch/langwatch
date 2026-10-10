@@ -304,7 +304,7 @@ func TestAutoPrereqsTakesWhatHavenNeedsAndLeavesConveniences(t *testing.T) {
 	for _, c := range chosen {
 		picked[c.Key] = c.Candidate
 	}
-	for _, want := range []string{"node", "pnpm", "portless", "postgres", "redis", "go"} {
+	for _, want := range []string{"node", "pnpm", "portless", "postgres", "redis", "go", "bun"} {
 		if _, ok := picked[want]; !ok {
 			t.Errorf("--yes must install %s (required or recommended)", want)
 		}

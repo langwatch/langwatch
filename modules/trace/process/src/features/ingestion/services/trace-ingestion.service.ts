@@ -9,6 +9,7 @@ import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
   resourceSchema,
+  SPAN_BACKFILL_MAX_PAST_DAYS,
   SPAN_MAX_PAST_MS,
   spanSchema,
   storableSpanTimesOf,
@@ -113,6 +114,14 @@ function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {
     : "span end time is not a valid timestamp";
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A backfill's reach in whole days, never short of the door's nor past the ceiling. */
+function maxPastMsOf(backfillMaxPastDays: number): number {
+  const days = Math.min(Math.max(Math.floor(backfillMaxPastDays), 0), SPAN_BACKFILL_MAX_PAST_DAYS);
+  return Math.max(days * DAY_MS, SPAN_MAX_PAST_MS);
+}
+
 /**
  * Process-wide Trace receiver. Transport keeps auth and HTTP response mapping;
  * this service owns raw OTLP trace traversal, validation, filtering, dedup and
@@ -147,10 +156,39 @@ export class TraceIngestionService {
     );
   }
 
-  async handleOtlpTraceRequest(
+  handleOtlpTraceRequest(
     tenantId: string,
     traceRequest: IExportTraceServiceRequest,
     piiRedactionLevel: PIIRedactionLevel,
+  ): Promise<TraceRequestCollectionResult> {
+    return this.collectOtlpTraces(tenantId, traceRequest, {
+      piiRedactionLevel,
+      maxPastMs: SPAN_MAX_PAST_MS,
+    });
+  }
+
+  /** An in-process backfill: the same receiver, reaching `backfillMaxPastDays` back (Q1 (a)). */
+  handleOtlpTraceBackfill(
+    input: Readonly<{
+      tenantId: string;
+      traceRequest: IExportTraceServiceRequest;
+      piiRedactionLevel: PIIRedactionLevel;
+      backfillMaxPastDays: number;
+    }>,
+  ): Promise<TraceRequestCollectionResult> {
+    return this.collectOtlpTraces(input.tenantId, input.traceRequest, {
+      piiRedactionLevel: input.piiRedactionLevel,
+      maxPastMs: maxPastMsOf(input.backfillMaxPastDays),
+    });
+  }
+
+  private async collectOtlpTraces(
+    tenantId: string,
+    traceRequest: IExportTraceServiceRequest,
+    {
+      piiRedactionLevel,
+      maxPastMs,
+    }: Readonly<{ piiRedactionLevel: PIIRedactionLevel; maxPastMs: number }>,
   ): Promise<TraceRequestCollectionResult> {
     return this.tracer.withActiveSpan(
       "TraceIngestionService.handleOtlpTraceRequest",
@@ -185,6 +223,7 @@ export class TraceIngestionService {
                   piiRedactionLevel,
                   otelSpanRef,
                   helperThreads,
+                  maxPastMs,
                 }),
               );
             }
@@ -247,6 +286,7 @@ export class TraceIngestionService {
     otelSpanRef: OtelSpan;
     /** Codex helper threads by request span id; absent, nothing is stamped. */
     helperThreads?: Map<string, string>;
+    maxPastMs: number;
   }): Promise<SpanIngestionResult> {
     const spanParseResult = spanSchema.safeParse(input.otelSpan);
     if (!spanParseResult.success) {
@@ -269,8 +309,9 @@ export class TraceIngestionService {
     }
     const { startTimeUnixMs } = decoded.times;
 
-    if (startTimeUnixMs < nowInstant().epochMilliseconds - SPAN_MAX_PAST_MS) {
-      return { status: "dropped", error: "span start time is more than 31 days in the past" };
+    if (startTimeUnixMs < nowInstant().epochMilliseconds - input.maxPastMs) {
+      const days = Math.round(input.maxPastMs / DAY_MS);
+      return { status: "dropped", error: `span start time is more than ${days} days in the past` };
     }
 
     // The stamp is the admission: it is applied before the filter reads the span.

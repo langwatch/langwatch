@@ -140,3 +140,38 @@ func TestUpRunsNoMigrationBeforeTheServicesBoot(t *testing.T) {
 		t.Errorf("the keeper's seed runs %q, want the checkout's seed script", seed.Job.Shell)
 	}
 }
+
+// @scenario "The seed writes the llmsim base URLs into the seeded providers"
+func TestSeedEnvCarriesTheLLMSimBaseURLs(t *testing.T) {
+	root := t.TempDir()
+	for _, f := range []struct{ path, body string }{
+		{filepath.Join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n"},
+		{filepath.Join(root, "node_modules", ".modules.yaml"), "{}\n"},
+	} {
+		if err := os.MkdirAll(filepath.Dir(f.path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f.path, []byte(f.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := &Orchestrator{sup: &fakeSupervisor{}, sys: &fakeSystem{now: time.Now()}, store: &fakeStore{}, log: zap.NewNop()}
+	st := domain.Stack{
+		Slug: "feat-x", WorktreeDir: root, Layout: domain.LayoutModular, APIPort: 6560,
+		PostgresPort: 5432, PostgresDatabase: "feat_x",
+		Services: []domain.Service{{Name: domain.LLMService, Port: 45595}},
+	}
+
+	seed, err := o.prepareWorktree(context.Background(), UpParams{WorktreeDir: root}, st)
+	if err != nil {
+		t.Fatalf("prepareWorktree: %v", err)
+	}
+	if seed == nil {
+		t.Fatal("no seed was handed to the keeper")
+	}
+	for _, want := range []string{"OPENAI_BASE_URL=http://127.0.0.1:45595/v1", "ANTHROPIC_BASE_URL=http://127.0.0.1:45595"} {
+		if !slices.Contains(seed.Job.Env, want) {
+			t.Errorf("the seed's env lacks %q, so the seeded provider rows would not reach llmsim", want)
+		}
+	}
+}
