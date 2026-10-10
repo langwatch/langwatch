@@ -185,6 +185,13 @@ Feature: The upgrade command
     And every phase is succeeded with a start and a finish
 
   @integration
+  Scenario: A schema step recorded done carries the start and finish of its schema phase
+    Given an empty database and a 3.21.0 image
+    When the upgrade runs
+    Then each Prisma step row's start and finish are the Postgres schema phase's
+    And each ClickHouse step row's start and finish are the ClickHouse schema phase's
+
+  @integration
   Scenario: A run whose schema fails records the failed phase and no later one
     Given the ClickHouse target fails to apply
     When the upgrade runs

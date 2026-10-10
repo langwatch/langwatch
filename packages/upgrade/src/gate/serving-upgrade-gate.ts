@@ -16,6 +16,7 @@ import type { UpgradePostgres } from "../ports.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 import { EXIT_CODES } from "../runner/upgrade-outcome.ts";
+import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
 import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
 import {
@@ -130,6 +131,7 @@ export function upgradeGateOver({
     ledger: {
       findSteps: async () => ((await runner.ledgerExists()) ? ledger.findSteps() : []),
       findRuns,
+      findSeedSteps: async () => prismaSteps({ rows: await readPrismaMigrations({ postgres }) }),
     },
     roster,
     credentialKeys,

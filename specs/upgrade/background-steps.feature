@@ -114,6 +114,13 @@ Feature: The worker runs declared background steps
     Then the step does not run and is reported as waiting
 
   @unit
+  Scenario: A step is stamped started only once old writers are gone
+    Given a pending background step that needs old writers gone
+    And the serving roster says an old writer is live on the first sweep and gone on the second
+    When the worker sweeps twice
+    Then the step is marked running only on the second sweep, so its start excludes the wait
+
+  @unit
   Scenario: A worker that stopped serving runs no background step
     Given a worker whose gate stopped serving
     When the worker sweeps its declared background steps

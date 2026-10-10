@@ -46,6 +46,7 @@ function gateOver({
   runs = [],
   schemaIsEmpty = false,
   blockingSteps = [PRISMA, GOOSE],
+  seedSteps,
 }: {
   role?: "api" | "worker";
   release?: string | null;
@@ -53,6 +54,7 @@ function gateOver({
   runs?: readonly { floor: string | null }[];
   schemaIsEmpty?: boolean;
   blockingSteps?: readonly string[];
+  seedSteps?: readonly { id: string; status: "done" | "pending" | "failed" }[];
 } = {}) {
   const ledger = memoryServingRosterLedger();
   const roster = createServingRoster({
@@ -85,6 +87,7 @@ function gateOver({
           outcome: "succeeded" as const,
           finishedAt: null,
         })),
+      ...(seedSteps ? { findSeedSteps: async () => seedSteps } : {}),
     },
     roster,
     schemaIsEmpty: async () => schemaIsEmpty,
@@ -212,6 +215,20 @@ describe("createUpgradeGate", () => {
       outstanding: [DATA],
     });
     expect(rows.size).toBe(0);
+  });
+
+  /** @scenario "An api before the ledger seed leaves out the steps Prisma's history already applied" */
+  it("names only the steps the seed would not record done", async () => {
+    const { gate } = gateOver({
+      role: "api",
+      steps: [],
+      seedSteps: [{ id: PRISMA, status: "done" }],
+    });
+    await expect(gate.admit()).resolves.toMatchObject({
+      admitted: false,
+      outcome: "upgrading",
+      outstanding: [GOOSE],
+    });
   });
 
   /** @scenario "A worker on an installation behind its image is told to run the upgrade" */

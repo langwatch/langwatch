@@ -538,6 +538,52 @@ describe("BackgroundStepsService deadline", () => {
   });
 });
 
+describe("BackgroundStepsService.sweep() with old writers", () => {
+  describe("given a step that needs old writers gone, live on the first sweep and gone on the next", () => {
+    /** @scenario "A step is stamped started only once old writers are gone" */
+    it("marks it running only on the sweep that finds them gone", async () => {
+      const id = "data-retention:keep-control-plane-events-forever";
+      const marked: number[] = [];
+      let sweepNo = 0;
+      const service = BackgroundStepsService.create({
+        ledger: {
+          findSteps: async () => [{ id, status: "pending", report: null }],
+          acquireLease: async () => ({}),
+          renewLease: async () => ({}),
+          releaseLease: async () => true,
+          markRunning: async () => {
+            marked.push(sweepNo);
+          },
+          setStatus: async () => undefined,
+          saveReport: async () => undefined,
+          reopen: async () => [],
+        },
+        steps: [
+          defineMigrationStep({
+            id,
+            kind: "data",
+            mode: "background",
+            description: "Keeps control-plane events forever.",
+            needsOldWritersGone: true,
+            run: async () => ({}),
+          }),
+        ],
+        serving: () => true,
+        oldWritersGoneFor: async () => sweepNo > 1,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+      const signal = new AbortController().signal;
+
+      sweepNo = 1;
+      expect((await service.sweep({ signal })).waiting).toEqual([id]);
+      sweepNo = 2;
+      expect((await service.sweep({ signal })).ran).toEqual([id]);
+      expect(marked).toEqual([2]);
+    });
+  });
+});
+
 describe("BackgroundStepsService.runNow()", () => {
   const id = "identity:reopen-unproven-accounts";
   const reopen = (run: MigrationStepRun) =>

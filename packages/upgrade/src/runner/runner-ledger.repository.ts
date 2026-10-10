@@ -166,6 +166,26 @@ export class UpgradeRunnerRepository {
     );
   }
 
+  /** Stamps steps with the instants (ISO 8601 UTC) of the run phase that applied them. */
+  async stampTiming({
+    ids,
+    startedAt,
+    finishedAt,
+  }: {
+    ids: readonly string[];
+    startedAt: string;
+    finishedAt: string;
+  }): Promise<void> {
+    if (ids.length === 0) return;
+    await this.query(
+      (t) => `UPDATE ${t.step}
+          SET "started_at" = ($2::timestamptz AT TIME ZONE 'UTC'),
+              "finished_at" = ($3::timestamptz AT TIME ZONE 'UTC'), "updated_at" = ${NOW_UTC}
+        WHERE "id" = ANY($1::text[])`,
+      [ids, startedAt, finishedAt],
+    );
+  }
+
   /**
    * Level-triggers a tenant step's row: `done` once no tenant is held or parked, `pending` when one
    * is again. Rows in any other status are the runner's or the operator's and stay as they are.

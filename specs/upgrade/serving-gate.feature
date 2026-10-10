@@ -87,6 +87,13 @@ Feature: Serving processes refuse to start when the installation is behind their
     Then the verdict is upgrading, naming both steps
 
   @unit
+  Scenario: An api before the ledger seed leaves out the steps Prisma's history already applied
+    Given the ledger has no steps yet and Prisma's history records "prisma:20261006180000_add_column" as finished
+    And the image declares that step and "clickhouse:00042"
+    When the api's serving gate checks the image
+    Then the verdict is upgrading, naming only "clickhouse:00042"
+
+  @unit
   Scenario: An api whose schema steps are done while a blocking step is outstanding is upgrading
     Given an image declaring the blocking data step "trace:fill-cost" beside its schema steps
     And the ledger records both schema steps as done and "trace:fill-cost" as pending

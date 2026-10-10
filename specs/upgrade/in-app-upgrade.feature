@@ -118,6 +118,12 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Then it answers 200
 
   @unit
+  Scenario: The upgrading line names a count and at most five step ids
+    Given an api whose gate answers upgrading with 482 outstanding steps
+    When the api starts
+    Then its log line reads "the installation is upgrading (482 steps outstanding: " followed by the first five ids and "…"
+
+  @unit
   Scenario: The api serves and reports ready once the ledger is current
     Given the api is in upgrading mode
     When the worker's run records the last blocking step as done

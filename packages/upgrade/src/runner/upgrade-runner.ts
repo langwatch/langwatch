@@ -669,10 +669,9 @@ export class UpgradeRunnerService {
       if (open.length > 0) await phases.start({ name, release: release.release });
     }
     const { reports, attempts } = await this.applyWithRetry({ release, signal });
-    const done = new Set([
-      ...(await this.recordPrisma({ open: engines[0].open, runId })),
-      ...(await this.recordClickHouse({ open: engines[1].open, reports, runId })),
-    ]);
+    const prismaDone = await this.recordPrisma({ open: engines[0].open, runId });
+    const gooseDone = await this.recordClickHouse({ open: engines[1].open, reports, runId });
+    const done = new Set([...prismaDone, ...gooseDone]);
     const unfinished = release.schema.filter((id) => !done.has(id));
     const failedPrisma = await this.failedPrismaMigrations();
     const failedOn = (engine: SchemaTargetReport["engine"]) =>
@@ -683,6 +682,8 @@ export class UpgradeRunnerService {
     const outcome = (failed: boolean) => (failed ? "failed" : "succeeded");
     await phases.end({ name: "postgres-schema", outcome: outcome(postgresFailed) });
     await phases.end({ name: "clickhouse-schema", outcome: outcome(clickhouseFailed) });
+    await this.stampPhaseTiming({ phases, name: "postgres-schema", ids: prismaDone });
+    await this.stampPhaseTiming({ phases, name: "clickhouse-schema", ids: gooseDone });
     if (failedPrisma.length > 0) {
       const reason = this.resolvable({ names: failedPrisma });
       if (reason !== null) throw prismaFailure({ names: failedPrisma, reason });
@@ -691,6 +692,22 @@ export class UpgradeRunnerService {
     }
     const failure = schemaFailure({ reports, unfinished });
     if (failure) throw failure;
+  }
+
+  /** A schema step's row carries the start and finish of the phase that applied it (T0-F4). */
+  private async stampPhaseTiming({
+    phases,
+    name,
+    ids,
+  }: {
+    phases: RunPhases;
+    name: "postgres-schema" | "clickhouse-schema";
+    ids: readonly string[];
+  }): Promise<void> {
+    const phase = phases.list().findLast((each) => each.name === name);
+    if (ids.length === 0 || !phase?.finishedAt) return;
+    const { startedAt, finishedAt } = phase;
+    await this.runner.stampTiming({ ids, startedAt, finishedAt });
   }
 
   /**

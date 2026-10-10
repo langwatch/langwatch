@@ -734,6 +734,22 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       }
     });
 
+    /** @scenario "A schema step recorded done carries the start and finish of its schema phase" */
+    it("stamps each schema step row with its schema phase's start and finish", async () => {
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      const phases = await phasesOf();
+      const rows = new Map((await ledger().findSteps()).map((row) => [row.id, row]));
+      const timingOf = (name: string) => {
+        const phase = phases.find((each) => each.name === name);
+        return {
+          startedAt: new Date(phase?.startedAt ?? 0),
+          finishedAt: new Date(phase?.finishedAt ?? 0),
+        };
+      };
+      expect(rows.get("prisma:20261001000000_base")).toMatchObject(timingOf("postgres-schema"));
+      expect(rows.get("clickhouse:00001")).toMatchObject(timingOf("clickhouse-schema"));
+    });
+
     /** @scenario "A run whose schema fails records the failed phase and no later one" */
     it("ends with a failed ClickHouse schema phase and records no reconcile", async () => {
       const applier = fakeApplier({ release: "3.20.1", failOn: ["shared"] });
